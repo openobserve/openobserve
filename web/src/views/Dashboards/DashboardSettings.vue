@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,96 +15,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="q-pa-none"
-    :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-    style="min-height: inherit"
+  <ODrawer
+    data-test="dashboard-settings-drawer"
+    bleed
+    :open="open"
+    :width="74"
+    :title="t('dashboard.setting')"
+    @update:open="$emit('update:open', $event)"
   >
-    <div class="row items-center no-wrap">
-      <div class="col">
-        <div class="q-mx-md q-my-md text-h6">
-          {{ t("dashboard.setting") }}
-        </div>
-      </div>
-      <div class="col-auto">
-        <q-icon
-          data-test="dashboard-settings-close-btn"
-          name="cancel"
-          class="cursor-pointer tw:mr-5"
-          size="20px"
-          v-close-popup="true"
-        />
-      </div>
+    <div data-test="dashboard-settings-main-container" class="h-full [min-height:inherit] p-0">
+      <OSplitter class="h-full" v-model="splitterModel" unit="px" disabled>
+        <template v-slot:before>
+          <div class="functions-tabs w-full">
+            <OTabs v-model="activeTab" orientation="vertical">
+              <OTab
+                name="generalSettings"
+                icon="settings"
+                :label="t('dashboard.generalSettings')"
+                class="justify-start py-0 capitalize"
+                data-test="dashboard-settings-general-tab"
+              />
+              <OTab
+                name="variableSettings"
+                icon="data-array"
+                :label="t('dashboard.variableSettings')"
+                class="justify-start py-0 capitalize"
+                data-test="dashboard-settings-variable-tab"
+              />
+              <OTab
+                name="tabSettings"
+                icon="tab"
+                :label="t('dashboard.tabSettings')"
+                class="justify-start py-0 capitalize"
+                data-test="dashboard-settings-tab-tab"
+              />
+            </OTabs>
+          </div>
+        </template>
+        <template v-slot:after>
+          <div class="scroll settings-content-scroll">
+            <OTabPanels v-model="activeTab" animated>
+              <OTabPanel name="generalSettings" class="!p-0" data-test="general-tab-panels-default">
+                <GeneralSettings @save="refreshRequired" @close="$emit('close')" />
+              </OTabPanel>
+
+              <OTabPanel
+                name="variableSettings"
+                class="!p-0"
+                data-test="variable-tab-panels-default"
+              >
+                <VariableSettings @save="refreshRequired" />
+              </OTabPanel>
+
+              <OTabPanel name="tabSettings" class="!p-0" data-test="tab-tab-panels-default">
+                <TabsSettings @refresh="refreshRequired" />
+              </OTabPanel>
+            </OTabPanels>
+          </div>
+        </template>
+      </OSplitter>
     </div>
-    <q-separator></q-separator>
-    <q-splitter
-      v-model="splitterModel"
-      unit="px"
-      style="height: calc(100vh - 65px)"
-      disable
-    >
-      <template v-slot:before>
-        <div class="functions-tabs" style="width: 100%">
-          <q-tabs
-            v-model="activeTab"
-            indicator-color="transparent"
-            inline-label
-            vertical
-          >
-            <q-tab
-              name="generalSettings"
-              icon="settings"
-              :label="t('dashboard.generalSettings')"
-              data-test="dashboard-settings-general-tab"
-            />
-            <q-tab
-              name="variableSettings"
-              icon="data_array"
-              :label="t('dashboard.variableSettings')"
-              data-test="dashboard-settings-variable-tab"
-            />
-            <q-tab
-              name="tabSettings"
-              icon="tab"
-              :label="t('dashboard.tabSettings')"
-              data-test="dashboard-settings-tab-tab"
-            />
-          </q-tabs>
-        </div>
-      </template>
-      <template v-slot:after>
-        <div class="q-mx-sm q-my-sm scroll" style="width: 60vw">
-          <q-tab-panels
-            v-model="activeTab"
-            animated
-            swipeable
-            vertical
-            transition-prev="fade"
-            transition-next="fade"
-          >
-            <q-tab-panel name="generalSettings" data-test="general-tab-panels-default">
-              <GeneralSettings @save="refreshRequired" />
-            </q-tab-panel>
-
-            <q-tab-panel name="variableSettings" data-test="variable-tab-panels-default">
-              <VariableSettings @save="refreshRequired" />
-            </q-tab-panel>
-
-            <q-tab-panel name="tabSettings" data-test="tab-tab-panels-default">
-              <TabsSettings @refresh="refreshRequired" />
-            </q-tab-panel>
-          </q-tab-panels>
-        </div>
-      </template>
-    </q-splitter>
-  </div>
+  </ODrawer>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onActivated, onBeforeMount } from "vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import GeneralSettings from "../../components/dashboards/settings/GeneralSettings.vue";
 import VariableSettings from "../../components/dashboards/settings/VariableSettings.vue";
 import TabsSettings from "../../components/dashboards/settings/TabsSettings.vue";
@@ -113,14 +97,26 @@ import { getImageURL } from "../../utils/zincutils";
 export default defineComponent({
   name: "AppSettings",
   components: {
+    ODrawer,
+    OTabs,
+    OTab,
+    OTabPanels,
+    OTabPanel,
+    OSplitter,
     VariableSettings,
     GeneralSettings,
     TabsSettings,
   },
-  emits: ["refresh"],
+  emits: ["refresh", "close", "update:open"],
+  props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
+  },
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const activeTab: any = ref("generalSettings");
     const templates = ref([]);
@@ -144,60 +140,31 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.dark-mode {
-  background-color: $dark-page;
-}
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
+<style scoped>
+/* keep(lib-override:o2-tabs.o2-splitter): vertical-tab label/active styling, the
+   splitter before-pane divider, and full-height tab panels — all target O2
+   component internals reached via :deep(). */
+.functions-tabs :deep(.o-tabs--vertical .o-tab__content.tab_content .o-tab__icon + .o-tab__label) {
+  padding-left: 0.875rem;
+  font-weight: 600;
 }
 
-.q-tab-panel {
-  padding: 0px !important;
+.functions-tabs :deep(.o-tabs--vertical .o-tab--active) {
+  color: var(--color-tab-text-color);
+  background-color: var(--color-theme-tab-bg);
 }
 
-.functions-tabs {
-  .q-tabs {
-    &--vertical {
-      margin: 20px 16px 0 16px;
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        // color: $dark;
-        text-transform: capitalize;
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          color: var(--o2-tab-text-color);
-          background-color: var(--o2-tab-bg);
-        }
-      }
-    }
-  }
+:deep(.o-splitter__before) {
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: the splitter rule is a 1-device-pixel border and must not scale with text or it smears at fractional zoom */
+  border-right: 1px solid var(--color-border-default);
 }
 
-:deep(.q-splitter__before) {
-  border-right: 1px solid $border-color;
-}
-
-.dark-mode {
-  :deep(.q-splitter__before) {
-    border-right-color: rgba(255, 255, 255, 0.12);
-  }
-}
-
-:deep(.q-splitter__separator) {
-  display: none !important;
+/* Let the settings tab content fill the splitter's full height so panels with a
+   sticky footer (e.g. Add Variable) can pin it to the bottom instead of leaving
+   dead space when the form is shorter than the drawer. */
+.settings-content-scroll,
+.settings-content-scroll > :deep(.o-tab-panels),
+.settings-content-scroll > :deep(.o-tab-panels > .o-tab-panel) {
+  height: 100%;
 }
 </style>

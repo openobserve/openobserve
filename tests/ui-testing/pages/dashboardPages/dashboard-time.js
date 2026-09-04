@@ -17,17 +17,19 @@ export default class DateTimeHelper {
   async setRelativeTimeRange(rangeCode) {
     // Minutes= m	Hours= h	Days= d	Weeks= w	Months= M
 
-    await this.page.waitForSelector(
-      '[data-test="date-time-btn"]:not([disabled])',
-      {
-        timeout: 15000,
-      }
-    );
-    await this.timePickerBtn.click();
+    const relBtn = this.page.locator(`[data-test="date-time-relative-${rangeCode}-btn"]`);
 
-    await this.page
-      .locator(`[data-test="date-time-relative-${rangeCode}-btn"]`)
-      .click();
-    await this.applyTimeBtn.click();
+    // ViewDashboard binds the picker's :disable to arePanelsLoading, so a click can land just after it goes disabled and silently never open the popover.
+    await expect(async () => {
+      if (!(await relBtn.isVisible())) {
+        await this.timePickerBtn.click({ timeout: 5000 });
+      }
+      await expect(relBtn).toBeVisible({ timeout: 5000 });
+    // Budget covers maxquery's deliberately slow panels holding arePanelsLoading true; the inner click stays short so a swallowed click is re-tried fast.
+    }).toPass({ timeout: 45000, intervals: [250, 500, 1000, 2000] });
+
+    // Use JS click — the dropdown can extend outside the viewport in the new layout
+    await relBtn.evaluate((el) => el.click());
+    await this.applyTimeBtn.evaluate((el) => el.click());
   }
 }

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,11 +17,10 @@ import { vi } from "vitest";
 import { createI18n } from "vue-i18n";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
-import { Quasar } from "quasar";
 
 /**
  * Shared test fixtures for cipher key components to avoid repetitive setup
- * This consolidates common patterns found across AddCipherKey, AddAkeylessType, 
+ * This consolidates common patterns found across AddCipherKey, AddAkeylessType,
  * AddOpenobserveType, and AddEncryptionMechanism test files
  */
 
@@ -144,7 +143,7 @@ export const createMockStore = () =>
     },
   });
 
-// Common mock router factory  
+// Common mock router factory
 export const createMockRouter = () =>
   createRouter({
     history: createWebHistory(),
@@ -182,34 +181,48 @@ export const createMockI18n = () =>
     },
   });
 
-// Common Quasar component stubs
-export const createQuasarStubs = () => ({
-  QPage: {
-    template: "<div class='q-page'><slot /></div>",
-  },
-  QForm: {
-    template: "<form class='create-cipher-form' @submit.prevent='$emit(\"submit\")'><slot /></form>",
-    emits: ["submit"],
-  },
-  QInput: {
+// Common O2 component stubs
+export const createComponentStubs = () => ({
+  OInput: {
     template: `
-      <div class='q-input' :data-test='$attrs["data-test"]'>
-        <input 
-          :value='modelValue' 
+      <div :data-test='$attrs["data-test"]'>
+        <input
+          :value='modelValue'
           @input='$emit("update:modelValue", $event.target.value)'
           :readonly='readonly'
           :disabled='disable'
         />
       </div>
     `,
-    props: ["modelValue", "label", "rules", "readonly", "disable", "tabindex"],
+    props: [
+      "modelValue",
+      "label",
+      "rules",
+      "readonly",
+      "disable",
+      "error",
+      "errorMessage",
+      "tabindex",
+    ],
     emits: ["update:modelValue"],
   },
-  QSelect: {
+  OTextarea: {
     template: `
-      <div class='q-select' :data-test='$attrs["data-test"]'>
-        <select 
-          :value='modelValue' 
+      <div :data-test='$attrs["data-test"]'>
+        <textarea
+          :value='modelValue'
+          @input='$emit("update:modelValue", $event.target.value)'
+        ></textarea>
+      </div>
+    `,
+    props: ["modelValue", "label", "error", "errorMessage"],
+    emits: ["update:modelValue"],
+  },
+  OSelect: {
+    template: `
+      <div :data-test='$attrs["data-test"]'>
+        <select
+          :value='modelValue'
           @change='$emit("update:modelValue", $event.target.value)'
         >
           <option v-for='option in options' :key='option.value' :value='option.value'>
@@ -218,57 +231,46 @@ export const createQuasarStubs = () => ({
         </select>
       </div>
     `,
-    props: ["modelValue", "options", "label", "rules", "tabindex"],
+    props: [
+      "modelValue",
+      "options",
+      "label",
+      "rules",
+      "error",
+      "errorMessage",
+      "labelKey",
+      "valueKey",
+      "tabindex",
+    ],
     emits: ["update:modelValue"],
   },
-  QBtn: {
+  OButton: {
     template: `
-      <button 
-        :data-test='$attrs["data-test"]' 
-        :disabled='disable || loading'
+      <button
+        :data-test='$attrs["data-test"]'
+        :disabled='disabled'
         @click='$emit("click")'
-        :class='$attrs.class'
       >
-        <slot />{{ label }}
+        <slot />
       </button>
     `,
-    props: ["label", "disable", "loading"],
+    props: ["variant", "size", "disabled", "label"],
     emits: ["click"],
   },
-  QStepper: {
-    template: "<div class='q-stepper'><slot /></div>",
+  OStepper: {
+    template: "<div class='o-stepper'><slot /></div>",
+    props: ["modelValue"],
   },
-  QStep: {
-    template: "<div class='q-step'><slot /></div>",
+  OStep: {
+    template: "<div class='o-step' :data-test='$attrs[\"data-test\"]'><slot /></div>",
     props: ["name", "title", "icon", "done"],
   },
-  QStepperNavigation: {
-    template: "<div class='q-stepper-navigation'><slot /></div>",
-  },
-  QSeparator: {
+  OSeparator: {
     template: "<hr />",
   },
-  QIcon: {
+  OIcon: {
     template: '<i :class="name"></i>',
     props: ["name", "size"],
-  },
-  QFieldset: {
-    template: "<fieldset><slot /></fieldset>",
-    props: ["legend"],
-  },
-});
-
-// Common Quasar configuration
-export const createQuasarConfig = () => ({
-  plugins: {},
-  config: {
-    platform: {
-      is: {
-        ios: false,
-        android: false,
-        desktop: true,
-      },
-    },
   },
 });
 
@@ -284,7 +286,7 @@ export const mockCipherKeysService = {
 export const mockZincUtils = {
   isValidResourceName: vi.fn((val: string) => {
     if (!val) return "Name is required";
-    return !/[:\?\/\#\s]/.test(val) || "Characters like :, ?, /, #, and spaces are not allowed.";
+    return !/[:?/#\s]/.test(val) || "Characters like :, ?, /, #, and spaces are not allowed.";
   }),
   maxLengthCharValidation: vi.fn((val: string, maxLength: number) => {
     if (!val) return true;
@@ -308,26 +310,20 @@ export const mockZincUtils = {
  * @returns Mount configuration object
  */
 export const createCipherKeyMountConfig = (
-  component: any, 
-  props: any, 
-  customStubs: Record<string, any> = {}
+  component: any,
+  props: any,
+  customStubs: Record<string, any> = {},
 ) => {
   const store = createMockStore();
   const router = createMockRouter();
   const i18n = createMockI18n();
-  const stubs = { ...createQuasarStubs(), ...customStubs };
-  const quasarConfig = createQuasarConfig();
+  const stubs = { ...createComponentStubs(), ...customStubs };
 
   return {
     component,
     props,
     global: {
-      plugins: [
-        [Quasar, quasarConfig],
-        store,
-        router,
-        i18n,
-      ],
+      plugins: [store, router, i18n],
       stubs,
     },
     store,
@@ -351,9 +347,9 @@ export const setupCipherKeyMocks = () => {
       name: "test-cipher",
       key: {
         store: { type: "local", local: "" },
-        mechanism: { type: "simple", simple_algorithm: "aes-256-siv" }
-      }
-    }
+        mechanism: { type: "simple", simple_algorithm: "aes-256-siv" },
+      },
+    },
   });
 };
 

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -34,9 +34,7 @@ if (config.enableAnalytics == "true") {
     });
 
     // Register the ready callback after load
-    rudderanalytics.ready(() => {
-      console.log("RudderStack analytics initialized successfully");
-    });
+    rudderanalytics.ready(() => {});
   } catch (error) {
     // Silently handle initialization errors - analytics is not critical
     // These errors typically occur when:

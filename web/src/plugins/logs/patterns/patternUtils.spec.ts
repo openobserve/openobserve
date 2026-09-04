@@ -1,0 +1,371 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, expect, it } from "vitest";
+import {
+  extractConstantsFromPattern,
+  escapeForMatchAll,
+  buildPatternSqlQuery,
+  buildPatternSetSqlQuery,
+  buildAlertNameFromPattern,
+  buildPatternAlertData,
+  compactCount,
+  formatBucketDuration,
+} from "./patternUtils";
+
+describe("extractConstantsFromPattern", () => {
+  it("returns segments longer than 10 chars split by <*>", () => {
+    const result = extractConstantsFromPattern("User authentication failed for <*> from host <*>");
+    expect(result).toEqual(
+      ["User authentication failed for", "from host"].filter((s) => s.trim().length > 10),
+    );
+  });
+
+  it("returns only segments longer than 10 chars", () => {
+    const result = extractConstantsFromPattern("INFO action <*> at 14:47.1755283");
+    // "INFO action" = 11 chars > 10 — included; "at 14:47.1755283" = 16 chars > 10 — included
+    expect(result).toContain("INFO action");
+    expect(result).toContain("at 14:47.1755283");
+  });
+
+  it("excludes short segments (<= 10 chars)", () => {
+    const result = extractConstantsFromPattern("GET <*> 200");
+    // "GET" = 3, "200" = 3 — both excluded
+    expect(result).toHaveLength(0);
+  });
+
+  it("handles <:NAMED> variable markers", () => {
+    const result = extractConstantsFromPattern(
+      "Connection established to <:HOST> on port <:PORT> successfully",
+    );
+    // "Connection established to" = 25 chars — included
+    expect(result).toContain("Connection established to");
+    // "on port" = 7 chars — excluded
+    expect(result).not.toContain("on port");
+    // "successfully" = 12 chars — included
+    expect(result).toContain("successfully");
+  });
+
+  it("returns empty array when template has no long constant segments", () => {
+    const result = extractConstantsFromPattern("<*> <*> <*>");
+    expect(result).toHaveLength(0);
+  });
+
+  it("trims whitespace from segments before length check", () => {
+    // Segment " short " trims to "short" (5 chars) — excluded
+    const result = extractConstantsFromPattern("short <*> also short");
+    expect(result).toHaveLength(0);
+  });
+
+  it("handles template with no variable markers", () => {
+    const result = extractConstantsFromPattern("This is a long constant string with no variables");
+    expect(result).toHaveLength(1);
+    expect(result[0]).toBe("This is a long constant string with no variables");
+  });
+});
+
+describe("escapeForMatchAll", () => {
+  it("escapes backslashes first", () => {
+    expect(escapeForMatchAll("a\\b")).toBe("a\\\\b");
+  });
+
+  it("escapes single quotes", () => {
+    expect(escapeForMatchAll("it's")).toBe("it\\'s");
+  });
+
+  it("escapes double quotes", () => {
+    expect(escapeForMatchAll('say "hello"')).toBe('say \\"hello\\"');
+  });
+
+  it("escapes newlines", () => {
+    expect(escapeForMatchAll("line1\nline2")).toBe("line1\\nline2");
+  });
+
+  it("escapes carriage returns", () => {
+    expect(escapeForMatchAll("line1\rline2")).toBe("line1\\rline2");
+  });
+
+  it("escapes tabs", () => {
+    expect(escapeForMatchAll("col1\tcol2")).toBe("col1\\tcol2");
+  });
+
+  it("does not modify plain strings", () => {
+    expect(escapeForMatchAll("hello world")).toBe("hello world");
+  });
+
+  it("handles backslash before quote correctly (order matters)", () => {
+    // Input: \'  → after backslash escape: \\'  → after quote escape: \\\\'
+    expect(escapeForMatchAll("\\'")).toBe("\\\\\\'");
+  });
+});
+
+describe("buildPatternSqlQuery", () => {
+  it("builds a SELECT with WHERE match_all clauses for long segments", () => {
+    const sql = buildPatternSqlQuery(
+      "User authentication failed for <*> from address <*>",
+      "my_stream",
+    );
+    expect(sql).toBe(
+      "SELECT * FROM 'my_stream' WHERE match_all('User authentication failed for') AND match_all('from address')",
+    );
+  });
+
+  it("returns SELECT without WHERE when no segments are long enough", () => {
+    const sql = buildPatternSqlQuery("GET <*> 200", "my_stream");
+    expect(sql).toBe("SELECT * FROM 'my_stream'");
+  });
+
+  it("escapes special chars in constants", () => {
+    const sql = buildPatternSqlQuery("Error: it's a problem here <*> done", "my_stream");
+    expect(sql).toContain("match_all('Error: it\\'s a problem here')");
+  });
+});
+
+describe("buildAlertNameFromPattern", () => {
+  it("prefixes with Alert for normal patterns", () => {
+    const name = buildAlertNameFromPattern("User logged in from <*>", "mystream", false);
+    expect(name).toMatch(/^Alert_/);
+  });
+
+  it("prefixes with Anomaly for anomaly patterns", () => {
+    const name = buildAlertNameFromPattern("Unknown error occurred <*>", "mystream", true);
+    expect(name).toMatch(/^Anomaly_/);
+  });
+
+  it("includes stream name in alert name", () => {
+    const name = buildAlertNameFromPattern("User logged in <*>", "prod_logs", false);
+    expect(name).toContain("prod_logs");
+  });
+
+  it("truncates to 60 chars", () => {
+    const name = buildAlertNameFromPattern(
+      "VeryLongWordOne VeryLongWordTwo VeryLongWordThree VeryLongWordFour <*>",
+      "very_long_stream_name",
+      false,
+    );
+    expect(name.length).toBeLessThanOrEqual(60);
+  });
+
+  it("falls back to stream name when template has no alphabetic words", () => {
+    const name = buildAlertNameFromPattern("123 <*> 456", "fallback_stream", false);
+    expect(name).toContain("fallback_stream");
+  });
+});
+
+describe("buildPatternAlertData", () => {
+  const mockPattern = {
+    pattern_id: "pid-1",
+    template: "User authentication failed for <*> from address <*>",
+    frequency: 500,
+    percentage: 12.5,
+    is_anomaly: false,
+  };
+
+  it("returns correct streamName and streamType", () => {
+    const data = buildPatternAlertData(mockPattern, "my_stream", 15, 1000);
+    expect(data.streamName).toBe("my_stream");
+    expect(data.streamType).toBe("logs");
+  });
+
+  it("sets sqlQuery using buildPatternSqlQuery", () => {
+    const data = buildPatternAlertData(mockPattern, "my_stream", 15, 1000);
+    expect(data.sqlQuery).toContain("SELECT * FROM 'my_stream'");
+    expect(data.sqlQuery).toContain("match_all(");
+  });
+
+  it("sets periodMinutes from argument", () => {
+    const data = buildPatternAlertData(mockPattern, "my_stream", 30, 1000);
+    expect(data.periodMinutes).toBe(30);
+  });
+
+  it("passes through pattern metadata", () => {
+    const data = buildPatternAlertData(mockPattern, "my_stream", 15, 999);
+    expect(data.patternId).toBe("pid-1");
+    expect(data.patternFrequency).toBe(500);
+    expect(data.patternPercentage).toBe(12.5);
+    expect(data.isAnomaly).toBe(false);
+    expect(data.totalLogsAnalyzed).toBe(999);
+  });
+
+  it("sets isAnomaly true when pattern.is_anomaly is truthy", () => {
+    const data = buildPatternAlertData({ ...mockPattern, is_anomaly: true }, "my_stream", 15, 0);
+    expect(data.isAnomaly).toBe(true);
+  });
+
+  it("defaults missing pattern fields to safe values", () => {
+    const data = buildPatternAlertData(
+      { template: "Something happened here <*> done" },
+      "s",
+      15,
+      0,
+    );
+    expect(data.patternId).toBe("");
+    expect(data.patternFrequency).toBe(0);
+    expect(data.patternPercentage).toBe(0);
+    expect(data.isAnomaly).toBe(false);
+  });
+});
+
+describe("compactCount", () => {
+  it("keeps small numbers verbatim", () => {
+    expect(compactCount(0)).toBe("0");
+    expect(compactCount(812)).toBe("812");
+  });
+
+  it("formats thousands with one decimal below 10K", () => {
+    expect(compactCount(1234)).toBe("1.2K");
+    expect(compactCount(9950)).toBe("9.9K");
+  });
+
+  it("formats larger thousands without decimals", () => {
+    expect(compactCount(45600)).toBe("46K");
+    expect(compactCount(206275)).toBe("206K");
+  });
+
+  it("formats millions and billions", () => {
+    expect(compactCount(1_234_567)).toBe("1.2M");
+    expect(compactCount(2_500_000_000)).toBe("2.5B");
+  });
+});
+
+describe("formatBucketDuration", () => {
+  // Stand-in for vue-i18n's plural handling: pick the form by n.
+  const t = (key: string, named: Record<string, unknown>) => {
+    const n = Number(named.n);
+    const unit = key.replace("logs.patternList.duration", "").toLowerCase();
+    const word = n === 1 ? unit.slice(0, -1) : unit;
+    return `${n} ${word}`;
+  };
+
+  it("uses the largest whole unit that fits", () => {
+    expect(formatBucketDuration(1680, t)).toBe("28 minutes");
+    expect(formatBucketDuration(3600, t)).toBe("1 hour");
+    expect(formatBucketDuration(7200, t)).toBe("2 hours");
+    expect(formatBucketDuration(86400, t)).toBe("1 day");
+  });
+
+  it("falls back to seconds when it isn't a whole minute", () => {
+    expect(formatBucketDuration(45, t)).toBe("45 seconds");
+    expect(formatBucketDuration(90, t)).toBe("90 seconds");
+  });
+
+  it("never reports a zero-length bucket", () => {
+    expect(formatBucketDuration(0, t)).toBe("1 second");
+  });
+});
+
+describe("buildPatternSetSqlQuery", () => {
+  // Two patterns whose invariant constants are long enough to survive
+  // extractConstantsFromPattern.
+  const ERROR_PATTERN = "Connection refused to upstream <*>";
+  const TIMEOUT_PATTERN = "Request deadline exceeded after <*>";
+
+  it("builds an include-only query", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: [ERROR_PATTERN],
+    });
+    expect(sql).toBe("SELECT * FROM 'k8s_logs' WHERE match_all('Connection refused to upstream')");
+  });
+
+  it("ORs several includes, each bracketed against the surrounding ANDs", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: [ERROR_PATTERN, TIMEOUT_PATTERN],
+    });
+    expect(sql).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE ((match_all('Connection refused to upstream')) OR " +
+        "(match_all('Request deadline exceeded after')))",
+    );
+  });
+
+  it("negates excludes as a group — the 'ignore these' case", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      excludes: [ERROR_PATTERN, TIMEOUT_PATTERN],
+    });
+    expect(sql).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE NOT ((match_all('Connection refused to upstream')) OR " +
+        "(match_all('Request deadline exceeded after')))",
+    );
+  });
+
+  it("ANDs the current search filter in front — the headline use case", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      baseFilter: "code = 500",
+      excludes: [ERROR_PATTERN],
+    });
+    expect(sql).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE (code = 500) AND NOT (match_all('Connection refused to upstream'))",
+    );
+  });
+
+  it("combines base filter, includes and excludes in that order", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      baseFilter: "code = 500",
+      includes: [ERROR_PATTERN],
+      excludes: [TIMEOUT_PATTERN],
+    });
+    expect(sql).toBe(
+      "SELECT * FROM 'k8s_logs' WHERE (code = 500) AND match_all('Connection refused to upstream') " +
+        "AND NOT (match_all('Request deadline exceeded after'))",
+    );
+  });
+
+  it("emits a count projection for threshold-on-number alerts", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: [ERROR_PATTERN],
+      select: "count",
+    });
+    expect(sql).toBe(
+      "SELECT count(*) AS cnt FROM 'k8s_logs' WHERE match_all('Connection refused to upstream')",
+    );
+  });
+
+  it("drops patterns with no distinctive constants rather than emitting a bare clause", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: ["<*> <*>"],
+    });
+    expect(sql).toBe("SELECT * FROM 'k8s_logs'");
+  });
+
+  it("selects everything when nothing at all is supplied", () => {
+    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs" })).toBe("SELECT * FROM 'k8s_logs'");
+  });
+
+  it("ignores a whitespace-only base filter", () => {
+    expect(buildPatternSetSqlQuery({ streamName: "k8s_logs", baseFilter: "   " })).toBe(
+      "SELECT * FROM 'k8s_logs'",
+    );
+  });
+
+  it("escapes quotes in pattern text", () => {
+    const sql = buildPatternSetSqlQuery({
+      streamName: "k8s_logs",
+      includes: ["cannot open user's configuration file <*>"],
+    });
+    expect(sql).toContain("\\'");
+  });
+
+  it("agrees with buildPatternSqlQuery for the single-include case", () => {
+    expect(buildPatternSetSqlQuery({ streamName: "s", includes: [ERROR_PATTERN] })).toBe(
+      buildPatternSqlQuery(ERROR_PATTERN, "s"),
+    );
+  });
+});

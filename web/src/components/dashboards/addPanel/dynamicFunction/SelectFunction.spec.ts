@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,9 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import SelectFunction from "@/components/dashboards/addPanel/dynamicFunction/SelectFunction.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
-
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 const i18n = createI18n({
   legacy: false,
@@ -52,7 +46,7 @@ const mockDashboardPanelData = {
   },
 };
 
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
     getAllSelectedStreams: vi.fn(() => [
       { stream: "stream1", streamAlias: "s1" },
@@ -115,9 +109,7 @@ describe("SelectFunction", () => {
   describe("Component Rendering", () => {
     it("should render select function dropdown", () => {
       wrapper = createWrapper();
-      expect(
-        wrapper.find('[data-test="dashboard-function-dropdown"]').exists()
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-function-dropdown"]').exists()).toBe(true);
     });
 
     it("should render with correct default structure", () => {
@@ -199,9 +191,7 @@ describe("SelectFunction", () => {
       const initialLength = wrapper.vm.fields.args.length;
       if (wrapper.vm.canAddArgument(wrapper.vm.fields.functionName)) {
         wrapper.vm.addArgument();
-        expect(wrapper.vm.fields.args.length).toBeGreaterThanOrEqual(
-          initialLength
-        );
+        expect(wrapper.vm.fields.args.length).toBeGreaterThanOrEqual(initialLength);
       }
     });
 
@@ -240,7 +230,7 @@ describe("SelectFunction", () => {
       };
       wrapper = createWrapper({ modelValue });
       const fieldSelector = wrapper.find(
-        '[data-test="dashboard-function-dropdown-arg-field-selector-0"]'
+        '[data-test="dashboard-function-dropdown-arg-field-selector-0"]',
       );
       expect(fieldSelector.exists()).toBe(true);
     });
@@ -339,10 +329,7 @@ describe("SelectFunction", () => {
 
     it("should get supported types for function and index", () => {
       wrapper = createWrapper();
-      const types = wrapper.vm.getSupportedTypeBasedOnFunctionNameAndIndex(
-        "concat",
-        0
-      );
+      const types = wrapper.vm.getSupportedTypeBasedOnFunctionNameAndIndex("concat", 0);
       expect(Array.isArray(types)).toBe(true);
     });
   });
@@ -419,7 +406,7 @@ describe("SelectFunction", () => {
       wrapper = createWrapper({ modelValue });
       if (wrapper.vm.canAddArgument("concat")) {
         const addBtn = wrapper.find(
-          '[data-test="dashboard-function-dropdown-add-argument-button"]'
+          '[data-test="dashboard-function-dropdown-add-argument-button"]',
         );
         expect(addBtn.exists()).toBe(true);
       }
@@ -434,7 +421,7 @@ describe("SelectFunction", () => {
       if (wrapper.vm.canAddArgument("concat")) {
         const initialLength = wrapper.vm.fields.args.length;
         const addBtn = wrapper.find(
-          '[data-test="dashboard-function-dropdown-add-argument-button"]'
+          '[data-test="dashboard-function-dropdown-add-argument-button"]',
         );
         if (addBtn.exists()) {
           await addBtn.trigger("click");
@@ -456,7 +443,7 @@ describe("SelectFunction", () => {
       wrapper = createWrapper({ modelValue });
       if (wrapper.vm.canRemoveArgument("concat", 0)) {
         const removeBtn = wrapper.find(
-          '[data-test="dashboard-function-dropdown-arg-remove-button-0"]'
+          '[data-test="dashboard-function-dropdown-arg-remove-button-0"]',
         );
         expect(removeBtn.exists()).toBe(true);
       }
@@ -474,7 +461,7 @@ describe("SelectFunction", () => {
       const initialLength = wrapper.vm.fields.args.length;
       if (wrapper.vm.canRemoveArgument("concat", 0)) {
         const removeBtn = wrapper.find(
-          '[data-test="dashboard-function-dropdown-arg-remove-button-0"]'
+          '[data-test="dashboard-function-dropdown-arg-remove-button-0"]',
         );
         if (removeBtn.exists()) {
           await removeBtn.trigger("click");
@@ -491,7 +478,10 @@ describe("SelectFunction", () => {
         args: [
           {
             type: "function",
-            value: { functionName: "sum", args: [{ type: "field", value: {} }] },
+            value: {
+              functionName: "sum",
+              args: [{ type: "field", value: {} }],
+            },
           },
         ],
       };
@@ -564,10 +554,7 @@ describe("SelectFunction", () => {
     it("should handle allowAddArgAt with n-1 value", () => {
       wrapper = createWrapper();
       // Some functions allow adding before last argument
-      const types = wrapper.vm.getSupportedTypeBasedOnFunctionNameAndIndex(
-        "concat",
-        0
-      );
+      const types = wrapper.vm.getSupportedTypeBasedOnFunctionNameAndIndex("concat", 0);
       expect(Array.isArray(types)).toBe(true);
     });
   });
@@ -599,7 +586,7 @@ describe("SelectFunction", () => {
       };
       wrapper = createWrapper({ modelValue });
       const typeSelector = wrapper.find(
-        '[data-test="dashboard-function-dropdown-arg-type-selector-0"]'
+        '[data-test="dashboard-function-dropdown-arg-type-selector-0"]',
       );
       expect(typeSelector.exists()).toBe(true);
     });
@@ -614,6 +601,36 @@ describe("SelectFunction", () => {
       wrapper.vm.onArgTypeChange(wrapper.vm.fields.args[0]);
       await flushPromises();
       expect(wrapper.vm.fields.args[0].type).toBe("number");
+    });
+
+    it("should expose the supported types for an argument", () => {
+      const modelValue = {
+        functionName: "concat",
+        args: [{ type: "string", value: "test" }],
+      };
+      wrapper = createWrapper({ modelValue });
+      // concat arg 0 supports field / string / function
+      const types = wrapper.vm
+        .getSupportedTypeBasedOnFunctionNameAndIndex("concat", 0)
+        .map((typeOption: { value: string }) => typeOption.value);
+      expect(types).toContain("field");
+      expect(types).toContain("string");
+      expect(types).toContain("function");
+    });
+
+    it("should reset the value to an empty object when the arg type changes to field", async () => {
+      const modelValue = {
+        functionName: "concat",
+        args: [{ type: "string", value: "test" }],
+      };
+      wrapper = createWrapper({ modelValue });
+
+      wrapper.vm.fields.args[0].type = "field";
+      wrapper.vm.onArgTypeChange(wrapper.vm.fields.args[0]);
+      await flushPromises();
+
+      expect(wrapper.vm.fields.args[0].type).toBe("field");
+      expect(wrapper.vm.fields.args[0].value).toEqual({});
     });
   });
 
@@ -639,6 +656,196 @@ describe("SelectFunction", () => {
       wrapper = createWrapper({ modelValue });
       // Last argument should have different styling
       expect(wrapper.vm.fields.args.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("Cast Suggestion", () => {
+    // A factory, not a shared object: tests mutate the arg they are given, and a
+    // shared literal leaks that mutation into every test that follows.
+    const textField = () => ({ type: "field", value: { field: "usage_amount" } });
+
+    beforeEach(() => {
+      (mockDashboardPanelData as any).meta = {
+        streamFields: {
+          groupedFields: [
+            {
+              name: "aws_cost_cur",
+              stream_alias: null,
+              schema: [
+                { name: "usage_amount", type: "Utf8" },
+                { name: "blended_cost", type: "Float64" },
+              ],
+            },
+          ],
+        },
+      };
+    });
+
+    afterEach(() => {
+      delete (mockDashboardPanelData as any).meta;
+    });
+
+    const suggestion = (w: any) =>
+      w.find('[data-test="dashboard-function-dropdown-arg-cast-suggestion-0"]');
+
+    it("should suggest a cast when a numeric aggregation targets a text field", () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      expect(suggestion(wrapper).exists()).toBe(true);
+    });
+
+    it("should stay silent for min and max, which accept text", () => {
+      wrapper = createWrapper({ modelValue: { functionName: "max", args: [textField()] } });
+      expect(suggestion(wrapper).exists()).toBe(false);
+    });
+
+    it("should stay silent for a numeric field", () => {
+      wrapper = createWrapper({
+        modelValue: {
+          functionName: "sum",
+          args: [{ type: "field", value: { field: "blended_cost" } }],
+        },
+      });
+      expect(suggestion(wrapper).exists()).toBe(false);
+    });
+
+    it("should stay silent for count", () => {
+      wrapper = createWrapper({ modelValue: { functionName: "count", args: [textField()] } });
+      expect(suggestion(wrapper).exists()).toBe(false);
+    });
+
+    it("should wrap the argument in a safe cast when applied", async () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      await wrapper
+        .find('[data-test="dashboard-function-dropdown-arg-cast-apply-0"]')
+        .trigger("click");
+
+      expect(wrapper.vm.fields.args[0]).toEqual({
+        type: "function",
+        value: {
+          functionName: "try_cast",
+          args: [
+            { type: "field", value: { field: "usage_amount" } },
+            { type: "castType", value: "DOUBLE" },
+          ],
+        },
+      });
+      expect(suggestion(wrapper).exists()).toBe(false);
+    });
+
+    it("should emit the cast to the parent, so the query actually changes", async () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      await wrapper
+        .find('[data-test="dashboard-function-dropdown-arg-cast-apply-0"]')
+        .trigger("click");
+
+      const emitted = wrapper.emitted("update:modelValue");
+      expect(emitted).toBeTruthy();
+      expect(emitted[emitted.length - 1][0].args[0].value.functionName).toBe("try_cast");
+    });
+
+    it("should suggest DOUBLE, never BIGINT — a decimal string casts to NULL", async () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      expect(
+        wrapper.find('[data-test="dashboard-function-dropdown-arg-cast-apply-0-BIGINT"]').exists(),
+      ).toBe(false);
+
+      await wrapper
+        .find('[data-test="dashboard-function-dropdown-arg-cast-apply-0"]')
+        .trigger("click");
+
+      expect(wrapper.vm.fields.args[0].value.args[1].value).toBe("DOUBLE");
+    });
+
+    it("should hide the suggestion once dismissed", async () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      await wrapper
+        .find('[data-test="dashboard-function-dropdown-arg-cast-dismiss-0"]')
+        .trigger("click");
+
+      expect(suggestion(wrapper).exists()).toBe(false);
+      expect(wrapper.vm.fields.args[0]).toEqual(textField());
+    });
+
+    it("should re-offer the suggestion when the field changes", async () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      await wrapper
+        .find('[data-test="dashboard-function-dropdown-arg-cast-dismiss-0"]')
+        .trigger("click");
+
+      wrapper.vm.fields.args[0].value = { field: "other_amount" };
+      (mockDashboardPanelData as any).meta.streamFields.groupedFields[0].schema.push({
+        name: "other_amount",
+        type: "Utf8",
+      });
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.castSuggestions[0]).toBeDefined();
+    });
+
+    it("should keep the cast when the aggregation is changed", async () => {
+      wrapper = createWrapper({ modelValue: { functionName: "sum", args: [textField()] } });
+      await wrapper
+        .find('[data-test="dashboard-function-dropdown-arg-cast-apply-0"]')
+        .trigger("click");
+
+      wrapper.vm.fields.functionName = "avg";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.fields.args[0].type).toBe("function");
+      expect(wrapper.vm.fields.args[0].value.functionName).toBe("try_cast");
+      expect(wrapper.vm.fields.args[0].value.args[0].value).toEqual({ field: "usage_amount" });
+    });
+
+    it("should keep the target type when switching between the two cast functions", async () => {
+      wrapper = createWrapper({
+        modelValue: {
+          functionName: "try_cast",
+          args: [textField(), { type: "castType", value: "BIGINT" }],
+        },
+      });
+
+      wrapper.vm.fields.functionName = "cast";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.fields.args[1]).toEqual({ type: "castType", value: "BIGINT" });
+    });
+
+    it("should still drop an argument the new function cannot accept", async () => {
+      wrapper = createWrapper({
+        modelValue: {
+          functionName: "try_cast",
+          args: [textField(), { type: "castType", value: "DOUBLE" }],
+        },
+      });
+
+      wrapper.vm.fields.functionName = "sum";
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.fields.args).toHaveLength(1);
+      expect(wrapper.vm.fields.args[0]).toEqual(textField());
+    });
+
+    it("should render a target type selector for a cast function", () => {
+      wrapper = createWrapper({
+        modelValue: {
+          functionName: "try_cast",
+          args: [textField(), { type: "castType", value: "DOUBLE" }],
+        },
+      });
+      expect(
+        wrapper.find('[data-test="dashboard-function-dropdown-arg-cast-type-select-1"]').exists(),
+      ).toBe(true);
+    });
+
+    it("should not offer a type switcher for an argument with a single allowed type", () => {
+      wrapper = createWrapper({
+        modelValue: {
+          functionName: "try_cast",
+          args: [textField(), { type: "castType", value: "DOUBLE" }],
+        },
+      });
+      expect(wrapper.vm.hasArgTypeChoice("try_cast", 0)).toBe(true);
+      expect(wrapper.vm.hasArgTypeChoice("try_cast", 1)).toBe(false);
     });
   });
 

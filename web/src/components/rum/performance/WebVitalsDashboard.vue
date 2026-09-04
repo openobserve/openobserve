@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,88 +17,105 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="relative-position">
+  <div class="rounded-default relative-position">
+    <!-- Resolving the _rumdata schema to decide whether browser Web Vitals exist -->
     <div
-      class="performance-dashboard"
-      :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
-    >
-      <div
-        class="text-bold q-ml-md q-px-sm rounded q-mt-sm q-py-xs learn-web-vitals-link flex items-center"
-        :class="store.state.theme === 'dark' ? 'bg-indigo-7' : 'bg-indigo-2'"
-      >
-        <q-icon
-          name="info"
-          size="1rem"
-          class="material-symbols-outlined q-mr-xs"
-        />
-        {{ t("rum.learnWebVitalsLabel") }}
-        <a
-          href="https://web.dev/articles/vitals"
-          title="https://web.dev/articles/vitals"
-          class="q-ml-xs"
-          target="_blank"
-          :class="store.state.theme === 'dark' ? 'text-white' : 'text-dark'"
-        >
-          {{ t("rum.clickHereLabel") }}
-        </a>
-      </div>
-      <RenderDashboardCharts
-        ref="webVitalsChartsRef"
-        :viewOnly="true"
-        :dashboardData="currentDashboardData.data"
-        :currentTimeObj="dateTime"
-        searchType="RUM"
-        @variablesManagerReady="onVariablesManagerReady"
-        @updated:data-zoom="onDataZoom"
-      />
-    </div>
-    <div
-      v-show="isLoading.length"
-      class="q-pb-lg flex items-center justify-center text-center absolute full-width tw:h-[calc(100vh-15.625rem)] tw:top-0"
+      v-if="!schemaResolved"
+      data-test="web-vitals-dashboard-schema-loading"
+      class="flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
     >
       <div>
-        <q-spinner-hourglass
-          color="primary"
-          size="2.5rem"
-          class="tw:mx-auto tw:block"
-        />
-        <div class="text-center full-width">Loading Dashboard</div>
+        <OSpinner size="md" class="mx-auto block" />
+        <div class="w-full text-center">{{ t("rum.loadingDashboard") }}</div>
       </div>
     </div>
-  </q-page>
+
+    <!--
+      Mobile-only stream: the browser Web Vital columns don't exist, so the
+      dashboard queries would fail. Show a friendly explanation instead of
+      firing six doomed queries.
+    -->
+    <OEmptyState
+      v-else-if="showEmptyState"
+      data-test="web-vitals-dashboard-browser-only-empty"
+      size="block"
+      illustration="browser-check"
+      :hide-action="true"
+    >
+      <template #title>{{ t("rum.webVitalsBrowserOnlyTitle") }}</template>
+      <template #description>{{ t("rum.webVitalsBrowserOnlyDescription") }}</template>
+    </OEmptyState>
+
+    <!-- Browser RUM data present (or schema inconclusive): render the dashboard -->
+    <template v-else>
+      <div class="performance-dashboard" :class="isLoading.length ? 'invisible' : 'visible'">
+        <div
+          data-test="learn-web-vitals-link"
+          class="rounded-default bg-badge-indigo-soft-bg ms-3 mt-2 flex w-fit items-center px-2 py-1 text-sm font-bold"
+        >
+          <OIcon name="info" size="sm" class="me-1" />
+          {{ t("rum.learnWebVitalsLabel", { product: raw("Web Vitals") }) }}
+          <a
+            :title="raw('https://web.dev/articles/vitals')"
+            href="https://web.dev/articles/vitals"
+            class="text-badge-indigo-soft-text ms-1"
+            target="_blank"
+          >
+            {{ t("rum.clickHereLabel") }}
+          </a>
+        </div>
+        <RenderDashboardCharts
+          ref="webVitalsChartsRef"
+          :viewOnly="true"
+          :frame="false"
+          :dashboardData="dashboardData"
+          :currentTimeObj="dateTime"
+          searchType="RUM"
+          @variablesManagerReady="onVariablesManagerReady"
+          @updated:data-zoom="onDataZoom"
+        />
+      </div>
+      <div
+        v-show="isLoading.length"
+        class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
+      >
+        <div>
+          <OSpinner size="md" class="mx-auto block" />
+          <div class="w-full text-center">{{ t("rum.loadingDashboard") }}</div>
+        </div>
+      </div>
+    </template>
+  </div>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import {
-  defineComponent,
-  ref,
-  watch,
-  onActivated,
-  nextTick,
-  onMounted,
-  type Ref,
-} from "vue";
+import { defineComponent, ref, watch, onActivated, nextTick, onMounted, type Ref } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
-import { getConsumableDateTime, getDashboard } from "@/utils/commons.ts";
+import { getDashboard } from "@/utils/commons.ts";
+import useRumPerformanceTab from "@/composables/rum/useRumPerformanceTab";
 import {
   parseDuration,
   generateDurationLabel,
   getDurationObjectFromParams,
   getQueryParamsForDuration,
 } from "@/utils/date";
-import { toRaw, unref, reactive } from "vue";
 import { useRoute } from "vue-router";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
-import overviewDashboard from "@/utils/rum/web_vitals.json";
-import { convertDashboardSchemaVersion } from "../../../utils/dashboard/convertDashboardSchemaVersion";
+import webVitalsDashboard from "@/utils/rum/web_vitals.json";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "WebVitalsDashboard",
   components: {
     RenderDashboardCharts,
+    OSpinner,
+    OIcon,
+    OEmptyState,
   },
   props: {
     dateTime: {
@@ -108,19 +125,23 @@ export default defineComponent({
   },
   emits: ["variablesManagerReady", "update:dateTime"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const router = useRouter();
     const store = useStore();
-    const currentDashboardData = reactive({
-      data: {},
-    });
+
+    // Adaptive dashboard: drops browser Web Vital panels the stream can't serve (e.g. a
+    // mobile-only stream) and reports when every panel was dropped so we can show the
+    // friendly empty state instead of firing doomed queries. Browser data renders as
+    // before. See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
+    const { dashboardData, schemaResolved, showEmptyState, ensureRumSchema } =
+      useRumPerformanceTab(webVitalsDashboard);
+
     const showDashboardSettingsDialog = ref(false);
     const viewOnly = ref(true);
     const eventLog = ref([]);
 
     const refDateTime: any = ref(null);
-    const currentDurationSelectionObj = ref({});
     const refreshInterval = ref(0);
     const selectedDate = ref();
     const webVitalsChartsRef = ref(null);
@@ -137,8 +158,10 @@ export default defineComponent({
       emit("update:dateTime", event);
     };
 
-    onMounted(async () => {
-      await loadDashboard();
+    onMounted(() => {
+      // Fire-and-forget: ensureRumSchema handles its own errors and flips
+      // schemaResolved in its finally, so the gate resolves independently.
+      ensureRumSchema();
       updateLayout();
     });
 
@@ -152,34 +175,7 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       // emit window resize event to trigger the layout
-      if (webVitalsChartsRef.value) {
-        webVitalsChartsRef.value.layoutUpdate();
-
-        // Dashboards gets overlapped as we have used keep alive
-        // Its an internal bug of vue-grid-layout
-        // So adding settimeout of 1 sec to fix the issue
-
-        webVitalsChartsRef.value.layoutUpdate();
-      }
       window.dispatchEvent(new Event("resize"));
-    };
-
-    const loadDashboard = async () => {
-      // schema migration
-      currentDashboardData.data =
-        convertDashboardSchemaVersion(overviewDashboard);
-
-      // if variables data is null, set it to empty list
-
-      if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
-      ) {
-        variablesData.isVariablesLoading = false;
-        variablesData.values = [];
-      }
     };
 
     const addSettingsData = () => {
@@ -239,8 +235,9 @@ export default defineComponent({
     });
 
     return {
-      currentDashboardData,
+      dashboardData,
       goBackToDashboardList,
+      raw,
       addPanelData,
       t,
       getDashboard,
@@ -265,31 +262,13 @@ export default defineComponent({
       onDataZoom,
       addSettingsData,
       showDashboardSettingsDialog,
-      loadDashboard,
       webVitalsChartsRef,
       isLoading,
       updateLayout,
       router,
+      schemaResolved,
+      showEmptyState,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.learn-web-vitals-link {
-  font-size: 14px;
-  width: fit-content;
-  border-radius: 4px;
-}
-.performance_title {
-  font-size: 24px;
-}
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-</style>
-
-<style lang="scss"></style>

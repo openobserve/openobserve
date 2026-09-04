@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,9 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import http from "./http";
-import { useStore } from "vuex";
 
 interface DomainRestriction {
   name: string;
@@ -23,19 +21,11 @@ interface DomainRestriction {
   allowedEmails: string[];
 }
 
-interface DomainSettings {
-  domains: DomainRestriction[];
-}
-
 const domainManagement = {
-  // Get SSO domain restrictions for an organization
   getDomainRestrictions: (metaOrg: string) => {
-    const store = useStore();
     return http().get(`/api/${metaOrg}/domain_management`);
   },
-  // Update specific domain settings
   updateDomainRestrictions: (metaOrg: string, domain: DomainRestriction) => {
-    const store = useStore();
     return http().put(`/api/${metaOrg}/domain_management`, domain);
   },
 };

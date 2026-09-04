@@ -1,178 +1,182 @@
+import type { I18nKey } from "@/types/i18n";
+
 import { getImageURL } from "@/utils/zincutils";
 
 export interface ChartType {
-  label: string;
+  /** Resolved by the consumer at render time — a module constant has no `t()` in reach. */
+  labelKey: I18nKey;
   value: string;
   asset: string;
 }
 
 export interface ChartCategory {
-  chartLabel: string;
+  /** Resolved by the consumer at render time; also the stable per-category identity. */
+  chartLabelKey: I18nKey;
   type: ChartType[];
 }
 
 export const chartTypesData: { data: ChartCategory[] } = {
   data: [
     {
-      chartLabel: "Line",
+      chartLabelKey: "dashboard.lineLabel",
       type: [
         {
-          label: "Basic Line Chart",
+          labelKey: "dashboard.customChartTypeSelector.examples.basicLineChart",
           value: "line-simple",
           asset: getImageURL("dashboard/CustomChartAssets/line-simple.webp"),
         },
         {
-          label: "Confidence Band",
+          labelKey: "dashboard.customChartTypeSelector.examples.confidenceBand",
           value: "confidence-band",
           asset: getImageURL("dashboard/CustomChartAssets/confidence-band.webp"),
         },
         {
-          label: "Multiple X Axes",
+          labelKey: "dashboard.customChartTypeSelector.examples.multipleXAxes",
           value: "multiple-x-axis",
           asset: getImageURL("dashboard/CustomChartAssets/multiple-x-axis.webp"),
         },
         {
-          label: "Intraday Line Breaks 1",
+          labelKey: "dashboard.customChartTypeSelector.examples.intradayLineBreaks1",
           value: "intraday-breaks-1",
           asset: getImageURL("dashboard/CustomChartAssets/intraday-breaks-1.webp"),
         },
       ],
     },
     {
-      chartLabel: "Bar",
+      chartLabelKey: "dashboard.barLabel",
       type: [
         {
-          label: "Bar Race",
+          labelKey: "dashboard.customChartTypeSelector.examples.barRace",
           value: "bar-race",
           asset: getImageURL("dashboard/CustomChartAssets/bar-race.webp"),
         },
         {
-          label: "Stacked Bar Normalization",
+          labelKey: "dashboard.customChartTypeSelector.examples.stackedBarNormalization",
           value: "bar-stack-normalization",
           asset: getImageURL("dashboard/CustomChartAssets/bar-stack-normalization.webp"),
         },
         {
-          label: "Stacked Radial Bar (Polar)",
+          labelKey: "dashboard.customChartTypeSelector.examples.stackedRadialBarPolar",
           value: "bar-polar-stack-radial",
           asset: getImageURL("dashboard/CustomChartAssets/bar-polar-stack-radial.webp"),
         },
       ],
     },
     {
-      chartLabel: "Pie",
+      chartLabelKey: "dashboard.pieLabel",
       type: [
         {
-          label: "Pie with Border",
+          labelKey: "dashboard.customChartTypeSelector.examples.pieWithBorder",
           value: "pie-border-radius",
           asset: getImageURL("dashboard/CustomChartAssets/pie-border-radius.webp"),
         },
         {
-          label: "Partition Data to Pies",
+          labelKey: "dashboard.customChartTypeSelector.examples.partitionDataToPies",
           value: "data-transform-multiple-pie",
           asset: getImageURL("dashboard/CustomChartAssets/data-transform-multiple-pie.webp"),
         },
       ],
     },
     {
-      chartLabel: "Scatter",
+      chartLabelKey: "dashboard.scatterLabel",
       type: [
         {
-          label: "Scatter Matrix",
+          labelKey: "dashboard.customChartTypeSelector.examples.scatterMatrix",
           value: "scatter-matrix",
           asset: getImageURL("dashboard/CustomChartAssets/scatter-matrix.webp"),
         },
         {
-          label: "Scatter Polynomial Regression",
+          labelKey: "dashboard.customChartTypeSelector.examples.scatterPolynomialRegression",
           value: "scatter-polynomial-regression",
           asset: getImageURL("dashboard/CustomChartAssets/scatter-polynomial-regression.webp"),
         },
       ],
     },
     {
-      chartLabel: "Radar",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.radar",
       type: [
         {
-          label: "Customized Radar Chart",
+          labelKey: "dashboard.customChartTypeSelector.examples.customizedRadarChart",
           value: "radar-custom",
           asset: getImageURL("dashboard/CustomChartAssets/radar-custom.webp"),
         },
         {
-          label: "Multiple Radar",
+          labelKey: "dashboard.customChartTypeSelector.examples.multipleRadar",
           value: "radar-multiple-2",
           asset: getImageURL("dashboard/CustomChartAssets/radar-multiple-2.webp"),
         },
       ],
     },
     {
-      chartLabel: "Boxplot",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.boxplot",
       type: [
         {
-          label: "Data Transform Simple Aggregate",
+          labelKey: "dashboard.customChartTypeSelector.examples.dataTransformSimpleAggregate",
           value: "data-transform-aggregate",
           asset: getImageURL("dashboard/CustomChartAssets/data-transform-aggregate.webp"),
         },
       ],
     },
     {
-      chartLabel: "Graph",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.graph",
       type: [
         {
-          label: "Graph on Cartesian",
+          labelKey: "dashboard.customChartTypeSelector.examples.graphOnCartesian",
           value: "graph-on-cartesian",
           asset: getImageURL("dashboard/CustomChartAssets/graph-on-cartesian.webp"),
         },
       ],
     },
     {
-      chartLabel: "Treemap",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.treemap",
       type: [
         {
-          label: "Treemap chart",
+          labelKey: "dashboard.customChartTypeSelector.examples.treemapChart",
           value: "treemap-chart",
           asset: getImageURL("dashboard/CustomChartAssets/treemap-chart.webp"),
         },
       ],
     },
     {
-      chartLabel: "Funnel",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.funnel",
       type: [
         {
-          label: "Customized Funnel",
+          labelKey: "dashboard.customChartTypeSelector.examples.customizedFunnel",
           value: "funnel-customize",
           asset: getImageURL("dashboard/CustomChartAssets/funnel-customize.webp"),
         },
       ],
     },
     {
-      chartLabel: "Dataset",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.dataset",
       type: [
         {
-          label: "Series Layout",
+          labelKey: "dashboard.customChartTypeSelector.examples.seriesLayout",
           value: "dataset-series-layout",
           asset: getImageURL("dashboard/CustomChartAssets/dataset-series-layout.webp"),
         },
       ],
     },
     {
-      chartLabel: "3D",
+      chartLabelKey: "dashboard.customChartTypeSelector.categories.threeD",
       type: [
         {
-          label: "3D Bar with Dataset",
+          labelKey: "dashboard.customChartTypeSelector.examples.threeDBarWithDataset",
           value: "bar3d-dataset",
           asset: getImageURL("dashboard/CustomChartAssets/bar3d-dataset.webp"),
         },
         {
-          label: "Bar3D Punch Card",
+          labelKey: "dashboard.customChartTypeSelector.examples.bar3dPunchCard",
           value: "bar3d-punchcard",
           asset: getImageURL("dashboard/CustomChartAssets/bar3d-punchcard.webp"),
         },
         {
-          label: "3D Scatter with Scatter Matrix",
+          labelKey: "dashboard.customChartTypeSelector.examples.threeDScatterWithScatterMatrix",
           value: "scatter3d-scatter-matrix",
           asset: getImageURL("dashboard/CustomChartAssets/scatter3d-scatter-matrix.webp"),
         },
         {
-          label: "3D Scatter Dataset",
+          labelKey: "dashboard.customChartTypeSelector.examples.threeDScatterDataset",
           value: "scatter3d-dataset",
           asset: getImageURL("dashboard/CustomChartAssets/scatter3D-dataset.webp"),
         },

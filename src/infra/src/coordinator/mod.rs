@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,10 +15,14 @@
 
 pub mod ai_prompts;
 pub mod alerts;
+pub mod dashboards;
 pub mod destinations;
 pub mod events;
+pub mod model_pricing;
+pub mod org_status;
 pub mod pipelines;
 pub mod service_streams;
+pub mod synthetics;
 pub mod system_settings;
 
 pub async fn get_coordinator() -> &'static Box<dyn crate::db::Db> {

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,47 +15,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page>
-    <div
-      style="text-align: center; width: 100%; font-size: 30px; margin: 40px 0px"
-    >
-      Member Subscription
+  <div class="rounded-default">
+    <div class="my-10 w-full text-center text-(length:--text-3xl)">
+      {{ t("billing.memberSubscription.title") }}
     </div>
     <div v-if="status == 'processing'">{{ message }}</div>
-    <div
-      v-else-if="status == 'error' && error == ''"
-      style="text-align: center"
-    >
-      Error while processing member subscription request.<br /><br />
+    <div v-else-if="status == 'error' && error == ''" class="text-center">
+      {{ t("billing.memberSubscription.errorProcessing") }}<br /><br />
     </div>
 
     <SanitizedHtmlRenderer
       v-else-if="status == 'error' && error !== ''"
       :htmlContent="error"
-      class="subscription_message"
+      class="mx-auto w-[70%] text-left text-base leading-7.5"
     />
 
-    <div v-else>Thank you for your subscription.</div>
+    <div v-else>{{ t("billing.memberSubscription.thankYou") }}</div>
 
     <!-- <div
       v-if="status == 'error' && error !== ''"
-      class="subscription_message q-btn-primary"
+      class="subscription_message"
     >
       <b>Please click the button below to proceed with your subscription after taking above mentioned action.</b><br />
-      <q-btn @click="ProcessSubscription(queryString, 'confirm')" class="q-mt-md">Confirm Member Subscription</q-btn>
+      <OButton variant="primary" class="mt-3" @click="ProcessSubscription(queryString, 'confirm')">Confirm Member Subscription</OButton>
     </div> -->
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import { useLocalOrganization, getPath } from "../utils/zincutils";
 
 import organizationsService from "../services/organizations";
 import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "PageUser",
@@ -65,7 +61,7 @@ export default defineComponent({
   data() {
     return {
       status: "processing",
-      message: "Please wait while we process your request...",
+      message: this.t("billing.pleaseWaitProcessingRequest"),
       error: "",
       queryString: this.$route.hash.split("=")[1],
     };
@@ -85,15 +81,15 @@ export default defineComponent({
       const params = new URLSearchParams(hash);
       const invited_org_id = params.get("org_id");
       await organizationsService
-        .process_subscription(s, action, invited_org_id)
+        .process_subscription(s, action, invited_org_id ?? "")
         .then((res) => {
           this.status = "completed";
-          const dismiss = this.$q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: res.data.message,
           });
 
-          if (res.data.hasOwnProperty("data")) {
+          if (Object.prototype.hasOwnProperty.call(res.data, "data")) {
             res.data.data.label = res.data.data.name;
             useLocalOrganization(res.data.data);
 
@@ -111,23 +107,14 @@ export default defineComponent({
   },
   setup() {
     const $store = useStore();
-    const $q = useQuasar();
     const $router = useRouter();
+    const { t } = useI18nTyped();
 
     return {
       $router,
       $store,
+      t,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.subscription_message {
-  font-size: 16px;
-  line-height: 30px;
-  width: 70%;
-  margin: auto;
-  text-align: left;
-}
-</style>

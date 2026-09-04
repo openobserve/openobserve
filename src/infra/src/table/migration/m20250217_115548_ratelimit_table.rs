@@ -1,4 +1,3 @@
-use sea_orm::DbBackend;
 use sea_orm_migration::prelude::*;
 
 const RESOURCE_KEY: &str = "rkey_idx";
@@ -27,18 +26,9 @@ impl MigrationTrait for Migration {
                 .await?;
         }
 
-        match manager.get_database_backend() {
-            DbBackend::MySql => {
-                manager
-                    .create_index(create_ratelimit_resource_key_idx_stmnt_mysql())
-                    .await?;
-            }
-            _ => {
-                manager
-                    .create_index(create_ratelimit_resource_key_idx_stmnt())
-                    .await?;
-            }
-        }
+        manager
+            .create_index(create_ratelimit_resource_key_idx_stmnt())
+            .await?;
 
         Ok(())
     }
@@ -125,16 +115,6 @@ fn create_ratelimit_resource_key_idx_stmnt() -> IndexCreateStatement {
         .to_owned()
 }
 
-fn create_ratelimit_resource_key_idx_stmnt_mysql() -> IndexCreateStatement {
-    sea_query::Index::create()
-        .name(RESOURCE_KEY)
-        .table(RateLimitRules::Table)
-        .col(RateLimitRules::Org)
-        .col(RateLimitRules::UserRole)
-        .col(RateLimitRules::UserId)
-        .to_owned()
-}
-
 #[derive(DeriveIden)]
 enum RateLimitRules {
     Table,
@@ -147,4 +127,28 @@ enum RateLimitRules {
     ApiGroupOperation,
     Threshold,
     CreatedAt,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_ratelimit_table_contains_name() {
+        let sql = create_ratelimit_table_statement().build(SqliteQueryBuilder);
+        assert!(sql.contains("rate_limit_rules"));
+    }
+
+    #[test]
+    fn test_resource_key_idx_contains_name() {
+        let sql = create_ratelimit_resource_key_idx_stmnt().build(SqliteQueryBuilder);
+        assert!(sql.contains(RESOURCE_KEY));
+    }
+
+    #[test]
+    fn test_resource_key_constant() {
+        assert_eq!(RESOURCE_KEY, "rkey_idx");
+    }
 }

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,6 @@
 
 import { searchState } from "@/composables/useLogs/searchState";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
-import useNotifications from "@/composables/useNotifications";
 import useStreamFields from "@/composables/useLogs/useStreamFields";
 import { useHistogram } from "@/composables/useLogs/useHistogram";
 import useSearchPagination from "@/composables/useLogs/useSearchPagination";
@@ -28,35 +27,38 @@ import {
 } from "@/ts/interfaces/query";
 import { logsErrorMessage } from "@/utils/common";
 import { getFunctionErrorMessage } from "@/utils/zincutils";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import { convertDateToTimestamp } from "@/utils/date";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import { rangesFromServerError } from "@/utils/query/sqlDiagnostics";
 
 export const useSearchResponseHandler = () => {
-  const { showErrorNotification, showCancelSearchNotification } =
-    useNotifications();
-  const { fnParsedSQL, hasAggregation, removeTraceId, updateUrlQueryParams } =
-    logsUtils();
+  const { t } = useI18nTyped();
 
-  const { getHistogramTitle, generateHistogramData, resetHistogramWithError } =
-    useHistogram();
+  // showCancelSearchNotification is defined in logsUtils, not useNotifications
+  const {
+    fnParsedSQL,
+    hasAggregation,
+    removeTraceId,
+    updateUrlQueryParams,
+    showCancelSearchNotification,
+  } = logsUtils();
 
-  const { refreshPagination } = useSearchPagination();
+  const { getHistogramTitle, getHistogramTitleParts, generateHistogramData } = useHistogram();
 
-  const { clearCache } = useLogsHighlighter();
+  const { refreshPagination, sortResponse } = useSearchPagination(t);
+
+  const { clearCache } = useLogsHighlighter(t);
 
   const store = useStore();
-  const { t } = useI18n();
 
   const {
     searchObj,
     searchObjDebug,
     searchAggData,
-    resetQueryData,
     notificationMsg,
     searchPartitionMap,
-    resetHistogramError,
-    histogramResults
+    histogramResults,
   } = searchState();
 
   const {
@@ -71,24 +73,33 @@ export const useSearchResponseHandler = () => {
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
   ) => {
-    if (
-      payload.type === "search" &&
-      response?.type === "search_response_hits"
-    ) {
+    // Backend streaming progress (already mapped from "progress" to
+    // "event_progress" by useStreamingSearch). Drives the top progress bar
+    // while results stream in. Mirrors the dashboard panel handling. The
+    // histogram runs as a separate stream, so its progress is tracked on a
+    // dedicated field to avoid clobbering the results progress (they can run
+    // concurrently).
+    if (response?.type === "event_progress") {
+      const percent = response?.content?.percent ?? 0;
+      if (payload.type === "histogram" || payload.type === "pageCount") {
+        searchObj.loadingHistogramProgressPercentage = percent;
+      } else {
+        searchObj.loadingProgressPercentage = percent;
+      }
+      return;
+    }
+
+    if (payload.type === "search" && response?.type === "search_response_hits") {
       const isStreamingAggs =
-        response.content?.streaming_aggs ||
-        searchObj.data.queryResults.streaming_aggs;
+        response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs;
       const shouldAppendStreamingResults = isStreamingAggs
         ? !response.content?.results?.hits?.length
         : true;
-      searchPartitionMap[payload.traceId].chunks[
-        searchPartitionMap[payload.traceId].partition
-      ]++;
+      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition]++;
 
       const isChunkedHits =
-        searchPartitionMap[payload.traceId].chunks[
-          searchPartitionMap[payload.traceId].partition
-        ] > 1;
+        searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] >
+        1;
 
       handleStreamingHits(
         payload,
@@ -100,10 +111,7 @@ export const useSearchResponseHandler = () => {
       return;
     }
 
-    if (
-      payload.type === "search" &&
-      response?.type === "search_response_metadata"
-    ) {
+    if (payload.type === "search" && response?.type === "search_response_metadata") {
       searchPartitionMap[payload.traceId] = searchPartitionMap[payload.traceId]
         ? searchPartitionMap[payload.traceId]
         : {
@@ -117,64 +125,51 @@ export const useSearchResponseHandler = () => {
         : true;
 
       searchPartitionMap[payload.traceId].partition++;
-      searchPartitionMap[payload.traceId].chunks[
-        searchPartitionMap[payload.traceId].partition
-      ] = 0;
+      searchPartitionMap[payload.traceId].chunks[searchPartitionMap[payload.traceId].partition] = 0;
 
       handleStreamingMetadata(
         payload,
         response,
         payload.isPagination,
-        shouldAppendStreamingResults &&
-          searchPartitionMap[payload.traceId].partition > 1,
+        shouldAppendStreamingResults && searchPartitionMap[payload.traceId].partition > 1,
       );
       return;
     }
 
-    if (
-      payload.type === "histogram" &&
-      response?.type === "search_response_hits"
-    ) {
-      handleHistogramStreamingHits(payload, response, payload.isPagination);
+    if (payload.type === "histogram" && response?.type === "search_response_hits") {
+      handleHistogramStreamingHits(payload, response);
       return;
     }
 
-    if (
-      payload.type === "histogram" &&
-      response?.type === "search_response_metadata"
-    ) {
-      handleHistogramStreamingMetadata(payload, response, payload.isPagination);
+    if (payload.type === "histogram" && response?.type === "search_response_metadata") {
+      handleHistogramStreamingMetadata(payload, response);
       return;
     }
 
-    if (
-      payload.type === "pageCount" &&
-      response?.type === "search_response_hits"
-    ) {
-      handlePageCountStreamingHits(payload, response, payload.isPagination);
+    if (payload.type === "pageCount" && response?.type === "search_response_hits") {
+      handlePageCountStreamingHits(payload, response);
       return;
     }
 
-    if (
-      payload.type === "pageCount" &&
-      response?.type === "search_response_metadata"
-    ) {
-      handlePageCountStreamingMetadata(payload, response, payload.isPagination);
+    if (payload.type === "pageCount" && response?.type === "search_response_metadata") {
+      handlePageCountStreamingMetadata(payload, response);
       return;
     }
 
     if (response.type === "cancel_response") {
       searchObj.loading = false;
       searchObj.loadingHistogram = false;
+      // Clear streaming progress so a re-run after cancel starts from 0.
+      searchObj.loadingProgressPercentage = 0;
+      searchObj.loadingHistogramProgressPercentage = 0;
       searchObj.data.isOperationCancelled = false;
 
-      showCancelSearchNotification();
+      showCancelSearchNotification(t);
       setCancelSearchError();
     }
   };
 
-
-  const handleStreamingHits = (
+  const handleStreamingHits = async (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
     isPagination: boolean,
@@ -182,10 +177,7 @@ export const useSearchResponseHandler = () => {
   ) => {
     const hits = response.content?.results?.hits || [];
 
-    if (
-      (isPagination && searchPartitionMap[payload.traceId].partition === 1) ||
-      !appendResult
-    ) {
+    if ((isPagination && searchPartitionMap[payload.traceId].partition === 1) || !appendResult) {
       clearCache();
       searchObj.data.queryResults.hits = hits;
     } else if (appendResult) {
@@ -198,22 +190,33 @@ export const useSearchResponseHandler = () => {
         response.content.results.hits.length,
         searchObj.data.queryResults.hits.length,
       );
-      trimPageCountExtraHit(
-        payload.queryReq,
-        searchObj.data.queryResults.hits.length,
+      trimPageCountExtraHit(payload.queryReq, searchObj.data.queryResults.hits.length);
+    }
+
+    if (
+      searchObj.data.queryResults.hits.length > 0 &&
+      store.state.zoConfig.timestamp_column != "" &&
+      Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "order_by_metadata") &&
+      searchObj.data.queryResults.order_by_metadata.length > 0
+    ) {
+      sortResponse(
+        searchObj.data.queryResults.hits,
+        store.state.zoConfig.timestamp_column,
+        searchObj.data.queryResults.order_by_metadata,
       );
     }
 
     refreshPagination(true);
-    processPostPaginationData();
+    await processPostPaginationData();
   };
 
-  const processPostPaginationData = () => {
+  const processPostPaginationData = async () => {
     updateFieldValues();
-    extractFields();
+    await extractFields();
     updateGridColumns();
-    filterHitsColumns();
+    await filterHitsColumns();
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const handleStreamingMetadata = (
@@ -226,37 +229,31 @@ export const useSearchResponseHandler = () => {
     handleAggregation(payload.queryReq, response);
     resetFieldValues();
 
-    if (!payload.queryReq.query.hasOwnProperty("track_total_hits")) {
+    if (!Object.prototype.hasOwnProperty.call(payload.queryReq.query, "track_total_hits")) {
       delete response.content.total;
     }
 
     if (appendResult) {
       searchObj.data.queryResults.total += response.content.results.total;
       searchObj.data.queryResults.took += response.content.results.took;
-      searchObj.data.queryResults.scan_size +=
-        response.content.results.scan_size;
+      searchObj.data.queryResults.scan_size += response.content.results.scan_size;
     } else {
       if (isPagination && response.content?.streaming_aggs) {
         searchObj.data.queryResults.from = response.content.results.from;
-        searchObj.data.queryResults.scan_size =
-          response.content.results.scan_size;
+        searchObj.data.queryResults.scan_size = response.content.results.scan_size;
         searchObj.data.queryResults.took = response.content.results.took;
       } else if (response.content?.streaming_aggs) {
         searchObj.data.queryResults = {
           ...response.content.results,
-          took:
-            (searchObj.data?.queryResults?.took || 0) +
-            response.content.results.took,
+          took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
           scan_size:
-            (searchObj.data?.queryResults?.scan_size || 0) +
-            response.content.results.scan_size,
+            (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
           hits: searchObj.data?.queryResults?.hits || [],
           streaming_aggs: response.content?.streaming_aggs,
         };
       } else if (isPagination) {
         searchObj.data.queryResults.from = response.content.results.from;
-        searchObj.data.queryResults.scan_size =
-          response.content.results.scan_size;
+        searchObj.data.queryResults.scan_size = response.content.results.scan_size;
         searchObj.data.queryResults.took = response.content.results.took;
         searchObj.data.queryResults.total = response.content.results.total;
       } else {
@@ -264,7 +261,7 @@ export const useSearchResponseHandler = () => {
       }
     }
 
-    if (response.content.results.hasOwnProperty("is_histogram_eligible")) {
+    if (Object.prototype.hasOwnProperty.call(response.content.results, "is_histogram_eligible")) {
       searchObj.data.queryResults.is_histogram_eligible =
         response.content.results.is_histogram_eligible;
     }
@@ -282,8 +279,7 @@ export const useSearchResponseHandler = () => {
         response.content.results.total != payload.queryReq.query.size
       ) {
         searchObj.data.queryResults.pageCountTotal =
-          payload.queryReq.query.size *
-            Math.max(searchObj.data.resultGrid.currentPage - 1, 0) +
+          payload.queryReq.query.size * Math.max(searchObj.data.resultGrid.currentPage - 1, 0) +
           response.content.results.total;
       }
     }
@@ -306,18 +302,10 @@ export const useSearchResponseHandler = () => {
   ) => {
     try {
       const parsedSQL = fnParsedSQL();
-      if (
-        shouldGetPageCount(queryReq, parsedSQL) &&
-        total === queryReq.query.size
-      ) {
+      if (shouldGetPageCount(queryReq, parsedSQL) && total === queryReq.query.size) {
         searchObj.data.queryResults.pageCountTotal =
-          searchObj.meta.resultGrid.rowsPerPage *
-            searchObj.data.resultGrid.currentPage +
-          1;
-      } else if (
-        shouldGetPageCount(queryReq, parsedSQL) &&
-        total !== queryReq.query.size
-      ) {
+          searchObj.meta.resultGrid.rowsPerPage * searchObj.data.resultGrid.currentPage + 1;
+      } else if (shouldGetPageCount(queryReq, parsedSQL) && total !== queryReq.query.size) {
         searchObj.data.queryResults.pageCountTotal =
           searchObj.meta.resultGrid.rowsPerPage *
             Math.max(searchObj.data.resultGrid.currentPage - 1, 0) +
@@ -328,21 +316,14 @@ export const useSearchResponseHandler = () => {
     }
   };
 
-  const trimPageCountExtraHit = (
-    queryReq: SearchRequestPayload,
-    total: any,
-  ) => {
+  const trimPageCountExtraHit = (queryReq: SearchRequestPayload, total: any) => {
     try {
       const parsedSQL = fnParsedSQL();
-      if (
-        shouldGetPageCount(queryReq, parsedSQL) &&
-        total === queryReq.query.size
-      ) {
-        searchObj.data.queryResults.hits =
-          searchObj.data.queryResults.hits.slice(
-            0,
-            searchObj.data.queryResults.hits.length - 1,
-          );
+      if (shouldGetPageCount(queryReq, parsedSQL) && total === queryReq.query.size) {
+        searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(
+          0,
+          searchObj.data.queryResults.hits.length - 1,
+        );
       }
     } catch (e: any) {
       console.error("Error while trimming page count extra hit", e);
@@ -352,8 +333,6 @@ export const useSearchResponseHandler = () => {
   const handleHistogramStreamingHits = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
-    isPagination: boolean,
-    appendResult: boolean = false,
   ) => {
     searchObj.loading = false;
 
@@ -361,15 +340,10 @@ export const useSearchResponseHandler = () => {
       searchObj.data.queryResults.aggs = [];
     }
 
-    if (
-      searchObj.data.queryResults.aggs.length == 0 &&
-      response.content.results.hits.length > 0
-    ) {
+    if (searchObj.data.queryResults.aggs.length == 0 && response.content.results.hits.length > 0) {
       let date = new Date();
-      const startDateTime =
-        searchObj.data.customDownloadQueryObj.query.start_time / 1000;
-      const endDateTime =
-        searchObj.data.customDownloadQueryObj.query.end_time / 1000;
+      const startDateTime = searchObj.data.customDownloadQueryObj.query.start_time / 1000;
+      const endDateTime = searchObj.data.customDownloadQueryObj.query.end_time / 1000;
       const nowString = response.content.results.hits[0].zo_sql_key;
       const now = new Date(nowString);
       const day = String(now.getDate()).padStart(2, "0");
@@ -378,20 +352,13 @@ export const useSearchResponseHandler = () => {
       const dateToBePassed = `${day}-${month}-${year}`;
       const hours = String(now.getHours()).padStart(2, "0");
       let minutes = String(now.getMinutes()).padStart(2, "0");
-      if (searchObj.data.histogramInterval / 1000 <= 9999) {
+      if ((searchObj.data.histogramInterval ?? 0) / 1000 <= 9999) {
         minutes = String(now.getMinutes() + 1).padStart(2, "0");
       }
       const time = `${hours}:${minutes}`;
-      const currentTimeToBePassed = convertDateToTimestamp(
-        dateToBePassed,
-        time,
-        "UTC",
-      );
+      const currentTimeToBePassed = convertDateToTimestamp(dateToBePassed, time, "UTC");
       if (!searchObj.data.histogramInterval) {
-        console.error(
-          "Error processing histogram data:",
-          "histogramInterval is not set",
-        );
+        console.error("Error processing histogram data:", "histogramInterval is not set");
         searchObj.loadingHistogram = false;
         return;
       }
@@ -420,13 +387,10 @@ export const useSearchResponseHandler = () => {
       }
     }
 
-
     if (searchObj.data.queryResults.order_by?.toLowerCase() === "desc") {
       searchObj.data.queryResults.aggs.push(...response.content.results.hits);
     } else {
-      searchObj.data.queryResults.aggs.unshift(
-        ...response.content.results.hits,
-      );
+      searchObj.data.queryResults.aggs.unshift(...response.content.results.hits);
     }
 
     (async () => {
@@ -441,6 +405,7 @@ export const useSearchResponseHandler = () => {
 
     if (!payload.meta?.isHistogramOnly)
       searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
 
     searchObjDebug["histogramProcessingEndTime"] = performance.now();
     searchObjDebug["histogramEndTime"] = performance.now();
@@ -449,27 +414,24 @@ export const useSearchResponseHandler = () => {
   const handleHistogramStreamingMetadata = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
-    isPagination: boolean,
-    appendResult: boolean = false,
   ) => {
     searchObjDebug["histogramProcessingStartTime"] = performance.now();
 
     searchObj.data.queryResults.scan_size += response.content.results.scan_size;
     searchObj.data.queryResults.took += response.content.results.took;
-    searchObj.data.queryResults.result_cache_ratio +=
-      response.content.results.result_cache_ratio;
-    searchObj.data.queryResults.histogram_interval =
-      response.content.results.histogram_interval;
+    searchObj.data.queryResults.result_cache_ratio += response.content.results.result_cache_ratio;
+    searchObj.data.queryResults.histogram_interval = response.content.results.histogram_interval;
 
     if (searchObj.data.queryResults.histogram_interval)
-      searchObj.data.histogramInterval =
-        searchObj.data.queryResults.histogram_interval * 1000000;
+      searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval * 1000000;
 
-    searchObj.data.queryResults.order_by =
-      response?.content?.results?.order_by ?? "desc";
+    searchObj.data.queryResults.order_by = response?.content?.results?.order_by ?? "desc";
 
     searchObj.data.queryResults.converted_histogram_query =
       response?.content?.results?.converted_histogram_query ?? "";
+
+    searchObj.data.queryResults.histogram_breakdown_field =
+      response?.content?.results?.histogram_breakdown_field ?? null;
 
     if (
       !searchObj.data.queryResults.visualization_histogram_interval &&
@@ -483,21 +445,13 @@ export const useSearchResponseHandler = () => {
   const handlePageCountStreamingHits = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
-    isPagination: boolean,
-    appendResult: boolean = false,
   ) => {
     let regeratePaginationFlag = false;
-    if (
-      response.content.results.hits.length !=
-      searchObj.meta.resultGrid.rowsPerPage
-    ) {
+    if (response.content.results.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
       regeratePaginationFlag = true;
     }
 
-    if (
-      response.content?.streaming_aggs ||
-      searchObj.data.queryResults.streaming_aggs
-    ) {
+    if (response.content?.streaming_aggs || searchObj.data.queryResults.streaming_aggs) {
       searchObj.data.queryResults.aggs = response.content.results.hits;
     } else {
       searchObj.data.queryResults.aggs.push(...response.content.results.hits);
@@ -505,43 +459,38 @@ export const useSearchResponseHandler = () => {
 
     refreshPagination(regeratePaginationFlag);
     searchObj.data.histogram.chartParams.title = getHistogramTitle();
+    searchObj.data.histogram.chartParams.titleParts = getHistogramTitleParts();
   };
 
   const handlePageCountStreamingMetadata = (
     payload: WebSocketSearchPayload,
     response: WebSocketSearchResponse,
-    isPagination: boolean,
-    appendResult: boolean = false,
   ) => {
-    removeTraceId(response.content.trace_id);
+    removeTraceId(response.content.trace_id ?? "");
 
     if (searchObj.data.queryResults.aggs == null) {
       searchObj.data.queryResults.aggs = [];
     }
 
-    searchObj.data.queryResults.streaming_aggs =
-      response?.content?.streaming_aggs;
+    searchObj.data.queryResults.streaming_aggs = response?.content?.streaming_aggs;
 
     searchObj.data.queryResults.scan_size += response.content.results.scan_size;
     searchObj.data.queryResults.took += response.content.results.took;
   };
 
-  const handleFunctionError = (
-    queryReq: SearchRequestPayload,
-    response: any,
-  ) => {
+  const handleFunctionError = (queryReq: SearchRequestPayload, response: any) => {
     if (
-      response.content.results.hasOwnProperty("function_error") &&
+      Object.prototype.hasOwnProperty.call(response.content.results, "function_error") &&
       response.content.results.function_error != ""
     ) {
       searchObj.data.functionError = response.content.results.function_error;
     }
 
     if (
-      response.content.results.hasOwnProperty("function_error") &&
+      Object.prototype.hasOwnProperty.call(response.content.results, "function_error") &&
       response.content.results.function_error != "" &&
-      response.content.results.hasOwnProperty("new_start_time") &&
-      response.content.results.hasOwnProperty("new_end_time")
+      Object.prototype.hasOwnProperty.call(response.content.results, "new_start_time") &&
+      Object.prototype.hasOwnProperty.call(response.content.results, "new_end_time")
     ) {
       response.content.results.function_error = getFunctionErrorMessage(
         response.content.results.function_error,
@@ -549,16 +498,13 @@ export const useSearchResponseHandler = () => {
         response.content.results.new_end_time,
         store.state.timezone,
       );
-      searchObj.data.datetime.startTime =
-        response.content.results.new_start_time;
+      searchObj.data.datetime.startTime = response.content.results.new_start_time;
       searchObj.data.datetime.endTime = response.content.results.new_end_time;
       searchObj.data.datetime.type = "absolute";
       queryReq.query.start_time = response.content.results.new_start_time;
       queryReq.query.end_time = response.content.results.new_end_time;
-      searchObj.data.histogramQuery.query.start_time =
-        response.content.results.new_start_time;
-      searchObj.data.histogramQuery.query.end_time =
-        response.content.results.new_end_time;
+      searchObj.data.histogramQuery.query.start_time = response.content.results.new_start_time;
+      searchObj.data.histogramQuery.query.end_time = response.content.results.new_end_time;
 
       updateUrlQueryParams();
     }
@@ -572,27 +518,26 @@ export const useSearchResponseHandler = () => {
         searchAggData.hasAggregation = true;
         searchObj.meta.resultGrid.showPagination = false;
 
-        if (
-          response.content?.streaming_aggs &&
-          response.content?.results?.total
-        ) {
+        if (response.content?.streaming_aggs && response.content?.results?.total) {
           searchAggData.total = response.content?.results?.total;
         } else {
-          searchAggData.total =
-            searchAggData.total + response.content?.results?.total;
+          searchAggData.total = searchAggData.total + response.content?.results?.total;
         }
       }
     }
   };
 
-  const handleSearchError = (request: any, err: WebSocketErrorResponse) => {
+  const handleSearchError = async (request: any, err: WebSocketErrorResponse) => {
     searchObj.loading = false;
     searchObj.loadingHistogram = false;
+    // Clear streaming progress so the next search starts from 0, not a stale value.
+    searchObj.loadingProgressPercentage = 0;
+    searchObj.loadingHistogramProgressPercentage = 0;
 
     const { message, trace_id, code, error_detail, error } = err.content;
 
     if (code === 20009) {
-      showCancelSearchNotification();
+      showCancelSearchNotification(t);
       setCancelSearchError();
     }
 
@@ -602,7 +547,7 @@ export const useSearchResponseHandler = () => {
       message,
       code,
       trace_id,
-      defaultMessage: "Error while processing request",
+      defaultMessage: t("search.errorWhileProcessingRequest"),
     });
 
     if (error === "rate_limit_exceeded") {
@@ -610,7 +555,7 @@ export const useSearchResponseHandler = () => {
     }
 
     if (request.type === "pageCount") {
-      searchObj.data.countErrorMsg = "Error while retrieving total events: ";
+      searchObj.data.countErrorMsg = t("search.errorWhileRetrievingTotalEvents");
       if (trace_id) searchObj.data.countErrorMsg += " TraceID: " + trace_id;
       notificationMsg.value = searchObj.data.countErrorMsg;
     } else if (request.type === "histogram") {
@@ -622,6 +567,23 @@ export const useSearchResponseHandler = () => {
       searchObj.data.errorDetail = error_detail || "";
       searchObj.data.errorMsg = errorMsg;
       notificationMsg.value = errorMsg;
+
+      // Surface backend query errors as Monaco squiggles. rangesFromServerError
+      // handles every locatable code centrally:
+      //   • 20001 syntax          → sqlparser line/column (SQL) or reconstructed
+      //                             filter parse (non-SQL).
+      //   • 20002/4/5/7/8 semantic → locate the offending identifier (unknown
+      //                             field/function/stream, GROUP BY, ambiguous)
+      //                             in the query text and squiggle each occurrence.
+      const ranges = await rangesFromServerError({
+        code,
+        message,
+        errorDetail: error_detail,
+        sqlMode: searchObj.meta.sqlMode,
+        query: searchObj.data.query,
+        streamName: searchObj.data.stream.selectedStream?.[0],
+      });
+      if (ranges.length > 0) searchObj.data.sqlSyntaxErrorRanges = ranges;
     }
   };
 
@@ -631,7 +593,7 @@ export const useSearchResponseHandler = () => {
     trace_id,
     defaultMessage,
   }: {
-    message?: string;
+    message?: I18nText;
     code?: number;
     trace_id?: string;
     defaultMessage: string;
@@ -644,14 +606,16 @@ export const useSearchResponseHandler = () => {
     }
 
     if (trace_id) {
-      errorMsg += ` <br><span class='text-subtitle1'>TraceID: ${trace_id}</span>`;
+      // Not translated: useQueryError re-extracts the id with /TraceID:\s*([a-f0-9A-F-]+)/i
+      // from this same string, so the marker has to stay this exact English token.
+      errorMsg += raw(` <br><span class='text-subtitle1'>TraceID: ${trace_id}</span>`);
     }
 
     return errorMsg;
   };
 
   const setCancelSearchError = () => {
-    if (!searchObj.data?.queryResults.hasOwnProperty("hits")) {
+    if (!Object.prototype.hasOwnProperty.call(searchObj.data?.queryResults, "hits")) {
       searchObj.data.queryResults.hits = [];
     }
 
@@ -661,21 +625,17 @@ export const useSearchResponseHandler = () => {
     }
 
     if (
-      searchObj.data?.queryResults?.hasOwnProperty("hits") &&
+      Object.prototype.hasOwnProperty.call(searchObj.data?.queryResults ?? {}, "hits") &&
       searchObj.data.queryResults?.hits?.length &&
       !searchObj.data.queryResults?.aggs?.length
     ) {
-      searchObj.data.histogram.errorMsg =
-        "Histogram search query was cancelled";
+      searchObj.data.histogram.errorMsg = t("search.histogramSearchQueryCancelled");
     }
   };
 
-  const shouldGetPageCount = (queryReq: any, parsedSQL: any): boolean => {
+  const shouldGetPageCount = (queryReq: any, _parsedSQL: any): boolean => {
     // Simplified version - implement full logic as needed
-    return (
-      !queryReq.query.sql?.includes("LIMIT") &&
-      !queryReq.query.sql?.includes("DISTINCT")
-    );
+    return !queryReq.query.sql?.includes("LIMIT") && !queryReq.query.sql?.includes("DISTINCT");
   };
 
   // const refreshPagination = (regenerateFlag: boolean = false) => {

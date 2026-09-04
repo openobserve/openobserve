@@ -6,6 +6,7 @@ const {
 import { ingestion } from "./utils/dashIngestion.js";
 import PageManager from "../../pages/page-manager";
 import DashboardVariablesScoped from "../../pages/dashboardPages/dashboard-variables-scoped";
+import { selectStreamFromDropdown, selectFieldFromDropdown, selectStreamType } from "../../pages/dashboardPages/dashboard-stream-field-utils.js";
 import { waitForDashboardPage, deleteDashboard } from "./utils/dashCreation.js";
 const { safeWaitForHidden, safeWaitForNetworkIdle } = require("../utils/wait-helpers.js");
 const {
@@ -36,14 +37,14 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add tab
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting("Tab1");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab1")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForTabVisible("Tab1");
 
     // Add global variable
     await scopedVars.addScopedVariable(globalVar, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
@@ -65,13 +66,13 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -87,31 +88,32 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add panel
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
     // Add X and Y axis fields (required for saving panel)
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard and panel editor to close
-    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
     // Wait for panel editor dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 10000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for settings button to be available (indicates panel editor has closed)
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.waitForDashboardReady({ timeout: 15000 });
 
     // Add tab
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting("Tab1");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab1")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForTabVisible("Tab1");
 
     // Add panel variable using panel name instead of panel ID
     await scopedVars.addScopedVariable(panelVar, "logs", "e2e_automate", "kubernetes_namespace_name", {
@@ -120,59 +122,39 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     });
 
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(panelVar)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(panelVar);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Try to add tab variable
-    await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await page.locator(SELECTORS.VARIABLE_NAME).fill(tabVar);
+    await scopedVars.clickAddVariableBtn();
+    await scopedVars.fillVariableName(tabVar);
 
-    await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
-    await page.getByRole("option", { name: "Selected Tabs", exact: true }).click();
+    await scopedVars.selectVariableScope("tabs");
 
-    // Select stream and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
-    await streamSelect.click();
-    await streamSelect.fill("e2e_automate");
-    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
-
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
-    await fieldSelect.click();
-    await fieldSelect.fill("kubernetes_container_name");
-    // Wait for options to load
-    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
+    // Select stream and field using shared utilities
+    await selectStreamType(page, "logs");
+    await selectStreamFromDropdown(page, "e2e_automate");
+    await selectFieldFromDropdown(page, "kubernetes_container_name");
 
     // Check dependency dropdown via filter - should NOT show panel variables
     // Add filter to check available dependency options
-    await page.locator(SELECTORS.ADD_FILTER_BTN).click();
+    await scopedVars.clickAddFilter();
 
-    const filterNameSelector = page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
-    await filterNameSelector.waitFor({ state: "visible" });
-    await filterNameSelector.click();
-    await filterNameSelector.fill("kubernetes_namespace_name");
-    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+    await scopedVars.selectFilterName("kubernetes_namespace_name");
 
-    const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
-    await operatorSelector.click();
-    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+    await scopedVars.selectFilterOperator("=");
 
-    // Click on the autocomplete to see available variables
-    const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
-    await autoComplete.waitFor({ state: "visible", timeout: 5000 });
-    await autoComplete.click();
-    // Small wait for dropdown to potentially appear - if no options, listbox won't show
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // Click on the filter value OCombobox input to open autocomplete suggestions
+    const filterValueInput = scopedVars.getFilterValueInput();
+    await filterValueInput.waitFor({ state: "visible", timeout: 5000 });
+    await filterValueInput.click();
 
-    // Check if dropdown appears (it might not if there are no valid options)
-    const hasListbox = await page.locator(SELECTORS.ROLE_LISTBOX).isVisible().catch(() => false);
+    // OCombobox opens on focus (:open-on-focus="true"); options appear immediately
+    const hasDropdown = await scopedVars.getFilterValueOptions().first().isVisible({ timeout: 2000 }).catch(() => false);
 
-    if (hasListbox) {
+    if (hasDropdown) {
       // If dropdown appears, verify panel variable is NOT in the list
-      const options = await page.locator(SELECTORS.ROLE_OPTION).allTextContents();
+      const options = await scopedVars.getFilterValueOptionTexts();
       expect(options).not.toContain(panelVar);
     } else {
       // If dropdown doesn't appear, it means there are no variables available (correct behavior)
@@ -182,13 +164,13 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -204,19 +186,19 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add Tab1 and Tab2
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting("Tab1");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab1")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForTabVisible("Tab1");
 
     await pm.dashboardSetting.addTabSetting("Tab2");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab2")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForTabVisible("Tab2");
 
     // Add variable to Tab1
     await scopedVars.addScopedVariable(tab1Var, "logs", "e2e_automate", "kubernetes_namespace_name", {
@@ -225,68 +207,42 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     });
 
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(tab1Var)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(tab1Var);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Try to add variable to Tab2
-    await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await page.locator(SELECTORS.VARIABLE_NAME).fill(tab2Var);
+    await scopedVars.clickAddVariableBtn();
+    await scopedVars.fillVariableName(tab2Var);
 
-    await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
-    await page.getByRole("option", { name: "Selected Tabs", exact: true }).click();
+    await scopedVars.selectVariableScope("tabs");
 
     // Open tabs dropdown and select tab2
-    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
-    // Wait for dropdown menu to be visible
-    await page.locator(SELECTORS.QUASAR.MENU).waitFor({ state: "visible", timeout: 5000 });
-    // Click the Tab2 option
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab2$/ }).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab2$/ }).click();
+    await scopedVars.selectVariableTab("Tab2");
 
-    // Select stream and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
-    await streamSelect.click();
-    await streamSelect.fill("e2e_automate");
-    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
-
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
-    await fieldSelect.click();
-    await fieldSelect.fill("kubernetes_container_name");
-    // Wait for options to load
-    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
+    // Select stream and field using shared utilities
+    await selectStreamType(page, "logs");
+    await selectStreamFromDropdown(page, "e2e_automate");
+    await selectFieldFromDropdown(page, "kubernetes_container_name");
 
     // Check dependency dropdown via filter - should NOT show Tab1's variable
-    await page.locator(SELECTORS.ADD_FILTER_BTN).click();
+    await scopedVars.clickAddFilter();
 
-    const filterNameSelector = page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
-    await filterNameSelector.waitFor({ state: "visible" });
-    await filterNameSelector.click();
-    await filterNameSelector.fill("kubernetes_namespace_name");
-    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+    await scopedVars.selectFilterName("kubernetes_namespace_name");
 
-    const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
-    await operatorSelector.click();
-    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+    await scopedVars.selectFilterOperator("=");
 
-    // Click on the autocomplete to see available variables
-    const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
-    await autoComplete.waitFor({ state: "visible", timeout: 5000 });
-    await autoComplete.click();
-    // Small wait for dropdown to potentially appear - if no options, listbox won't show
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // Click on the filter value OCombobox input to open autocomplete suggestions
+    const filterValueInput2 = scopedVars.getFilterValueInput();
+    await filterValueInput2.waitFor({ state: "visible", timeout: 5000 });
+    await filterValueInput2.click();
 
-    // Check if dropdown appears (it might not if there are no valid options)
-    const hasListbox = await page.locator(SELECTORS.ROLE_LISTBOX).isVisible().catch(() => false);
+    // OCombobox opens on focus (:open-on-focus="true"); options appear immediately
+    const hasDropdown2 = await scopedVars.getFilterValueOptions().first().isVisible({ timeout: 2000 }).catch(() => false);
 
-    if (hasListbox) {
+    if (hasDropdown2) {
       // If dropdown appears, verify tab1's variable is NOT in the list
-      const options = await page.locator(SELECTORS.ROLE_OPTION).allTextContents();
-      expect(options).not.toContain(tab1Var);
+      const options2 = await scopedVars.getFilterValueOptionTexts();
+      expect(options2).not.toContain(tab1Var);
     } else {
       // If dropdown doesn't appear, it means there are no variables available (correct behavior)
       // This is actually the expected behavior - tab2 cannot depend on tab1's variable
@@ -295,13 +251,13 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -318,19 +274,19 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add tab
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting("Tab1");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab1")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForTabVisible("Tab1");
 
     // Add global and tab variables
     await scopedVars.addScopedVariable(globalVar, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(globalVar)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(globalVar);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // open setting window
@@ -341,42 +297,43 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
       assignedTabs: ["tab1"]
     });
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(tabVar)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(tabVar);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardReady({ timeout: 10000 });
 
     // Switch to Tab1 and add panel
-    await page.locator(getTabSelector("Tab1")).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(getTabSelector("Tab1")).click();
+    await scopedVars.waitForTabVisible("Tab1");
+    await scopedVars.clickTab("Tab1");
     // Wait for tab content to load
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.waitForAddPanelBtn({ timeout: 5000 });
     // Ensure no dialogs are open before adding panel
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
     // Add X and Y axis fields (required for saving panel)
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for panel to be added to dashboard and panel editor to close
-    await page.locator(SELECTORS.PANEL_ANY).first().waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getAnyPanel(0).waitFor({ state: "visible", timeout: 15000 });
     // Wait for panel editor dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 10000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 10000 });
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
     // Wait for settings button to be available (indicates panel editor has closed)
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.waitForDashboardReady({ timeout: 15000 });
     // Additional wait to ensure dashboard is stable after panel creation
     await safeWaitForNetworkIdle(page, { timeout: 5000 });
 
@@ -385,86 +342,52 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // openSetting() already waits for the dialog to be fully open (verifies general tab is visible)
     await pm.dashboardSetting.openVariables();
     // Wait for variables tab to be active and add button to be visible
-    await page.locator(SELECTORS.ADD_VARIABLE_BTN).waitFor({ state: "visible", timeout: 10000 });
-    await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await page.locator(SELECTORS.VARIABLE_NAME).fill(panelVar);
+    await scopedVars.waitForAddVariableBtnVisible();
+    await scopedVars.clickAddVariableBtn();
+    await scopedVars.fillVariableName(panelVar);
 
-    await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
-    await page.getByRole("option", { name: "Selected Panels", exact: true }).click();
+    await scopedVars.selectVariableScope("panels");
 
     // First select the tab containing the panel
-    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
-    // Wait for dropdown menu to be visible
-    await page.locator(SELECTORS.QUASAR.MENU).waitFor({ state: "visible", timeout: 5000 });
-    // Click the Tab1 option
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab1$/ }).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Tab1$/ }).click();
-    await page.keyboard.press('Escape');
-    // Wait for dropdown to close
-    await safeWaitForHidden(page, SELECTORS.QUASAR.MENU, { timeout: 3000 });
+    await scopedVars.selectVariableTab("Tab1");
 
     // Then select the panel by name
-    await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).click();
-    // Wait for dropdown menu to be visible
-    await page.locator(SELECTORS.QUASAR.MENU).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel1$/ }).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel1$/ }).click();
+    await scopedVars.selectVariablePanel("Panel1");
 
-    // Select stream and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
-    await streamSelect.click();
-    await streamSelect.fill("e2e_automate");
-    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
-
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
-    await fieldSelect.click();
-    await fieldSelect.fill("kubernetes_pod_name");
-    // Wait for options to load
-    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
+    // Select stream and field using shared utilities
+    await selectStreamType(page, "logs");
+    await selectStreamFromDropdown(page, "e2e_automate");
+    await selectFieldFromDropdown(page, "kubernetes_pod_name");
 
     // Check dependency dropdown via filter - should show both global and tab variables
-    await page.locator(SELECTORS.ADD_FILTER_BTN).click();
+    await scopedVars.clickAddFilter();
 
-    const filterNameSelector = page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
-    await filterNameSelector.waitFor({ state: "visible" });
-    await filterNameSelector.click();
-    await filterNameSelector.fill("kubernetes_namespace_name");
-    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+    await scopedVars.selectFilterName("kubernetes_namespace_name");
 
-    const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
-    await operatorSelector.click();
-    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+    await scopedVars.selectFilterOperator("=");
 
-    // Click on the autocomplete to see available variables
-    const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
-    await autoComplete.waitFor({ state: "visible", timeout: 10000 });
-    await autoComplete.click();
+    // Click on the filter value OCombobox input to open autocomplete suggestions
+    const filterValueInput3 = scopedVars.getFilterValueInput();
+    await filterValueInput3.waitFor({ state: "visible", timeout: 10000 });
+    await filterValueInput3.click();
 
-    // Wait for dropdown options to appear - CommonAutoComplete uses data-test="common-auto-complete-option"
-    await page.locator(SELECTORS.AUTO_COMPLETE_OPTION).first().waitFor({ state: "visible", timeout: 10000 });
-    // Ensure all options are loaded
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // OCombobox opens on focus; wait for options to appear
+    await scopedVars.getFilterValueOptions().first().waitFor({ state: "visible", timeout: 10000 });
 
-    const options = await page.locator(SELECTORS.AUTO_COMPLETE_OPTION).allTextContents();
-    expect(options).toContain(globalVar);
-    expect(options).toContain(tabVar);
+    const options3 = await scopedVars.getFilterValueOptionTexts();
+    expect(options3).toContain(globalVar);
+    expect(options3).toContain(tabVar);
 
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -480,12 +403,13 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add Panel1
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
@@ -494,6 +418,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardCreate.addPanelToExistingDashboard();
     await pm.chartTypeSelector.selectChartType("bar");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
     await pm.dashboardPanelActions.addPanelName("Panel2");
     await pm.dashboardPanelActions.savePanel();
@@ -506,75 +431,41 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     });
 
     // Try to add variable to Panel2 depending on Panel1's variable
-    await page.locator(SELECTORS.ADD_VARIABLE_BTN).click();
-    await page.locator(SELECTORS.VARIABLE_NAME).fill(panel2Var);
+    await scopedVars.clickAddVariableBtn();
+    await scopedVars.fillVariableName(panel2Var);
 
-    await page.locator(SELECTORS.VARIABLE_SCOPE_SELECT).click();
-    await page.getByRole("option", { name: "Selected Panels", exact: true }).click();
+    await scopedVars.selectVariableScope("panels");
 
     // First select the default tab to enable the panels dropdown
-    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.VARIABLE_TABS_SELECT).click();
-    // Wait for dropdown menu to be visible
-    await page.locator(SELECTORS.QUASAR.MENU).waitFor({ state: "visible", timeout: 5000 });
-    // Click the Default tab option
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Default$/ }).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Default$/ }).click();
-    await page.keyboard.press('Escape');
-    // Wait for dropdown to close
-    await safeWaitForHidden(page, SELECTORS.QUASAR.MENU, { timeout: 3000 });
+    await scopedVars.selectVariableTab("Default");
 
     // Now open the panels dropdown and select panel2 by name
-    await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.VARIABLE_PANELS_SELECT).click();
-    // Wait for dropdown menu to be visible
-    await page.locator(SELECTORS.QUASAR.MENU).waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel2$/ }).waitFor({ state: "visible" });
-    await page.locator(SELECTORS.QUASAR.MENU_ITEM).filter({ hasText: /^Panel2$/ }).click();
+    await scopedVars.selectVariablePanel("Panel2");
 
-    // Select stream and field
-    await page.locator(SELECTORS.VARIABLE_STREAM_TYPE_SELECT).click();
-    await page.getByRole("option", { name: "logs", exact: true }).click();
-
-    const streamSelect = page.locator(SELECTORS.VARIABLE_STREAM_SELECT);
-    await streamSelect.click();
-    await streamSelect.fill("e2e_automate");
-    await page.getByRole("option", { name: "e2e_automate", exact: true }).click();
-
-    const fieldSelect = page.locator(SELECTORS.VARIABLE_FIELD_SELECT);
-    await fieldSelect.click();
-    await fieldSelect.fill("kubernetes_pod_name");
-    // Wait for options to load
-    await page.locator(SELECTORS.ROLE_OPTION).first().waitFor({ state: "visible", timeout: 5000 });
-    await page.locator(SELECTORS.ROLE_OPTION).first().click();
+    // Select stream and field using shared utilities
+    await selectStreamType(page, "logs");
+    await selectStreamFromDropdown(page, "e2e_automate");
+    await selectFieldFromDropdown(page, "kubernetes_pod_name");
 
     // Check dependency dropdown via filter - should NOT show Panel1's variable
-    await page.locator(SELECTORS.ADD_FILTER_BTN).click();
+    await scopedVars.clickAddFilter();
 
-    const filterNameSelector = page.locator(SELECTORS.FILTER_NAME_SELECTOR).last();
-    await filterNameSelector.waitFor({ state: "visible" });
-    await filterNameSelector.click();
-    await filterNameSelector.fill("kubernetes_namespace_name");
-    await page.getByRole("option", { name: "kubernetes_namespace_name" }).click();
+    await scopedVars.selectFilterName("kubernetes_namespace_name");
 
-    const operatorSelector = page.locator(SELECTORS.FILTER_OPERATOR_SELECTOR).last();
-    await operatorSelector.click();
-    await page.getByRole("option", { name: "=", exact: true }).locator("div").nth(2).click();
+    await scopedVars.selectFilterOperator("=");
 
-    // Click on the autocomplete to see available variables
-    const autoComplete = page.locator(SELECTORS.AUTO_COMPLETE).last();
-    await autoComplete.waitFor({ state: "visible", timeout: 5000 });
-    await autoComplete.click();
-    // Small wait for dropdown to potentially appear - if no options, listbox won't show
-    await safeWaitForNetworkIdle(page, { timeout: 3000 });
+    // Click on the filter value OCombobox input to open autocomplete suggestions
+    const filterValueInput4 = scopedVars.getFilterValueInput();
+    await filterValueInput4.waitFor({ state: "visible", timeout: 5000 });
+    await filterValueInput4.click();
 
-    // Check if dropdown appears (it might not if there are no valid options)
-    const hasListbox = await page.locator(SELECTORS.ROLE_LISTBOX).isVisible().catch(() => false);
+    // OCombobox opens on focus (:open-on-focus="true"); options appear immediately
+    const hasDropdown4 = await scopedVars.getFilterValueOptions().first().isVisible({ timeout: 2000 }).catch(() => false);
 
-    if (hasListbox) {
+    if (hasDropdown4) {
       // If dropdown appears, verify panel1's variable is NOT in the list
-      const options = await page.locator(SELECTORS.ROLE_OPTION).allTextContents();
-      expect(options).not.toContain(panel1Var);
+      const options4 = await scopedVars.getFilterValueOptionTexts();
+      expect(options4).not.toContain(panel1Var);
     } else {
       // If dropdown doesn't appear, it means there are no variables available (correct behavior)
       // This is expected - panel variables cannot depend on other panel variables
@@ -583,13 +474,13 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -604,24 +495,24 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add multiple tabs
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting("Tab1");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab1")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForTabVisible("Tab1");
 
     await pm.dashboardSetting.addTabSetting("Tab2");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab2")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForTabVisible("Tab2");
 
     await pm.dashboardSetting.addTabSetting("Tab3");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab3")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForTabVisible("Tab3");
 
     // Add variable assigned to all tabs
     await scopedVars.addScopedVariable(variableName, "logs", "e2e_automate", "kubernetes_namespace_name", {
@@ -630,24 +521,23 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     });
 
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(variableName);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for dashboard to be fully loaded after closing settings
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardReady({ timeout: 10000 });
 
     // Verify variable is visible in all tabs
     const tabMapping = { tab1: "Tab1", tab2: "Tab2", tab3: "Tab3" };
     for (const tabId of ["tab1", "tab2", "tab3"]) {
-      const tabLocator = page.locator(getTabSelector(tabMapping[tabId]));
-      await tabLocator.click();
+      await scopedVars.clickTab(tabMapping[tabId]);
       // Wait for tab to be active by checking for active state or waiting for tab content to load
-      await page.locator(SELECTORS.ADD_PANEL_BTN).or(page.locator(SELECTORS.PANEL_ANY)).first().waitFor({ state: "visible", timeout: 5000 });
+      await scopedVars.waitForTabContentLoaded();
 
       // Wait for variable to appear on the dashboard after tab switch
-      await page.locator(getVariableSelector(variableName)).waitFor({ state: "visible", timeout: 10000 });
+      await scopedVars.getVariableSelectorLocator(variableName).waitFor({ state: "visible", timeout: 10000 });
 
       await scopedVars.verifyVariableVisibility(variableName, true);
     }
@@ -655,7 +545,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -670,12 +560,13 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add multiple panels
     await pm.dashboardCreate.addPanel();
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
@@ -683,14 +574,15 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardCreate.addPanelToExistingDashboard();
     await pm.chartTypeSelector.selectChartType("bar");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
     await pm.dashboardPanelActions.addPanelName("Panel2");
     await pm.dashboardPanelActions.savePanel();
 
     // Wait for both panels to be fully rendered
-    await page.locator(SELECTORS.PANEL_ANY).nth(1).waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.getAnyPanel(1).waitFor({ state: "visible", timeout: 15000 });
     // Wait for settings button to ensure panels are fully loaded
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardReady({ timeout: 10000 });
 
     // Add variable assigned to both panels using panel names
     await pm.dashboardSetting.openSetting();
@@ -699,15 +591,15 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
       assignedPanels: ["Panel1", "Panel2"]
     });
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(variableName)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(variableName);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
     // Wait for variable selectors to appear on panels
-    await page.locator(getVariableSelector(variableName)).first().waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(variableName).first().waitFor({ state: "visible", timeout: 10000 });
 
     // Verify variable is visible for both panels - should have 2 variable selectors (one per panel)
-    const variableSelectors = page.locator(getVariableSelector(variableName));
+    const variableSelectors = scopedVars.getVariableSelectorLocator(variableName);
     await expect(variableSelectors).toHaveCount(2, { timeout: 10000 });
     // Verify both are visible
     await expect(variableSelectors.first()).toBeVisible({ timeout: 5000 });
@@ -716,7 +608,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -731,14 +623,14 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add tab
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting("Tab1");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab1")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForTabVisible("Tab1");
 
     // Create tab variable WITHOUT any global variables
     await scopedVars.addScopedVariable(tabVar, "logs", "e2e_automate", "kubernetes_namespace_name", {
@@ -747,28 +639,28 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     });
 
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(tabVar)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(tabVar);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for dashboard to be fully loaded after closing settings
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardReady({ timeout: 10000 });
 
     // Switch to Tab1 and verify variable exists
-    await page.locator(getTabSelector("Tab1")).click();
+    await scopedVars.clickTab("Tab1");
     // Wait for tab content to load
-    await page.locator(SELECTORS.ADD_PANEL_BTN).or(page.locator(SELECTORS.PANEL_ANY)).first().waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.waitForTabContentLoaded();
 
     // Wait for variable to appear on the dashboard after tab switch
-    await page.locator(getVariableSelector(tabVar)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.getVariableSelectorLocator(tabVar).waitFor({ state: "visible", timeout: 10000 });
 
     await scopedVars.verifyVariableVisibility(tabVar, true);
 
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -784,19 +676,19 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add Tab1
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting("Tab1");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab1")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForTabVisible("Tab1");
 
     // Add global and tab variables
     await scopedVars.addScopedVariable(globalVar, "logs", "e2e_automate", "kubernetes_namespace_name", { scope: "global" });
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(globalVar)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(globalVar);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // open setting window
@@ -807,31 +699,30 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
       assignedTabs: ["tab1"]
     });
     // Wait for variable to be saved
-    await page.locator(getEditVariableBtn(tabVar)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(tabVar);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardReady({ timeout: 10000 });
 
     // Switch to Tab1
-    await page.locator(getTabSelector("Tab1")).click();
+    await scopedVars.clickTab("Tab1");
     // Wait for tab content to load
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.waitForAddPanelBtn({ timeout: 5000 });
     // Ensure no dialogs are open before adding panel
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Go to add panel
     await pm.dashboardCreate.addPanel();
     // Wait for panel editor to open - wait for the chart type selection which appears first
-    const panelEditorIndicator = page.locator(SELECTORS.CHART_LINE_ITEM).or(page.locator(SELECTORS.APPLY_BTN)).first();
-    await panelEditorIndicator.waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.waitForPanelEditorOpen();
 
     // Check available variables in panel edit mode
     // Both global and tab1 variables should be available
@@ -841,6 +732,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Save panel
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
@@ -848,7 +740,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 
@@ -864,19 +756,19 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     await pm.dashboardCreate.waitForDashboardUIStable();
     await pm.dashboardCreate.createDashboard(dashboardName);
 
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible" });
+    await scopedVars.waitForAddPanelBtn();
 
     // Add Tab1 and Tab2
     await pm.dashboardSetting.openSetting();
     await pm.dashboardSetting.addTabSetting("Tab1");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab1")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForTabVisible("Tab1");
 
     await pm.dashboardSetting.addTabSetting("Tab2");
     await pm.dashboardSetting.saveTabSetting();
     // Wait for tab to be created and visible
-    await page.locator(getTabSelector("Tab2")).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForTabVisible("Tab2");
 
     // Add variables to both tabs
     await scopedVars.addScopedVariable(tab1Var, "logs", "e2e_automate", "kubernetes_namespace_name", {
@@ -884,7 +776,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
       assignedTabs: ["tab1"]
     });
     // Wait for first variable to be saved
-    await page.locator(getEditVariableBtn(tab1Var)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(tab1Var);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await scopedVars.addScopedVariable(tab2Var, "logs", "e2e_automate", "kubernetes_container_name", {
@@ -892,27 +784,26 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
       assignedTabs: ["tab2"]
     });
     // Wait for second variable to be saved
-    await page.locator(getEditVariableBtn(tab2Var)).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForEditVariableBtnVisible(tab2Var);
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     await pm.dashboardSetting.closeSettingWindow();
 
     // Wait for settings dialog to be fully closed
-    await safeWaitForHidden(page, SELECTORS.QUASAR.DIALOG, { timeout: 5000 });
+    await safeWaitForHidden(page, SELECTORS.COMPONENTS.DIALOG, { timeout: 5000 });
     await safeWaitForNetworkIdle(page, { timeout: 3000 });
 
     // Wait for dashboard to be fully loaded after closing settings
-    await page.locator(SELECTORS.SETTING_BTN).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardReady({ timeout: 10000 });
 
     // Go to Tab1 and add panel
-    await page.locator(getTabSelector("Tab1")).click();
+    await scopedVars.clickTab("Tab1");
     // Wait for tab content to load
-    await page.locator(SELECTORS.ADD_PANEL_BTN).waitFor({ state: "visible", timeout: 5000 });
+    await scopedVars.waitForAddPanelBtn({ timeout: 5000 });
 
     await pm.dashboardCreate.addPanel();
     // Wait for panel editor to open - wait for the chart type selection which appears first
-    const panelEditorIndicator2 = page.locator(SELECTORS.CHART_LINE_ITEM).or(page.locator(SELECTORS.APPLY_BTN)).first();
-    await panelEditorIndicator2.waitFor({ state: "visible", timeout: 15000 });
+    await scopedVars.waitForPanelEditorOpen();
 
     // Should see Tab1 variable, but NOT Tab2 variable
     await scopedVars.verifyVariableInPanelEdit(tab1Var, true);
@@ -921,6 +812,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Save the panel to avoid the discard confirmation dialog
     await pm.chartTypeSelector.selectChartType("line");
     await pm.chartTypeSelector.selectStream("e2e_automate");
+    await pm.chartTypeSelector.removeField("y_axis_1", "y");
     await pm.chartTypeSelector.searchAndAddField("kubernetes_pod_name", "y");
     await pm.dashboardPanelActions.addPanelName("Panel1");
     await pm.dashboardPanelActions.savePanel();
@@ -928,7 +820,7 @@ test.describe("Dashboard Variables - Creation & Scope Restrictions", { tag: ['@d
     // Cleanup
     await pm.dashboardCreate.backToDashboardList();
     // Wait for dashboard list to be fully loaded
-    await page.locator(SELECTORS.SEARCH).waitFor({ state: "visible", timeout: 10000 });
+    await scopedVars.waitForDashboardSearch();
     await deleteDashboard(page, dashboardName);
   });
 });

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,14 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import {
-  PromQLChartConverter,
-  ProcessedPromQLData,
-  TOOLTIP_SCROLL_STYLE,
-} from "./shared/types";
+import { PromQLChartConverter, ProcessedPromQLData, TOOLTIP_SCROLL_STYLE } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 import { getSeriesColor } from "../colorPalette";
+import { chartColor } from "@/utils/chartTheme";
 
 /**
  * Converter for gauge charts
@@ -29,22 +26,13 @@ import { getSeriesColor } from "../colorPalette";
 export class GaugeConverter implements PromQLChartConverter {
   supportedTypes = ["gauge"];
 
-  convert(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-    store: any,
-    extras: any,
-    chartPanelRef?: any,
-  ) {
+  convert(processedData: ProcessedPromQLData[], panelSchema: any, store: any, extras: any) {
     const config = panelSchema.config || {};
     const series: any[] = [];
     const aggregation = config.aggregation || "last";
 
     // Calculate grid layout for multiple gauges
-    const totalGauges = processedData.reduce(
-      (sum, qd) => sum + qd.series.length,
-      0,
-    );
+    const totalGauges = processedData.reduce((sum, qd) => sum + qd.series.length, 0);
     const gridLayout = this.calculateGridLayout(totalGauges, panelSchema);
 
     let gaugeIndex = 0;
@@ -105,12 +93,7 @@ export class GaugeConverter implements PromQLChartConverter {
                 },
               },
               itemStyle: {
-                color: this.getGaugeColor(
-                  value,
-                  seriesData.name,
-                  panelSchema,
-                  store,
-                ),
+                color: this.getGaugeColor(value, seriesData.name, panelSchema, store),
               },
             },
           ],
@@ -141,18 +124,13 @@ export class GaugeConverter implements PromQLChartConverter {
         show: true,
         trigger: "item",
         textStyle: {
-          color: store.state.theme === "dark" ? "#fff" : "#000",
+          color: chartColor("--color-tooltip-text"),
           fontSize: 12,
         },
         extraCssText: TOOLTIP_SCROLL_STYLE,
         valueFormatter: (value: any) => {
           return formatUnitValue(
-            getUnitValue(
-              value,
-              config?.unit,
-              config?.unit_custom,
-              config?.decimals,
-            ),
+            getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
           );
         },
       },
@@ -164,8 +142,7 @@ export class GaugeConverter implements PromQLChartConverter {
    */
   private calculateGridLayout(totalGauges: number, panelSchema: any) {
     const config = panelSchema.config || {};
-    const gaugesPerRow =
-      config.gauges_per_row || Math.ceil(Math.sqrt(totalGauges));
+    const gaugesPerRow = config.gauges_per_row || Math.ceil(Math.sqrt(totalGauges));
     const rows = Math.ceil(totalGauges / gaugesPerRow);
 
     const gridWidth = 100 / gaugesPerRow;
@@ -204,12 +181,7 @@ export class GaugeConverter implements PromQLChartConverter {
   /**
    * Get color for gauge based on value and configuration
    */
-  private getGaugeColor(
-    value: number,
-    seriesName: string,
-    panelSchema: any,
-    store: any,
-  ) {
+  private getGaugeColor(value: number, seriesName: string, panelSchema: any, store: any) {
     const config = panelSchema.config || {};
 
     try {

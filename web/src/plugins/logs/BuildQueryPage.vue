@@ -1,0 +1,552 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div
+    class="border-border-default relative h-full w-full border-t"
+    data-test="logs-build-query-page"
+  >
+    <!-- PanelEditor with BUILD_PRESET -->
+    <PanelEditor
+      ref="panelEditorRef"
+      pageType="build"
+      :editMode="true"
+      :selectedDateTime="dashboardPanelData.meta.dateTime"
+      :showAddToDashboardButton="true"
+      @addToDashboard="onAddToDashboard"
+      @chartApiError="handleChartApiError"
+      @queryGenerated="onQueryGenerated"
+      @customQueryModeChanged="onCustomQueryModeChanged"
+      @searchRequestTraceIdsUpdated="onSearchRequestTraceIdsUpdated"
+    />
+
+    <!-- Add to Dashboard Dialog -->
+    <AddToDashboard
+      v-model:open="showAddToDashboardDialog"
+      :dashboardPanelData="dashboardPanelData"
+      @save="addPanelToDashboard"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, onMounted, defineAsyncComponent, provide } from "vue";
+import { useRouter } from "vue-router";
+import { useI18nTyped } from "@/types/i18n";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import {
+  parseSQL,
+  shouldUseCustomMode,
+  parsedQueryToPanelFields,
+} from "@/utils/query/sqlQueryParser";
+import { decodeBuildConfig } from "@/composables/useLogs/logsVisualization";
+import { parseWhereClauseToFilter } from "@/utils/query/sqlUtils";
+import useNotifications from "@/composables/useNotifications";
+import { searchState } from "@/composables/useLogs/searchState";
+
+// ============================================================================
+// Component Imports
+// ============================================================================
+
+// PanelEditor is imported synchronously so it's available immediately in onMounted
+import PanelEditor from "@/components/dashboards/PanelEditor/PanelEditor.vue";
+
+// These can remain async as they're not needed immediately
+const AddToDashboard = defineAsyncComponent(() => import("@/plugins/metrics/AddToDashboard.vue"));
+
+// ============================================================================
+// Default Builder Fields
+// ============================================================================
+
+/** Default x-axis field: histogram(_timestamp) */
+const DEFAULT_X_AXIS_FIELD = () => ({
+  label: "_timestamp",
+  alias: "x_axis_1",
+  column: "_timestamp",
+  color: null,
+  type: "build",
+  functionName: "histogram",
+  args: [
+    { type: "field", value: { field: "_timestamp" } },
+    { type: "histogramInterval", value: null },
+  ],
+  sortBy: "ASC",
+  isDerived: false,
+  havingConditions: [],
+});
+
+/** Default y-axis field: count(_timestamp) */
+const DEFAULT_Y_AXIS_FIELD = () => ({
+  label: "_timestamp",
+  alias: "y_axis_1",
+  column: "_timestamp",
+  color: "#5960b2",
+  type: "build",
+  functionName: "count",
+  args: [{ type: "field", value: { field: "_timestamp" } }],
+  sortBy: null,
+  isDerived: false,
+  havingConditions: [],
+});
+
+// ============================================================================
+// Props and Emits
+// ============================================================================
+
+interface Props {
+  /** Current SQL query from logs search (only used when isSqlMode is true) */
+  searchQuery?: string;
+  /** Selected stream name */
+  selectedStream?: string;
+  /** Selected date time */
+  selectedDateTime?: {
+    start_time: number | string;
+    end_time: number | string;
+    valueType?: "relative" | "absolute";
+    relativeTimePeriod?: string;
+  };
+  /** Whether this is the first toggle to build tab (for shared link support) */
+  isFirstToggle?: boolean;
+  /** Whether SQL mode is ON in the logs page */
+  isSqlMode?: boolean;
+  /** Raw WHERE clause text from non-SQL mode */
+  whereClause?: string;
+}
+
+const props = withDefaults(defineProps<Props>(), {
+  searchQuery: "",
+  selectedStream: "",
+  selectedDateTime: undefined,
+  isFirstToggle: true,
+  isSqlMode: true,
+  whereClause: "",
+});
+
+// Emits
+const emit = defineEmits<{
+  /** Emitted when SQL query is generated from builder fields */
+  (e: "queryGenerated", query: string): void;
+  /** Emitted when customQuery mode changes (true = custom mode, false = builder mode) */
+  (e: "customQueryModeChanged", isCustomMode: boolean): void;
+  /** Emitted when initialization is complete */
+  (e: "initialized"): void;
+  /** Emitted when search request trace IDs change (for cancel query functionality) */
+  (e: "searchRequestTraceIdsUpdated", traceIds: string[]): void;
+}>();
+
+// ============================================================================
+// Setup
+// ============================================================================
+
+const { t } = useI18nTyped();
+const router = useRouter();
+const panelEditorRef = ref<any>(null);
+const showAddToDashboardDialog = ref(false);
+
+// Get dashboard panel data for build page
+const {
+  dashboardPanelData,
+  resetDashboardPanelData,
+  updateGroupedFields,
+  makeAutoSQLQuery,
+  validatePanel,
+} = useDashboardPanelData("build", t);
+
+const { showErrorNotification } = useNotifications();
+const { searchObj } = searchState();
+
+// Provide page key for child components
+provide("dashboardPanelDataPageKey", "build");
+
+// ============================================================================
+// URL Config Restore Helper
+// ============================================================================
+
+/**
+ * Restore build state from URL params.
+ * On first toggle (shared link), restores fields, customQuery, query, chart type, and config.
+ * On subsequent toggles, only config is used (chart type and fields re-derived from searchQuery).
+ */
+const restoreConfigFromUrl = (): {
+  type?: string;
+  config?: any;
+  fields?: any;
+  joins?: any[];
+  customQuery?: boolean;
+  query?: string;
+} => {
+  const buildData = router.currentRoute.value?.query?.build_data as string | undefined;
+  if (!buildData) {
+    return {};
+  }
+
+  try {
+    const decoded = decodeBuildConfig(buildData);
+    if (!decoded) {
+      return {};
+    }
+
+    return {
+      type: decoded.type,
+      config: decoded.config,
+      fields: decoded.fields,
+      joins: decoded.joins,
+      customQuery: decoded.customQuery,
+      query: decoded.query,
+    };
+  } catch (error) {
+    console.error("Failed to restore build config from URL:", error);
+    return {};
+  }
+};
+
+// ============================================================================
+// Initialization
+// ============================================================================
+
+const initializeFromQuery = async () => {
+  // Reset panel data first
+  resetDashboardPanelData();
+
+  // Sync datetime from parent
+  if (props.selectedDateTime) {
+    dashboardPanelData.meta.dateTime = { ...props.selectedDateTime };
+  }
+
+  // Restore config/chart type from the saved view being applied, else from URL
+  // params (similar to visualization's preservedConfig). Fields and chart type are
+  // only restored on the FIRST toggle (shared links); on later tab switches they
+  // are re-derived from props.searchQuery. A saved view is the exception: it wins
+  // over the URL — which still holds the build_data of whatever was open before —
+  // and restores in full even when the build tab was already visited. Consumed
+  // once, so later toggles go back to re-deriving from the logs query.
+  const savedViewConfig = searchObj.meta.savedBuildConfig;
+  searchObj.meta.savedBuildConfig = null;
+  const urlConfig = savedViewConfig ?? restoreConfigFromUrl();
+  const restoreFields = props.isFirstToggle || !!savedViewConfig;
+  let shouldAutoSelectChartType = true;
+
+  // Always restore config from URL (for settings like table_dynamic_columns, etc.)
+  if (urlConfig.config) {
+    dashboardPanelData.data.config = {
+      ...dashboardPanelData.data.config,
+      ...urlConfig.config,
+    };
+  }
+  if (urlConfig.type && restoreFields) {
+    dashboardPanelData.data.type = urlConfig.type;
+    shouldAutoSelectChartType = false;
+  }
+
+  // Restore saved fields directly instead of parsing searchQuery, preserving the
+  // exact builder/custom state.
+  if (
+    restoreFields &&
+    urlConfig.fields &&
+    (urlConfig.fields.x?.length || urlConfig.fields.y?.length || urlConfig.customQuery)
+  ) {
+    const savedFields = urlConfig.fields;
+    dashboardPanelData.data.queries[0].fields.stream =
+      savedFields.stream || props.selectedStream || "";
+    dashboardPanelData.data.queries[0].fields.stream_type = savedFields.stream_type || "logs";
+    dashboardPanelData.data.queries[0].fields.x = savedFields.x || [];
+    dashboardPanelData.data.queries[0].fields.y = savedFields.y || [];
+    dashboardPanelData.data.queries[0].fields.breakdown = savedFields.breakdown || [];
+    if (savedFields.filter) {
+      dashboardPanelData.data.queries[0].fields.filter = savedFields.filter;
+    }
+    dashboardPanelData.data.queries[0].customQuery = urlConfig.customQuery || false;
+    if (urlConfig.joins) {
+      dashboardPanelData.data.queries[0].joins = urlConfig.joins;
+    }
+    if (urlConfig.query) {
+      dashboardPanelData.data.queries[0].query = urlConfig.query;
+    }
+
+    // Load stream fields for the query builder
+    if (dashboardPanelData.data.queries[0].fields.stream) {
+      await updateGroupedFields();
+    }
+
+    // Generate SQL query for builder mode (auto mode)
+    if (!dashboardPanelData.data.queries[0].customQuery) {
+      const generatedQuery = await makeAutoSQLQuery();
+      if (generatedQuery !== undefined) {
+        emit("queryGenerated", generatedQuery);
+      }
+    }
+
+    // Notify parent and run query
+    emit("initialized");
+    await runQuery();
+    return;
+  }
+
+  // ---- Case 1: Non-SQL mode → builder mode with defaults ----
+  // When SQL mode is OFF, always use builder mode with histogram/count fields
+  // and carry over the WHERE clause as a filter
+  if (!props.isSqlMode) {
+    if (props.selectedStream) {
+      dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
+      dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+      await updateGroupedFields();
+    }
+
+    dashboardPanelData.data.queries[0].customQuery = false;
+
+    // Default x-axis and y-axis fields
+    dashboardPanelData.data.queries[0].fields.x = [DEFAULT_X_AXIS_FIELD()];
+    dashboardPanelData.data.queries[0].fields.y = [DEFAULT_Y_AXIS_FIELD()];
+
+    // Parse WHERE clause into builder filter
+    if (props.whereClause?.trim()) {
+      const filter = await parseWhereClauseToFilter(props.whereClause);
+      dashboardPanelData.data.queries[0].fields.filter = filter;
+    }
+
+    emit("initialized");
+
+    const generatedQuery = await makeAutoSQLQuery();
+    if (generatedQuery !== undefined) {
+      emit("queryGenerated", generatedQuery);
+    }
+    await runQuery();
+    return;
+  }
+
+  // ---- Case 3: SQL mode ON (existing behavior) ----
+
+  // If no query or bare SELECT * FROM "stream" (without WHERE/GROUP BY/etc.),
+  // use builder mode with default histogram/count fields.
+  // Queries with WHERE clause should be parsed so the filter is preserved.
+  const trimmedQuery = props.searchQuery?.trim() || "";
+  const isEmptyOrSelectAll =
+    !trimmedQuery || /^\s*select\s+\*\s+from\s+["'`]?[\w.:-]+["'`]?\s*$/i.test(trimmedQuery);
+  if (isEmptyOrSelectAll) {
+    if (props.selectedStream) {
+      dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
+      dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+      await updateGroupedFields();
+    }
+    dashboardPanelData.data.queries[0].customQuery = false;
+
+    // Default x-axis and y-axis fields
+    dashboardPanelData.data.queries[0].fields.x = [DEFAULT_X_AXIS_FIELD()];
+    dashboardPanelData.data.queries[0].fields.y = [DEFAULT_Y_AXIS_FIELD()];
+
+    emit("initialized");
+    const generatedQuery = await makeAutoSQLQuery();
+    if (generatedQuery !== undefined) {
+      emit("queryGenerated", generatedQuery);
+    }
+    await runQuery();
+    return;
+  } else if (shouldUseCustomMode(props.searchQuery)) {
+    // Complex query - use custom mode
+    if (props.selectedStream) {
+      dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
+      dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+    }
+    dashboardPanelData.data.queries[0].query = props.searchQuery;
+    dashboardPanelData.data.queries[0].customQuery = true;
+    // Use table chart with dynamic columns for custom mode (unless chart type from URL)
+    if (shouldAutoSelectChartType) {
+      dashboardPanelData.data.type = "table";
+    }
+    dashboardPanelData.data.config.table_dynamic_columns = true;
+  } else {
+    try {
+      // Try to parse the query
+      const parsed = await parseSQL(props.searchQuery, "logs");
+
+      if (parsed.customQuery) {
+        // Parsing failed or complex query detected
+        if (props.selectedStream) {
+          dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
+          dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+        }
+        dashboardPanelData.data.queries[0].query = props.searchQuery;
+        dashboardPanelData.data.queries[0].customQuery = true;
+        // Use table chart with dynamic columns for custom mode (unless chart type from URL)
+        if (shouldAutoSelectChartType) {
+          dashboardPanelData.data.type = "table";
+        }
+        dashboardPanelData.data.config.table_dynamic_columns = true;
+      } else {
+        // Successfully parsed - apply to builder (auto mode)
+        const panelFields = parsedQueryToPanelFields(parsed);
+
+        // Set stream from parsed query or fallback to selected stream
+        const streamName = panelFields.stream || props.selectedStream;
+        dashboardPanelData.data.queries[0].fields.stream = streamName;
+        dashboardPanelData.data.queries[0].fields.stream_type = panelFields.stream_type || "logs";
+
+        // Apply parsed fields to builder
+        dashboardPanelData.data.queries[0].fields.x = panelFields.x;
+        dashboardPanelData.data.queries[0].fields.y = panelFields.y;
+        dashboardPanelData.data.queries[0].fields.breakdown = panelFields.breakdown;
+        dashboardPanelData.data.queries[0].fields.filter = panelFields.filter;
+        dashboardPanelData.data.queries[0].customQuery = false;
+
+        // Apply parsed JOINs to builder
+        if (panelFields.joins && panelFields.joins.length > 0) {
+          dashboardPanelData.data.queries[0].joins = panelFields.joins;
+        }
+
+        // Auto-select chart type based on fields (unless chart type from URL):
+        // - If useTableChart flag is set (more than 2 GROUP BY fields) → use "table" chart
+        // - If only Y-axis fields (no X-axis, no breakdown) → use "metric" chart
+        if (shouldAutoSelectChartType) {
+          if (panelFields.useTableChart) {
+            dashboardPanelData.data.type = "table";
+          } else if (panelFields.y.length === 0) {
+            dashboardPanelData.data.type = "table";
+          } else if (
+            panelFields.x.length === 0 &&
+            panelFields.y.length > 0 &&
+            panelFields.breakdown.length === 0
+          ) {
+            dashboardPanelData.data.type = "metric";
+          }
+        }
+
+        // Load stream fields after setting the stream from parsed query
+        if (streamName) {
+          await updateGroupedFields();
+        }
+      }
+    } catch (error) {
+      console.error("Error parsing query:", error);
+      // Fall back to custom mode
+      if (props.selectedStream) {
+        dashboardPanelData.data.queries[0].fields.stream = props.selectedStream;
+        dashboardPanelData.data.queries[0].fields.stream_type = "logs";
+      }
+      dashboardPanelData.data.queries[0].query = props.searchQuery;
+      dashboardPanelData.data.queries[0].customQuery = true;
+      // Use table chart with dynamic columns for custom mode (unless chart type from URL on first toggle)
+      if (shouldAutoSelectChartType) {
+        dashboardPanelData.data.type = "table";
+      }
+      dashboardPanelData.data.config.table_dynamic_columns = true;
+    }
+  }
+
+  // Notify parent that initialization is complete
+  // This marks the end of first toggle, so subsequent tab switches will auto-select chart type
+  emit("initialized");
+
+  // Run the query after initialization
+  await runQuery();
+};
+
+// ============================================================================
+// Event Handlers
+// ============================================================================
+
+const handleChartApiError = (error: any) => {
+  console.error("Chart API error:", error);
+};
+
+const onAddToDashboard = () => {
+  const errors: string[] = [];
+  validatePanel(errors, true);
+  if (errors.length) {
+    showErrorNotification(t("logs.buildQueryPage.validationErrors"));
+    return;
+  }
+  showAddToDashboardDialog.value = true;
+};
+
+const addPanelToDashboard = () => {
+  showAddToDashboardDialog.value = false;
+};
+
+// ============================================================================
+// Watchers
+// ============================================================================
+
+// NOTE: URL sync for build mode fields is handled by explicit actions (runQuery, apply)
+// rather than a deep watcher. A deep watcher here would call router.push on every
+// field/filter mutation, causing excessive history pushes. The explicit-action
+// pattern avoids that.
+
+// NOTE: Field change watcher for auto SQL generation has been moved to PanelEditor.vue
+// PanelEditor emits 'queryGenerated' and 'customQueryModeChanged' which we forward to parent
+
+// ============================================================================
+// PanelEditor Event Handlers (forward to parent)
+// ============================================================================
+
+const onQueryGenerated = (query: string) => {
+  // Forward the generated query to parent (Index.vue -> SearchBar)
+  emit("queryGenerated", query);
+};
+
+const onCustomQueryModeChanged = (isCustomMode: boolean) => {
+  // Forward the custom query mode change to parent
+  emit("customQueryModeChanged", isCustomMode);
+};
+
+const onSearchRequestTraceIdsUpdated = (traceIds: string[]) => {
+  // Forward search request trace IDs to parent for cancel query functionality
+  emit("searchRequestTraceIdsUpdated", traceIds);
+};
+
+// ============================================================================
+// Lifecycle
+// ============================================================================
+
+onMounted(() => {
+  initializeFromQuery();
+  // Note: PanelEditor's watcher (with immediate: true) will emit initial customQueryModeChanged
+});
+
+// ============================================================================
+// Expose
+// ============================================================================
+
+/**
+ * Run the query in PanelEditor
+ */
+const runQuery = async (withoutCache?: boolean) => {
+  // Sync latest datetime from parent before running the query
+  if (props.selectedDateTime) {
+    dashboardPanelData.meta.dateTime = { ...props.selectedDateTime };
+  }
+
+  // Ensure stream fields are loaded before running query in builder mode
+  if (!dashboardPanelData.data.queries[0].customQuery) {
+    if (!dashboardPanelData.meta.streamFields?.groupedFields?.length) {
+      await updateGroupedFields();
+    }
+    // Generate SQL query after stream fields are loaded
+    // The watcher won't fire because only streamFields changed, not the watched fields
+    const generatedQuery = await makeAutoSQLQuery();
+    if (generatedQuery !== undefined) {
+      emit("queryGenerated", generatedQuery);
+    }
+  }
+
+  panelEditorRef.value?.runQuery(withoutCache);
+};
+
+defineExpose({
+  runQuery,
+  panelEditorRef,
+  dashboardPanelData,
+});
+</script>

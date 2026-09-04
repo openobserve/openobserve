@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,27 +15,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div class="q-pa-sm">
-      <CopyContent class="copy-content-container-cls" :content="content" />
-    </div>
-    <div style="margin-left: 20px">
-      Check further documentation at
-      <a
-        target="_blank"
-        href="https://axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve/"
-        >https://axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve/</a
-      >
-    </div>
-  </div>
+  <IngestionContent>
+    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
+    <IngestionDocLink
+      href="https://axoflow.com/docs/axosyslog-core/chapter-destinations/openobserve/"
+    />
+  </IngestionContent>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { raw } from "@/types/i18n";
+import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
+import IngestionContent from "@/components/ingestion/IngestionContent.vue";
+import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
 export default defineComponent({
   name: "SyslogNg",
   props: {
@@ -46,7 +42,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent },
+  components: { CopyContent, IngestionContent, IngestionDocLink },
   setup() {
     const store = useStore();
     const endpoint: any = ref({
@@ -76,6 +72,7 @@ log {
     flags(flow-control);
 };`;
     return {
+      raw,
       store,
       config,
       endpoint,

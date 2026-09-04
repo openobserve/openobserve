@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,5 +25,13 @@ export const config = {
 
 export const siteURL = {
   contactSales: "https://openobserve.ai/contactus/",
-  contactSupport: "https://openobserve.ai/contactus/"
-}
+  contactSupport: "https://openobserve.ai/contactus/",
+  pricingJsonUrl: "https://openobserve.ai/pricing.json",
+};
+
+// Synthetics browser-test recorder (OpenObserve Extension / playwright-crx).
+// `extensionId` is the Chrome extension id the web app messages over
+// externally_connectable; overridable per-environment via the Vite env var.
+export const synthetics = {
+  extensionId: import.meta.env.VITE_SYNTHETICS_EXTENSION_ID || "openobserve-recorder-extension",
+};

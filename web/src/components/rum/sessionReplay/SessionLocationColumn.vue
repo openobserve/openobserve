@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,59 +15,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div>
-      <div class="row items-center no-wrap">
-        <span :class="`fi fi-${column.country_iso_code} q-mr-sm`" />
-        <div class="tw:text-[0.75rem]">{{ column.country }}</div>
-      </div>
-      <div class="row q-mt-xs items-center">
-        <div class="text-grey-8">
-          {{ column.city || "Unknown" }}
-        </div>
-        <q-icon
+  <div class="flex h-full min-w-0 flex-col justify-center gap-2 leading-tight">
+    <div class="flex min-w-0 flex-nowrap items-center">
+      <span
+        v-if="column.country_iso_code"
+        :class="`fi fi-${column.country_iso_code} me-1.5 shrink-0`"
+      />
+      <div class="truncate text-xs">{{ column.country || t("common.unknown") }}</div>
+    </div>
+    <div class="text-text-secondary flex min-w-0 flex-nowrap items-center text-xs">
+      <template v-for="(part, index) in detailParts" :key="`${index}-${part}`">
+        <OIcon
+          v-if="index > 0"
           data-test="circle-icon"
           name="circle"
-          size="4px"
-          class="q-mx-md text-grey-6"
+          size="xs"
+          class="text-icon-color mx-1.5 shrink-0"
         />
-        <div class="text-grey-8">{{ column.browser }}</div>
-        <q-icon
-          data-test="circle-icon"
-          name="circle"
-          size="4px"
-          class="q-mx-md text-grey-6"
-        />
-        <div class="text-grey-8">{{ column.os }}</div>
-      </div>
+        <span class="truncate">{{ part }}</span>
+      </template>
     </div>
   </div>
 </template>
 <script lang="ts" setup>
+import { computed } from "vue";
 import "flag-icons/css/flag-icons.min.css";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
 
-defineProps({
+const { t } = useI18nTyped();
+
+const props = defineProps({
   column: {
     type: Object,
     required: true,
   },
 });
+
+// Only render the parts that are actually known — no dangling separators.
+const detailParts = computed(() => {
+  const parts = [props.column.city, props.column.browser, props.column.os]
+    .map((part) => (part || "").trim())
+    .filter(Boolean);
+  return parts.length ? parts : [t("common.unknown")];
+});
 </script>
-<style lang="scss">
-.error_type {
-  font-size: 1rem;
-  color: $info;
-}
-
-.error_description {
-  font-size: 0.875rem;
-}
-
-.error_message {
-  font-size: 0.875rem;
-}
-
-.error_time {
-  font-size: 0.75rem;
-}
-</style>

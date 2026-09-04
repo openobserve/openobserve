@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use std::{
     sync::{
-        Arc,
+        Arc, LazyLock as Lazy,
         atomic::{AtomicU8, Ordering},
     },
     time::Duration,
@@ -34,7 +34,6 @@ use config::{
 };
 use futures::{StreamExt, TryStreamExt};
 use hashbrown::HashMap;
-use once_cell::sync::Lazy;
 use tokio::{
     sync::{Mutex, OnceCell, mpsc},
     task::JoinHandle,
@@ -52,7 +51,10 @@ const SUPER_CLUSTER_PREFIX: &str = "super_cluster_kv_";
 static NATS_CLIENT: OnceCell<Client> = OnceCell::const_new();
 
 pub async fn get_nats_client() -> &'static Client {
-    NATS_CLIENT.get_or_init(connect).await
+    NATS_CLIENT
+        .get_or_try_init(connect)
+        .await
+        .unwrap_or_else(|e| panic!("{e}"))
 }
 
 async fn get_bucket_by_key<'a>(
@@ -70,25 +72,47 @@ async fn get_bucket_by_key<'a>(
         history: cfg.nats.history,
         ..Default::default()
     };
-    if bucket_name == "nodes" || bucket_name == "clusters" {
+    // Named literally, like the buckets above: this layer does not import from
+    // the domain modules. A test in `cluster::ai_sessions` pins these names.
+    if bucket_name == "nodes"
+        || bucket_name == "clusters"
+        || bucket_name == "locker"
+        || bucket_name == "lockers"
+        || bucket_name == "ai_replicas"
+        || bucket_name == "ai_session_owners"
+    {
         // if changed ttl need recreate the bucket
         // CMD: nats kv del -f o2_nodes
-        let ttl = Duration::from_secs(cfg.limit.node_heartbeat_ttl as u64);
+        let ttl = if bucket_name.starts_with("locker") {
+            cfg.nats.lock_max_age
+        } else if bucket_name == "ai_session_owners" {
+            cfg.limit.ai_session_owner_ttl as u64
+        } else {
+            // o2-ai replicas heartbeat on the same contract as cluster nodes.
+            cfg.limit.node_heartbeat_ttl as u64
+        };
+        let ttl = Duration::from_secs(ttl);
         bucket.max_age = ttl;
         if cfg.nats.v211_support {
             bucket.limit_markers = Some(ttl);
         }
     }
-    let kv = jetstream.create_key_value(bucket).await.map_err(|e| {
-        Error::Message(format!(
-            "[NATS:get_bucket_by_key] create jetstream kv {bucket_name} error: {e}"
-        ))
-    })?;
+    // Try to get the existing bucket first to avoid conflicts when the bucket was created
+    // with different parameters
+    let kv = match jetstream.get_key_value(&bucket.bucket).await {
+        Ok(kv) => kv,
+        Err(_) => jetstream.create_key_value(bucket).await.map_err(|e| {
+            Error::Message(format!(
+                "[NATS:get_bucket_by_key] create jetstream kv {bucket_name} error: {e}"
+            ))
+        })?,
+    };
     Ok((kv, key.trim_start_matches(bucket_name)))
 }
 
-pub async fn init() {
-    _ = get_nats_client().await;
+pub async fn init() -> Result<()> {
+    NATS_CLIENT.get_or_try_init(connect).await?;
+    Ok(())
 }
 
 pub struct NatsDb {
@@ -145,6 +169,10 @@ impl NatsDb {
         let prefix = prefix.to_string();
         let self_prefix = self.prefix.to_string();
         let _task: JoinHandle<Result<()>> = tokio::task::spawn(async move {
+            // stream revision of the last entry we processed; a recreated watcher
+            // resumes from here instead of dropping the events published meanwhile
+            let mut last_revision: u64 = 0;
+            let mut backoff = KV_WATCH_BACKOFF_MIN;
             loop {
                 if cluster::is_offline() {
                     break;
@@ -153,7 +181,7 @@ impl NatsDb {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[NATS:kv_watch] prefix: {prefix}, get bucket error: {e}");
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        backoff = kv_watch_backoff(backoff).await;
                         continue;
                     }
                 };
@@ -163,33 +191,58 @@ impl NatsDb {
                     bucket.name,
                     prefix
                 );
-                let mut entries = match bucket.watch_all().await {
+                // if the bucket was recreated, our resume point is meaningless
+                if last_revision > bucket.stream.cached_info().state.last_sequence {
+                    last_revision = 0;
+                }
+                let entries = if last_revision == 0 {
+                    bucket.watch_all().await
+                } else {
+                    bucket.watch_all_from_revision(last_revision + 1).await
+                };
+                let mut entries = match entries {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!(
                             "[NATS:kv_watch] prefix: {prefix}, bucket.watch_all error: {e}"
                         );
-                        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                        backoff = kv_watch_backoff(backoff).await;
                         continue;
                     }
                 };
+                // transient errors (e.g. a missed heartbeat while the connection
+                // re-establishes) recover on their own, and every recreation leaves
+                // a new consumer on the server, so only recreate the watcher when
+                // it fails persistently
+                let mut errors = 0;
                 loop {
                     match entries.next().await {
                         None => {
-                            log::error!("[NATS:kv_watch] prefix: {prefix}, get message error");
+                            log::error!("[NATS:kv_watch] prefix: {prefix}, watcher closed");
                             break;
                         }
-                        Some(entry) => {
-                            let entry = match entry {
-                                Ok(entry) => entry,
-                                Err(e) => {
-                                    log::error!(
-                                        "[NATS:kv_watch] prefix: {prefix}, get message error: {e}"
-                                    );
-                                    break;
-                                }
+                        Some(Err(e)) => {
+                            errors += 1;
+                            if errors >= KV_WATCH_MAX_ERRORS {
+                                log::error!(
+                                    "[NATS:kv_watch] prefix: {prefix}, get message error: {e}, recreating watcher"
+                                );
+                                break;
+                            }
+                            log::warn!("[NATS:kv_watch] prefix: {prefix}, get message error: {e}");
+                        }
+                        Some(Ok(entry)) => {
+                            errors = 0;
+                            backoff = KV_WATCH_BACKOFF_MIN;
+                            last_revision = entry.revision;
+                            let Some(item_key) = key_decode(&entry.key) else {
+                                log::warn!(
+                                    "[NATS:kv_watch] prefix: {prefix}, skipping undecodable key: \
+                                     {}",
+                                    entry.key
+                                );
+                                continue;
                             };
-                            let item_key = key_decode(&entry.key);
                             if !item_key.starts_with(new_key) {
                                 continue;
                             }
@@ -219,11 +272,27 @@ impl NatsDb {
                         }
                     }
                 }
+                // wait before recreating the watcher, otherwise a nats disruption
+                // turns into a consumer churn storm across the whole cluster
+                backoff = kv_watch_backoff(backoff).await;
             }
             Ok(())
         });
         Ok(Arc::new(rx))
     }
+}
+
+// every watcher recreation creates a new ephemeral consumer on the nats server,
+// so a watcher that keeps failing must not retry in a tight loop
+const KV_WATCH_BACKOFF_MIN: u64 = 1; // seconds
+const KV_WATCH_BACKOFF_MAX: u64 = 30; // seconds
+// consecutive errors without a single healthy entry before the watcher is recreated
+const KV_WATCH_MAX_ERRORS: usize = 3;
+
+// sleep for the current backoff, then return the next one
+async fn kv_watch_backoff(secs: u64) -> u64 {
+    tokio::time::sleep(Duration::from_secs(secs)).await;
+    std::cmp::min(secs * 2, KV_WATCH_BACKOFF_MAX)
 }
 
 impl Default for NatsDb {
@@ -279,6 +348,16 @@ impl super::Db for NatsDb {
             None => Err(Error::from(DbError::KeyNotExists(key.to_string()))),
             Some(v) => Ok(v),
         }
+    }
+
+    /// Exact-key lookup, without `get`'s `start_dt` prefix-scan fallback — that
+    /// fallback costs a fresh consumer plus a full bucket drain on every miss.
+    async fn get_if_exists(&self, key: &str) -> Result<Option<Bytes>> {
+        let (bucket, new_key) = get_bucket_by_key(&self.prefix, key).await?;
+        bucket
+            .get(&key_encode(new_key))
+            .await
+            .map_err(|e| Error::Message(format!("[NATS:get_if_exists] bucket.get error: {e}")))
     }
 
     async fn put(
@@ -564,7 +643,7 @@ pub async fn create_table() -> Result<()> {
     Ok(())
 }
 
-pub async fn connect() -> async_nats::Client {
+async fn connect() -> Result<async_nats::Client> {
     let cfg = get_config();
     if cfg.common.print_key_config {
         log::info!("Nats init get_config(): {:?}", cfg.nats);
@@ -582,15 +661,16 @@ pub async fn connect() -> async_nats::Client {
         .nats
         .addr
         .split(',')
-        .map(|a| a.parse().unwrap())
-        .collect::<Vec<ServerAddr>>();
-    match async_nats::connect_with_options(addrs.clone(), opts).await {
-        Ok(client) => client,
-        Err(e) => {
-            log::error!("NATS connect failed for address(es): {addrs:?}, err: {e}");
-            panic!("NATS connect failed");
-        }
-    }
+        .map(|a| a.parse())
+        .collect::<std::result::Result<Vec<ServerAddr>, _>>()
+        .map_err(|e| Error::Message(format!("invalid NATS address {}: {e}", cfg.nats.addr)))?;
+    async_nats::connect_with_options(addrs.clone(), opts)
+        .await
+        .map_err(|e| {
+            Error::Message(format!(
+                "NATS connect failed for address(es): {addrs:?}, err: {e}"
+            ))
+        })
 }
 
 async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
@@ -621,9 +701,13 @@ async fn keys(kv: &jetstream::kv::Store, prefix: &str) -> Result<Vec<String>> {
             .last()
             .unwrap()
             .to_string();
-        let key = key_decode(&key);
-        if key.starts_with(prefix) {
-            keys.push(key);
+        match key_decode(&key) {
+            Some(key) if key.starts_with(prefix) => keys.push(key),
+            Some(_) => {}
+            None => log::warn!(
+                "[NATS:keys] bucket {}, skipping undecodable key: {key}",
+                kv.name
+            ),
         }
         if let Ok(info) = message.info()
             && info.pending == 0
@@ -648,6 +732,7 @@ pub(crate) struct Locker {
     lock_id: String,
     state: Arc<AtomicU8>, // 0: init, 1: locking, 2: release
     tx: Option<mpsc::Sender<()>>,
+    keep_alive: Mutex<Option<JoinHandle<()>>>,
 }
 
 impl Locker {
@@ -657,6 +742,7 @@ impl Locker {
             lock_id: ider::uuid(),
             state: Arc::new(AtomicU8::new(0)),
             tx: None,
+            keep_alive: Mutex::new(None),
         }
     }
 
@@ -721,8 +807,8 @@ impl Locker {
                 )));
             } else {
                 return Err(Error::Message(format!(
-                    "nats lock for key: {}, error: {}",
-                    self.key, err
+                    "nats lock for key: {}, error: {err}",
+                    self.key
                 )));
             }
         }
@@ -733,13 +819,15 @@ impl Locker {
         let lock_id = self.lock_id.clone();
         let lock_key = self.key.clone();
         let bucket_key = key.clone();
-        tokio::task::spawn(async move {
+        let state = self.state.clone();
+        let handle = tokio::task::spawn(async move {
             if let Err(e) =
-                keep_alive_lock(&mut rx, &bucket, &bucket_key, &lock_key, &lock_id).await
+                keep_alive_lock(&mut rx, &bucket, &bucket_key, &lock_key, &lock_id, state).await
             {
                 log::error!("nats keep alive for key: {lock_key}, error: {e}");
             }
         });
+        *self.keep_alive.lock().await = Some(handle);
 
         Ok(())
     }
@@ -762,10 +850,22 @@ impl Locker {
         }
         self.state.store(2, Ordering::SeqCst);
         if let Err(e) = self.tx.as_ref().unwrap().send(()).await {
-            log::error!("nats unlock sender for key: {}, error: {}", self.key, e);
+            log::error!("nats unlock sender for key: {}, error: {e}", self.key);
+        }
+
+        // Wait for the keep-alive task to fully exit before purging. Otherwise an
+        // in-flight `put` could resurrect the key right after we purge it.
+        let keep_alive = self.keep_alive.lock().await.take();
+        if let Some(handle) = keep_alive
+            && let Err(e) = handle.await
+        {
+            log::error!(
+                "nats unlock keep alive join for key: {}, error: {e}",
+                self.key
+            );
         }
         if let Err(e) = bucket.purge(&key).await {
-            log::error!("nats unlock for key: {}, error: {}", self.key, e);
+            log::error!("nats unlock for key: {}, error: {e}", self.key);
             return Err(Error::Message("nats unlock error".to_string()));
         };
         Ok(())
@@ -852,16 +952,23 @@ async fn keep_alive_lock(
     key: &str,
     orig_key: &str,
     lock_id: &str,
+    state: Arc<AtomicU8>,
 ) -> Result<()> {
     let interval = std::cmp::max(1, LOCKER_WATCHER_UPDATE_TTL as u64 / 3);
     let mut ticker = tokio::time::interval(tokio::time::Duration::from_secs(interval));
     ticker.tick().await; // first tick will be immediate
     loop {
         tokio::select! {
-            _ = ticker.tick() => {}
+            // prefer the stop signal so we never issue a `put` once unlock began
+            biased;
             _ = rx.recv() => {
                 break;
             }
+            _ = ticker.tick() => {}
+        }
+        // the lock has been released, stop keeping it alive
+        if state.load(Ordering::SeqCst) != 1 {
+            break;
         }
         // update the locker time to keep alive
         let value = Bytes::from(format!(
@@ -886,9 +993,23 @@ fn key_encode(key: &str) -> String {
     base64::encode(key).replace('+', "-").replace('/', "_")
 }
 
+/// Inverse of [`key_encode`]; `None` for a key this process did not write.
+/// Fallible rather than `unwrap`: buckets shared with o2-ai can hold a plain
+/// key from an older peer, and panicking would kill every listing of the bucket.
 #[inline]
-fn key_decode(key: &str) -> String {
-    base64::decode(key.replace('-', "+").replace('_', "/")).unwrap()
+fn key_decode(key: &str) -> Option<String> {
+    base64::decode(key.replace('-', "+").replace('_', "/")).ok()
+}
+
+/// Whether `get_bucket_by_key` gives `bucket_name` a `max_age`. Lets the domain
+/// modules assert their buckets still get a TTL without this layer importing
+/// from them — see `cluster::ai_sessions`.
+#[cfg(test)]
+pub(crate) fn bucket_has_ttl(bucket_name: &str) -> bool {
+    matches!(
+        bucket_name,
+        "nodes" | "clusters" | "locker" | "lockers" | "ai_replicas" | "ai_session_owners"
+    )
 }
 
 #[inline]
@@ -907,6 +1028,17 @@ mod tests {
         assert!(!use_kv_watcher("/super_cluster_kv_nodes/"));
         assert!(!use_kv_watcher("/super_cluster_kv_clusters/"));
         assert!(!use_kv_watcher("/other_prefix/"));
+    }
+
+    #[test]
+    fn test_key_decode_returns_none_for_garbage() {
+        let encoded = key_encode("/compact/delete/org/logs/stream");
+        assert_eq!(
+            key_decode(&encoded).as_deref(),
+            Some("/compact/delete/org/logs/stream")
+        );
+        // a malformed key that came off the wire must not panic
+        assert_eq!(key_decode("!!not-base64!!"), None);
     }
 
     #[test]
@@ -942,7 +1074,7 @@ mod tests {
 
         for key in keys {
             let encoded = key_encode(key);
-            let decoded = key_decode(&encoded);
+            let decoded = key_decode(&encoded).expect("we just encoded it");
             assert_eq!(
                 decoded, key,
                 "Failed roundtrip for key: '{}', encoded: '{}', decoded: '{}'",
@@ -952,10 +1084,17 @@ mod tests {
     }
 
     #[test]
+    fn test_key_decode_rejects_a_plain_key_instead_of_panicking() {
+        // A plain key left by an older o2-ai peer must be skipped, not panic.
+        assert_eq!(key_decode("not base64 at all!"), None);
+        assert_eq!(key_decode("ai_replicas/o2ai-0"), None);
+    }
+
+    #[test]
     fn test_key_encode_empty_string() {
         let key = "";
         let encoded = key_encode(key);
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, key);
     }
 
@@ -965,7 +1104,7 @@ mod tests {
 
         for key in keys {
             let encoded = key_encode(key);
-            let decoded = key_decode(&encoded);
+            let decoded = key_decode(&encoded).expect("we just encoded it");
             assert_eq!(decoded, key, "Failed roundtrip for unicode key: '{}'", key);
         }
     }
@@ -1046,7 +1185,7 @@ mod tests {
         assert!(!encoded.contains('/'));
         assert!(!encoded.contains('+'));
 
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, original);
     }
 
@@ -1084,7 +1223,7 @@ mod tests {
     fn test_key_encode_long_string() {
         let long_key = "a".repeat(1000);
         let encoded = key_encode(&long_key);
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, long_key);
     }
 
@@ -1092,7 +1231,7 @@ mod tests {
     fn test_key_encode_newlines_and_tabs() {
         let key = "key\nwith\nnewlines\tand\ttabs";
         let encoded = key_encode(key);
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, key);
     }
 
@@ -1100,7 +1239,7 @@ mod tests {
     fn test_key_encode_binary_like_data() {
         let key = "key\0with\0null\0bytes";
         let encoded = key_encode(key);
-        let decoded = key_decode(&encoded);
+        let decoded = key_decode(&encoded).expect("we just encoded it");
         assert_eq!(decoded, key);
     }
 
@@ -1129,7 +1268,7 @@ mod tests {
 
         for key in keys {
             let encoded = key_encode(key);
-            let decoded = key_decode(&encoded);
+            let decoded = key_decode(&encoded).expect("we just encoded it");
             assert_eq!(decoded, key, "Failed for key of length: {}", key.len());
         }
     }

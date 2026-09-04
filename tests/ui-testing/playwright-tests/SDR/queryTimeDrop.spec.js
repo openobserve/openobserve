@@ -2,98 +2,6 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 
-async function closeStreamDetailSidebar(page) {
-  // Close stream detail sidebar if open
-  const cancelButton = page.getByRole('button', { name: 'Cancel' });
-  const cancelVisible = await cancelButton.isVisible({ timeout: 1000 }).catch(() => false);
-  if (cancelVisible) {
-    await cancelButton.click();
-    testLogger.info('Closed stream detail sidebar');
-    await page.waitForTimeout(500);
-  }
-}
-
-async function navigateToLogsQuick(page) {
-  // Quick navigation to logs without VRL editor wait
-  await page.locator('[data-test="menu-link-\\/logs-item"]').click();
-  await page.waitForLoadState('networkidle');
-  testLogger.info('Navigated to Logs (fast - no VRL wait)');
-}
-
-async function verifyMultipleFieldsDrop(page, pm, streamName, fieldsToVerify) {
-  testLogger.info(`Verifying ${fieldsToVerify.length} fields for drop status`);
-
-  await closeStreamDetailSidebar(page);
-  await navigateToLogsQuick(page);
-  await pm.logsPage.selectStream(streamName);
-  await page.waitForTimeout(1000);
-  await pm.logsPage.clickRefreshButton();
-  await page.waitForTimeout(2000);
-
-  // Try multiple selectors to find all log entries
-  let logTableCell = page.locator('[data-test="log-table-column-0-source"]');
-  let logCount = await logTableCell.count();
-  testLogger.info(`Selector [data-test="log-table-column-0-source"] found ${logCount} entries`);
-
-  // If that doesn't work, try table rows
-  if (logCount < fieldsToVerify.length) {
-    logTableCell = page.locator('.logs-result-table tbody tr[role="row"]');
-    logCount = await logTableCell.count();
-    testLogger.info(`Selector .logs-result-table tbody tr[role="row"] found ${logCount} entries`);
-  }
-
-  // Try another common selector
-  if (logCount < fieldsToVerify.length) {
-    logTableCell = page.locator('tbody tr');
-    logCount = await logTableCell.count();
-    testLogger.info(`Selector tbody tr found ${logCount} entries`);
-  }
-
-  testLogger.info(`Final: Found ${logCount} log entries in the UI`);
-
-  if (logCount === 0) {
-    throw new Error('No logs found in the stream');
-  }
-
-  // Get all log texts
-  const allLogTexts = [];
-  for (let i = 0; i < logCount; i++) {
-    const text = await logTableCell.nth(i).textContent();
-    allLogTexts.push(text);
-  }
-
-  // For each field we want to verify, check if it exists in logs
-  for (const { fieldName, shouldBeDropped } of fieldsToVerify) {
-    testLogger.info(`Verifying field: ${fieldName}, shouldBeDropped: ${shouldBeDropped}`);
-
-    let foundInAnyLog = false;
-
-    // Search through all logs to see if field exists
-    for (let i = 0; i < allLogTexts.length; i++) {
-      const logText = allLogTexts[i];
-      const fieldAsJsonKey = `"${fieldName}":`;
-      const fieldAsKey = `${fieldName}:`;
-
-      if (logText.includes(fieldAsJsonKey) || logText.includes(fieldAsKey)) {
-        foundInAnyLog = true;
-        testLogger.info(`Found ${fieldName} in log ${i}`);
-        break;
-      }
-    }
-
-    if (shouldBeDropped) {
-      // Field should NOT be found in any log
-      expect(foundInAnyLog).toBeFalsy();
-      testLogger.info(`✓ Field ${fieldName} is correctly DROPPED at query time`);
-    } else {
-      // Field should be found in at least one log
-      expect(foundInAnyLog).toBeTruthy();
-      testLogger.info(`✓ Field ${fieldName} is visible as expected`);
-    }
-  }
-}
-
-
 test.describe("Query Time Drop - Combined Test", { tag: '@enterprise' }, () => {
   test.describe.configure({ mode: 'serial' });
   let pm;
@@ -140,7 +48,7 @@ test.describe("Query Time Drop - Combined Test", { tag: '@enterprise' }, () => {
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     testLogger.info('Combined query time drop test setup completed');
   });
 
@@ -196,15 +104,16 @@ test.describe("Query Time Drop - Combined Test", { tag: '@enterprise' }, () => {
       fieldValue: p.value
     }));
 
-    await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
+    // Query-time SDR transforms data at search time, so STEP 1 (visible) and STEP 4
+    // (dropped) inspect the SAME ingested batch — reuse one marker for both.
+    const ingestMarker = await pm.logsPage.ingestMultipleFields(testStreamName, dataToIngest);
 
     // Verify all fields are visible before drop
-    testLogger.info('Verifying 4 fields for drop status');
     const fieldsBeforeDrop = patternsToTest.map(p => ({
       fieldName: p.field,
       shouldBeDropped: false
     }));
-    await verifyMultipleFieldsDrop(page, pm, testStreamName, fieldsBeforeDrop);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsBeforeDrop, ingestMarker);
     testLogger.info('✓ STEP 1 PASSED: All fields visible without SDR');
 
     // STEP 2: Create all 4 SDR patterns
@@ -217,7 +126,7 @@ test.describe("Query Time Drop - Combined Test", { tag: '@enterprise' }, () => {
 
       // Verify pattern was created
       await pm.sdrPatternsPage.navigateToRegexPatterns();
-      const exists = await pm.sdrPatternsPage.checkPatternExists(patternConfig.name);
+      const exists = await pm.sdrPatternsPage.waitForPatternCreated(patternConfig.name); // backend-consistent create gate (API source of truth)
       expect(exists).toBeTruthy();
       testLogger.info(`✓ Created and verified pattern: ${patternConfig.name}`);
     }
@@ -247,7 +156,7 @@ test.describe("Query Time Drop - Combined Test", { tag: '@enterprise' }, () => {
       fieldName: p.field,
       shouldBeDropped: true
     }));
-    await verifyMultipleFieldsDrop(page, pm, testStreamName, fieldsAfterDrop);
+    await pm.sdrVerificationPage.verifyMultipleFields(pm.logsPage, testStreamName, fieldsAfterDrop, ingestMarker);
     testLogger.info('✓ STEP 4 PASSED: All fields are DROPPED at query time');
 
     testLogger.info('=== ✓ COMBINED QUERY TIME DROP TEST COMPLETED SUCCESSFULLY ===');

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -16,62 +16,56 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600">
+    <div class="mb-2 flex items-center font-semibold">
       <span>{{ t("dashboard.colorBySeriesTitle") }}</span>
-      <q-btn
-        no-caps
-        padding="xs"
-        class=""
-        size="sm"
-        flat
-        icon="info_outline"
+      <OButton
+        variant="ghost"
+        size="icon"
         data-test="dashboard-addpanel-config-color-by-series"
+        icon-left="info-outline"
       >
-        <q-tooltip
-          class="bg-grey-8"
-          anchor="bottom middle"
-          self="top middle"
-          max-width="250px"
-        >
-          {{ t("dashboard.colorBySeriesTooltip") }}
-        </q-tooltip>
-      </q-btn>
+        <template #icon-left><OIcon name="info-outline" size="sm" /></template>
+        <OTooltip
+          :content="t('dashboard.colorBySeriesTooltip')"
+          side="bottom"
+          max-width="15.625rem"
+        />
+      </OButton>
     </div>
-    <q-btn
+    <OButton
+      variant="outline"
+      size="sm"
       @click="openColorBySeriesPopUp"
-      style="cursor: pointer; padding: 0px 5px"
-      :label="
-        dashboardPanelData?.data?.config?.color?.colorBySeries?.length
-          ? t('dashboard.editColorBySeries')
-          : t('dashboard.applyColorBySeries')
-      "
-      no-caps
       data-test="dashboard-addpanel-config-colorBySeries-add-btn"
-      class="el-border"
+    >
+      {{
+        dashboardPanelData?.data?.config?.color?.colorBySeries?.length
+          ? t("dashboard.editColorBySeries")
+          : t("dashboard.applyColorBySeries")
+      }}
+    </OButton>
+    <ColorBySeriesPopUp
+      :open="showColorBySeriesPopUp"
+      :seriesOptions="seriesOptions?.series"
+      :colorBySeries="dashboardPanelData?.data?.config?.color?.colorBySeries || []"
+      @close="showColorBySeriesPopUp = false"
+      @save="saveColorBySeriesconfig"
     />
-    <q-dialog v-model="showColorBySeriesPopUp">
-      <ColorBySeriesPopUp
-        :seriesOptions="seriesOptions?.series"
-        :colorBySeries="
-          dashboardPanelData?.data?.config?.color?.colorBySeries || []
-        "
-        @close="showColorBySeriesPopUp = false"
-        @save="saveColorBySeriesconfig"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-      />
-    </q-dialog>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, inject, ref, computed, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColorBySeriesPopUp from "./ColorBySeriesPopUp.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "ColorBySeries",
-  components: { ColorBySeriesPopUp },
+  components: { ColorBySeriesPopUp, OButton, OTooltip, OIcon },
   props: {
     colorBySeriesData: {
       type: Object,
@@ -79,15 +73,10 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const showColorBySeriesPopUp = ref(false);
 
@@ -111,10 +100,7 @@ export default defineComponent({
       const panelType = dashboardPanelData.data.type;
       const chartOptions = props.colorBySeriesData?.options;
       // For pie and donut charts, extract series names from data[].name
-      if (
-        (panelType === "pie" || panelType === "donut") &&
-        chartOptions?.series?.[0]?.data
-      ) {
+      if ((panelType === "pie" || panelType === "donut") && chartOptions?.series?.[0]?.data) {
         const pieDonutSeriesNames = chartOptions.series[0].data
           .filter((item: any) => item && item.name) // Filter out invalid items
           .map((item: any) => ({
@@ -125,10 +111,7 @@ export default defineComponent({
       // For gauge charts, extract series names from each series' data[0].name
       if (panelType === "gauge" && chartOptions?.series) {
         const gaugeSeriesNames = chartOptions.series
-          .filter(
-            (series: any) =>
-              series && series.data && series.data[0] && series.data[0].name,
-          ) // Filter out invalid series
+          .filter((series: any) => series && series.data && series.data[0] && series.data[0].name) // Filter out invalid series
           .map((series: any) => ({
             name: series.data[0].name,
           }));
@@ -153,5 +136,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped></style>

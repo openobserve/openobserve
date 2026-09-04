@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,31 +18,70 @@ import { mount, VueWrapper } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createWebHistory } from "vue-router";
 import { createI18n } from "vue-i18n";
-import { Quasar } from "quasar";
 import DashboardSettings from "./DashboardSettings.vue";
 
 // Mock child components
 const mockGeneralSettings = {
   name: "GeneralSettings",
   template: '<div data-test="general-settings-mock">GeneralSettings</div>',
-  emits: ["save"]
+  emits: ["save", "close"],
 };
 
 const mockVariableSettings = {
-  name: "VariableSettings", 
+  name: "VariableSettings",
   template: '<div data-test="variable-settings-mock">VariableSettings</div>',
-  emits: ["save"]
+  emits: ["save"],
 };
 
 const mockTabsSettings = {
   name: "TabsSettings",
   template: '<div data-test="tabs-settings-mock">TabsSettings</div>',
-  emits: ["refresh"]
+  emits: ["refresh"],
+};
+
+// ---------------------------------------------------------------------------
+// ODrawer stub — mirrors the migrated component's overlay surface.
+// Renders the default slot so children are queryable. Exposes the migrated
+// props/emits so tests can assert wiring without depending on the real
+// ODrawer overlay implementation.
+// ---------------------------------------------------------------------------
+const ODrawerStub = {
+  name: "ODrawer",
+  template:
+    "<div class='o-drawer-stub' :data-test='$attrs[\"data-test\"]' :data-open='open'>" +
+    "<slot name='header' />" +
+    "<slot />" +
+    "<slot name='footer' />" +
+    "</div>",
+  props: [
+    "open",
+    "side",
+    "persistent",
+    "size",
+    "width",
+    "title",
+    "subTitle",
+    "showClose",
+    "seamless",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
 };
 
 // Mock getImageURL utility
 vi.mock("../../utils/zincutils", () => ({
-  getImageURL: vi.fn((path: string) => `mocked-${path}`)
+  getImageURL: vi.fn((path: string) => `mocked-${path}`),
 }));
 
 describe("DashboardSettings.vue", () => {
@@ -57,12 +96,12 @@ describe("DashboardSettings.vue", () => {
       state: {
         theme,
         selectedOrganization: {
-          identifier: "test-org"
-        }
+          identifier: "test-org",
+        },
       },
       getters: {},
       mutations: {},
-      actions: {}
+      actions: {},
     });
   };
 
@@ -70,9 +109,7 @@ describe("DashboardSettings.vue", () => {
   const createMockRouter = () => {
     return createRouter({
       history: createWebHistory(),
-      routes: [
-        { path: "/", component: { template: "<div>Home</div>" } }
-      ]
+      routes: [{ path: "/", component: { template: "<div>Home</div>" } }],
     });
   };
 
@@ -85,14 +122,36 @@ describe("DashboardSettings.vue", () => {
         en: {
           dashboard: {
             setting: "Dashboard Settings",
-            generalSettings: "General Settings", 
+            generalSettings: "General Settings",
             variableSettings: "Variable Settings",
-            tabSettings: "Tab Settings"
-          }
-        }
-      }
+            tabSettings: "Tab Settings",
+          },
+        },
+      },
     });
   };
+
+  // Factory — single source of truth for the mount config. Each test gets a
+  // fresh wrapper backed by the (per-test) store/router/i18n created in
+  // beforeEach.
+  const mountComponent = (props: Record<string, any> = {}) =>
+    mount(DashboardSettings, {
+      props: {
+        open: true,
+        ...props,
+      },
+      global: {
+        plugins: [store, router, i18n],
+        stubs: {
+          ODrawer: ODrawerStub,
+        },
+        components: {
+          GeneralSettings: mockGeneralSettings,
+          VariableSettings: mockVariableSettings,
+          TabsSettings: mockTabsSettings,
+        },
+      },
+    });
 
   beforeEach(() => {
     store = createMockStore();
@@ -109,31 +168,13 @@ describe("DashboardSettings.vue", () => {
 
   describe("Component Mounting and Initialization", () => {
     it("should mount successfully", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
       expect(wrapper.exists()).toBe(true);
     });
 
     it("should initialize with correct default values", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
       const vm = wrapper.vm as any;
       expect(vm.activeTab).toBe("generalSettings");
@@ -142,16 +183,7 @@ describe("DashboardSettings.vue", () => {
     });
 
     it("should have correct component name", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
       expect(wrapper.vm.$options.name).toBe("AppSettings");
     });
@@ -160,88 +192,47 @@ describe("DashboardSettings.vue", () => {
   describe("Template Rendering", () => {
     it("should render main container with correct theme class for light theme", () => {
       store = createMockStore("light");
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
-      const mainContainer = wrapper.find(".q-pa-none");
+      const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      expect(mainContainer.classes()).toContain("bg-white");
+      // Theme is handled by design tokens; container markup is theme-independent.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
       expect(mainContainer.classes()).not.toContain("dark-mode");
     });
 
     it("should render main container with correct theme class for dark theme", () => {
       store = createMockStore("dark");
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
-      const mainContainer = wrapper.find(".q-pa-none");
+      const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      expect(mainContainer.classes()).toContain("dark-mode");
+      // Theme is handled by design tokens; container markup is identical in both themes.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
       expect(mainContainer.classes()).not.toContain("bg-white");
     });
 
-    it("should render dashboard settings title", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+    it("should pass the title 'Dashboard Settings' to ODrawer", () => {
+      wrapper = mountComponent();
 
-      const title = wrapper.find(".text-h6");
-      expect(title.exists()).toBe(true);
-      expect(title.text()).toBe("Dashboard Settings");
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(true);
+      expect(drawer.props("title")).toBe("Dashboard Settings");
     });
 
-    it("should render close button", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+    it("should pass the configured width (74) to ODrawer", () => {
+      wrapper = mountComponent();
 
-      const closeButton = wrapper.find('[data-test="dashboard-settings-close-btn"]');
-      expect(closeButton.exists()).toBe(true);
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("width")).toBe(74);
     });
 
     it("should render splitter with correct model value", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
-      const splitter = wrapper.findComponent({ name: "QSplitter" });
+      const splitter = wrapper.findComponent({ name: "OSplitter" });
       expect(splitter.exists()).toBe(true);
       expect(splitter.props("modelValue")).toBe(220);
     });
@@ -249,19 +240,10 @@ describe("DashboardSettings.vue", () => {
 
   describe("Tabs Functionality", () => {
     it("should render all three tabs with correct names and labels", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
       const generalTab = wrapper.find('[data-test="dashboard-settings-general-tab"]');
-      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');  
+      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');
       const tabTab = wrapper.find('[data-test="dashboard-settings-tab-tab"]');
 
       expect(generalTab.exists()).toBe(true);
@@ -274,108 +256,55 @@ describe("DashboardSettings.vue", () => {
     });
 
     it("should have generalSettings as default active tab", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
-      const tabs = wrapper.findComponent({ name: "QTabs" });
-      expect(tabs.exists()).toBe(true);
-      expect(tabs.props("modelValue")).toBe("generalSettings");
+      const vm = wrapper.vm as any;
+      expect(vm.activeTab).toBe("generalSettings");
     });
 
     it("should change active tab when a different tab is clicked", async () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
-      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');
-      await variableTab.trigger("click");
+      // OTab uses reka-ui TabsTrigger; set activeTab directly to simulate tab switch
+      (wrapper.vm as any).activeTab = "variableSettings";
+      await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.activeTab).toBe("variableSettings");
     });
 
     it("should render tab panels component", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
-      const tabPanels = wrapper.findComponent({ name: "QTabPanels" });
-      expect(tabPanels.exists()).toBe(true);
-      expect(tabPanels.props("modelValue")).toBe("generalSettings");
+      const vm = wrapper.vm as any;
+      expect(vm.activeTab).toBe("generalSettings");
     });
 
     it("should render active tab component (GeneralSettings by default)", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
       const generalSettings = wrapper.findComponent({ name: "GeneralSettings" });
       expect(generalSettings.exists()).toBe(true);
     });
 
     it("should render VariableSettings component when variable tab is active", async () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+      wrapper = mountComponent();
+
+      // OTab uses reka-ui TabsTrigger; set activeTab directly to simulate tab switch
+      (wrapper.vm as any).activeTab = "variableSettings";
+      await wrapper.vm.$nextTick();
+
+      const variableSettings = wrapper.findComponent({
+        name: "VariableSettings",
       });
-
-      // Change to variable tab
-      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');
-      await variableTab.trigger("click");
-
-      const variableSettings = wrapper.findComponent({ name: "VariableSettings" });
       expect(variableSettings.exists()).toBe(true);
     });
 
     it("should render TabsSettings component when tab tab is active", async () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
-      // Change to tab tab
-      const tabTab = wrapper.find('[data-test="dashboard-settings-tab-tab"]');
-      await tabTab.trigger("click");
+      // OTab uses reka-ui TabsTrigger; set activeTab directly to simulate tab switch
+      (wrapper.vm as any).activeTab = "tabSettings";
+      await wrapper.vm.$nextTick();
 
       const tabsSettings = wrapper.findComponent({ name: "TabsSettings" });
       expect(tabsSettings.exists()).toBe(true);
@@ -384,16 +313,7 @@ describe("DashboardSettings.vue", () => {
 
   describe("Methods and Event Handling", () => {
     it("should emit refresh event when refreshRequired is called", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
       // Call the refreshRequired method directly
       const vm = wrapper.vm as any;
@@ -405,19 +325,10 @@ describe("DashboardSettings.vue", () => {
     });
 
     it("should emit refresh event when GeneralSettings emits save event", async () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
       const generalSettings = wrapper.findComponent({ name: "GeneralSettings" });
-      
+
       // Emit save event from GeneralSettings
       await generalSettings.vm.$emit("save");
 
@@ -426,24 +337,30 @@ describe("DashboardSettings.vue", () => {
       expect(wrapper.emitted("refresh")).toHaveLength(1);
     });
 
+    it("should emit close event when GeneralSettings emits close event", async () => {
+      wrapper = mountComponent();
+
+      const generalSettings = wrapper.findComponent({ name: "GeneralSettings" });
+
+      // Emit close event from GeneralSettings — newly-wired event added in
+      // the ODrawer migration
+      await generalSettings.vm.$emit("close");
+
+      expect(wrapper.emitted("close")).toBeTruthy();
+      expect(wrapper.emitted("close")).toHaveLength(1);
+    });
+
     it("should emit refresh event when VariableSettings emits save event", async () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
+      wrapper = mountComponent();
+
+      // OTab uses reka-ui TabsTrigger; set activeTab directly to simulate tab switch
+      (wrapper.vm as any).activeTab = "variableSettings";
+      await wrapper.vm.$nextTick();
+
+      const variableSettings = wrapper.findComponent({
+        name: "VariableSettings",
       });
 
-      // Switch to variable tab first
-      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');
-      await variableTab.trigger("click");
-
-      const variableSettings = wrapper.findComponent({ name: "VariableSettings" });
-      
       // Emit save event from VariableSettings
       await variableSettings.vm.$emit("save");
 
@@ -453,23 +370,14 @@ describe("DashboardSettings.vue", () => {
     });
 
     it("should emit refresh event when TabsSettings emits refresh event", async () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
-      // Switch to tab tab first
-      const tabTab = wrapper.find('[data-test="dashboard-settings-tab-tab"]');
-      await tabTab.trigger("click");
+      // OTab uses reka-ui TabsTrigger; set activeTab directly to simulate tab switch
+      (wrapper.vm as any).activeTab = "tabSettings";
+      await wrapper.vm.$nextTick();
 
       const tabsSettings = wrapper.findComponent({ name: "TabsSettings" });
-      
+
       // Emit refresh event from TabsSettings
       await tabsSettings.vm.$emit("refresh");
 
@@ -478,55 +386,82 @@ describe("DashboardSettings.vue", () => {
       expect(wrapper.emitted("refresh")).toHaveLength(1);
     });
 
-    it("should handle close button click functionality", async () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
-
-      const closeButton = wrapper.find('[data-test="dashboard-settings-close-btn"]');
-      expect(closeButton.exists()).toBe(true);
-      
-      // Verify it's a button element
-      expect(closeButton.element.tagName.toLowerCase()).toBe('i');
-      
-      // Test that clicking the button doesn't throw an error
-      await closeButton.trigger('click');
-      
-      // The button should be clickable
-      expect(closeButton.exists()).toBe(true);
-    });
-
     it("should handle splitter model value changes", async () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
-      const splitter = wrapper.findComponent({ name: "QSplitter" });
+      const splitter = wrapper.findComponent({ name: "OSplitter" });
       expect(splitter.exists()).toBe(true);
-      
+
       // Test initial splitter value
       expect(splitter.props("modelValue")).toBe(220);
-      
+
       // Test changing splitter value
       const vm = wrapper.vm as any;
       vm.splitterModel = 300;
       await wrapper.vm.$nextTick();
-      
+
       expect(vm.splitterModel).toBe(300);
+    });
+  });
+
+  describe("ODrawer surface — props, emits, and wiring contract", () => {
+    it("renders the ODrawer overlay surface", () => {
+      wrapper = mountComponent();
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.exists()).toBe(true);
+    });
+
+    it("forwards the `open` prop from the parent to ODrawer", async () => {
+      wrapper = mountComponent({ open: true });
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("open")).toBe(true);
+
+      await wrapper.setProps({ open: false });
+      expect(drawer.props("open")).toBe(false);
+    });
+
+    it("defaults `open` to false when no prop is supplied", () => {
+      // Override factory to pass no `open` prop
+      wrapper = mount(DashboardSettings, {
+        global: {
+          plugins: [store, router, i18n],
+          stubs: { ODrawer: ODrawerStub },
+          components: {
+            GeneralSettings: mockGeneralSettings,
+            VariableSettings: mockVariableSettings,
+            TabsSettings: mockTabsSettings,
+          },
+        },
+      });
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      expect(drawer.props("open")).toBe(false);
+    });
+
+    it("re-emits update:open with the same value when ODrawer emits update:open=false", async () => {
+      wrapper = mountComponent({ open: true });
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      await drawer.vm.$emit("update:open", false);
+      await wrapper.vm.$nextTick();
+
+      const events = wrapper.emitted("update:open");
+      expect(events).toBeTruthy();
+      expect(events![events!.length - 1]).toEqual([false]);
+    });
+
+    it("re-emits update:open=true when ODrawer emits update:open=true", async () => {
+      wrapper = mountComponent({ open: false });
+
+      const drawer = wrapper.findComponent(ODrawerStub);
+      await drawer.vm.$emit("update:open", true);
+      await wrapper.vm.$nextTick();
+
+      const events = wrapper.emitted("update:open");
+      expect(events).toBeTruthy();
+      expect(events![events!.length - 1]).toEqual([true]);
     });
   });
 
@@ -534,56 +469,33 @@ describe("DashboardSettings.vue", () => {
     it("should handle missing or undefined theme state", () => {
       const storeWithoutTheme = createMockStore();
       storeWithoutTheme.state.theme = undefined;
+      store = storeWithoutTheme;
 
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [storeWithoutTheme, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
-      const mainContainer = wrapper.find(".q-pa-none");
+      const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      // Should default to light theme behavior when theme is undefined
-      expect(mainContainer.classes()).toContain("bg-white");
+      // Container markup is theme-independent; renders regardless of theme state.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
     });
 
     it("should handle null theme state", () => {
       const storeWithNullTheme = createMockStore();
       storeWithNullTheme.state.theme = null;
+      store = storeWithNullTheme;
 
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [storeWithNullTheme, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
-      const mainContainer = wrapper.find(".q-pa-none");
+      const mainContainer = wrapper.find('[data-test="dashboard-settings-main-container"]');
       expect(mainContainer.exists()).toBe(true);
-      // Should default to light theme behavior when theme is null
-      expect(mainContainer.classes()).toContain("bg-white");
+      // Container markup is theme-independent; renders regardless of theme state.
+      expect(mainContainer.classes()).toContain("[min-height:inherit]");
+      expect(mainContainer.classes()).toContain("h-full");
     });
 
     it("should handle empty templates array", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
       const vm = wrapper.vm as any;
       expect(vm.templates).toEqual([]);
@@ -591,47 +503,28 @@ describe("DashboardSettings.vue", () => {
     });
 
     it("should maintain activeTab state when switching between tabs rapidly", async () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
-      // Rapidly switch tabs
-      const variableTab = wrapper.find('[data-test="dashboard-settings-variable-tab"]');
-      const tabTab = wrapper.find('[data-test="dashboard-settings-tab-tab"]');
-      const generalTab = wrapper.find('[data-test="dashboard-settings-general-tab"]');
-
-      await variableTab.trigger("click");
+      // OTab uses reka-ui TabsTrigger; set activeTab directly to simulate rapid tab switching
+      (wrapper.vm as any).activeTab = "variableSettings";
+      await wrapper.vm.$nextTick();
       expect(wrapper.vm.activeTab).toBe("variableSettings");
 
-      await tabTab.trigger("click");
+      (wrapper.vm as any).activeTab = "tabSettings";
+      await wrapper.vm.$nextTick();
       expect(wrapper.vm.activeTab).toBe("tabSettings");
 
-      await generalTab.trigger("click");
+      (wrapper.vm as any).activeTab = "generalSettings";
+      await wrapper.vm.$nextTick();
       expect(wrapper.vm.activeTab).toBe("generalSettings");
     });
 
     it("should handle getImageURL function call", () => {
-      wrapper = mount(DashboardSettings, {
-        global: {
-          plugins: [store, router, i18n, Quasar],
-          components: {
-            GeneralSettings: mockGeneralSettings,
-            VariableSettings: mockVariableSettings,
-            TabsSettings: mockTabsSettings
-          }
-        }
-      });
+      wrapper = mountComponent();
 
       const vm = wrapper.vm as any;
       expect(typeof vm.getImageURL).toBe("function");
-      
+
       // Test that getImageURL returns expected format
       const result = vm.getImageURL("test-path");
       expect(result).toBe("mocked-test-path");

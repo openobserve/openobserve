@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,158 +15,168 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit; height: calc(100vh - 44px);">
-    <div>
-    <div class="card-container tw:mb-[0.625rem]">
-    <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px]"
-      >
-    <div
-      data-test="iam-groups-section-title"
-      class="q-table__title tw:font-[600]"
-    >
-      {{ t("iam.groups") }}
-    </div>
-    <div class=" row items-center justify-end">
-        <div data-test="iam-groups-search-input">
-          <q-input
-              v-model="filterQuery"
-              borderless
-              dense
-              class="q-ml-auto no-border o2-search-input tw:h-[36px]"
-              :placeholder="t('iam.searchGroup')"
+  <OPageLayout :title="t('iam.groups')" icon="group" bleed>
+    <template #subtitle>
+      <span data-test="iam-groups-subtitle">
+        {{ t("iam.groupsPage.subtitle") }}
+      </span>
+    </template>
+    <template #actions>
+      <OButton data-test="iam-groups-add-group-btn" variant="primary" size="sm" @click="addGroup">
+        {{ t("iam.addGroup") }}
+      </OButton>
+    </template>
+    <div class="min-h-0 w-full flex-1 overflow-hidden">
+      <div class="bg-card-glass-bg h-full">
+        <OTable
+          :frame="false"
+          data-test="iam-groups-table-section"
+          :data="rows"
+          :columns="columns"
+          row-key="group_name"
+          :loading="loading"
+          :selected-ids="selectedGroupNames"
+          v-model:global-filter="filterQuery"
+          :show-global-filter="false"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[20, 50, 100, 250, 500]"
+          :footer-title="t('iam.groups')"
+          sorting="client"
+          selection="multiple"
+          filter-mode="client"
+          :default-columns="false"
+          show-index
+          @update:selected-ids="handleSelectedIdsUpdate"
+        >
+          <template #toolbar>
+            <div class="flex w-full items-center gap-2">
+              <OSearchInput
+                v-model="filterQuery"
+                :placeholder="t('iam.searchGroup')"
+                class="flex-1"
+                data-test="iam-groups-search-input"
+              />
+            </div>
+          </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="iam-groups-refresh-btn"
+              @click="setupGroups"
             >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
-              </template>
-            </q-input>
-        </div>
-        <q-btn
-          data-test="iam-groups-add-group-btn"
-          class="q-ml-sm o2-primary-button tw:h-[36px]"
-          flat
-          no-caps
-          :label="t(`iam.addGroup`)"
-          @click="addGroup"
-        />
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="iamGroupsRefresh"
+              />
+            </OButton>
+          </template>
+          <template #cell-actions="{ row }">
+            <div class="flex items-center justify-center">
+              <OButton
+                :data-test="`iam-groups-edit-${row.group_name}-role-icon`"
+                data-row-action="edit"
+                variant="ghost"
+                size="icon-sm"
+                :title="t('common.edit')"
+                @click="editGroup(row)"
+              >
+                <OIcon name="edit" size="sm" />
+              </OButton>
+              <OButton
+                :data-test="`iam-groups-delete-${row.group_name}-role-icon`"
+                data-row-action="delete"
+                variant="ghost"
+                size="icon-sm"
+                :title="t('common.delete')"
+                @click="showConfirmDialog(row)"
+              >
+                <OIcon name="delete" size="sm" />
+              </OButton>
+            </div>
+          </template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-groups"
+              :filtered="!!filterQuery"
+              @action="(id) => (id === 'create' ? addGroup() : (filterQuery = ''))"
+            />
+          </template>
+          <template #bottom>
+            <span class="text-xs font-normal">{{ rows.length }} {{ t("iam.groups") }}</span>
+            <OButton
+              v-if="selectedGroups.length > 0"
+              data-test="iam-groups-bulk-delete-btn"
+              variant="outline-destructive"
+              size="sm"
+              :loading="bulkDeleteLoading"
+              @click="openBulkDeleteDialog"
+              icon-left="delete"
+            >
+              {{ t("common.delete") }}
+            </OButton>
+          </template>
+        </OTable>
       </div>
     </div>
-    </div>
-    <div class="tw:w-full tw:h-full">
-      <div class="card-container tw:h-[calc(100vh-127px)]">      
-        <app-table
-        data-test="iam-groups-table-section"
-        class="iam-table o2-quasar-app-table o2-quasar-table-header-sticky"
-        :tableStyle="hasVisibleRows ? 'height: calc(100vh - 127px); overflow-y: auto;' : ''"
-        :rows="visibleRows"
-        :columns="columns"
-        pagination
-        :rows-per-page="20"
-        :filter="{
-          value: filterQuery,
-          method: filterGroups,
-        }"
-        :bordered="false"
-        :title="t('iam.groups')"
-        :hideTopPagination="true"
-        :showBottomPaginationWithTitle="true"
-        selection="multiple"
-        row-key="group_name"
-        v-model:selected="selectedGroups"
-        :theme="store.state.theme"
-      >
-        <template  v-slot:actions="slotProps: any">
-          <div class="tw:flex tw:items-center tw:gap-2 tw:justify-center">
-            <q-btn
-              :data-test="`iam-groups-edit-${slotProps.column.row.group_name}-role-icon`"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              icon="edit"
-              :title="t('common.edit')"
-              @click="editGroup(slotProps.column.row)"
-            >
-            </q-btn>
-            <q-btn
-              :data-test="`iam-groups-delete-${slotProps.column.row.group_name}-role-icon`"
-              padding="sm"
-              unelevated
-              size="sm"
-              round
-              flat
-              :icon="outlinedDelete"
-              :title="t('common.delete')"
-              @click="showConfirmDialog(slotProps.column.row)"
-            >
-            </q-btn>
-          </div>
-        </template>
-        <template v-slot:bottom-actions>
-          <q-btn
-            v-if="selectedGroups.length > 0"
-            data-test="iam-groups-bulk-delete-btn"
-            class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-secondary-button-dark'
-                : 'o2-secondary-button-light'
-            "
-            no-caps
-            dense
-            @click="openBulkDeleteDialog"
-          >
-            <q-icon name="delete" size="16px" />
-            <span class="tw:ml-2">{{ t('common.delete') }}</span>
-          </q-btn>
-        </template>
-      </app-table>
-    </div>
-    </div>
-    </div>
-    <q-dialog v-model="showAddGroup" position="right" full-height maximized>
-      <AddGroup
-        style="width: 30vw"
-        :org_identifier="store.state.selectedOrganization.identifier"
-        @cancel:hideform="hideAddGroup"
-        @added:group="setupGroups"
-      />
-    </q-dialog>
+    <AddGroup
+      v-model:open="showAddGroup"
+      :org_identifier="store.state.selectedOrganization.identifier"
+      @added:group="onGroupAdded"
+    />
     <ConfirmDialog
-      title="Delete Group"
-      :message="`Are you sure you want to delete '${deleteConformDialog?.data?.group_name as string}'?`"
+      :title="t('iam.appGroups.deleteGroupTitle')"
+      :message="
+        t('iam.appGroups.deleteGroupConfirm', { name: deleteConformDialog?.data?.group_name })
+      "
+      :warning-message="deleteImpactMessage"
       @update:ok="_deleteGroup"
       @update:cancel="deleteConformDialog.show = false"
       v-model="deleteConformDialog.show"
     />
     <ConfirmDialog
-      title="Bulk Delete Groups"
-      :message="`Are you sure you want to delete ${selectedGroups.length} group(s)?`"
+      :title="t('iam.appGroups.bulkDeleteGroupsTitle')"
+      :message="t('iam.appGroups.bulkDeleteGroupsConfirm', { count: selectedGroups.length })"
+      :warning-message="bulkDeleteImpactMessage"
       @update:ok="bulkDeleteUserGroups"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-  </q-page>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
 import { ref, onBeforeMount, computed } from "vue";
 import AddGroup from "./AddGroup.vue";
-import { useI18n } from "vue-i18n";
-import AppTable from "@/components/AppTable.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { cloneDeep } from "lodash-es";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
-import { getGroups, deleteGroup, bulkDeleteGroups } from "@/services/iam";
+import { getGroups, deleteGroup, bulkDeleteGroups, getGroup } from "@/services/iam";
 import usePermissions from "@/composables/iam/usePermissions";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { useReo } from "@/services/reodotdev_analytics";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
 const showAddGroup = ref(false);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { track } = useReo();
 
@@ -180,65 +190,77 @@ const { groupsState } = usePermissions();
 
 const filterQuery = ref("");
 
-const q = useQuasar();
-
 const deleteConformDialog = ref({
   show: false,
   data: null as any,
 });
 
 const selectedGroups: any = ref([]);
-const confirmBulkDelete = ref(false);
+const selectedGroupNames = computed(() => selectedGroups.value.map((g: any) => g.group_name));
 
-const columns: any = [
+const handleSelectedIdsUpdate = (ids: string[]) => {
+  const groupsMap = new Map(rows.value.map((g: any) => [g.group_name, g]));
+  selectedGroups.value = ids.map((id) => groupsMap.get(id)).filter(Boolean);
+};
+
+const confirmBulkDelete = ref(false);
+const bulkDeleteLoading = ref(false);
+
+const columns: OTableColumnDef[] = [
   {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "left",
-    style: "width: 67px;",
-  },
-  {
-    name: "group_name",
-    field: "group_name",
-    label: t("iam.groupName"),
-    align: "left",
+    id: "group_name",
+    header: t("iam.groupName"),
+    accessorKey: "group_name",
     sortable: true,
+    meta: { align: "left", autoWidth: true, isName: true },
   },
   {
-    name: "actions",
-    field: "actions",
-    label: t("alerts.actions"),
-    align: "center",
-    sortable: false,
-    slot: true,
-    slotName: "actions",
-    classes: "actions-column",
+    id: "actions",
+    header: t("alerts.actions"),
+    isAction: true,
+    pinned: "right",
+    size: 80,
+    minSize: 64,
+    maxSize: 100,
+    meta: { align: "center", actionCount: 2 },
   },
 ];
-
-const groups = ref([]);
 
 onBeforeMount(() => {
   setupGroups();
 });
 
 const updateTable = () => {
-  let counter = 1;
-  rows.value = cloneDeep(
-    groupsState.groups.map((group: { group_name: string }, index: number) => ({
-      ...group,
-      "#": counter <= 9 ? `0${counter++}` : counter++,
-    }))
-  );
+  rows.value = cloneDeep(groupsState.groups);
 };
 
 const addGroup = () => {
   track("Button Click", {
     button: "Add Group",
-    page: "Groups"
+    page: "Groups",
   });
   showAddGroup.value = true;
+};
+
+// After a group is created, route straight into EditGroup on the Roles tab so
+// the user can start assigning roles instead of being dropped back on the list
+// with an empty group.
+const onGroupAdded = (payload: { group_name: string; data?: any }) => {
+  if (!payload?.group_name) {
+    setupGroups();
+    return;
+  }
+
+  router.push({
+    name: "editGroup",
+    params: {
+      group_name: payload.group_name,
+    },
+    query: {
+      org_identifier: store.state.selectedOrganization.identifier,
+      tab: "roles",
+    },
+  });
 };
 
 const editGroup = (group: any) => {
@@ -253,7 +275,9 @@ const editGroup = (group: any) => {
   });
 };
 
+const loading = ref(false);
 const setupGroups = async () => {
+  loading.value = true;
   await getGroups(store.state.selectedOrganization.identifier)
     .then((res) => {
       groupsState.groups = res.data.map((group: string) => ({
@@ -263,48 +287,53 @@ const setupGroups = async () => {
     })
     .catch((err) => {
       console.log(err);
+    })
+    .finally(() => {
+      loading.value = false;
     });
-};
-
-const hideAddGroup = () => {
-  showAddGroup.value = false;
-};
-
-const filterGroups = (rows: any, terms: any) => {
-  var filtered = [];
-  terms = terms.toLowerCase();
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i]["group_name"].toLowerCase().includes(terms)) {
-      filtered.push(rows[i]);
-    }
-  }
-  return filtered;
 };
 
 const deleteUserGroup = (group: any) => {
   deleteGroup(group.group_name, store.state.selectedOrganization.identifier)
     .then(() => {
-      q.notify({
-        message: "Group deleted successfully!",
-        color: "positive",
-        position: "bottom",
+      toast({
+        message: t("iam.appGroups.groupDeletedSuccess"),
+        variant: "success",
       });
       setupGroups();
     })
     .catch((error: any) => {
       if (error.response.status != 403) {
-        q.notify({
-          message: "Error while deleting group!",
-          color: "negative",
-          position: "bottom",
+        toast({
+          message: t("iam.appGroups.errorDeletingGroup"),
+          variant: "error",
         });
       }
     });
 };
 
-const showConfirmDialog = (row: any) => {
+// Blast-radius warning for the single-group delete dialog. We resolve the live
+// member count with one getGroup call on delete-click (the group detail payload
+// carries the users array; the list payload does not).
+const deleteImpactMessage = ref(raw(""));
+
+const fetchGroupMemberCount = async (groupName: string): Promise<number> => {
+  const res = await getGroup(groupName, store.state.selectedOrganization.identifier);
+  return Array.isArray(res.data?.users) ? res.data.users.length : 0;
+};
+
+const showConfirmDialog = async (row: any) => {
   deleteConformDialog.value.show = true;
   deleteConformDialog.value.data = row;
+  deleteImpactMessage.value = t("iam.groupsPage.delete.impact", { count: 0 });
+
+  try {
+    const count = await fetchGroupMemberCount(row.group_name);
+    deleteImpactMessage.value = t("iam.groupsPage.delete.impact", { count });
+  } catch (err) {
+    // If the count lookup fails, keep the generic warning rather than blocking.
+    console.log(err);
+  }
 };
 
 const _deleteGroup = () => {
@@ -312,11 +341,33 @@ const _deleteGroup = () => {
   deleteConformDialog.value.data = null;
 };
 
-const openBulkDeleteDialog = () => {
+// Blast-radius warning for the bulk-delete dialog. With exactly one group
+// selected we resolve its live member count, matching the per-row delete. For
+// 2+ groups we keep static copy to avoid N requests.
+const bulkDeleteImpactMessage = ref(raw(""));
+
+const openBulkDeleteDialog = async () => {
   confirmBulkDelete.value = true;
+
+  if (selectedGroups.value.length === 1) {
+    bulkDeleteImpactMessage.value = t("iam.groupsPage.delete.impact", {
+      count: 0,
+    });
+    try {
+      const count = await fetchGroupMemberCount(selectedGroups.value[0].group_name);
+      bulkDeleteImpactMessage.value = t("iam.groupsPage.delete.impact", {
+        count,
+      });
+    } catch (err) {
+      console.log(err);
+    }
+  } else {
+    bulkDeleteImpactMessage.value = t("iam.groupsPage.bulkDelete.impact");
+  }
 };
 
 const bulkDeleteUserGroups = async () => {
+  bulkDeleteLoading.value = true;
   const groupNames = selectedGroups.value.map((group: any) => group.group_name);
 
   try {
@@ -331,22 +382,22 @@ const bulkDeleteUserGroups = async () => {
     }
 
     if (successful.length > 0 && unsuccessful.length === 0) {
-      q.notify({
-        message: `Successfully deleted ${successful.length} group(s)`,
-        color: "positive",
-        position: "bottom",
+      toast({
+        message: t("iam.appGroups.bulkDeleteSuccess", { count: successful.length }),
+        variant: "success",
       });
     } else if (successful.length > 0 && unsuccessful.length > 0) {
-      q.notify({
-        message: `Deleted ${successful.length} group(s). Failed to delete ${unsuccessful.length} group(s)`,
-        color: "warning",
-        position: "bottom",
+      toast({
+        message: t("iam.appGroups.bulkDeletePartial", {
+          count: successful.length,
+          failCount: unsuccessful.length,
+        }),
+        variant: "warning",
       });
     } else if (unsuccessful.length > 0) {
-      q.notify({
-        message: `Failed to delete ${unsuccessful.length} group(s)`,
-        color: "negative",
-        position: "bottom",
+      toast({
+        message: t("iam.appGroups.bulkDeleteFailed", { count: unsuccessful.length }),
+        variant: "error",
       });
     }
 
@@ -355,39 +406,37 @@ const bulkDeleteUserGroups = async () => {
     confirmBulkDelete.value = false;
   } catch (error: any) {
     if (error.response?.status != 403 || error?.status != 403) {
-      q.notify({
-        message: error.response?.data?.message || error?.message || "Error while deleting groups",
-        color: "negative",
-        position: "bottom",
+      toast({
+        message:
+          error.response?.data?.message || error?.message || t("iam.appGroups.errorDeletingGroups"),
+        variant: "error",
       });
     }
     confirmBulkDelete.value = false;
+  } finally {
+    bulkDeleteLoading.value = false;
   }
 };
 
-const visibleRows = computed(() => {
-  if (!filterQuery.value) return rows.value || []
-  return filterGroups(rows.value || [], filterQuery.value)
-})
-
-const hasVisibleRows = computed(() => visibleRows.value.length > 0)
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcuts([
+  {
+    id: "iamGroupsAdd",
+    handler: () => {
+      if (!isInputFocused()) addGroup();
+    },
+  },
+  {
+    id: "iamGroupsRefresh",
+    handler: () => {
+      if (!isInputFocused()) setupGroups();
+    },
+  },
+  {
+    id: "iamGroupsFocusSearch",
+    handler: () => {
+      focusSearchInput("iam-groups-search-input");
+    },
+  },
+]);
 </script>
-
-<style scoped></style>
-<style lang="scss">
-.iam-table {
-  .thead-sticky,
-  .tfoot-sticky {
-    position: sticky;
-    top: 0;
-    opacity: 1;
-    z-index: 1;
-    background: transparent !important;
-  }
-
-  .q-table--dark .thead-sticky,
-  .q-table--dark .tfoot-sticky {
-    background: transparent !important;
-  }
-}
-</style>

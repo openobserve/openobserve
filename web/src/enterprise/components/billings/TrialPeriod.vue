@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,72 +15,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="full-width trial-period-container q-pa-md gradient-banner" v-if="showTrialPeriodMsg == true">
-    <div class="row">
-      <div class="col">
-        <span class="o2-trial-message">{{ getTrialPeriodMessage() }}</span>
-        <br />
-        <span class="o2-trial-subtitle">Upgrade to a plan to continue enjoying the services by OpenObserve.</span>
-      </div>
-      <div class="col-2 q-mt-sm" v-if="currentPage != 'billing'">
-        <q-btn 
-          @click="redirectBilling" 
-          class="cursor-pointer text-capitalize bg-primary text-white q-px-md q-py-sm rounded-md float-right"
-          dense
-        >{{ t("billing.upgradeNow") }}</q-btn>
-      </div>
-      <div class="col-2 q-mt-sm" v-if="currentPage == 'billing'">
-        <q-btn 
-          @click="redirectContactSupport" 
-          class="cursor-pointer text-capitalize bg-primary text-white q-px-md q-py-sm rounded-md float-right"
-          dense
-        >{{ t("billing.contactSupport") }}</q-btn>
-      </div>
-    </div>
+  <div
+    v-if="showTrialPeriodMsg"
+    data-test="trial-period-container"
+    class="rounded-default bg-status-warning-bg border-status-warning-text text-status-warning-text flex w-full items-center gap-3 border px-4 py-2"
+  >
+    <!-- Warning icon -->
+    <OIcon name="warning" size="sm" class="text-status-warning-text shrink-0" />
+
+    <!-- Message + subtitle on one line -->
+    <p class="m-0 min-w-0 flex-1 truncate text-sm">
+      <strong class="font-semibold">{{ getTrialPeriodMessage() }}</strong>
+      <span class="mx-1 opacity-60">·</span>
+      <span>{{ t("billing.upgradeToPlanMessage") }}</span>
+    </p>
+
+    <!-- CTA button -->
+    <OButton
+      v-if="currentPage != 'billing'"
+      variant="warning"
+      size="xs"
+      class="shrink-0"
+      @click="redirectBilling"
+      >{{ t("billing.upgradeNow") }}</OButton
+    >
+    <OButton v-else variant="warning" size="xs" class="shrink-0" @click="redirectContactSupport">{{
+      t("billing.contactSupport")
+    }}</OButton>
   </div>
 </template>
 
 <script lang="ts">
 // @ts-ignore
 import { defineComponent, ref, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import { siteURL } from "@/constants/config";
 import { getDueDays } from "@/utils/zincutils";
 import BillingService from "@/services/billings";
-
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "TrialPeriod",
+  components: { OButton, OIcon },
   props: ["currentPage"],
   methods: {
     getTrialPeriodMessage() {
-      if(Object.hasOwn(this.store.state.organizationData.organizationSettings, "free_trial_expiry") && this.store.state.organizationData.organizationSettings.free_trial_expiry != "" && this.store.state.organizationData.organizationSettings.free_trial_expiry != null) {
-        let dueDays = this.getDueDays(this.store.state.organizationData.organizationSettings.free_trial_expiry);
-        if(dueDays >= 0) {
-          if(dueDays > 1) {
-            return `${dueDays} Days remaining in your trial account`;
-          } else {
-            return `${dueDays} Day remaining in your trial account`;
-          }
+      if (
+        Object.hasOwn(
+          this.store.state.organizationData.organizationSettings,
+          "free_trial_expiry",
+        ) &&
+        this.store.state.organizationData.organizationSettings.free_trial_expiry != "" &&
+        this.store.state.organizationData.organizationSettings.free_trial_expiry != null
+      ) {
+        let dueDays = this.getDueDays(
+          this.store.state.organizationData.organizationSettings.free_trial_expiry,
+        );
+        if (dueDays >= 0) {
+          return this.t("billing.trialDaysRemaining", { count: dueDays }, dueDays);
         } else {
-          return "Your trial period has expired.";
+          return this.t("billing.trialPeriodHasExpired");
         }
       }
+      return undefined;
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
 
-    const hasTrialExpiry = Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry")
-      && store.state.organizationData.organizationSettings.free_trial_expiry != ""
-      && store.state.organizationData.organizationSettings.free_trial_expiry != null;
+    const hasTrialExpiry =
+      Object.hasOwn(store.state.organizationData.organizationSettings, "free_trial_expiry") &&
+      store.state.organizationData.organizationSettings.free_trial_expiry != "" &&
+      store.state.organizationData.organizationSettings.free_trial_expiry != null;
 
     const showTrialPeriodMsg = ref(hasTrialExpiry);
 
@@ -89,7 +101,7 @@ export default defineComponent({
       try {
         if (config.isCloud === "true") {
           const res = await BillingService.list_subscription(
-            store.state.selectedOrganization.identifier
+            store.state.selectedOrganization.identifier,
           );
           if (res.data?.provider === "aws") {
             // AWS billing - don't show trial period message
@@ -103,12 +115,12 @@ export default defineComponent({
     });
 
     const redirectBilling = () => {
-      router.push('/billings/plans/')
+      router.push("/billings/plans/");
     };
 
     const redirectContactSupport = () => {
       window.open(siteURL.contactSupport, "_blank");
-    }
+    };
 
     return {
       t,
@@ -123,44 +135,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style>
-.gradient-banner {
-  background: linear-gradient(
-    to right,
-    transparent 60%,
-    #f7f7ff 70%,
-    #cdf7e4 100%  );
-}
-
-.trial-period-container {
-  border: 1px solid #D7D7D7;
-  border-radius: 6px;
-}
-
-.o2-trial-message {
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 32px;
-}
-
-.o2-trial-subtitle {
-  font-size: 16px;
-  font-weight: 400;
-  line-height: 22px;
-}
-
-.body--dark {
-  .gradient-banner {
-    background: linear-gradient(
-      to right,
-      transparent 60%,
-      #24262F 70%,
-      #2C3934 100%  );
-  }
-
-  .trial-period-container {
-    border: 1px solid #454F5B;
-  }
-}
-</style>

@@ -6,14 +6,14 @@ export class PipelineDestinations {
     constructor(page) {
         this.page = page;
 
-        this.pipelineDestinationsTabSelector = '[data-test="pipeline-destinations-tab"]';
+        this.pipelineDestinationsTabSelector = 'button[data-test="pipeline-destinations-tab"]';
     }
 
     async navigateToManagement() {
 
         // Wait for the settings menu link to be visible before clicking
-        await this.page.locator('[data-test="menu-link-settings-item"]').waitFor({ state: 'visible' });
-        await this.page.locator('[data-test="menu-link-settings-item"]').click();
+        await this.page.locator('[data-test="menu-link-/settings-item"]').waitFor({ state: 'visible' });
+        await this.page.locator('[data-test="menu-link-/settings-item"]').click();
     }
 
     async navigateToPipelineDestinations() {
@@ -30,10 +30,13 @@ export class PipelineDestinations {
         await this.page.locator('[data-test="destination-type-card-openobserve"]').click();
         await this.page.locator('[data-test="step1-continue-btn"]').waitFor({ state: 'visible' });
         await this.page.locator('[data-test="step1-continue-btn"]').click();
-        await this.page.locator('[data-test="add-destination-name-input"]').waitFor({ state: 'visible' });
-        await this.page.locator('[data-test="add-destination-name-input"]').fill(name);
-        await this.page.locator('[data-test="add-destination-url-input"]').waitFor({ state: 'visible' });
-        await this.page.locator('[data-test="add-destination-url-input"]').fill(url);
+        // OFormInput wraps OInput; inner native <input> has -field suffix. Use attached + force.
+        const nameField = this.page.locator('[data-test="add-destination-name-input-field"]');
+        await nameField.waitFor({ state: 'attached', timeout: 10000 });
+        await nameField.fill(name, { force: true });
+        const urlField = this.page.locator('[data-test="add-destination-url-input-field"]');
+        await urlField.waitFor({ state: 'attached', timeout: 10000 });
+        await urlField.fill(url, { force: true });
         await this.page.locator('[data-test="add-destination-submit-btn"]').waitFor({ state: 'visible' });
         await this.page.locator('[data-test="add-destination-submit-btn"]').click();
     }

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,151 +16,145 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-splitter
-    v-model="splitterModel"
-    unit="px"
-    style="min-height: calc(100vh - 130px)"
-  >
-    <template v-slot:before>
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)]">
-          <q-tabs
-            v-model="ingestiontabs"
-            indicator-color="transparent"
-            inline-label
-            vertical
-          >
-            <q-route-tab
-              name="curl"
-              :to="{
-                name: 'curl',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              icon="data_object"
-              label="Curl"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="filebeat"
-              :to="{
-                name: 'filebeat',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/filebeat.png')"
-              label="Filebeat"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              default
-              name="fluentbit"
-              :to="{
-                name: 'fluentbit',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
-              label="FluentBit"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="fluentd"
-              :to="{
-                name: 'fluentd',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
-              label="Fluentd"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="vector"
-              :to="{
-                name: 'vector',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/vector.png')"
-              label="Vector"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="ingestLogsFromOtel"
-              :to="{
-                name: 'ingestLogsFromOtel',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-              label="OTEL Collector"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="logstash"
-              :to="{
-                name: 'logstash',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/logstash.svg')"
-              label="Logstash"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="syslogNg"
-              :to="{
-                name: 'syslogNg',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              icon="plagiarism"
-              label="Syslog-ng"
-              content-class="tab_content"
-            />
-          </q-tabs>
-        </div>
-      </div>
+  <DataSourceSidebarLayout v-model="ingestiontabs" :splitter-width="250">
+    <template #tabs>
+      <ORouteTab
+        name="curl"
+        data-test="ingestion-logs-tab-curl"
+        :to="{
+          name: 'curl',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        icon="data-object"
+        :label="t('ingestion.curl')"
+      />
+      <ORouteTab
+        name="filebeat"
+        data-test="ingestion-logs-tab-filebeat"
+        :to="{
+          name: 'filebeat',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/filebeat.png')"
+        :label="t('ingestion.filebeat')"
+      />
+      <ORouteTab
+        name="fluentbit"
+        data-test="ingestion-logs-tab-fluentbit"
+        :to="{
+          name: 'fluentbit',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/fluentbit_icon.png')"
+        :label="t('ingestion.fluentbit')"
+      />
+      <ORouteTab
+        name="fluentd"
+        data-test="ingestion-logs-tab-fluentd"
+        :to="{
+          name: 'fluentd',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/fluentd_icon.svg')"
+        :label="t('ingestion.fluentd')"
+      />
+      <ORouteTab
+        name="vector"
+        :to="{
+          name: 'vector',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/vector.png')"
+        :label="t('ingestion.vector')"
+      />
+      <ORouteTab
+        name="ingestLogsFromOtel"
+        :to="{
+          name: 'ingestLogsFromOtel',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+        :label="t('ingestion.otelCollector')"
+      />
+      <ORouteTab
+        name="logstash"
+        :to="{
+          name: 'logstash',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/logstash.svg')"
+        :label="t('ingestion.logstash')"
+      />
+      <ORouteTab
+        name="syslogNg"
+        :to="{
+          name: 'syslogNg',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        icon="plagiarism"
+        :label="t('ingestion.syslogNg')"
+      />
+      <ORouteTab
+        name="loongcollector"
+        data-test="ingestion-logs-tab-loongcollector"
+        :to="{
+          name: 'loongcollector',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/loongcollector.svg')"
+        :label="t('ingestion.loongCollector')"
+      />
     </template>
 
-    <template v-slot:after>
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)]">
-          <router-view
-            :title="ingestiontabs"
-            :currOrgIdentifier="currOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-            @copy-to-clipboard-fn="copyToClipboardFn"
-          >
-          </router-view>
-        </div>
+    <div class="h-full w-full">
+      <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
+        <router-view
+          :title="ingestiontabs"
+          :currOrgIdentifier="currOrgIdentifier"
+          :currUserEmail="currentUserEmail"
+          @copy-to-clipboard-fn="copyToClipboardFn"
+        >
+        </router-view>
       </div>
-    </template>
-  </q-splitter>
+    </div>
+  </DataSourceSidebarLayout>
 </template>
 
 <script lang="ts">
+import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, computed, onUpdated } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "IngestLogs",
+  components: { ORouteTab, DataSourceSidebarLayout },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -168,23 +162,16 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
-    const ingestiontabs = ref("");
-    const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier,
+    const ingestiontabs = ref(
+      resolveTab("ingestLogs", router.currentRoute.value.name as string, "curl"),
     );
-    const ingestRoutes = [
-      "curl",
-      "fluentbit",
-      "fluentd",
-      "vector",
-      "syslogNg",
-    ];
+    const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
+    const ingestRoutes = ["curl", "fluentbit", "fluentd", "vector", "syslogNg", "loongcollector"];
 
     onBeforeMount(() => {
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
@@ -219,28 +206,20 @@ export default defineComponent({
     });
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText)
-        .then(() => {
-          q.notify({
-            type: "positive",
-            message: "Content Copied Successfully!",
-            timeout: 5000,
+      copyToClipboard(content.innerText, t, {
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("ingestion.copyContentError"),
+        timeout: 5000,
+      }).then((success: boolean) => {
+        if (success) {
+          segment.track("Button Click", {
+            button: "Copy to Clipboard",
+            ingestion: router.currentRoute.value.name,
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Ingestion",
           });
-        })
-        .catch(() => {
-          q.notify({
-            type: "negative",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-        });
-
-      segment.track("Button Click", {
-        button: "Copy to Clipboard",
-        ingestion: router.currentRoute.value.name,
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Ingestion",
+        }
       });
     };
 
@@ -258,7 +237,6 @@ export default defineComponent({
       router,
       config,
       rowData,
-      splitterModel: ref(250),
       currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
       copyToClipboardFn,
@@ -273,31 +251,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.ingestionPage {
-  padding: 1.5rem 0 0;
-  .head {
-    padding-bottom: 1rem;
-  }
-  
-}
-</style>
-<style lang="scss">
-.ingestionPage {
-  .q-tab-panel {
-    padding: 0 !important;
-    .tab_content {
-      .q-tab__label {
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-      }
-    }
-  }
-
-  .q-icon > img {
-    height: auto !important;
-  }
-}
-</style>

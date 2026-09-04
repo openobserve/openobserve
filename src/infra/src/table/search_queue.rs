@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,9 +19,9 @@ use sea_orm::{
     Statement,
 };
 
-use super::{entity::search_queue::*, get_lock};
+use super::entity::search_queue::*;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
@@ -40,20 +40,14 @@ pub async fn add(
         ..Default::default()
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::insert(record).exec(client).await?;
 
     Ok(())
 }
 
 pub async fn delete(id: i64) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Id.eq(id))
         .exec(client)
@@ -63,10 +57,7 @@ pub async fn delete(id: i64) -> Result<(), errors::Error> {
 }
 
 pub async fn delete_by_trace_id(trace_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::TraceId.eq(trace_id))
         .exec(client)
@@ -76,7 +67,7 @@ pub async fn delete_by_trace_id(trace_id: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn count(work_group: &str, user_id: Option<&str>) -> Result<usize, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut query = Entity::find().filter(Column::WorkGroup.eq(work_group));
     if let Some(user_id) = user_id {
         query = query.filter(Column::UserId.eq(user_id));
@@ -103,33 +94,20 @@ pub async fn count_all_levels(
     org_id: Option<&str>,
     user_id: Option<&str>,
 ) -> Result<(usize, usize, usize), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let backend = client.get_database_backend();
 
     // Build the SQL query using window functions for efficient counting
     // This counts all three levels in a single query to avoid multiple round-trips
-    let sql = match backend {
-        sea_orm::DatabaseBackend::Postgres | sea_orm::DatabaseBackend::Sqlite => {
-            // PostgreSQL uses $1, $2, $3 for parameter placeholders
-            "SELECT
-                COUNT(*) as global_count,
-                SUM(CASE WHEN org_id = $1 THEN 1 ELSE 0 END) as org_count,
-                SUM(CASE WHEN org_id = $2 AND user_id = $3 THEN 1 ELSE 0 END) as user_count
-            FROM search_queue
-            WHERE work_group = $4
-            LIMIT 1"
-        }
-        sea_orm::DatabaseBackend::MySql => {
-            // MySQL uses ? for parameter placeholders
-            // MySQL's SUM() returns DECIMAL, so cast to SIGNED INTEGER
-            "SELECT
-                COUNT(*) as global_count,
-                CAST(SUM(CASE WHEN org_id = ? THEN 1 ELSE 0 END) AS SIGNED) as org_count,
-                CAST(SUM(CASE WHEN org_id = ? AND user_id = ? THEN 1 ELSE 0 END) AS SIGNED) as user_count
-            FROM search_queue
-            WHERE work_group = ?
-            LIMIT 1"
-        }
+    let sql = {
+        // PostgreSQL/SQLite use $1, $2, $3 for parameter placeholders
+        "SELECT
+            COUNT(*) as global_count,
+            SUM(CASE WHEN org_id = $1 THEN 1 ELSE 0 END) as org_count,
+            SUM(CASE WHEN org_id = $2 AND user_id = $3 THEN 1 ELSE 0 END) as user_count
+        FROM search_queue
+        WHERE work_group = $4
+        LIMIT 1"
     };
 
     #[derive(Debug, FromQueryResult)]
@@ -165,24 +143,28 @@ pub async fn count_all_levels(
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
 
     Ok(())
 }
 
 pub async fn clean_incomplete(expired: i64) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::CreatedAt.lt(expired))
         .exec(client)
         .await?;
 
+    Ok(())
+}
+
+/// Deletes all search queue entries belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+    Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
     Ok(())
 }

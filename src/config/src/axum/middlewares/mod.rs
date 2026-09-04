@@ -16,9 +16,11 @@
 use axum::http::{HeaderMap, HeaderValue, header::HeaderName};
 
 mod access_log;
+mod real_ip;
 mod slow_log;
 
 pub use access_log::{AccessLogLayer, AccessLogService, get_http_access_log_format};
+pub use real_ip::{ClientIpSources, RealIp, extract_real_ip, resolve_client_ip_sources};
 pub use slow_log::{SlowLogLayer, SlowLogService};
 // Re-export tower_http compression for convenience
 pub use tower_http::compression::CompressionLayer;
@@ -44,5 +46,32 @@ pub fn insert_process_time_header(time: i64, headers: &mut HeaderMap) {
         && let Ok(value) = HeaderValue::from_str(&time.to_string())
     {
         headers.insert(HEADER_O2_PROCESS_TIME.clone(), value);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_insert_process_time_header_zero_does_nothing() {
+        let mut headers = HeaderMap::new();
+        insert_process_time_header(0, &mut headers);
+        assert!(!headers.contains_key(&HEADER_O2_PROCESS_TIME));
+    }
+
+    #[test]
+    fn test_insert_process_time_header_negative_does_nothing() {
+        let mut headers = HeaderMap::new();
+        insert_process_time_header(-1, &mut headers);
+        assert!(!headers.contains_key(&HEADER_O2_PROCESS_TIME));
+    }
+
+    #[test]
+    fn test_insert_process_time_header_positive_inserts_value() {
+        let mut headers = HeaderMap::new();
+        insert_process_time_header(12345, &mut headers);
+        assert!(headers.contains_key(&HEADER_O2_PROCESS_TIME));
+        assert_eq!(headers[&HEADER_O2_PROCESS_TIME], "12345");
     }
 }

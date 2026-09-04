@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -25,8 +25,8 @@ use config::meta::{
 pub use intermediate::convert_str_to_meta_report_timerange;
 pub use queries::ListReportsQueryResult;
 use sea_orm::{
-    ActiveModelTrait, ActiveValue::NotSet, ConnectionTrait, EntityTrait, ModelTrait, Set,
-    TransactionTrait,
+    ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, ConnectionTrait, EntityTrait, ModelTrait,
+    QueryFilter, Set, TransactionTrait,
 };
 use svix_ksuid::{Ksuid, KsuidLike};
 
@@ -60,10 +60,9 @@ pub async fn get_by_name<C: ConnectionTrait + TransactionTrait>(
     folder_snowflake_id: &str,
     report_name: &str,
 ) -> Result<Option<(MetaFolder, MetaReport)>, Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let Some(models) = queries::SelectReportAndJoinRelationsResult::get(
-        conn,
+        &txn,
         org_id,
         folder_snowflake_id,
         report_name,
@@ -81,10 +80,9 @@ pub async fn get_by_id<C: ConnectionTrait + TransactionTrait>(
     conn: &C,
     report_id: &str,
 ) -> Result<Option<(MetaFolder, MetaReport)>, Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let Some(models) =
-        queries::SelectReportAndJoinRelationsResult::get_by_id(conn, report_id).await?
+        queries::SelectReportAndJoinRelationsResult::get_by_id(&txn, report_id).await?
     else {
         return Ok(None);
     };
@@ -105,7 +103,6 @@ pub async fn create_report<C: ConnectionTrait + TransactionTrait>(
     report: MetaReport,
     report_id: Option<Ksuid>,
 ) -> Result<(String, MetaReport), Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
     let report_id = report_id
@@ -158,6 +155,7 @@ pub async fn create_report<C: ConnectionTrait + TransactionTrait>(
         created_at: Set(now),
         updated_at: Set(Some(now)),
         start_at: Set(report.start),
+        image_preview: Set(report.image_preview),
     };
     let report_model = report_active_model.insert(&txn).await?;
 
@@ -200,7 +198,6 @@ pub async fn update_report<C: ConnectionTrait + TransactionTrait>(
     new_folder_snowflake_id: Option<&str>,
     report: MetaReport,
 ) -> Result<String, Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
 
     let Some(models) = queries::SelectReportAndJoinRelationsResult::get(
@@ -262,10 +259,126 @@ pub async fn update_report<C: ConnectionTrait + TransactionTrait>(
         created_at: NotSet, // Never updated after creation.
         updated_at: Set(Some(Utc::now().timestamp_micros())),
         start_at: Set(report.start),
+        image_preview: Set(report.image_preview),
     };
     report_active_model.update(&txn).await?;
 
     // Determine which `report_dashboards` records to create, update, and delete.
+    let existing_rltns = models.joined_dashboards;
+    let desired_rltns = report.dashboards;
+    let rltns_to_create = relations::relations_to_create(
+        &txn,
+        &report.org_id,
+        &models.report.id,
+        &existing_rltns,
+        &desired_rltns,
+    )
+    .await?;
+    let rltns_to_update = relations::relations_to_update(&existing_rltns, &desired_rltns)?;
+    let rltns_to_delete = relations::relations_to_delete(&existing_rltns, &desired_rltns);
+
+    if !rltns_to_create.is_empty() {
+        report_dashboards::Entity::insert_many(rltns_to_create)
+            .exec(&txn)
+            .await?;
+    }
+    for rltn_active_model in rltns_to_update {
+        rltn_active_model.update(&txn).await?;
+    }
+    for rltn_pk in rltns_to_delete {
+        report_dashboards::Entity::delete_by_id(rltn_pk)
+            .exec(&txn)
+            .await?;
+    }
+
+    txn.commit().await?;
+    Ok(models.report.id)
+}
+
+/// Deletes a report by its KSUID.
+pub async fn delete_by_id<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    report_id: &str,
+) -> Result<String, Error> {
+    let txn = conn.begin().await?;
+    let Some(report_model) = reports::Entity::find()
+        .filter(reports::Column::Id.eq(report_id))
+        .one(&txn)
+        .await?
+    else {
+        return Ok(String::new());
+    };
+    let id = report_model.id.clone();
+    report_model.delete(&txn).await?;
+    txn.commit().await?;
+    Ok(id)
+}
+
+/// Updates the report identified by its KSUID.
+///
+/// Optionally moves it to a new folder if `new_folder_snowflake_id` is given.
+pub async fn update_by_id<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    report_id: &str,
+    new_folder_snowflake_id: Option<&str>,
+    report: MetaReport,
+) -> Result<String, Error> {
+    let txn = conn.begin().await?;
+
+    let Some(models) =
+        queries::SelectReportAndJoinRelationsResult::get_by_id(&txn, report_id).await?
+    else {
+        return Err(Error::ReportNotFound);
+    };
+
+    // Resolve the new folder FK if moving.
+    let folder_id = if let Some(new_folder_snowflake_id) = new_folder_snowflake_id {
+        let maybe_folder_model = super::folders::get_model(
+            &txn,
+            &report.org_id,
+            new_folder_snowflake_id,
+            FolderType::Reports,
+        )
+        .await?;
+        let folder_model = maybe_folder_model.ok_or(Error::ReportFolderNotFound)?;
+        Set(folder_model.id)
+    } else {
+        NotSet
+    };
+
+    let frequency_intermediate: intermediate::ReportFrequency = report
+        .frequency
+        .try_into()
+        .map_err(|_| Error::NegativeFrequencyInterval)?;
+    let frequency_json = serde_json::to_value(frequency_intermediate)?;
+
+    let destinations_intermediate: intermediate::ReportDestinations =
+        report.destinations.clone().into();
+    let destinations_json = serde_json::to_value(destinations_intermediate)?;
+
+    let report_active_model = reports::ActiveModel {
+        id: Set(models.report.id.clone()),
+        org: Set(models.report.org.clone()),
+        folder_id,
+        name: Set(report.name),
+        title: Set(report.title),
+        description: Set(Some(report.description).filter(|s| !s.is_empty())),
+        enabled: Set(report.enabled),
+        frequency: Set(frequency_json),
+        destinations: Set(destinations_json),
+        message: Set(Some(report.message).filter(|s| !s.is_empty())),
+        timezone: Set(report.timezone),
+        tz_offset: Set(report.tz_offset),
+        owner: Set(Some(report.owner).filter(|s| !s.is_empty())),
+        last_edited_by: Set(Some(report.last_edited_by).filter(|s| !s.is_empty())),
+        created_at: NotSet,
+        updated_at: Set(Some(Utc::now().timestamp_micros())),
+        start_at: Set(report.start),
+        image_preview: Set(report.image_preview),
+    };
+    report_active_model.update(&txn).await?;
+
+    // Update report_dashboards relations.
     let existing_rltns = models.joined_dashboards;
     let desired_rltns = report.dashboards;
     let rltns_to_create = relations::relations_to_create(
@@ -304,10 +417,9 @@ pub async fn delete_by_name<C: ConnectionTrait + TransactionTrait>(
     folder_snowflake_id: &str,
     report_name: &str,
 ) -> Result<String, Error> {
-    let _lock = super::get_lock().await;
     let txn = conn.begin().await?;
     let Some((_folder_model, Some(report_model))) =
-        queries::get_report_from_folder(conn, org_id, folder_snowflake_id, report_name).await?
+        queries::get_report_from_folder(&txn, org_id, folder_snowflake_id, report_name).await?
     else {
         return Ok(String::new());
     };
@@ -319,8 +431,17 @@ pub async fn delete_by_name<C: ConnectionTrait + TransactionTrait>(
 
 /// Delete all reports.
 pub async fn delete_all<C: ConnectionTrait>(conn: &C) -> Result<(), Error> {
-    let _lock = super::get_lock().await;
     reports::Entity::delete_many().exec(conn).await?;
+    Ok(())
+}
+
+/// Deletes all reports belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
+    let client = crate::db::get_orm_client_rw().await;
+    reports::Entity::delete_many()
+        .filter(reports::Column::Org.eq(org_id))
+        .exec(client)
+        .await?;
     Ok(())
 }
 
@@ -329,7 +450,44 @@ pub async fn list_reports<C: ConnectionTrait>(
     conn: &C,
     params: &ListReportsParams,
 ) -> Result<Vec<ListReportsQueryResult>, Error> {
-    let _lock = super::get_lock().await;
     let reports = queries::ListReportsQueryResult::get(conn, params).await?;
     Ok(reports)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_report_not_found_display() {
+        assert_eq!(Error::ReportNotFound.to_string(), "Report not found.");
+    }
+
+    #[test]
+    fn test_error_dashboard_not_found_display() {
+        assert_eq!(Error::DashboardNotFound.to_string(), "Dashboard not found.");
+    }
+
+    #[test]
+    fn test_error_report_folder_not_found_display() {
+        assert_eq!(
+            Error::ReportFolderNotFound.to_string(),
+            "Report folder not found."
+        );
+    }
+
+    #[test]
+    fn test_error_negative_frequency_interval_display() {
+        assert_eq!(
+            Error::NegativeFrequencyInterval.to_string(),
+            "Frequency interval cannot be negative."
+        );
+    }
+
+    #[test]
+    fn test_error_from_serde_json_error() {
+        let json_err = serde_json::from_str::<serde_json::Value>("invalid json {{").unwrap_err();
+        let err: Error = json_err.into();
+        assert!(matches!(err, Error::Json(_)));
+    }
 }

@@ -1,68 +1,61 @@
 <template>
-  <div style="display: flex; align-items: center; width: 100%">
-    <q-select
-    borderless hide-bottom-space
+  <div class="flex w-full items-center">
+    <OSelect
       v-model="backgroundType"
       :options="colorModeOptions"
-      dense
       :label="t('dashboard.colorMode')"
-      class="showLabelOnTop selectedLabel tw:w-full"
-      stack-label
-      emit-value
-      :display-value="
-        backgroundType
-          ? colorModeOptions.find((it: any) => it.value === backgroundType)
-              ?.label
-          : 'None'
-      "
+      class="flex-1"
       data-test="dashboard-config-color-mode"
-    ></q-select>
+    />
 
     <div v-if="backgroundType === 'single'">
       <div
-        class="color-input-wrapper"
-        style="margin-top: 36px; margin-left: 5px"
+        data-test="dashboard-config-color-input-wrapper"
+        class="relative ms-1.25 mt-9 inline-flex h-6.25 w-6.25 items-center overflow-hidden rounded-full"
       >
-        <input type="color" v-model="backgroundColor" />
+        <input
+          data-test="dashboard-config-color-input"
+          type="color"
+          v-model="backgroundColor"
+          class="absolute top-1/2 left-1/2 m-0 h-[4em] w-[4em] -translate-x-1/2 -translate-y-1/2 overflow-hidden border-0 p-0"
+        />
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import useDashboardPanelData from "@/composables/useDashboardPanel";
-import { computed, defineComponent, inject, onBeforeMount, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import { computed, defineComponent, inject, watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "BackgroundColorConfig",
+  components: { OSelect },
   setup() {
     // Destructure props and emit if needed
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
-    const { t } = useI18n();
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { t } = useI18nTyped();
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const colorModeOptions = [
-      { label: t("dashboard.none"), value: "" },
+      { label: t("dashboard.none"), value: null },
       { label: t("dashboard.singleColor"), value: "single" },
     ];
 
     // Reactive references for background configuration
     const backgroundType = computed({
-      get: () => dashboardPanelData.data.config.background?.type ?? "",
+      get: () => dashboardPanelData.data.config.background?.type || null,
       set: (value) => {
+        const type = value ?? "";
         if (!dashboardPanelData.data.config.background) {
           dashboardPanelData.data.config.background = {
-            type: value,
+            type,
             value: { color: "" },
           };
         } else {
-          dashboardPanelData.data.config.background.type = value;
+          dashboardPanelData.data.config.background.type = type;
         }
       },
     });
@@ -102,28 +95,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.color-input-wrapper {
-  height: 25px;
-  width: 25px;
-  overflow: hidden;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  position: relative;
-}
-
-.color-input-wrapper input[type="color"] {
-  position: absolute;
-  height: 4em;
-  width: 4em;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  overflow: hidden;
-  border: none;
-  margin: 0;
-  padding: 0;
-}
-</style>

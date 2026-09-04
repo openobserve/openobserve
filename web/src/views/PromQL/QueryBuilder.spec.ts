@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,12 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
+import { mount, flushPromises, config } from "@vue/test-utils";
+import i18n from "@/locales";
 import QueryBuilder from "./QueryBuilder.vue";
 
-installQuasar({ plugins: [Notify] });
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // Mock the child components
 vi.mock("@/components/promql/components/MetricSelector.vue", () => ({
@@ -51,7 +50,7 @@ vi.mock("@/components/promql/components/OperationsList.vue", () => ({
 
 // Mock the query modeller
 vi.mock("@/components/promql/operations/queryModeller", () => ({
-  promQueryModeller: {
+  promqlRenderer: {
     renderQuery: vi.fn((query) => {
       if (!query.metric) return "";
       let result = query.metric;
@@ -75,6 +74,12 @@ Object.assign(navigator, {
   },
 });
 
+// Mock Toast
+const mockNotify = vi.fn(() => vi.fn());
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockNotify(...args),
+}));
+
 describe("QueryBuilder", () => {
   let wrapper: any;
 
@@ -82,10 +87,6 @@ describe("QueryBuilder", () => {
     return mount(QueryBuilder, {
       global: {
         stubs: {
-          QCard: false,
-          QCardSection: false,
-          QSeparator: false,
-          QBtn: false,
           MetricSelector: true,
           LabelFilterEditor: true,
           OperationsList: true,
@@ -108,7 +109,7 @@ describe("QueryBuilder", () => {
     it("should render the component", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".promql-query-builder").exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-query-builder"]').exists()).toBe(true);
     });
 
     it("should display the title and subtitle", () => {
@@ -170,10 +171,7 @@ describe("QueryBuilder", () => {
       wrapper = createWrapper();
 
       wrapper.vm.visualQuery.metric = "http_requests_total";
-      wrapper.vm.visualQuery.operations = [
-        { type: "rate" },
-        { type: "sum" },
-      ];
+      wrapper.vm.visualQuery.operations = [{ type: "rate" }, { type: "sum" }];
       await wrapper.vm.$nextTick();
 
       expect(wrapper.vm.generatedQuery).toContain("sum(rate(http_requests_total))");
@@ -212,28 +210,29 @@ describe("QueryBuilder", () => {
     });
 
     it("should show notification after copying", async () => {
+      mockNotify.mockClear();
       wrapper = createWrapper();
 
       wrapper.vm.visualQuery.metric = "test_metric";
       await wrapper.vm.$nextTick();
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
       await wrapper.vm.copyQuery();
+      await flushPromises();
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "positive",
+          variant: "success",
           message: "Query copied to clipboard!",
-        })
+        }),
       );
     });
 
     it("should disable copy button when no query is generated", () => {
       wrapper = createWrapper();
 
-      const copyButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Copy Query")
-      );
+      const copyButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Copy Query"));
 
       expect(copyButton?.element.disabled).toBe(true);
     });
@@ -244,9 +243,9 @@ describe("QueryBuilder", () => {
       wrapper.vm.visualQuery.metric = "test_metric";
       await wrapper.vm.$nextTick();
 
-      const copyButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Copy Query")
-      );
+      const copyButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Copy Query"));
 
       expect(copyButton?.element.disabled).toBe(false);
     });
@@ -273,25 +272,25 @@ describe("QueryBuilder", () => {
     });
 
     it("should show notification after clearing", async () => {
+      mockNotify.mockClear();
       wrapper = createWrapper();
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
       await wrapper.vm.clearQuery();
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "info",
+          variant: "info",
           message: "Query cleared",
-        })
+        }),
       );
     });
 
     it("should clear button should always be enabled", () => {
       wrapper = createWrapper();
 
-      const clearButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Clear All")
-      );
+      const clearButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Clear All"));
 
       expect(clearButton?.element.disabled).toBe(false);
     });
@@ -311,19 +310,19 @@ describe("QueryBuilder", () => {
     });
 
     it("should show notification when testing query", async () => {
+      mockNotify.mockClear();
       wrapper = createWrapper();
 
       wrapper.vm.visualQuery.metric = "test_metric";
       await wrapper.vm.$nextTick();
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
       await wrapper.vm.testQuery();
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(mockNotify).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "info",
+          variant: "info",
           message: "Query testing will be implemented soon",
-        })
+        }),
       );
     });
 
@@ -345,9 +344,9 @@ describe("QueryBuilder", () => {
     it("should disable test button when no query is generated", () => {
       wrapper = createWrapper();
 
-      const testButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Test Query")
-      );
+      const testButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Test Query"));
 
       expect(testButton?.element.disabled).toBe(true);
     });
@@ -358,9 +357,9 @@ describe("QueryBuilder", () => {
       wrapper.vm.visualQuery.metric = "test_metric";
       await wrapper.vm.$nextTick();
 
-      const testButton = wrapper.findAll("button").find((btn: any) =>
-        btn.text().includes("Test Query")
-      );
+      const testButton = wrapper
+        .findAll("button")
+        .find((btn: any) => btn.text().includes("Test Query"));
 
       expect(testButton?.element.disabled).toBe(false);
     });

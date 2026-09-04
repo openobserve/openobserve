@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -35,10 +35,7 @@ export function useWorker() {
    * @returns
    */
 
-  function runWorker<T, R>(
-    data: T,
-    workerFunction: (data: T) => R
-  ): Promise<R> {
+  function runWorker<T, R>(data: T, workerFunction: (data: T) => R): Promise<R> {
     return new Promise((resolve, reject) => {
       // Convert the function to a string
       const functionString = workerFunction.toString();
@@ -54,7 +51,7 @@ export function useWorker() {
           };
         `,
         ],
-        { type: "application/javascript" }
+        { type: "application/javascript" },
       );
 
       // Create a worker from the blob

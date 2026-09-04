@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,11 +14,12 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it } from "vitest";
-import { 
-  formatInterval, 
-  getTimeInSecondsBasedOnUnit, 
-  formatRateInterval, 
-  processVariableContent 
+import {
+  formatInterval,
+  getTimeInSecondsBasedOnUnit,
+  formatRateInterval,
+  processVariableContent,
+  normalizeVariableSyntax,
 } from "./variablesUtils";
 
 describe("Variables Utils", () => {
@@ -194,62 +195,62 @@ describe("Variables Utils", () => {
         { name: "env", value: "production" },
         { name: "empty", value: "" },
         { name: "null", value: null },
-      ]
+      ],
     };
 
     it("should replace simple variable placeholders", () => {
       const content = "SELECT * FROM logs WHERE region = '${region}' AND env = '${env}'";
       const expected = "SELECT * FROM logs WHERE region = 'us-east-1' AND env = 'production'";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should replace alternative syntax variable placeholders", () => {
       const content = "SELECT * FROM logs WHERE region = '$region' AND env = '$env'";
       const expected = "SELECT * FROM logs WHERE region = 'us-east-1' AND env = 'production'";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle array values with default comma separation", () => {
       const content = "SELECT * FROM logs WHERE service IN (${service})";
       const expected = "SELECT * FROM logs WHERE service IN (api,web,db)";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle array values with CSV formatting", () => {
       const content = "SELECT * FROM logs WHERE service IN (${service:csv})";
       const expected = "SELECT * FROM logs WHERE service IN (api,web,db)";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle array values with pipe formatting", () => {
       const content = "SELECT * FROM logs WHERE service REGEXP '${service:pipe}'";
       const expected = "SELECT * FROM logs WHERE service REGEXP 'api|web|db'";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle array values with double quote formatting", () => {
       const content = "SELECT * FROM logs WHERE service IN (${service:doublequote})";
       const expected = 'SELECT * FROM logs WHERE service IN ("api","web","db")';
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle array values with single quote formatting", () => {
       const content = "SELECT * FROM logs WHERE service IN (${service:singlequote})";
       const expected = "SELECT * FROM logs WHERE service IN ('api','web','db')";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle empty values", () => {
       const content = "SELECT * FROM logs WHERE field = '${empty}'";
       const expected = "SELECT * FROM logs WHERE field = ''";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
@@ -264,19 +265,19 @@ describe("Variables Utils", () => {
     it("should handle multiple occurrences of the same variable", () => {
       const content = "${region}-${region}-${region}";
       const expected = "us-east-1-us-east-1-us-east-1";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
     it("should handle content with no variables", () => {
       const content = "SELECT * FROM logs WHERE timestamp > '2023-01-01'";
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(content);
     });
 
     it("should handle undefined variables data", () => {
       const content = "SELECT * FROM logs WHERE region = '${region}'";
-      
+
       expect(processVariableContent(content, null)).toBe(content);
       expect(processVariableContent(content, undefined)).toBe(content);
     });
@@ -284,19 +285,19 @@ describe("Variables Utils", () => {
     it("should handle empty variables data", () => {
       const content = "SELECT * FROM logs WHERE region = '${region}'";
       const emptyData = { values: [] };
-      
+
       expect(processVariableContent(content, emptyData)).toBe(content);
     });
 
     it("should handle variables without names", () => {
       const content = "SELECT * FROM logs WHERE region = '${region}'";
-      const invalidData = { 
+      const invalidData = {
         values: [
           { value: "us-east-1" }, // missing name
           { name: "", value: "test" }, // empty name
-        ]
+        ],
       };
-      
+
       expect(processVariableContent(content, invalidData)).toBe(content);
     });
 
@@ -305,10 +306,10 @@ describe("Variables Utils", () => {
         SELECT * FROM logs 
         WHERE region = '\${region}' 
         AND service IN (\${service:singlequote})
-        AND env = '\$env'
+        AND env = '$env'
         AND query REGEXP '\${service:pipe}'
       `;
-      
+
       const expected = `
         SELECT * FROM logs 
         WHERE region = 'us-east-1' 
@@ -316,7 +317,7 @@ describe("Variables Utils", () => {
         AND env = 'production'
         AND query REGEXP 'api|web|db'
       `;
-      
+
       expect(processVariableContent(content, mockVariablesData)).toBe(expected);
     });
 
@@ -379,7 +380,7 @@ describe("Variables Utils", () => {
       });
 
       it("should handle null and undefined inputs", () => {
-        expect(getTimeInSecondsBasedOnUnit(null, "s")).toBe(null); // null * 1 = null  
+        expect(getTimeInSecondsBasedOnUnit(null, "s")).toBe(null); // null * 1 = null
         expect(getTimeInSecondsBasedOnUnit(undefined, "s")).toBe(undefined); // undefined * 1 = undefined
         expect(getTimeInSecondsBasedOnUnit(5, null)).toBe(5);
         expect(getTimeInSecondsBasedOnUnit(5, undefined)).toBe(5);
@@ -421,7 +422,7 @@ describe("Variables Utils", () => {
           { name: "mixed", value: ["string", 123, true] },
           { name: "special_chars", value: "test@#$%^&*()_+" },
           { name: "unicode", value: "测试数据" },
-        ]
+        ],
       };
 
       it("should handle numeric array values", () => {
@@ -461,14 +462,18 @@ describe("Variables Utils", () => {
       });
 
       it("should handle nested variable-like patterns that aren't variables", () => {
-        const content = "SELECT * FROM logs WHERE field LIKE '${region}' AND other = '$not_a_variable'";
-        const expected = "SELECT * FROM logs WHERE field LIKE 'us-east-1' AND other = '$not_a_variable'";
+        const content =
+          "SELECT * FROM logs WHERE field LIKE '${region}' AND other = '$not_a_variable'";
+        const expected =
+          "SELECT * FROM logs WHERE field LIKE 'us-east-1' AND other = '$not_a_variable'";
         expect(processVariableContent(content, extendedMockData)).toBe(expected);
       });
 
       it("should handle malformed variable patterns", () => {
-        const content = "SELECT * FROM logs WHERE field = '${' AND other = '}' AND valid = '${region}'";
-        const expected = "SELECT * FROM logs WHERE field = '${' AND other = '}' AND valid = 'us-east-1'";
+        const content =
+          "SELECT * FROM logs WHERE field = '${' AND other = '}' AND valid = '${region}'";
+        const expected =
+          "SELECT * FROM logs WHERE field = '${' AND other = '}' AND valid = 'us-east-1'";
         expect(processVariableContent(content, extendedMockData)).toBe(expected);
       });
 
@@ -505,13 +510,109 @@ describe("Variables Utils", () => {
     });
   });
 
+  describe("normalizeVariableSyntax", () => {
+    it("should normalize mustache with spaces", () => {
+      expect(normalizeVariableSyntax("{{ hello }}")).toBe("{{hello}}");
+      expect(normalizeVariableSyntax("{{  hello  }}")).toBe("{{hello}}");
+      expect(normalizeVariableSyntax("{{ hello}}")).toBe("{{hello}}");
+      expect(normalizeVariableSyntax("{{hello }}")).toBe("{{hello}}");
+    });
+
+    it("should normalize mustache with format specifier and spaces", () => {
+      expect(normalizeVariableSyntax("{{ hello : csv }}")).toBe("{{hello:csv}}");
+      expect(normalizeVariableSyntax("{{ hello:csv }}")).toBe("{{hello:csv}}");
+      expect(normalizeVariableSyntax("{{hello : pipe}}")).toBe("{{hello:pipe}}");
+      expect(normalizeVariableSyntax("{{ hello :doublequote }}")).toBe("{{hello:doublequote}}");
+      expect(normalizeVariableSyntax("{{ hello : singlequote }}")).toBe("{{hello:singlequote}}");
+    });
+
+    it("should normalize dollar-brace with spaces", () => {
+      expect(normalizeVariableSyntax("${ hello }")).toBe("${hello}");
+      expect(normalizeVariableSyntax("${  hello  }")).toBe("${hello}");
+      expect(normalizeVariableSyntax("${ hello}")).toBe("${hello}");
+      expect(normalizeVariableSyntax("${hello }")).toBe("${hello}");
+    });
+
+    it("should normalize dollar-brace with format specifier and spaces", () => {
+      expect(normalizeVariableSyntax("${ hello : csv }")).toBe("${hello:csv}");
+      expect(normalizeVariableSyntax("${ hello:pipe }")).toBe("${hello:pipe}");
+      expect(normalizeVariableSyntax("${hello : doublequote}")).toBe("${hello:doublequote}");
+    });
+
+    it("should not alter already-normalized syntax", () => {
+      expect(normalizeVariableSyntax("{{hello}}")).toBe("{{hello}}");
+      expect(normalizeVariableSyntax("${hello}")).toBe("${hello}");
+      expect(normalizeVariableSyntax("$hello")).toBe("$hello");
+      expect(normalizeVariableSyntax("{{hello:csv}}")).toBe("{{hello:csv}}");
+    });
+
+    it("should not alter bare dollar-sign variables", () => {
+      expect(normalizeVariableSyntax("$hello")).toBe("$hello");
+    });
+
+    it("should handle multiple variables in one string", () => {
+      expect(normalizeVariableSyntax("{{ a }} and ${ b } and {{c:csv}}")).toBe(
+        "{{a}} and ${b} and {{c:csv}}",
+      );
+    });
+
+    it("should handle variables with hyphens and underscores", () => {
+      expect(normalizeVariableSyntax("{{ k8s-cluster_name }}")).toBe("{{k8s-cluster_name}}");
+      expect(normalizeVariableSyntax("${ k8s-cluster_name }")).toBe("${k8s-cluster_name}");
+    });
+
+    it("should not break non-variable content", () => {
+      const content = "SELECT * FROM logs WHERE timestamp > '2023-01-01'";
+      expect(normalizeVariableSyntax(content)).toBe(content);
+    });
+  });
+
+  describe("processVariableContent with spaces", () => {
+    const mockVariablesData = {
+      values: [
+        { name: "region", value: "us-east-1" },
+        { name: "service", value: ["api", "web", "db"] },
+      ],
+    };
+
+    it("should replace mustache variables with spaces", () => {
+      const content = "SELECT * FROM logs WHERE region = '{{ region }}'";
+      const expected = "SELECT * FROM logs WHERE region = 'us-east-1'";
+      expect(processVariableContent(content, mockVariablesData)).toBe(expected);
+    });
+
+    it("should replace dollar-brace variables with spaces", () => {
+      const content = "SELECT * FROM logs WHERE region = '${ region }'";
+      const expected = "SELECT * FROM logs WHERE region = 'us-east-1'";
+      expect(processVariableContent(content, mockVariablesData)).toBe(expected);
+    });
+
+    it("should replace mustache variables with format specifier and spaces", () => {
+      const content = "SELECT * FROM logs WHERE service IN ({{ service : csv }})";
+      const expected = "SELECT * FROM logs WHERE service IN (api,web,db)";
+      expect(processVariableContent(content, mockVariablesData)).toBe(expected);
+    });
+
+    it("should replace dollar-brace variables with format specifier and spaces", () => {
+      const content = "SELECT * FROM logs WHERE service REGEXP '${ service : pipe }'";
+      const expected = "SELECT * FROM logs WHERE service REGEXP 'api|web|db'";
+      expect(processVariableContent(content, mockVariablesData)).toBe(expected);
+    });
+
+    it("should handle mixed spaced and non-spaced variables", () => {
+      const content = "{{ region }} and ${region} and {{ service : csv }}";
+      const expected = "us-east-1 and us-east-1 and api,web,db";
+      expect(processVariableContent(content, mockVariablesData)).toBe(expected);
+    });
+  });
+
   describe("Integration Tests", () => {
     it("should work together for time-based variable processing", () => {
       const interval = 3600000; // 1 hour in ms
       const formatted = formatInterval(interval);
       const seconds = getTimeInSecondsBasedOnUnit(formatted.value, formatted.unit);
       const rateFormatted = formatRateInterval(seconds);
-      
+
       expect(formatted).toEqual({ value: 1, unit: "h" });
       expect(seconds).toBe(3600);
       expect(rateFormatted).toBe("1h");
@@ -521,13 +622,14 @@ describe("Variables Utils", () => {
       const variablesData = {
         values: [
           { name: "interval", value: "1h" },
-          { name: "services", value: ["api", "web"] }
-        ]
+          { name: "services", value: ["api", "web"] },
+        ],
       };
-      
-      const query = "rate(requests[${interval}]) by (service) where service in (${services:singlequote})";
+
+      const query =
+        "rate(requests[${interval}]) by (service) where service in (${services:singlequote})";
       const processed = processVariableContent(query, variablesData);
-      
+
       expect(processed).toBe("rate(requests[1h]) by (service) where service in ('api','web')");
     });
   });

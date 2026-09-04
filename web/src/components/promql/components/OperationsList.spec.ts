@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,23 +15,55 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import OperationsList from "./OperationsList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { PromOperationId } from "@/components/promql/types";
+import { PromqlStepId } from "@/components/promql/types";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
+// ── Stubs ────────────────────────────────────────────────────────────────────
+
+const oDialogStub = {
+  inheritAttrs: false,
+  template:
+    '<div data-test="o-dialog" v-if="open">' +
+    '<slot name="header" />' +
+    "<slot />" +
+    '<slot name="footer" />' +
+    '<button data-test="o-dialog-primary" @click="$emit(\'click:primary\')">{{ primaryButtonLabel }}</button>' +
+    '<button data-test="o-dialog-secondary" @click="$emit(\'click:secondary\')">{{ secondaryButtonLabel }}</button>' +
+    '<button data-test="o-dialog-neutral" @click="$emit(\'click:neutral\')">{{ neutralButtonLabel }}</button>' +
+    '<button data-test="o-dialog-close" @click="$emit(\'update:open\', false)">close</button>' +
+    "</div>",
+  props: [
+    "open",
+    "persistent",
+    "size",
+    "title",
+    "subTitle",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "primaryButtonVariant",
+    "primaryButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLabel",
+    "secondaryButtonVariant",
+    "secondaryButtonDisabled",
+    "secondaryButtonLoading",
+    "neutralButtonLabel",
+    "neutralButtonVariant",
+    "neutralButtonDisabled",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+};
 
 describe("OperationsList", () => {
   let wrapper: any;
 
   const mockOperations = [
-    { id: PromOperationId.Rate, params: ["5m"] },
-    { id: PromOperationId.Sum, params: [["method", "status"]] },
+    { id: PromqlStepId.Rate, params: ["5m"] },
+    { id: PromqlStepId.Sum, params: [["method", "status"]] },
   ];
 
   const mockDashboardData = {
@@ -70,6 +102,9 @@ describe("OperationsList", () => {
       },
       global: {
         plugins: [i18n, store],
+        stubs: {
+          ODialog: oDialogStub,
+        },
         mocks: {
           $t: (key: string) => key,
         },
@@ -80,17 +115,18 @@ describe("OperationsList", () => {
   describe("Component Rendering", () => {
     it("should render operations list container", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".tw\\:py-\\[0\\.25rem\\]").exists()).toBe(true);
+      // Outer py-[0.25rem] wrapper removed in commit 3e7c9baf6a; check the inner row instead
+      expect(wrapper.find(".ps-2").exists()).toBe(true);
     });
 
     it("should display layout name", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".layout-name").text()).toBe("Operations");
+      expect(wrapper.find('[data-test="promql-operations-list-label"]').text()).toBe("Operations");
     });
 
     it("should render operation items", () => {
       wrapper = createWrapper();
-      const operations = wrapper.findAll(".operation-item");
+      const operations = wrapper.findAll('[data-test="promql-operations-item"]');
       expect(operations.length).toBe(mockOperations.length);
     });
 
@@ -133,7 +169,7 @@ describe("OperationsList", () => {
     });
 
     it("should display operation name only when no params", () => {
-      const opsWithNoParams = [{ id: PromOperationId.Abs, params: [] }];
+      const opsWithNoParams = [{ id: PromqlStepId.Abs, params: [] }];
       wrapper = createWrapper({ operations: opsWithNoParams });
 
       const label = wrapper.vm.computedLabel(opsWithNoParams[0]);
@@ -156,16 +192,14 @@ describe("OperationsList", () => {
       const operations = [...mockOperations];
       wrapper = createWrapper({ operations });
 
-      const removeButton = wrapper.find(
-        '[data-test="promql-operation-remove-0"]',
-      );
+      const removeButton = wrapper.find('[data-test="promql-operation-remove-0"]');
       await removeButton.trigger("click");
 
       // Check that update:operations event was emitted with removed operation
       const emitted = wrapper.emitted("update:operations");
       expect(emitted).toBeTruthy();
       expect(emitted![0][0]).toHaveLength(1);
-      expect(emitted![0][0][0].id).toBe(PromOperationId.Sum);
+      expect(emitted![0][0][0].id).toBe(PromqlStepId.Sum);
     });
 
     it("should add operation with default params", () => {
@@ -173,11 +207,11 @@ describe("OperationsList", () => {
       wrapper = createWrapper({ operations });
 
       const opDef = {
-        id: PromOperationId.Rate,
+        id: PromqlStepId.Rate,
         name: "Rate",
         params: [{ name: "Range", type: "string" as const }],
         defaultParams: ["5m"],
-        category: "Range Functions",
+        group: "Rate & range",
       };
 
       wrapper.vm.addOperation(opDef);
@@ -186,7 +220,7 @@ describe("OperationsList", () => {
       const emitted = wrapper.emitted("update:operations");
       expect(emitted).toBeTruthy();
       expect(emitted![0][0]).toHaveLength(1);
-      expect(emitted![0][0][0].id).toBe(PromOperationId.Rate);
+      expect(emitted![0][0][0].id).toBe(PromqlStepId.Rate);
       expect(emitted![0][0][0].params).toEqual(["5m"]);
     });
   });
@@ -202,8 +236,8 @@ describe("OperationsList", () => {
       // Check that update:operations event was emitted with reordered operations
       const emitted = wrapper.emitted("update:operations");
       expect(emitted).toBeTruthy();
-      expect(emitted![0][0][0].id).toBe(PromOperationId.Sum);
-      expect(emitted![0][0][1].id).toBe(PromOperationId.Rate);
+      expect(emitted![0][0][0].id).toBe(PromqlStepId.Sum);
+      expect(emitted![0][0][1].id).toBe(PromqlStepId.Rate);
     });
 
     it("should emit update event on drag", () => {
@@ -229,13 +263,61 @@ describe("OperationsList", () => {
   });
 
   describe("Operation Selector Dialog", () => {
-    it("should show operation selector dialog", async () => {
+    it("should show operation selector dialog when add button clicked", async () => {
+      wrapper = createWrapper();
+
+      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(false);
+
+      const addButton = wrapper.find('[data-test="promql-add-operation"]');
+      await addButton.trigger("click");
+      await flushPromises();
+
+      expect(wrapper.vm.showOperationSelector).toBe(true);
+      expect(wrapper.find('[data-test="o-dialog"]').exists()).toBe(true);
+    });
+
+    it("should pass correct props to ODialog", async () => {
       wrapper = createWrapper();
 
       const addButton = wrapper.find('[data-test="promql-add-operation"]');
       await addButton.trigger("click");
+      await flushPromises();
 
-      expect(wrapper.vm.showOperationSelector).toBe(true);
+      const dialog = wrapper.findComponent(oDialogStub);
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.props("size")).toBe("sm");
+      expect(dialog.props("title")).toBe("Add Operation");
+      expect(dialog.props("primaryButtonLabel")).toBe("Close");
+    });
+
+    it("should close dialog when primary button (Close) is clicked via emit", async () => {
+      wrapper = createWrapper();
+
+      // Open the dialog first
+      wrapper.vm.showOperationSelector = true;
+      await flushPromises();
+
+      const dialog = wrapper.findComponent(oDialogStub);
+      expect(dialog.exists()).toBe(true);
+
+      // Drive the primary close action via the emit
+      await dialog.vm.$emit("click:primary");
+      await flushPromises();
+
+      expect(wrapper.vm.showOperationSelector).toBe(false);
+    });
+
+    it("should close dialog when update:open is emitted with false", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.showOperationSelector = true;
+      await flushPromises();
+
+      const dialog = wrapper.findComponent(oDialogStub);
+      await dialog.vm.$emit("update:open", false);
+      await flushPromises();
+
+      expect(wrapper.vm.showOperationSelector).toBe(false);
     });
 
     it("should close dialog after adding operation", () => {
@@ -245,11 +327,11 @@ describe("OperationsList", () => {
       wrapper.vm.showOperationSelector = true;
 
       const opDef = {
-        id: PromOperationId.Rate,
+        id: PromqlStepId.Rate,
         name: "Rate",
         params: [],
         defaultParams: ["5m"],
-        category: "Range Functions",
+        group: "Rate & range",
       };
 
       wrapper.vm.addOperation(opDef);
@@ -264,11 +346,11 @@ describe("OperationsList", () => {
       wrapper.vm.searchQuery = "rate";
 
       const opDef = {
-        id: PromOperationId.Rate,
+        id: PromqlStepId.Rate,
         name: "Rate",
         params: [],
         defaultParams: ["5m"],
-        category: "Range Functions",
+        group: "Rate & range",
       };
 
       wrapper.vm.addOperation(opDef);
@@ -281,12 +363,8 @@ describe("OperationsList", () => {
 
       wrapper.vm.searchQuery = "rate";
 
-      const filtered = wrapper.vm.getFilteredOperationsForCategory(
-        "Range Functions",
-      );
-      expect(filtered.some((op: any) => op.id === PromOperationId.Rate)).toBe(
-        true,
-      );
+      const filtered = wrapper.vm.getFilteredOperationsForCategory("Rate & range");
+      expect(filtered.some((op: any) => op.id === PromqlStepId.Rate)).toBe(true);
     });
 
     it("should show all operations when search is empty", () => {
@@ -294,42 +372,39 @@ describe("OperationsList", () => {
 
       wrapper.vm.searchQuery = "";
 
-      const filtered = wrapper.vm.getFilteredOperationsForCategory(
-        "Range Functions",
-      );
+      const filtered = wrapper.vm.getFilteredOperationsForCategory("Rate & range");
       expect(filtered.length).toBeGreaterThan(0);
     });
   });
 
   describe("Operation Parameters", () => {
     it("should handle number parameter type", () => {
-      const ops = [{ id: PromOperationId.TopK, params: [10, []] }];
+      const ops = [{ id: PromqlStepId.TopK, params: [10, []] }];
       wrapper = createWrapper({ operations: ops });
 
-      const opDef = wrapper.vm.getOperationDef(PromOperationId.TopK);
+      const opDef = wrapper.vm.getStepSpec(PromqlStepId.TopK);
       expect(opDef?.params[0].type).toBe("number");
     });
 
     it("should handle string parameter type", () => {
-      const ops = [{ id: PromOperationId.Rate, params: ["5m"] }];
+      const ops = [{ id: PromqlStepId.Rate, params: ["5m"] }];
       wrapper = createWrapper({ operations: ops });
 
-      const opDef = wrapper.vm.getOperationDef(PromOperationId.Rate);
+      const opDef = wrapper.vm.getStepSpec(PromqlStepId.Rate);
       expect(opDef?.params[0].type).toBe("string");
     });
 
     it("should handle select parameter type with multi-select", () => {
-      const ops = [{ id: PromOperationId.Sum, params: [["method"]] }];
+      const ops = [{ id: PromqlStepId.Sum, params: [["method"]] }];
       wrapper = createWrapper({ operations: ops });
 
-      const opDef = wrapper.vm.getOperationDef(PromOperationId.Sum);
+      const opDef = wrapper.vm.getStepSpec(PromqlStepId.Sum);
       expect(opDef?.params[0].type).toBe("select");
     });
 
     it("should display parameter hints for select type", () => {
       wrapper = createWrapper();
 
-      const text = wrapper.html();
       // Should show hint when labels are available
       expect(wrapper.vm.availableLabels.length).toBeGreaterThan(0);
     });
@@ -340,17 +415,15 @@ describe("OperationsList", () => {
       wrapper = createWrapper();
 
       const categories = wrapper.vm.categories;
-      expect(categories).toContain("Range Functions");
-      expect(categories).toContain("Aggregations");
-      expect(categories).toContain("Functions");
+      expect(categories).toContain("Rate & range");
+      expect(categories).toContain("Aggregation");
+      expect(categories).toContain("Math");
     });
 
     it("should get operations for specific category", () => {
       wrapper = createWrapper();
 
-      const rangeOps = wrapper.vm.getFilteredOperationsForCategory(
-        "Range Functions",
-      );
+      const rangeOps = wrapper.vm.getFilteredOperationsForCategory("Rate & range");
       expect(rangeOps.length).toBeGreaterThan(0);
     });
   });
@@ -359,12 +432,7 @@ describe("OperationsList", () => {
     it("should access available labels from dashboard data", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.availableLabels).toEqual([
-        "method",
-        "status",
-        "path",
-        "host",
-      ]);
+      expect(wrapper.vm.availableLabels).toEqual(["method", "status", "path", "host"]);
     });
 
     it("should handle empty available labels", () => {
@@ -391,7 +459,7 @@ describe("OperationsList", () => {
 
   describe("Edge Cases", () => {
     it("should handle operation with empty params", () => {
-      const ops = [{ id: PromOperationId.Abs, params: [] }];
+      const ops = [{ id: PromqlStepId.Abs, params: [] }];
       wrapper = createWrapper({ operations: ops });
 
       const label = wrapper.vm.computedLabel(ops[0]);
@@ -399,7 +467,7 @@ describe("OperationsList", () => {
     });
 
     it("should handle operation with null params", () => {
-      const ops = [{ id: PromOperationId.Abs, params: [null] }];
+      const ops = [{ id: PromqlStepId.Abs, params: [null] }];
       wrapper = createWrapper({ operations: ops });
 
       const label = wrapper.vm.computedLabel(ops[0]);
@@ -407,7 +475,7 @@ describe("OperationsList", () => {
     });
 
     it("should handle operation with undefined params", () => {
-      const ops = [{ id: PromOperationId.Abs, params: [undefined] }];
+      const ops = [{ id: PromqlStepId.Abs, params: [undefined] }];
       wrapper = createWrapper({ operations: ops });
 
       const label = wrapper.vm.computedLabel(ops[0]);
@@ -427,31 +495,23 @@ describe("OperationsList", () => {
     it("should have proper data-test attributes", () => {
       wrapper = createWrapper();
 
-      expect(
-        wrapper.find('[data-test="promql-add-operation"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="promql-operation-0"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="promql-operation-remove-0"]').exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="promql-add-operation"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-operation-0"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="promql-operation-remove-0"]').exists()).toBe(true);
     });
 
     it("should have tooltips", () => {
       wrapper = createWrapper();
 
       const addButton = wrapper.find('[data-test="promql-add-operation"]');
-      expect(addButton.findComponent({ name: "QTooltip" }).exists()).toBe(true);
+      expect(addButton.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
 
     it("should have drag handle tooltips", () => {
       wrapper = createWrapper();
 
       const dragHandle = wrapper.find(".drag-handle");
-      expect(dragHandle.findComponent({ name: "QTooltip" }).exists()).toBe(
-        true,
-      );
+      expect(dragHandle.findComponent({ name: "OTooltip" }).exists()).toBe(true);
     });
   });
 });

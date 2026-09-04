@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import Drilldown from "@/components/dashboards/addPanel/Drilldown.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -26,42 +24,38 @@ import router from "@/test/unit/helpers/router";
 const mockDashboardPanelData = {
   data: {
     config: {
-      drilldown: []
+      drilldown: [],
     },
     queries: [{ fields: [] }],
-    type: "line"
+    type: "line",
   },
   layout: {
-    currentQueryIndex: 0
-  }
+    currentQueryIndex: 0,
+  },
 };
 
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
-    dashboardPanelData: mockDashboardPanelData
-  }))
+    dashboardPanelData: mockDashboardPanelData,
+  })),
 }));
-
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 const mockVariablesData = [
   { name: "region", value: "us-east-1" },
-  { name: "environment", value: "production" }
+  { name: "environment", value: "production" },
 ];
 
 describe("Drilldown", () => {
   let wrapper: any;
 
   const defaultProps = {
-    variablesData: mockVariablesData
+    variablesData: mockVariablesData,
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
-    
-    store.state.theme = 'light';
+
+    store.state.theme = "light";
     mockDashboardPanelData.data.config.drilldown = [];
   });
 
@@ -75,28 +69,25 @@ describe("Drilldown", () => {
     return mount(Drilldown, {
       props: {
         ...defaultProps,
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n, store, router],
         provide: {
-          dashboardPanelDataPageKey: "dashboard"
+          dashboardPanelDataPageKey: "dashboard",
         },
         stubs: {
-          'DrilldownPopUp': {
-            template: '<div data-test="drilldown-popup"></div>',
-            emits: ['close']
+          DrilldownPopUp: {
+            name: "DrilldownPopUp",
+            template: '<div data-test="drilldown-popup" :data-open="open"></div>',
+            props: ["open", "drilldownDataIndex", "isEditMode", "variablesData"],
+            emits: ["close"],
           },
-          'AppDialog': {
-            template: '<div v-if="modelValue" data-test="app-dialog"><slot /></div>',
-            props: ['modelValue'],
-            emits: ['update:modelValue']
-          }
         },
         mocks: {
-          $t: (key: string) => key
-        }
-      }
+          $t: (key: string) => key,
+        },
+      },
     });
   };
 
@@ -104,27 +95,40 @@ describe("Drilldown", () => {
     it("should render drilldown section", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.text()).toContain('Drilldown');
+      // Title block was removed in config redesign (PR #10917);
+      // the section header is now rendered by the parent ConfigPanel expansion item.
+      // Verify the component itself still mounts correctly.
+      expect(wrapper.exists()).toBe(true);
     });
 
     it("should render info tooltip button", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-info"]').exists()).toBe(true);
+      // Info tooltip button was removed from this component in config redesign (PR #10917);
+      // it is no longer rendered inside Drilldown.vue.
+      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-info"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should render add drilldown button", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').text()).toBe('+ Add');
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').exists(),
+      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').text()).toBe(
+        "+ Add",
+      );
     });
 
     it("should not render drilldown items when list is empty", () => {
       mockDashboardPanelData.data.config.drilldown = [];
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]').exists(),
+      ).toBe(false);
     });
 
     it("should not show dialog initially", () => {
@@ -138,77 +142,89 @@ describe("Drilldown", () => {
     it("should accept and handle variablesData prop", () => {
       const customVariables = [
         { name: "user", value: "admin" },
-        { name: "role", value: "superuser" }
+        { name: "role", value: "superuser" },
       ];
 
       wrapper = createWrapper({ variablesData: customVariables });
 
-      expect(wrapper.props('variablesData')).toEqual(customVariables);
+      expect(wrapper.props("variablesData")).toEqual(customVariables);
     });
 
     it("should handle empty variablesData", () => {
       wrapper = createWrapper({ variablesData: [] });
 
-      expect(wrapper.props('variablesData')).toEqual([]);
+      expect(wrapper.props("variablesData")).toEqual([]);
     });
 
     it("should handle undefined variablesData", () => {
       wrapper = createWrapper({ variablesData: undefined });
 
-      expect(wrapper.props('variablesData')).toBeUndefined();
+      expect(wrapper.props("variablesData")).toBeUndefined();
     });
   });
 
   describe("Drilldown Items Rendering", () => {
     it("should render drilldown items when they exist", async () => {
-      mockDashboardPanelData.data.config.drilldown = [
-        { name: "Dashboard 1", url: "/dashboard/1" }
-      ];
+      mockDashboardPanelData.data.config.drilldown = [{ name: "Dashboard 1", url: "/dashboard/1" }];
       wrapper = createWrapper();
 
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]').text()).toContain('Dashboard 1');
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]').text(),
+      ).toContain("Dashboard 1");
     });
 
     it("should render multiple drilldown items", async () => {
       mockDashboardPanelData.data.config.drilldown = [
         { name: "Dashboard 1", url: "/dashboard/1" },
         { name: "Dashboard 2", url: "/dashboard/2" },
-        { name: "External URL", url: "https://example.com" }
+        { name: "External URL", url: "https://example.com" },
       ];
       wrapper = createWrapper();
 
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-1"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-2"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-1"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-2"]').exists(),
+      ).toBe(true);
     });
 
     it("should render remove button for each drilldown item", async () => {
-      mockDashboardPanelData.data.config.drilldown = [
-        { name: "Dashboard 1", url: "/dashboard/1" }
-      ];
+      mockDashboardPanelData.data.config.drilldown = [{ name: "Dashboard 1", url: "/dashboard/1" }];
       wrapper = createWrapper();
 
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-remove-0"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-drilldown-remove-0"]').exists(),
+      ).toBe(true);
     });
 
     it("should display drilldown names with numbering", async () => {
       mockDashboardPanelData.data.config.drilldown = [
         { name: "First Dashboard", url: "/dashboard/1" },
-        { name: "Second Dashboard", url: "/dashboard/2" }
+        { name: "Second Dashboard", url: "/dashboard/2" },
       ];
       wrapper = createWrapper();
 
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]').text()).toBe('1. First Dashboard');
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-1"]').text()).toBe('2. Second Dashboard');
+      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]').text()).toBe(
+        "1. First Dashboard",
+      );
+      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-1"]').text()).toBe(
+        "2. Second Dashboard",
+      );
     });
   });
 
@@ -217,7 +233,7 @@ describe("Drilldown", () => {
       wrapper = createWrapper();
 
       const addBtn = wrapper.find('[data-test="dashboard-addpanel-config-drilldown-add-btn"]');
-      await addBtn.trigger('click');
+      await addBtn.trigger("click");
 
       expect(wrapper.vm.showDrilldownPopUp).toBe(true);
       expect(wrapper.vm.isDrilldownEditMode).toBe(false);
@@ -227,7 +243,7 @@ describe("Drilldown", () => {
     it("should have addNewDrilldown method", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.addNewDrilldown).toBe('function');
+      expect(typeof wrapper.vm.addNewDrilldown).toBe("function");
     });
 
     it("should set correct state when adding new drilldown", () => {
@@ -243,15 +259,15 @@ describe("Drilldown", () => {
 
   describe("Editing Drilldowns", () => {
     it("should show dialog in edit mode when drilldown item is clicked", async () => {
-      mockDashboardPanelData.data.config.drilldown = [
-        { name: "Dashboard 1", url: "/dashboard/1" }
-      ];
+      mockDashboardPanelData.data.config.drilldown = [{ name: "Dashboard 1", url: "/dashboard/1" }];
       wrapper = createWrapper();
 
       await wrapper.vm.$nextTick();
 
-      const drilldownItem = wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]');
-      await drilldownItem.trigger('click');
+      const drilldownItem = wrapper.find(
+        '[data-test="dashboard-addpanel-config-drilldown-name-0"]',
+      );
+      await drilldownItem.trigger("click");
 
       expect(wrapper.vm.showDrilldownPopUp).toBe(true);
       expect(wrapper.vm.isDrilldownEditMode).toBe(true);
@@ -261,7 +277,7 @@ describe("Drilldown", () => {
     it("should have onDrilldownClick method", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.onDrilldownClick).toBe('function');
+      expect(typeof wrapper.vm.onDrilldownClick).toBe("function");
     });
 
     it("should set correct state when editing drilldown", () => {
@@ -277,9 +293,7 @@ describe("Drilldown", () => {
 
   describe("Removing Drilldowns", () => {
     it("should remove drilldown when remove button is clicked", async () => {
-      mockDashboardPanelData.data.config.drilldown = [
-        { name: "Dashboard 1", url: "/dashboard/1" }
-      ];
+      mockDashboardPanelData.data.config.drilldown = [{ name: "Dashboard 1", url: "/dashboard/1" }];
       wrapper = createWrapper();
 
       await wrapper.vm.$nextTick();
@@ -287,7 +301,7 @@ describe("Drilldown", () => {
       expect(mockDashboardPanelData.data.config.drilldown.length).toBe(1);
 
       const removeBtn = wrapper.find('[data-test="dashboard-addpanel-config-drilldown-remove-0"]');
-      await removeBtn.trigger('click');
+      await removeBtn.trigger("click");
 
       expect(mockDashboardPanelData.data.config.drilldown.length).toBe(0);
     });
@@ -296,7 +310,7 @@ describe("Drilldown", () => {
       mockDashboardPanelData.data.config.drilldown = [
         { name: "Dashboard 1", url: "/dashboard/1" },
         { name: "Dashboard 2", url: "/dashboard/2" },
-        { name: "Dashboard 3", url: "/dashboard/3" }
+        { name: "Dashboard 3", url: "/dashboard/3" },
       ];
       wrapper = createWrapper();
 
@@ -304,7 +318,7 @@ describe("Drilldown", () => {
 
       // Remove middle item (index 1)
       const removeBtn = wrapper.find('[data-test="dashboard-addpanel-config-drilldown-remove-1"]');
-      await removeBtn.trigger('click');
+      await removeBtn.trigger("click");
 
       expect(mockDashboardPanelData.data.config.drilldown.length).toBe(2);
       expect(mockDashboardPanelData.data.config.drilldown[0].name).toBe("Dashboard 1");
@@ -314,13 +328,13 @@ describe("Drilldown", () => {
     it("should have removeDrilldownByIndex method", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.removeDrilldownByIndex).toBe('function');
+      expect(typeof wrapper.vm.removeDrilldownByIndex).toBe("function");
     });
 
     it("should remove drilldown through method call", () => {
       mockDashboardPanelData.data.config.drilldown = [
         { name: "Dashboard 1", url: "/dashboard/1" },
-        { name: "Dashboard 2", url: "/dashboard/2" }
+        { name: "Dashboard 2", url: "/dashboard/2" },
       ];
       wrapper = createWrapper();
 
@@ -338,7 +352,19 @@ describe("Drilldown", () => {
       wrapper.vm.showDrilldownPopUp = true;
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="app-dialog"]').exists()).toBe(true);
+      // After ODialog/ODrawer migration, the AppDialog wrapper was removed.
+      // DrilldownPopUp now owns its dialog and is controlled via the :open prop.
+      const popupEl = wrapper.find('[data-test="drilldown-popup"]');
+      expect(popupEl.exists()).toBe(true);
+      expect(popupEl.attributes("data-open")).toBe("true");
+    });
+
+    it("should pass open=false to DrilldownPopUp by default", () => {
+      wrapper = createWrapper();
+
+      const popupEl = wrapper.find('[data-test="drilldown-popup"]');
+      expect(popupEl.exists()).toBe(true);
+      expect(popupEl.attributes("data-open")).toBe("false");
     });
 
     it("should pass correct props to DrilldownPopUp", async () => {
@@ -349,12 +375,12 @@ describe("Drilldown", () => {
       wrapper.vm.showDrilldownPopUp = true;
       await wrapper.vm.$nextTick();
 
-      const popup = wrapper.findComponent({ name: 'DrilldownPopUp' });
-      if (popup.exists()) {
-        expect(popup.props('drilldownDataIndex')).toBe(5);
-        expect(popup.props('isEditMode')).toBe(true);
-        expect(popup.props('variablesData')).toEqual(mockVariablesData);
-      }
+      const popup = wrapper.findComponent('[data-test="drilldown-popup"]');
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("open")).toBe(true);
+      expect(popup.props("drilldownDataIndex")).toBe(5);
+      expect(popup.props("isEditMode")).toBe(true);
+      expect(popup.props("variablesData")).toEqual(mockVariablesData);
     });
 
     it("should close dialog when saveDrilldownData is called", () => {
@@ -374,23 +400,41 @@ describe("Drilldown", () => {
     it("should have saveDrilldownData method", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.saveDrilldownData).toBe('function');
+      expect(typeof wrapper.vm.saveDrilldownData).toBe("function");
+    });
+
+    it("should close popup when DrilldownPopUp emits close", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.showDrilldownPopUp = true;
+      wrapper.vm.isDrilldownEditMode = true;
+      wrapper.vm.selectedDrilldownIndexToEdit = 1;
+      await wrapper.vm.$nextTick();
+
+      const popup = wrapper.findComponent('[data-test="drilldown-popup"]');
+      expect(popup.exists()).toBe(true);
+
+      await popup.vm.$emit("close");
+
+      expect(wrapper.vm.showDrilldownPopUp).toBe(false);
+      expect(wrapper.vm.isDrilldownEditMode).toBe(false);
+      expect(wrapper.vm.selectedDrilldownIndexToEdit).toBe(null);
     });
   });
 
   describe("Theme Integration", () => {
     it("should handle light theme", async () => {
-      store.state.theme = 'light';
+      store.state.theme = "light";
       wrapper = createWrapper();
 
-      expect(wrapper.vm.store.state.theme).toBe('light');
+      expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
     it("should handle dark theme", async () => {
-      store.state.theme = 'dark';
+      store.state.theme = "dark";
       wrapper = createWrapper();
 
-      expect(wrapper.vm.store.state.theme).toBe('dark');
+      expect(wrapper.vm.store.state.theme).toBe("dark");
     });
   });
 
@@ -400,9 +444,9 @@ describe("Drilldown", () => {
         data: {
           config: {},
           queries: [{ fields: [] }],
-          type: "line"
+          type: "line",
         },
-        layout: { currentQueryIndex: 0 }
+        layout: { currentQueryIndex: 0 },
       };
 
       // Simulate initialization as component would do
@@ -453,7 +497,9 @@ describe("Drilldown", () => {
       wrapper = createWrapper();
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-drilldown-add-btn"]').exists(),
+      ).toBe(true);
     });
 
     it("should handle null drilldown configuration", () => {
@@ -461,9 +507,9 @@ describe("Drilldown", () => {
         data: {
           config: { drilldown: null },
           queries: [{ fields: [] }],
-          type: "line"
+          type: "line",
         },
-        layout: { currentQueryIndex: 0 }
+        layout: { currentQueryIndex: 0 },
       };
 
       // Simulate initialization as component would do
@@ -476,7 +522,7 @@ describe("Drilldown", () => {
 
     it("should handle component unmounting gracefully", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(() => wrapper.unmount()).not.toThrow();
     });
@@ -490,9 +536,7 @@ describe("Drilldown", () => {
     });
 
     it("should handle removing invalid index gracefully", () => {
-      mockDashboardPanelData.data.config.drilldown = [
-        { name: "Dashboard 1", url: "/dashboard/1" }
-      ];
+      mockDashboardPanelData.data.config.drilldown = [{ name: "Dashboard 1", url: "/dashboard/1" }];
       wrapper = createWrapper();
 
       expect(() => wrapper.vm.removeDrilldownByIndex(10)).not.toThrow();
@@ -501,13 +545,18 @@ describe("Drilldown", () => {
 
     it("should handle long drilldown names gracefully", async () => {
       mockDashboardPanelData.data.config.drilldown = [
-        { name: "This is a very long dashboard name that should be truncated with ellipsis when displayed in the UI", url: "/dashboard/1" }
+        {
+          name: "This is a very long dashboard name that should be truncated with ellipsis when displayed in the UI",
+          url: "/dashboard/1",
+        },
       ];
       wrapper = createWrapper();
 
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]').exists()).toBe(true);
+      expect(
+        wrapper.find('[data-test="dashboard-addpanel-config-drilldown-name-0"]').exists(),
+      ).toBe(true);
     });
   });
 
@@ -515,16 +564,16 @@ describe("Drilldown", () => {
     it("should have correct component name", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.$options.name).toBe('Drilldown');
+      expect(wrapper.vm.$options.name).toBe("Drilldown");
     });
 
     it("should have all required methods", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.onDrilldownClick).toBe('function');
-      expect(typeof wrapper.vm.addNewDrilldown).toBe('function');
-      expect(typeof wrapper.vm.removeDrilldownByIndex).toBe('function');
-      expect(typeof wrapper.vm.saveDrilldownData).toBe('function');
+      expect(typeof wrapper.vm.onDrilldownClick).toBe("function");
+      expect(typeof wrapper.vm.addNewDrilldown).toBe("function");
+      expect(typeof wrapper.vm.removeDrilldownByIndex).toBe("function");
+      expect(typeof wrapper.vm.saveDrilldownData).toBe("function");
     });
 
     it("should have all required data properties", () => {
@@ -543,7 +592,10 @@ describe("Drilldown", () => {
       wrapper = createWrapper();
 
       // Add a drilldown (simulate)
-      mockDashboardPanelData.data.config.drilldown.push({ name: "Test 1", url: "/test/1" });
+      mockDashboardPanelData.data.config.drilldown.push({
+        name: "Test 1",
+        url: "/test/1",
+      });
       await wrapper.vm.$nextTick();
 
       // Click on it to edit
@@ -562,9 +614,7 @@ describe("Drilldown", () => {
     });
 
     it("should handle drilldown data modifications", () => {
-      mockDashboardPanelData.data.config.drilldown = [
-        { name: "Initial", url: "/initial" }
-      ];
+      mockDashboardPanelData.data.config.drilldown = [{ name: "Initial", url: "/initial" }];
       wrapper = createWrapper();
 
       // Modify drilldown data

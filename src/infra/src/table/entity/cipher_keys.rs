@@ -14,9 +14,33 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub kind: String,
     pub data: String,
+    /// When `true` this row is an internally auto-provisioned key (e.g. the
+    /// per-org DEK for envelope encryption) and is hidden from the public API.
+    pub is_system: bool,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            org: "myorg".to_string(),
+            created_by: "admin@example.com".to_string(),
+            created_at: 1000,
+            name: "my-key".to_string(),
+            kind: "aes256".to_string(),
+            data: "base64encodedkey".to_string(),
+            is_system: false,
+        };
+        assert_eq!(m.name, "my-key");
+        assert_eq!(m.kind, "aes256");
+        assert!(!m.is_system);
+    }
+}

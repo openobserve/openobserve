@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,493 +15,93 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="overflow-y: auto" class="scroll">
-    <div class="row tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs" style="height: 48px; overflow-y: auto">
-    <div class="card-container tw:w-full tw:h-full tw:flex" >
-      <div class="flex items-center col">
-        <div
-          class="flex items-center q-table__title q-mx-md tw:font-semibold tw:text-xl"
+  <OPageLayout
+    data-test="metrics-page"
+    :title="t('search.metrics')"
+    icon="bar-chart"
+    :back="{
+      label: t('search.metrics'),
+      onClick: goBackToExplorer,
+      dataTest: 'metrics-editor-back-btn',
+    }"
+    bleed
+  >
+    <template #actions>
+      <SyntaxGuideMetrics />
+      <MetricLegends />
+      <DateTimePickerDashboard
+        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type) && selectedDate"
+        v-model="selectedDate"
+        ref="dateTimePickerRef"
+        :disable="disable"
+        class="h-8"
+        data-test="metrics-date-picker"
+      />
+      <AutoRefreshInterval
+        v-if="!['html', 'markdown', 'custom_chart'].includes(dashboardPanelData.data.type)"
+        v-model="refreshInterval"
+        trigger
+        :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+        @trigger="runQuery"
+        class="h-8"
+        data-test="metrics-auto-refresh"
+      />
+      <ShareButton
+        v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
+        :url="metricsShareUrl"
+        variant="outline"
+        size="icon-toolbar"
+        data-test="metrics-share-btn"
+        shortcut-id="metricsCopyUrl"
+        class="h-8"
+      />
+      <template v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)">
+        <OButton
+          v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
+          variant="outline-destructive"
+          size="sm-toolbar"
+          data-test="metrics-cancel"
+          @click="cancelAddPanelQuery"
         >
-          <span>
-            {{ t("search.metrics") }}
+          <span class="relative flex items-center justify-center">
+            <span class="invisible">{{ t("metrics.runQuery") }}</span>
+            <span class="absolute">{{ t("panel.cancel") }}</span>
           </span>
-        </div>
-        <syntax-guide-metrics class="q-mr-sm" />
-        <MetricLegends class="q-mr-sm" />
-      </div>
-      <div class="text-right col flex justify-end items-center">
-        <DateTimePickerDashboard
-          v-if="
-            !['html', 'markdown'].includes(dashboardPanelData.data.type) &&
-            selectedDate
-          "
-          v-model="selectedDate"
-          ref="dateTimePickerRef"
-          :disable="disable"
-          class="dashboard-icons"
-          data-test="metrics-date-picker"
-        />
-          <AutoRefreshInterval
-          v-if="
-            !['html', 'markdown', 'custom_chart'].includes(
-              dashboardPanelData.data.type,
-            )
-          "
-          v-model="refreshInterval"
-          trigger
-          :min-refresh-interval="
-            store.state?.zoConfig?.min_auto_refresh_interval || 5
-          "
-          @trigger="runQuery"
-          class="q-mr-xs q-px-none dashboards-icon dashboards-auto-refresh-interval"
-          data-test="metrics-auto-refresh"
-        />
-        <div
-          v-if="!['html', 'markdown'].includes(dashboardPanelData.data.type)"
-          class="dashboard-icons tw:mx-2"
+        </OButton>
+        <OButton
+          v-else
+          variant="primary"
+          size="sm-toolbar"
+          data-test="metrics-apply"
+          :loading="disable"
+          :disabled="disable"
+          @click="runQuery"
         >
-          <q-btn
-            v-if="config.isEnterprise == 'true' && searchRequestTraceIds.length"
-            class="tw:text-xs tw:font-bold no-border"
-            data-test="metrics-cancel"
-            padding="xs lg"
-            color="negative"
-            no-caps
-            :label="t('panel.cancel')"
-            @click="cancelAddPanelQuery"
-          />
-          <q-btn
-            v-else
-            class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
-            data-test="metrics-apply"
-            :loading="disable"
-            :disable="disable"
-            no-caps
-            :label="t('metrics.runQuery')"
-            @click="runQuery"
-          />
-        </div>
-      </div>
-    </div>
-    </div>
-    <div>
-      <div class="row" style="overflow-y: auto">
-         <div class="tw:pl-[0.625rem]">
-          <div
-            class="col scroll card-container tw:mr-[0.625rem]"
-            style="
-              overflow-y: auto;
-              height: 100%;
-              min-width: 100px;
-              max-width: 100px;
-            "
-          >
-            <ChartSelection
-              v-model:selectedChartType="dashboardPanelData.data.type"
-              @update:selected-chart-type="resetAggregationFunction"
-            />
-          </div>
-        </div>
-        <q-separator vertical />
-        <!-- for query related chart only -->
-        <div
-          v-if="
-            !['html', 'markdown', 'custom_chart'].includes(
-              dashboardPanelData.data.type,
-            )
-          "
-          class="col tw:mr-[0.625rem]"
-          style="display: flex; flex-direction: row; overflow-x: hidden"
-        >
-          <!-- collapse field list bar -->
-          <div
-            v-if="!dashboardPanelData.layout.showFieldList"
-            class="field-list-sidebar-header-collapsed card-container"
-            @click="collapseFieldList"
-            style="width: 50px; height: 100%; flex-shrink: 0"
-          >
-            <q-icon
-              name="expand_all"
-              class="field-list-collapsed-icon rotate-90"
-              data-test="metrics-field-list-collapsed-icon"
-            />
-            <div class="field-list-collapsed-title">{{ t("panel.fields") }}</div>
-          </div>
-          <q-splitter
-            v-model="dashboardPanelData.layout.splitter"
-            :limits="[0, 20]"
-            :style="{
-              width: dashboardPanelData.layout.showFieldList ? '100%' : 'calc(100% - 50px)',
-              height: '100%'
-            }"
-          >
-            <template #before>
-              <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-              <div
-                v-if="dashboardPanelData.layout.showFieldList"
-                class="col scroll card-container"
-                style="height: calc(100vh - 106px); overflow-y: auto"
-              >
-                <div class="column" style="height: 100%">
-                  <div class="col-auto q-pa-sm">
-                    <span class="text-weight-bold">{{ t("panel.fields") }}</span>
-                  </div>
-                  <div class="col" style="width: 100%">
-                    <!-- <GetFields :editMode="editMode" /> -->
-                    <FieldList :editMode="editMode" />
-                  </div>
-                </div>
-              </div>
-              </div>
-            </template>
-            <template #separator>
-              <q-btn
-                color="primary"
-                size="sm"
-                :icon="
-                  dashboardPanelData.layout.showFieldList
-                    ? 'chevron_left'
-                    : 'chevron_right'
-                "
-                dense
-                round
-                :class="dashboardPanelData.layout.showFieldList ? 'splitter-icon-expand' : 'splitter-icon-collapse'"
-                style="top: 14px; z-index: 100"
-                @click.stop="collapseFieldList"
-              />
-            </template>
-            <template #after>
-              <div class="row card-container">
-                <div
-                  class="col scroll"
-                  style="height: calc(100vh - 106px); overflow-y: auto"
-                >
-                  <div class="layout-panel-container col">
-                    <DashboardQueryBuilder
-                      :dashboardData="currentDashboardData.data"
-                    />
-                    <q-separator />
+          {{ t("metrics.runQuery") }}
+          <OTooltip :content="t('metrics.runQuery')" shortcut-id="metricsRunQuery" />
+        </OButton>
+      </template>
+    </template>
+    <!-- PanelEditor Content Area -->
+    <PanelEditor
+      ref="panelEditorRef"
+      pageType="metrics"
+      :editMode="false"
+      :dashboardData="currentDashboardData.data"
+      :variablesData="{} as unknown as PanelEditorVariablesData"
+      :selectedDateTime="dashboardPanelData.meta.dateTime"
+      @addToDashboard="addToDashboard"
+      @chartApiError="handleChartApiError"
+      @dataZoom="onDataZoom"
+    />
 
-                    <div v-if="isOutDated" class="tw:p-2">
-                      <div
-                        :style="{
-                          borderColor: '#c3920d',
-                          borderWidth: '1px',
-                          borderStyle: 'solid',
-                          backgroundColor:
-                            store.state.theme == 'dark'
-                              ? '#2a1f03'
-                              : '#faf2da',
-                          padding: '1%',
-                          borderRadius: '5px',
-                        }"
-                      >
-                        <div style="font-weight: 700">
-                          Your chart is not up to date
-                        </div>
-                        <div>
-                          Chart Configuration / Variables has been updated,
-                          but the chart was not updated automatically. Click
-                          on the "Apply" button to run the query again
-                        </div>
-                      </div>
-                    </div>
-                    <div class="col tw:relative" >
-                      <div
-                        class="tw:h-[calc(100vh-500px)] tw:min-h-[140px] tw:mt-[54px]"
-                      >
-                        <PanelSchemaRenderer
-                          v-if="chartData"
-                          @metadata-update="metaDataValue"
-                          :key="dashboardPanelData.data.type"
-                          :panelSchema="chartData"
-                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="{}"
-                          :width="6"
-                          :showLegendsButton="true"
-                          @error="handleChartApiError"
-                          @updated:data-zoom="onDataZoom"
-                          :allowAlertCreation="true"
-                          @updated:vrl-function-field-list="
-                            updateVrlFunctionFieldList
-                          "
-                          @last-triggered-at-update="
-                            handleLastTriggeredAtUpdate
-                          "
-                          @series-data-update="seriesDataUpdate"
-                          @show-legends="showLegendsDialog = true"
-                          ref="panelSchemaRendererRef"
-                          searchType="ui"
-                          @is-partial-data-update="handleIsPartialDataUpdate"
-                          @loading-state-change="handleLoadingStateChange"
-                          @is-cached-data-differ-with-current-time-range-update="
-                            handleIsCachedDataDifferWithCurrentTimeRangeUpdate
-                          "
-                          @limit-number-of-series-warning-message-update="
-                            handleLimitNumberOfSeriesWarningMessage
-                          "
-                        />
-                      </div>
-                      <div
-                        class="flex column items-end q-pr-lg q-mb-md q-pt-xs tw:gap-1"
-                        style="position: absolute; top: 0px; right: -13px"
-                      >
-                        <q-btn
-                          size="md"
-                          class="q-pa-none o2-primary-button tw:h-[30px] element-box-shadow"
-                          no-caps
-                          dense
-                          style="padding: 2px 4px;"
-                          @click="addToDashboard"
-                          :title="t('search.addToDashboard')"
-                          >{{ t("search.addToDashboard") }}</q-btn
-                        >
-                        <PanelErrorButtons
-                        :error="errorMessage"
-                        :maxQueryRangeWarning="maxQueryRangeWarning"
-                        :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-                        :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
-                        :isPartialData="isPartialData"
-                        :isPanelLoading="isPanelLoading"
-                        :lastTriggeredAt="lastTriggeredAt"
-                        :viewOnly="false"
-                      />
-                      </div>
-                    </div>
-                    <DashboardErrorsComponent
-                      :errors="errorData"
-                      class="col-auto"
-                      style="flex-shrink: 0"
-                    />
-                  </div>
-                  <div class="row column tw:h-[calc(100vh-180px)]">
-                    <DashboardQueryEditor />
-                  </div>
-                </div>
-                <q-separator vertical />
-                <div class="col-auto">
-                  <PanelSidebar
-                    :title="t('dashboard.configLabel')"
-                    v-model="dashboardPanelData.layout.isConfigPanelOpen"
-                  >
-                    <ConfigPanel
-                      :dashboardPanelData="dashboardPanelData"
-                      :variablesData="{}"
-                      :panelData="seriesData"
-                    />
-                  </PanelSidebar>
-                </div>
-              </div>
-            </template>
-          </q-splitter>
-        </div>
-        <div
-          v-if="dashboardPanelData.data.type == 'html'"
-          class="col column tw:mr-[0.625rem]"
-          style="height: calc(100vh - 106px); flex: 1"
-        >
-          <div class="card-container tw:h-full tw:flex tw:flex-col">
-            <CustomHTMLEditor
-              v-model="dashboardPanelData.data.htmlContent"
-              style="flex: 1; min-height: 0"
-            />
-            <DashboardErrorsComponent :errors="errorData" class="tw:flex-shrink-0" />
-          </div>
-        </div>
-        <div
-          v-if="dashboardPanelData.data.type == 'markdown'"
-          class="col column tw:mr-[0.625rem]"
-          style="height: calc(100vh - 106px); flex: 1"
-        >
-          <div class="card-container tw:h-full tw:flex tw:flex-col">
-            <CustomMarkdownEditor
-              v-model="dashboardPanelData.data.markdownContent"
-              style="flex: 1; min-height: 0"
-            />
-            <DashboardErrorsComponent :errors="errorData" class="tw:flex-shrink-0" />
-          </div>
-        </div>
-        <div
-          v-if="dashboardPanelData.data.type == 'custom_chart'"
-          class="col tw:mr-[0.625rem]"
-          style="
-            overflow-y: auto;
-            display: flex;
-            flex-direction: row;
-            overflow-x: hidden;
-          "
-        >
-          <q-splitter
-            v-model="dashboardPanelData.layout.splitter"
-            :limits="[0, 20]"
-            :style="{
-              width: dashboardPanelData.layout.showFieldList
-                ? '100%'
-                : 'calc(100% - 50px)',
-              height: '100%',
-            }"
-          >
-            <template #before>
-              <div
-                class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]"
-              >
-                <div
-                  class="col scroll card-container"
-                  style="height: calc(100vh - 106px); overflow-y: auto"
-                >
-                  <div
-                    v-if="dashboardPanelData.layout.showFieldList"
-                    class="column"
-                    style="height: 100%"
-                  >
-                    <div class="col-auto q-pa-sm">
-                      <span class="text-weight-bold">{{
-                        t("panel.fields")
-                      }}</span>
-                    </div>
-                    <div class="col" style="width: 100%">
-                      <FieldList :editMode="editMode" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </template>
-            <template #separator>
-              <div class="splitter-vertical splitter-enabled"></div>
-              <q-btn
-                color="primary"
-                size="sm"
-                :icon="
-                  dashboardPanelData.layout.showFieldList
-                    ? 'chevron_left'
-                    : 'chevron_right'
-                "
-                dense
-                round
-                style="top: 14px; z-index: 100"
-                @click="collapseFieldList"
-              />
-            </template>
-            <template #after>
-              <div
-                class="row card-container"
-                style="height: calc(100vh - 106px); overflow-y: auto"
-              >
-                <div class="col scroll" style="height: 100%; display: flex; flex-direction: column">
-                  <div style="height: 500px; flex-shrink: 0; overflow: hidden">
-                    <q-splitter
-                      class="query-editor-splitter"
-                      v-model="splitterModel"
-                      style="height: 100%"
-                      @update:model-value="layoutSplitterUpdated"
-                    >
-                      <template #before>
-                        <div style="position: relative; width: 100%; height: 100%">
-                          <CustomChartEditor
-                            v-model="dashboardPanelData.data.customChartContent"
-                            style="width: 100%; height: 100%"
-                          />
-                        </div>
-                      </template>
-                      <template #separator>
-                        <div class="splitter-vertical splitter-enabled"></div>
-                        <q-avatar
-                          color="primary"
-                          text-color="white"
-                          size="20px"
-                          icon="drag_indicator"
-                          style="top: 10px; left: 3.5px"
-                          data-test="dashboard-markdown-editor-drag-indicator"
-                        />
-                      </template>
-                      <template #after>
-                        <div class="flex justify-end q-mr-sm">
-                          <PanelErrorButtons
-                            :error="errorMessage"
-                            :maxQueryRangeWarning="maxQueryRangeWarning"
-                            :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
-                            :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
-                            :isPartialData="isPartialData"
-                            :isPanelLoading="isPanelLoading"
-                          />
-                        </div>
-                        <PanelSchemaRenderer
-                          v-if="chartData"
-                          @metadata-update="metaDataValue"
-                          :key="dashboardPanelData.data.type"
-                          :panelSchema="chartData"
-                          :selectedTimeObj="dashboardPanelData.meta.dateTime"
-                          :variablesData="{}"
-                          :width="6"
-                          :showLegendsButton="true"
-                          @error="handleChartApiError"
-                          @updated:data-zoom="onDataZoom"
-                          :allowAlertCreation="true"
-                          @updated:vrl-function-field-list="updateVrlFunctionFieldList"
-                          @last-triggered-at-update="handleLastTriggeredAtUpdate"
-                          @series-data-update="seriesDataUpdate"
-                          @show-legends="showLegendsDialog = true"
-                          searchType="ui"
-                          @is-partial-data-update="handleIsPartialDataUpdate"
-                          @loading-state-change="handleLoadingStateChange"
-                          @is-cached-data-differ-with-current-time-range-update="
-                            handleIsCachedDataDifferWithCurrentTimeRangeUpdate
-                          "
-                          @limit-number-of-series-warning-message-update="
-                            handleLimitNumberOfSeriesWarningMessage
-                          "
-                        />
-                      </template>
-                    </q-splitter>
-                  </div>
-                  <div class="col-auto" style="flex-shrink: 0">
-                    <DashboardErrorsComponent
-                      :errors="errorData"
-                      class="col-auto"
-                      style="flex-shrink: 0"
-                    />
-                  </div>
-                  <div class="row column tw:h-[calc(100vh-180px)]">
-                    <DashboardQueryEditor />
-                  </div>
-                </div>
-                <q-separator vertical />
-                <div class="col-auto">
-                  <PanelSidebar
-                    :title="t('dashboard.configLabel')"
-                    v-model="dashboardPanelData.layout.isConfigPanelOpen"
-                  >
-                    <ConfigPanel
-                      :dashboardPanelData="dashboardPanelData"
-                      :variablesData="{}"
-                      :panelData="seriesData"
-                    />
-                  </PanelSidebar>
-                </div>
-              </div>
-            </template>
-          </q-splitter>
-        </div>
-      </div>
-    </div>
-    <q-dialog
-      v-model="showAddToDashboardDialog"
-      position="right"
-      full-height
-      maximized
-    >
-      <add-to-dashboard
-        @save="addPanelToDashboard"
-        :dashboardPanelData="dashboardPanelData"
-      />
-    </q-dialog>
-    <q-dialog v-model="showLegendsDialog">
-      <ShowLegendsPopup
-        :panelData="currentPanelData"
-        @close="showLegendsDialog = false"
-      />
-    </q-dialog>
-  </div>
+    <!-- Add to Dashboard Dialog -->
+    <AddToDashboard
+      v-model:open="showAddToDashboardDialog"
+      :dashboardPanelData="dashboardPanelData"
+      @save="addPanelToDashboard"
+    />
+  </OPageLayout>
 </template>
 
 <script lang="ts">
@@ -509,28 +109,20 @@ import {
   defineComponent,
   ref,
   computed,
-  toRaw,
   nextTick,
   watch,
   reactive,
-  onUnmounted,
   onMounted,
+  onBeforeMount,
   defineAsyncComponent,
 } from "vue";
-import PanelSidebar from "@/components/dashboards/addPanel/PanelSidebar.vue";
-import ChartSelection from "@/components/dashboards/addPanel/ChartSelection.vue";
-import FieldList from "@/components/dashboards/addPanel/FieldList.vue";
+import { useI18nTyped } from "@/types/i18n";
+import { useStore } from "vuex";
+import useDashboardPanelData from "../../composables/dashboard/useDashboardPanel";
+import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import MetricLegends from "./MetricLegends.vue";
-import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
-import DashboardQueryBuilder from "@/components/dashboards/addPanel/DashboardQueryBuilder.vue";
-import useDashboardPanelData from "../../composables/useDashboardPanel";
-import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
-import DashboardErrorsComponent from "@/components/dashboards/addPanel/DashboardErrors.vue";
-import VariablesValueSelector from "@/components/dashboards/VariablesValueSelector.vue";
-import PanelSchemaRenderer from "@/components/dashboards/PanelSchemaRenderer.vue";
-import RelativeTime from "@/components/common/RelativeTime.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { isEqual, debounce } from "lodash-es";
 import { provide } from "vue";
 import useNotifications from "@/composables/useNotifications";
@@ -538,85 +130,69 @@ import config from "@/aws-exports";
 import useCancelQuery from "@/composables/dashboard/useCancelQuery";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import { checkIfConfigChangeRequiredApiCallOrNot } from "@/utils/dashboard/checkConfigChangeApiCall";
-import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEditor.vue";
-const PanelErrorButtons = defineAsyncComponent(() => {
-  return import("@/components/dashboards/PanelErrorButtons.vue");
-});
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- PanelEditorVariablesData is used only in a template `as` cast (:variablesData), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
+import { PanelEditor, type PanelEditorVariablesData } from "@/components/dashboards/PanelEditor";
+import { saveMetricsStream, restoreMetricsStream } from "@/utils/streamPersist";
+import useDefaultPanelFields from "@/composables/dashboard/useDefaultPanelFields";
+import { useRoute, useRouter } from "vue-router";
+import ShareButton from "@/components/common/ShareButton.vue";
+import {
+  getMetricsConfig,
+  encodeMetricsConfig,
+  applyMetricsBlob,
+  applyDeepLinkOverrides,
+} from "@/composables/metrics/metricsUrlState";
+import {
+  queryParamsToSelectedDate,
+  selectedDateToQueryParams,
+  refreshLabelToInterval,
+  refreshIntervalToLabel,
+} from "@/utils/dashboard/urlTimeParams";
+import { hasAnyDeepLinkParam } from "@/utils/url/deepLinkParams";
+import { METRICS_PARAMS } from "@/utils/metrics/metricsParamRegistry";
+
 const AddToDashboard = defineAsyncComponent(() => {
   return import("./../metrics/AddToDashboard.vue");
 });
-
-const ConfigPanel = defineAsyncComponent(() => {
-  return import("@/components/dashboards/addPanel/ConfigPanel.vue");
-});
-
-const QueryInspector = defineAsyncComponent(() => {
-  return import("@/components/dashboards/QueryInspector.vue");
-});
-
-const CustomHTMLEditor = defineAsyncComponent(() => {
-  return import("@/components/dashboards/addPanel/CustomHTMLEditor.vue");
-});
-
-const CustomMarkdownEditor = defineAsyncComponent(() => {
-  return import("@/components/dashboards/addPanel/CustomMarkdownEditor.vue");
-});
-
-const ShowLegendsPopup = defineAsyncComponent(() => {
-  return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
-});
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
 
 export default defineComponent({
   name: "Metrics",
   props: ["metaData"],
 
   components: {
-    ChartSelection,
-    FieldList,
-    DashboardQueryBuilder,
+    OPageLayout,
     DateTimePickerDashboard,
-    DashboardErrorsComponent,
-    PanelSidebar,
-    ConfigPanel,
-    VariablesValueSelector,
-    PanelSchemaRenderer,
-    RelativeTime,
-    DashboardQueryEditor: defineAsyncComponent(
-      () => import("@/components/dashboards/addPanel/DashboardQueryEditor.vue"),
-    ),
-    QueryInspector,
-    CustomHTMLEditor,
-    CustomMarkdownEditor,
     SyntaxGuideMetrics,
     MetricLegends,
     AddToDashboard,
     AutoRefreshInterval,
-    CustomChartEditor,
-    ShowLegendsPopup,
-    PanelErrorButtons,
+    PanelEditor,
+    OButton,
+    OTooltip,
+    ShareButton,
   },
-  setup(props) {
+  setup() {
     provide("dashboardPanelDataPageKey", "metrics");
 
+    // PanelEditor ref for accessing exposed methods/properties
+    const panelEditorRef = ref<InstanceType<typeof PanelEditor> | null>(null);
+
     // This will be used to copy the chart data to the chart renderer component
-    const showLegendsDialog = ref(false);
-    const panelSchemaRendererRef: any = ref(null);
     // This will deep copy the data object without reactivity and pass it on to the chart renderer
     const chartData = ref();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
+    const route = useRoute();
+    const router = useRouter();
     const { showErrorNotification } = useNotifications();
-    const {
-      dashboardPanelData,
-      resetDashboardPanelData,
-      resetDashboardPanelDataAndAddTimeField,
-      resetAggregationFunction,
-      validatePanel,
-      removeXYFilters,
-      makeAutoSQLQuery,
-    } = useDashboardPanelData("metrics");
+    const { dashboardPanelData, resetDashboardPanelData, resetAggregationFunction, validatePanel } =
+      useDashboardPanelData("metrics", t);
+    const { applyDefaultPanelFields } = useDefaultPanelFields("metrics", t);
     const editMode = ref(false);
-    const splitterModel = ref(50);
     const selectedDate: any = ref({
       valueType: "relative",
       startTime: null,
@@ -628,192 +204,190 @@ export default defineComponent({
       errors: [],
     });
 
-    // to store and show when the panel was last loaded
-    const lastTriggeredAt = ref(null);
-    const handleLastTriggeredAtUpdate = (data: any) => {
-      lastTriggeredAt.value = data;
-    };
-
     const showAddToDashboardDialog = ref(false);
-
-    const seriesData = ref([] as any[]);
-    const seriesDataUpdate = (data: any) => {
-      seriesData.value = data;
-    };
 
     // refresh interval v-model
     const refreshInterval = ref(0);
 
-    const metaData = ref(null);
-    const showViewPanel = ref(false);
-    const metaDataValue = (metadata: any) => {
-      // console.time("metaDataValue");
-      metaData.value = metadata;
-      // console.timeEnd("metaDataValue");
-    };
-
     const currentDashboardData: any = reactive({
       data: {},
+    });
+
+    // Not kept-alive: re-mounts each navigation, so onMounted is the only restore point.
+    let pendingAutoRun = false;
+
+    const applyMetricsDefaults = () => {
+      errorData.errors = [];
+      editMode.value = false;
+      resetDashboardPanelData();
+
+      // for metrics page, use stream type as metric
+      dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
+
+      if (store.state.zoConfig?.auto_query_enabled) {
+        const persisted = restoreMetricsStream(store.state.selectedOrganization.identifier);
+        if (persisted) {
+          dashboardPanelData.data.queries[0].fields.stream = persisted;
+        }
+      }
+
+      dashboardPanelData.data.type = "line";
+      dashboardPanelData.data.queryType = "promql";
+      dashboardPanelData.data.queries[0].customQuery = false;
+      dashboardPanelData.layout.showQueryBar = true;
+      chartData.value = {};
+    };
+
+    // panel -> URL: fresh metrics_data blob + time/refresh, dropping override params (diff-guarded).
+    const syncStateToUrl = () => {
+      const query: Record<string, any> = {
+        org_identifier: store.state.selectedOrganization.identifier,
+        refresh: refreshIntervalToLabel(refreshInterval.value),
+        ...selectedDateToQueryParams(selectedDate.value),
+        metrics_data: encodeMetricsConfig(getMetricsConfig(dashboardPanelData)),
+      };
+      const changed =
+        Object.keys(query).some((k) => String(query[k]) !== String(route.query[k] ?? "")) ||
+        Object.keys(route.query).some((k) => !(k in query));
+      if (changed) router.replace({ query }).catch(() => {});
+    };
+
+    // URL -> panel (blob -> overrides -> time/refresh); returns the auto-run gate.
+    const hydrateFromUrl = (): boolean => {
+      const q = route.query as Record<string, any>;
+
+      if (q.metrics_data) applyMetricsBlob(q.metrics_data, dashboardPanelData);
+      applyDeepLinkOverrides(q, dashboardPanelData);
+
+      if (q.period || (q.from && q.to)) {
+        selectedDate.value = queryParamsToSelectedDate(q);
+      }
+      if (q.refresh != null) {
+        refreshInterval.value = refreshLabelToInterval(
+          q.refresh,
+          store.state?.zoConfig?.min_auto_refresh_interval || 0,
+        );
+      }
+
+      return !!q.metrics_data || hasAnyDeepLinkParam(q, METRICS_PARAMS);
+    };
+
+    // seed builder-mode slots (a stream but no query) with a starter query before auto-run.
+    const seedBuilderSlots = async () => {
+      const queries = dashboardPanelData.data.queries;
+      for (let i = 0; i < queries.length; i++) {
+        const qq = queries[i];
+        if (qq?.fields?.stream && !qq.customQuery && !qq.query) {
+          dashboardPanelData.layout.currentQueryIndex = i;
+          await applyDefaultPanelFields();
+        }
+      }
+      dashboardPanelData.layout.currentQueryIndex = 0;
+    };
+
+    // Share URL: fresh /metrics link from current editor state, freezing relative period to absolute.
+    const metricsShareUrl = computed(() => {
+      void route.fullPath; // reactive dep on URL
+      const url = new URL(window.location.origin + window.location.pathname);
+      const sp = url.searchParams;
+      sp.set("org_identifier", store.state.selectedOrganization.identifier);
+
+      // freeze the window: getConsumableDateTime() is in MICROSECONDS -> ms
+      const ct: any = dateTimePickerRef.value?.getConsumableDateTime?.();
+      if (ct?.startTime && ct?.endTime) {
+        sp.set("from", String(Math.floor(ct.startTime / 1000)));
+        sp.set("to", String(Math.floor(ct.endTime / 1000)));
+      } else {
+        const tp: any = selectedDateToQueryParams(selectedDate.value);
+        if (tp.period) sp.set("period", tp.period);
+        else if (tp.from != null) {
+          sp.set("from", String(tp.from));
+          sp.set("to", String(tp.to));
+        }
+      }
+
+      sp.set("refresh", refreshIntervalToLabel(refreshInterval.value));
+      sp.set("metrics_data", encodeMetricsConfig(getMetricsConfig(dashboardPanelData)));
+      return url.href;
     });
 
     // this is used to activate the watcher only after on mounted
     let isPanelConfigWatcherActivated = false;
     const isPanelConfigChanged = ref(false);
 
-    onUnmounted(async () => {
-      // clear a few things
-      resetDashboardPanelData();
+    // Reset before children mount so FieldList sees stream_type=metrics (avoids a spurious logs stream fetch).
+    onBeforeMount(() => {
+      applyMetricsDefaults();
+      pendingAutoRun = hydrateFromUrl();
     });
 
     onMounted(async () => {
-      errorData.errors = [];
+      // DateTimePicker is now mounted; safe to read its value
+      updateDateTime();
 
-      editMode.value = false;
-      resetDashboardPanelDataAndAddTimeField();
-
-      // for metrics page, use stream type as metric
-      dashboardPanelData.data.queries[0].fields.stream_type = "metrics";
-      // need to remove the xy filters
-      removeXYFilters();
-
-      // set default chart type as line
-      dashboardPanelData.data.type = "line";
-      // set the default query type as promql for metrics
-      dashboardPanelData.data.queryType = "promql";
-      dashboardPanelData.data.queries[0].customQuery = false;
-
-      // set the show query bar by default for metrics page
-      dashboardPanelData.layout.showQueryBar = true;
-
-      chartData.value = {};
-      // set the value of the date time after the reset
-      updateDateTime(selectedDate.value);
-
-      // let it call the wathcers and then mark the panel config watcher as activated
+      // let it call the watchers and then mark the panel config watcher as activated
       await nextTick();
       isPanelConfigWatcherActivated = true;
-    });
 
-    const isInitialDashboardPanelData = () => {
-      return (
-        dashboardPanelData.data.description == "" &&
-        !dashboardPanelData.data.config.unit &&
-        !dashboardPanelData.data.config.unit_custom &&
-        dashboardPanelData.data.queries[0].fields.x.length == 0 &&
-        dashboardPanelData.data.queries[0].fields?.breakdown?.length == 0 &&
-        dashboardPanelData.data.queries[0].fields.y.length == 0 &&
-        dashboardPanelData.data.queries[0].fields.z.length == 0 &&
-        dashboardPanelData.data.queries[0].fields.filter.conditions.length ==
-          0 &&
-        dashboardPanelData.data.queries.length == 1
-      );
-    };
+      await seedBuilderSlots();
 
-    const isOutDated = computed(() => {
-      //check that is it addpanel initial call
-      if (isInitialDashboardPanelData() && !editMode.value) return false;
-      //compare chartdata and dashboardpaneldata and variables data as well
-      return !isEqual(chartData.value, dashboardPanelData.data);
-    });
-
-    watch(isOutDated, () => {
-      window.dispatchEvent(new Event("resize"));
+      // auto-run a restored blob / inbound deep-link, then normalize the URL
+      if (pendingAutoRun) {
+        pendingAutoRun = false;
+        updateDateTime();
+        runQuery();
+      }
     });
 
     watch(
       () => dashboardPanelData.data.type,
       async () => {
-        // console.time("watch:dashboardPanelData.data.type");
         await nextTick();
         chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
-        // console.timeEnd("watch:dashboardPanelData.data.type");
+
+        // chart-type change re-renders outside runQuery(); re-sync only for an established view (metrics_data present).
+        if (isPanelConfigWatcherActivated && route.query.metrics_data) {
+          syncStateToUrl();
+        }
       },
     );
 
     watch(selectedDate, () => {
-      // console.time("watch:selectedDate");
-      updateDateTime(selectedDate.value);
-      // console.timeEnd("watch:selectedDate");
+      updateDateTime();
     });
 
     // resize the chart when config panel is opened and closed
     watch(
       () => dashboardPanelData.layout.isConfigPanelOpen,
       () => {
-        // console.time("watch:dashboardPanelData.layout.isConfigPanelOpen");
         window.dispatchEvent(new Event("resize"));
-        // console.timeEnd("watch:dashboardPanelData.layout.isConfigPanelOpen");
       },
     );
 
-    // Generate the query when the fields are updated
     watch(
-      () => [
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.stream,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.x,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.y,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.breakdown,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.z,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.filter,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].customQuery,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.latitude,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.longitude,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.weight,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.source,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.target,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.value,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.name,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].fields.value_for_maps,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].config.limit,
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ].joins,
-      ],
-      () => {
-        // only continue if current mode is auto query generation
+      () => dashboardPanelData.data.queries[0]?.fields?.stream,
+      async (stream: string, oldStream: string) => {
+        if (store.state.zoConfig?.auto_query_enabled && stream) {
+          saveMetricsStream(store.state.selectedOrganization.identifier, stream);
+        }
+
+        // Seed the default query when a stream becomes available in builder mode
+        // with an empty query (the !query guard avoids overwriting an existing one).
+        const query = dashboardPanelData.data.queries[0];
         if (
-          !dashboardPanelData.data.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ].customQuery
+          isPanelConfigWatcherActivated &&
+          stream &&
+          stream !== oldStream &&
+          !query?.customQuery &&
+          !query?.query
         ) {
-          // makeAutoSQLQuery is async function
-          makeAutoSQLQuery();
+          await applyDefaultPanelFields();
         }
       },
-      { deep: true },
     );
+
+    // NOTE: Field change watcher for auto SQL generation has been moved to PanelEditor.vue
+    // This centralizes the logic and ensures consistent behavior across all pages
 
     // resize the chart when query editor is opened and closed
     watch(
@@ -824,7 +398,6 @@ export default defineComponent({
     );
 
     const runQuery = () => {
-      // console.time("runQuery");
       if (!isValid(true, false)) {
         return;
       }
@@ -833,11 +406,18 @@ export default defineComponent({
       chartData.value = JSON.parse(JSON.stringify(dashboardPanelData.data));
       // refresh the date time based on current time if relative date is selected
       dateTimePickerRef.value && dateTimePickerRef.value.refresh();
-      updateDateTime(selectedDate.value);
-      // console.timeEnd("runQuery");
+      updateDateTime();
+
+      // Call PanelEditor's runQuery if available
+      if (panelEditorRef.value) {
+        panelEditorRef.value.runQuery();
+      }
+
+      // panel -> URL (full blob + time/refresh); normalizes any inbound params.
+      syncStateToUrl();
     };
 
-    const updateDateTime = (value: object) => {
+    const updateDateTime = () => {
       if (selectedDate.value && dateTimePickerRef?.value) {
         const date = dateTimePickerRef.value?.getConsumableDateTime();
 
@@ -852,22 +432,17 @@ export default defineComponent({
     watch(
       () => dashboardPanelData.data,
       () => {
-        // console.time("watch:dashboardPanelData.data");
         if (isPanelConfigWatcherActivated) {
           isPanelConfigChanged.value = true;
         }
-        // console.timeEnd("watch:dashboardPanelData.data");
       },
       { deep: true },
     );
 
     // Auto-apply config changes that don't require API calls (similar to dashboard)
-    const debouncedUpdateChartConfig = debounce((newVal, oldVal) => {
+    const debouncedUpdateChartConfig = debounce((newVal) => {
       if (!isEqual(chartData.value, newVal)) {
-        const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(
-          chartData.value,
-          newVal,
-        );
+        const configNeedsApiCall = checkIfConfigChangeRequiredApiCallOrNot(chartData.value, newVal);
 
         if (!configNeedsApiCall) {
           chartData.value = JSON.parse(JSON.stringify(newVal));
@@ -888,30 +463,16 @@ export default defineComponent({
 
       // check if name of panel is there
       if (!onlyChart) {
-        if (
-          dashboardData.data.title == null ||
-          dashboardData.data.title.trim() == ""
-        ) {
-          errors.push("Name of Panel is required");
+        if (dashboardData.data.title == null || dashboardData.data.title.trim() == "") {
+          errors.push(t("metrics.index.namePanelRequired"));
         }
       }
 
       // will push errors in errors array
       validatePanel(errors, isFieldsValidationRequired);
 
-      // show all the errors
-      // for (let index = 0; index < errors.length; index++) {
-      //   $q.notify({
-      //     type: "negative",
-      //     message: errors[index],
-      //     timeout: 5000,
-      //   });
-      // }
-
       if (errors.length) {
-        showErrorNotification(
-          "There are some errors, please fix them and try again",
-        );
+        showErrorNotification(t("metrics.index.errorsFixTryAgain"));
       }
 
       if (errors.length) {
@@ -921,25 +482,15 @@ export default defineComponent({
       }
     };
 
-    const layoutSplitterUpdated = () => {
-      window.dispatchEvent(new Event("resize"));
-      if (!dashboardPanelData.layout.showFieldList) {
-        dashboardPanelData.layout.splitter = 0;
-      }
-    };
-
-    const handleChartApiError = (errorMessage: {
-      message: string;
-      code: string;
-    }) => {
+    const handleChartApiError = (errorMessage: { message: string; code: string }) => {
       if (errorMessage?.message) {
         const errorList = errorData.errors ?? [];
         errorList.splice(0);
         errorList.push(errorMessage.message);
       }
     };
+
     const onDataZoom = (event: any) => {
-      // console.time("onDataZoom");
       const selectedDateObj = {
         start: new Date(event.start),
         end: new Date(event.end),
@@ -956,185 +507,7 @@ export default defineComponent({
 
       // set it as a absolute time
       dateTimePickerRef?.value?.setCustomDate("absolute", selectedDateObj);
-      // console.timeEnd("onDataZoom");
     };
-
-    const updateVrlFunctionFieldList = (fieldList: any) => {
-      // extract all panelSchema alias
-      const aliasList: any = [];
-
-      // remove panelschema fields from field list
-
-      // add x axis alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.x?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
-        }
-      });
-
-      // add breakdown alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.breakdown?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
-        }
-      });
-
-      // add y axis alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.y?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
-        }
-      });
-
-      // add z axis alias
-      dashboardPanelData?.data?.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ]?.fields?.z?.forEach((it: any) => {
-        if (!it.isDerived) {
-          aliasList.push(it.alias);
-        }
-      });
-
-      // add latitude alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.latitude?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.latitude?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.latitude.alias,
-        );
-      }
-
-      // add longitude alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.longitude?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.longitude?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.longitude.alias,
-        );
-      }
-
-      // add weight alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.weight?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.weight?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.weight.alias,
-        );
-      }
-
-      // add source alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.source?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.source?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.source.alias,
-        );
-      }
-
-      // add target alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.target?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.target?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.target.alias,
-        );
-      }
-
-      // add source alias
-      if (
-        dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.value?.alias &&
-        !dashboardPanelData?.data?.queries[
-          dashboardPanelData.layout.currentQueryIndex
-        ]?.fields?.value?.isDerived
-      ) {
-        aliasList.push(
-          dashboardPanelData?.data?.queries[
-            dashboardPanelData.layout.currentQueryIndex
-          ]?.fields?.value.alias,
-        );
-      }
-
-      // remove custom query fields from field list
-      dashboardPanelData.meta.stream.customQueryFields.forEach((it: any) => {
-        aliasList.push(it.name);
-      });
-
-      // rest will be vrl function fields
-      fieldList = fieldList
-        .filter((field: any) => aliasList.indexOf(field) < 0)
-        .map((field: any) => ({ name: field, type: "Utf8" }));
-
-      dashboardPanelData.meta.stream.vrlFunctionFieldList = fieldList;
-    };
-
-    const hoveredSeriesState = ref({
-      hoveredSeriesName: "",
-      panelId: -1,
-      dataIndex: -1,
-      seriesIndex: -1,
-      hoveredTime: null,
-      setHoveredSeriesName: function (name: string) {
-        hoveredSeriesState.value.hoveredSeriesName = name ?? "";
-      },
-      setIndex: function (
-        dataIndex: number,
-        seriesIndex: number,
-        panelId: any,
-        hoveredTime?: any,
-      ) {
-        hoveredSeriesState.value.dataIndex = dataIndex ?? -1;
-        hoveredSeriesState.value.seriesIndex = seriesIndex ?? -1;
-        hoveredSeriesState.value.panelId = panelId ?? -1;
-        hoveredSeriesState.value.hoveredTime = hoveredTime ?? null;
-      },
-    });
-
-    // used provide and inject to share data between components
-    // it is currently used in panelschemarendered, chartrenderer, convertpromqldata(via panelschemarenderer), and convertsqldata
-    provide("hoveredSeriesState", hoveredSeriesState);
 
     // [START] cancel running queries
 
@@ -1146,10 +519,7 @@ export default defineComponent({
     });
 
     // provide variablesAndPanelsDataLoadingState to share data between components
-    provide(
-      "variablesAndPanelsDataLoadingState",
-      variablesAndPanelsDataLoadingState,
-    );
+    provide("variablesAndPanelsDataLoadingState", variablesAndPanelsDataLoadingState);
 
     const searchRequestTraceIds = computed(() => {
       const searchIds = Object.values(
@@ -1158,7 +528,7 @@ export default defineComponent({
 
       return searchIds.flat() as string[];
     });
-    const { traceIdRef, cancelQuery } = useCancelQuery();
+    const { traceIdRef, cancelQuery } = useCancelQuery(t);
 
     const cancelAddPanelQuery = () => {
       traceIdRef.value = searchRequestTraceIds.value;
@@ -1168,9 +538,7 @@ export default defineComponent({
     const disable = ref(false);
 
     watch(variablesAndPanelsDataLoadingState, () => {
-      const panelsValues = Object.values(
-        variablesAndPanelsDataLoadingState.panels,
-      );
+      const panelsValues = Object.values(variablesAndPanelsDataLoadingState.panels);
       disable.value = panelsValues.some((item: any) => item === true);
     });
 
@@ -1182,9 +550,7 @@ export default defineComponent({
       if (errors.length) {
         // set errors into errorData
         errorData.errors = errors;
-        showErrorNotification(
-          "There are some errors, please fix them and try again",
-        );
+        showErrorNotification(t("metrics.index.errorsFixTryAgain"));
         return;
       } else {
         showAddToDashboardDialog.value = true;
@@ -1195,56 +561,69 @@ export default defineComponent({
       showAddToDashboardDialog.value = false;
     };
 
-    const collapseFieldList = () => {
-      if (dashboardPanelData.layout.showFieldList) {
-        dashboardPanelData.layout.splitter = 0;
-        dashboardPanelData.layout.showFieldList = false;
-      } else {
-        dashboardPanelData.layout.splitter = 20;
-        dashboardPanelData.layout.showFieldList = true;
+    const goBackToExplorer = () => {
+      const back = router.options?.history?.state?.back;
+      if (
+        typeof back === "string" &&
+        back.startsWith("/metrics") &&
+        !back.startsWith("/metrics/editor")
+      ) {
+        router.back();
+        return;
       }
+      router.push({
+        name: "metrics",
+        query: {
+          org_identifier: store.state.selectedOrganization?.identifier,
+        },
+      });
     };
 
     // [END] cancel running queries
 
-    const maxQueryRangeWarning = ref("");
-    const limitNumberOfSeriesWarningMessage = ref("");
-    const errorMessage = computed(() => {
-        return errorData.errors.join("\n");
-      });
-    const isPartialData = ref(false);
-    const isPanelLoading = ref(false);
-    const isCachedDataDifferWithCurrentTimeRange = ref(false);
-
-    const handleIsPartialDataUpdate = (data: boolean) => {
-      isPartialData.value = data;
-    };
-
-    const handleLoadingStateChange = (data: boolean) => {
-      isPanelLoading.value = data;
-    };
-
-    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (data: boolean) => {
-      isCachedDataDifferWithCurrentTimeRange.value = data;
-    };
-
-    const handleLimitNumberOfSeriesWarningMessage = (data: string) => {
-      limitNumberOfSeriesWarningMessage.value = data;
-    };
-
-    const currentPanelData = computed(() => {
-      const rendererData = panelSchemaRendererRef.value?.panelData || {};
-      return {
-        ...rendererData,
-        config: dashboardPanelData.data.config || {},
-      };
-    });
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "metricsRunQuery",
+        handler: () => runQuery(),
+      },
+      {
+        id: "metricsRefresh",
+        handler: () => {
+          if (isInputFocused()) return;
+          runQuery();
+        },
+      },
+      {
+        id: "metricsFocusQuery",
+        handler: () => {
+          // The metrics PromQL editor is Monaco — focus its inner textarea.
+          const el = document.querySelector<HTMLElement>(
+            '[data-test="dashboard-panel-query-editor"] textarea, [data-test="dashboard-panel-query-editor"] .monaco-editor textarea',
+          );
+          el?.focus();
+        },
+      },
+      {
+        id: "metricsAddToDashboard",
+        handler: () => {
+          if (isInputFocused()) return;
+          addToDashboard();
+        },
+      },
+      {
+        id: "metricsCopyUrl",
+        handler: () => {
+          // Reuse ShareButton's short-URL + clipboard + toast flow.
+          document.querySelector<HTMLElement>('[data-test="metrics-share-btn"]')?.click();
+        },
+      },
+    ]);
 
     return {
       t,
       updateDateTime,
       runQuery,
-      layoutSplitterUpdated,
       dashboardPanelData,
       chartData,
       editMode,
@@ -1253,18 +632,9 @@ export default defineComponent({
       handleChartApiError,
       currentDashboardData,
       resetAggregationFunction,
-      isOutDated,
       store,
       dateTimePickerRef,
-      showViewPanel,
-      metaDataValue,
-      metaData,
       onDataZoom,
-      updateVrlFunctionFieldList,
-      lastTriggeredAt,
-      handleLastTriggeredAtUpdate,
-      seriesDataUpdate,
-      seriesData,
       searchRequestTraceIds,
       cancelAddPanelQuery,
       disable,
@@ -1272,90 +642,11 @@ export default defineComponent({
       showAddToDashboardDialog,
       addPanelToDashboard,
       addToDashboard,
+      goBackToExplorer,
       refreshInterval,
-      splitterModel,
-      collapseFieldList,
-      showLegendsDialog,
-      currentPanelData,
-      panelSchemaRendererRef,
-      handleLoadingStateChange,
-      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
-      handleLimitNumberOfSeriesWarningMessage,
-      maxQueryRangeWarning,
-      limitNumberOfSeriesWarningMessage,
-      errorMessage,
-      isPartialData,
-      isPanelLoading,
-      isCachedDataDifferWithCurrentTimeRange,
-      handleIsPartialDataUpdate,
+      panelEditorRef,
+      metricsShareUrl,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.layout-panel-container {
-  display: flex;
-  flex-direction: column;
-}
-
-.dashboard-icons {
-  height: 32px;
-}
-
-.splitter-vertical {
-  width: 4px;
-  height: 100%;
-}
-.splitter-enabled {
-  background-color: #ffffff00;
-  transition: 0.3s;
-  transition-delay: 0.2s;
-}
-
-.splitter-enabled:hover {
-  background-color: orange;
-}
-
-.field-list-sidebar-header-collapsed {
-  cursor: pointer;
-  width: 50px;
-  height: 100%;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-}
-
-.field-list-collapsed-icon {
-  margin-top: 10px;
-  font-size: 20px;
-}
-
-.field-list-collapsed-title {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
-  font-weight: bold;
-}
-</style>
-
-<style lang="scss">
-.dashboards-auto-refresh-interval{
-  .q-btn {
-      min-height: 2rem; // 30px
-      max-height: 2rem; // 30px
-      padding: 0 0.25rem; // 4px
-      border-radius: 0.375rem; // 6px
-      transition: all 0.2s ease;
-
-      &:hover {
-        background-color: var(--o2-hover-accent);
-      }
-
-      .q-icon {
-        font-size: 1.125rem; // 18px
-      }
-    }
-};
-</style>

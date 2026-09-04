@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,145 +15,153 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="toc-container" class="tw:px-2 tw:pt-4 tw:pb-2 tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
+  <div data-test="toc-container" class="flex h-full flex-col overflow-hidden px-2 pt-4 pb-2">
     <div
       data-test="toc-section-container"
-      class="section-container tw:overflow-hidden tw:flex tw:flex-col tw:flex-1"
+      class="border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border"
     >
       <!-- Header -->
       <div
         data-test="toc-header"
-        :class="[
-          'section-header-bg tw:px-3 tw:py-2 tw:flex tw:items-center tw:gap-2 tw:border-b tw:flex-shrink-0',
-          isDarkMode
-            ? 'tw:border-gray-700'
-            : 'tw:border-gray-200'
-        ]"
+        class="border-border-default !bg-theme-table-header-bg flex flex-shrink-0 items-center gap-2 border-b px-3 py-2"
       >
-        <q-icon data-test="toc-header-icon" name="format_list_bulleted" size="16px" class="tw:opacity-80" />
-        <span data-test="toc-header-title" :class="isDarkMode ? 'tw:text-gray-300' : 'tw:text-gray-700'" class="tw:text-xs tw:font-semibold">
-          Table of Contents
+        <OIcon
+          data-test="toc-header-icon"
+          name="format-list-bulleted"
+          size="sm"
+          class="opacity-80"
+        />
+        <span data-test="toc-header-title" class="text-text-body text-xs font-semibold">
+          {{ t("alerts.incidents.tableOfContents") }}
         </span>
       </div>
 
       <!-- Content -->
-      <div data-test="toc-content" class="tw:p-3 tw:flex-1 tw:overflow-auto">
+      <div data-test="toc-content" class="flex-1 overflow-auto p-3">
         <!-- Table of Contents -->
-        <div v-if="tableOfContents.length === 0" data-test="toc-empty-state" :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-xs tw:italic">
-          No sections available
+        <div
+          v-if="tableOfContents.length === 0"
+          data-test="toc-empty-state"
+          class="text-text-secondary text-xs italic"
+        >
+          {{ t("alerts.incidents.noSectionsAvailable") }}
         </div>
-        <div v-else class="tw:space-y-1">
+        <div v-else class="space-y-1">
           <!-- TOC Items -->
           <template v-for="item in tableOfContents" :key="item.id">
             <div :data-test="`toc-level1-item-${item.id}`">
               <!-- Level 1 Item -->
               <div
                 :data-test="`toc-level1-content-${item.id}`"
-                :class="[
-                  'tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1.5 tw:rounded tw:transition-colors',
-                  isDarkMode
-                    ? 'tw:text-gray-200'
-                    : 'tw:text-gray-900'
-                ]"
+                class="rounded-default text-text-heading flex items-center gap-2 px-2 py-1.5 transition-colors"
               >
                 <!-- Icon on the left -->
-                <q-icon
+                <OIcon
                   :data-test="`toc-level1-icon-${item.id}`"
                   :name="item.children.length > 0 ? 'folder' : 'article'"
-                  size="14px"
-                  class="tw:opacity-60 tw:flex-shrink-0"
+                  size="sm"
+                  class="flex-shrink-0 opacity-60"
                 />
                 <!-- Text in the middle - clickable to scroll -->
                 <span
                   :data-test="`toc-level1-text-${item.id}`"
                   @click="$emit('scroll-to-section', item.id)"
-                  :class="[
-                    'tw:text-xs tw:font-medium tw:truncate tw:flex-1 tw:cursor-pointer',
-                    isDarkMode
-                      ? 'hover:tw:text-blue-400'
-                      : 'hover:tw:text-blue-600'
-                  ]"
-                >{{ item.text }}</span>
+                  class="hover:text-text-link-hover flex-1 cursor-pointer truncate text-xs font-medium"
+                  >{{ item.text }}</span
+                >
                 <!-- Expand button on the right (only for items with children) -->
-                <q-btn
+                <OButton
                   v-if="item.children.length > 0"
                   :data-test="`toc-level1-expand-btn-${item.id}`"
-                  flat
-                  dense
-                  round
-                  size="xs"
-                  :icon="expandedSections[item.id] ? 'expand_more' : 'chevron_right'"
+                  variant="ghost"
+                  size="icon-xs-circle"
                   @click="$emit('toggle-section', item, $event)"
-                  class="tw:flex-shrink-0"
+                  class="flex-shrink-0"
                 >
-                  <q-tooltip data-test="toc-expand-tooltip" :delay="500">{{ expandedSections[item.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
-                </q-btn>
+                  <OIcon
+                    :name="expandedSections[item.id] ? 'expand-more' : 'chevron-right'"
+                    size="sm"
+                  />
+                  <OTooltip
+                    :content="expandedSections[item.id] ? t('common.collapse') : t('common.expand')"
+                    side="top"
+                  />
+                </OButton>
               </div>
 
               <!-- Level 2 Children -->
-              <div v-if="expandedSections[item.id] && item.children.length > 0" :data-test="`toc-level2-container-${item.id}`" class="tw:ml-4 tw:space-y-1 tw:mt-1">
+              <div
+                v-if="expandedSections[item.id] && item.children.length > 0"
+                :data-test="`toc-level2-container-${item.id}`"
+                class="ms-4 mt-1 space-y-1"
+              >
                 <template v-for="child in item.children" :key="child.id">
                   <div :data-test="`toc-level2-item-${child.id}`">
                     <!-- Level 2 Item -->
                     <div
                       :data-test="`toc-level2-content-${child.id}`"
-                      :class="[
-                        'tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:rounded tw:transition-colors',
-                        isDarkMode
-                          ? 'tw:text-gray-300'
-                          : 'tw:text-gray-700'
-                      ]"
+                      class="rounded-default text-text-body flex items-center gap-2 px-2 py-1 transition-colors"
                     >
                       <!-- Icon on the left -->
-                      <q-icon
+                      <OIcon
                         :data-test="`toc-level2-icon-${child.id}`"
                         name="label"
-                        size="12px"
-                        class="tw:opacity-60 tw:flex-shrink-0"
+                        size="xs"
+                        class="flex-shrink-0 opacity-60"
                       />
                       <!-- Text in the middle - clickable to scroll -->
                       <span
                         :data-test="`toc-level2-text-${child.id}`"
                         @click="$emit('scroll-to-section', child.id)"
-                        :class="[
-                          'tw:text-xs tw:truncate tw:flex-1 tw:cursor-pointer',
-                          isDarkMode
-                            ? 'hover:tw:text-blue-400'
-                            : 'hover:tw:text-blue-600'
-                        ]"
-                      >{{ child.text }}</span>
+                        class="hover:text-text-link-hover flex-1 cursor-pointer truncate text-xs"
+                        >{{ child.text }}</span
+                      >
                       <!-- Expand button on the right (only for items with children) -->
-                      <q-btn
+                      <OButton
                         v-if="child.children.length > 0"
                         :data-test="`toc-level2-expand-btn-${child.id}`"
-                        flat
-                        dense
-                        round
-                        size="xs"
-                        :icon="expandedSections[child.id] ? 'expand_more' : 'chevron_right'"
+                        variant="ghost"
+                        size="icon-xs-circle"
                         @click="$emit('toggle-section', child, $event)"
-                        class="tw:flex-shrink-0"
+                        class="flex-shrink-0"
                       >
-                        <q-tooltip data-test="toc-expand-tooltip" :delay="500">{{ expandedSections[child.id] ? 'Collapse' : 'Expand' }}</q-tooltip>
-                      </q-btn>
+                        <OIcon
+                          :name="expandedSections[child.id] ? 'expand-more' : 'chevron-right'"
+                          size="sm"
+                        />
+                        <OTooltip
+                          :content="
+                            expandedSections[child.id] ? t('common.collapse') : t('common.expand')
+                          "
+                          side="top"
+                        />
+                      </OButton>
                     </div>
 
                     <!-- Level 3 Children -->
-                    <div v-if="expandedSections[child.id] && child.children.length > 0" :data-test="`toc-level3-container-${child.id}`" class="tw:ml-4 tw:space-y-1 tw:mt-1">
+                    <div
+                      v-if="expandedSections[child.id] && child.children.length > 0"
+                      :data-test="`toc-level3-container-${child.id}`"
+                      class="ms-4 mt-1 space-y-1"
+                    >
                       <div
                         v-for="grandchild in child.children"
                         :key="grandchild.id"
                         :data-test="`toc-level3-item-${grandchild.id}`"
                         @click="$emit('scroll-to-section', grandchild.id)"
-                        :class="[
-                          'tw:flex tw:items-center tw:gap-2 tw:px-2 tw:py-1 tw:rounded tw:cursor-pointer tw:transition-colors',
-                          isDarkMode
-                            ? 'hover:tw:bg-gray-700 tw:text-gray-400'
-                            : 'hover:tw:bg-blue-50 tw:text-gray-600'
-                        ]"
+                        class="rounded-default text-text-secondary hover:bg-surface-subtle-hover flex cursor-pointer items-center gap-2 px-2 py-1 transition-colors"
                       >
-                        <q-icon :data-test="`toc-level3-icon-${grandchild.id}`" name="fiber_manual_record" size="8px" class="tw:opacity-60" />
-                        <span :data-test="`toc-level3-text-${grandchild.id}`" class="tw:text-[11px] tw:truncate">{{ grandchild.text }}</span>
+                        <OIcon
+                          :data-test="`toc-level3-icon-${grandchild.id}`"
+                          name="fiber-manual-record"
+                          size="xs"
+                          class="opacity-60"
+                        />
+                        <span
+                          :data-test="`toc-level3-text-${grandchild.id}`"
+                          class="text-2xs truncate"
+                          >{{ grandchild.text }}</span
+                        >
                       </div>
                     </div>
                   </div>
@@ -169,6 +177,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, PropType } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 interface TocItem {
   id: string;
@@ -180,6 +192,7 @@ interface TocItem {
 
 export default defineComponent({
   name: "IncidentTableOfContents",
+  components: { OButton, OIcon, OTooltip },
   props: {
     tableOfContents: {
       type: Array as PropType<TocItem[]>,
@@ -194,17 +207,10 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['scroll-to-section', 'toggle-section'],
+  emits: ["scroll-to-section", "toggle-section"],
+  setup() {
+    const { t } = useI18nTyped();
+    return { t };
+  },
 });
 </script>
-
-<style lang="scss" scoped>
-.section-header-bg {
-  background: var(--o2-table-header-bg) !important;
-}
-
-.section-container {
-  border: 0.0625rem solid var(--o2-border-color);
-  border-radius: 0.375rem;
-}
-</style>

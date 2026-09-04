@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -37,6 +37,19 @@ pub enum TriggerModule {
     DerivedStream,
     QueryRecommendations,
     Backfill,
+    AnomalyDetection,
+    // APPEND ONLY. The implicit discriminant is the value stored in
+    // `scheduled_jobs.module` (this enum is persisted via `sqlx::Type` +
+    // `#[repr(i32)]`, not by name), so inserting a variant above this line
+    // silently remaps every existing row to a different module.
+    /// SLI ingest — one job per enabled SLO, cadence = its slice interval.
+    Slo,
+    /// Bulk historical fill. Its own lane, because a bulk scan sharing a
+    /// concurrency budget with latency-sensitive incremental passes would
+    /// starve them (§6b.9).
+    SloBackfill,
+    /// Boolean expression evaluated over durable child-alert rollup states.
+    CompositeAlert,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -47,6 +60,10 @@ impl std::fmt::Display for TriggerModule {
             Self::DerivedStream => write!(f, "derived_stream"),
             Self::QueryRecommendations => write!(f, "query_recommendations"),
             Self::Backfill => write!(f, "backfill"),
+            Self::AnomalyDetection => write!(f, "anomaly_detection"),
+            Self::Slo => write!(f, "slo"),
+            Self::SloBackfill => write!(f, "slo_backfill"),
+            Self::CompositeAlert => write!(f, "composite_alert"),
         }
     }
 }
@@ -59,6 +76,9 @@ pub struct TriggerId {
 #[derive(sqlx::FromRow, Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Trigger {
     pub id: i64,
+    /// Monotonic physical-claim generation used to fence reclaimed jobs.
+    #[serde(default)]
+    pub claim_epoch: i64,
     pub org: String,
     pub module: TriggerModule,
     pub module_key: String,
@@ -95,8 +115,48 @@ pub struct ScheduledTriggerData {
     pub tolerance: i64,
     #[serde(default)]
     pub last_satisfied_at: Option<i64>,
+    /// Last run's outcome as the `RunOutcome` wire string. Written only by
+    /// anomaly detection, which has no `alert_states` rollup row to read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_outcome: Option<String>,
+    /// When `last_outcome` was recorded (microseconds).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_outcome_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub backfill_job: Option<BackfillJob>,
+    // ── Multi-level silence (alerts_2.md §7.1) ──────────────────────────────
+    // For alerts WITH a warning threshold, silence stops suppressing
+    // *evaluation* and suppresses only *delivery* — otherwise a
+    // Warning→Critical escalation during a silence window can never be
+    // observed. Single-level alerts keep the legacy behaviour (next_run_at is
+    // pushed forward) and never set these.
+    /// Deliver nothing until this timestamp, unless the level escalates.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub delivery_silenced_until: Option<i64>,
+    /// Severity of the last DELIVERED notification (`AlertLevel::to_i32`).
+    /// Escalation is measured against this, not against the previous
+    /// evaluation — otherwise a flap down and back up would re-notify.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_notified_level: Option<i32>,
+    // ── Per-destination retry ledger (templates-v2 §6.1) ────────────────────
+    /// Destinations already delivered for the in-flight notification cycle.
+    /// A retry re-sends ONLY to destinations not listed here; cleared when the
+    /// notification cycle completes (full success or max-retries), so it can
+    /// never outlive its cycle and suppress the NEXT firing.
+    ///
+    /// `serde(default)` is load-bearing: during a rolling upgrade a
+    /// pre-upgrade node may have written a `trigger.data` row without this
+    /// field while a retry is in flight.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notified_destinations: Vec<String>,
+    /// Phase-2: rendered chart id, reused across destinations and retries.
+    ///
+    /// RESERVED AND INTENTIONALLY UNUSED — no reader and no writer exists yet;
+    /// it is added now so a Phase-2 upgrade does not have to migrate rows
+    /// written by Phase-1a nodes. Do not delete as dead code: Phase 2 (chart
+    /// rendering) is its only consumer.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chart_id: Option<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -134,6 +194,11 @@ impl ScheduledTriggerData {
     pub fn reset(&mut self) {
         self.period_end_time = None;
         self.tolerance = 0;
+        // Every `reset()` call site is a cycle-terminating path (max retries
+        // reached, or the run abandoned). Clearing the ledger here is what
+        // guarantees it cannot outlive its notification cycle and suppress
+        // delivery on the NEXT firing.
+        self.notified_destinations.clear();
     }
 
     pub fn to_json_string(&self) -> String {
@@ -142,5 +207,368 @@ impl ScheduledTriggerData {
 
     pub fn from_json_string(s: &str) -> Result<Self, serde_json::Error> {
         json::from_str(s)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_trigger_module_display() {
+        assert_eq!(TriggerModule::Alert.to_string(), "alert");
+        assert_eq!(TriggerModule::Report.to_string(), "report");
+        assert_eq!(TriggerModule::DerivedStream.to_string(), "derived_stream");
+        assert_eq!(
+            TriggerModule::QueryRecommendations.to_string(),
+            "query_recommendations"
+        );
+        assert_eq!(TriggerModule::Backfill.to_string(), "backfill");
+        assert_eq!(
+            TriggerModule::AnomalyDetection.to_string(),
+            "anomaly_detection"
+        );
+        assert_eq!(TriggerModule::Slo.to_string(), "slo");
+        assert_eq!(TriggerModule::SloBackfill.to_string(), "slo_backfill");
+        assert_eq!(TriggerModule::CompositeAlert.to_string(), "composite_alert");
+    }
+
+    /// The discriminant IS the stored value. A variant inserted above an
+    /// existing one would remap every `scheduled_jobs` row to a different
+    /// module — silently, with no migration to catch it.
+    #[test]
+    fn trigger_module_discriminants_are_pinned() {
+        assert_eq!(TriggerModule::Report as i32, 0);
+        assert_eq!(TriggerModule::Alert as i32, 1);
+        assert_eq!(TriggerModule::DerivedStream as i32, 2);
+        assert_eq!(TriggerModule::QueryRecommendations as i32, 3);
+        assert_eq!(TriggerModule::Backfill as i32, 4);
+        assert_eq!(TriggerModule::AnomalyDetection as i32, 5);
+        assert_eq!(TriggerModule::Slo as i32, 6);
+        assert_eq!(TriggerModule::SloBackfill as i32, 7);
+        assert_eq!(TriggerModule::CompositeAlert as i32, 8);
+    }
+
+    #[test]
+    fn composite_alert_module_serde_is_append_only_and_round_trips() {
+        let encoded = serde_json::to_string(&TriggerModule::CompositeAlert).unwrap();
+        assert_eq!(encoded, r#""CompositeAlert""#);
+        assert_eq!(
+            serde_json::from_str::<TriggerModule>(&encoded).unwrap(),
+            TriggerModule::CompositeAlert
+        );
+
+        // Pin the pre-composite wire spellings as well as the numeric values:
+        // a rolling upgrade must keep reading jobs serialized by older nodes.
+        for (variant, wire) in [
+            (TriggerModule::Report, "Report"),
+            (TriggerModule::Alert, "Alert"),
+            (TriggerModule::DerivedStream, "DerivedStream"),
+            (TriggerModule::QueryRecommendations, "QueryRecommendations"),
+            (TriggerModule::Backfill, "Backfill"),
+            (TriggerModule::AnomalyDetection, "AnomalyDetection"),
+            (TriggerModule::Slo, "Slo"),
+            (TriggerModule::SloBackfill, "SloBackfill"),
+        ] {
+            assert_eq!(
+                serde_json::to_string(&variant).unwrap(),
+                format!(r#""{wire}""#)
+            );
+            assert_eq!(
+                serde_json::from_str::<TriggerModule>(&format!(r#""{wire}""#)).unwrap(),
+                variant
+            );
+        }
+    }
+
+    #[test]
+    fn test_scheduled_trigger_data_reset_preserves_last_satisfied_at() {
+        let mut data = ScheduledTriggerData {
+            period_end_time: Some(1000),
+            tolerance: 42,
+            last_satisfied_at: Some(999),
+            last_outcome: None,
+            last_outcome_at: None,
+            backfill_job: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
+            notified_destinations: vec![],
+            chart_id: None,
+        };
+        data.reset();
+        assert!(data.period_end_time.is_none());
+        assert_eq!(data.tolerance, 0);
+        // reset must NOT clear last_satisfied_at
+        assert_eq!(data.last_satisfied_at, Some(999));
+    }
+
+    /// The ledger must not survive a cycle-terminating reset: if it did, the
+    /// NEXT firing would skip every destination listed here and silently
+    /// deliver nothing to them.
+    #[test]
+    fn reset_clears_notified_destinations_ledger() {
+        let mut data = ScheduledTriggerData {
+            notified_destinations: vec!["slack-oncall".into(), "pagerduty".into()],
+            ..Default::default()
+        };
+        data.reset();
+        assert!(
+            data.notified_destinations.is_empty(),
+            "ledger outlived its notification cycle"
+        );
+    }
+
+    #[test]
+    fn scheduled_trigger_data_ledger_roundtrip_and_tolerance() {
+        // Old JSON without the new fields must parse (retry across upgrade).
+        let old: ScheduledTriggerData = serde_json::from_str(r#"{"tolerance":0}"#).unwrap();
+        assert!(old.notified_destinations.is_empty());
+        assert!(old.chart_id.is_none());
+
+        let with = ScheduledTriggerData {
+            notified_destinations: vec!["slack-oncall".into()],
+            ..Default::default()
+        };
+        let s = serde_json::to_string(&with).unwrap();
+        let back: ScheduledTriggerData = serde_json::from_str(&s).unwrap();
+        assert_eq!(back.notified_destinations, vec!["slack-oncall"]);
+
+        // An empty ledger stays out of the serialized payload entirely, so
+        // pre-upgrade nodes reading the row are unaffected.
+        let empty = ScheduledTriggerData::default().to_json_string();
+        assert!(!empty.contains("notified_destinations"));
+        assert!(!empty.contains("chart_id"));
+    }
+
+    #[test]
+    fn test_scheduled_trigger_data_reset_already_default() {
+        let mut data = ScheduledTriggerData::default();
+        data.reset(); // should not panic
+        assert!(data.period_end_time.is_none());
+        assert_eq!(data.tolerance, 0);
+    }
+
+    #[test]
+    fn test_scheduled_trigger_data_json_roundtrip() {
+        let data = ScheduledTriggerData {
+            period_end_time: Some(1_234_567),
+            tolerance: 10,
+            last_satisfied_at: Some(9_999_999),
+            last_outcome: None,
+            last_outcome_at: None,
+            backfill_job: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
+            notified_destinations: vec![],
+            chart_id: None,
+        };
+        let json = data.to_json_string();
+        let restored = ScheduledTriggerData::from_json_string(&json).unwrap();
+        assert_eq!(restored.period_end_time, data.period_end_time);
+        assert_eq!(restored.tolerance, data.tolerance);
+        assert_eq!(restored.last_satisfied_at, data.last_satisfied_at);
+    }
+
+    #[test]
+    fn test_scheduled_trigger_data_from_invalid_json() {
+        let result = ScheduledTriggerData::from_json_string("not json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_scheduled_trigger_data_json_omits_none_fields() {
+        let data = ScheduledTriggerData::default();
+        let json = data.to_json_string();
+        // period_end_time is None → skip_serializing_if omits it
+        assert!(!json.contains("period_end_time"));
+    }
+
+    #[test]
+    fn test_deletion_status_default_is_not_required() {
+        let s: DeletionStatus = Default::default();
+        assert_eq!(s, DeletionStatus::NotRequired);
+    }
+
+    #[test]
+    fn test_deletion_status_serde_roundtrip_all_variants() {
+        for (variant, expected) in [
+            (DeletionStatus::NotRequired, "\"not_required\""),
+            (DeletionStatus::Pending, "\"pending\""),
+            (DeletionStatus::InProgress, "\"in_progress\""),
+            (DeletionStatus::Completed, "\"completed\""),
+        ] {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: DeletionStatus = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_backfill_job_deletion_job_ids_skip_serializing_when_empty() {
+        let job = BackfillJob {
+            current_position: 100,
+            deletion_status: DeletionStatus::NotRequired,
+            deletion_job_ids: vec![],
+            error: None,
+        };
+        let val = serde_json::to_value(&job).unwrap();
+        assert!(!val.as_object().unwrap().contains_key("deletion_job_ids"));
+        assert!(!val.as_object().unwrap().contains_key("error"));
+    }
+
+    #[test]
+    fn test_backfill_job_with_ids_and_error_serializes() {
+        let job = BackfillJob {
+            current_position: 999,
+            deletion_status: DeletionStatus::InProgress,
+            deletion_job_ids: vec!["job1".to_string(), "job2".to_string()],
+            error: Some("oops".to_string()),
+        };
+        let val = serde_json::to_value(&job).unwrap();
+        assert_eq!(val["deletion_job_ids"].as_array().unwrap().len(), 2);
+        assert_eq!(val["error"], "oops");
+        assert_eq!(val["current_position"], 999_i64);
+    }
+
+    #[test]
+    fn test_trigger_status_default_is_waiting() {
+        let s: TriggerStatus = Default::default();
+        assert_eq!(s, TriggerStatus::Waiting);
+    }
+
+    #[test]
+    fn test_trigger_status_serde_roundtrip() {
+        for variant in [
+            TriggerStatus::Waiting,
+            TriggerStatus::Processing,
+            TriggerStatus::Completed,
+        ] {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: TriggerStatus = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_trigger_start_end_time_none_absent_from_json() {
+        let t = Trigger {
+            id: 1,
+            claim_epoch: 0,
+            org: "org".to_string(),
+            module: TriggerModule::Alert,
+            module_key: "k".to_string(),
+            next_run_at: 0,
+            is_realtime: false,
+            is_silenced: false,
+            status: TriggerStatus::Waiting,
+            start_time: None,
+            end_time: None,
+            retries: 0,
+            data: "{}".to_string(),
+        };
+        let json = serde_json::to_value(&t).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("start_time"));
+        assert!(!obj.contains_key("end_time"));
+    }
+
+    #[test]
+    fn test_trigger_start_end_time_some_present_in_json() {
+        let t = Trigger {
+            id: 2,
+            claim_epoch: 0,
+            org: "org".to_string(),
+            module: TriggerModule::Alert,
+            module_key: "k".to_string(),
+            next_run_at: 0,
+            is_realtime: false,
+            is_silenced: false,
+            status: TriggerStatus::Waiting,
+            start_time: Some(1000),
+            end_time: Some(2000),
+            retries: 0,
+            data: "{}".to_string(),
+        };
+        let json = serde_json::to_value(&t).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("start_time"));
+        assert_eq!(obj["start_time"], serde_json::json!(1000_i64));
+        assert!(obj.contains_key("end_time"));
+        assert_eq!(obj["end_time"], serde_json::json!(2000_i64));
+    }
+
+    #[test]
+    fn trigger_claim_epoch_defaults_for_pre_migration_payloads_and_round_trips() {
+        let old_payload = serde_json::json!({
+            "id": 1,
+            "org": "org",
+            "module": "Alert",
+            "module_key": "key",
+            "next_run_at": 10,
+            "is_realtime": false,
+            "is_silenced": false,
+            "status": "Waiting",
+            "retries": 0,
+            "data": "{}"
+        });
+        let old: Trigger = serde_json::from_value(old_payload).unwrap();
+        assert_eq!(old.claim_epoch, 0);
+
+        let claimed = Trigger {
+            claim_epoch: 42,
+            ..old
+        };
+        let value = serde_json::to_value(&claimed).unwrap();
+        assert_eq!(value["claim_epoch"], 42);
+        let restored: Trigger = serde_json::from_value(value).unwrap();
+        assert_eq!(restored.claim_epoch, 42);
+    }
+
+    #[test]
+    fn test_trigger_mem_size_at_least_struct_size() {
+        let t = Trigger {
+            id: 1,
+            claim_epoch: 0,
+            org: "myorg".to_string(),
+            module: TriggerModule::Alert,
+            module_key: "key".to_string(),
+            next_run_at: 0,
+            is_realtime: false,
+            is_silenced: false,
+            status: TriggerStatus::Waiting,
+            start_time: None,
+            end_time: None,
+            retries: 0,
+            data: "{}".to_string(),
+        };
+        assert!(t.mem_size() >= std::mem::size_of::<Trigger>());
+    }
+
+    #[test]
+    fn test_scheduled_trigger_data_with_backfill_job_json_roundtrip() {
+        let data = ScheduledTriggerData {
+            period_end_time: Some(500),
+            tolerance: 5,
+            last_satisfied_at: None,
+            last_outcome: None,
+            last_outcome_at: None,
+            delivery_silenced_until: None,
+            last_notified_level: None,
+            notified_destinations: vec![],
+            chart_id: None,
+            backfill_job: Some(BackfillJob {
+                current_position: 42,
+                deletion_status: DeletionStatus::Pending,
+                deletion_job_ids: vec!["j1".to_string()],
+                error: None,
+            }),
+        };
+        let json = data.to_json_string();
+        let restored = ScheduledTriggerData::from_json_string(&json).unwrap();
+        let bj = restored.backfill_job.unwrap();
+        assert_eq!(bj.current_position, 42);
+        assert_eq!(bj.deletion_status, DeletionStatus::Pending);
+        assert_eq!(bj.deletion_job_ids.len(), 1);
     }
 }

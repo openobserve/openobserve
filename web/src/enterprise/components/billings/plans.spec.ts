@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,16 +16,23 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Plans from "./plans.vue";
-import { Quasar } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import BillingService from "@/services/billings";
-import config from "@/aws-exports";
 import * as zincutils from "@/utils/zincutils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick } from "vue";
 
-installQuasar();
+// Mock toast
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(() => vi.fn()), // Returns dismiss function
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+  useToast: () => ({
+    toast: mockToast,
+    toasts: [],
+  }),
+}));
 
 // Mock BillingService
 vi.mock("@/services/billings", () => ({
@@ -42,6 +49,7 @@ vi.mock("@/services/billings", () => ({
 vi.mock("@/utils/zincutils", () => ({
   useLocalOrganization: vi.fn(),
   convertToTitleCase: vi.fn((str) => str),
+  getImageURL: vi.fn((path) => `mocked-image-url-${path}`),
 }));
 
 // Mock config
@@ -78,7 +86,6 @@ vi.mock("@/enterprise/components/billings/TrialPeriod.vue", () => ({
 describe("Plans Component", () => {
   let wrapper: any;
   let mockRouter: any;
-  let mockNotify: any;
 
   const mockSubscriptionResponse = {
     data: {
@@ -96,12 +103,8 @@ describe("Plans Component", () => {
       push: vi.fn(),
     };
 
-    mockNotify = vi.fn();
-
     // Setup mocks with default successful responses
-    (BillingService.list_subscription as any).mockResolvedValue(
-      mockSubscriptionResponse,
-    );
+    (BillingService.list_subscription as any).mockResolvedValue(mockSubscriptionResponse);
     (BillingService.resume_subscription as any).mockResolvedValue({
       data: { success: true },
     });
@@ -139,9 +142,6 @@ describe("Plans Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $q: {
-            notify: mockNotify,
-          },
         },
       },
     });
@@ -244,8 +244,8 @@ describe("Plans Component", () => {
 
     await wrapper.vm.loadSubscription();
 
-    expect(mockNotify).toHaveBeenCalledWith({
-      type: "warning",
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "warning",
       message: "Please subscribe to one of the plan.",
       timeout: 5000,
     });
@@ -260,8 +260,8 @@ describe("Plans Component", () => {
 
     expect(wrapper.vm.loading).toBe(false);
     expect(wrapper.vm.proLoading).toBe(false);
-    expect(mockNotify).toHaveBeenCalledWith({
-      type: "negative",
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "error",
       message: "Network error",
       timeout: 5000,
     });
@@ -289,10 +289,7 @@ describe("Plans Component", () => {
 
     await wrapper.vm.onLoadSubscription("pay-as-you-go");
 
-    expect(BillingService.get_hosted_url).toHaveBeenCalledWith(
-      "default",
-      "pay-as-you-go",
-    );
+    expect(BillingService.get_hosted_url).toHaveBeenCalledWith("default", "pay-as-you-go");
     expect(window.location.href).toBe("https://hosted.example.com");
   });
 
@@ -309,8 +306,8 @@ describe("Plans Component", () => {
     await flushPromises();
 
     expect(wrapper.vm.proLoading).toBe(false);
-    expect(mockNotify).toHaveBeenCalledWith({
-      type: "negative",
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "error",
       message: "Resume failed",
       timeout: 5000,
     });
@@ -328,8 +325,8 @@ describe("Plans Component", () => {
     // Wait for all pending promises to resolve
     await flushPromises();
 
-    expect(mockNotify).toHaveBeenCalledWith({
-      type: "negative",
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "error",
       message: "Hosted URL failed",
       timeout: 5000,
     });
@@ -352,10 +349,7 @@ describe("Plans Component", () => {
 
     await wrapper.vm.onChangePaymentDetail("cust_123");
 
-    expect(BillingService.get_session_url).toHaveBeenCalledWith(
-      "default",
-      "cust_123",
-    );
+    expect(BillingService.get_session_url).toHaveBeenCalledWith("default", "cust_123");
     expect(window.location.href).toBe("https://session.example.com");
   });
 
@@ -380,8 +374,8 @@ describe("Plans Component", () => {
     // Wait for async operations to complete
     await new Promise((resolve) => setTimeout(resolve, 10));
 
-    expect(mockNotify).toHaveBeenCalledWith({
-      type: "negative",
+    expect(mockToast).toHaveBeenCalledWith({
+      variant: "error",
       message: "Session URL failed",
       timeout: 5000,
     });
@@ -390,25 +384,19 @@ describe("Plans Component", () => {
   // Test 20: retrieveHostedPage method - successful
   it("should reload page when hosted page state is succeeded", async () => {
     // Test the behavior without relying on component state
-    const mockHostedResponse = { id: "hp_123" };
     const response = {
       data: { data: { hosted_page: { state: "succeeded" } } },
     };
 
     // Mock window.location.reload
-    const reloadSpy = vi
-      .spyOn(window.location, "reload")
-      .mockImplementation(() => {});
+    const reloadSpy = vi.spyOn(window.location, "reload").mockImplementation(() => {});
 
     // Mock the service call
     (BillingService.retrieve_hosted_page as any).mockResolvedValue(response);
 
     // Test the function behavior by simulating what it should do
     const simulateRetrieveHostedPage = async () => {
-      const res = await BillingService.retrieve_hosted_page(
-        "default",
-        "hp_123",
-      );
+      const res = await BillingService.retrieve_hosted_page("default", "hp_123");
       if (res.data.data.hosted_page.state === "succeeded") {
         window.location.reload();
       }
@@ -416,10 +404,7 @@ describe("Plans Component", () => {
 
     await simulateRetrieveHostedPage();
 
-    expect(BillingService.retrieve_hosted_page).toHaveBeenCalledWith(
-      "default",
-      "hp_123",
-    );
+    expect(BillingService.retrieve_hosted_page).toHaveBeenCalledWith("default", "hp_123");
     expect(reloadSpy).toHaveBeenCalled();
 
     reloadSpy.mockRestore();
@@ -455,9 +440,6 @@ describe("Plans Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $q: {
-            notify: mockNotify,
-          },
         },
       },
     });
@@ -593,15 +575,9 @@ describe("Plans Component", () => {
         },
         mocks: {
           $router: mockRouter,
-          $q: {
-            notify: mockNotify,
-          },
         },
       },
     });
-
-    // Clear previous calls
-    mockNotify.mockClear();
 
     const errorTypes = [
       { error: new Error("Simple error"), expectedMessage: "Simple error" },
@@ -610,14 +586,12 @@ describe("Plans Component", () => {
 
     for (let i = 0; i < errorTypes.length; i++) {
       const errorType = errorTypes[i];
-      (BillingService.list_subscription as any).mockRejectedValue(
-        errorType.error,
-      );
+      (BillingService.list_subscription as any).mockRejectedValue(errorType.error);
 
       await freshWrapper.vm.loadSubscription();
 
-      expect(mockNotify).toHaveBeenNthCalledWith(i + 1, {
-        type: "negative",
+      expect(mockToast).toHaveBeenNthCalledWith(i + 1, {
+        variant: "error",
         message: errorType.expectedMessage,
         timeout: 5000,
       });
@@ -646,9 +620,7 @@ describe("Plans Component", () => {
 
   // Test 33: Error handling without try-catch
   it("should handle promise rejections in async methods", async () => {
-    (BillingService.list_subscription as any).mockRejectedValue(
-      new Error("Async error"),
-    );
+    (BillingService.list_subscription as any).mockRejectedValue(new Error("Async error"));
 
     // This should not throw an unhandled promise rejection
     await expect(wrapper.vm.loadSubscription()).resolves.toBeUndefined();

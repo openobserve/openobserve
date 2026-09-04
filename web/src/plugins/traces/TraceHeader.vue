@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,56 +16,49 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex justify-start items-center header-bg bg-grey-2 trace-header-container"
-    :class="store.state.theme === 'dark' ? 'bg-grey-9' : 'bg-grey-2'"
+    class="rounded-t-default sticky top-0 z-1999 flex h-7.5 items-center justify-start bg-[color-mix(in_srgb,currentColor_5%,transparent)]"
     data-test="trace-header"
+    :style="
+      isSidebarOpen && {
+        width: splitterWidth + 'px',
+      }
+    "
   >
     <div
-      class="tw:relative flex justify-start items-center no-wrap row q-px-sm trace-header-left"
+      class="relative flex flex-nowrap items-center justify-start px-2"
       :style="{
         width: splitterWidth + 'px',
       }"
       data-test="trace-header-operation-name"
     >
-      Operation Name
-      <q-avatar
-        color="primary"
-        text-color="white"
-        size="1.25rem"
-        icon="drag_indicator"
-        class="resize-btn"
+      {{ t("traces.traceHeader.operationName") }}
+      <div
+        class="bg-accent absolute -top-0.5 -right-2.5 z-10 inline-flex h-5 w-5 cursor-col-resize items-center justify-center rounded-full"
         @mousedown="handleMouseDown"
         data-test="trace-header-resize-btn"
-      />
+      >
+        <OIcon name="drag-indicator" size="sm" class="text-white" />
+      </div>
     </div>
     <div
-      class="flex justify-start items-center no-wrap row relative-position trace-header-right"
+      class="relative flex flex-nowrap items-center justify-start"
       :style="{
         width: `calc(100% - ${splitterWidth}px)`,
       }"
       data-test="trace-header-tics"
-      v-if="baseTracePosition && baseTracePosition.tics?.length"
+      v-if="!isSidebarOpen && baseTracePosition && baseTracePosition.tics?.length"
     >
-      <div
-        class="col-3 text-caption q-pl-md"
-        data-test="trace-header-tic-label-0"
-      >
+      <div class="w-1/4 ps-3 text-xs" data-test="trace-header-tic-label-0">
         {{ baseTracePosition.tics?.[0]?.label || "" }}
       </div>
-      <div
-        class="col-3 text-caption q-pl-xs"
-        data-test="trace-header-tic-label-1"
-      >
+      <div class="w-1/4 ps-1 text-xs" data-test="trace-header-tic-label-1">
         {{ baseTracePosition.tics?.[1]?.label || "" }}
       </div>
-      <div
-        class="col-3 text-caption q-pl-xs"
-        data-test="trace-header-tic-label-2"
-      >
+      <div class="w-1/4 ps-1 text-xs" data-test="trace-header-tic-label-2">
         {{ baseTracePosition.tics?.[2]?.label || "" }}
       </div>
       <div
-        class="col-3 text-caption flex justify-between items-center q-px-xs"
+        class="flex w-1/4 items-center justify-between px-1 text-xs"
         data-test="trace-header-tic-label-3"
       >
         <div>{{ baseTracePosition.tics?.[3]?.label || "" }}</div>
@@ -73,10 +66,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <div
         v-for="(tick, index) in baseTracePosition['tics']"
-        class="trace-tic"
+        class="trace-tic bg-border-default absolute -top-0.75 z-1 h-6.5 w-px"
         :class="{
-          'trace-tic-first': index === 0,
-          'bg-dark-tic': store.state.theme === 'dark',
+          'z-5 hidden': index === 0,
         }"
         :key="tick.value + index"
         :style="{
@@ -91,9 +83,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent } from "vue";
 import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
   name: "TraceNavbar",
+  components: { OIcon },
   props: {
     baseTracePosition: {
       type: Object,
@@ -107,6 +102,10 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
+    isSidebarOpen: {
+      type: Boolean,
+      default: false,
+    },
   },
   methods: {
     handleMouseDown(event: any) {
@@ -116,65 +115,11 @@ export default defineComponent({
 
   setup() {
     const store = useStore();
+    const { t } = useI18nTyped();
     return {
       store,
+      t,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-$toolbarHeight: 50px;
-$traceHeaderHeight: 30px;
-$traceChartHeight: 250px;
-
-.trace-header-container {
-  height: 1.875rem;
-  top: 0;
-  z-index: 1999;
-  position: sticky;
-  border-radius: 0.5rem 0.5rem 0 0;
-}
-
-.trace-header-container.bg-grey-9 {
-  border-color: #3c3c3c;
-}
-
-.spans-container {
-  position: relative;
-}
-
-.collapse-btn {
-  width: 0.625rem;
-  height: 0.625rem;
-}
-
-.trace-tic {
-  position: absolute;
-  top: -0.1875rem;
-  width: 0.0625rem;
-  background-color: #cacaca;
-  z-index: 1;
-  height: 1.625rem;
-}
-
-.trace-tic.bg-dark-tic {
-  background-color: #3c3c3c;
-}
-
-.trace-tic-first {
-  z-index: 5;
-}
-
-.header-bg {
-  background-color: color-mix(in srgb, currentColor 5%, transparent);
-}
-
-.resize-btn {
-  position: absolute;
-  right: -0.625rem;
-  top: -0.125rem;
-  z-index: 10;
-  cursor: col-resize;
-}
-</style>

@@ -1,0 +1,196 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import http from "./http";
+
+/** Single session row returned by the backend's session endpoint. */
+export interface SessionApiHit {
+  session_id: string;
+  /** Earliest span `start_time` in the session (nanoseconds). */
+  start_time: number;
+  /** Latest span `end_time` in the session (nanoseconds). */
+  end_time: number;
+  /** end_time - start_time (nanoseconds). */
+  duration: number;
+  /** Distinct trace_ids in the session = number of conversation turns. */
+  trace_count: number;
+  gen_ai_usage_input_tokens: number;
+  gen_ai_usage_output_tokens: number;
+  gen_ai_usage_total_tokens: number;
+  gen_ai_usage_cost: number;
+  gen_ai_usage_cache_read_input_tokens?: number;
+  gen_ai_usage_cache_creation_input_tokens?: number;
+  gen_ai_usage_cost_cache_read_input?: number;
+  gen_ai_usage_cost_cache_creation_input?: number;
+  gen_ai_usage_cost_estimated_without_cache?: number;
+  gen_ai_usage_cost_cache_read_savings?: number;
+  gen_ai_usage_cost_net_cache_impact?: number;
+  /** Number of error spans across all traces in this session. */
+  error_count: number;
+  user_ids?: string[];
+  first_user_message?: string | null;
+}
+
+export interface SessionApiResponse {
+  took: number;
+  /** Exact on the last page; otherwise a lower bound sufficient to enable Next. */
+  total: number;
+  from: number;
+  size: number;
+  hits: SessionApiHit[];
+  trace_id?: string;
+  function_error?: string;
+  /** Whether at least one session exists after this page. */
+  has_more: boolean;
+  /** False when `total` is only the known lower bound used for pagination. */
+  total_is_exact: boolean;
+}
+
+export interface SessionDetailsApiResponse {
+  took: number;
+  total: number;
+  from: number;
+  size: number;
+  hits: SessionDetailsApiHit[];
+  trace_id?: string;
+  function_error?: string;
+}
+
+/** Per-trace turn summary returned by the session-detail endpoint. */
+export interface SessionDetailsApiHit {
+  trace_id: string;
+  /** All distinct, non-empty user IDs found on spans in this trace. */
+  user_ids: string[];
+  start_time: number;
+  end_time: number;
+  duration: number;
+  spans: [number, number];
+  service_name: Array<{
+    service_name: string;
+    count: number;
+    duration: number;
+    service_type?: string;
+  }>;
+  first_event: {
+    service_name: string;
+    operation_name: string;
+  };
+  gen_ai_usage_input_tokens: number;
+  gen_ai_usage_output_tokens: number;
+  gen_ai_usage_total_tokens: number;
+  gen_ai_usage_cost: number;
+  gen_ai_usage_cache_read_input_tokens: number;
+  gen_ai_usage_cache_creation_input_tokens: number;
+  gen_ai_usage_cost_cache_read_input: number;
+  gen_ai_usage_cost_cache_creation_input: number;
+  gen_ai_usage_cost_estimated_without_cache: number;
+  gen_ai_usage_cost_cache_read_savings: number;
+  gen_ai_usage_cost_net_cache_impact: number;
+  gen_ai_input_messages?: unknown;
+  models: string[];
+}
+
+const sessions = {
+  /**
+   * Fetch the paginated session list from
+   * `GET /api/{org_id}/{stream_name}/traces/session`.
+   *
+   * Server expects microsecond timestamps for `start_time`/`end_time` and
+   * pages by the complete session's latest end_time, then aggregates the
+   * selected session IDs, so the frontend doesn't need to build SQL itself.
+   *
+   * @example
+   *   await sessions.list({
+   *     orgId: "default",
+   *     streamName: "default",
+   *     startTime: 1700000000000000,
+   *     endTime:   1700001000000000,
+   *     page: 0,
+   *     pageSize: 25,
+   *   });
+   */
+  list: ({
+    orgId,
+    streamName,
+    startTime,
+    endTime,
+    page = 0,
+    pageSize = 25,
+    filter = "",
+    timeout,
+  }: {
+    orgId: string;
+    streamName: string;
+    startTime: number;
+    endTime: number;
+    page?: number;
+    pageSize?: number;
+    filter?: string;
+    timeout?: number;
+  }) => {
+    const params = new URLSearchParams({
+      from: String(page * pageSize),
+      size: String(pageSize),
+      start_time: String(startTime),
+      end_time: String(endTime),
+    });
+    if (filter) params.set("filter", filter);
+    if (timeout) params.set("timeout", String(timeout));
+    const url = `/api/${orgId}/${encodeURIComponent(
+      streamName,
+    )}/traces/session?${params.toString()}`;
+    return http().get<SessionApiResponse>(url);
+  },
+
+  /**
+   * Fetch per-turn trace summaries for a single session. The backend returns
+   * the same hit shape used by traces/latest_stream, but computes each turn's
+   * status from all spans in the trace.
+   */
+  details: ({
+    orgId,
+    streamName,
+    sessionId,
+    startTime,
+    endTime,
+    from = 0,
+    size = 1000,
+    timeout,
+  }: {
+    orgId: string;
+    streamName: string;
+    sessionId: string;
+    startTime: number;
+    endTime: number;
+    from?: number;
+    size?: number;
+    timeout?: number;
+  }) => {
+    const params = new URLSearchParams({
+      session_id: sessionId,
+      from: String(from),
+      size: String(size),
+      start_time: String(startTime),
+      end_time: String(endTime),
+    });
+    if (timeout) params.set("timeout", String(timeout));
+    const url = `/api/${orgId}/${encodeURIComponent(
+      streamName,
+    )}/traces/session/details?${params.toString()}`;
+    return http().get<SessionDetailsApiResponse>(url);
+  },
+};
+
+export default sessions;

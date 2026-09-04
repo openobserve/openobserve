@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,114 +15,94 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="iam-roles-selection-section" class="col q-pa-none" >
-    <div
-      class="flex justify-start q-px-md q-py-sm card-container"
-      style="position: sticky; top: 0px; z-index: 2"
-      :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-    >
-      <div class="q-mr-md">
-        <div
-          data-test="iam-roles-selection-show-toggle"
-          class="flex items-center"
-        >
-          <span
-            data-test="iam-roles-selection-show-text"
-            style="font-size: 14px"
-          >
-            Show
+  <div data-test="iam-roles-selection-section" class="flex h-full flex-col p-0">
+    <div class="bg-card-glass-bg flex shrink-0 justify-start px-3 py-2">
+      <div class="me-3">
+        <div data-test="iam-roles-selection-show-toggle" class="flex items-center">
+          <span data-test="iam-roles-selection-show-text" style="font-size: var(--text-sm)">
+            {{ t("iam.groupRoles.show") }}
           </span>
-          <div
-            class="q-ml-xs"
-            style="
-              border: 1px solid #d7d7d7;
-              width: fit-content;
-              border-radius: 0.3rem;
-              padding: 2px;
-            "
+          <OToggleGroup
+            class="ms-1"
+            :model-value="usersDisplay"
+            @update:model-value="(v) => updateUserTable(v as string)"
           >
-            <template v-for="visual in usersDisplayOptions" :key="visual.value">
-              <q-btn
-                :data-test="`iam-roles-selection-show-${visual.value}-btn`"
-                :color="visual.value === usersDisplay ? 'primary' : ''"
-                :flat="visual.value === usersDisplay ? false : true"
-                dense
-                no-caps
-                size="11px"
-                class="q-px-md visual-selection-btn"
-                @click="updateUserTable(visual.value)"
-                style="height: 30px;"
-              >
-                {{ visual.label }}</q-btn
-              >
-            </template>
-          </div>
+            <OToggleGroupItem
+              v-for="visual in usersDisplayOptions"
+              :key="visual.value"
+              :value="visual.value"
+              size="sm"
+              :data-test="`iam-roles-selection-show-${visual.value}-btn`"
+            >
+              {{ visual.label }}
+            </OToggleGroupItem>
+          </OToggleGroup>
         </div>
       </div>
-      <div
-        data-test="iam-roles-selection-search-input"
-        class="q-mr-md"
-        style="width: 400px"
-      >
-        <q-input
+      <div data-test="iam-roles-selection-search-input" class="me-3">
+        <OSearchInput
           data-test="alert-list-search-input"
           v-model="userSearchKey"
-          borderless
-          dense
-          class="no-border o2-search-input tw:h-[36px] tw:w-[200px]"
-          placeholder="Search Roles"
-        >
-          <template #prepend>
-            <q-icon name="search" class="cursor-pointer o2-search-input-icon" />
-          </template>
-        </q-input>
+          class="h-9 w-50"
+          :placeholder="t('iam.groupRoles.searchRoles')"
+        />
       </div>
     </div>
-    <div data-test="iam-roles-selection-table" style="height: calc(100vh - 250px); overflow-y: auto;" class="card-container">
-      <template v-if="rows.length">
-        <app-table
-          :rows="visibleRows"
-          :columns="columns"
-          :dense="true"
-          :virtual-scroll="false"
-          :title="t('iam.roles')"
-          class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          :tableStyle="hasVisibleRows ? 'height: calc(100vh - 250px); overflow-y: auto;' : ''"
-          :hideTopPagination="true"
-          :showBottomPaginationWithTitle="true"
-        >
-          <template v-slot:select="slotProps: any">
-            <q-checkbox
-              :data-test="`iam-roles-selection-table-body-row-${slotProps.column.row.role_name}-checkbox`"
-              size="xs"
-              v-model="slotProps.column.row.isInGroup"
-              class="filter-check-box cursor-pointer"
-              @click="toggleUserSelection(slotProps.column.row)"
-            />
-          </template>
-        </app-table>
-      </template>
-      <div
-        data-test="iam-roles-selection-table-no-users-text"
-        v-if="!rows.length"
-        class="text-bold q-pl-md q-py-md"
+    <div data-test="iam-roles-selection-table" class="bg-card-glass-bg min-h-0 flex-1">
+      <OTable
+        :data="rows"
+        :columns="columns"
+        row-key="role_name"
+        :loading="props.loading"
+        :global-filter="userSearchKey"
+        pagination="client"
+        :page-size="100"
+        sorting="client"
+        filter-mode="client"
+        :default-columns="false"
+        :show-global-filter="false"
+        :footer-title="t('iam.roles')"
+        dense
       >
-        No users added
-      </div>
+        <template #cell-select="{ row }">
+          <OCheckbox
+            :data-test="`iam-roles-selection-table-body-row-${row.role_name}-checkbox`"
+            :model-value="row.isInGroup"
+            class="filter-check-box cursor-pointer"
+            @update:model-value="toggleUserSelection(row)"
+          />
+        </template>
+        <template #empty>
+          <OEmptyState
+            size="hero"
+            preset="no-roles"
+            :filtered="!!userSearchKey"
+            :hide-action="!userSearchKey"
+            @action="(id) => id === 'clear-filters' && (userSearchKey = '')"
+          />
+        </template>
+      </OTable>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { watch, onBeforeMount, computed } from "vue";
-import AppTable from "@/components/AppTable.vue";
+import { watch, onBeforeMount } from "vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import usePermissions from "@/composables/iam/usePermissions";
 import { cloneDeep } from "lodash-es";
 import type { Ref } from "vue";
 import { ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getRoles } from "@/services/iam";
 import { useStore } from "vuex";
+import { TABLE_CHECKBOX_COL_SIZE, COL } from "@/lib/core/Table/OTable.types";
 
 // show selected users in the table
 // Add is_selected to the user object
@@ -144,13 +124,17 @@ const props = defineProps({
     type: Set,
     default: () => new Set(),
   },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-const emits = defineEmits(["add", "remove"]);
+defineEmits(["add", "remove"]);
 
 const users = ref([]);
 
-const { rolesState, groupsState } = usePermissions();
+usePermissions();
 
 const rows: Ref<any[]> = ref([]);
 
@@ -158,18 +142,18 @@ const userSearchKey = ref("");
 
 const usersDisplay = ref("selected");
 
+const { t } = useI18nTyped();
+
 const usersDisplayOptions = [
   {
-    label: "All",
+    label: t("iam.groupRoles.all"),
     value: "all",
   },
   {
-    label: "Selected",
+    label: t("iam.groupRoles.selected"),
     value: "selected",
   },
 ];
-
-const { t } = useI18n();
 
 const hasFetchedOrgUsers = ref(false);
 
@@ -177,23 +161,24 @@ const store = useStore();
 
 const groupUsersMap = ref(new Set());
 
-const columns = [
+const columns: OTableColumnDef[] = [
   {
-    name: "select",
-    field: "",
-    label: "",
-    align: "left",
-    sortable: false,
-    slot: true,
-    slotName: "select",
-    style: "width: 67px",
+    id: "select",
+    header: raw(""),
+    accessorKey: "isInGroup",
+    cell: (info: any) => info.getValue(),
+    size: TABLE_CHECKBOX_COL_SIZE,
+    minSize: 32,
+    maxSize: 40,
+    meta: { align: "center", compactPadding: true },
   },
   {
-    name: "role_name",
-    field: "role_name",
-    label: t("iam.roleName"),
-    align: "left",
+    id: "role_name",
+    header: t("iam.roleName"),
+    accessorKey: "role_name",
     sortable: true,
+    size: COL.role,
+    meta: { align: "left", autoWidth: true },
   },
 ];
 
@@ -213,7 +198,7 @@ watch(
   },
   {
     deep: true,
-  }
+  },
 );
 
 const updateUserTable = async (value: string) => {
@@ -233,55 +218,38 @@ const updateUserTable = async (value: string) => {
 const getchOrgUsers = async () => {
   // fetch group users
   hasFetchedOrgUsers.value = true;
-  return new Promise(async (resolve) => {
-    const data: any = await getRoles(
-      store.state.selectedOrganization.identifier
-    );
+  const data: any = await getRoles(store.state.selectedOrganization.identifier);
 
-    users.value = cloneDeep(data.data).map((role: any, index: number) => {
-      return {
-        role_name: role,
-        "#": index + 1,
-        isInGroup: groupUsersMap.value.has(role),
-      };
-    });
-    resolve(true);
+  users.value = cloneDeep(data.data).map((role: any) => {
+    return {
+      role_name: role,
+      isInGroup: groupUsersMap.value.has(role),
+    };
   });
+  return true;
 };
 
 const toggleUserSelection = (user: any) => {
-  if (user.isInGroup && !groupUsersMap.value.has(user.role_name)) {
-    props.addedRoles.add(user.role_name);
-  } else if (!user.isInGroup && groupUsersMap.value.has(user.role_name)) {
-    props.removedRoles.add(user.role_name);
-  }
+  user.isInGroup = !user.isInGroup;
 
-  if (!user.isInGroup && props.addedRoles.has(user.role_name)) {
-    props.addedRoles.delete(user.role_name);
-  }
-
-  if (user.isInGroup && props.removedRoles.has(user.role_name)) {
-    props.removedRoles.delete(user.role_name);
-  }
-};
-
-const filterRoles = (rows: any[], term: string) => {
-  var filtered = [];
-  for (var i = 0; i < rows.length; i++) {
-    var user = rows[i];
-    if (user.role_name.toLowerCase().indexOf(term.toLowerCase()) > -1) {
-      filtered.push(user);
+  if (user.isInGroup) {
+    // Newly selected
+    if (!groupUsersMap.value.has(user.role_name)) {
+      // Not originally in group — stage for addition
+      props.addedRoles.add(user.role_name);
+    } else {
+      // Was originally in group — undo pending removal
+      props.removedRoles.delete(user.role_name);
+    }
+  } else {
+    // Newly deselected
+    if (groupUsersMap.value.has(user.role_name)) {
+      // Was originally in group — stage for removal
+      props.removedRoles.add(user.role_name);
+    } else {
+      // Was not originally in group — undo pending addition
+      props.addedRoles.delete(user.role_name);
     }
   }
-  return filtered;
 };
-
-const visibleRows = computed(() => {
-  if (!userSearchKey.value) return rows.value || [];
-  return filterRoles(rows.value || [], userSearchKey.value);
-});
-
-const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 </script>
-
-<style scoped></style>

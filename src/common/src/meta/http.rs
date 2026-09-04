@@ -1,0 +1,623 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use axum::{
+    Json,
+    http::{HeaderValue, StatusCode},
+    response::{IntoResponse, Response},
+};
+use infra::errors;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
+
+pub const CONTENT_TYPE_JSON: &str = "application/json";
+pub const CONTENT_TYPE_PROTO: &str = "application/x-protobuf";
+pub const ERROR_HEADER: &str = "X-Error-Message";
+
+/// HTTP response
+/// code 200 is success
+/// code 400 is error
+/// code 404 is not found
+/// code 500 is internal server error
+/// code 503 is service unavailable
+/// code >= 1000 is custom error code
+/// message is the message or error message
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema)]
+pub struct HttpResponse {
+    pub code: u16,
+    pub message: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_detail: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trace_id: Option<String>,
+    /// One-line guidance on how to fix the error (agent self-correction, D4).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hint: Option<String>,
+    /// Closest valid alternatives for a mistyped field/function name.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub suggestions: Option<Vec<String>>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ESResponse {
+    pub took: u16,
+    pub errors: bool,
+    // pub items: Vec<Item>
+}
+
+impl HttpResponse {
+    pub fn message(code: impl Into<u16>, message: impl ToString) -> Self {
+        HttpResponse {
+            code: code.into(),
+            message: message.to_string(),
+            id: None,
+            name: None,
+            error_detail: None,
+            trace_id: None,
+            hint: None,
+            suggestions: None,
+        }
+    }
+
+    pub fn error(code: impl Into<u16>, error: impl ToString) -> Self {
+        HttpResponse {
+            code: code.into(),
+            message: error.to_string(),
+            id: None,
+            name: None,
+            error_detail: None,
+            trace_id: None,
+            hint: None,
+            suggestions: None,
+        }
+    }
+
+    pub fn error_code(err: errors::ErrorCodes) -> Self {
+        HttpResponse {
+            code: err.get_code(),
+            message: err.get_message(),
+            id: None,
+            name: None,
+            error_detail: Some(err.get_error_detail()),
+            trace_id: None,
+            hint: None,
+            suggestions: None,
+        }
+    }
+
+    pub fn error_code_with_trace_id(err: &errors::ErrorCodes, trace_id: Option<String>) -> Self {
+        HttpResponse {
+            code: err.get_code(),
+            message: err.get_message(),
+            id: None,
+            name: None,
+            error_detail: Some(err.get_error_detail()),
+            trace_id,
+            hint: None,
+            suggestions: None,
+        }
+    }
+
+    pub fn with_trace_id(&mut self, trace_id: String) -> &mut Self {
+        self.trace_id = Some(trace_id);
+        self
+    }
+
+    pub fn with_id(&mut self, id: String) -> &mut Self {
+        self.id = Some(id);
+        self
+    }
+
+    pub fn with_name(&mut self, name: String) -> &mut Self {
+        self.name = Some(name);
+        self
+    }
+
+    /// Send a normal response in json format and associate the
+    /// provided message as `message` field.
+    pub fn ok(msg: impl ToString) -> Response {
+        (
+            StatusCode::OK,
+            Json(Self::message(StatusCode::OK, msg.to_string())),
+        )
+            .into_response()
+    }
+
+    pub fn created(msg: impl ToString) -> Response {
+        (
+            StatusCode::CREATED,
+            Json(Self::message(StatusCode::CREATED, msg.to_string())),
+        )
+            .into_response()
+    }
+
+    pub fn found(loc: impl ToString, cookie: Option<String>) -> Response {
+        let mut builder = Response::builder()
+            .status(StatusCode::FOUND)
+            .header("Location", loc.to_string());
+        if let Some(c) = cookie {
+            builder = builder.header("Set-Cookie", c)
+        }
+        builder.body(().into()).unwrap()
+    }
+
+    /// Send a BadRequest response in json format and associate the
+    /// provided error as `error` field.
+    pub fn bad_request(error: impl ToString) -> Response {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(Self::error(StatusCode::BAD_REQUEST, error.to_string())),
+        )
+            .into_response()
+    }
+
+    /// Send an Unauthorized response in json format and sets the
+    /// provided error as the `error` field.
+    pub fn unauthorized(error: impl ToString) -> Response {
+        (
+            StatusCode::FORBIDDEN,
+            Json(Self::error(StatusCode::UNAUTHORIZED, error.to_string())),
+        )
+            .into_response()
+    }
+
+    /// Send a Forbidden response in json format and associate the
+    /// provided error as `error` field.
+    pub fn forbidden(error: impl ToString) -> Response {
+        (
+            StatusCode::FORBIDDEN,
+            Json(Self::error(StatusCode::FORBIDDEN, error.to_string())),
+        )
+            .into_response()
+    }
+
+    /// Send a PaymentRequired (402) response in json format and associate the
+    /// provided error as `error` field.
+    pub fn payment_required(error: impl ToString) -> Response {
+        (
+            StatusCode::PAYMENT_REQUIRED,
+            Json(Self::error(StatusCode::PAYMENT_REQUIRED, error.to_string())),
+        )
+            .into_response()
+    }
+
+    /// Send a Forbidden response in json format and associate the
+    /// provided error as `error` field.
+    pub fn conflict(error: impl ToString) -> Response {
+        (
+            StatusCode::CONFLICT,
+            Json(Self::error(StatusCode::CONFLICT, error.to_string())),
+        )
+            .into_response()
+    }
+
+    /// Send a PreconditionFailed (412) response in json format and associate
+    /// the provided error as `error` field.
+    ///
+    /// Used where the request is well-formed and permitted, but a condition the
+    /// caller must acknowledge has not been met yet — a cost estimate above the
+    /// warning threshold, for instance.
+    pub fn precondition_failed(error: impl ToString) -> Response {
+        (
+            StatusCode::PRECONDITION_FAILED,
+            Json(Self::error(
+                StatusCode::PRECONDITION_FAILED,
+                error.to_string(),
+            )),
+        )
+            .into_response()
+    }
+
+    /// Send a NotFound response in json format and associate the
+    /// provided error as `error` field.
+    pub fn not_found(error: impl ToString) -> Response {
+        (
+            StatusCode::NOT_FOUND,
+            Json(Self::error(StatusCode::NOT_FOUND, error.to_string())),
+        )
+            .into_response()
+    }
+
+    /// Send a InternalServerError response in json format and associate the
+    /// provided error as `error` field.
+    pub fn internal_error(error: impl ToString) -> Response {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(Self::error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                error.to_string(),
+            )),
+        )
+            .into_response()
+    }
+
+    /// Send a BadGateway response in json format and associate the provided
+    /// error as `error` field.
+    ///
+    /// For failures that belong to an upstream service the request was
+    /// forwarded to, rather than to this server or to the caller.
+    pub fn bad_gateway(error: impl ToString) -> Response {
+        (
+            StatusCode::BAD_GATEWAY,
+            Json(Self::error(StatusCode::BAD_GATEWAY, error.to_string())),
+        )
+            .into_response()
+    }
+
+    /// Send a TooManyRequests response in json format and associate the
+    /// provided error as `error` field.
+    pub fn too_many_requests(error: impl ToString) -> Response {
+        (
+            StatusCode::TOO_MANY_REQUESTS,
+            Json(Self::error(
+                StatusCode::TOO_MANY_REQUESTS,
+                error.to_string(),
+            )),
+        )
+            .into_response()
+    }
+
+    /// Send an error response in json format that also reports the message through
+    /// [`ERROR_HEADER`] for the audit log.
+    pub fn error_with_header(code: StatusCode, error: impl ToString) -> Response {
+        let error = error.to_string();
+        (
+            code,
+            [(ERROR_HEADER, error_header_value(&error))],
+            Json(Self::error(code, &error)),
+        )
+            .into_response()
+    }
+
+    /// Send a response in json format, status code is 200.
+    /// The payload should be serde-serializable.
+    pub fn json<T: Serialize>(payload: T) -> Response {
+        (StatusCode::OK, Json(payload)).into_response()
+    }
+}
+
+/// Implement IntoResponse for HttpResponse so it can be returned directly from handlers
+impl IntoResponse for HttpResponse {
+    fn into_response(self) -> Response {
+        let status = match self.code {
+            200 => StatusCode::OK,
+            400 => StatusCode::BAD_REQUEST,
+            401 => StatusCode::UNAUTHORIZED,
+            402 => StatusCode::PAYMENT_REQUIRED,
+            403 => StatusCode::FORBIDDEN,
+            404 => StatusCode::NOT_FOUND,
+            409 => StatusCode::CONFLICT,
+            429 => StatusCode::TOO_MANY_REQUESTS,
+            500 => StatusCode::INTERNAL_SERVER_ERROR,
+            503 => StatusCode::SERVICE_UNAVAILABLE,
+            _ => StatusCode::OK,
+        };
+        (status, Json(self)).into_response()
+    }
+}
+
+/// Build an [`ERROR_HEADER`] value out of an error message.
+///
+/// These messages interpolate user-supplied names (org, stream, field type), so they can hold
+/// anything. Control bytes make `HeaderValue` construction fail, which costs the whole response:
+/// axum replaces it with a bare 500 that hides the real status and message. Non-ascii bytes are
+/// accepted but then `HeaderValue::to_str` refuses to read them back, so the audit log silently
+/// drops the message. Escaping everything outside visible ascii avoids both.
+pub fn error_header_value(message: &str) -> HeaderValue {
+    let needs_escape = |c: char| !matches!(c, ' '..='~' | '\t');
+    let value = if message.contains(needs_escape) {
+        let mut escaped = String::with_capacity(message.len());
+        for c in message.chars() {
+            if needs_escape(c) {
+                escaped.extend(c.escape_default());
+            } else {
+                escaped.push(c);
+            }
+        }
+        HeaderValue::from_str(&escaped)
+    } else {
+        HeaderValue::from_str(message)
+    };
+    value.unwrap_or_else(|_| HeaderValue::from_static("error"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_http_response() {
+        let msg = "This is an error response";
+        let err = HttpResponse::message(StatusCode::OK, msg.to_string());
+        assert_eq!(err.code, StatusCode::OK.as_u16());
+        assert_eq!(err.message, msg);
+
+        let err = HttpResponse::error(StatusCode::INTERNAL_SERVER_ERROR, msg.to_string());
+        assert_eq!(err.code, StatusCode::INTERNAL_SERVER_ERROR.as_u16());
+        assert_eq!(err.message, msg);
+
+        let errcode = errors::ErrorCodes::ServerInternalError(msg.to_string());
+        let err =
+            HttpResponse::error_code(errors::ErrorCodes::ServerInternalError(msg.to_string()));
+        assert_eq!(err.code, errcode.get_code());
+        assert_eq!(err.message, errcode.get_message());
+    }
+
+    #[test]
+    fn test_http_response_with_trace_id() {
+        let mut response = HttpResponse::message(StatusCode::OK, "test");
+        response.with_trace_id("trace-123".to_string());
+        assert_eq!(response.trace_id, Some("trace-123".to_string()));
+    }
+
+    #[test]
+    fn test_http_response_with_id() {
+        let mut response = HttpResponse::message(StatusCode::OK, "test");
+        response.with_id("id-123".to_string());
+        assert_eq!(response.id, Some("id-123".to_string()));
+    }
+
+    #[test]
+    fn test_http_response_with_name() {
+        let mut response = HttpResponse::message(StatusCode::OK, "test");
+        response.with_name("test-name".to_string());
+        assert_eq!(response.name, Some("test-name".to_string()));
+    }
+
+    #[test]
+    fn test_http_response_error_code_with_trace_id() {
+        let errcode = errors::ErrorCodes::ServerInternalError("test error".to_string());
+        let response =
+            HttpResponse::error_code_with_trace_id(&errcode, Some("trace-123".to_string()));
+        assert_eq!(response.code, errcode.get_code());
+        assert_eq!(response.message, errcode.get_message());
+        assert_eq!(response.error_detail, Some(errcode.get_error_detail()));
+        assert_eq!(response.trace_id, Some("trace-123".to_string()));
+    }
+
+    #[test]
+    fn test_http_response_serialization() {
+        let response = HttpResponse {
+            code: 200,
+            message: "success".to_string(),
+            id: Some("id-123".to_string()),
+            name: Some("test".to_string()),
+            error_detail: None,
+            trace_id: Some("trace-123".to_string()),
+            hint: None,
+            suggestions: None,
+        };
+
+        let serialized = serde_json::to_string(&response).unwrap();
+        let deserialized: HttpResponse = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(response.code, deserialized.code);
+        assert_eq!(response.message, deserialized.message);
+        assert_eq!(response.id, deserialized.id);
+        assert_eq!(response.name, deserialized.name);
+        assert_eq!(response.error_detail, deserialized.error_detail);
+        assert_eq!(response.trace_id, deserialized.trace_id);
+    }
+
+    #[test]
+    fn test_es_response() {
+        let response = ESResponse {
+            took: 100,
+            errors: false,
+        };
+
+        assert_eq!(response.took, 100);
+        assert!(!response.errors);
+    }
+
+    #[test]
+    fn test_es_response_serialization() {
+        let response = ESResponse {
+            took: 100,
+            errors: false,
+        };
+
+        let serialized = serde_json::to_string(&response).unwrap();
+        let deserialized: ESResponse = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(response.took, deserialized.took);
+        assert_eq!(response.errors, deserialized.errors);
+    }
+
+    #[test]
+    fn test_http_response_ok() {
+        let response = HttpResponse::ok("success");
+        assert_eq!(response.status(), http::StatusCode::OK);
+    }
+
+    #[test]
+    fn test_http_response_bad_request() {
+        let response = HttpResponse::bad_request("bad request");
+        assert_eq!(response.status(), http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn test_http_response_unauthorized() {
+        let response = HttpResponse::unauthorized("unauthorized");
+        assert_eq!(response.status(), http::StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn test_http_response_forbidden() {
+        let response = HttpResponse::forbidden("forbidden");
+        assert_eq!(response.status(), http::StatusCode::FORBIDDEN);
+    }
+
+    #[test]
+    fn test_http_response_conflict() {
+        let response = HttpResponse::conflict("conflict");
+        assert_eq!(response.status(), http::StatusCode::CONFLICT);
+    }
+
+    #[test]
+    fn test_http_response_not_found() {
+        let response = HttpResponse::not_found("not found");
+        assert_eq!(response.status(), http::StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn test_http_response_internal_error() {
+        let response = HttpResponse::internal_error("internal error");
+        assert_eq!(response.status(), http::StatusCode::INTERNAL_SERVER_ERROR);
+    }
+
+    #[test]
+    fn test_http_response_json() {
+        let payload = vec![1, 2, 3];
+        let response = HttpResponse::json(payload);
+        assert_eq!(response.status(), http::StatusCode::OK);
+    }
+
+    #[test]
+    fn test_optional_fields_not_serialized_when_none() {
+        let response = HttpResponse {
+            code: 200,
+            message: "ok".to_string(),
+            id: None,
+            name: None,
+            error_detail: None,
+            trace_id: None,
+            hint: None,
+            suggestions: None,
+        };
+        let serialized = serde_json::to_string(&response).unwrap();
+        assert!(!serialized.contains("id"));
+        assert!(!serialized.contains("name"));
+        assert!(!serialized.contains("error_detail"));
+        assert!(!serialized.contains("trace_id"));
+    }
+
+    #[test]
+    fn test_http_response_builder_chaining() {
+        let mut response = HttpResponse::message(StatusCode::OK, "test");
+        response
+            .with_id("id-1".into())
+            .with_name("name-1".into())
+            .with_trace_id("trace-1".into());
+
+        assert_eq!(response.id, Some("id-1".into()));
+        assert_eq!(response.name, Some("name-1".into()));
+        assert_eq!(response.trace_id, Some("trace-1".into()));
+    }
+
+    #[test]
+    fn test_optional_fields_serialized_when_some() {
+        let response = HttpResponse {
+            code: 200,
+            message: "ok".to_string(),
+            id: Some("id-123".to_string()),
+            name: Some("my-name".to_string()),
+            error_detail: Some("detail".to_string()),
+            trace_id: Some("trace-abc".to_string()),
+            hint: None,
+            suggestions: None,
+        };
+        let json = serde_json::to_string(&response).unwrap();
+        assert!(json.contains("\"id\""));
+        assert!(json.contains("\"name\""));
+        assert!(json.contains("error_detail"));
+        assert!(json.contains("trace_id"));
+    }
+
+    #[test]
+    fn test_into_response_unrecognized_code_defaults_to_ok() {
+        let http_response = HttpResponse {
+            code: 418, // teapot — not in match arms
+            message: "test".to_string(),
+            id: None,
+            name: None,
+            error_detail: None,
+            trace_id: None,
+            hint: None,
+            suggestions: None,
+        };
+        let response = http_response.into_response();
+        assert_eq!(response.status(), http::StatusCode::OK);
+    }
+
+    #[test]
+    fn test_http_response_payment_required() {
+        let response = HttpResponse::payment_required("pay up");
+        assert_eq!(response.status(), http::StatusCode::PAYMENT_REQUIRED);
+    }
+
+    #[test]
+    fn test_http_response_too_many_requests() {
+        let response = HttpResponse::too_many_requests("slow down");
+        assert_eq!(response.status(), http::StatusCode::TOO_MANY_REQUESTS);
+    }
+
+    #[test]
+    fn test_error_header_value_passes_ascii_through_unchanged() {
+        let message = "stream 'my-stream' is reserved\tand cannot be created";
+        assert_eq!(error_header_value(message).to_str().unwrap(), message);
+    }
+
+    #[test]
+    fn test_error_header_value_escapes_unreadable_chars() {
+        // Control bytes make `HeaderValue::from_str` fail outright; non-ascii ones make
+        // `to_str` fail, which is what the audit middleware reads the header with.
+        for (message, expected) in [
+            (
+                "invalid data type: v^\u{11}0K",
+                "invalid data type: v^\\u{11}0K",
+            ),
+            ("org Q\u{b4}\u{ed}\u{cd}j", "org Q\\u{b4}\\u{ed}\\u{cd}j"),
+            ("a\u{7f}b", "a\\u{7f}b"),
+        ] {
+            assert_eq!(error_header_value(message).to_str().unwrap(), expected);
+        }
+    }
+
+    #[test]
+    fn test_error_with_header_keeps_status_for_unprintable_message() {
+        // A control byte in the message used to fail header construction, which made axum
+        // replace the whole response with a bare 500 "failed to parse header value".
+        let response = HttpResponse::error_with_header(
+            StatusCode::BAD_REQUEST,
+            "invalid data type: v^\u{11}0K",
+        );
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        assert_eq!(
+            response.headers().get(ERROR_HEADER).unwrap(),
+            "invalid data type: v^\\u{11}0K"
+        );
+    }
+
+    #[test]
+    fn test_into_response_503_service_unavailable() {
+        let http_response = HttpResponse {
+            code: 503,
+            message: "down".to_string(),
+            id: None,
+            name: None,
+            error_detail: None,
+            trace_id: None,
+            hint: None,
+            suggestions: None,
+        };
+        let response = http_response.into_response();
+        assert_eq!(response.status(), http::StatusCode::SERVICE_UNAVAILABLE);
+    }
+}

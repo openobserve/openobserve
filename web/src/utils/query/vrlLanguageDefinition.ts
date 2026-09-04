@@ -10,7 +10,7 @@ export const vrlLanguageDefinition = {
     { open: "(", close: ")", token: "delimiter.parenthesis" },
   ],
 
-  regEx: /\/(?!\/\/)(?:[^\/\\]|\\.)*\/[igm]*/,
+  regEx: /\/(?!\/\/)(?:[^/\\]|\\.)*\/[igm]*/,
 
   keywords: [
     "abort",
@@ -39,16 +39,15 @@ export const vrlLanguageDefinition = {
   ],
 
   // we include these common regular expressions
-  symbols: /[=><!~?&%|+\-*\/\^\.,\:]+/,
-  escapes:
-    /\\(?:[abfnrtv\\"'$]|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
+  symbols: /[=><!~?&%|+\-*/^.,:]+/,
+  escapes: /\\(?:[abfnrtv\\"'$]|x[0-9A-Fa-f]{1,4}|u[0-9A-Fa-f]{4}|U[0-9A-Fa-f]{8})/,
 
   // The main tokenizer for our languages
   tokenizer: {
     root: [
       // function invokes fallible
       [
-        /([a-zA-Z_!]+)(\!)(\()/,
+        /([a-zA-Z_!]+)(!)(\()/,
         {
           cases: {
             $3: ["keyword", "keyword", ""],
@@ -71,14 +70,11 @@ export const vrlLanguageDefinition = {
       [/r'[^']+'/, { token: "regexp" /*log: 'root_r_string::\n\n$0'*/ }],
 
       // timestamps
-      [
-        /t'[^']+'/,
-        { token: "regexp" /*log: 'function_arg_r_string::\n\n$0'*/ },
-      ],
+      [/t'[^']+'/, { token: "regexp" /*log: 'function_arg_r_string::\n\n$0'*/ }],
 
       // field access, eg: .foo
       [
-        /(\.[^\ \=]+)([\ |\=])/,
+        /(\.[^ =]+)([ |=])/,
         {
           cases: {
             $2: ["entity", ""],
@@ -90,7 +86,7 @@ export const vrlLanguageDefinition = {
       [/s'[^']+'/, { token: "string" /*log: 'root_s_string::\n\n$0'*/ }],
 
       // identifiers and keywords
-      [/\@[a-zA-Z_]\w*/, "variable.predefined"],
+      [/@[a-zA-Z_]\w*/, "variable.predefined"],
 
       [
         /[a-zA-Z_]\w*/,
@@ -118,16 +114,16 @@ export const vrlLanguageDefinition = {
 
       [/^(\s*)(@regEx)/, ["", "regexp"]],
       [/(\()(\s*)(@regEx)/, ["@brackets", "", "regexp"]],
-      [/(\,)(\s*)(@regEx)/, ["delimiter", "", "regexp"]],
-      [/(\=)(\s*)(@regEx)/, ["delimiter", "", "regexp"]],
-      [/(\:)(\s*)(@regEx)/, ["delimiter", "", "regexp"]],
+      [/(,)(\s*)(@regEx)/, ["delimiter", "", "regexp"]],
+      [/(=)(\s*)(@regEx)/, ["delimiter", "", "regexp"]],
+      [/(:)(\s*)(@regEx)/, ["delimiter", "", "regexp"]],
       [/(\[)(\s*)(@regEx)/, ["@brackets", "", "regexp"]],
-      [/(\!)(\s*)(@regEx)/, ["delimiter", "", "regexp"]],
-      [/(\&)(\s*)(@regEx)/, ["delimiter", "", "regexp"]],
+      [/(!)(\s*)(@regEx)/, ["delimiter", "", "regexp"]],
+      [/(&)(\s*)(@regEx)/, ["delimiter", "", "regexp"]],
       [/(\|)(\s*)(@regEx)/, ["delimiter", "", "regexp"]],
       [/(\?)(\s*)(@regEx)/, ["delimiter", "", "regexp"]],
       [/(\{)(\s*)(@regEx)/, ["@brackets", "", "regexp"]],
-      [/(\;)(\s*)(@regEx)/, ["", "", "regexp"]],
+      [/(;)(\s*)(@regEx)/, ["", "", "regexp"]],
 
       // delimiters
       [
@@ -142,12 +138,12 @@ export const vrlLanguageDefinition = {
           },
         },
       ],
-      [/[{}()\[\]]/, "@brackets"],
+      [/[{}()[\]]/, "@brackets"],
       [/@symbols/, "delimiter"],
 
       // numbers
-      [/\d+[eE]([\-+]?\d+)?/, "number.float"],
-      [/\d+\.\d+([eE][\-+]?\d+)?/, "number.float"],
+      [/\d+[eE]([-+]?\d+)?/, "number.float"],
+      [/\d+\.\d+([eE][-+]?\d+)?/, "number.float"],
       [/0[xX][0-9a-fA-F]+/, "number.hex"],
       [/0[0-7]+(?!\d)/, "number.octal"],
       [/\d+/, "number"],
@@ -179,7 +175,7 @@ export const vrlLanguageDefinition = {
     ],
 
     string: [
-      [/[^"'\#\\]+/, "string"],
+      [/[^"'#\\]+/, "string"],
       [/@escapes/, "string.escape"],
       [/\./, "string.escape.invalid"],
       [/\./, "string.escape.invalid"],
@@ -235,7 +231,7 @@ export const vrlLanguageDefinition = {
     ],
 
     hereregexp: [
-      [/[^\\\/#]+/, "regexp"],
+      [/[^\\/#]+/, "regexp"],
       [/\\./, "regexp"],
       [/#.*$/, "comment"],
       ["///[igm]*", { token: "regexp", next: "@pop" }],
@@ -280,24 +276,12 @@ export const vrlLanguageDefinition = {
       // newline func(.foo)
       // [/(\.)/, { token: "entity" }],
       // r strings
-      [
-        /r'[^']+'/,
-        { token: "regexp" /*log: 'function_arg_r_string::\n\n$0'*/ },
-      ],
-      [
-        /t'[^']+'/,
-        { token: "regexp" /*log: 'function_arg_r_string::\n\n$0'*/ },
-      ],
+      [/r'[^']+'/, { token: "regexp" /*log: 'function_arg_r_string::\n\n$0'*/ }],
+      [/t'[^']+'/, { token: "regexp" /*log: 'function_arg_r_string::\n\n$0'*/ }],
       // s strings
       [/s'[^']+'/, { token: "string" /*log: 'root_s_string::\n\n$0'*/ }],
-      [
-        /\)/,
-        { token: "", /*log: 'end_off_function_arg::\n\n$0',*/ next: "@pop" },
-      ],
-      [
-        /[\.\[\]\,\\\"\%\{\}\$\:\^\w]+/,
-        { token: "" /*log: 'function_arg_anything_else::\n\n$0'*/ },
-      ],
+      [/\)/, { token: "", /*log: 'end_off_function_arg::\n\n$0',*/ next: "@pop" }],
+      [/[.[\],\\"%{}$:^\w]+/, { token: "" /*log: 'function_arg_anything_else::\n\n$0'*/ }],
     ],
   },
 };

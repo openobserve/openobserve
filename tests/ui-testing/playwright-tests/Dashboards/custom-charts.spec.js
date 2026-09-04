@@ -6,8 +6,12 @@ const {
 import path from "path";
 import fs from "fs";
 import { ingestion } from "./utils/dashIngestion.js";
+import { deleteDashboard } from "./utils/dashCreation.js";
 import PageManager from "../../pages/page-manager";
 const testLogger = require('../utils/test-logger.js');
+
+const generateDashboardName = (prefix) =>
+  `${prefix}_` + Math.random().toString(36).substr(2, 9);
 
 // Function to read JSON test files
 function readJsonFile(filename) {
@@ -30,6 +34,15 @@ test.describe("Custom Charts Tests", () => {
   test.beforeEach(async ({ page }) => {
     await navigateToBase(page);
     await ingestion(page);
+
+    // navigateToBase() alone can land on the wrong org's page on cloud (the
+    // stored session's "last active org" wins over the org_identifier query
+    // param on a bare root load) — force the correct org context with an
+    // explicit navigation to a real feature page.
+    await page.goto(
+      `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
+    );
+    await page.waitForLoadState("domcontentloaded");
   });
 
   test("Add Pictorial JSON in Monaco Editor", async ({ page }) => {
@@ -41,25 +54,30 @@ test.describe("Custom Charts Tests", () => {
       return;
     }
 
-    await pm.dashboardPage.addCustomChart();
+    const dashboardName = generateDashboardName("Customcharts_Pictorial");
+    await pm.dashboardPage.addCustomChart(dashboardName);
 
-    // Type the content with raw modifier to bypass autocomplete
-    await page.keyboard.insertText(pictorialJSON);
-
-    await page.waitForTimeout(1000);
-    // await page.locator('[data-test="dashboard-panel-error-bar-icon"]').click();
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".inputarea")
-      .fill('select * from "e2e_automate"');
-    await page.waitForTimeout(2000);
+    // Set both editors via Monaco API — .inputarea.fill() stopped overriding the
+    // panel's auto-generated query, leaving panelSchema.query empty so Apply
+    // shows "Please enter query for custom chart" instead of running JS validation.
+    await pm.dashboardPage.setCustomChartCode(pictorialJSON);
+    await pm.dashboardPage.setDashboardPanelQuery('select * from "e2e_automate"');
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await page.waitForTimeout(3000);
+
+    // The validation error is displayed inside an OTooltip on the warning
+    // button — it is not in the DOM until the button is hovered.
+    const errorBtn = pm.dashboardPage.getPanelErrorDataBtn();
+    await expect(errorBtn).toBeVisible({ timeout: 30000 });
     await expect(
-      page.getByText(
+      await pm.dashboardPage.getPanelErrorTooltipText(
         "Unsafe code detected: Access to 'document' is not allowed"
       )
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 5000 });
+
+    await page.goto(
+      `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
+    );
+    await deleteDashboard(page, dashboardName);
   });
 
   test("Add line JSON in Monaco Editor", async ({ page }) => {
@@ -70,18 +88,24 @@ test.describe("Custom Charts Tests", () => {
       return;
     }
 
-    await pm.dashboardPage.addCustomChart();
+    const dashboardName = generateDashboardName("Customcharts_Line");
+    await pm.dashboardPage.addCustomChart(dashboardName);
 
-    // Type the content with raw modifier to bypass autocomplete
-    await page.keyboard.insertText(lineJSON);
-
-    await page.waitForTimeout(1000);
-    await page
-      .locator('[data-test="dashboard-panel-query-editor"]')
-      .locator(".inputarea")
-      .fill('select * from "e2e_automate"');
-    await page.waitForTimeout(3000);
+    // Set both editors via Monaco API (see Pictorial test above)
+    await pm.dashboardPage.setCustomChartCode(lineJSON);
+    await pm.dashboardPage.setDashboardPanelQuery('select * from "e2e_automate"');
     await pm.dashboardPanelActions.applyDashboardBtn();
-    await page.waitForTimeout(3000);
+
+    // line.json is SAFE ECharts code (no forbidden identifiers), so Apply must
+    // actually render the chart — NOT surface a validation/empty-query error.
+    // (Previously this test only waited 3s and asserted nothing.)
+    await pm.dashboardPanelActions.expectCustomChartRendered(expect);
+    await expect(pm.dashboardPage.getUnsafeCodeText()).toBeHidden();
+    await expect(pm.dashboardPage.getPleaseEnterQueryText()).toBeHidden();
+
+    await page.goto(
+      `${process.env["ZO_BASE_URL"]}/web/dashboards?org_identifier=${process.env["ORGNAME"]}&folder=default`
+    );
+    await deleteDashboard(page, dashboardName);
   });
 });

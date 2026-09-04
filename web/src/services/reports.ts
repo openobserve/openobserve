@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,29 +24,27 @@ import http from "./http";
 // PUT /{org_id}/reports/{name}/trigger -- trigger report immediately
 
 const reports = {
+  // v1 API — used by the create/edit form
   list: (
     org_identifier: string = "",
     folder_id: string = "",
     dashboard_id: string = "",
     cache: boolean = false,
   ) => {
-    let query = "";
-
     const params = [];
     if (folder_id) params.push(`folder_id=${folder_id}`);
     if (dashboard_id) params.push(`dashboard_id=${dashboard_id}`);
     if (cache) params.push(`cache=${cache}`);
-    query = params.join("&");
-
+    const query = params.join("&");
     return http().get(`/api/${org_identifier}/reports?${query}`);
   },
   getReport: (org_identifier: string, reportName: string) => {
-    return http().get(
-      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`,
-    );
+    return http().get(`/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`);
   },
-  createReport: (org_identifier: string, payload: any) => {
-    return http().post(`/api/${org_identifier}/reports`, payload);
+  createReport: (org_identifier: string, payload: any, folder_id?: string) => {
+    let url = `/api/${org_identifier}/reports`;
+    if (folder_id) url += `?folder=${folder_id}`;
+    return http().post(url, payload);
   },
   updateReport: (org_identifier: string, payload: any) => {
     return http().put(
@@ -55,28 +53,65 @@ const reports = {
     );
   },
   deleteReport: (org_identifier: string, reportName: string) => {
-    return http().delete(
-      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`,
-    );
+    return http().delete(`/api/${org_identifier}/reports/${encodeURIComponent(reportName)}`);
   },
   bulkDelete: (org_identifier: string, data: any) => {
     return http().delete(`/api/${org_identifier}/reports/bulk`, { data });
   },
   triggerReport: (org_identifier: string, reportName: string) => {
+    return http().put(`/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/trigger`);
+  },
+  toggleReportState: (org_identifier: string, reportName: string, state: boolean) => {
     return http().put(
-      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/trigger`,
+      `/api/${org_identifier}/reports/${encodeURIComponent(reportName)}/enable?value=${state}`,
     );
   },
-  toggleReportState: (
+
+  // v2 — folder-aware, ID-based
+  getReportById: (org_identifier: string, report_id: string) => {
+    return http().get(`/api/v2/${org_identifier}/reports/${report_id}`);
+  },
+  createReportV2: (org_identifier: string, payload: any, folder_id?: string) => {
+    let url = `/api/v2/${org_identifier}/reports`;
+    if (folder_id) url += `?folder=${encodeURIComponent(folder_id)}`;
+    return http().post(url, payload);
+  },
+  updateReportById: (
     org_identifier: string,
-    reportName: string,
-    state: boolean,
+    report_id: string,
+    payload: any,
+    new_folder_id?: string,
   ) => {
-    return http().put(
-      `/api/${org_identifier}/reports/${encodeURIComponent(
-        reportName,
-      )}/enable?value=${state}`,
-    );
+    let url = `/api/v2/${org_identifier}/reports/${report_id}`;
+    if (new_folder_id) url += `?folder=${encodeURIComponent(new_folder_id)}`;
+    return http().put(url, payload);
+  },
+  listByFolderId: (
+    org_identifier: string,
+    folder_id?: string,
+    dashboard_id?: string,
+    cache?: boolean,
+    name_substring?: string,
+  ) => {
+    const params: string[] = [];
+    if (folder_id) params.push(`folder=${folder_id}`);
+    if (dashboard_id) params.push(`dashboard_id=${dashboard_id}`);
+    if (name_substring) params.push(`report_name_substring=${encodeURIComponent(name_substring)}`);
+    if (typeof cache == "boolean") params.push(`cache=${cache}`);
+    const query = params.length ? `?${params.join("&")}` : "";
+    return http().get(`/api/v2/${org_identifier}/reports${query}`);
+  },
+  deleteReportById: (org_identifier: string, report_id: string) => {
+    return http().delete(`/api/v2/${org_identifier}/reports/${report_id}`);
+  },
+  bulkDeleteById: (org_identifier: string, data: { ids: string[] }) => {
+    return http().delete(`/api/v2/${org_identifier}/reports/bulk`, { data });
+  },
+  triggerReportById: (org_identifier: string, report_id: string) => {
+    return http().put(`/api/v2/${org_identifier}/reports/${report_id}/trigger`);
+  },
+  toggleReportStateById: (org_identifier: string, report_id: string, state: boolean) => {
+    return http().patch(`/api/v2/${org_identifier}/reports/${report_id}/enable?value=${state}`);
   },
 };
 

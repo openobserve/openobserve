@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -30,13 +30,41 @@ vi.stubGlobal(
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
-  }))
+  })),
 );
 
 class ResizeObserver {
-  observe() {}
-  unobserve() {}
-  disconnect() {}
+  private callback: ResizeObserverCallback;
+  private elements: Set<Element> = new Set();
+
+  constructor(callback: ResizeObserverCallback) {
+    this.callback = callback;
+  }
+
+  observe(element: Element) {
+    this.elements.add(element);
+    const rect = element.getBoundingClientRect();
+    this.callback(
+      [
+        {
+          target: element,
+          contentRect: rect,
+          borderBoxSize: [{ inlineSize: rect.width, blockSize: rect.height }],
+          contentBoxSize: [{ inlineSize: rect.width, blockSize: rect.height }],
+          devicePixelContentBoxSize: [{ inlineSize: rect.width, blockSize: rect.height }],
+        },
+      ] as any,
+      this,
+    );
+  }
+
+  unobserve(element: Element) {
+    this.elements.delete(element);
+  }
+
+  disconnect() {
+    this.elements.clear();
+  }
 }
 
 vi.stubGlobal("ResizeObserver", ResizeObserver);

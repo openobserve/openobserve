@@ -1,31 +1,33 @@
 <template>
-  <div
-    data-test="loading-container"
-    class="tw:h-[100vh] tw:flex tw:flex-col tw:items-center tw:justify-center"
-  >
-    <q-spinner data-test="spinner" color="primary" size="3em" :thickness="2" />
-    <div data-test="message" class="message">Redirecting...</div>
+  <div data-test="loading-container" class="flex h-[100vh] flex-col items-center justify-center">
+    <OSpinner size="lg" data-test="spinner" />
+    <div data-test="message" class="text-text-secondary text-base">
+      {{ t("common.shortUrl.redirecting") }}
+    </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import shortURL from "@/services/short_url";
 import { useStore } from "vuex";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "ShortUrl",
+  components: { OSpinner },
   props: {
     id: {
       type: String,
       required: true,
     },
   },
-  setup(props, { emit }) {
-    const route = useRoute();
+  setup(props) {
     const router = useRouter();
     const store = useStore();
+    const { t } = useI18nTyped();
 
     const routeToHome = () => {
       router.replace({
@@ -51,10 +53,7 @@ export default defineComponent({
 
     const fetchAndRedirect = async () => {
       try {
-        const response = await shortURL.get(
-          store.state.selectedOrganization.identifier,
-          props.id,
-        );
+        const response = await shortURL.get(store.state.selectedOrganization.identifier, props.id);
 
         if (typeof response.data === "string") {
           handleOriginalUrl(response.data);
@@ -75,6 +74,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       routeToHome,
       handleOriginalUrl,
       routeToOriginalUrl,
@@ -83,37 +83,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-.loading-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100vh;
-}
-
-.spinner {
-  border: 4px solid rgba(0, 0, 0, 0.1);
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border-left-color: #09f;
-  animation: spin 1s linear infinite;
-  margin-bottom: 16px;
-}
-
-.message {
-  font-size: 16px;
-  color: #666;
-}
-
-@keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-</style>

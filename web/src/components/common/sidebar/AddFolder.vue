@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,203 +15,173 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-    <q-card class="column full-height">
-      <q-card-section class="q-px-md q-py-sm">
-        <div class="row items-center no-wrap">
-          <div class="col">
-            <div v-if="editMode" class="text-body1 text-bold">
-              {{ t("dashboard.updateFolder") }}
-            </div>
-            <div v-else class="text-body1 text-bold">
-              {{ t("common.addFolder") }}
-            </div>
-          </div>
-          <div class="col-auto">
-            <q-btn
-              v-close-popup="true"
-              round
-              flat
-              icon="cancel"
-              data-test="dashboard-folder-cancel"
+  <ODialog
+    :open="open"
+    size="sm"
+    :title="editMode ? t('dashboard.updateFolder') : t('common.addFolder')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('common.save')"
+    form-id="add-folder-sidebar-form"
+    data-test="dashboard-folder-dialog"
+    @update:open="$emit('update:open', $event)"
+    @click:secondary="$emit('update:open', false)"
+  >
+    <div>
+      <OForm
+        id="add-folder-sidebar-form"
+        class="flex flex-col gap-5"
+        :schema="addFolderSchema"
+        :default-values="addFolderDefaults"
+        @submit="onSubmit"
+      >
+        <div class="flex items-start gap-3">
+          <FolderIconField :start-touched="startIconTouched" />
+          <div class="min-w-0 flex-1">
+            <OFormInput
+              name="name"
+              :label="t('dashboard.nameOfVariable')"
+              required
+              data-test="dashboard-folder-add-name"
             />
           </div>
         </div>
-      </q-card-section>
-      <q-separator />
-      <q-card-section>
-        <q-form ref="addFolderForm" @submit.stop="onSubmit.execute">
-          <q-input
-            v-model="folderData.name"
-            :label="t('dashboard.nameOfVariable') + '*'"
-            class="q-py-none showLabelOnTop"
-            data-test="dashboard-folder-add-name"
-            stack-label
-            borderless
-            dense
-            :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
-            :lazy-rules="true"
-          />
-          <span>&nbsp;</span>
-          <q-input
-            v-model="folderData.description"
-            :label="t('dashboard.typeDesc')"
-            color="input-border"
-            bg-color="input-bg"
-            data-test="dashboard-folder-add-description"
-            class="q-py-md showLabelOnTop"
-            stack-label
-            borderless
-            dense
-          />
-  
-          <div class="flex justify-start q-mt-sm">
-            <q-btn
-              v-close-popup="true"
-              class="o2-secondary-button tw:h-[36px]"
-              :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-              flat
-              :label="t('dashboard.cancel')"
-              no-caps
-              data-test="dashboard-folder-add-cancel"
-            />
-            <q-btn
-              data-test="dashboard-folder-add-save"
-              :disable="folderData.name.trim() === ''"
-              :loading="onSubmit.isLoading.value"
-              :label="t('common.save')"
-              class="o2-primary-button tw:h-[36px] q-ml-md"
-              :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-              flat
-              type="submit"
-              no-caps
-            />
-          </div>
-        </q-form>
-      </q-card-section>
-    </q-card>
-  </template>
-  
-  <script lang="ts">
-  import { defineComponent, ref } from "vue";
-  import { createFolder, createFolderByType, updateFolder, updateFolderByType } from "@/utils/commons";
-  import { useI18n } from "vue-i18n";
-  import { useStore } from "vuex";
-  import { getImageURL } from "@/utils/zincutils";
-  import { useLoading } from "@/composables/useLoading";
-  import useNotifications from "@/composables/useNotifications";
-  import { useReo } from "@/services/reodotdev_analytics";
-  
-  const defaultValue = () => {
-    return {
-      folderId: "",
-      name: "",
-      description: "",
-    };
-  };
-  
-  export default defineComponent({
-    name: "CommonAddFolder",
-    props: {
-      folderId: {
-        type: String,
-        default: "default",
-      },
-      editMode: {
-        type: Boolean,
-        default: false,
-      },
-      type: {
-        type: String,
-        default: "alerts",
-      },
+        <OFormInput
+          name="description"
+          :label="t('dashboard.typeDesc')"
+          data-test="dashboard-folder-add-description"
+        />
+      </OForm>
+    </div>
+  </ODialog>
+</template>
+
+<script lang="ts">
+import { defineComponent, computed } from "vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { createFolderByType, updateFolderByType } from "@/utils/commons";
+import { useI18nTyped } from "@/types/i18n";
+import { useStore } from "vuex";
+import useNotifications from "@/composables/useNotifications";
+import { useReo } from "@/services/reodotdev_analytics";
+import { makeAddFolderSchema, type AddFolderForm } from "./AddFolder.schema";
+import FolderIconField from "./FolderIconField.vue";
+import { useFolderIcons } from "@/composables/useFolderIcons";
+
+export default defineComponent({
+  name: "CommonAddFolder",
+  components: { ODialog, OForm, OFormInput, FolderIconField },
+  props: {
+    open: {
+      type: Boolean,
+      default: false,
     },
-    emits: ["update:modelValue"],
-    setup(props, { emit }) {
-      const store: any = useStore();
-      const addFolderForm: any = ref(null);
-      const disableColor: any = ref("");
-      const folderData: any = ref(
-        props.editMode
-          ? JSON.parse(
-              JSON.stringify(
-                store.state.organizationData.foldersByType[props.type].find(
-                  (item: any) => item.folderId === props.folderId
-                )
-              )
-            )
-          : defaultValue()
+    folderId: {
+      type: String,
+      default: "default",
+    },
+    editMode: {
+      type: Boolean,
+      default: false,
+    },
+    type: {
+      type: String,
+      default: "alerts",
+    },
+  },
+  emits: ["update:modelValue", "update:open"],
+  setup(props, { emit }) {
+    const store: any = useStore();
+    const { t } = useI18nTyped();
+    const addFolderSchema = makeAddFolderSchema(t);
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
+    const { track } = useReo();
+    const { iconFor } = useFolderIcons();
+
+    const findFolder = () =>
+      store.state.organizationData.foldersByType[props.type]?.find(
+        (item: any) => item.folderId === props.folderId,
       );
-      const isValidIdentifier: any = ref(true);
-      const { t } = useI18n();
-      const { showPositiveNotification, showErrorNotification } =
-        useNotifications();
-      const { track } = useReo();
-  
-      const onSubmit = useLoading(async () => {
-        await addFolderForm.value.validate().then(async (valid: any) => {
-          if (!valid) {
-            return false;
-          }
-  
-          try {
-            //if edit mode
-            if (props.editMode) {
-              await updateFolderByType (
-                store,
-                folderData.value.folderId,
-                folderData.value,
-                props.type
-              );
-              showPositiveNotification("Folder updated successfully", {
-                timeout: 2000,
-              });
-              emit("update:modelValue", folderData.value);
-            }
-            //else new folder
-            else {
-              //trim the folder name here
-              folderData.value.name = folderData.value.name.trim();
-              const newFolder: any = await createFolderByType(store, folderData.value, props.type);
-              emit("update:modelValue", newFolder);
-              showPositiveNotification("Folder added successfully", {
-                timeout: 2000,
-              });
-            }
-            folderData.value = {
-              folderId: "",
-              name: "",
-              description: "",
-            };
-            await addFolderForm.value.resetValidation();
-          } catch (err: any) {
-            showErrorNotification(
-              err?.response?.data?.message ??
-                (props.editMode
-                  ? "Folder updation failed"
-                  : "Folder creation failed"),
-              { timeout: 2000 }
-            );
-          }
-          track("Button Click", {
-            button: "Save New Folder",
-            page: "Folders",
+
+    // Renaming a folder that already carries an icon must not re-suggest one.
+    const startIconTouched = computed(() => props.editMode && !!iconFor(findFolder()));
+
+    // The OForm is the single source of truth. OForm reads `defaultValues`
+    // once at mount, and ODialog remounts the body on open — so this computed
+    // seeds the fields each time the dialog opens (edit → the folder's values,
+    // create → blank). No local model / no manual reset needed.
+    const addFolderDefaults = computed((): AddFolderForm => {
+      if (props.editMode) {
+        const found = findFolder();
+        return {
+          name: found?.name ?? "",
+          description: found?.description ?? "",
+          icon: iconFor(found),
+        };
+      }
+      return { name: "", description: "", icon: null };
+    });
+
+    // Plain async @submit handler — the validated `value` is the source of
+    // truth. `folderId` (not a form field) comes from the prop.
+    const onSubmit = async (value: AddFolderForm) => {
+      const name = (value.name ?? "").trim();
+      const description = value.description ?? "";
+      // Sent to the API as well as stored locally: the field is ignored by the
+      // current backend, so the payload is already right for the day it lands.
+      const icon = value.icon ?? null;
+      try {
+        if (props.editMode) {
+          const found = findFolder();
+          const payload = {
+            ...(found ? JSON.parse(JSON.stringify(found)) : {}),
+            folderId: props.folderId,
+            name,
+            description,
+            icon,
+          };
+          await updateFolderByType(store, props.folderId, payload, props.type);
+          showPositiveNotification(t("toastMessages.sidebar.folderUpdatedSuccessfully"), {
+            timeout: 2000,
           });
-        });
+          emit("update:modelValue", payload);
+          emit("update:open", false);
+        } else {
+          const newFolder: any = await createFolderByType(
+            store,
+            { name, description, icon },
+            props.type,
+          );
+          emit("update:modelValue", newFolder);
+          emit("update:open", false);
+          showPositiveNotification(t("toastMessages.sidebar.folderAddedSuccessfully"), {
+            timeout: 2000,
+          });
+        }
+      } catch (err: any) {
+        showErrorNotification(
+          err?.response?.data?.message ??
+            (props.editMode
+              ? t("common.sidebar.folderUpdateFailed")
+              : t("common.sidebar.folderCreateFailed")),
+          { timeout: 2000 },
+        );
+      }
+      track("Button Click", {
+        button: "Save New Folder",
+        page: "Folders",
       });
-  
-      return {
-        t,
-        disableColor,
-        isPwd: ref(true),
-        status,
-        folderData,
-        addFolderForm,
-        store,
-        isValidIdentifier,
-        getImageURL,
-        onSubmit,
-        defaultValue,
-      };
-    },
-  });
-  </script>
+    };
+
+    return {
+      t,
+      addFolderSchema,
+      store,
+      addFolderDefaults,
+      startIconTouched,
+      onSubmit,
+    };
+  },
+});
+</script>

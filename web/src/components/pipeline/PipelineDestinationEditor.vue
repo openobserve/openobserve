@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,37 +15,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page
-    class="q-pa-none o2-custom-bg"
+  <OPageLayout
+    :back="{
+      label: t('pipeline_destinations.header'),
+      onClick: () => emit('cancel'),
+    }"
+    bleed
   >
-    <div
-      class="row items-center no-wrap card-container q-px-md tw:mb-[0.675rem]"
-    >
-      <div class="flex items-center tw:h-[60px]">
-        <div
-          no-caps
-          padding="xs"
-          outline
-          icon="arrow_back_ios_new"
-          class="el-border tw:w-6 tw:h-6 flex items-center justify-center cursor-pointer el-border-radius q-mr-sm"
-          title="Go Back"
-          @click="$emit('cancel')"
+    <template #title>
+      <span data-test="pipeline-destination-editor-title">
+        <template v-if="destination"
+          >{{ t("alert_destinations.updateTitle") }} - {{ destination.name }}</template
         >
-          <q-icon name="arrow_back_ios_new" size="14px" />
-        </div>
-        <div class="col" data-test="pipeline-destination-editor-title">
-          <div v-if="destination" class="text-h6">
-            {{ t("alert_destinations.updateTitle") }} - {{ destination.name }}
-          </div>
-          <div v-else class="text-h6">
-            {{ t("alert_destinations.addTitle") }}
-          </div>
-        </div>
-      </div>
-    </div>
+        <template v-else>{{ t("alert_destinations.addTitle") }}</template>
+      </span>
+    </template>
 
-    <div class="card-container tw:py-2 q-px-md tw:h-[calc(100vh-120px)] tw:overflow-auto">
-      <div class="tw:w-[50vw]">
+    <div class="rounded-default overflow-auto px-3 py-2">
+      <div class="w-full">
         <CreateDestinationForm
           :destination="destination"
           @created="handleDestinationCreated"
@@ -54,18 +41,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
     </div>
-  </q-page>
+  </OPageLayout>
 </template>
 
 <script lang="ts" setup>
-import { defineProps, defineEmits } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import CreateDestinationForm from "./NodeForm/CreateDestinationForm.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Props
-const props = defineProps<{
+defineProps<{
   destination?: any;
 }>();
 
@@ -87,9 +74,3 @@ const handleCancel = () => {
   emit("cancel");
 };
 </script>
-
-<style lang="scss" scoped>
-.card-container {
-  border-radius: 8px;
-}
-</style>

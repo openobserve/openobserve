@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -201,28 +201,6 @@ mod tests {
                 "folders"."org",
                 "folders"."type",
                 "folders"."name"
-            "#
-        );
-    }
-
-    #[test]
-    fn duplicates_mysql() {
-        let sql = FolderCount::select_statement()
-            .build(DbBackend::MySql)
-            .to_string();
-        collapsed_eq!(
-            &sql,
-            r#"
-                SELECT
-                `folders`.`org`,
-                `folders`.`type`,
-                `folders`.`name`,
-                COUNT(`folders`.`id`) AS `count`
-                FROM `folders` 
-                GROUP BY 
-                `folders`.`org`,
-                `folders`.`type`,
-                `folders`.`name`
             "#
         );
     }

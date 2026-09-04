@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,45 +15,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
-    class="column-order-popup scroll"
+  <ODialog
+    :open="open"
+    @update:open="
+      (v) => {
+        if (!v) cancelEdit();
+      }
+    "
+    :title="t('dashboard.columnOrder')"
+    size="lg"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('common.save')"
+    @click:secondary="cancelEdit"
+    @click:primary="saveEdit"
     data-test="dashboard-column-order-popup"
-    style="padding: 0px 10px; min-width: min(700px, 90vw); max-height: 80vh"
   >
-    <!-- Header -->
-    <div
-      class="flex justify-between items-center q-pa-md header"
-      style="border-bottom: 2px solid gray; margin-bottom: 5px"
-    >
-      <div class="flex items-center q-table__title q-mr-md">
-        <span>{{ t("dashboard.columnOrder") }}</span>
-      </div>
-      <q-btn
-        icon="close"
-        class="q-ml-xs"
-        unelevated
-        size="sm"
-        round
-        outline
-        @click.stop="cancelEdit"
-        data-test="dashboard-column-order-cancel"
-      />
-    </div>
-
     <!-- Content -->
-    <div class="scrollable-content">
-      <div class="text-caption text-grey-7 q-mb-md">
+    <div>
+      <div class="text-text-secondary mb-3 text-xs" data-test="dashboard-column-order-description">
         {{ t("dashboard.columnOrderDescription") }}
       </div>
 
       <!-- Empty state -->
       <div
         v-if="!editColumnOrder || editColumnOrder.length === 0"
-        class="text-center q-pa-xl text-grey-6"
+        class="text-text-muted p-6 text-center"
+        data-test="dashboard-column-order-empty-state"
       >
-        <q-icon name="view_column" size="48px" class="q-mb-md" />
-        <div class="text-body1">{{ t("dashboard.noColumnsOrdered") }}</div>
-        <div class="text-caption">
+        <OIcon name="view-column" class="mb-3 h-12 w-12" />
+        <div class="text-base">{{ t("dashboard.noColumnsOrdered") }}</div>
+        <div class="text-xs">
           {{ t("dashboard.columnsDefaultOrder") }}
         </div>
       </div>
@@ -69,87 +60,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="(column, index) in editColumnOrder"
           :key="`column-${index}`"
-          class="column-order-row"
+          class="border-border-default hover:bg-surface-subtle-hover mb-1 flex items-center border-b px-3 py-2 transition-colors last:border-b-0"
           :data-test="`column-order-row-${index}`"
         >
-            <!-- Drag handle -->
-            <div class="drag-handle">
-              <q-icon
-                name="drag_indicator"
-                color="grey-6"
-                size="20px"
-                :data-test="`column-order-drag-handle-${index}`"
-              />
-            </div>
-
-            <!-- Column number -->
-            <div class="column-number">{{ index + 1 }}.</div>
-
-            <!-- Column name -->
-            <div class="column-name">{{ column }}</div>
-
-            <!-- Actions -->
-            <div class="column-actions">
-              <q-btn
-                flat
-                dense
-                round
-                size="sm"
-                icon="arrow_upward"
-                :disable="index === 0"
-                @click="moveColumnUp(index)"
-                :data-test="`column-order-move-up-${index}`"
-              >
-                <q-tooltip>{{ t("dashboard.moveUp") }}</q-tooltip>
-              </q-btn>
-              <q-btn
-                flat
-                dense
-                round
-                size="sm"
-                icon="arrow_downward"
-                :disable="index === editColumnOrder.length - 1"
-                @click="moveColumnDown(index)"
-                :data-test="`column-order-move-down-${index}`"
-              >
-                <q-tooltip>{{ t("dashboard.moveDown") }}</q-tooltip>
-              </q-btn>
-            </div>
+          <!-- Drag handle -->
+          <div
+            class="me-2 flex cursor-move items-center px-1"
+            data-test="dashboard-column-order-drag-handle"
+          >
+            <OIcon
+              name="drag-indicator"
+              size="md"
+              :data-test="`column-order-drag-handle-${index}`"
+            />
           </div>
+
+          <!-- Column number -->
+          <div
+            class="text-compact text-text-secondary min-w-8 font-medium"
+            data-test="dashboard-column-order-column-number"
+          >
+            {{ index + 1 }}.
+          </div>
+
+          <!-- Column name -->
+          <div
+            class="text-compact flex-1 overflow-hidden font-medium text-ellipsis whitespace-nowrap"
+            data-test="dashboard-column-order-column-name"
+          >
+            {{ column }}
+          </div>
+
+          <!-- Actions -->
+          <div class="ms-2 flex gap-0.5" data-test="dashboard-column-order-column-actions">
+            <OButton
+              variant="ghost"
+              size="icon"
+              :disabled="index === 0"
+              @click="moveColumnUp(index)"
+              :data-test="`column-order-move-up-${index}`"
+              icon-left="arrow-upward"
+            >
+              <OTooltip :content="t('dashboard.moveUp')" />
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon"
+              :disabled="index === editColumnOrder.length - 1"
+              @click="moveColumnDown(index)"
+              :data-test="`column-order-move-down-${index}`"
+              icon-left="arrow-downward"
+            >
+              <OTooltip :content="t('dashboard.moveDown')" />
+            </OButton>
+          </div>
+        </div>
       </draggable>
     </div>
-
-    <!-- Footer -->
-    <div class="sticky-footer q-pa-md">
-      <q-btn
-        :label="t('common.cancel')"
-        outline
-        no-caps
-        @click.stop="cancelEdit"
-        data-test="dashboard-column-order-cancel-btn"
-      />
-      <q-btn
-        :label="t('common.save')"
-        color="primary"
-        no-caps
-        @click.stop="saveEdit"
-        data-test="dashboard-column-order-save-btn"
-      />
-    </div>
-  </q-card>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { VueDraggableNext } from "vue-draggable-next";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "ColumnOrderPopUp",
   components: {
     draggable: VueDraggableNext as any,
+    OButton,
+    ODialog,
+    OIcon,
+    OTooltip,
   },
   props: {
+    open: {
+      type: Boolean,
+      required: true,
+    },
     columnOrder: {
       type: Array as () => string[],
       default: () => [],
@@ -161,7 +154,7 @@ export default defineComponent({
   },
   emits: ["cancel", "save"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const editColumnOrder = ref<string[]>([]);
 
     // Drag options
@@ -175,14 +168,10 @@ export default defineComponent({
     const initializeColumnOrder = () => {
       if (props.columnOrder && props.columnOrder.length > 0) {
         // Filter the column order to only include columns that are in availableColumns
-        const filtered = props.columnOrder.filter((col) =>
-          props.availableColumns.includes(col)
-        );
+        const filtered = props.columnOrder.filter((col) => props.availableColumns.includes(col));
 
         // Find columns in availableColumns that are not in columnOrder
-        const remaining = props.availableColumns.filter(
-          (col) => !filtered.includes(col)
-        );
+        const remaining = props.availableColumns.filter((col) => !filtered.includes(col));
 
         // Combine: ordered columns first, then remaining in their natural order
         editColumnOrder.value = [...filtered, ...remaining];
@@ -202,7 +191,7 @@ export default defineComponent({
       () => {
         initializeColumnOrder();
       },
-      { deep: true }
+      { deep: true },
     );
 
     const moveColumnUp = (index: number) => {
@@ -222,6 +211,10 @@ export default defineComponent({
     };
 
     const cancelEdit = () => {
+      // Reset in-progress edits so re-opening the popup starts from the persisted
+      // column order — the component stays mounted across open/close cycles, so
+      // onMounted/availableColumns-watch wouldn't otherwise re-initialise.
+      initializeColumnOrder();
       emit("cancel");
     };
 
@@ -241,108 +234,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.column-order-popup {
-  .scrollable-content {
-    overflow-y: auto;
-    max-height: calc(80vh - 190px);
-    padding: 12px;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-      background: transparent;
-    }
-    &::-webkit-scrollbar-thumb {
-      background: #d1d5db;
-      border-radius: 4px;
-    }
-    scrollbar-width: thin;
-    scrollbar-color: #d1d5db transparent;
-  }
-
-  .column-order-row {
-    display: flex;
-    align-items: center;
-    padding: 8px 12px;
-    margin-bottom: 4px;
-    border-bottom: 1px solid #cccccc70;
-    transition: background-color 0.2s;
-
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.02);
-    }
-
-    &:last-child {
-      border-bottom: none;
-    }
-
-    .drag-handle {
-      cursor: move;
-      padding: 2px 4px;
-      margin-right: 8px;
-      display: flex;
-      align-items: center;
-    }
-
-    .column-number {
-      min-width: 32px;
-      color: #666;
-      font-weight: 500;
-      font-size: 13px;
-    }
-
-    .column-name {
-      flex: 1;
-      font-weight: 500;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      font-size: 13px;
-    }
-
-    .column-actions {
-      display: flex;
-      gap: 2px;
-      margin-left: 8px;
-    }
-  }
-}
-
-.sticky-footer {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  z-index: 10;
-  border-top: 1px solid #eee;
-  box-shadow: rgb(240, 240, 240) 0px -4px 7px 0px;
-  background: white;
-}
-
-// Dark mode support
-.body--dark {
-  .column-order-popup {
-    .column-order-row {
-      border-bottom-color: rgba(255, 255, 255, 0.12);
-
-      &:hover {
-        background-color: rgba(255, 255, 255, 0.05);
-      }
-
-      .column-number {
-        color: #aaa;
-      }
-    }
-  }
-
-  .sticky-footer {
-    border-top-color: rgba(255, 255, 255, 0.28);
-    box-shadow: rgba(0, 0, 0, 0.3) 0px -4px 7px 0px;
-    background: var(--q-dark);
-  }
-}
-</style>

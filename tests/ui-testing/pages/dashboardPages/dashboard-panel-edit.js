@@ -1,5 +1,7 @@
 //dashboard panel edit page
-// Methods: Duplicate panel, Edit panel, Delete panel, Download json, Download csv, Move to another tab, Fullscreen panel, Refresh panel, Edit layout, Go to logs
+// Methods: Duplicate panel, Edit panel, Delete panel, Download json, Download csv, Move to another tab, Fullscreen panel, Refresh panel, Edit layout, Go to logs, Create alert from panel
+import { expect } from '@playwright/test';
+
 export default class DashboardPanel {
   constructor(page) {
     this.page = page;
@@ -25,7 +27,9 @@ export default class DashboardPanel {
     this.moveTab = page.locator(
       '[data-test="dashboard-move-to-another-panel"]'
     );
-    this.deleteConfirmBtn = page.locator('[data-test="confirm-button"]');
+    this.deleteConfirmBtn = page.locator(
+      '[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
     this.fullscreen = page.locator(
       '[data-test="dashboard-panel-fullscreen-btn"]'
     );
@@ -44,6 +48,63 @@ export default class DashboardPanel {
     this.queryInspector = page.locator(
       '[data-test="dashboard-query-inspector-panel"]'
     );
+    // In-editor "data view" query inspector (opened from the panel data view,
+    // distinct from the panel-dropdown Inspector above).
+    this.dataViewQueryInspectorBtn = page.locator(
+      '[data-test="dashboard-panel-data-view-query-inspector-btn"]'
+    );
+    this.inspectorQueryEditor = page.locator('.inspector-query-editor');
+    this.queryInspectorCloseBtn = page.locator(
+      '[data-test="query-inspector-dialog"] [data-test="o-dialog-close-btn"]'
+    );
+
+    // VERIFIED: Create Alert from Panel Menu (PanelContainer.vue:289)
+    this.createAlertFromPanel = page.locator('[data-test="dashboard-create-alert-from-panel"]');
+
+    // VERIFIED: Alert Context Menu selectors (AlertContextMenu.vue)
+    this.alertContextMenu = page.locator('[data-test="alert-context-menu"]');
+    this.alertContextMenuAbove = page.locator('[data-test="alert-context-menu-above"]');
+    this.alertContextMenuBelow = page.locator('[data-test="alert-context-menu-below"]');
+
+    // VERIFIED: Chart renderer (ChartRenderer.vue:19)
+    this.chartRendererCanvas = page.locator('[data-test="chart-renderer"]');
+    // VERIFIED: no-data empty-state overlay (PanelSchemaRenderer.vue) — same
+    // locator dashboard-panel-actions.js exposes as noDataElement/getNoDataLocator().
+    this.noDataElement = page.locator('[data-test="no-data"]');
+  }
+
+  // Click the in-editor "data view" query inspector button
+  async clickDataViewQueryInspector() {
+    await this.dataViewQueryInspectorBtn.click();
+  }
+
+  // Wait for the query inspector to be open AND its query rows rendered. The
+  // dialog becomes visible before the rows are populated, so waiting on the
+  // dialog alone lets an assertion run against an empty body.
+  async waitForQueryInspector(index = 0) {
+    await this.page
+      .locator('[data-test="query-inspector-dialog"]')
+      .first()
+      .waitFor({ state: "visible", timeout: 15000 });
+    await this.getExecutedQuery(index).waitFor({
+      state: "visible",
+      timeout: 15000,
+    });
+  }
+
+  // Query inspector editor content locator (chain .filter()/.last() as needed)
+  getInspectorQueryEditor() {
+    return this.inspectorQueryEditor;
+  }
+
+  // Executed-query row in the query inspector (by index)
+  getExecutedQuery(index = 0) {
+    return this.page.locator(`[data-test="query-inspector-executed-query-${index}"]`);
+  }
+
+  // Original-query row in the query inspector (by index)
+  getOriginalQuery(index = 0) {
+    return this.page.locator(`[data-test="query-inspector-original-query-${index}"]`);
   }
 
   // Duplicate panel
@@ -126,16 +187,9 @@ export default class DashboardPanel {
 
   //edit layout
   async editLayoutPanel(panelName, height) {
-    // await this.page
-    //   .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
-    //   .waitFor({ state: "visible" });
-    // await this.page
-    //   .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
-    //   .click();
-    await this.page
-      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
-      .waitFor({ state: "visible" })
-      .click();
+    const dropdownBtn = this.page.locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`);
+    await dropdownBtn.waitFor({ state: "visible" });
+    await dropdownBtn.click();
     await this.editLayout.waitFor({ state: "visible" });
     await this.editLayout.click();
     await this.panelHeight.waitFor({ state: "visible" });
@@ -153,6 +207,79 @@ export default class DashboardPanel {
     await this.goToLogs.click();
   }
 
+  // Create Alert from panel dropdown menu
+  async createAlertFromPanelMenu(panelName) {
+    await this.page
+      .locator(`[data-test="dashboard-edit-panel-${panelName}-dropdown"]`)
+      .click();
+    await this.createAlertFromPanel.waitFor({ state: "visible" });
+    await this.createAlertFromPanel.click();
+  }
+
+  // Right-click on chart center to open alert context menu
+  // Retries because ECharts needs time after data load to register contextmenu handlers
+  async rightClickChartForAlert(maxRetries = 3) {
+    const chartCanvas = this.chartRendererCanvas.first();
+    await chartCanvas.waitFor({ state: "visible", timeout: 15000 });
+
+    // savePanel() triggers a fresh panel query; chart-renderer's DOM node stays
+    // "visible" the whole time, but a same-sized "no-data" empty-state overlay
+    // (absolute inset-0 sibling) covers it and intercepts clicks until that
+    // re-query resolves. A waitForResponse on the search-stream call isn't
+    // enough here (the caller already awaits one) — the DOM/no-data state
+    // updates a beat after the network response resolves, via Vue reactivity.
+    // Wait for the overlay to clear before right-clicking, otherwise the
+    // click lands on the overlay instead of the chart.
+    await this.noDataElement
+      .first()
+      .waitFor({ state: "hidden", timeout: 20000 })
+      .catch(() => {});
+
+    const box = await chartCanvas.boundingBox();
+    const position = box
+      ? { x: Math.floor(box.width / 2), y: Math.floor(box.height / 2) }
+      : { x: 200, y: 100 };
+
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      await chartCanvas.click({ button: "right", position });
+      const menuVisible = await this.alertContextMenu
+        .waitFor({ state: "visible", timeout: 3000 })
+        .then(() => true)
+        .catch(() => false);
+      if (menuVisible) return;
+    }
+    // Final attempt without catching - let it throw if still not visible
+    await chartCanvas.click({ button: "right", position });
+  }
+
+  // Verify alert context menu is visible
+  async expectAlertContextMenuVisible() {
+    await expect(this.alertContextMenu).toBeVisible({ timeout: 10000 });
+  }
+
+  // Verify alert context menu is hidden
+  async expectAlertContextMenuHidden() {
+    await expect(this.alertContextMenu).not.toBeVisible({ timeout: 5000 });
+  }
+
+  // Select "above threshold" from alert context menu
+  // dispatchEvent is used because AlertContextMenu uses <teleport to="body"> which
+  // places the menu under overlays that intercept pointer events from click({ force: true }).
+  // dispatchEvent('click') dispatches directly on the element through Playwright's locator path.
+  async selectAlertAboveThreshold() {
+    await this.alertContextMenuAbove.waitFor({ state: "visible" });
+    await this.alertContextMenuAbove.dispatchEvent("click");
+  }
+
+  // Select "below threshold" from alert context menu
+  // dispatchEvent is used because AlertContextMenu uses <teleport to="body"> which
+  // places the menu under overlays that intercept pointer events from click({ force: true }).
+  // dispatchEvent('click') dispatches directly on the element through Playwright's locator path.
+  async selectAlertBelowThreshold() {
+    await this.alertContextMenuBelow.waitFor({ state: "visible" });
+    await this.alertContextMenuBelow.dispatchEvent("click");
+  }
+
   //open Query inspector
 
   async openQueryInspector(panelName) {
@@ -166,12 +293,45 @@ export default class DashboardPanel {
     try {
       await this.queryInspector.waitFor({ state: "visible", timeout: 10000 });
     } catch (e) {
-      // Menu may not have opened, retry click
-      await this.page.keyboard.press('Escape');
-      await this.page.waitForTimeout(500);
+      // Menu may not have opened, retry click — click outside to dismiss any open dropdown
+      await this.page.locator('body').click({ position: { x: 10, y: 10 } }).catch(() => {});
+      await this.queryInspector.waitFor({ state: "hidden", timeout: 5000 }).catch(() => {});
       await dropdownBtn.click();
       await this.queryInspector.waitFor({ state: "visible", timeout: 10000 });
     }
     await this.queryInspector.click();
+  }
+
+  // Return the panel-name element locator (edit panel header).
+  getPanelNameLocator() {
+    return this.namepanel;
+  }
+
+  // Return the dashboard panel container locator (hover target for panel menu).
+  getPanelContainer() {
+    return this.page.locator('[data-test="dashboard-panel-container"]');
+  }
+
+  // Alert context menu options (shown on chart right-click).
+  getAlertContextMenuAbove() {
+    return this.alertContextMenuAbove;
+  }
+  getAlertContextMenuBelow() {
+    return this.alertContextMenuBelow;
+  }
+
+  // Click on an empty page corner to dismiss the alert context menu.
+  async clickOutsideContextMenu() {
+    await this.page.locator("body").click({ position: { x: 10, y: 10 } });
+  }
+
+  // Return the inspector query-editor entry that contains the given SQL text.
+  getInspectorQueryByText(sql) {
+    return this.inspectorQueryEditor.filter({ hasText: sql }).first();
+  }
+
+  // Close the query inspector dialog.
+  async closeQueryInspector() {
+    await this.queryInspectorCloseBtn.click();
   }
 }

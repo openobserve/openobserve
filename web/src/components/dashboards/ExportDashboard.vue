@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,46 +14,42 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-btn
-    class="dashboard-icons q-px-sm q-ml-sm"
-    size="sm"
-    outline
-    no-caps
-    icon="download"
+  <OButton
+    variant="outline"
+    size="icon-xs"
     @click="downloadDashboard()"
     data-test="export-dashboard"
+    icon-left="download"
   >
-    <q-tooltip>{{ t("dashboard.export") }}</q-tooltip>
-  </q-btn>
+    <OTooltip :content="t('dashboard.export')" shortcut-id="dashboardExport" />
+  </OButton>
 </template>
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useI18nTyped } from "@/types/i18n";
 import { getDashboard } from "../../utils/commons.ts";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
 
 export default defineComponent({
   name: "ExportDashboard",
+  components: { OButton, OTooltip },
   props: ["dashboardId"],
-  setup(props, { emit }) {
-    const { t } = useI18n();
+  setup(props) {
+    const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
     const downloadDashboard = async () => {
       // get the dashboard
-      const dashboard = await getDashboard(
-        store,
-        props.dashboardId,
-        route.query.folder
-      );
+      const dashboard = await getDashboard(store, props.dashboardId, route.query.folder);
       dashboard.owner = "";
 
       // prepare json and download via a click
       const data =
-        "data:text/json;charset=utf-8," +
-        encodeURIComponent(JSON.stringify(dashboard, null, 2));
+        "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(dashboard, null, 2));
       const htmlA = document.createElement("a");
       htmlA.setAttribute("href", data);
       const fileName = dashboard.title || "dashboard";
@@ -68,9 +64,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.dashboard-icons {
-  height: 30px;
-}
-</style>

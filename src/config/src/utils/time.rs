@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,8 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::{DateTime, Datelike, Duration, NaiveDateTime, TimeZone, Utc};
-use once_cell::sync::Lazy;
+use std::sync::LazyLock as Lazy;
+
+use chrono::{DateTime, Datelike, Duration, NaiveDateTime, Offset, TimeZone, Utc};
+use chrono_tz::Tz;
 
 use crate::utils::json;
 
@@ -25,6 +27,11 @@ pub static BASE_TIME: Lazy<DateTime<Utc>> =
 
 pub static DAY_MICRO_SECS: i64 = 24 * 3600 * 1_000_000;
 pub static HOUR_MICRO_SECS: i64 = 3600 * 1_000_000;
+
+pub enum HourFormat {
+    Zero,
+    Real,
+}
 
 // check format: 1s, 1m, 1h, 1d, 1w, 1y, 1h10m30s
 static TIME_UNITS: [(char, u64); 7] = [
@@ -66,14 +73,17 @@ pub fn second_micros(n: i64) -> i64 {
 }
 
 #[inline(always)]
-pub fn get_ymdh_from_micros(n: i64) -> String {
+pub fn get_ymdh_from_micros(n: i64, hour_format: HourFormat) -> String {
     let n = if n > 0 {
         n
     } else {
         Utc::now().timestamp_micros()
     };
     let t = Utc.timestamp_nanos(n * 1000);
-    t.format("%Y/%m/%d/%H").to_string()
+    match hour_format {
+        HourFormat::Zero => t.format("%Y/%m/%d/00").to_string(),
+        HourFormat::Real => t.format("%Y/%m/%d/%H").to_string(),
+    }
 }
 
 #[inline(always)]
@@ -158,9 +168,11 @@ pub fn parse_timestamp_micro_from_value(v: &json::Value) -> Result<(i64, bool), 
         json::Value::String(s) => (parse_str_to_timestamp_micros(s)?, false),
         json::Value::Number(n) => {
             if n.is_i64() {
-                (n.as_i64().unwrap(), true)
+                let n = n.as_i64().unwrap();
+                (n, n > 0)
             } else if n.is_u64() {
-                (n.as_u64().unwrap() as i64, true)
+                let n = n.as_u64().unwrap() as i64;
+                (n, n > 0)
             } else if n.is_f64() {
                 (n.as_f64().unwrap() as i64, false)
             } else {
@@ -225,33 +237,58 @@ pub fn parse_milliseconds(s: &str) -> Result<u64, anyhow::Error> {
 }
 
 pub fn parse_timezone_to_offset(offset: &str) -> i64 {
-    // let offset = "+08:00"; // or "-07:00" or "UTC"
-    let sign: i64;
-    let time: &str;
+    parse_timezone_to_offset_opt(offset).expect("Invalid time zone offset")
+}
 
-    if let Some(stripped) = offset.strip_prefix('+') {
-        sign = 1;
-        time = stripped;
+/// Parse a fixed timezone offset string into seconds east of UTC.
+///
+/// Accepts the same forms as [`parse_timezone_to_offset`] (`"+08:00"`, `"-07:00"`,
+/// `"UTC"`, `"CST"`, empty string), but returns `None` for unsupported / malformed
+/// input (e.g. IANA names like `"Asia/Shanghai"`) instead of panicking. Use this
+/// whenever the timezone string can come from user-supplied SQL.
+pub fn parse_timezone_to_offset_opt(offset: &str) -> Option<i64> {
+    // let offset = "+08:00"; // or "-07:00" or "UTC"
+    let (sign, time): (i64, &str) = if let Some(stripped) = offset.strip_prefix('+') {
+        (1, stripped)
     } else if let Some(stripped) = offset.strip_prefix('-') {
-        sign = -1;
-        time = stripped;
+        (-1, stripped)
     } else if offset.eq_ignore_ascii_case("cst") {
-        sign = 1;
-        time = "+08:00";
+        (1, "08:00")
     } else if offset.eq_ignore_ascii_case("utc") || offset.is_empty() {
-        sign = 0;
-        time = "00:00";
+        (0, "00:00")
     } else {
-        panic!("Invalid time zone offset");
+        return None;
+    };
+
+    // convert time (HH:MM) to seconds
+    let mut seconds: i64 = 0;
+    for part in time.split(':') {
+        let val = part.parse::<i64>().ok()?;
+        seconds = seconds * 60 + val * 60;
     }
 
-    // convert time to seconds
-    let seconds: i64 = time
-        .split(':')
-        .map(|val| val.parse::<i64>().unwrap())
-        .fold(0, |acc, val| acc * 60 + val * 60);
+    Some(sign * seconds)
+}
 
-    sign * seconds
+/// Resolve a timezone string into seconds east of UTC, evaluated at `reference_micros`.
+///
+/// Accepts everything [`parse_timezone_to_offset_opt`] does (fixed offsets like
+/// `"+08:00"`, plus `"UTC"`, `"CST"`, empty) **and** IANA zone names like
+/// `"America/Los_Angeles"`. For a named zone the offset in effect at `reference_micros`
+/// is returned, so DST is resolved for that instant — a query range that straddles a
+/// DST transition resolves to this single offset. Returns `None` for input that is
+/// neither a known fixed offset nor a valid IANA name.
+pub fn parse_timezone_to_offset_at(timezone: &str, reference_micros: i64) -> Option<i64> {
+    // fast path: fixed offset / "UTC" / "CST" / ""
+    if let Some(offset) = parse_timezone_to_offset_opt(timezone) {
+        return Some(offset);
+    }
+    // IANA named zone, resolved at the reference instant
+    let tz: Tz = timezone.parse().ok()?;
+    let reference = DateTime::<Utc>::from_timestamp_micros(reference_micros)
+        .unwrap_or_else(|| DateTime::<Utc>::from_timestamp_micros(0).unwrap());
+    let offset = tz.offset_from_utc_datetime(&reference.naive_utc());
+    Some(offset.fix().local_minus_utc() as i64)
 }
 
 #[inline(always)]
@@ -297,6 +334,22 @@ pub fn format_duration(ms: u64) -> String {
         parts.push(format!("{remaining_seconds}s"));
     }
     parts.join("")
+}
+
+/// Parse an interval string like "5m", "1h", "30s" into minutes.
+/// Returns 0 for unrecognised formats.
+pub fn parse_interval_to_minutes(s: &str) -> i64 {
+    if let Some(n) = s.strip_suffix('m') {
+        n.parse().unwrap_or(0)
+    } else if let Some(n) = s.strip_suffix('h') {
+        n.parse::<i64>().unwrap_or(0) * 60
+    } else if let Some(n) = s.strip_suffix('s') {
+        n.parse::<i64>().unwrap_or(0) / 60
+    } else if let Some(n) = s.strip_suffix('d') {
+        n.parse::<i64>().unwrap_or(0) * 1440
+    } else {
+        s.parse().unwrap_or(0)
+    }
 }
 
 #[cfg(test)]
@@ -437,6 +490,49 @@ mod tests {
     }
 
     #[test]
+    fn test_parse_timezone_to_offset_opt() {
+        // valid forms match the panicking variant
+        assert_eq!(parse_timezone_to_offset_opt(""), Some(0));
+        assert_eq!(parse_timezone_to_offset_opt("UTC"), Some(0));
+        assert_eq!(parse_timezone_to_offset_opt("CST"), Some(28800));
+        assert_eq!(parse_timezone_to_offset_opt("+08:00"), Some(28800));
+        assert_eq!(parse_timezone_to_offset_opt("-08:00"), Some(-28800));
+        // fractional offsets (e.g. IST +05:30, Nepal +05:45)
+        assert_eq!(parse_timezone_to_offset_opt("+05:30"), Some(19800));
+        assert_eq!(parse_timezone_to_offset_opt("-05:45"), Some(-20700));
+        // invalid / unsupported input returns None instead of panicking
+        assert_eq!(parse_timezone_to_offset_opt("America/New_York"), None);
+        assert_eq!(parse_timezone_to_offset_opt("+ab:cd"), None);
+    }
+
+    #[test]
+    fn test_parse_timezone_to_offset_at() {
+        let winter = 1_704_067_200_000_000; // 2024-01-01T00:00:00Z
+        let summer = 1_719_792_000_000_000; // 2024-07-01T00:00:00Z
+        // fixed offsets still work (reference ignored)
+        assert_eq!(parse_timezone_to_offset_at("+08:00", winter), Some(28800));
+        assert_eq!(parse_timezone_to_offset_at("UTC", winter), Some(0));
+        assert_eq!(parse_timezone_to_offset_at("", winter), Some(0));
+        // IANA zone without DST -> constant offset
+        assert_eq!(
+            parse_timezone_to_offset_at("Asia/Shanghai", winter),
+            Some(8 * 3600)
+        );
+        // IANA zone with DST: America/Los_Angeles is PST (-8h) in winter, PDT (-7h) in summer
+        assert_eq!(
+            parse_timezone_to_offset_at("America/Los_Angeles", winter),
+            Some(-8 * 3600)
+        );
+        assert_eq!(
+            parse_timezone_to_offset_at("America/Los_Angeles", summer),
+            Some(-7 * 3600)
+        );
+        // invalid input -> None (no panic)
+        assert_eq!(parse_timezone_to_offset_at("Not/AZone", winter), None);
+        assert_eq!(parse_timezone_to_offset_at("garbage", winter), None);
+    }
+
+    #[test]
     fn test_end_of_the_day() {
         let t_d_arr = [
             (1609545599999999, 1609459200000000),
@@ -449,11 +545,26 @@ mod tests {
 
     #[test]
     fn test_get_ymdhms_from_micros() {
-        assert_eq!(get_ymdh_from_micros(1609459200000000), "2021/01/01/00");
-        assert_eq!(get_ymdh_from_micros(1744077663427000), "2025/04/08/02");
+        assert_eq!(
+            get_ymdh_from_micros(1609459200000000, HourFormat::Real),
+            "2021/01/01/00"
+        );
+        assert_eq!(
+            get_ymdh_from_micros(1744077663427000, HourFormat::Real),
+            "2025/04/08/02"
+        );
+
+        assert_eq!(
+            get_ymdh_from_micros(1609459200000000, HourFormat::Zero),
+            "2021/01/01/00"
+        );
+        assert_eq!(
+            get_ymdh_from_micros(1744077663427000, HourFormat::Zero),
+            "2025/04/08/00"
+        );
 
         // Test with input 0 (uses current time, so we can't test the exact value)
-        let result = get_ymdh_from_micros(0);
+        let result = get_ymdh_from_micros(0, HourFormat::Real);
         assert!(!result.is_empty());
     }
 
@@ -563,5 +674,48 @@ mod tests {
         let t2 = now_micros();
         assert!(t2 > t1);
         assert!(t2 - t1 >= 10000); // At least 10ms difference
+    }
+
+    #[test]
+    fn test_parse_interval_to_minutes() {
+        assert_eq!(parse_interval_to_minutes("30m"), 30);
+        assert_eq!(parse_interval_to_minutes("2h"), 120);
+        assert_eq!(parse_interval_to_minutes("90s"), 1);
+        assert_eq!(parse_interval_to_minutes("1d"), 1440);
+        assert_eq!(parse_interval_to_minutes("60"), 60);
+        assert_eq!(parse_interval_to_minutes("invalid"), 0);
+    }
+
+    #[test]
+    fn test_parse_timestamp_micro_from_value_f64() {
+        // f64 number → is_f64() branch (line 166)
+        let v = json::json!(1609459200.0f64);
+        let result = parse_timestamp_micro_from_value(&v);
+        assert!(result.is_ok());
+        let (ts, is_valid) = result.unwrap();
+        assert!(ts > 0);
+        assert!(!is_valid); // f64 sets is_i64=false → is_valid=false
+    }
+
+    #[test]
+    fn test_parse_timestamp_micro_from_value_invalid_type_returns_error() {
+        // bool/null → `_` arm → Err("Invalid time format [type]")
+        let v = json::json!(true);
+        assert!(parse_timestamp_micro_from_value(&v).is_err());
+        let v = json::json!(null);
+        assert!(parse_timestamp_micro_from_value(&v).is_err());
+    }
+
+    #[test]
+    fn test_parse_str_to_timestamp_micros_invalid_returns_error() {
+        // Both i64 parse and str parse fail → Err("invalid time format [string]")
+        let result = parse_str_to_timestamp_micros("not_a_time_string!!!$$$");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid time zone offset")]
+    fn test_parse_timezone_to_offset_invalid_panics() {
+        parse_timezone_to_offset("America/New_York");
     }
 }

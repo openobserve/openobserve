@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,46 +21,19 @@ pub struct Migration;
 #[async_trait::async_trait]
 impl MigrationTrait for Migration {
     async fn up(&self, manager: &SchemaManager) -> Result<(), DbErr> {
-        // Use add_column_if_not_exists for non-MySQL databases
-        // For MySQL, catch and ignore "Duplicate column" errors for idempotency
-        if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
-            let result = manager
-                .alter_table(
-                    Table::alter()
-                        .table(OrgUsers::Table)
-                        .add_column(
-                            ColumnDef::new(OrgUsers::AllowStaticToken)
-                                .boolean()
-                                .not_null()
-                                .default(true),
-                        )
-                        .to_owned(),
-                )
-                .await;
-
-            // Ignore "Duplicate column" error for idempotency (test retries)
-            if let Err(e) = result {
-                let err_msg = e.to_string();
-                if !err_msg.contains("Duplicate column") {
-                    return Err(e);
-                }
-            }
-            Ok(())
-        } else {
-            manager
-                .alter_table(
-                    Table::alter()
-                        .table(OrgUsers::Table)
-                        .add_column_if_not_exists(
-                            ColumnDef::new(OrgUsers::AllowStaticToken)
-                                .boolean()
-                                .not_null()
-                                .default(true),
-                        )
-                        .to_owned(),
-                )
-                .await
-        }
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(OrgUsers::Table)
+                    .add_column_if_not_exists(
+                        ColumnDef::new(OrgUsers::AllowStaticToken)
+                            .boolean()
+                            .not_null()
+                            .default(true),
+                    )
+                    .to_owned(),
+            )
+            .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
@@ -79,4 +52,19 @@ impl MigrationTrait for Migration {
 enum OrgUsers {
     Table,
     AllowStaticToken,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20251230_000001_add_allow_static_token_to_org_users"
+        );
+    }
 }

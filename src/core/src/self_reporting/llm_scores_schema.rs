@@ -1,0 +1,273 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use std::sync::LazyLock as Lazy;
+
+use anyhow::Result;
+use config::{
+    meta::{
+        self_reporting::llm_scores::{self, LlmScoreRecord},
+        stream::{StreamSettings, StreamType},
+    },
+    utils::{schema::schema_eq, time::now_micros},
+};
+use dashmap::DashSet;
+
+static INITIALIZED_ORGS: Lazy<DashSet<String>> = Lazy::new(DashSet::new);
+
+fn expected_llm_scores_schema() -> Result<arrow_schema::Schema> {
+    let sample = config::utils::json::to_value(LlmScoreRecord::init_for_reflection())?;
+    // Log ingestion flattens nested values before schema inference. Mirror that
+    // here so optional scalar fields are initialized even when metadata is JSON.
+    let sample = config::utils::flatten::flatten(sample)?;
+    let sample = sample
+        .as_object()
+        .ok_or_else(|| anyhow::anyhow!("Failed to convert LlmScoreRecord to JSON object"))?;
+
+    Ok(config::utils::schema::infer_json_schema_from_map(
+        llm_scores::LLM_SCORES_STREAM,
+        StreamType::Logs,
+        std::iter::once(sample),
+    )?)
+}
+
+pub async fn ensure_llm_scores_stream_initialized(org_id: &str) -> Result<()> {
+    if !INITIALIZED_ORGS.insert(org_id.to_string()) {
+        return Ok(());
+    }
+
+    let schema_initialized = initialize_llm_scores_stream_schema(org_id)
+        .await
+        .inspect_err(|e| {
+            log::warn!(
+                "[LLM-SCORES] Failed to initialize _llm_scores stream schema for org {org_id}: {e}"
+            );
+        })
+        .is_ok();
+    let experiment_index_initialized = initialize_experiment_id_index(org_id)
+        .await
+        .inspect_err(|e| {
+            log::warn!(
+                "[LLM-SCORES] Failed to initialize experiment_id index for org {org_id}: {e}"
+            );
+        })
+        .is_ok();
+
+    retain_initialization_marker(org_id, schema_initialized && experiment_index_initialized);
+
+    Ok(())
+}
+
+fn retain_initialization_marker(org_id: &str, initialized: bool) {
+    if !initialized {
+        INITIALIZED_ORGS.remove(org_id);
+    }
+}
+
+async fn initialize_experiment_id_index(org_id: &str) -> Result<()> {
+    let mut settings =
+        infra::schema::get_settings(org_id, llm_scores::LLM_SCORES_STREAM, StreamType::Logs)
+            .await
+            .map(|settings| (*settings).clone())
+            .unwrap_or_default();
+    if !add_experiment_id_index(&mut settings, now_micros()) {
+        return Ok(());
+    }
+    schema::save_stream_settings(
+        org_id,
+        llm_scores::LLM_SCORES_STREAM,
+        StreamType::Logs,
+        settings,
+    )
+    .await?;
+    Ok(())
+}
+
+fn add_experiment_id_index(settings: &mut StreamSettings, now: i64) -> bool {
+    const FIELD: &str = "experiment_id";
+    if settings.index_fields.iter().any(|field| field == FIELD) {
+        return false;
+    }
+    settings.index_fields.push(FIELD.to_string());
+    settings
+        .index_fields_updated_at
+        .insert(FIELD.to_string(), now);
+    true
+}
+
+async fn initialize_llm_scores_stream_schema(org_id: &str) -> Result<()> {
+    let stream_name = llm_scores::LLM_SCORES_STREAM;
+    let stream_type = StreamType::Logs;
+
+    log::info!("[LLM-SCORES] Creating _llm_scores stream schema for {org_id}/{stream_name}");
+
+    let expected_schema = expected_llm_scores_schema()?;
+
+    if infra::schema::get(org_id, stream_name, stream_type)
+        .await
+        .is_ok_and(|ref schema| schema_eq(schema, &expected_schema))
+    {
+        log::debug!(
+            "[LLM-SCORES] _llm_scores stream {org_id}/{stream_name} already exists with expected schema"
+        );
+        return Ok(());
+    }
+
+    match crate::db::schema::merge(
+        org_id,
+        stream_name,
+        stream_type,
+        &expected_schema,
+        Some(config::utils::time::now_micros()),
+    )
+    .await
+    {
+        Ok(_) => {
+            log::info!(
+                "[LLM-SCORES] Successfully created _llm_scores stream schema for {org_id}/{stream_name} with {} fields",
+                expected_schema.fields().len()
+            );
+            Ok(())
+        }
+        Err(e) => {
+            log::error!(
+                "[LLM-SCORES] Failed to create _llm_scores stream schema for {org_id}/{stream_name}: {e}"
+            );
+            Err(anyhow::anyhow!("Schema creation failed: {}", e))
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_ensure_llm_scores_stream_initialized_returns_ok() {
+        let test_org = "test_llm_scores_org_1";
+        let result = ensure_llm_scores_stream_initialized(test_org).await;
+        assert!(result.is_ok());
+        INITIALIZED_ORGS.remove(test_org);
+    }
+
+    #[tokio::test]
+    async fn test_ensure_llm_scores_stream_initialized_idempotent() {
+        let test_org = "test_llm_scores_org_2";
+        let r1 = ensure_llm_scores_stream_initialized(test_org).await;
+        let r2 = ensure_llm_scores_stream_initialized(test_org).await;
+        assert!(r1.is_ok());
+        assert!(r2.is_ok());
+    }
+
+    #[test]
+    fn test_llm_score_reflection_has_all_fields() {
+        let sample = LlmScoreRecord::init_for_reflection();
+        let json_value = config::utils::json::to_value(&sample).unwrap();
+        let obj = json_value.as_object().unwrap();
+        assert!(obj.contains_key("id"));
+        assert!(obj.contains_key("task_id"));
+        assert!(obj.contains_key("eval_run_id"));
+        assert!(obj.contains_key("evaluator_trace_id"));
+        assert!(obj.contains_key("org_id"));
+        assert!(obj.contains_key("target_scope"));
+        assert!(obj.contains_key("target_id"));
+        assert!(obj.contains_key("evaluation_key"));
+        assert!(obj.contains_key("score_version"));
+        assert!(obj.contains_key("ref_timestamp"));
+        assert!(obj.contains_key("job_version"));
+        assert!(obj.contains_key("span_id"));
+        assert!(obj.contains_key("trace_id"));
+        assert!(obj.contains_key("session_id"));
+        assert!(obj.contains_key("experiment_id"));
+        assert!(obj.contains_key("row_id"));
+        assert!(obj.contains_key("trial_index"));
+        assert!(obj.contains_key("record_ts"));
+        assert!(obj.contains_key("status"));
+        assert!(obj.contains_key("skip_reason"));
+        assert!(obj.contains_key("level"));
+        assert!(obj.contains_key("name"));
+        assert!(obj.contains_key("value_numeric"));
+        assert!(obj.contains_key("value_categorical"));
+        assert!(obj.contains_key("value_boolean"));
+        assert!(obj.contains_key("data_type"));
+        assert!(obj.contains_key("score_config_id"));
+        assert!(obj.contains_key("score_config_row_id"));
+        assert!(obj.contains_key("review_submission_id"));
+        assert!(obj.contains_key("queue_id"));
+        assert!(obj.contains_key("queue_item_id"));
+        assert!(obj.contains_key("review_submission_score_count"));
+        assert!(obj.contains_key("reasoning"));
+        assert!(obj.contains_key("review_submission_comments"));
+        assert!(obj.contains_key("scorer_id"));
+        assert!(obj.contains_key("source_stream_type"));
+        assert!(!obj.contains_key("agent_name"));
+        assert!(!obj.contains_key("agent_id"));
+        assert!(!obj.contains_key("target_agent_name"));
+        assert!(!obj.contains_key("target_agent_id"));
+        assert!(obj.contains_key("_timestamp"));
+    }
+
+    #[test]
+    fn test_llm_score_reflection_schema_has_all_value_fields() {
+        let schema = expected_llm_scores_schema().unwrap();
+
+        assert!(schema.field_with_name("value_numeric").is_ok());
+        assert!(schema.field_with_name("value_categorical").is_ok());
+        assert!(schema.field_with_name("value_boolean").is_ok());
+        assert!(schema.field_with_name("ref_timestamp").is_ok());
+        assert!(schema.field_with_name("row_id").is_ok());
+        assert!(schema.field_with_name("trial_index").is_ok());
+        assert!(schema.field_with_name("record_ts").is_ok());
+        assert!(schema.field_with_name("status").is_ok());
+        assert!(schema.field_with_name("skip_reason").is_ok());
+        assert!(schema.field_with_name("score_config_row_id").is_ok());
+        assert!(schema.field_with_name("review_submission_id").is_ok());
+        assert!(schema.field_with_name("queue_id").is_ok());
+        assert!(schema.field_with_name("queue_item_id").is_ok());
+        assert!(
+            schema
+                .field_with_name("review_submission_score_count")
+                .is_ok()
+        );
+        assert!(schema.field_with_name("review_submission_comments").is_ok());
+    }
+
+    #[test]
+    fn experiment_id_index_is_added_once_with_its_update_time() {
+        let mut settings = StreamSettings::default();
+
+        assert!(add_experiment_id_index(&mut settings, 123));
+        assert!(!add_experiment_id_index(&mut settings, 456));
+        assert_eq!(settings.index_fields, vec!["experiment_id"]);
+        assert_eq!(
+            settings.index_fields_updated_at.get("experiment_id"),
+            Some(&123)
+        );
+    }
+
+    #[test]
+    fn failed_initialization_releases_the_org_for_retry() {
+        let org_id = "retry-llm-score-initialization";
+        INITIALIZED_ORGS.insert(org_id.to_string());
+
+        retain_initialization_marker(org_id, false);
+
+        assert!(!INITIALIZED_ORGS.contains(org_id));
+        assert!(INITIALIZED_ORGS.insert(org_id.to_string()));
+        retain_initialization_marker(org_id, true);
+        assert!(INITIALIZED_ORGS.contains(org_id));
+        INITIALIZED_ORGS.remove(org_id);
+    }
+}

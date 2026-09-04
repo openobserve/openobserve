@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,256 +15,201 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="relative-position full-height" data-test="edit-role-page">
+  <OPageLayout
+    class="pb-2.5"
+    data-test="edit-role-page"
+    :title="raw(editingRole)"
+    :back="{ label: t('iam.roles'), onClick: cancelPermissionsUpdate }"
+    bleed
+  >
     <!-- TODO OK : Add button to delete role in toolbar -->
-    <div
-      data-test="edit-role-title"
-      class="tw:pb-[0.625rem]"
-    >
-    <div class="card-container q-py-sm">
-          <span style="font-size: 18px;" class="q-px-md ">{{ editingRole }}</span> 
-           <AppTabs
-              data-test="edit-role-tabs"
-              :tabs="tabs"
-              :active-tab="activeTab"
-              @update:active-tab="updateActiveTab"
-            />
-    </div>
-</div>
-
-
-    <template v-if="isFetchingInitialRoles">
-      <div data-test="edit-role-page-loading-spinner" style="margin-top: 64px">
-        <q-spinner-hourglass
-          color="primary"
-          size="40px"
-          style="margin: 0 auto; display: block"
+    <div data-test="edit-role-title" class="shrink-0">
+      <div class="bg-card-glass-bg flex flex-col py-2">
+        <AppTabs
+          data-test="edit-role-tabs"
+          :tabs="tabs"
+          :active-tab="activeTab"
+          :dirty-title="t('iam.editRole.unsavedDot.title')"
+          @update:active-tab="updateActiveTab"
         />
-        <div class="text-center full-width">
-          Hold on tight, we're fetching your role details...
-        </div>
       </div>
-    </template>
-    <template v-else>
-      <div style="min-height: calc(100% - (39px + 55px + 49px))">
-        <GroupUsers
-          data-test="edit-role-users-section"
-          v-show="activeTab === 'users'"
-          :groupUsers="roleUsers"
-          :activeTab="activeTab"
-          :added-users="addedUsers"
-          :removed-users="removedUsers"
-          context="role"
-        />
-        <GroupServiceAccounts
-          v-if="config.isCloud == 'false'"
-          data-test="edit-role-users-section"
-          v-show="activeTab === 'serviceAccounts'"
-          :groupUsers="roleUsers"
-          :activeTab="activeTab"
-          :added-users="addedUsers"
-          :removed-users="removedUsers"
-        />
+    </div>
 
-        <div
-          v-show="activeTab === 'permissions'"
-          data-test="edit-role-permissions-section"
-          class="card-container tw:h-[calc(100vh-200px)]"
-        >
+    <div class="min-h-0 flex-1 overflow-hidden">
+      <GroupUsers
+        data-test="edit-role-users-section"
+        v-show="activeTab === 'users'"
+        :groupUsers="roleUsers"
+        :activeTab="activeTab"
+        :added-users="addedUsers"
+        :removed-users="removedUsers"
+        context="role"
+      />
+      <GroupServiceAccounts
+        v-if="store.state.zoConfig.service_account_enabled"
+        data-test="edit-role-users-section"
+        v-show="activeTab === 'serviceAccounts'"
+        :groupUsers="roleUsers"
+        :activeTab="activeTab"
+        :added-users="addedServiceAccounts"
+        :removed-users="removedServiceAccounts"
+      />
+
+      <div
+        v-show="activeTab === 'permissions'"
+        data-test="edit-role-permissions-section"
+        class="bg-card-glass-bg flex h-full flex-col"
+      >
+        <div class="bg-surface-base flex flex-shrink-0 items-center justify-between">
           <div
-            class="flex justify-between items-center"
-            :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+            v-show="permissionsUiType === 'table'"
+            data-test="edit-role-permissions-filters"
+            class="sticky top-0 z-2 flex items-start justify-start gap-3 px-3 py-2"
           >
-            <div
-              v-show="permissionsUiType === 'table'"
-              data-test="edit-role-permissions-filters"
-              class=" flex items-start q-px-md q-py-sm justify-start"
-              style="position: sticky; top: 0px; z-index: 2"
-            >
-              <div
-                data-test="edit-role-permissions-show-toggle"
-                class="flex items-center q-mr-md"
+            <div data-test="edit-role-permissions-show-toggle" class="flex items-center">
+              <span data-test="edit-role-permissions-show-text" style="font-size: var(--text-sm)">
+                {{ t("iam.editRole.show") }}
+              </span>
+              <OToggleGroup
+                class="ms-1"
+                :model-value="filter.permissions"
+                @update:model-value="(v) => updateTableData(v as string)"
               >
-                <span
-                  data-test="edit-role-permissions-show-text"
-                  style="font-size: 14px"
-                >
-                  Show
-                </span>
-                <div
-                  class="q-ml-xs"
-                   style="
-                  border: 1px solid var(--o2-border-color);
-                  width: fit-content;
-                  border-radius: 0.3rem;
-                  padding: 2px;
-                "
-                >
-                  <template
-                    v-for="visual in permissionDisplayOptions"
-                    :key="visual.value"
-                  >
-                    <q-btn
-                      :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-                      :color="
-                        visual.value === filter.permissions ? 'primary' : ''
-                      "
-                      :flat="visual.value === filter.permissions ? false : true"
-                      dense
-                      no-caps
-                      size="11px"
-                      class="q-px-md visual-selection-btn"
-                      @click="updateTableData(visual.value)"
-                      style="height: 30px;"
-                    >
-                      {{ visual.label }}</q-btn
-                    >
-                  </template>
-                </div>
-              </div>
-              <div data-test="edit-role-permissions-search-input">
-                <q-input
-                  v-model="filter.value"
-                  borderless
-                  :debounce="500"
-                  dense
-                  class="no-border q-mr-md o2-search-input tw:h-[36px] tw:w-[200px]"
-                  :class="store.state.theme === 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
-                  :placeholder="`Search Permissions`"
-                  @update:model-value="onResourceChange"
-                >
-                  <template #prepend>
-                    <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme === 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
-                  </template>
-                </q-input>
-              </div>
-              <div data-test="edit-role-permissions-resource-select-input">
-                <q-select
-                  v-model="filter.resource"
-                  :options="filteredResources"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="q-mr-sm"
-                  placeholder="Select Resource"
-                  map-options
-                  use-input
-                  emit-value
-                  fill-input
-                  hide-selected
-                  borderless
-                  dense
-                  clearable
-                  style="width: 200px"
-                  @filter="filterResourceOptions"
-                  @update:model-value="onResourceChange"
-                />
-              </div>
-            </div>
-            <div></div>
-            <div
-              data-test="edit-role-permissions-ui-type-toggle"
-              class="q-mr-md q-my-xs"
-              style="
-              border: 1px solid #d7d7d7;
-              width: fit-content;
-              border-radius: 0.3rem;
-              padding: 2px;
-            "
-            >
-              <template
-                v-for="visual in permissionUiOptions"
-                :key="visual.value"
-              >
-                <q-btn
+                <OToggleGroupItem
+                  v-for="visual in permissionDisplayOptions"
+                  :key="visual.value"
+                  :value="visual.value"
+                  size="sm"
                   :data-test="`edit-role-permissions-show-${visual.value}-btn`"
-                  :color="visual.value === permissionsUiType ? 'primary' : ''"
-                  :flat="visual.value === permissionsUiType ? false : true"
-                  dense
-                  no-caps
-                  size="11px"
-                  class="q-px-md visual-selection-btn"
-                  @click="updatePermissionsUi(visual.value)"
                 >
-                  {{ visual.label }}</q-btn
-                >
-              </template>
+                  {{ visual.label }}
+                </OToggleGroupItem>
+              </OToggleGroup>
             </div>
-          </div>
-
-          <div data-test="edit-role-permissions-table-section" class="el-border-radius q-px-md">
-            <div v-show="permissionsUiType === 'table'">
-              <permissions-table
-                ref="permissionTableRef"
-                :rows="permissionsState.permissions"
-                :customFilteredPermissions="filteredPermissions"
-                :filter="filter"
-                :visibleResourceCount="countOfVisibleResources"
-                :selected-permissions-hash="selectedPermissionsHash"
-                @updated:permission="handlePermissionChange"
-                @expand:row="expandPermission"
+            <div data-test="edit-role-permissions-search-input">
+              <OInput
+                v-model="filter.value"
+                :debounce="500"
+                class="no-border o2-search-input h-9 w-50"
+                :placeholder="t('iam.editRole.searchPermissions')"
+                @update:model-value="onResourceChange"
+              >
+                <template #icon-left>
+                  <OIcon name="search" size="sm" />
+                </template>
+              </OInput>
+            </div>
+            <div data-test="edit-role-permissions-resource-select-input">
+              <OSelect
+                v-model="filter.resource"
+                :options="resourceOptions"
+                :placeholder="t('iam.editRole.selectResource')"
+                clearable
+                searchable
+                style="width: 12.5rem"
+                @update:model-value="onResourceChange"
               />
             </div>
-            <div v-show="permissionsUiType === 'json'">
-              <div class="flex items-center justify-between">
-                <div class="q-mb-md text-bold">
-                  {{ selectedPermissionsHash.size }} Permission
-                </div>
-                <div
-                  class="flex items-center cursor-pointer"
-                  :title="t('menu.help')"
-                  @click="toggleHelpSection"
-                >
-                  <q-icon name="help" size="17px" />
-                  <span class="q-ml-xs"> Help </span>
-                </div>
+          </div>
+          <div></div>
+          <div class="flex items-center gap-2">
+            <span data-test="edit-role-permissions-count" class="text-sm font-bold">
+              {{
+                t("iam.editRole.permissionCountSingular", { count: selectedPermissionsHash.size })
+              }}
+            </span>
+            <OToggleGroup
+              data-test="edit-role-permissions-ui-type-toggle"
+              class="my-1 me-3"
+              :model-value="permissionsUiType"
+              @update:model-value="(v) => updatePermissionsUi(v as string)"
+            >
+              <OToggleGroupItem
+                v-for="visual in permissionUiOptions"
+                :key="visual.value"
+                :value="visual.value"
+                size="sm"
+                :data-test="`edit-role-permissions-show-${visual.value}-btn`"
+              >
+                {{ visual.label }}
+              </OToggleGroupItem>
+            </OToggleGroup>
+          </div>
+        </div>
+
+        <div
+          data-test="edit-role-permissions-table-section"
+          class="rounded-default min-h-0 flex-1 overflow-y-auto"
+        >
+          <div v-show="permissionsUiType === 'table'">
+            <PermissionsTable
+              ref="permissionTableRef"
+              :rows="permissionsState.permissions"
+              :customFilteredPermissions="filteredPermissions"
+              :filter="filter"
+              :visibleResourceCount="countOfVisibleResources"
+              :selected-permissions-hash="selectedPermissionsHash"
+              :loading="isFetchingInitialRoles"
+              @updated:permission="handlePermissionChange"
+              @updated:permission-batch="handlePermissionBatchChange"
+              @expand:row="expandPermission"
+              @update:filter="onClearFilter"
+            />
+          </div>
+          <div v-show="permissionsUiType === 'json'">
+            <div class="flex items-center justify-between">
+              <div class="mb-3 font-bold">
+                {{
+                  t("iam.editRole.permissionCountSingular", { count: selectedPermissionsHash.size })
+                }}
               </div>
-              <div class="flex no-wrap">
-                <div
-                  :style="
-                    isHelpOpen
-                      ? { width: 'calc(100% - 350px)' }
-                      : { width: '100%' }
-                  "
-                >
-                  <query-editor
-                    data-test="logs-vrl-function-editor"
-                    editor-id="add-function-editor"
-                    class="monaco-editor q-mt-sm"
-                    language="json"
-                    ref="permissionJsonEditorRef"
-                    v-model:query="permissionsJsonValue"
-                    style="height: calc(100vh - 295px)"
+              <div
+                class="flex cursor-pointer items-center"
+                :title="t('menu.help')"
+                @click="toggleHelpSection"
+              >
+                <OIcon name="help" size="sm" />
+                <span class="ms-1"> {{ t("iam.editRole.help") }} </span>
+              </div>
+            </div>
+            <div class="flex flex-nowrap">
+              <div :style="isHelpOpen ? { width: 'calc(100% - 21.875rem)' } : { width: '100%' }">
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+                <QueryEditor
+                  data-test="logs-vrl-function-editor"
+                  editor-id="add-function-editor"
+                  class="mt-2"
+                  language="json"
+                  ref="permissionJsonEditorRef"
+                  v-model:query="permissionsJsonValue"
+                  style="height: calc(100vh - var(--navbar-height) - 295px)"
+                />
+                <!-- eslint-enable local/no-hardcoded-px -->
+              </div>
+              <div v-if="isHelpOpen" style="width: 21.875rem" class="p-2">
+                <div class="flex items-center justify-between px-2">
+                  <div style="font-size: var(--text-base)">
+                    {{ t("iam.editRole.quickReference") }}
+                  </div>
+                  <OIcon
+                    class="cursor-pointer"
+                    name="close"
+                    size="xs"
+                    :title="t('common.close')"
+                    @click="toggleHelpSection"
                   />
                 </div>
-                <div v-if="isHelpOpen" style="width: 350px" class="q-pa-sm">
-                  <div class="flex justify-between items-center q-px-sm">
-                    <div style="font-size: 16px">Quick Reference</div>
-                    <q-icon
-                      class="cursor-pointer"
-                      name="close"
-                      size="14px"
-                      :title="t('common.close')"
-                      @click="toggleHelpSection"
-                    />
+                <OSeparator class="mt-2 mb-4" />
+                <div class="mt-2 px-2">
+                  <div>
+                    {{ t("iam.editRole.jsonConfigHelp") }}
                   </div>
-                  <q-separator class="q-mt-sm q-mb-md" />
-                  <div class="q-mt-sm q-px-sm">
-                    <div>
-                      Configure access with JSON objects specifying "object"
-                      (resource) and "permission" (access level).
-                    </div>
-                    <pre style="font-size: 12px">
-{
-  "object": "MainResource:ChildResource",
-  "permission": "AccessType"
-}</pre
-                    >
-                    <div>
-                      <span class="text-bold">Child Resource:</span> <br />
-                      Specific instance or
-                      <span class="text-bold">organizationID</span> for all
-                      instances within a main resource.
-                    </div>
+                  <pre style="font-size: var(--text-xs)">{{ raw(jsonPermissionSample) }}</pre>
+                  <div>
+                    <span class="font-bold">{{ t("iam.editRole.childResource") }}</span> <br />
+                    {{ t("iam.editRole.specificInstanceOr") }}
+                    <span class="font-bold">{{ raw("organizationID") }}</span>
+                    {{ t("iam.editRole.forAllInstances") }}
                   </div>
                 </div>
               </div>
@@ -272,56 +217,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
       </div>
+    </div>
+    <div class="z-2 mt-2.5 flex w-full flex-shrink-0 justify-end">
       <div
-        class="flex justify-end tw:w-full"
-        style="position: sticky; bottom: 0.45rem; z-index: 2"
+        class="bg-card-glass-bg border-border-default flex w-full justify-end gap-2 border-t px-3 py-2"
       >
-      <div class="card-container tw:w-full tw:py-2 tw:px-3 tw:justify-end tw:flex">
-        <q-btn
+        <OButton
           data-test="edit-role-cancel-btn"
-          class="o2-secondary-button"
-          :label="t('alerts.cancel')"
-          no-caps
+          variant="outline"
+          size="sm-action"
           @click="cancelPermissionsUpdate"
-        />
-        <q-btn
+        >
+          {{ t("alerts.cancel") }}
+        </OButton>
+        <OButton
           data-test="edit-role-save-btn"
-          :label="t('alerts.save')"
-          class="o2-primary-button q-ml-md"
-          no-caps
+          variant="primary"
+          size="sm-action"
           @click="saveRole"
-        />
+        >
+          {{ t("alerts.save") }}
+        </OButton>
       </div>
-        
-      </div>
-    </template>
-  </div>
+    </div>
+  </OPageLayout>
+  <ConfirmDialog
+    :title="t('iam.editRole.leaveConfirm.title')"
+    :message="t('iam.editRole.leaveConfirm.message')"
+    @update:ok="onLeaveConfirm(true)"
+    @update:cancel="onLeaveConfirm(false)"
+    v-model="leaveConfirm.show"
+  />
 </template>
 
 <script setup lang="ts">
 import { cloneDeep } from "lodash-es";
-import { defineAsyncComponent, ref, type Ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, defineAsyncComponent, nextTick, ref, type Ref } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import type { Resource, Entity, Permission } from "@/ts/interfaces";
 import PermissionsTable from "@/components/iam/roles/PermissionsTable.vue";
 import { useStore } from "vuex";
 import usePermissions from "@/composables/iam/usePermissions";
-import { useRouter } from "vue-router";
+import { useRouter, onBeforeRouteLeave } from "vue-router";
 import { onBeforeMount } from "vue";
-import {
-  updateRole,
-  getResources,
-  getResourcePermission,
-  getRoleUsers,
-} from "@/services/iam";
-import { useQuasar } from "quasar";
-import type { AxiosPromise } from "axios";
-import streamService from "@/services/stream";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import { updateRole, getResources, getAllRolePermissions, getRoleUsers } from "@/services/iam";
 import pipelineService from "@/services/pipelines";
 import alertService from "@/services/alerts";
 import reportService from "@/services/reports";
 import templateService from "@/services/alert_templates";
-import actions from "@/services/action_scripts";
 import destinationService from "@/services/alert_destination";
 import jsTransformService from "@/services/jstransform";
 import organizationsService from "@/services/organizations";
@@ -330,18 +280,21 @@ import dashboardService from "@/services/dashboards";
 import serviceAccountService from "@/services/service_accounts";
 import useStreams from "@/composables/useStreams";
 import { getGroups, getRoles } from "@/services/iam";
-import AppTabs from "@/components/common/AppTabs.vue";
 import GroupUsers from "../groups/GroupUsers.vue";
-import { nextTick } from "vue";
+import AppTabs from "@/components/common/AppTabs.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import GroupServiceAccounts from "../groups/GroupServiceAccounts.vue";
 import cipherKeysService from "@/services/cipher_keys";
 import RePatternsService from "@/services/regex_pattern";
-import config from "@/aws-exports";
 import commonService from "@/services/common";
+import syntheticsService from "@/services/synthetics";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import onlineEvalsService from "@/services/online-evals.service";
+import llmQueuesService from "@/services/llm-queues.service";
+import llmDatasetsService from "@/services/llm-datasets.service";
 
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
 
 onBeforeMount(() => {
   permissionsState.permissions = [];
@@ -351,17 +304,20 @@ onBeforeMount(() => {
 
 const permissionTableRef: any = ref(null);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const { permissionsState } = usePermissions();
 
 const router = useRouter();
 
-const q = useQuasar();
-
 const store = useStore();
 
 const isHelpOpen = ref(false);
+
+const jsonPermissionSample = `{
+  "object": "MainResource:ChildResource",
+  "permission": "AccessType"
+}`;
 
 const permissionJsonEditorRef: any = ref(null);
 
@@ -393,49 +349,108 @@ const permissionsJsonValue = ref("");
 const addedUsers = ref(new Set());
 const removedUsers = ref(new Set());
 
+// Service-account membership is staged in its own pair of sets so the Users and
+// Service Accounts tabs track dirty state independently (they're sent together
+// as users in the save payload, since the backend treats both as principals).
+const addedServiceAccounts = ref(new Set());
+const removedServiceAccounts = ref(new Set());
+
 const roleUsers: Ref<string[]> = ref([]);
 
 const permissionsUiType = ref("table");
 
-const { getStreams } = useStreams();
+const { getStreams } = useStreams(t);
 
-const tabs = [
-  {
-    value: "permissions",
-    label: "Permissions",
-  },
-  {
-    value: "users",
-    label: "Users",
-  },
-];
+// Per-tab unsaved-changes flags. Each tab tracks only its own pending changes.
+const isPermissionsDirty = computed(
+  () =>
+    Object.keys(addedPermissions.value).length > 0 ||
+    Object.keys(removedPermissions.value).length > 0,
+);
 
-if (config.isCloud == "false") {
-  tabs.push({
-    value: "serviceAccounts",
-    label: "Service Accounts",
+const isUsersDirty = computed(() => addedUsers.value.size > 0 || removedUsers.value.size > 0);
+
+const isServiceAccountsDirty = computed(
+  () => addedServiceAccounts.value.size > 0 || removedServiceAccounts.value.size > 0,
+);
+
+const isAnyDirty = computed(
+  () => isPermissionsDirty.value || isUsersDirty.value || isServiceAccountsDirty.value,
+);
+
+// Route-leave guard: warn before discarding unsaved permission/membership
+// changes. The pending navigation is held until the user resolves the dialog.
+const leaveConfirm = ref<{
+  show: boolean;
+  resolve: ((proceed: boolean) => void) | null;
+}>({ show: false, resolve: null });
+
+const onLeaveConfirm = (proceed: boolean) => {
+  leaveConfirm.value.show = false;
+  leaveConfirm.value.resolve?.(proceed);
+  leaveConfirm.value.resolve = null;
+};
+
+onBeforeRouteLeave(() => {
+  if (!isAnyDirty.value) return true;
+
+  return new Promise<boolean>((resolve) => {
+    leaveConfirm.value.resolve = resolve;
+    leaveConfirm.value.show = true;
   });
-}
+});
+
+const tabs = computed(() => {
+  const baseTabs = [
+    {
+      value: "permissions",
+      label: t("iam.editRole.permissions"),
+      icon: "shield",
+      dirty: isPermissionsDirty.value,
+    },
+    {
+      value: "users",
+      label: t("iam.editRole.users"),
+      icon: "group",
+      dirty: isUsersDirty.value,
+    },
+  ];
+
+  if (store.state.zoConfig.service_account_enabled) {
+    baseTabs.push({
+      value: "serviceAccounts",
+      label: t("iam.editRole.serviceAccounts"),
+      icon: "smart-toy",
+      dirty: isServiceAccountsDirty.value,
+    });
+  }
+
+  return baseTabs;
+});
 
 const permissionDisplayOptions = [
   {
-    label: "All",
+    label: t("iam.editRole.all"),
     value: "all",
+    icon: "format-list-bulleted",
   },
   {
-    label: "Selected",
+    label: t("iam.editRole.selected"),
     value: "selected",
+    icon: "check-box",
   },
 ];
 
 const permissionUiOptions = [
   {
-    label: "Table",
+    label: t("iam.editRole.table"),
     value: "table",
+    icon: "table-chart",
   },
   {
-    label: "JSON",
+    label: t("iam.editRole.json"),
     value: "json",
+    icon: "data-object",
   },
 ];
 
@@ -483,17 +498,31 @@ const getRoleDetails = () => {
       await updateRolePermissions(permissions.value);
       isFetchingInitialRoles.value = false;
 
+      // A brand-new role has no saved permissions, so the default "Selected"
+      // filter renders an empty matrix that looks broken. Default to "All" so
+      // the user sees the full permission grid to start checking boxes.
+      if (selectedPermissionsHash.value.size === 0) {
+        filter.value.permissions = "all";
+
+        // "Read-only" preset (from the Add Role dialog) seeds AllowList +
+        // AllowGet across all top-level resources so evaluators get a safe,
+        // non-empty starting point. These land as pending "added" permissions
+        // the user can still tweak before saving.
+        if (router.currentRoute.value.query.preset === "readonly") {
+          seedReadonlyPreset();
+        }
+      }
+
       updateTableData();
     })
     .catch((error) => {
       isFetchingInitialRoles.value = false;
-      q.notify({
-        message: error?.response?.status === 404
-          ? "Role not found or has been deleted. Redirecting to roles list."
-          : error?.message || "Failed to load role details. Redirecting to roles list.",
-        color: "negative",
-        position: "bottom",
-        timeout: 3000,
+      toast({
+        message:
+          error?.response?.status === 404
+            ? t("iam.editRole.roleNotFound")
+            : error?.message || t("iam.editRole.loadFailed"),
+        variant: "error",
       });
       router.push({
         name: "roles",
@@ -525,16 +554,13 @@ const getResourceByName = (
   for (let i = 0; i < resources.length; i++) {
     if (resources[i].resourceName === resourceName) return resources[i];
     else if (resources[i].childs.length) {
-      const isFound = getResourceByName(
-        resources[i].childs,
-        resourceName,
-        level + 1,
-      );
+      const isFound = getResourceByName(resources[i].childs, resourceName, level + 1);
       if (isFound) return isFound;
     }
   }
 
   if (!level) return null;
+  return undefined;
 };
 
 const setPermission = (resource: any, visited: Set<string>) => {
@@ -561,19 +587,14 @@ const setPermission = (resource: any, visited: Set<string>) => {
   resourceMapper.value[resourcePermission.name] = resourcePermission;
 
   if (resource.parent) {
-    const parentResource = getResourceByName(
-      permissionsState.permissions,
-      resource.parent,
-    );
+    const parentResource = getResourceByName(permissionsState.permissions, resource.parent);
 
     if (parentResource) {
       parentResource.childs.push(resourcePermission as Resource);
       return;
     } else {
       // Find parent in resources array
-      const _parentResource = permissionsState.resources.find(
-        (r) => r.key === resource.parent,
-      );
+      const _parentResource = permissionsState.resources.find((r) => r.key === resource.parent);
 
       if (_parentResource && !visited.has(_parentResource.key)) {
         // Process parent first
@@ -595,8 +616,7 @@ const setPermission = (resource: any, visited: Set<string>) => {
   modifyResourcePermissions(resourcePermission);
   if (
     resourcePermission.name === "org" &&
-    store.state.selectedOrganization.identifier !==
-      store.state.zoConfig.meta_org
+    store.state.selectedOrganization.identifier !== store.state.zoConfig.meta_org
   ) {
     return; // Skip adding 'org' resource if the organization is not _meta
   }
@@ -615,14 +635,10 @@ const setDefaultPermissions = () => {
   };
 
   // First process resources without parents
-  permissionsState.resources
-    .filter((resource: any) => !resource.parent)
-    .forEach(processResource);
+  permissionsState.resources.filter((resource: any) => !resource.parent).forEach(processResource);
 
   // Then process resources with parents
-  permissionsState.resources
-    .filter((resource: any) => resource.parent)
-    .forEach(processResource);
+  permissionsState.resources.filter((resource: any) => resource.parent).forEach(processResource);
 
   // Filter out child resources from the top level
   permissionsState.permissions = permissionsState.permissions.filter(
@@ -635,27 +651,30 @@ const modifyResourcePermissions = (resource: Resource) => {
     resource.permission.AllowDelete.show = false;
     resource.permission.AllowPost.show = false;
   }
+  if (resource.resourceName === "logs_pattern" || resource.resourceName === "logs_insights") {
+    resource.permission.AllowList.show = false;
+    resource.permission.AllowDelete.show = false;
+    resource.permission.AllowPost.show = false;
+    resource.permission.AllowPut.show = false;
+  }
+  if (resource.resourceName === "logs_cache") {
+    resource.permission.AllowList.show = false;
+    resource.permission.AllowGet.show = false;
+    resource.permission.AllowPost.show = false;
+    resource.permission.AllowPut.show = false;
+  }
 };
 
 const getResourcePermissions = () => {
-  const promises: AxiosPromise<any>[] = [];
-  permissionsState.resources.forEach((resource) => {
-    promises.push(
-      getResourcePermission({
-        role_name: editingRole.value,
-        org_identifier: store.state.selectedOrganization.identifier,
-        resource: resource.key,
-      }),
-    );
-  });
-
+  // Single request returns the role's permissions across all resource types.
+  // Backend returns a flat Permission[].
   return new Promise((resolve, reject) => {
-    Promise.all(promises)
-      .then((res) => {
-        res.forEach((resourcePermissions: { data: Permission[] }) => {
-          permissions.value.push(...resourcePermissions.data);
-        });
-        promises.length = 0;
+    getAllRolePermissions({
+      role_name: editingRole.value,
+      org_identifier: store.state.selectedOrganization.identifier,
+    })
+      .then((res: { data: Permission[] }) => {
+        permissions.value.push(...res.data);
         resolve(true);
       })
       .catch((err) => {
@@ -775,12 +794,45 @@ const updateRolePermissions = async (permissions: Permission[]) => {
         }
       }
 
+      if (!resourceMapper[resource] && resource === "report") {
+        if (!resourceMapper["rfolder"]) {
+          resourceMapper["rfolder"] = getResourceByName(
+            permissionsState.permissions,
+            "rfolder",
+          ) as Resource;
+        }
+
+        await getResourceEntities(resourceMapper["rfolder"]);
+
+        if (!resourceMapper[resource]) {
+          resourceMapper[resource] = getResourceByName(
+            permissionsState.permissions,
+            resource,
+          ) as Resource;
+        }
+      }
+
+      if (!resourceMapper[resource] && resource === "synthetics") {
+        if (!resourceMapper["synthetic_folder"]) {
+          resourceMapper["synthetic_folder"] = getResourceByName(
+            permissionsState.permissions,
+            "synthetic_folder",
+          ) as Resource;
+        }
+
+        await getResourceEntities(resourceMapper["synthetic_folder"]);
+
+        if (!resourceMapper[resource]) {
+          resourceMapper[resource] = getResourceByName(
+            permissionsState.permissions,
+            resource,
+          ) as Resource;
+        }
+      }
+
       if (!resourceMapper[resource]) continue;
 
-      if (
-        resourceMapper[resource].parent &&
-        !resourceMapper[resourceMapper[resource].parent]
-      ) {
+      if (resourceMapper[resource].parent && !resourceMapper[resourceMapper[resource].parent]) {
         resourceMapper[resourceMapper[resource].parent] = getResourceByName(
           permissionsState.permissions,
           resourceMapper[resource].parent,
@@ -788,32 +840,43 @@ const updateRolePermissions = async (permissions: Permission[]) => {
       }
 
       if (entity === "_all_" + getOrgId()) {
-        resourceMapper[resource].permission[permissions[i].permission].value =
-          true;
+        resourceMapper[resource].permission[permissions[i].permission].value = true;
 
         continue;
       }
 
       if (resourceMapper[resource].parent)
-        await getResourceEntities(
-          resourceMapper[resourceMapper[resource].parent],
-        );
+        await getResourceEntities(resourceMapper[resourceMapper[resource].parent]);
 
       // This is just to handle dashboard permissions, need to fix this
       if (resource === "dashboard") {
-        const [folderId, dashboardId] = entity.split("/");
+        const [folderId] = entity.split("/");
 
         const dashResource = resourceMapper["dfolder"].entities.find(
           (e: Entity) => e.name === folderId,
         );
         await getResourceEntities(dashResource as Entity);
       } else if (resource === "alert") {
-        const [folderId, alertId] = entity.split("/");
+        const [folderId] = entity.split("/");
 
         const alertResource = resourceMapper["afolder"].entities.find(
           (e: Entity) => e.name === folderId,
         );
         await getResourceEntities(alertResource as Entity);
+      } else if (resource === "report") {
+        const [folderId] = entity.split("/");
+
+        const reportResource = resourceMapper["rfolder"].entities.find(
+          (e: Entity) => e.name === folderId,
+        );
+        await getResourceEntities(reportResource as Entity);
+      } else if (resource === "synthetics") {
+        // Synthetics entities are plain monitor ids (no folder prefix), so the
+        // owning folder can't be derived from the entity — load every folder's
+        // monitors so the permission can be matched to its row.
+        for (const folderEntity of resourceMapper["synthetic_folder"]?.entities ?? []) {
+          await getResourceEntities(folderEntity as Entity);
+        }
       } else if (
         resource === "logs" ||
         resource === "metrics" ||
@@ -845,13 +908,29 @@ const decodePermission = (permission: string) => {
 };
 
 const cancelPermissionsUpdate = () => {
-  router.push(
-    { name: "roles",
+  router.push({
+    name: "roles",
     query: {
-        org_identifier: store.state.selectedOrganization.identifier,
-        }
-     } 
-);
+      org_identifier: store.state.selectedOrganization.identifier,
+    },
+  });
+};
+
+// Seed AllowList + AllowGet on every visible top-level resource. Mirrors a
+// user manually checking those two columns, so the changes flow through the
+// normal added/removed-permission bookkeeping and the Save payload.
+const seedReadonlyPreset = () => {
+  const readonlyPerms = ["AllowList", "AllowGet"];
+  permissionsState.permissions.forEach((resource: Resource) => {
+    readonlyPerms.forEach((perm) => {
+      const permDetail = resource.permission?.[perm as "AllowList"];
+      // Only seed permissions the resource actually exposes and that are not
+      // already selected.
+      if (!permDetail || !permDetail.show || permDetail.value) return;
+      permDetail.value = true;
+      handlePermissionChange(resource, perm);
+    });
+  });
 };
 
 const handlePermissionChange = (row: any, permission: string) => {
@@ -861,8 +940,7 @@ const handlePermissionChange = (row: any, permission: string) => {
   // As there can be conflict in resource name and org id, as they can be same.
   // So we are adding _all_ prefix to org id to differentiate between org id and resource name
 
-  if (row.type === "Type")
-    entity = "_all_" + store.state.selectedOrganization.identifier;
+  if (row.type === "Type") entity = "_all_" + store.state.selectedOrganization.identifier;
   else entity = row.name;
 
   if (row.type === "Resource" && row.top_level) {
@@ -876,15 +954,21 @@ const handlePermissionChange = (row: any, permission: string) => {
   updatePermissionMappings(permissionHash);
 };
 
+const handlePermissionBatchChange = (
+  changes: { row: any; permission: string; newValue: boolean }[],
+) => {
+  changes.forEach(({ row, permission, newValue }) => {
+    row.permission[permission].value = newValue;
+    handlePermissionChange(row, permission);
+  });
+};
+
 const updatePermissionMappings = (permissionHash: string) => {
   const permissionSplit = permissionHash.split(":");
   const object = permissionSplit[0] + ":" + permissionSplit[1];
   const permission = permissionSplit[2];
 
-  if (
-    !addedPermissions.value[permissionHash] &&
-    !permissionsHash.value.has(permissionHash)
-  ) {
+  if (!addedPermissions.value[permissionHash] && !permissionsHash.value.has(permissionHash)) {
     selectedPermissionsHash.value.add(permissionHash);
     addedPermissions.value[permissionHash] = {
       object,
@@ -967,9 +1051,7 @@ const updatePermissionsUi = async (value: string) => {
 const updateJsonInTable = () => {
   const permissions = JSON.parse(permissionsJsonValue.value);
 
-  const permissionsHash = new Set(
-    permissions.map((p: any) => p.object + ":" + p.permission),
-  );
+  const permissionsHash = new Set(permissions.map((p: any) => p.object + ":" + p.permission));
   let hash = "";
   let permission;
   let resource = "";
@@ -999,6 +1081,17 @@ const updateJsonInTable = () => {
         resourceDetails = resourceMapper.value["afolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
+      } else if (resource === "report") {
+        const [folderId] = entity.split("/");
+
+        resourceDetails = resourceMapper.value["rfolder"].entities.find(
+          (e: Entity) => e.name === folderId,
+        ) as Entity;
+      } else if (resource === "synthetics") {
+        // Plain-id entity — locate the folder whose loaded monitors contain it.
+        resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
+          (f.entities ?? []).some((e: Entity) => e.name === entity),
+        ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
         resourceDetails.permission[permission.permission as "AllowAll"].value =
           selectedPermissionsHash.value.has(
@@ -1015,12 +1108,7 @@ const updateJsonInTable = () => {
         ) as Entity;
       }
 
-      updateEntityPermission(
-        resourceDetails,
-        resource,
-        entity,
-        permission.permission,
-      );
+      updateEntityPermission(resourceDetails, resource, entity, permission.permission);
     }
   });
 
@@ -1040,7 +1128,7 @@ const updateJsonInTable = () => {
       resourceDetails = resourceMapper.value[resource];
 
       if (resource === "dashboard") {
-        const [folderId, dashboardId] = entity.split("/");
+        const [folderId] = entity.split("/");
 
         resourceDetails = resourceMapper.value["dfolder"].entities.find(
           (e: Entity) => e.name === folderId,
@@ -1049,6 +1137,17 @@ const updateJsonInTable = () => {
         const [folderId] = entity.split("/");
 
         resourceDetails = resourceMapper.value["afolder"].entities.find(
+          (e: Entity) => e.name === folderId,
+        ) as Entity;
+      } else if (resource === "synthetics") {
+        // Plain-id entity — locate the folder whose loaded monitors contain it.
+        resourceDetails = resourceMapper.value["synthetic_folder"].entities.find((f: Entity) =>
+          (f.entities ?? []).some((e: Entity) => e.name === entity),
+        ) as Entity;
+      } else if (resource === "report") {
+        const [folderId] = entity.split("/");
+
+        resourceDetails = resourceMapper.value["rfolder"].entities.find(
           (e: Entity) => e.name === folderId,
         ) as Entity;
       } else if (entity === "_all_" + getOrgId()) {
@@ -1067,33 +1166,7 @@ const updateJsonInTable = () => {
         ) as Entity;
       }
 
-      updateEntityPermission(
-        resourceDetails,
-        resource,
-        entity,
-        permission.permission,
-      );
-    }
-  });
-};
-
-const updateExpandedResources = (resources: (Resource | Entity)[]) => {
-  resources.forEach(async (resource) => {
-    // Check if the current item is an object and has the 'expand' key
-    if (
-      typeof resource === "object" &&
-      resource.expand &&
-      resource.has_entities
-    ) {
-      resource.is_loading = true;
-      await getResourceEntities(resource);
-      resource.is_loading;
-      // Perform additional actions as needed
-    }
-
-    // If the item itself contains a nested array, call the function recursively
-    if (Array.isArray(resource.entities)) {
-      updateExpandedResources(resource.entities);
+      updateEntityPermission(resourceDetails, resource, entity, permission.permission);
     }
   });
 };
@@ -1106,8 +1179,8 @@ const countVisibleResources = (permissions: (Resource | Entity)[]): number => {
       count += 1;
     }
 
-    // Recursively count in nested entities
-    if (permission.entities?.length) {
+    // Recursively count in nested entities only when the parent row is expanded
+    if (permission.entities?.length && permission.expand) {
       count += countVisibleResources(permission.entities);
     }
   });
@@ -1127,8 +1200,7 @@ const updatePermissionVisibility = (
 
     const parentRelations = [...relations];
 
-    if (permission.type === "Type")
-      parentRelations.push(permission.resourceName);
+    if (permission.type === "Type") parentRelations.push(permission.resourceName);
 
     const showResource = Object.values(permission.permission).some(
       (permDetail) => permDetail.value,
@@ -1136,8 +1208,7 @@ const updatePermissionVisibility = (
 
     let isResourceFiltered = true;
 
-    if (filter.value.resource)
-      isResourceFiltered = parentRelations.includes(filter.value.resource);
+    if (filter.value.resource) isResourceFiltered = parentRelations.includes(filter.value.resource);
 
     if (filter.value.value) {
       isResourceFiltered =
@@ -1148,9 +1219,7 @@ const updatePermissionVisibility = (
     }
 
     permission.show =
-      filter.value.permissions === "all"
-        ? isResourceFiltered
-        : showResource && isResourceFiltered;
+      filter.value.permissions === "all" ? isResourceFiltered : showResource && isResourceFiltered;
 
     if (forceShow) permission.show = true;
 
@@ -1188,12 +1257,9 @@ const updatePermissionVisibility = (
       permission.name === "index"
     ) {
       filteredEntities =
-        heavyResourceEntities.value[permission.name]?.filter(
-          (entity: any) => entity.show,
-        ) || [];
+        heavyResourceEntities.value[permission.name]?.filter((entity: any) => entity.show) || [];
     } else {
-      filteredEntities =
-        permission.entities?.filter((entity) => entity.show) || [];
+      filteredEntities = permission.entities?.filter((entity) => entity.show) || [];
     }
 
     // Update the permission object to add `show` property
@@ -1265,45 +1331,15 @@ const updatePermissionVisibility = (
 //   });
 // };
 
-const filterRowsByResourceName = (
-  rows: (Resource | Entity)[],
-  resourceName: string,
-) => {
-  return rows.reduce(
-    (filteredRows: (Resource | Entity)[], row: Resource | Entity) => {
-      // Check if the current row matches the filter
-      if (row.resourceName === resourceName) {
-        // If the row has nested rows, filter those as well
-        if (row.entities && row.entities.length) {
-          row.entities = filterRowsByResourceName(
-            row.entities,
-            resourceName,
-          ) as Entity[];
-        }
-        // Add the row to the filtered list
-        filteredRows.push(row);
-      } else if (row.entities && row.entities.length) {
-        // Even if the current row doesn't match, there might be nested rows that do
-        const filteredEntities = filterRowsByResourceName(
-          row.entities,
-          resourceName,
-        );
-        // Only add the row if it has matching nested rows
-        if (filteredEntities.length) {
-          // Optionally, you might want to clone the row here to avoid mutating the original
-          const newRow = { ...row, entities: filteredEntities };
-          filteredRows.push(newRow as Resource);
-        }
-      }
-      return filteredRows;
-    },
-    [],
-  );
-};
-
 const onResourceChange = async () => {
   updatePermissionVisibility(permissionsState.permissions);
   countVisibleResources(permissionsState.permissions);
+};
+
+const onClearFilter = () => {
+  filter.value.value = "";
+  filter.value.resource = "";
+  onResourceChange();
 };
 
 function filterResources(rows: any, terms: any) {
@@ -1317,10 +1353,7 @@ function filterResources(rows: any, terms: any) {
       continue;
     }
     for (var j = 0; j < rows[i].entities.length; j++) {
-      if (
-        !isAdded &&
-        rows[i].entities[j]["display_name"].toLowerCase().includes(terms)
-      ) {
+      if (!isAdded && rows[i].entities[j]["display_name"].toLowerCase().includes(terms)) {
         filtered.push(rows[i]);
         break;
       }
@@ -1342,11 +1375,7 @@ const expandPermission = async (resource: any) => {
   }
 };
 
-const getPermissionHash = (
-  resourceName: string,
-  permission: string,
-  entity?: string,
-) => {
+const getPermissionHash = (resourceName: string, permission: string, entity?: string) => {
   if (!entity) entity = "_all_" + store.state.selectedOrganization.identifier;
 
   return `${resourceName}:${entity}:${permission}`;
@@ -1384,27 +1413,49 @@ const getResourceEntities = (resource: Resource | Entity) => {
     metadata: getMetadataStreams,
     report: getReports,
     service_accounts: getServiceAccounts,
-    action_scripts: getActionScripts,
     cipher_keys: getCipherKeys,
     afolder: getAlertFolders,
+    rfolder: getReportFolders,
+    synthetic_folder: getSyntheticsFolders,
+    synthetics: getSynthetics,
     re_patterns: getRePatterns,
+    provider: getProviders,
+    score_config: getScoreConfigs,
+    scorer: getScorers,
+    eval_job: getEvalJobs,
+    annotation_queue: getAnnotationQueues,
+    dataset: getDatasets,
+    logs_pattern: getLogsPatternStreams,
+    logs_insights: getLogsInsightsStreams,
+    logs_cache: getLogsCacheStreams,
   };
 
-  return new Promise(async (resolve, reject) => {
-    if (!resource.entities?.length) {
-      resource.is_loading = true;
-      if (resource.childName) {
-        await listEntitiesFnMap[resource.childName](resource);
-      } else {
-        await listEntitiesFnMap[resource.resourceName](resource);
+  return new Promise((resolve, reject) => {
+    (async () => {
+      try {
+        if (!resource.entities?.length) {
+          resource.is_loading = true;
+          try {
+            const listEntities = resource.childName
+              ? listEntitiesFnMap[resource.childName]
+              : listEntitiesFnMap[resource.resourceName];
+
+            if (listEntities) {
+              await listEntities(resource);
+            }
+          } finally {
+            resource.is_loading = false;
+          }
+
+          // unncecessaryly we are updating the all resource entities, fix to update the current resource
+          updatePermissionVisibility(permissionsState.permissions);
+        }
+
+        resolve(true);
+      } catch (err) {
+        reject(err);
       }
-
-      // unncecessaryly we are updating the all resource entities, fix to update the current resource
-      updatePermissionVisibility(permissionsState.permissions);
-      resource.is_loading = false;
-    }
-
-    resolve(true);
+    })();
   });
 };
 
@@ -1413,7 +1464,7 @@ const getEnrichmentTables = async () => {
 
   updateResourceEntities("enrichment_table", ["name"], data.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1458,16 +1509,8 @@ const getOrgs = async () => {
 };
 
 const getSavedViews = async () => {
-  const savedViews = await savedviewsService.get(
-    store.state.selectedOrganization.identifier,
-  );
-  updateResourceEntities(
-    "savedviews",
-    ["view_id"],
-    [...savedViews.data.views],
-    false,
-    "view_name",
-  );
+  const savedViews = await savedviewsService.get(store.state.selectedOrganization.identifier);
+  updateResourceEntities("savedviews", ["view_id"], [...savedViews.data.views], false, "view_name");
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1479,9 +1522,7 @@ const getFolders = async () => {
     store.state.selectedOrganization.identifier,
   );
 
-  let isDefaultPresent = folders.data.list.find(
-    (folder: any) => folder.folderId === "default",
-  );
+  let isDefaultPresent = folders.data.list.find((folder: any) => folder.folderId === "default");
 
   if (!isDefaultPresent) {
     folders.data.list.unshift({ folderId: "default", name: "default" });
@@ -1506,22 +1547,54 @@ const getAlertFolders = async () => {
     "alerts",
   );
 
-  let isDefaultPresent = folders.data.list.find(
-    (folder: any) => folder.folderId === "default",
+  let isDefaultPresent = folders.data.list.find((folder: any) => folder.folderId === "default");
+
+  if (!isDefaultPresent) {
+    folders.data.list.unshift({ folderId: "default", name: "default" });
+  }
+
+  updateResourceEntities("afolder", ["folderId"], [...folders.data.list], true, "name", "alert");
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+const getSyntheticsFolders = async () => {
+  // Same shape as getAlertFolders — synthetics folders live under folder type "synthetics".
+  const folders: any = await commonService.list_Folders(
+    store.state.selectedOrganization.identifier,
+    "synthetics",
   );
+
+  let isDefaultPresent = folders.data.list.find((folder: any) => folder.folderId === "default");
 
   if (!isDefaultPresent) {
     folders.data.list.unshift({ folderId: "default", name: "default" });
   }
 
   updateResourceEntities(
-    "afolder",
+    "synthetic_folder",
     ["folderId"],
     [...folders.data.list],
     true,
     "name",
-    "alert",
+    "synthetics",
   );
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+const getSynthetics = async (resource: Entity | Resource) => {
+  // Monitors of one folder. Unlike alerts, synthetics FGA entities are plain
+  // monitor ids (no folder prefix) — matches backend set_ownership objects.
+  const res: any = await syntheticsService.listByFolderId(
+    store.state.selectedOrganization.identifier,
+    resource.name,
+  );
+
+  // `monitors` was renamed `checks` in the synthetics list response.
+  const syntheticRows = res.data?.checks ?? res.data?.monitors ?? [];
+  updateEntityEntities(resource, ["id"], [...syntheticRows], false, "name");
+
   return new Promise((resolve) => {
     resolve(true);
   });
@@ -1587,17 +1660,9 @@ const getTemplates = async () => {
 };
 
 const getPipelines = async () => {
-  const pipelines = await pipelineService.getPipelines(
-    store.state.selectedOrganization.identifier,
-  );
+  const pipelines = await pipelineService.getPipelines(store.state.selectedOrganization.identifier);
 
-  updateResourceEntities(
-    "pipeline",
-    ["pipeline_id"],
-    [...pipelines.data.list],
-    false,
-    "name",
-  );
+  updateResourceEntities("pipeline", ["pipeline_id"], [...pipelines.data.list], false, "name");
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1616,13 +1681,7 @@ const getAlerts = async (resource: Entity | Resource) => {
     "",
   );
 
-  updateEntityEntities(
-    resource,
-    ["alertId"],
-    [...alerts.data.list],
-    false,
-    "name",
-  );
+  updateEntityEntities(resource, ["alertId"], [...alerts.data.list], false, "name");
 
   return new Promise((resolve) => {
     resolve(true);
@@ -1634,7 +1693,37 @@ const getLogs = async (resource: Resource | Entity) => {
 
   updateEntityEntities(resource, ["name"], logs.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getLogsPatternStreams = async () => {
+  const logs: any = await getStreams("logs", false);
+
+  updateResourceEntities("logs_pattern", ["name"], logs.list);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getLogsInsightsStreams = async () => {
+  const logs: any = await getStreams("logs", false);
+
+  updateResourceEntities("logs_insights", ["name"], logs.list);
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getLogsCacheStreams = async () => {
+  const logs: any = await getStreams("logs", false);
+
+  updateResourceEntities("logs_cache", ["name"], logs.list);
+
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1644,7 +1733,7 @@ const getIndexStreams = async (resource: Resource | Entity) => {
 
   updateEntityEntities(resource, ["name"], indices.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1654,7 +1743,7 @@ const getMetrics = async (resource: Resource | Entity) => {
 
   updateEntityEntities(resource, ["name"], metrics.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1664,30 +1753,67 @@ const getTraces = async (resource: Resource | Entity) => {
 
   updateEntityEntities(resource, ["name"], traces.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
 
-const getMetadataStreams = async (resource: Resource | Entity) => {
+const getMetadataStreams = async () => {
   const metadata: any = await getStreams("metadata", false);
 
   updateResourceEntities("metadata", ["name"], metadata.list);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
 
-const getActionScripts = async () => {
-  const actionScripts = await actions.list(
+const getStreamsTypes = async () => {
+  const streams = [
+    { stream_type: "logs", name: t("common.logs") },
+    { stream_type: "traces", name: t("common.traces") },
+    { stream_type: "metrics", name: t("common.metrics") },
+    { stream_type: "index", name: t("iam.indices") },
+  ];
+
+  streams.forEach((stream) => {
+    updateResourceResource(stream.stream_type, "stream", ["stream_type"], [stream], true, "name");
+  });
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getReportFolders = async () => {
+  const folders: any = await commonService.list_Folders(
     store.state.selectedOrganization.identifier,
+    "reports",
   );
 
-  updateResourceEntities(
-    "action_scripts",
-    ["id"],
-    [...actionScripts.data],
+  let isDefaultPresent = folders.data.list.find((folder: any) => folder.folderId === "default");
+
+  if (!isDefaultPresent) {
+    folders.data.list.unshift({ folderId: "default", name: "default" });
+  }
+
+  updateResourceEntities("rfolder", ["folderId"], [...folders.data.list], true, "name", "report");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getReports = async (resource: Entity | Resource) => {
+  const reports: any = await reportService.listByFolderId(
+    store.state.selectedOrganization.identifier,
+    resource.name,
+  );
+
+  updateEntityEntities(
+    resource,
+    ["report_id"],
+    [...(reports.data.list ?? reports.data)],
     false,
     "name",
   );
@@ -1697,46 +1823,8 @@ const getActionScripts = async () => {
   });
 };
 
-const getStreamsTypes = async () => {
-  const streams = [
-    { stream_type: "logs", name: "Logs" },
-    { stream_type: "traces", name: "Traces" },
-    { stream_type: "metrics", name: "Metrics" },
-    { stream_type: "index", name: "Indices" },
-  ];
-
-  streams.forEach((stream) => {
-    updateResourceResource(
-      stream.stream_type,
-      "stream",
-      ["stream_type"],
-      [stream],
-      true,
-      "name",
-    );
-  });
-
-  return new Promise((resolve, reject) => {
-    resolve(true);
-  });
-};
-
-const getReports = async () => {
-  const reports = await reportService.list(
-    store.state.selectedOrganization.identifier,
-  );
-
-  updateResourceEntities("report", ["name"], [...reports.data]);
-
-  return new Promise((resolve) => {
-    resolve(true);
-  });
-};
-
 const getServiceAccounts = async () => {
-  const accounts = await serviceAccountService.list(
-    store.state.selectedOrganization.identifier,
-  );
+  const accounts = await serviceAccountService.list(store.state.selectedOrganization.identifier);
 
   updateResourceEntities("service_accounts", ["email"], accounts.data.data);
 
@@ -1746,31 +1834,105 @@ const getServiceAccounts = async () => {
 };
 
 const getCipherKeys = async () => {
-  const data: any = await cipherKeysService.list(
-    store.state.selectedOrganization.identifier,
-  );
+  const data: any = await cipherKeysService.list(store.state.selectedOrganization.identifier);
 
   updateResourceEntities("cipher_keys", ["name"], [...data.data.keys]);
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
 
 const getRePatterns = async () => {
-  const data: any = await RePatternsService.list(
+  const data: any = await RePatternsService.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("re_patterns", ["id"], [...data.data.patterns], false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getProviders = async () => {
+  const providers = await onlineEvalsService.providers.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities("provider", ["id"], providers, false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getScoreConfigs = async () => {
+  const scoreConfigs = await onlineEvalsService.scoreConfigs.list(
     store.state.selectedOrganization.identifier,
   );
 
   updateResourceEntities(
-    "re_patterns",
-    ["id"],
-    [...data.data.patterns],
+    "score_config",
+    ["entityId"],
+    scoreConfigs.map((scoreConfig: any) => ({
+      ...scoreConfig,
+      entityId: scoreConfig.entityId ?? scoreConfig.entity_id ?? scoreConfig.id,
+    })),
     false,
     "name",
   );
 
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getScorers = async () => {
+  const scorers = await onlineEvalsService.scorers.list(
+    store.state.selectedOrganization.identifier,
+  );
+
+  updateResourceEntities(
+    "scorer",
+    ["entityId"],
+    scorers.map((scorer: any) => ({
+      ...scorer,
+      entityId: scorer.entityId ?? scorer.entity_id ?? scorer.id,
+    })),
+    false,
+    "name",
+  );
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getEvalJobs = async () => {
+  const evalJobs = await onlineEvalsService.jobs.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("eval_job", ["id"], evalJobs, false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getAnnotationQueues = async () => {
+  const queues = await llmQueuesService.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("annotation_queue", ["id"], queues, false, "name");
+
+  return new Promise((resolve) => {
+    resolve(true);
+  });
+};
+
+const getDatasets = async () => {
+  const datasets = await llmDatasetsService.list(store.state.selectedOrganization.identifier);
+
+  updateResourceEntities("dataset", ["id"], datasets, false, "name");
+
+  return new Promise((resolve) => {
     resolve(true);
   });
 };
@@ -1799,6 +1961,9 @@ const updateEntityEntities = (
       if (entity.childName === "alert") {
         entityName = entity["name"] + "/" + _entity["alert_id"];
       }
+      if (entity.childName === "report") {
+        entityName = entity["name"] + "/" + _entity["report_id"];
+      }
     }
 
     return {
@@ -1806,61 +1971,37 @@ const updateEntityEntities = (
       permission: {
         AllowAll: {
           value: selectedPermissionsHash.value.has(
-            getPermissionHash(
-              entity.childName as string,
-              "AllowAll",
-              entityName,
-            ),
+            getPermissionHash(entity.childName as string, "AllowAll", entityName),
           ),
           show: true,
         },
         AllowGet: {
           value: selectedPermissionsHash.value.has(
-            getPermissionHash(
-              entity.childName as string,
-              "AllowGet",
-              entityName,
-            ),
+            getPermissionHash(entity.childName as string, "AllowGet", entityName),
           ),
           show: true,
         },
         AllowDelete: {
           value: selectedPermissionsHash.value.has(
-            getPermissionHash(
-              entity.childName as string,
-              "AllowDelete",
-              entityName,
-            ),
+            getPermissionHash(entity.childName as string, "AllowDelete", entityName),
           ),
           show: true,
         },
         AllowPut: {
           value: selectedPermissionsHash.value.has(
-            getPermissionHash(
-              entity.childName as string,
-              "AllowPut",
-              entityName,
-            ),
+            getPermissionHash(entity.childName as string, "AllowPut", entityName),
           ),
           show: true,
         },
         AllowList: {
           value: selectedPermissionsHash.value.has(
-            getPermissionHash(
-              entity.childName as string,
-              "AllowList",
-              entityName,
-            ),
+            getPermissionHash(entity.childName as string, "AllowList", entityName),
           ),
           show: hasEntities,
         },
         AllowPost: {
           value: selectedPermissionsHash.value.has(
-            getPermissionHash(
-              entity.childName as string,
-              "AllowPost",
-              entityName,
-            ),
+            getPermissionHash(entity.childName as string, "AllowPost", entityName),
           ),
           show: hasEntities,
         },
@@ -1960,9 +2101,24 @@ const updateResourceEntities = (
       display_name: displayNameKey ? _entity[displayNameKey] : entityName,
       show: true,
       childName: childName || "",
-      top_level: !!resource.childs.find((child) => child.name === childName)
-        ?.top_level,
+      top_level: !!resource.childs.find((child) => child.name === childName)?.top_level,
     });
+    // Hide non-applicable permissions for logs_pattern and logs_insights entities
+    if (resourceName === "logs_pattern" || resourceName === "logs_insights") {
+      const entity = resource.entities[resource.entities.length - 1];
+      entity.permission.AllowList.show = false;
+      entity.permission.AllowDelete.show = false;
+      entity.permission.AllowPost.show = false;
+      entity.permission.AllowPut.show = false;
+    }
+    // Hide non-applicable permissions for logs_cache entities (only All and Delete)
+    if (resourceName === "logs_cache") {
+      const entity = resource.entities[resource.entities.length - 1];
+      entity.permission.AllowList.show = false;
+      entity.permission.AllowGet.show = false;
+      entity.permission.AllowPost.show = false;
+      entity.permission.AllowPut.show = false;
+    }
   });
 };
 
@@ -2070,25 +2226,28 @@ const updateResourceResource = (
 const saveRole = () => {
   if (permissionsUiType.value === "json") updateJsonInTable();
 
+  // Users and service accounts are both sent as users; merge the two staging
+  // sets (dedup via Set) for the request payload.
   const payload = {
     add: Object.values(addedPermissions.value),
     remove: Object.values(removedPermissions.value),
-    add_users: Array.from(addedUsers.value) as string[],
-    remove_users: Array.from(removedUsers.value) as string[],
+    add_users: Array.from(
+      new Set([...addedUsers.value, ...addedServiceAccounts.value]),
+    ) as string[],
+    remove_users: Array.from(
+      new Set([...removedUsers.value, ...removedServiceAccounts.value]),
+    ) as string[],
   };
 
-  if (
-    !(
-      payload.add.length ||
-      payload.remove.length ||
-      payload.add_users.length ||
-      payload.remove_users.length
-    )
-  ) {
-    q.notify({
-      type: "info",
-      message: `No updates detected.`,
-      timeout: 3000,
+  if (!(
+    payload.add.length ||
+    payload.remove.length ||
+    payload.add_users.length ||
+    payload.remove_users.length
+  )) {
+    toast({
+      variant: "info",
+      message: t("iam.editRole.noUpdatesDetected"),
     });
 
     return;
@@ -2099,20 +2258,18 @@ const saveRole = () => {
     org_identifier: store.state.selectedOrganization.identifier,
     payload,
   })
-    .then(async (res) => {
+    .then(async () => {
       // combine permissionsHash and selectedPermissionsHash
 
-      q.notify({
-        type: "positive",
-        message: `Updated role successfully!`,
-        timeout: 3000,
+      toast({
+        variant: "success",
+        message: t("iam.editRole.updateSuccess"),
       });
 
       // Resetting permissions state on save
 
       Object.keys(removedPermissions.value).forEach((permission) => {
-        if (permissionsHash.value.has(permission))
-          permissionsHash.value.delete(permission);
+        if (permissionsHash.value.has(permission)) permissionsHash.value.delete(permission);
 
         if (selectedPermissionsHash.value.has(permission))
           selectedPermissionsHash.value.delete(permission);
@@ -2130,64 +2287,41 @@ const saveRole = () => {
       removedPermissions.value = {};
 
       roleUsers.value = roleUsers.value.filter(
-        (user) => !removedUsers.value.has(user),
+        (user) => !removedUsers.value.has(user) && !removedServiceAccounts.value.has(user),
       );
 
       addedUsers.value.forEach((value: any) => {
         roleUsers.value.push(value);
       });
 
+      addedServiceAccounts.value.forEach((value: any) => {
+        roleUsers.value.push(value);
+      });
+
       addedUsers.value = new Set([]);
 
       removedUsers.value = new Set([]);
+
+      addedServiceAccounts.value = new Set([]);
+
+      removedServiceAccounts.value = new Set([]);
     })
     .catch((err) => {
       if (err.response.status != 403) {
-        q.notify({
-          type: "negative",
-          message: `Error while updating role!`,
-          timeout: 3000,
+        toast({
+          variant: "error",
+          message: t("iam.editRole.updateError"),
         });
       }
       console.log(err);
     });
 };
 
-const filterColumns = (options: any[], val: String, update: Function) => {
-  let filteredOptions: any[] = [];
-  if (val === "") {
-    update(() => {
-      filteredOptions = [...options];
-    });
-    return filteredOptions;
-  }
-  update(() => {
-    const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.label.toLowerCase().indexOf(value) > -1,
-    );
-  });
-  return filteredOptions;
-};
-
-const filterResourceOptions = (val: string, update: any) => {
-  filteredResources.value = filterColumns(
-    resourceOptions.value,
-    val,
-    update,
-  ) as any[];
-};
-
 const updateEntityPermission = (
   resource: Resource | Entity,
   resourceName: string,
   entityName: string,
-  permission:
-    | "AllowAll"
-    | "AllowList"
-    | "AllowGet"
-    | "AllowDelete"
-    | "AllowPost",
+  permission: "AllowAll" | "AllowList" | "AllowGet" | "AllowDelete" | "AllowPost",
 ) => {
   if (resource?.entities)
     resource.entities.forEach((entity: Entity) => {
@@ -2208,4 +2342,3 @@ const toggleHelpSection = async () => {
   permissionJsonEditorRef.value.resetEditorLayout();
 };
 </script>
-<style scoped></style>

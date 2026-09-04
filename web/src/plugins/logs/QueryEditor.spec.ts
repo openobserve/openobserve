@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
-
 import QueryEditor from "@/components/CodeQueryEditor.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -27,14 +24,9 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
-
 describe.skip("Search Result", async () => {
   let wrapper: any;
   beforeEach(async () => {
-    
     wrapper = mount(QueryEditor, {
       attachTo: "#app",
       props: {

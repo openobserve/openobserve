@@ -1,12 +1,19 @@
+// Copyright 2026 OpenObserve Inc.
 import { describe, it, expect, beforeEach } from "vitest";
-import { useMetricsCorrelationDashboard, type MetricsCorrelationConfig } from "./useMetricsCorrelationDashboard";
+import {
+  useMetricsCorrelationDashboard,
+  type MetricsCorrelationConfig,
+} from "./useMetricsCorrelationDashboard";
 import type { StreamInfo } from "@/services/service_streams";
+import i18nInstance from "@/locales";
+
+const t = (i18nInstance.global as any).t;
 
 describe("useMetricsCorrelationDashboard", () => {
   let composable: ReturnType<typeof useMetricsCorrelationDashboard>;
 
   beforeEach(() => {
-    composable = useMetricsCorrelationDashboard();
+    composable = useMetricsCorrelationDashboard(t);
   });
 
   describe("generateDashboard", () => {
@@ -68,8 +75,8 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(panel.queryType).toBe("sql");
       expect(panel.queries).toHaveLength(1);
       expect(panel.queries[0].query).toContain('FROM "cpu_usage"');
-      expect(panel.queries[0].query).toContain("service = 'api'");
-      expect(panel.queries[0].query).toContain('"k8s-cluster" = \'prod\'');
+      expect(panel.queries[0].query).toContain("\"service\" = 'api'");
+      expect(panel.queries[0].query).toContain("\"k8s-cluster\" = 'prod'");
     });
 
     it("should handle special characters in filter values", () => {
@@ -95,7 +102,7 @@ describe("useMetricsCorrelationDashboard", () => {
       const query = dashboard.tabs[0].panels[0].queries[0].query;
 
       // Single quotes should be escaped
-      expect(query).toContain("description = 'it''s a test'");
+      expect(query).toContain("\"description\" = 'it''s a test'");
     });
 
     it("should position panels in 3-column grid", () => {
@@ -125,7 +132,84 @@ describe("useMetricsCorrelationDashboard", () => {
 
       // Second row
       expect(panels[3].layout.x).toBe(0);
-      expect(panels[3].layout.y).toBe(16);
+      expect(panels[3].layout.y).toBe(14);
+    });
+
+    it("should use default panelWidth=64 and panelHeight=16 in createMetricPanel when not provided", () => {
+      const metricStreams: StreamInfo[] = [
+        { stream_name: "cpu_usage", filters: {} },
+        { stream_name: "memory_usage", filters: {} },
+        { stream_name: "disk_io", filters: {} },
+        { stream_name: "network_rx", filters: {} },
+      ];
+
+      const config: MetricsCorrelationConfig = {
+        serviceName: "test",
+        matchedDimensions: {},
+        metricStreams: [],
+        orgIdentifier: "test-org",
+        timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+      };
+
+      // No panelWidth / panelHeight passed — defaults apply
+      const dashboard = composable.generateDashboard(metricStreams, config);
+      const panels = dashboard.tabs[0].panels;
+
+      // Width and height use defaults
+      expect(panels[0].layout.w).toBe(64);
+      expect(panels[0].layout.h).toBe(14);
+
+      // x is col * 64 (default panelWidth)
+      expect(panels[0].layout.x).toBe(0); // col 0
+      expect(panels[1].layout.x).toBe(64); // col 1
+      expect(panels[2].layout.x).toBe(128); // col 2
+
+      // y is row * 16 (default panelHeight)
+      expect(panels[0].layout.y).toBe(0); // row 0
+      expect(panels[3].layout.y).toBe(14); // row 1
+    });
+
+    it("should use custom panelWidth and panelHeight in createMetricPanel when provided", () => {
+      const metricStreams: StreamInfo[] = [
+        { stream_name: "cpu_usage", filters: {} },
+        { stream_name: "memory_usage", filters: {} },
+        { stream_name: "disk_io", filters: {} },
+        { stream_name: "network_rx", filters: {} },
+      ];
+
+      const config: MetricsCorrelationConfig = {
+        serviceName: "test",
+        matchedDimensions: {},
+        metricStreams: [],
+        orgIdentifier: "test-org",
+        timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+      };
+
+      const customWidth = 100;
+      const customHeight = 20;
+      const dashboard = composable.generateDashboard(
+        metricStreams,
+        config,
+        "dark",
+        customWidth,
+        customHeight,
+      );
+      const panels = dashboard.tabs[0].panels;
+
+      // Width and height use custom values
+      expect(panels[0].layout.w).toBe(customWidth);
+      expect(panels[0].layout.h).toBe(customHeight);
+
+      // Columns are derived from how many panels fit in the 192-unit grid:
+      // cols = floor(192 / 100) = 1, so panels stack in a single column.
+      expect(panels[0].layout.x).toBe(0); // col 0
+      expect(panels[1].layout.x).toBe(0); // wraps to next row (only 1 col fits)
+      expect(panels[2].layout.x).toBe(0);
+
+      // y is row * customHeight; with 1 column each panel is its own row
+      expect(panels[0].layout.y).toBe(0); // row 0 * 20
+      expect(panels[1].layout.y).toBe(customHeight); // row 1 * 20
+      expect(panels[3].layout.y).toBe(customHeight * 3); // row 3 * 20
     });
   });
 
@@ -191,8 +275,8 @@ describe("useMetricsCorrelationDashboard", () => {
       // Should only use matched dimension values from API filters
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
       expect(query).toContain('FROM "default"');
-      expect(query).toContain("service_name = 'api'");
-      expect(query).toContain("env = 'prod'");
+      expect(query).toContain("\"service_name\" = 'api'");
+      expect(query).toContain("\"env\" = 'prod'");
       expect(query).not.toContain("host = 'server01'"); // Not in API filters
     });
 
@@ -220,7 +304,7 @@ describe("useMetricsCorrelationDashboard", () => {
       expect(dashboard).toBeDefined();
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
       expect(query).toContain('FROM "correlated_logs"');
-      expect(query).toContain('"k8s-pod" = \'api-xyz\'');
+      expect(query).toContain("\"k8s-pod\" = 'api-xyz'");
     });
 
     it("should return null when no log streams available", () => {
@@ -270,7 +354,7 @@ describe("useMetricsCorrelationDashboard", () => {
 
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
       // Should only include service_name (string, non-internal) in WHERE clause
-      expect(query).toContain("service_name = 'api'");
+      expect(query).toContain("\"service_name\" = 'api'");
       expect(query).not.toContain("port");
       expect(query).not.toContain("enabled");
       // _timestamp appears in ORDER BY, not in WHERE clause (which is correct)
@@ -304,16 +388,15 @@ describe("useMetricsCorrelationDashboard", () => {
       const query = dashboard!.tabs[0].panels[0].queries[0].query;
 
       // Fields with hyphens should be quoted
-      expect(query).toContain('"k8s-cluster" = \'prod\'');
-      expect(query).toContain('"k8s-namespace" = \'default\'');
-      // Regular field names should not be quoted
-      expect(query).toContain("service = 'api'");
+      expect(query).toContain("\"k8s-cluster\" = 'prod'");
+      expect(query).toContain("\"k8s-namespace\" = 'default'");
+      // Regular field names are quoted too — every identifier goes through
+      // quoteSqlIdentifier so escaping can never be forgotten (F2/F38)
+      expect(query).toContain("\"service\" = 'api'");
     });
 
     it("should set table_dynamic_columns for logs panel", () => {
-      const logStreams: StreamInfo[] = [
-        { stream_name: "app_logs", filters: {} },
-      ];
+      const logStreams: StreamInfo[] = [{ stream_name: "app_logs", filters: {} }];
 
       const config: MetricsCorrelationConfig = {
         serviceName: "api-server",
@@ -330,6 +413,56 @@ describe("useMetricsCorrelationDashboard", () => {
 
       expect(dashboard!.tabs[0].panels[0].config.table_dynamic_columns).toBe(true);
       expect(dashboard!.tabs[0].panels[0].type).toBe("table");
+    });
+
+    it("should use default panelWidth=192 and panelHeight=44 in createCorrelationDashboard when not provided", () => {
+      const logStreams: StreamInfo[] = [{ stream_name: "app_logs", filters: {} }];
+
+      const config: MetricsCorrelationConfig = {
+        serviceName: "api-server",
+        matchedDimensions: {},
+        metricStreams: [],
+        orgIdentifier: "test-org",
+        timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+      };
+
+      // No panelWidth / panelHeight passed — defaults apply
+      const dashboard = composable.generateLogsDashboard(logStreams, config);
+      const layout = dashboard!.tabs[0].panels[0].layout;
+
+      expect(layout.w).toBe(192);
+      expect(layout.h).toBe(44);
+      // Single-stream panel always positioned at top-left
+      expect(layout.x).toBe(0);
+      expect(layout.y).toBe(0);
+    });
+
+    it("should use custom panelWidth and panelHeight in createCorrelationDashboard when provided", () => {
+      const logStreams: StreamInfo[] = [{ stream_name: "app_logs", filters: {} }];
+
+      const config: MetricsCorrelationConfig = {
+        serviceName: "api-server",
+        matchedDimensions: {},
+        metricStreams: [],
+        orgIdentifier: "test-org",
+        timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+      };
+
+      const customWidth = 256;
+      const customHeight = 60;
+      const dashboard = composable.generateLogsDashboard(
+        logStreams,
+        config,
+        customWidth,
+        customHeight,
+      );
+      const layout = dashboard!.tabs[0].panels[0].layout;
+
+      expect(layout.w).toBe(customWidth);
+      expect(layout.h).toBe(customHeight);
+      // Position is always fixed at top-left regardless of dimensions
+      expect(layout.x).toBe(0);
+      expect(layout.y).toBe(0);
     });
   });
 
@@ -358,9 +491,7 @@ describe("useMetricsCorrelationDashboard", () => {
     });
 
     it("should handle streams with empty filters", () => {
-      const logStreams: StreamInfo[] = [
-        { stream_name: "app_logs", filters: {} },
-      ];
+      const logStreams: StreamInfo[] = [{ stream_name: "app_logs", filters: {} }];
 
       const config: MetricsCorrelationConfig = {
         serviceName: "test",
@@ -381,9 +512,7 @@ describe("useMetricsCorrelationDashboard", () => {
     });
 
     it("should use time range from config", () => {
-      const metricStreams: StreamInfo[] = [
-        { stream_name: "cpu", filters: {} },
-      ];
+      const metricStreams: StreamInfo[] = [{ stream_name: "cpu", filters: {} }];
 
       const config: MetricsCorrelationConfig = {
         serviceName: "test",
@@ -400,6 +529,60 @@ describe("useMetricsCorrelationDashboard", () => {
 
       expect(dashboard.defaultDatetimeDuration.startTime).toBe(1234567890000000);
       expect(dashboard.defaultDatetimeDuration.endTime).toBe(1234567990000000);
+    });
+  });
+
+  describe("subject overrides (F31)", () => {
+    const semanticGroups = [
+      {
+        id: "k8s-namespace",
+        fields: ["k8s_namespace_name", "service_k8s_namespace_name"],
+      },
+    ] as MetricsCorrelationConfig["semanticGroups"];
+
+    const buildConfig = (
+      overrides: Partial<MetricsCorrelationConfig>,
+    ): MetricsCorrelationConfig => ({
+      serviceName: "api",
+      matchedDimensions: { "k8s-namespace": "staging" },
+      metricStreams: [],
+      orgIdentifier: "test-org",
+      timeRange: { startTime: 1000000000000000, endTime: 1000000900000000 },
+      semanticGroups,
+      ...overrides,
+    });
+
+    it("replaces the stream's own alias rather than ANDing both aliases", () => {
+      const metricStreams: StreamInfo[] = [
+        { stream_name: "cpu", filters: { service_k8s_namespace_name: "prod" } },
+      ];
+
+      const dashboard = composable.generateDashboard(
+        metricStreams,
+        buildConfig({
+          metricSchemas: {
+            cpu: { schema: [{ name: "k8s_namespace_name" }, { name: "value" }] },
+          },
+        }),
+      );
+
+      const query = dashboard.tabs[0].panels[0].queries[0].query;
+      expect(query).toContain(`"k8s_namespace_name" = 'staging'`);
+      expect(query).not.toContain("service_k8s_namespace_name");
+    });
+
+    it("does not guess a field name when the stream schema is unavailable", () => {
+      const metricStreams: StreamInfo[] = [
+        { stream_name: "cpu", filters: { service_k8s_namespace_name: "prod" } },
+      ];
+
+      // No metricSchemas entry -> schema unknown. Guessing an alias here used to
+      // emit a WHERE on a nonexistent column and kill the panel.
+      const dashboard = composable.generateDashboard(metricStreams, buildConfig({}));
+
+      const query = dashboard.tabs[0].panels[0].queries[0].query;
+      expect(query).toContain(`"service_k8s_namespace_name" = 'prod'`);
+      expect(query).not.toContain("'staging'");
     });
   });
 });

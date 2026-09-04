@@ -1,13 +1,20 @@
 <template>
   <svg
+    data-test="dashboard-icon-step-middle-svg"
     width="82"
     height="83"
     viewBox="0 0 82 83"
     fill="none"
     xmlns="http://www.w3.org/2000/svg"
   >
-    <path d="M80 77V6.5H39V77H0" stroke="currentColor" stroke-width="4" />
+    <path
+      data-test="dashboard-icon-step-middle-path"
+      d="M80 77V6.5H39V77H0"
+      stroke="currentColor"
+      stroke-width="4"
+    />
     <circle
+      data-test="dashboard-icon-step-middle-circle"
       cx="6"
       cy="6"
       r="6"
@@ -15,6 +22,7 @@
       fill="currentColor"
     />
     <circle
+      data-test="dashboard-icon-step-middle-circle"
       cx="6"
       cy="6"
       r="6"

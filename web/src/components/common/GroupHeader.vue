@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,54 +15,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:flex tw:items-center tw:gap-2">
-    <img v-if="showIcon" style="width: 24px; height: 24px;" :src="icon" alt="icon" />
-    <span class="title-text">
+  <div class="flex items-center gap-2">
+    <img class="size-6" v-if="showIcon" :src="icon" :alt="t('components.groupHeader.icon')" />
+    <span data-test="common-group-header-title" class="text-base leading-6 font-bold">
       {{ title }}
     </span>
-    <span class="tw:flex-1">
-      <q-separator />
+    <span class="flex-1">
+      <OSeparator />
     </span>
   </div>
 </template>
-  
+
 <script lang="ts">
 import { getImageURL } from "@/utils/zincutils";
-import { computed, defineComponent } from "vue";
+import { computed, defineComponent, type PropType } from "vue";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "GroupHeader",
-  components: {},
+  components: { OSeparator },
   props: {
+    // Double cast is required: `StringConstructor` yields plain `string`, which
+    // does not overlap the branded `I18nText`. (`<script setup>` needs no cast.)
     title: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
-    iconPath:{
+    iconPath: {
       type: String,
       default: "",
     },
     showIcon: {
       type: Boolean,
       default: true,
-    }
+    },
   },
-  setup(props, { emit }) {
+  setup(props) {
+    const { t } = useI18nTyped();
     const icon = computed(() => {
-      return getImageURL(props.iconPath)
-    })
+      return getImageURL(props.iconPath);
+    });
     return {
       icon,
+      t,
     };
   },
 });
 </script>
-    
-<style scoped lang="scss">
-.title-text{
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 24px;
-}
-</style>
-    

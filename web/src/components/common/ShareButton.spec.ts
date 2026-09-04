@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,25 +15,17 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "../../test/unit/helpers/install-quasar-plugin";
-import { Notify, copyToClipboard } from "quasar";
 import ShareButton from "./ShareButton.vue";
 import { createStore } from "vuex";
 import { createI18n } from "vue-i18n";
 import shortURLService from "@/services/short_url";
 
-installQuasar({
-  plugins: { Notify },
-});
-
 // Mock copyToClipboard
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    copyToClipboard: vi.fn(() => Promise.resolve()),
-  };
-});
+vi.mock("@/utils/clipboard", () => ({
+  copyToClipboard: vi.fn(() => Promise.resolve(true)),
+}));
+
+import { copyToClipboard } from "@/utils/clipboard";
 
 // Mock short URL service
 vi.mock("@/services/short_url", () => ({
@@ -42,7 +34,7 @@ vi.mock("@/services/short_url", () => ({
       Promise.resolve({
         status: 200,
         data: { short_url: "https://short.url/abc123" },
-      })
+      }),
     ),
   },
 }));
@@ -79,7 +71,8 @@ describe("ShareButton", () => {
             linkCopiedSuccessfully: "Link copied successfully",
             errorCopyingLink: "Error copying link",
             errorShorteningLink: "Error shortening link",
-            webUrlNotConfigured: "Share URL is disabled until ZO_WEB_URL is configured by your administrator.",
+            webUrlNotConfigured:
+              "Share URL is disabled until ZO_WEB_URL is configured by your administrator.",
           },
         },
       },
@@ -100,16 +93,29 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
+          OButton: {
             template: '<button :data-test="dataTest"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
 
     expect(wrapper.exists()).toBe(true);
+  });
+
+  it("exposes handleShareClick, which keyboard shortcuts invoke through a template ref", () => {
+    const wrapper = mount(ShareButton, {
+      props: {
+        url: "https://example.com/logs?query=test",
+      },
+      global: {
+        plugins: [store, i18n],
+      },
+    });
+
+    expect(typeof wrapper.vm.handleShareClick).toBe("function");
   });
 
   it("should disable button when no URL is provided", () => {
@@ -120,23 +126,24 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
+          OButton: {
             template: '<button :disable="disable"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
 
     const button = wrapper.find("button");
-    expect(button.attributes("disable")).toBeDefined();
+    expect(button.attributes("disabled")).toBeDefined();
   });
 
   it("should copy URL to clipboard on click (Chrome)", async () => {
     // Mock non-Safari browser
     Object.defineProperty(window.navigator, "userAgent", {
-      value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      value:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
       configurable: true,
     });
 
@@ -156,12 +163,12 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
-            template: '<button @click="$emit(\'click\')"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
-            emits: ['click'],
+          OButton: {
+            template: "<button @click=\"$emit('click')\"><slot /></button>",
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
+            emits: ["click"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -170,20 +177,30 @@ describe("ShareButton", () => {
     await flushPromises();
 
     expect(mockCreate).toHaveBeenCalledWith("test-org", "https://example.com/logs?query=test");
-    expect(mockCopyToClipboard).toHaveBeenCalledWith("https://short.url/abc123");
+    expect(mockCopyToClipboard).toHaveBeenCalledWith(
+      "https://short.url/abc123",
+      expect.any(Function),
+      {
+        successMessage: "Link copied successfully",
+        errorMessage: "Error copying link",
+        timeout: 5000,
+      },
+    );
   });
 
   it("should emit copy:success event when copy succeeds (Chrome)", async () => {
     // Mock non-Safari browser
     Object.defineProperty(window.navigator, "userAgent", {
-      value: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
+      value:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36",
       configurable: true,
     });
 
     const mockCopyToClipboard = copyToClipboard as any;
     const mockCreate = shortURLService.create as any;
 
-    mockCopyToClipboard.mockResolvedValue(undefined);
+    // Must resolve to true so the component emits copy:success (not copy:error)
+    mockCopyToClipboard.mockResolvedValue(true);
     mockCreate.mockResolvedValue({
       status: 200,
       data: { short_url: "https://short.url/abc123" },
@@ -196,12 +213,12 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
-            template: '<button @click="$emit(\'click\')"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
-            emits: ['click'],
+          OButton: {
+            template: "<button @click=\"$emit('click')\"><slot /></button>",
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
+            emits: ["click"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -226,11 +243,11 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
-            template: '<button><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+          OButton: {
+            template: "<button><slot /></button>",
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          QTooltip: {
+          OTooltip: {
             template: '<div class="tooltip">{{ $slots.default?.()[0]?.children }}</div>',
           },
         },
@@ -250,18 +267,13 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
-            template: '<button :class="buttonClass" :size="buttonSize"><slot /></button>',
-            props: ['dataTest', 'buttonClass', 'buttonSize', 'loading', 'disable', 'icon'],
-          },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
 
     const button = wrapper.find("button");
-    expect(button.attributes("class")).toBe("custom-class");
-    expect(button.attributes("size")).toBe("md");
+    expect(button.classes()).toContain("custom-class");
   });
 
   it("should show label when showLabel is true", () => {
@@ -273,11 +285,11 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
-            template: '<button><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+          OButton: {
+            template: "<button><slot /></button>",
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
@@ -294,17 +306,58 @@ describe("ShareButton", () => {
       global: {
         plugins: [store, i18n],
         stubs: {
-          QBtn: {
+          OButton: {
             template: '<button :disable="disable"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
 
     const button = wrapper.find("button");
-    expect(button.attributes("disable")).toBeDefined();
+    expect(button.attributes("disabled")).toBeDefined();
+  });
+
+  it("ignores a programmatic handleShareClick when web_url is not configured", async () => {
+    const storeWithoutWebUrl = createStore({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+        pendingShortURL: null,
+        zoConfig: { web_url: "" },
+      },
+      mutations: {
+        setPendingShortURL(state, payload) {
+          state.pendingShortURL = payload;
+        },
+        clearPendingShortURL(state) {
+          state.pendingShortURL = null;
+        },
+      },
+    });
+
+    const wrapper = mount(ShareButton, {
+      props: { url: "https://example.com/logs" },
+      global: { plugins: [storeWithoutWebUrl, i18n] },
+    });
+
+    // Keyboard shortcuts call this directly, so the disabled attribute cannot gate it.
+    wrapper.vm.handleShareClick();
+    await flushPromises();
+
+    expect(shortURLService.create).not.toHaveBeenCalled();
+  });
+
+  it("ignores a programmatic handleShareClick while the disabled prop is set", async () => {
+    const wrapper = mount(ShareButton, {
+      props: { url: "https://example.com/logs", disabled: true },
+      global: { plugins: [store, i18n] },
+    });
+
+    wrapper.vm.handleShareClick();
+    await flushPromises();
+
+    expect(shortURLService.create).not.toHaveBeenCalled();
   });
 
   it("should disable button when web_url is not configured", () => {
@@ -333,17 +386,17 @@ describe("ShareButton", () => {
       global: {
         plugins: [storeWithoutWebUrl, i18n],
         stubs: {
-          QBtn: {
+          OButton: {
             template: '<button :disable="disable"><slot /></button>',
-            props: ['dataTest', 'class', 'size', 'loading', 'disable', 'icon'],
+            props: ["dataTest", "class", "size", "loading", "disable", "icon"],
           },
-          QTooltip: { template: '<div><slot /></div>' },
+          OTooltip: { template: "<div><slot /></div>" },
         },
       },
     });
 
     const button = wrapper.find("button");
-    expect(button.attributes("disable")).toBeDefined();
+    expect(button.attributes("disabled")).toBeDefined();
   });
 
   it("should show warning tooltip when web_url is not configured", () => {

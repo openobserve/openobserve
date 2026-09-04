@@ -1,0 +1,299 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { escapeHtml } from "@/utils/html";
+import { gt, raw } from "@/types/i18n";
+
+/**
+ * Helper functions for tree view custom tooltips
+ */
+
+/**
+ * Emphasise a metric label. The markup lives here rather than in the message so
+ * the translations stay plain text (same rationale as `chip()` in
+ * `alerts/anomalySummaryGenerator.ts`).
+ */
+const bold = (value: string) => `<strong>${value}</strong>`;
+
+/**
+ * Format large numbers with K/M notation
+ */
+export const formatNumber = (n: number): string => {
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + "M";
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + "K";
+  return String(n);
+};
+
+/**
+ * Format latency from nanoseconds to human-readable string
+ */
+export const formatLatency = (ns: number): string => {
+  if (!ns) return raw("N/A");
+  const ms = ns / 1e6;
+  return ms >= 1000 ? (ms / 1000).toFixed(2) + "s" : ms.toFixed(2) + "ms";
+};
+
+/**
+ * Calculate point-to-cubic-bezier distance using 20-sample approximation
+ */
+export const pointToBezierDistance = (
+  px: number,
+  py: number,
+  shape: {
+    x1: number;
+    y1: number;
+    cpx1: number;
+    cpy1: number;
+    cpx2: number;
+    cpy2: number;
+    x2: number;
+    y2: number;
+  },
+): number => {
+  let min = Infinity;
+  const { x1, y1, cpx1, cpy1, cpx2, cpy2, x2, y2 } = shape;
+
+  for (let i = 0; i <= 20; i++) {
+    const t = i / 20;
+    const u = 1 - t;
+    const bx = u * u * u * x1 + 3 * u * u * t * cpx1 + 3 * u * t * t * cpx2 + t * t * t * x2;
+    const by = u * u * u * y1 + 3 * u * u * t * cpy1 + 3 * u * t * t * cpy2 + t * t * t * y2;
+    const d = Math.hypot(px - bx, py - by);
+    if (d < min) min = d;
+  }
+  return min;
+};
+
+/**
+ * Generate node tooltip HTML content with direction-aware metrics
+ */
+export const generateNodeTooltipContent = (
+  nodeName: string,
+  requests: number,
+  errors: number,
+  errorRate: number,
+): string => {
+  return `
+    <strong>${escapeHtml(nodeName)}</strong><br/>
+    ${gt("traces.graphTooltip.requests", { value: formatNumber(requests) })}<br/>
+    ${gt("traces.graphTooltip.errors", { value: formatNumber(errors) })}<br/>
+    ${gt("traces.graphTooltip.errorRate", { value: errorRate.toFixed(2) })}
+  `;
+};
+
+/**
+ * Generate edge tooltip HTML content
+ */
+export const generateEdgeTooltipContent = (
+  total: number,
+  failed: number,
+  errorRate: number,
+  p50Ns: number,
+  p95Ns: number,
+  p99Ns: number,
+): string => {
+  return `
+    ${bold(gt("traces.graphTooltip.requestsLabel"))} ${formatNumber(total)}<br/>
+    ${bold(gt("traces.graphTooltip.errorsLabel"))} ${failed} (${errorRate.toFixed(2)}%)<br/>
+    ${bold(gt("traces.graphTooltip.p50Label"))} ${formatLatency(p50Ns)}<br/>
+    ${bold(gt("traces.graphTooltip.p95Label"))} ${formatLatency(p95Ns)}<br/>
+    ${bold(gt("traces.graphTooltip.p99Label"))} ${formatLatency(p99Ns)}
+  `;
+};
+
+/**
+ * Find incoming edge data for a node in tree view
+ */
+export const findIncomingEdgeForNode = (
+  nodeName: string,
+  parentName: string | undefined,
+  edges: any[],
+): any | null => {
+  // Handle entry-point nodes (no parent or empty parent name)
+  if (!parentName || parentName === "") {
+    const edge = edges.find((e: any) => e.from === null && e.to === nodeName);
+    if (edge) return edge;
+    // Fallback to any edge to this node
+    return edges.find((e: any) => e.to === nodeName) || null;
+  }
+
+  // Try exact match first
+  const edge = edges.find((e: any) => e.from === parentName && e.to === nodeName);
+
+  if (edge) return edge;
+
+  // Fallback: find any edge to this node
+  return edges.find((e: any) => e.to === nodeName) || null;
+};
+
+/**
+ * Calculate total metrics from outgoing edges (for root nodes)
+ */
+export const calculateRootNodeMetrics = (
+  nodeName: string,
+  edges: any[],
+): { requests: number; errors: number; errorRate: number } => {
+  const outgoing = edges.filter((e: any) => e.from === nodeName);
+
+  if (outgoing.length === 0) {
+    return { requests: 0, errors: 0, errorRate: 0 };
+  }
+
+  const total = outgoing.reduce((s: number, e: any) => s + (e.total_requests || 0), 0);
+  const failed = outgoing.reduce((s: number, e: any) => s + (e.failed_requests || 0), 0);
+  const errorRate = total > 0 ? (failed / total) * 100 : 0;
+
+  return { requests: total, errors: failed, errorRate };
+};
+
+/**
+ * Generate service node tooltip content (for ServiceGraph)
+ */
+export const generateServiceNodeTooltipContent = (metadata: any): string => {
+  if (!metadata) return "";
+
+  const requests = metadata.requests || 0;
+  const errors = metadata.errors || 0;
+  const errorRate = metadata.errorRate || 0;
+
+  return `
+    <div class="tree-tooltip">
+      <div class="tooltip-header">${escapeHtml(metadata.serviceName || gt("traces.unknownService"))}</div>
+      <div class="tooltip-metrics">
+        <div>${gt("traces.graphTooltip.requests", { value: formatNumber(requests) })}</div>
+        <div>${gt("traces.graphTooltip.errors", { value: formatNumber(errors) })}</div>
+        <div>${gt("traces.graphTooltip.errorRate", { value: errorRate.toFixed(1) })}</div>
+      </div>
+    </div>
+  `;
+};
+
+/**
+ * Generate pattern node tooltip content (for TraceDetails patterns)
+ */
+export const generatePatternNodeTooltipContent = (metadata: any): string => {
+  if (!metadata) return "";
+  const {
+    serviceName,
+    pathSignature = gt("traces.unknownPattern"),
+    count = 1,
+    avg = 0,
+    traceTimePercent = 0,
+  } = metadata;
+
+  return `
+    <div class="flex flex-col gap-0.5">
+      <div class="font-semibold pb-1 text-left">${escapeHtml(serviceName || pathSignature)}</div>
+      <div class="flex justify-between gap-3">
+        <span class="w-12 text-left">${gt("traces.graphTooltip.spansLabel")}</span>
+        <span class="font-mono text-left flex-1">${count}</span>
+      </div>
+      <div class="flex justify-between gap-3">
+        <span class="w-12 text-left">${gt("traces.graphTooltip.averageLabel")}</span>
+        <span class="font-mono text-left flex-1">${gt("traces.graphTooltip.averageOfTrace", {
+          avg: avg.toFixed(2),
+          percent: traceTimePercent.toFixed(1),
+        })}</span>
+      </div>
+      <div class="flex justify-between gap-3">
+        <span class="w-12 text-left">${gt("traces.graphTooltip.errorsLabel")}</span>
+        <span class="font-mono text-left flex-1">${metadata.errorCount || 0}</span>
+      </div>
+    </div>
+  `;
+};
+
+/**
+ * Generate tooltip HTML content for trace pattern metrics
+ * Shows comprehensive duration metrics in single column format
+ */
+export const generateTracePatternTooltipContent = (metadata: any): string => {
+  if (!metadata) {
+    /* eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
+    return `
+      <div style="
+        font-family: var(--font-sans);
+        font-size: 0.75rem;
+        line-height: 1.4;
+        max-width: 17.5rem;
+        color: rgba(255, 255, 255, 0.88);
+      ">
+        <div style="
+          font-weight: 600;
+          font-size: 0.8125rem;
+          margin-bottom: 0.5rem;
+          color: rgba(255, 255, 255, 0.95);
+          border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+          padding-bottom: 0.25rem;
+        ">${gt("traces.unknownPattern")}</div>
+        <div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.callsLabel")} <span style="font-family: var(--font-mono);">1</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.averageLabel")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.minimumLabel")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.maximumLabel")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p75Label")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p95Label")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p99Label")} <span style="font-family: var(--font-mono);">0.0ms</span></div>
+          <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.errorRateLabel")} <span style="font-family: var(--font-mono); color: #10b981;">0.0%</span></div>
+        </div>
+      </div>
+    `;
+    /* eslint-enable local/no-hardcoded-px */
+  }
+
+  const {
+    pathSignature = gt("traces.unknownPattern"),
+    count = 1,
+    avg = 0,
+    min = 0,
+    max = 0,
+    p75 = 0,
+    p95 = 0,
+    p99 = 0,
+    errorRate = 0,
+  } = metadata;
+
+  /* eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
+  return `
+    <div style="
+      font-family: var(--font-sans);
+      font-size: 0.75rem;
+      line-height: 1.4;
+      max-width: 17.5rem;
+      color: rgba(255, 255, 255, 0.88);
+    ">
+      <div style="
+        font-weight: 600;
+        font-size: 0.8125rem;
+        margin-bottom: 0.5rem;
+        color: rgba(255, 255, 255, 0.95);
+        border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        padding-bottom: 0.25rem;
+      ">${escapeHtml(pathSignature)}</div>
+
+      <div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.callsLabel")} <span style="font-family: var(--font-mono);">${count}</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.averageLabel")} <span style="font-family: var(--font-mono);">${avg.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.minimumLabel")} <span style="font-family: var(--font-mono);">${min.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.maximumLabel")} <span style="font-family: var(--font-mono);">${max.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p75Label")} <span style="font-family: var(--font-mono);">${p75.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p95Label")} <span style="font-family: var(--font-mono);">${p95.toFixed(1)}ms</span></div>
+        <div style="margin-bottom: 0.125rem;">${gt("traces.graphTooltip.p99Label")} <span style="font-family: var(--font-mono);">${p99.toFixed(1)}ms</span></div>
+        <div>${gt("traces.graphTooltip.errorRateLabel")} <span style="font-family: var(--font-mono); color: ${errorRate > 0 ? "#ef4444" : "#10b981"};">${errorRate.toFixed(1)}%</span></div>
+      </div>
+    </div>
+  `;
+  /* eslint-enable local/no-hardcoded-px */
+};

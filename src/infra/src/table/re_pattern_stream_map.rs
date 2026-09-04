@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,9 +17,9 @@ use config::meta::stream::StreamType;
 use sea_orm::{ColumnTrait, DbErr, EntityTrait, QueryFilter, Set, SqlErr, TransactionTrait};
 use serde::{Deserialize, Serialize};
 
-use super::{entity::re_pattern_stream_map::*, get_lock};
+use super::entity::re_pattern_stream_map::*;
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
@@ -124,24 +124,18 @@ pub async fn add(entry: PatternAssociationEntry) -> Result<(), errors::Error> {
         ..Default::default()
     };
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     match Entity::insert(record).exec(client).await {
         Ok(_) => {}
-        Err(e) => {
-            drop(_lock);
-            match e.sql_err() {
-                Some(SqlErr::UniqueConstraintViolation(_)) => {
-                    return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
-                }
-                _ => {
-                    return Err(e.into());
-                }
+        Err(e) => match e.sql_err() {
+            Some(SqlErr::UniqueConstraintViolation(_)) => {
+                return Err(errors::Error::DbError(errors::DbError::UniqueViolation));
             }
-        }
+            _ => {
+                return Err(e.into());
+            }
+        },
     }
-    drop(_lock);
 
     Ok(())
 }
@@ -150,9 +144,7 @@ pub async fn batch_process(
     added: Vec<PatternAssociationEntry>,
     removed: Vec<PatternAssociationEntry>,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     let txn = client.begin().await?;
 
     // we MUST first remove the entries and then add. This is because
@@ -205,7 +197,7 @@ pub async fn batch_process(
 pub async fn get_by_pattern_id(
     pattern_id: &str,
 ) -> Result<Vec<PatternAssociationEntry>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = Entity::find()
         .filter(Column::PatternId.eq(pattern_id))
         .into_model::<Model>()
@@ -219,7 +211,7 @@ pub async fn get_by_pattern_id(
 }
 
 pub async fn list_all() -> Result<Vec<PatternAssociationEntry>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let records = Entity::find().into_model::<Model>().all(client).await?;
 
@@ -235,9 +227,7 @@ pub async fn remove_associations_by_stream(
     stream: &str,
     stype: StreamType,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .filter(Column::Stream.eq(stream))
@@ -245,16 +235,129 @@ pub async fn remove_associations_by_stream(
         .exec(client)
         .await?;
 
-    drop(_lock);
-
     Ok(())
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
 
     Ok(())
+}
+
+/// Deletes all re_pattern stream map entries belonging to the given org.
+pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pattern_policy_from_str_all_variants() {
+        assert_eq!(PatternPolicy::from("DropField"), PatternPolicy::DropField);
+        assert_eq!(PatternPolicy::from("Redact"), PatternPolicy::Redact);
+        assert_eq!(PatternPolicy::from("Hash"), PatternPolicy::Hash);
+    }
+
+    #[test]
+    fn test_pattern_policy_from_unknown_defaults_to_redact() {
+        assert_eq!(PatternPolicy::from("Unknown"), PatternPolicy::Redact);
+        assert_eq!(PatternPolicy::from(""), PatternPolicy::Redact);
+    }
+
+    #[test]
+    fn test_pattern_policy_display() {
+        assert_eq!(PatternPolicy::DropField.to_string(), "DropField");
+        assert_eq!(PatternPolicy::Redact.to_string(), "Redact");
+        assert_eq!(PatternPolicy::Hash.to_string(), "Hash");
+    }
+
+    #[test]
+    fn test_apply_policy_from_str_all_variants() {
+        assert_eq!(ApplyPolicy::from("AtIngestion"), ApplyPolicy::AtIngestion);
+        assert_eq!(ApplyPolicy::from("AtSearch"), ApplyPolicy::AtSearch);
+        assert_eq!(ApplyPolicy::from("Both"), ApplyPolicy::Both);
+    }
+
+    #[test]
+    fn test_apply_policy_from_unknown_defaults_to_at_ingestion() {
+        assert_eq!(ApplyPolicy::from("unknown"), ApplyPolicy::AtIngestion);
+    }
+
+    #[test]
+    fn test_apply_policy_display() {
+        assert_eq!(ApplyPolicy::AtIngestion.to_string(), "AtIngestion");
+        assert_eq!(ApplyPolicy::AtSearch.to_string(), "AtSearch");
+        assert_eq!(ApplyPolicy::Both.to_string(), "Both");
+    }
+
+    #[test]
+    fn test_pattern_policy_roundtrip_via_string() {
+        for policy in [
+            PatternPolicy::DropField,
+            PatternPolicy::Redact,
+            PatternPolicy::Hash,
+        ] {
+            let s = policy.to_string();
+            assert_eq!(PatternPolicy::from(s.as_str()), policy);
+        }
+    }
+
+    #[test]
+    fn test_apply_policy_roundtrip_via_string() {
+        for policy in [
+            ApplyPolicy::AtIngestion,
+            ApplyPolicy::AtSearch,
+            ApplyPolicy::Both,
+        ] {
+            let s = policy.to_string();
+            assert_eq!(ApplyPolicy::from(s.as_str()), policy);
+        }
+    }
+
+    #[test]
+    fn test_pattern_association_entry_from_model_maps_all_fields() {
+        let model = Model {
+            id: 42,
+            org: "myorg".to_string(),
+            stream: "logs".to_string(),
+            stream_type: "logs".to_string(),
+            field: "email".to_string(),
+            pattern_id: "pat-1".to_string(),
+            policy: "Redact".to_string(),
+            apply_at: "AtIngestion".to_string(),
+        };
+        let entry = PatternAssociationEntry::from(model);
+        assert_eq!(entry.id, 42);
+        assert_eq!(entry.org, "myorg");
+        assert_eq!(entry.stream, "logs");
+        assert_eq!(entry.field, "email");
+        assert_eq!(entry.pattern_id, "pat-1");
+        assert_eq!(entry.policy, PatternPolicy::Redact);
+        assert_eq!(entry.apply_at, ApplyPolicy::AtIngestion);
+    }
+
+    #[test]
+    fn test_pattern_association_entry_from_model_drop_field_both() {
+        let model = Model {
+            id: 1,
+            org: "org".to_string(),
+            stream: "stream".to_string(),
+            stream_type: "metrics".to_string(),
+            field: "ip".to_string(),
+            pattern_id: "p2".to_string(),
+            policy: "DropField".to_string(),
+            apply_at: "Both".to_string(),
+        };
+        let entry = PatternAssociationEntry::from(model);
+        assert_eq!(entry.policy, PatternPolicy::DropField);
+        assert_eq!(entry.apply_at, ApplyPolicy::Both);
+    }
 }

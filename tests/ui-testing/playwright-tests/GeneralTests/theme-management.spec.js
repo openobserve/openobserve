@@ -14,9 +14,10 @@ test.describe("Theme Management Tests", () => {
     await navigateToBase(page);
     pm = new PageManager(page);
 
-    // Post-authentication stabilization wait
+    // Post-authentication stabilization wait — keyed on the profile button which
+    // is the first user-actionable element to mount after layout shell hydrates.
     await page.waitForLoadState('domcontentloaded');
-    await page.waitForTimeout(1000);
+    await expect(pm.themePage.profileMenuBtn).toBeVisible({ timeout: 10000 });
 
     testLogger.info('Theme management test setup completed');
   });
@@ -56,10 +57,12 @@ test.describe("Theme Management Tests", () => {
       await page.reload();
       await page.waitForLoadState('domcontentloaded');
 
-      // Wait for theme to be restored from storage (Vue/Quasar needs time to apply it)
+      // Wait for theme to be restored from storage (Vue needs time to apply it).
+      // The dark-mode signal is the `.dark` class on <html> (set by
+      // utils/theme.ts); the legacy `body--dark` on <body> was retired.
       await page.waitForFunction(
-        (darkClass) => document.body.classList.contains(darkClass),
-        'body--dark',
+        (darkClass) => document.documentElement.classList.contains(darkClass),
+        'dark',
         { timeout: 10000 }
       );
 
@@ -85,11 +88,11 @@ test.describe("Theme Management Tests", () => {
       testLogger.info('Predefined themes dialog opened');
 
       // Verify light mode tab is visible
-      await expect(page.locator(pm.themePage.lightModeTab)).toBeVisible();
+      await pm.themePage.expectLightModeTabVisible();
       testLogger.info('Light Mode tab visible');
 
       // Verify dark mode tab is visible
-      await expect(page.locator(pm.themePage.darkModeTab)).toBeVisible();
+      await pm.themePage.expectDarkModeTabVisible();
       testLogger.info('Dark Mode tab visible');
 
       // Switch between tabs
@@ -99,17 +102,15 @@ test.describe("Theme Management Tests", () => {
       await pm.themePage.selectLightModeTab();
       testLogger.info('Switched back to Light Mode tab');
 
-      // Verify predefined theme options (use .first() as themes exist in both Light and Dark tabs)
-      const expectedThemes = ['Ocean Breeze', 'Purple Dream', 'Indigo Night', 'Sky Blue'];
+      // Verify predefined theme options (Light tab is currently active)
+      const expectedThemes = ['O2 Signature', 'O2 Pulse', 'O2 Horizon', 'O2 Beacon'];
       for (const themeName of expectedThemes) {
-        const themeCard = page.locator(pm.themePage.themeCard).filter({ hasText: themeName }).first();
-        await expect(themeCard).toBeVisible();
+        await pm.themePage.expectThemeCardVisible(themeName, 'light');
         testLogger.info(`Theme "${themeName}" is visible`);
       }
 
       // Verify Custom Color option exists
-      const customCard = page.locator(pm.themePage.themeCard).filter({ hasText: 'Custom Color' }).first();
-      await expect(customCard).toBeVisible();
+      await pm.themePage.expectCustomColorCardVisible('light');
       testLogger.info('Custom Color option is visible');
 
       // Close dialog
@@ -129,22 +130,22 @@ test.describe("Theme Management Tests", () => {
       // Open predefined themes dialog
       await pm.themePage.openPredefinedThemesDialog();
 
-      // Apply "Ocean Breeze" theme
-      await pm.themePage.applyThemeByName('Ocean Breeze');
-      testLogger.info('Applied Ocean Breeze theme');
+      // Apply "O2 Pulse" theme
+      await pm.themePage.applyThemeByName('O2 Pulse');
+      testLogger.info('Applied O2 Pulse theme');
 
       // Verify notification
       await pm.themePage.expectNotificationContains('applied');
       testLogger.info('Theme application notification shown');
 
       // Verify "Applied" badge appears
-      const isApplied = await pm.themePage.isThemeApplied('Ocean Breeze');
+      const isApplied = await pm.themePage.isThemeApplied('O2 Pulse');
       expect(isApplied).toBe(true);
-      testLogger.info('Applied badge shown for Ocean Breeze');
+      testLogger.info('Applied badge shown for O2 Pulse');
 
       // Now test reset - Apply a different theme first
-      await pm.themePage.applyThemeByName('Purple Dream');
-      testLogger.info('Applied Purple Dream theme');
+      await pm.themePage.applyThemeByName('O2 Horizon');
+      testLogger.info('Applied O2 Horizon theme');
 
       // Reset to default
       await pm.themePage.resetToDefaultTheme();
@@ -179,9 +180,9 @@ test.describe("Theme Management Tests", () => {
       // Select dark mode tab
       await pm.themePage.selectDarkModeTab();
 
-      // Apply "Sky Blue" theme for dark mode
-      await pm.themePage.applyThemeByName('Sky Blue');
-      testLogger.info('Applied Sky Blue theme in dark mode');
+      // Apply "O2 Beacon" theme for dark mode
+      await pm.themePage.applyThemeByName('O2 Beacon', 'dark');
+      testLogger.info('Applied O2 Beacon theme in dark mode');
 
       // Verify notification
       await pm.themePage.expectNotificationContains('applied');
@@ -210,7 +211,7 @@ test.describe("Theme Management Tests", () => {
       testLogger.info('Custom color picker opened');
 
       // Verify color picker is visible
-      await expect(page.locator(pm.themePage.colorPickerDialog).first()).toBeVisible();
+      await pm.themePage.expectColorPickerDialogVisible();
       testLogger.info('Color picker dialog is visible');
 
       // Close color picker

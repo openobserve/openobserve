@@ -1,0 +1,10 @@
+{
+  "number": 90002,
+  "title": "[fixture] Streams page — spacing between stream count and Bulk Delete button is too tight",
+  "body": "### Bug Description\n\nOn the Streams page, the horizontal spacing between the stream-count text (e.g. `50 streams`) and the **Bulk Delete** button is visibly too small. The two elements appear to touch or nearly touch, giving a cramped look.\n\n<img width=\"2316\" height=\"1239\" alt=\"streams-spacing\" src=\"https://github.com/user-attachments/assets/c8f7d889-ccca-449f-9aec-a293b9e63673\" />\n\n### Priority\n\nP3 - Low\n\n### Severity\n\nMinor\n\n### Steps to Reproduce (Optional)\n\n_No response_\n\n### Which OpenObserve Functionalities Are Affected?\n\n- [x] Streams\n- [x] Cosmetic\n\n(Synthetic fixture — the repro is ENTIRELY in the attached screenshot. This exercises the vision preprocessor + Analyst reading `bug-<N>-attachments.md`. Expected outcome: vision preprocessor produces a non-empty description of the streams-page screenshot; Analyst extracts `area: Streams`, uses the image description to populate reproduction_steps or note `has_visual_repro: true`; testability >= MEDIUM instead of SKIP.)",
+  "labels": [
+    {"name": "Needs-Testing"},
+    {"name": "fixture"}
+  ],
+  "comments": []
+}

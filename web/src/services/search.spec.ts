@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -80,7 +80,8 @@ describe("Search Service", () => {
       });
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true",
-        params.query
+        params.query,
+        undefined,
       );
     });
 
@@ -100,7 +101,7 @@ describe("Search Service", () => {
 
       await search.search(params);
 
-      const expectedUrl = 
+      const expectedUrl =
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true" +
         "&dashboard_id=dash-123" +
         "&folder_id=folder-456" +
@@ -110,7 +111,7 @@ describe("Search Service", () => {
         "&tab_id=tab-1" +
         "&tab_name=Test%20Tab";
 
-      expect(mockHttp.post).toHaveBeenCalledWith(expectedUrl, params.query);
+      expect(mockHttp.post).toHaveBeenCalledWith(expectedUrl, params.query, undefined);
     });
 
     it("should add is_ui_histogram parameter when provided", async () => {
@@ -125,7 +126,8 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true&is_ui_histogram=true",
-        params.query
+        params.query,
+        undefined,
       );
     });
 
@@ -140,14 +142,15 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true&is_multi_stream_search=true",
-        params.query
+        params.query,
+        undefined,
       );
     });
 
     it("should use multi endpoint when query.query.sql is not a string", async () => {
       const params = {
         org_identifier: "test-org",
-        query: { 
+        query: {
           query: { sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"] },
         },
         page_type: "logs",
@@ -157,14 +160,15 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search_multi?type=logs&search_type=ui&use_cache=true",
-        params.query.query
+        params.query.query,
+        undefined,
       );
     });
 
     it("should handle multi endpoint with aggs", async () => {
       const params = {
         org_identifier: "test-org",
-        query: { 
+        query: {
           query: { sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"] },
           aggs: { some: "aggregation" },
         },
@@ -175,7 +179,8 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search_multi?type=logs&search_type=ui&use_cache=true",
-        { ...params.query.query, aggs: params.query.aggs }
+        { ...params.query.query, aggs: params.query.aggs },
+        undefined,
       );
     });
 
@@ -207,7 +212,8 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=false",
-        params.query
+        params.query,
+        undefined,
       );
     });
 
@@ -225,8 +231,79 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search?type=logs&search_type=ui&use_cache=true",
-        params.query
+        params.query,
+        undefined,
       );
+    });
+
+    it("should pass transformResponse config when page_type is traces", async () => {
+      const params = {
+        org_identifier: "org",
+        query: { query: { sql: "SELECT 1" } },
+        page_type: "traces",
+      };
+
+      await search.search(params);
+
+      const postCall = mockHttp.post.mock.calls[0];
+      const axiosConfig = postCall[2];
+      expect(axiosConfig).toBeDefined();
+      expect(Array.isArray(axiosConfig.transformResponse)).toBe(true);
+      expect(axiosConfig.transformResponse).toHaveLength(1);
+      expect(typeof axiosConfig.transformResponse[0]).toBe("function");
+    });
+
+    it("should have transformResponse that patches ns fields and parses JSON", async () => {
+      const params = {
+        org_identifier: "org",
+        query: { query: { sql: "SELECT 1" } },
+        page_type: "traces",
+      };
+
+      await search.search(params);
+
+      const postCall = mockHttp.post.mock.calls[0];
+      const transformFn = postCall[2].transformResponse[0];
+
+      const rawJson = JSON.stringify({ start_time: "PLACEHOLDER" }).replace(
+        '"PLACEHOLDER"',
+        "1700000000123456789",
+      );
+      // rawJson = '{"start_time":1700000000123456789}'
+      const result = transformFn(rawJson);
+
+      expect(result._start_time_ns).toBe("1700000000123456789");
+    });
+
+    it("should not pass transformResponse config when page_type is not traces", async () => {
+      const params = {
+        org_identifier: "org",
+        query: { query: { sql: "SELECT 1" } },
+        page_type: "logs",
+      };
+
+      await search.search(params);
+
+      const postCall = mockHttp.post.mock.calls[0];
+      // axiosConfig is undefined for non-traces page types
+      expect(postCall[2]).toBeUndefined();
+    });
+
+    it("should not throw when transformResponse receives invalid JSON", async () => {
+      const params = {
+        org_identifier: "org",
+        query: { query: { sql: "SELECT 1" } },
+        page_type: "traces",
+      };
+
+      await search.search(params);
+
+      const postCall = mockHttp.post.mock.calls[0];
+      const transformFn = postCall[2].transformResponse[0];
+
+      // The catch branch re-tries JSON.parse(data) which also throws on invalid JSON.
+      // We verify the function itself does not introduce additional errors beyond that.
+      expect(() => transformFn("not json")).toThrow(SyntaxError);
     });
   });
 
@@ -234,7 +311,13 @@ describe("Search Service", () => {
     it("should build correct URL for result schema", async () => {
       const params = {
         org_identifier: "test-org",
-        query: { query: { sql: "SELECT * FROM logs" } },
+        query: {
+          query: {
+            sql: "SELECT * FROM logs",
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
+          },
+        },
         page_type: "logs",
       };
 
@@ -242,14 +325,20 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/result_schema?type=logs&search_type=ui&use_cache=true&is_streaming=false",
-        params.query
+        params.query,
       );
     });
 
     it("should add dashboard parameters to result schema URL", async () => {
       const params = {
         org_identifier: "test-org",
-        query: { query: { sql: "SELECT * FROM logs" } },
+        query: {
+          query: {
+            sql: "SELECT * FROM logs",
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
+          },
+        },
         page_type: "logs",
         dashboard_id: "dash-123",
         folder_id: "folder-456",
@@ -258,7 +347,7 @@ describe("Search Service", () => {
 
       await search.result_schema(params);
 
-      const expectedUrl = 
+      const expectedUrl =
         "/api/test-org/result_schema?type=logs&search_type=ui&use_cache=true&is_streaming=true" +
         "&dashboard_id=dash-123" +
         "&folder_id=folder-456";
@@ -266,11 +355,15 @@ describe("Search Service", () => {
       expect(mockHttp.post).toHaveBeenCalledWith(expectedUrl, params.query);
     });
 
-    it("should use multi endpoint for result schema when needed", async () => {
+    it("should use standard endpoint for result schema with array sql", async () => {
       const params = {
         org_identifier: "test-org",
-        query: { 
-          query: { sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"] },
+        query: {
+          query: {
+            sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"],
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
+          },
         },
         page_type: "logs",
       };
@@ -278,16 +371,20 @@ describe("Search Service", () => {
       await search.result_schema(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/result_schema_multi?type=logs&search_type=ui&use_cache=true",
-        params.query.query
+        "/api/test-org/result_schema?type=logs&search_type=ui&use_cache=true&is_streaming=false",
+        params.query,
       );
     });
 
-    it("should handle result schema multi endpoint with aggs", async () => {
+    it("should use standard endpoint for result schema with array sql and aggs", async () => {
       const params = {
         org_identifier: "test-org",
-        query: { 
-          query: { sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"] },
+        query: {
+          query: {
+            sql: ["SELECT * FROM logs1", "SELECT * FROM logs2"],
+            start_time: (Date.now() - 3600000) * 1000,
+            end_time: Date.now() * 1000,
+          },
           aggs: { some: "aggregation" },
         },
         page_type: "logs",
@@ -296,8 +393,8 @@ describe("Search Service", () => {
       await search.result_schema(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/result_schema_multi?type=logs&search_type=ui&use_cache=true",
-        { ...params.query.query, aggs: params.query.aggs }
+        "/api/test-org/result_schema?type=logs&search_type=ui&use_cache=true&is_streaming=false",
+        params.query,
       );
     });
   });
@@ -317,14 +414,13 @@ describe("Search Service", () => {
         is_multistream: false,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/logs/_around?key=key123&size=10&sql=SELECT * FROM logs&type=logs",
-        params.body
+        params.body,
       );
       expect(http).toHaveBeenCalledWith({
         headers: { traceparent: "trace-123" },
@@ -345,14 +441,13 @@ describe("Search Service", () => {
         is_multistream: true,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/logs/_around_multi?key=key123&size=10&sql=SELECT * FROM logs&type=logs",
-        params.body
+        params.body,
       );
     });
 
@@ -370,39 +465,13 @@ describe("Search Service", () => {
         is_multistream: false,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/logs/_around?key=key123&size=10&sql=SELECT * FROM logs&type=logs&query_fn=custom_function",
-        params.body
-      );
-    });
-
-    it("should add action_id parameter when provided", async () => {
-      const params = {
-        org_identifier: "test-org",
-        index: "logs",
-        key: "key123",
-        size: "10",
-        query_context: "SELECT * FROM logs",
-        query_fn: "",
-        stream_type: "logs",
-        regions: "",
-        clusters: "",
-        is_multistream: false,
-        traceparent: "trace-123",
-        body: { filter: "test" },
-        action_id: "action123",
-      };
-
-      await search.search_around(params);
-
-      expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/logs/_around?key=key123&size=10&sql=SELECT * FROM logs&type=logs&action_id=action123",
-        params.body
+        params.body,
       );
     });
 
@@ -420,14 +489,13 @@ describe("Search Service", () => {
         is_multistream: false,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/logs/_around?key=key123&size=10&sql=SELECT * FROM logs&type=logs&regions=us-east-1&clusters=cluster1",
-        params.body
+        params.body,
       );
     });
   });
@@ -445,7 +513,7 @@ describe("Search Service", () => {
       await search.metrics_query_range(params);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/prometheus/api/v1/query_range?use_cache=true&start=1609459200&end=1609545600&step=5m&query=up"
+        "/api/test-org/prometheus/api/v1/query_range?use_cache=true&start=1609459200&end=1609545600&step=5m&query=up",
       );
     });
 
@@ -467,7 +535,7 @@ describe("Search Service", () => {
 
       await search.metrics_query_range(params);
 
-      const expectedUrl = 
+      const expectedUrl =
         "/api/test-org/prometheus/api/v1/query_range?use_cache=true&start=1609459200&end=1609545600&step=1m&query=cpu_usage%7Binstance%3D'server1'%7D" +
         "&dashboard_id=dash-123" +
         "&folder_id=folder-456" +
@@ -493,7 +561,7 @@ describe("Search Service", () => {
       await search.metrics_query(params);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/prometheus/api/v1/query?time=1609545600&query=up"
+        "/api/test-org/prometheus/api/v1/query?time=1609545600&query=up",
       );
     });
   });
@@ -510,7 +578,7 @@ describe("Search Service", () => {
       await search.get_promql_series(params);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/prometheus/api/v1/series?match[]=up&start=1609459200&end=1609545600"
+        "/api/test-org/prometheus/api/v1/series?match[]=up&start=1609459200&end=1609545600",
       );
     });
   });
@@ -530,7 +598,85 @@ describe("Search Service", () => {
       await search.get_traces(params);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/traces/traces/latest?filter=service_name='webapp'&start_time=1609459200&end_time=1609545600&from=0&size=100"
+        `/api/test-org/traces/traces/latest?filter=${encodeURIComponent("service_name='webapp'")}&start_time=1609459200&end_time=1609545600&from=0&size=100`,
+      );
+    });
+  });
+
+  describe("get_trace_time_ranges", () => {
+    const T1 = "01a034c1aabc72f78880daf6c9755cff";
+    const T2 = "0badc0ffee0ddf00dd15ea5eba5eba11";
+
+    it("joins ids with commas on the org-wide endpoint", async () => {
+      await search.get_trace_time_ranges({ org_identifier: "test-org", trace_ids: [T1, T2] });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        `/api/test-org/traces/time_range?trace_id=${T1}%2C${T2}`,
+      );
+    });
+
+    it("sends the bounds, hint and stream filter when given", async () => {
+      await search.get_trace_time_ranges({
+        org_identifier: "test-org",
+        trace_ids: [T1],
+        start_time: 1000,
+        end_time: 2000,
+        hint_ts: 1500,
+        streams: ["default", "payments_traces"],
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        `/api/test-org/traces/time_range?trace_id=${T1}&start_time=1000&end_time=2000&hint_ts=1500&streams=default%2Cpayments_traces`,
+      );
+    });
+
+    it("omits a lone bound — the server rejects start_time without end_time", async () => {
+      await search.get_trace_time_ranges({
+        org_identifier: "test-org",
+        trace_ids: [T1],
+        start_time: 1000,
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(`/api/test-org/traces/time_range?trace_id=${T1}`);
+    });
+
+    it("omits an empty stream filter", async () => {
+      await search.get_trace_time_ranges({
+        org_identifier: "test-org",
+        trace_ids: [T1],
+        streams: [],
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(`/api/test-org/traces/time_range?trace_id=${T1}`);
+    });
+
+    it("sends a zero bound pair — 0/0 is the server's 'no bounds' encoding, not absence", async () => {
+      await search.get_trace_time_ranges({
+        org_identifier: "test-org",
+        trace_ids: [T1],
+        start_time: 0,
+        end_time: 0,
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        `/api/test-org/traces/time_range?trace_id=${T1}&start_time=0&end_time=0`,
+      );
+    });
+  });
+
+  describe("get_trace_details", () => {
+    it("should build the trace details URL with a caller range and hint", async () => {
+      await search.get_trace_details({
+        org_identifier: "test-org",
+        stream_name: "traces",
+        trace_id: "trace/id",
+        start_time: 10,
+        end_time: 20,
+        hint_ts: 15,
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        "/api/test-org/traces/traces/trace%2Fid/details?start_time=10&end_time=20&hint_ts=15",
       );
     });
   });
@@ -549,7 +695,7 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search_partition?type=logs&enable_align_histogram=true",
-        params.query
+        params.query,
       );
       expect(http).toHaveBeenCalledWith({
         headers: { traceparent: "trace-123" },
@@ -569,7 +715,7 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/_search_partition_multi?type=logs&enable_align_histogram=true",
-        params.query
+        params.query,
       );
     });
   });
@@ -588,10 +734,7 @@ describe("Search Service", () => {
 
       await search.delete_running_queries("test-org", traceIDs);
 
-      expect(mockHttp.put).toHaveBeenCalledWith(
-        "/api/test-org/query_manager/cancel",
-        traceIDs
-      );
+      expect(mockHttp.put).toHaveBeenCalledWith("/api/test-org/query_manager/cancel", traceIDs);
     });
   });
 
@@ -607,43 +750,73 @@ describe("Search Service", () => {
     it("should get search history with basic parameters", async () => {
       await search.get_history("test-org");
 
-      expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/_search_history",
-        {
-          stream_type: "logs",
-          org_identifier: "test-org",
-          user_email: null,
-        }
-      );
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
+        stream_type: "logs",
+        org_identifier: "test-org",
+        user_email: null,
+      });
     });
 
     it("should get search history with start and end time", async () => {
       await search.get_history("test-org", 1609459200, 1609545600);
 
-      expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/_search_history",
-        {
-          stream_type: "logs",
-          org_identifier: "test-org",
-          user_email: null,
-          start_time: 1609459200,
-          end_time: 1609545600,
-        }
-      );
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
+        stream_type: "logs",
+        org_identifier: "test-org",
+        user_email: null,
+        start_time: 1609459200,
+        end_time: 1609545600,
+      });
     });
 
     it("should get search history with only start time", async () => {
       await search.get_history("test-org", 1609459200, null);
 
-      expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/_search_history",
-        {
-          stream_type: "logs",
-          org_identifier: "test-org",
-          user_email: null,
-          start_time: 1609459200,
-        }
-      );
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
+        stream_type: "logs",
+        org_identifier: "test-org",
+        user_email: null,
+        start_time: 1609459200,
+      });
+    });
+
+    it("should get search history scoped to a traces stream", async () => {
+      await search.get_history("test-org", 1609459200, 1609545600, "traces", "my-trace-stream");
+
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
+        stream_type: "traces",
+        org_identifier: "test-org",
+        user_email: null,
+        start_time: 1609459200,
+        end_time: 1609545600,
+        stream_name: "my-trace-stream",
+      });
+    });
+
+    it("should get search history scoped to a metrics stream", async () => {
+      await search.get_history("test-org", 1609459200, 1609545600, "metrics", "my-metric-stream");
+
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
+        stream_type: "metrics",
+        org_identifier: "test-org",
+        user_email: null,
+        start_time: 1609459200,
+        end_time: 1609545600,
+        stream_name: "my-metric-stream",
+      });
+    });
+
+    it("should default to logs and omit stream_name when only stream_type is missing", async () => {
+      await search.get_history("test-org", 1609459200, 1609545600, null, "unscoped-stream");
+
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
+        stream_type: "logs",
+        org_identifier: "test-org",
+        user_email: null,
+        start_time: 1609459200,
+        end_time: 1609545600,
+        stream_name: "unscoped-stream",
+      });
     });
   });
 
@@ -659,7 +832,7 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/search_jobs?type=logs&search_type=ui&use_cache=true",
-        params.query
+        params.query,
       );
       expect(http).toHaveBeenCalledWith({
         headers: { traceparent: "00-test-trace-parent-01" },
@@ -678,7 +851,7 @@ describe("Search Service", () => {
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/search_jobs?type=logs&search_type=api&use_cache=true",
-        params.query
+        params.query,
       );
       expect(http).toHaveBeenCalledWith({
         headers: { traceparent: "custom-trace" },
@@ -695,9 +868,7 @@ describe("Search Service", () => {
 
       await search.cancel_scheduled_search(params);
 
-      expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/search_jobs/job-123/cancel"
-      );
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/search_jobs/job-123/cancel");
     });
   });
 
@@ -710,9 +881,7 @@ describe("Search Service", () => {
 
       await search.retry_scheduled_search(params);
 
-      expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/search_jobs/job-123/retry"
-      );
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/search_jobs/job-123/retry");
     });
   });
 
@@ -725,9 +894,7 @@ describe("Search Service", () => {
 
       await search.delete_scheduled_search(params);
 
-      expect(mockHttp.delete).toHaveBeenCalledWith(
-        "/api/test-org/search_jobs/job-123"
-      );
+      expect(mockHttp.delete).toHaveBeenCalledWith("/api/test-org/search_jobs/job-123");
     });
   });
 
@@ -741,7 +908,7 @@ describe("Search Service", () => {
       await search.get_scheduled_search_list(params);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/search_jobs?type=logs&search_type=ui&use_cache=true"
+        "/api/test-org/search_jobs?type=logs&search_type=ui&use_cache=true",
       );
     });
   });
@@ -758,7 +925,7 @@ describe("Search Service", () => {
       await search.get_scheduled_search_result(params);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/test-org/search_jobs/job-123/result?type=logs&search_type=ui&use_cache=true&size=100&from=0"
+        "/api/test-org/search_jobs/job-123/result?type=logs&search_type=ui&use_cache=true&size=100&from=0",
       );
     });
   });

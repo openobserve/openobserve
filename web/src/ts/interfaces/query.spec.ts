@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -422,12 +422,7 @@ describe("Query Interfaces", () => {
     });
 
     it("should accept all streaming event types", () => {
-      const types: StreamingSearchEvent["type"][] = [
-        "message",
-        "error",
-        "open",
-        "end",
-      ];
+      const types: StreamingSearchEvent["type"][] = ["message", "error", "open", "end"];
 
       types.forEach((type) => {
         const event: StreamingSearchEvent = {
@@ -477,7 +472,7 @@ describe("Query Interfaces", () => {
   describe("PromQL Interfaces", () => {
     it("should accept PromQLQueryPayload", () => {
       const payload: PromQLQueryPayload = {
-        query: 'rate(http_requests_total[5m])',
+        query: "rate(http_requests_total[5m])",
         start_time: 1640995200000000,
         end_time: 1640998800000000,
         step: "30s",

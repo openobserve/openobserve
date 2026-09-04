@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,60 +13,88 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::get_config;
 use migration::Migrator;
 use sea_orm_migration::MigratorTrait;
 
-use crate::{
-    db::{ORM_CLIENT_DDL, SQLITE_STORE, connect_to_orm_ddl, sqlite::CLIENT_RW},
-    dist_lock,
-};
+use crate::{db::get_orm_client_ddl, dist_lock};
 
-pub mod action_scripts;
+pub mod alert_composites;
+pub mod alert_eval_intervals;
 pub mod alert_incidents;
+pub mod alert_states;
 pub mod alerts;
+pub mod anomaly_detection;
 pub mod backfill_jobs;
 pub mod cipher;
 pub mod compactor_manual_jobs;
+#[cfg(test)]
+mod composite_alerts_contract_tests;
 pub mod dashboards;
 pub mod destinations;
 pub mod distinct_values;
 pub mod enrichment_table_urls;
 pub mod enrichment_tables;
 pub mod entity;
+pub mod evaluation_watermarks;
+pub mod external_alerts;
 pub mod folders;
+pub mod gen_ai_agents;
+pub mod incident_events;
+pub mod incident_integrations;
 pub mod kv_store;
+pub mod llm_secrets;
 mod migration;
+pub mod model_pricing;
+pub mod online_eval_jobs;
+pub mod org_ai_toolsets;
+pub mod org_cleanup_tasks;
+pub mod org_ingestion_tokens;
+pub mod org_storage_providers;
 pub mod org_users;
 pub mod organizations;
+pub mod providers;
 pub mod ratelimit;
 pub mod re_pattern;
 pub mod re_pattern_stream_map;
 pub mod reports;
+pub mod score_configs;
+pub mod scorers;
 pub mod search_job;
 pub mod search_queue;
 pub mod service_streams;
-pub mod service_streams_dimensions;
 pub mod sessions;
 pub mod short_urls;
+pub mod slo;
+pub mod slo_backfill_jobs;
+pub mod slo_budget;
+pub mod slos;
+pub mod source_maps;
+pub mod status_pages;
+pub mod synthetics_agents;
+pub mod synthetics_checks;
+pub mod synthetics_jobs;
+pub mod synthetics_locations;
+pub mod synthetics_probe_tokens;
+pub mod synthetics_runs;
 pub mod system_prompts;
 pub mod system_settings;
 pub mod templates;
 pub mod timed_annotation_panels;
 pub mod timed_annotations;
+#[cfg(feature = "cloud")]
+pub mod trial_quota_usage;
 pub mod users;
+pub mod workflows;
 
 pub async fn init() -> Result<(), anyhow::Error> {
     distinct_values::init().await?;
     short_urls::init().await?;
-    service_streams::init().await?;
-    service_streams_dimensions::init().await?;
     Ok(())
 }
 
 pub async fn migrate() -> Result<(), anyhow::Error> {
     let locker = dist_lock::lock("/database/migration", 0).await?;
-    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    let client = get_orm_client_ddl().await;
     // This is a hack to fix the failing alerts migration
     // For postgres, we need to run the migration that populates the alerts table first.
     // Otherwise, the `m20250109_092400_recreate_tables_with_ksuids` migration will fail.
@@ -80,7 +108,7 @@ pub async fn migrate() -> Result<(), anyhow::Error> {
 /// Get the index of the migration that populates the alerts table.
 /// This index is used as the first stage of the migration process.
 async fn get_alerts_populate_migration_index() -> Result<u32, anyhow::Error> {
-    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    let client = get_orm_client_ddl().await;
     let migrations = Migrator::get_pending_migrations(client).await?;
     let mut index: u32 = 0;
     for (i, migration) in migrations.iter().enumerate() {
@@ -97,7 +125,7 @@ async fn get_alerts_populate_migration_index() -> Result<u32, anyhow::Error> {
 }
 
 pub async fn down(steps: Option<u32>) -> Result<(), anyhow::Error> {
-    let client = ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    let client = get_orm_client_ddl().await;
     Migrator::down(client, steps).await?;
     Ok(())
 }
@@ -108,23 +136,6 @@ pub async fn create_user_tables() -> Result<(), anyhow::Error> {
     org_users::create_table().await?;
 
     Ok(())
-}
-
-/// Acquires a lock on the SQLite client if SQLite is configured as the meta store.
-///
-/// # Returns
-/// - `Some(MutexGuard)` if SQLite is configured
-/// - `None` if a different store is configured
-pub async fn get_lock() -> Option<tokio::sync::MutexGuard<'static, sqlx::Pool<sqlx::Sqlite>>> {
-    if get_config()
-        .common
-        .meta_store
-        .eq_ignore_ascii_case(SQLITE_STORE)
-    {
-        Some(CLIENT_RW.lock().await)
-    } else {
-        None
-    }
 }
 
 #[macro_export]

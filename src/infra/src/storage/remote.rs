@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,18 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{ops::Range, time::Duration};
+use std::time::Duration;
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{get_config, metrics};
-use futures::stream::BoxStream;
+use futures::{StreamExt, stream::BoxStream};
 use object_store::{
-    Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
-    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore, path::Path,
+    CopyOptions, Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta,
+    ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
+    path::Path,
 };
 
-use crate::storage::{CONCURRENT_REQUESTS, format_key};
+use crate::storage::CONCURRENT_REQUESTS;
 
 // test only
 const TEST_FILE: &str = "o2_test/check.txt";
@@ -43,12 +44,28 @@ pub struct StorageConfig {
 
 pub struct Remote {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
+    bucket_prefix: String,
 }
 
 impl Remote {
+    pub fn name() -> &'static str {
+        "remote"
+    }
+
     pub fn new(config: StorageConfig) -> Self {
+        let bucket_prefix = config.bucket_prefix.clone();
         Self {
             client: LimitStore::new(init_client(config), CONCURRENT_REQUESTS),
+            bucket_prefix,
+        }
+    }
+
+    /// Format the key with the bucket prefix for this specific Remote instance
+    fn format_key(&self, key: &str) -> String {
+        if !self.bucket_prefix.is_empty() && !key.starts_with(&self.bucket_prefix) {
+            format!("{}{}", self.bucket_prefix, key)
+        } else {
+            key.to_string()
         }
     }
 }
@@ -78,7 +95,7 @@ impl ObjectStore for Remote {
         let data_size = payload.content_length();
         match self
             .client
-            .put_opts(&(format_key(&file, true).into()), payload, opts)
+            .put_opts(&(self.format_key(&file).into()), payload, opts)
             .await
         {
             Ok(_) => {
@@ -116,7 +133,7 @@ impl ObjectStore for Remote {
         let file = location.to_string();
         match self
             .client
-            .put_multipart_opts(&(format_key(&file, true).into()), opts)
+            .put_multipart_opts(&(self.format_key(&file).into()), opts)
             .await
         {
             Ok(r) => Ok(r),
@@ -127,59 +144,30 @@ impl ObjectStore for Remote {
         }
     }
 
-    async fn get(&self, location: &Path) -> Result<GetResult> {
-        let start = std::time::Instant::now();
-        let file = location.to_string();
-        let result = self
-            .client
-            .get(&(format_key(&file, true).into()))
-            .await
-            .map_err(|e| {
-                if file.ne(TEST_FILE) {
-                    log::error!("[STORAGE] get remote file: {file}, error: {e:?}");
-                }
-                e
-            })?;
-
-        // metrics
-        let data_len = result.meta.size;
-        let columns = file.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
-            metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "get", "remote"])
-                .inc_by(data_len as u64);
-            metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "get", "remote"])
-                .inc();
-            let time = start.elapsed().as_secs_f64();
-            metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "remote"])
-                .inc_by(time);
-        }
-        log::debug!("[STORAGE] get remote file: {file}");
-
-        Ok(result)
-    }
-
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
         let start = std::time::Instant::now();
         let file = location.to_string();
         let result = self
             .client
-            .get_opts(&(format_key(&file, true).into()), options)
+            .get_opts(&(self.format_key(&file).into()), options)
             .await
             .map_err(|e| {
                 log::error!("[STORAGE] get_opts remote file: {file}, error: {e:?}");
                 e
             })?;
 
-        // metrics
-        let data_len = result.meta.size;
+        // metrics — use the actual returned range size, not the full file
+        // size. For range / suffix GETs `result.meta.size` is the total file
+        // length, which would over-count bytes by ~the file size each call.
+        let mut data_len = result.range.end - result.range.start;
+        if data_len == 0 {
+            data_len = result.meta.size;
+        }
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
                 .with_label_values(&[columns[1], columns[2], "get_opts", "remote"])
-                .inc_by(data_len as u64);
+                .inc_by(data_len);
             metrics::STORAGE_READ_REQUESTS
                 .with_label_values(&[columns[1], columns[2], "get_opts", "remote"])
                 .inc();
@@ -192,75 +180,43 @@ impl ObjectStore for Remote {
         Ok(result)
     }
 
-    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
-        let start = std::time::Instant::now();
-        let file = location.to_string();
-        let data = self
-            .client
-            .get_range(&(format_key(&file, true).into()), range.clone())
-            .await
-            .map_err(|e| {
-                log::error!(
-                    "[STORAGE] get_range remote file: {file}, range: {range:?}, error: {e:?}"
-                );
-                e
-            })?;
-
-        // metrics
-        let data_len = data.len();
-        let columns = file.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
-            metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
-                .inc_by(data_len as u64);
-            metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
-                .inc();
-            let time = start.elapsed().as_secs_f64();
-            metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get_range", "remote"])
-                .inc_by(time);
-        }
-
-        Ok(data)
-    }
-
-    async fn delete(&self, location: &Path) -> Result<()> {
-        let mut result: Result<()> = Ok(());
-        for _ in 0..3 {
-            result = self
-                .client
-                .delete(&(format_key(location.as_ref(), true).into()))
-                .await;
-            if result.is_ok() {
-                let file = location.to_string();
-                let columns = file.split('/').collect::<Vec<&str>>();
-                metrics::STORAGE_WRITE_REQUESTS
-                    .with_label_values(&[columns[1], columns[2], "remote"])
-                    .inc();
-                break;
-            }
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        }
-        result
+    fn delete_stream(
+        &self,
+        locations: BoxStream<'static, Result<Path>>,
+    ) -> BoxStream<'static, Result<Path>> {
+        let prefix = self.bucket_prefix.clone();
+        let formatted = locations
+            .map(move |result| {
+                result.map(|path| {
+                    let key = path.as_ref().to_string();
+                    if !prefix.is_empty() && !key.starts_with(&prefix) {
+                        Path::from(format!("{}{}", prefix, key))
+                    } else {
+                        path
+                    }
+                })
+            })
+            .boxed();
+        self.client.delete_stream(formatted)
     }
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
         let key = prefix.map(|p| p.as_ref());
-        let prefix = format_key(key.unwrap_or(""), true);
+        let prefix = self.format_key(key.unwrap_or(""));
         self.client.list(Some(&prefix.into()))
     }
 
-    async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {
-        Err(Error::NotImplemented)
+    async fn list_with_delimiter(&self, prefix: Option<&Path>) -> Result<ListResult> {
+        let key = prefix.map(|p| p.as_ref());
+        let prefix = self.format_key(key.unwrap_or(""));
+        self.client.list_with_delimiter(Some(&prefix.into())).await
     }
 
-    async fn copy(&self, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn copy_if_not_exists(&self, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
+    async fn copy_opts(&self, _from: &Path, _to: &Path, _options: CopyOptions) -> Result<()> {
+        Err(Error::NotImplemented {
+            operation: "copy_opts".to_string(),
+            implementer: Self::name().to_string(),
+        })
     }
 }
 
@@ -293,7 +249,8 @@ fn init_aws_config(config: StorageConfig) -> object_store::Result<object_store::
         .with_client_options(opts)
         .with_bucket_name(&config.bucket_name)
         .with_retry(retry_config)
-        .with_virtual_hosted_style_request(force_hosted_style);
+        .with_virtual_hosted_style_request(force_hosted_style)
+        .with_disable_bulk_delete(!cfg.s3.feature_bulk_delete);
     if !config.server_url.is_empty() {
         builder = builder.with_endpoint(&config.server_url);
     }
@@ -349,6 +306,22 @@ fn init_gcp_config(
         builder = builder.with_service_account_path(&config.access_key);
     }
     builder.build()
+}
+
+pub fn build_signer(
+    config: StorageConfig,
+) -> object_store::Result<Box<dyn object_store::signer::Signer + Send + Sync>> {
+    let provider = config.provider.to_lowercase();
+    match provider.as_str() {
+        "aws" | "s3" | "" => init_aws_config(config)
+            .map(|s| Box::new(s) as Box<dyn object_store::signer::Signer + Send + Sync>),
+        "gcs" | "gcp" => init_gcp_config(config)
+            .map(|s| Box::new(s) as Box<dyn object_store::signer::Signer + Send + Sync>),
+        "azure" => init_azure_config(config)
+            .map(|s| Box::new(s) as Box<dyn object_store::signer::Signer + Send + Sync>),
+        _ => init_aws_config(config)
+            .map(|s| Box::new(s) as Box<dyn object_store::signer::Signer + Send + Sync>),
+    }
 }
 
 fn init_client(config: StorageConfig) -> Box<dyn object_store::ObjectStore> {
@@ -407,4 +380,69 @@ pub async fn test_config() -> Result<(), anyhow::Error> {
         return Err(anyhow::anyhow!("S3 upload test failed: {e}"));
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use object_store::local::LocalFileSystem;
+
+    use super::*;
+
+    fn make_remote(prefix: &str) -> Remote {
+        Remote {
+            client: LimitStore::new(
+                Box::new(
+                    LocalFileSystem::new_with_prefix("/tmp")
+                        .expect("LocalFileSystem creation failed"),
+                ),
+                CONCURRENT_REQUESTS,
+            ),
+            bucket_prefix: prefix.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_name_returns_remote() {
+        assert_eq!(Remote::name(), "remote");
+    }
+
+    #[test]
+    fn test_display_formats_to_storage_for_remote() {
+        let r = make_remote("");
+        assert_eq!(format!("{r}"), "storage for remote");
+    }
+
+    #[test]
+    fn test_debug_contains_storage_for_remote() {
+        let r = make_remote("");
+        let s = format!("{r:?}");
+        assert!(s.contains("storage for remote"));
+    }
+
+    #[test]
+    fn test_format_key_empty_prefix_is_passthrough() {
+        let r = make_remote("");
+        assert_eq!(
+            r.format_key("files/default/logs/foo.parquet"),
+            "files/default/logs/foo.parquet"
+        );
+    }
+
+    #[test]
+    fn test_format_key_with_prefix_prepends() {
+        let r = make_remote("my-bucket/");
+        assert_eq!(
+            r.format_key("files/foo.parquet"),
+            "my-bucket/files/foo.parquet"
+        );
+    }
+
+    #[test]
+    fn test_format_key_already_has_prefix_no_double_prefix() {
+        let r = make_remote("my-bucket/");
+        assert_eq!(
+            r.format_key("my-bucket/files/foo.parquet"),
+            "my-bucket/files/foo.parquet"
+        );
+    }
 }

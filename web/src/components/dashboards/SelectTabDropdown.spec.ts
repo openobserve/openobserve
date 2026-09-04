@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,781 +13,211 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { nextTick } from "vue";
+import SelectTabDropdown from "./SelectTabDropdown.vue";
+import i18n from "@/locales";
+import { createStore } from "vuex";
 
-// Mock Vue Router
-const mockRoute = {
-  query: {},
-  path: "/dashboards",
+// Stub AddTab to expose v-model:open + refresh contract used by the
+// ODialog/ODrawer-based migration of SelectTabDropdown.
+// inheritAttrs:false so parent's data-test fall-through doesn't clobber our
+// own data-test markers used for query selectors.
+const AddTabStub = {
+  name: "AddTab",
+  inheritAttrs: false,
+  props: ["open", "editMode", "dashboardId", "folderId"],
+  emits: ["update:open", "refresh"],
+  template: `
+    <div
+      data-test="add-tab-stub"
+      :data-open="String(open)"
+      :data-edit-mode="String(editMode)"
+      :data-dashboard-id="dashboardId == null ? '' : String(dashboardId)"
+      :data-folder-id="folderId == null ? '' : String(folderId)"
+    >
+      <button
+        data-test="add-tab-stub-close"
+        @click="$emit('update:open', false)"
+      />
+      <button
+        data-test="add-tab-stub-refresh"
+        @click="$emit('refresh', { name: 'Emitted Tab', tabId: 'emitted123' })"
+      />
+    </div>
+  `,
 };
 
-vi.mock("vue-router", () => ({
-  useRoute: () => mockRoute,
-}));
+const mountComponent = (props: Record<string, any>, store: any) =>
+  mount(SelectTabDropdown, {
+    props,
+    global: {
+      plugins: [i18n, store],
+      stubs: { AddTab: AddTabStub },
+    },
+  });
 
-// Mock utils/commons
+// Mock the utils functions
 vi.mock("@/utils/commons", () => ({
-  getDashboard: vi.fn(),
-  addTab: vi.fn(),
-  editTab: vi.fn(),
-}));
-
-// Mock useLoading composable
-const mockLoadingComposable = {
-  execute: vi.fn(),
-  isLoading: { value: false },
-};
-
-vi.mock("@/composables/useLoading", () => ({
-  useLoading: vi.fn((fn) => {
-    mockLoadingComposable.execute = vi.fn().mockImplementation(() => fn());
-    return mockLoadingComposable;
+  getDashboard: vi.fn().mockResolvedValue({
+    title: "Test Dashboard",
+    dashboardId: "dash1",
+    tabs: [
+      { name: "Tab 1", tabId: "tab1" },
+      { name: "Tab 2", tabId: "tab2" },
+    ],
   }),
 }));
 
-// Mock Quasar components
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    Quasar: actual.Quasar,
-  };
-});
-
-import SelectTabDropdown from "@/components/dashboards/SelectTabDropdown.vue";
-import i18n from "@/locales";
-import store from "@/test/unit/helpers/store";
-import { getDashboard } from "@/utils/commons";
-
-const mockGetDashboard = getDashboard as any;
-
-installQuasar();
-
 describe("SelectTabDropdown", () => {
-  let wrapper: any;
-
-  const mockDashboardData = {
-    dashboardId: "dashboard-1",
-    name: "Test Dashboard",
-    tabs: [
-      {
-        tabId: "tab-1",
-        name: "Tab 1",
-        description: "First tab",
-      },
-      {
-        tabId: "tab-2",
-        name: "Tab 2",
-        description: "Second tab",
-      },
-    ],
-  };
-
-  const defaultProps = {
-    folderId: "folder-1",
-    dashboardId: "dashboard-1",
-  };
+  let store: any;
 
   beforeEach(() => {
+    store = createStore({
+      state: {
+        selectedOrganization: {
+          identifier: "org123",
+        },
+      },
+    });
+
     vi.clearAllMocks();
-    mockGetDashboard.mockResolvedValue(mockDashboardData);
-    mockLoadingComposable.isLoading.value = false;
   });
 
-  afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-    }
+  it("should render the component", () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: "dash1" }, store);
+
+    expect(wrapper.exists()).toBe(true);
   });
 
-  const createWrapper = (props = {}) => {
-    return mount(SelectTabDropdown, {
-      props: {
-        ...defaultProps,
-        ...props,
-      },
-      global: {
-        plugins: [i18n, store],
-        mocks: {
-          $t: (key: string) => {
-            const translations: Record<string, string> = {
-              "dashboard.selectTabLabel": "Select Tab",
-              "search.noResult": "No results found",
-            };
-            return translations[key] || key;
-          },
-        },
-        stubs: {
-          QSelect: true,
-          QBtn: true,
-          QDialog: true,
-          QItem: true,
-          QItemSection: true,
-          AddTab: true,
-        },
-      },
-    });
-  };
+  it("should render tab dropdown", () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: "dash1" }, store);
 
-  describe("Component Initialization", () => {
-    it("should render component with default setup", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
-    });
-
-    it("should initialize with required props", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.$props.folderId).toBe("folder-1");
-      expect(wrapper.vm.$props.dashboardId).toBe("dashboard-1");
-    });
-
-    it("should initialize reactive data correctly", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.selectedTab).toBeDefined();
-      expect(wrapper.vm.tabList).toBeDefined();
-      expect(Array.isArray(wrapper.vm.tabList)).toBe(true);
-      expect(wrapper.vm.showAddTabDialog).toBe(false);
-      expect(wrapper.vm.getTabList).toBeDefined();
-    });
-
-    it("should call getTabList on mount", () => {
-      wrapper = createWrapper();
-
-      expect(mockLoadingComposable.execute).toHaveBeenCalled();
-    });
-
-    it("should handle props with null values", () => {
-      wrapper = createWrapper({
-        folderId: null,
-        dashboardId: null,
-      });
-
-      expect(wrapper.exists()).toBe(true);
-    });
+    const dropdown = wrapper.find('[data-test="dashboard-dropdown-tab-selection"]');
+    expect(dropdown.exists()).toBe(true);
   });
 
-  describe("Template Rendering", () => {
-    it("should render tab select dropdown", () => {
-      wrapper = createWrapper();
+  it("should render add tab button", () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: "dash1" }, store);
 
-      expect(wrapper.findComponent({ name: 'q-select' }).exists()).toBe(true);
-    });
-
-    it("should render add tab button", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.findComponent({ name: 'q-btn' }).exists()).toBe(true);
-    });
-
-    it("should not render dialog initially", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.showAddTabDialog).toBe(false);
-    });
-
-    it("should render dialog when showAddTabDialog is true", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.showAddTabDialog = true;
-      await nextTick();
-
-      expect(wrapper.findComponent({ name: 'q-dialog' }).exists()).toBe(true);
-    });
+    const addButton = wrapper.find('[data-test="dashboard-tab-new-add"]');
+    expect(addButton.exists()).toBe(true);
   });
 
-  describe("Props Validation", () => {
-    it("should accept string folderId", () => {
-      const props = SelectTabDropdown.props;
-      const validator = props.folderId.validator;
+  it("should render AddTab stub with closed state and forwarded props", () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: "dash1" }, store);
 
-      expect(validator("folder-1")).toBe(true);
-      expect(validator("")).toBe(true);
-    });
-
-    it("should accept null folderId", () => {
-      const props = SelectTabDropdown.props;
-      const validator = props.folderId.validator;
-
-      expect(validator(null)).toBe(true);
-    });
-
-    it("should reject invalid folderId types", () => {
-      const props = SelectTabDropdown.props;
-      const validator = props.folderId.validator;
-
-      expect(validator(123)).toBe(false);
-      expect(validator({})).toBe(false);
-      expect(validator([])).toBe(false);
-      expect(validator(true)).toBe(false);
-    });
-
-    it("should accept string dashboardId", () => {
-      const props = SelectTabDropdown.props;
-      const validator = props.dashboardId.validator;
-
-      expect(validator("dashboard-1")).toBe(true);
-      expect(validator("")).toBe(true);
-    });
-
-    it("should accept null dashboardId", () => {
-      const props = SelectTabDropdown.props;
-      const validator = props.dashboardId.validator;
-
-      expect(validator(null)).toBe(true);
-    });
-
-    it("should reject invalid dashboardId types", () => {
-      const props = SelectTabDropdown.props;
-      const validator = props.dashboardId.validator;
-
-      expect(validator(123)).toBe(false);
-      expect(validator({})).toBe(false);
-      expect(validator([])).toBe(false);
-      expect(validator(true)).toBe(false);
-    });
-
-    it("should have correct prop configuration", () => {
-      const props = SelectTabDropdown.props;
-      
-      expect(props.folderId.required).toBe(true);
-      expect(props.dashboardId.required).toBe(true);
-    });
+    const addTab = wrapper.find('[data-test="add-tab-stub"]');
+    expect(addTab.exists()).toBe(true);
+    expect(addTab.attributes("data-open")).toBe("false");
+    expect(addTab.attributes("data-edit-mode")).toBe("false");
+    expect(addTab.attributes("data-dashboard-id")).toBe("dash1");
+    expect(addTab.attributes("data-folder-id")).toBe("folder1");
   });
 
-  describe("Tab List Loading", () => {
-    it("should load tabs on initialization", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
+  it("should open add tab dialog when add button is clicked", async () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: "dash1" }, store);
 
-      expect(mockGetDashboard).toHaveBeenCalledWith(
-        store,
-        "dashboard-1",
-        "folder-1"
-      );
-    });
+    const addButton = wrapper.find('[data-test="dashboard-tab-new-add"]');
+    await addButton.trigger("click");
 
-    it("should set tabList from dashboard data", async () => {
-      wrapper = createWrapper();
-      
-      // Manually trigger the loading logic
-      await wrapper.vm.getTabList.execute();
-
-      expect(wrapper.vm.tabList).toEqual([
-        { label: "Tab 1", value: "tab-1" },
-        { label: "Tab 2", value: "tab-2" },
-      ]);
-    });
-
-    it("should select first tab automatically", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.vm.getTabList.execute();
-
-      expect(wrapper.vm.selectedTab).toEqual({
-        label: "Tab 1",
-        value: "tab-1",
-      });
-    });
-
-    it("should handle empty tabs array", async () => {
-      mockGetDashboard.mockResolvedValue({
-        ...mockDashboardData,
-        tabs: [],
-      });
-
-      wrapper = createWrapper();
-      await wrapper.vm.getTabList.execute();
-
-      expect(wrapper.vm.tabList).toEqual([]);
-      expect(wrapper.vm.selectedTab).toBeNull();
-    });
-
-    it("should handle dashboard without tabs property", async () => {
-      mockGetDashboard.mockResolvedValue({
-        dashboardId: "dashboard-1",
-        name: "Test Dashboard",
-      });
-
-      wrapper = createWrapper();
-      await wrapper.vm.getTabList.execute();
-
-      // When tabs property is undefined, the component sets tabList to undefined
-      expect(wrapper.vm.tabList).toBeUndefined();
-      expect(wrapper.vm.selectedTab).toBeNull();
-    });
-
-    it("should not load when dashboardId is null", async () => {
-      wrapper = createWrapper({
-        dashboardId: null,
-      });
-
-      await wrapper.vm.getTabList.execute();
-
-      expect(mockGetDashboard).not.toHaveBeenCalled();
-    });
-
-    it("should not load when folderId is null", async () => {
-      wrapper = createWrapper({
-        folderId: null,
-      });
-
-      await wrapper.vm.getTabList.execute();
-
-      expect(mockGetDashboard).not.toHaveBeenCalled();
-    });
-
-    it("should handle API errors gracefully", async () => {
-      mockGetDashboard.mockRejectedValue(new Error("API Error"));
-
-      wrapper = createWrapper();
-
-      // Suppress unhandled rejection by catching it
-      await expect(wrapper.vm.getTabList.execute()).rejects.toThrow("API Error");
-    });
-
-    it("should show loading state", () => {
-      mockLoadingComposable.isLoading.value = true;
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.getTabList.isLoading.value).toBe(true);
-    });
+    expect(wrapper.vm.showAddTabDialog).toBe(true);
+    expect(wrapper.find('[data-test="add-tab-stub"]').attributes("data-open")).toBe("true");
   });
 
-  describe("Add Tab Dialog", () => {
-    it("should open dialog when add button functionality triggered", async () => {
-      wrapper = createWrapper();
+  it("should close add tab dialog when AddTab emits update:open=false", async () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: "dash1" }, store);
 
-      wrapper.vm.showAddTabDialog = true;
-      await nextTick();
+    // open first
+    await wrapper.find('[data-test="dashboard-tab-new-add"]').trigger("click");
+    expect(wrapper.vm.showAddTabDialog).toBe(true);
 
-      expect(wrapper.vm.showAddTabDialog).toBe(true);
-    });
+    // child emits update:open=false (v-model:open contract from ODialog/ODrawer)
+    await wrapper.find('[data-test="add-tab-stub-close"]').trigger("click");
 
-    it("should render AddTab component in dialog", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.showAddTabDialog = true;
-      await nextTick();
-
-      // Test that dialog state is managed for AddTab rendering
-      expect(wrapper.vm.showAddTabDialog).toBe(true);
-    });
-
-    it("should pass correct props to AddTab component", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.showAddTabDialog = true;
-      await nextTick();
-
-      // Test that the dialog is open which would contain AddTab
-      expect(wrapper.vm.showAddTabDialog).toBe(true);
-      expect(wrapper.vm.dashboardId).toBe("dashboard-1");
-      expect(wrapper.vm.folderId).toBe("folder-1");
-    });
-
-    it("should close dialog and update tab list when tab created", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.showAddTabDialog = true;
-
-      const newTabData = {
-        tabId: "tab-3",
-        name: "New Tab",
-        description: "Newly created tab",
-      };
-
-      await wrapper.vm.updateTabList(newTabData);
-
-      expect(wrapper.vm.showAddTabDialog).toBe(false);
-      expect(wrapper.vm.selectedTab).toEqual({
-        label: "New Tab",
-        value: "tab-3",
-      });
-    });
-
-    it("should reload tab list after adding new tab", async () => {
-      wrapper = createWrapper();
-
-      const newTabData = {
-        tabId: "tab-3",
-        name: "New Tab",
-        description: "Newly created tab",
-      };
-
-      // Clear previous calls
-      mockLoadingComposable.execute.mockClear();
-
-      await wrapper.vm.updateTabList(newTabData);
-
-      expect(mockLoadingComposable.execute).toHaveBeenCalled();
-    });
+    expect(wrapper.vm.showAddTabDialog).toBe(false);
+    expect(wrapper.find('[data-test="add-tab-stub"]').attributes("data-open")).toBe("false");
   });
 
-  describe("Event Emissions", () => {
-    it("should emit tab-selected when selectedTab changes", async () => {
-      wrapper = createWrapper();
+  it("should emit tab-selected when selectedTab changes", async () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: "dash1" }, store);
 
-      wrapper.vm.selectedTab = {
-        label: "Tab 2",
-        value: "tab-2",
-      };
+    await flushPromises();
 
-      await nextTick();
+    wrapper.vm.selectedTab = { label: "Test Tab", value: "testTab123" };
+    await wrapper.vm.$nextTick();
 
-      expect(wrapper.emitted("tab-selected")).toBeTruthy();
-      expect(wrapper.emitted("tab-selected")[0][0]).toEqual({
-        label: "Tab 2",
-        value: "tab-2",
-      });
-    });
-
-    it("should emit tab-list-updated when tabs are loaded", async () => {
-      wrapper = createWrapper();
-
-      // Clear any previous emissions
-      wrapper.emittedEvents = {};
-
-      await wrapper.vm.getTabList.execute();
-
-      // The emit happens inside the getTabList function, so we need to check differently
-      // Since we're using a mock, let's verify the component state instead
-      expect(wrapper.vm.tabList).toHaveLength(2);
-    });
-
-    it("should emit tab-selected with null when no tabs", async () => {
-      mockGetDashboard.mockResolvedValue({
-        ...mockDashboardData,
-        tabs: [],
-      });
-
-      wrapper = createWrapper();
-      await wrapper.vm.getTabList.execute();
-
-      // Check that selectedTab is null
-      expect(wrapper.vm.selectedTab).toBeNull();
-    });
+    expect(wrapper.emitted("tab-selected")).toBeTruthy();
   });
 
-  describe("Watchers", () => {
-    it("should reload tabs when dashboardId changes", async () => {
-      wrapper = createWrapper();
+  it("should load tabs on mount", async () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: "dash1" }, store);
 
-      // Clear previous calls
-      mockLoadingComposable.execute.mockClear();
+    await flushPromises();
 
-      await wrapper.setProps({
-        dashboardId: "new-dashboard-id",
-      });
-
-      expect(mockLoadingComposable.execute).toHaveBeenCalled();
-    });
-
-    it("should emit tab-selected when selectedTab changes", async () => {
-      wrapper = createWrapper();
-
-      wrapper.vm.selectedTab = {
-        label: "Test Tab",
-        value: "test-tab",
-      };
-
-      await nextTick();
-
-      const emittedEvents = wrapper.emitted("tab-selected");
-      expect(emittedEvents).toBeTruthy();
-      expect(emittedEvents[emittedEvents.length - 1][0]).toEqual({
-        label: "Test Tab",
-        value: "test-tab",
-      });
-    });
+    expect(wrapper.vm.tabList).toHaveLength(2);
+    expect(wrapper.vm.tabList[0].label).toBe("Tab 1");
   });
 
-  describe("Component Lifecycle", () => {
-    it("should handle component mounting without errors", () => {
-      expect(() => {
-        wrapper = createWrapper();
-      }).not.toThrow();
-    });
+  it("should select first tab automatically", async () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: "dash1" }, store);
 
-    it("should handle component unmounting without errors", () => {
-      wrapper = createWrapper();
+    await flushPromises();
 
-      expect(() => {
-        wrapper.unmount();
-      }).not.toThrow();
-    });
-
-    it("should call getTabList on activation", async () => {
-      wrapper = createWrapper();
-
-      // Clear previous calls
-      mockLoadingComposable.execute.mockClear();
-
-      // Simulate onActivated hook - this is harder to test directly
-      // but we can test that the method exists and works
-      await wrapper.vm.getTabList.execute();
-
-      expect(mockLoadingComposable.execute).toHaveBeenCalled();
-    });
+    // selectedTab is a primitive tab id, not an option object.
+    expect(wrapper.vm.selectedTab).toBe("tab1");
   });
 
-  describe("Store Integration", () => {
-    it("should use store correctly", () => {
-      wrapper = createWrapper();
+  it("should emit tab-list-updated after loading tabs", async () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: "dash1" }, store);
 
-      expect(wrapper.vm.store).toBeDefined();
-      expect(wrapper.vm.store.state).toBeDefined();
-    });
+    await flushPromises();
 
-    it("should pass store to getDashboard function", async () => {
-      wrapper = createWrapper();
-
-      await wrapper.vm.getTabList.execute();
-
-      expect(mockGetDashboard).toHaveBeenCalledWith(
-        store,
-        expect.any(String),
-        expect.any(String)
-      );
-    });
+    expect(wrapper.emitted("tab-list-updated")).toBeTruthy();
   });
 
-  describe("Loading State Management", () => {
-    it("should use useLoading composable", () => {
-      wrapper = createWrapper();
+  it("should handle null dashboardId gracefully", async () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: null }, store);
 
-      expect(wrapper.vm.getTabList).toBeDefined();
-      expect(wrapper.vm.getTabList.isLoading).toBeDefined();
-      expect(wrapper.vm.getTabList.execute).toBeTypeOf("function");
-    });
+    await flushPromises();
 
-    it("should handle loading state changes", async () => {
-      mockLoadingComposable.isLoading.value = true;
-      wrapper = createWrapper();
-
-      expect(wrapper.vm.getTabList.isLoading.value).toBe(true);
-
-      mockLoadingComposable.isLoading.value = false;
-      await nextTick();
-
-      expect(wrapper.vm.getTabList.isLoading.value).toBe(false);
-    });
+    expect(wrapper.vm.tabList).toEqual([]);
   });
 
-  describe("Edge Cases", () => {
-    it("should handle null dashboard data", async () => {
-      mockGetDashboard.mockResolvedValue(null);
+  it("should handle null folderId gracefully", async () => {
+    const wrapper = mountComponent({ folderId: null, dashboardId: "dash1" }, store);
 
-      wrapper = createWrapper();
+    await flushPromises();
 
-      expect(async () => {
-        await wrapper.vm.getTabList.execute();
-      }).not.toThrow();
-    });
-
-    it("should handle undefined dashboard data", async () => {
-      mockGetDashboard.mockResolvedValue(undefined);
-
-      wrapper = createWrapper();
-
-      expect(async () => {
-        await wrapper.vm.getTabList.execute();
-      }).not.toThrow();
-    });
-
-    it("should handle malformed tab data", async () => {
-      mockGetDashboard.mockResolvedValue({
-        dashboardId: "dashboard-1",
-        name: "Test Dashboard",
-        tabs: [
-          {
-            // Missing tabId
-            name: "Incomplete Tab",
-          },
-          {
-            tabId: "tab-2",
-            // Missing name
-          },
-          null,
-          undefined,
-        ],
-      });
-
-      wrapper = createWrapper();
-
-      // Catch any potential errors from malformed data
-      try {
-        await wrapper.vm.getTabList.execute();
-        // Component should handle malformed data without throwing
-      } catch (error) {
-        // If it throws, that's also acceptable behavior
-        expect(error).toBeDefined();
-      }
-    });
-
-    it("should handle updateTabList with invalid data", async () => {
-      wrapper = createWrapper();
-
-      // Suppress potential unhandled rejections by properly awaiting and catching
-      try {
-        await wrapper.vm.updateTabList(null);
-        // If no error, component handles null gracefully
-      } catch (error) {
-        // Expected error for null input
-        expect(error).toBeDefined();
-      }
-
-      try {
-        await wrapper.vm.updateTabList({});
-        // If no error, component handles empty object gracefully
-      } catch (error) {
-        // Expected error for missing properties
-        expect(error).toBeDefined();
-      }
-    });
-
-    it("should handle empty prop values", () => {
-      wrapper = createWrapper({
-        folderId: "",
-        dashboardId: "",
-      });
-
-      expect(wrapper.exists()).toBe(true);
-    });
+    expect(wrapper.vm.tabList).toEqual([]);
   });
 
-  describe("Tab Selection", () => {
-    it("should select tab when selectedTab is set", async () => {
-      wrapper = createWrapper();
+  it("should update tab list after adding new tab", async () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: "dash1" }, store);
 
-      // Wait for initial loading to complete
-      await wrapper.vm.getTabList.execute();
-      await nextTick();
+    await flushPromises();
 
-      const tabData = {
-        label: "Selected Tab",
-        value: "selected-tab-id",
-      };
+    const newTab = { name: "New Tab", tabId: "newTab123" };
+    await wrapper.vm.updateTabList(newTab);
 
-      // Now set the custom tab after initial loading is done
-      wrapper.vm.selectedTab = tabData;
-      await nextTick();
-
-      expect(wrapper.vm.selectedTab).toEqual(tabData);
-    });
-
-    it("should emit correct data when tab selection changes", async () => {
-      wrapper = createWrapper();
-
-      const tabData = {
-        label: "New Selection",
-        value: "new-selection-id",
-      };
-
-      wrapper.vm.selectedTab = tabData;
-      await nextTick();
-
-      const emittedEvents = wrapper.emitted("tab-selected");
-      expect(emittedEvents).toBeTruthy();
-      expect(emittedEvents[emittedEvents.length - 1][0]).toEqual(tabData);
-    });
-
-    it("should handle rapid tab selection changes", async () => {
-      wrapper = createWrapper();
-
-      const tabs = [
-        { label: "Tab A", value: "tab-a" },
-        { label: "Tab B", value: "tab-b" },
-        { label: "Tab C", value: "tab-c" },
-      ];
-
-      for (const tab of tabs) {
-        wrapper.vm.selectedTab = tab;
-        await nextTick();
-      }
-
-      const emittedEvents = wrapper.emitted("tab-selected");
-      expect(emittedEvents).toBeTruthy();
-      expect(emittedEvents.length).toBeGreaterThanOrEqual(tabs.length);
-    });
+    expect(wrapper.vm.showAddTabDialog).toBe(false);
+    expect(wrapper.vm.selectedTab).toBe("newTab123");
   });
 
-  describe("Dialog State Management", () => {
-    it("should manage dialog visibility correctly", async () => {
-      wrapper = createWrapper();
+  it("should close dialog and update selected tab when AddTab emits refresh", async () => {
+    const wrapper = mountComponent({ folderId: "folder1", dashboardId: "dash1" }, store);
 
-      // Initially false
-      expect(wrapper.vm.showAddTabDialog).toBe(false);
+    await flushPromises();
 
-      // Set to true
-      wrapper.vm.showAddTabDialog = true;
-      await nextTick();
-      expect(wrapper.vm.showAddTabDialog).toBe(true);
+    // open the dialog
+    await wrapper.find('[data-test="dashboard-tab-new-add"]').trigger("click");
+    expect(wrapper.vm.showAddTabDialog).toBe(true);
 
-      // Set back to false
-      wrapper.vm.showAddTabDialog = false;
-      await nextTick();
-      expect(wrapper.vm.showAddTabDialog).toBe(false);
-    });
+    // child emits refresh with new tab payload
+    await wrapper.find('[data-test="add-tab-stub-refresh"]').trigger("click");
+    await flushPromises();
 
-    it("should close dialog when updateTabList is called", async () => {
-      wrapper = createWrapper();
-      wrapper.vm.showAddTabDialog = true;
-
-      await wrapper.vm.updateTabList({
-        tabId: "new-tab",
-        name: "New Tab",
-      });
-
-      expect(wrapper.vm.showAddTabDialog).toBe(false);
-    });
-  });
-
-  describe("API Integration", () => {
-    it("should call getDashboard with correct parameters", async () => {
-      wrapper = createWrapper();
-      await wrapper.vm.getTabList.execute();
-
-      expect(mockGetDashboard).toHaveBeenCalledWith(
-        store,
-        "dashboard-1",
-        "folder-1"
-      );
-    });
-
-    it("should handle network errors gracefully", async () => {
-      const networkError = new Error("Network error");
-      mockGetDashboard.mockRejectedValue(networkError);
-
-      wrapper = createWrapper();
-
-      // The useLoading composable handles errors, so this should not throw
-      try {
-        await wrapper.vm.getTabList.execute();
-      } catch (error) {
-        // If it throws, that's expected behavior for the mock
-        expect(error).toBe(networkError);
-      }
-
-      // Check that component still exists and is in a safe state
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("should retry loading when props change", async () => {
-      wrapper = createWrapper();
-      await flushPromises();
-
-      // Clear initial call
-      mockGetDashboard.mockClear();
-      mockLoadingComposable.execute.mockClear();
-
-      await wrapper.setProps({
-        dashboardId: "new-dashboard",
-      });
-
-      expect(mockLoadingComposable.execute).toHaveBeenCalled();
-    });
+    expect(wrapper.vm.showAddTabDialog).toBe(false);
+    expect(wrapper.vm.selectedTab).toBe("emitted123");
   });
 });

@@ -1,0 +1,47 @@
+name: CI gate
+
+# Required check on main: pending without the ready-for-ci label, so an untested PR cannot be queued.
+# A status is needed because skipped jobs count as passing for required checks.
+on:
+  # pull_request_target so fork PRs get a status too; no checkout, so nothing untrusted runs.
+  pull_request_target:
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+  # The queue commit must carry every required check; the gate is already passed by then.
+  merge_group:
+
+permissions:
+  statuses: write
+
+concurrency:
+  group: ci-gate-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          LABELED: ${{ github.event_name == 'merge_group' || contains(github.event.pull_request.labels.*.name, 'ready-for-ci') }}
+          DRAFT: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.draft == true }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ "$DRAFT" = "true" ]; then
+            STATE=pending; DESC="Draft PR: paid CI does not run until it is marked ready for review."
+          elif [ "$LABELED" = "true" ]; then
+            STATE=success; DESC="ready-for-ci label present; CI runs on every push"
+          else
+            STATE=pending; DESC="Add the ready-for-ci label to run CI. Required before this PR can be queued."
+          fi
+          gh api -X POST "repos/${{ github.repository }}/statuses/$SHA" \
+            -f state="$STATE" -f context=ci-gate -f description="$DESC" -f target_url="$RUN_URL" \
+            --jq '"\(.context): \(.state)"'
+          # o2-enterprise posts ent-build-status-check on PR heads only; a queue commit never gets one, and
+          # a fork PR cannot be built there. Report it as passed in both cases so a required check cannot deadlock the queue.
+          if [ "${{ github.event_name }}" = "merge_group" ] || [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ]; then
+            gh api -X POST "repos/${{ github.repository }}/statuses/$SHA" \
+              -f state=success -f context=ent-build-status-check -f description="gate passed on the PR head; not re-run on this commit" \
+              --jq '"\(.context): \(.state)"'
+          fi

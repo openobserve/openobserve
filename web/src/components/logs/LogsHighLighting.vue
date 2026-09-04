@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -35,18 +35,23 @@ Usage Examples:
 - <LogsHighLighting :data="1234567890123" />  // Timestamp-like number
 -->
 <template>
-  <span class="logs-highlight-json" v-html="colorizedJson"></span>
+  <span
+    class="logs-highlight-json inline font-mono text-xs wrap-break-word"
+    v-html="colorizedJson"
+  ></span>
 </template>
 
 <script setup lang="ts">
-import { computed, withDefaults } from "vue";
-import { useStore } from "vuex";
+// withDefaults is a compiler macro; importing it conflicts with the macro declaration
+import { computed } from "vue";
+import { useTheme } from "@/composables/useTheme";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import { useI18nTyped } from "@/types/i18n";
 
 /**
  * Component Props Interface
  */
-interface Props {
+export interface Props {
   data: any;
   showBraces?: boolean;
   showQuotes?: boolean;
@@ -61,8 +66,9 @@ const props = withDefaults(defineProps<Props>(), {
   simpleMode: false,
 });
 
-const store = useStore();
-const { colorizeJson } = useLogsHighlighter();
+const { isDark } = useTheme();
+const { t } = useI18nTyped();
+const { colorizeJson } = useLogsHighlighter(t);
 
 /**
  * Main colorization logic with integrated highlighting
@@ -71,7 +77,7 @@ const { colorizeJson } = useLogsHighlighter();
 const colorizedJson = computed((): string => {
   return colorizeJson(
     props.data,
-    store.state.theme === "dark",
+    isDark.value,
     props.showBraces,
     props.showQuotes,
     props.queryString,
@@ -79,14 +85,3 @@ const colorizedJson = computed((): string => {
   );
 });
 </script>
-
-<style scoped lang="scss">
-@import "@/assets/styles/log-highlighting.css";
-
-.logs-highlight-json {
-  font-family: monospace;
-  font-size: 12px;
-  word-break: break-word;
-  display: inline;
-}
-</style>

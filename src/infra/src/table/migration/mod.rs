@@ -92,7 +92,182 @@ mod m20260108_000001_recreate_enrichment_table_urls_with_ksuids;
 mod m20260113_000001_add_alert_template;
 mod m20260116_000001_add_enabled_to_backfill_jobs;
 mod m20260119_000001_add_stat_interval_to_ratelimit;
+mod m20260121_00001_create_sourcemap_table;
 mod m20260131_000001_add_unique_constraint_templates_org_name;
+mod m20260212_000001_widen_incident_correlation_key;
+mod m20260214_000001_create_incident_events_table;
+mod m20260227_000001_add_alert_creates_incident;
+mod m20260305_000001_create_trial_quota_usage_table;
+mod m20260310_000001_create_anomaly_detection_config_table;
+mod m20260310_000002_create_anomaly_detection_models_table;
+mod m20260312_000001_create_eval_templates_table;
+mod m20260317_000001_add_anomaly_detection_config_columns;
+mod m20260318_000001_recreate_service_streams_schema;
+mod m20260318_000002_drop_service_streams_dimensions;
+mod m20260318_000003_alter_alert_incidents_schema;
+mod m20260318_000004_add_set_id_to_service_streams;
+mod m20260318_000005_add_all_dimensions_to_service_streams;
+mod m20260326_000001_add_field_name_mapping_to_service_streams;
+mod m20260331_000001_create_sys_rca_agent_service_accounts;
+mod m20260401_00001_create_org_s3_table;
+mod m20260402_000001_reports_add_image_fields;
+mod m20260414_000001_add_is_system_to_cipher_keys;
+mod m20260414_000002_create_org_ai_toolsets;
+mod m20260415_000001_create_model_pricing_table;
+mod m20260415_000002_add_source_to_model_pricing;
+mod m20260504_000001_add_anomaly_detection_config_folder_fk;
+mod m20260506_000001_create_org_ingestion_tokens_table;
+mod m20260520_000001_create_providers_table;
+mod m20260520_000002_create_score_configs_table;
+mod m20260520_000003_create_scorers_table;
+mod m20260520_000004_create_online_eval_jobs_table;
+mod m20260520_000005_drop_eval_templates_table;
+mod m20260604_000001_add_kind_to_pipeline;
+mod m20260622_000001_add_org_id_to_short_urls;
+mod m20260623_000001_create_org_cleanup_tasks;
+mod m20260623_000002_add_status_and_deleted_at_to_organizations;
+mod m20260629_000001_create_gen_ai_agents_table;
+mod m20260707_000001_create_synthetics_monitors;
+mod m20260707_000002_create_synthetics_runs;
+mod m20260707_000003_create_synthetics_jobs;
+mod m20260707_000004_create_synthetics_probe_tokens;
+mod m20260710_000001_add_target_scope_to_online_eval_jobs;
+mod m20260714_000001_create_synthetics_locations;
+mod m20260714_000002_create_synthetics_agents;
+mod m20260720_000001_add_alert_workflows_col;
+mod m20260720_000001_create_workflow_errors_table;
+mod m20260720_000001_create_workflow_run_data_table;
+mod m20260720_000001_create_workflows_table;
+mod m20260723_000001_add_env_version_to_gen_ai_agents;
+mod m20260724_000001_add_name_is_default_to_synthetics_probe_tokens;
+mod m20260724_000002_add_token_id_to_synthetics_agents;
+mod m20260725_000001_create_alert_states_tables;
+mod m20260725_000002_add_threshold_and_level_columns;
+mod m20260726_000001_add_priority_and_tags_to_alerts;
+mod m20260726_000002_add_priority_and_tags_to_anomaly_config;
+mod m20260726_000003_add_group_lifecycle_columns;
+mod m20260727_000001_create_slo_tables;
+mod m20260727_000002_add_slo_columns_to_alerts;
+mod m20260728_000001_create_workflows_associations_table;
+mod m20260729_000001_add_promql_multi_alert_to_alerts;
+mod m20260730_000001_add_alert_state_to_synthetics_monitors;
+mod m20260730_000002_create_incident_integrations;
+mod m20260730_000003_create_external_alerts;
+mod m20260730_000004_add_alert_kind_to_incident_alerts;
+mod m20260731_000001_create_llm_annotation_queue_tables;
+mod m20260731_000003_create_llm_dataset_tables;
+mod m20260802_000001_add_template_kind;
+mod m20260803_000001_add_destinations_to_incident_integrations;
+mod m20260803_000001_add_down_notified_at_to_synthetics_locations;
+mod m20260804_000001_create_workflow_drafts_table;
+mod m20260809_000001_create_alert_eval_intervals_table;
+mod m20260811_000001_create_llm_experiments;
+mod m20260812_000001_add_provider_rate_limits;
+mod m20260812_000001_create_composite_alerts;
+mod m20260818_000001_create_llm_idempotency_records;
+mod m20260818_000002_create_llm_remote_tasks;
+mod m20260820_000001_add_icon_to_folders;
+mod m20260820_000003_create_llm_secrets;
+mod m20260822_000001_create_status_pages_tables;
+mod m20260824_000001_create_llm_playground_snapshots;
+mod m20260825_000001_add_alert_pending_period_col;
+mod m20260825_000001_add_steps_configured_to_synthetics_jobs;
+mod m20260825_000001_create_status_page_custom_domains;
+mod m20260827_000001_drop_table_action_scripts;
+
+#[cfg(test)]
+pub(crate) async fn create_scheduled_jobs_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    let manager = SchemaManager::new(db);
+    manager
+        .create_table(
+            Table::create()
+                .table(Alias::new("scheduled_jobs"))
+                .if_not_exists()
+                .col(
+                    ColumnDef::new(Alias::new("id"))
+                        .big_integer()
+                        .not_null()
+                        .primary_key()
+                        .auto_increment(),
+                )
+                // The scheduler owns `claim_epoch` (see infra::scheduler's
+                // idempotent bootstrap); the test helper mirrors that so the
+                // composite migration never has to add it.
+                .col(
+                    ColumnDef::new(Alias::new("claim_epoch"))
+                        .big_integer()
+                        .not_null()
+                        .default(0),
+                )
+                .to_owned(),
+        )
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_composite_alert_tables_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use m20260825_000001_add_alert_pending_period_col as update;
+    use sea_orm_migration::MigrationTrait;
+
+    create_scheduled_jobs_for_test(db).await?;
+    let manager = SchemaManager::new(db);
+    m20260812_000001_create_composite_alerts::Migration
+        .up(&manager)
+        .await?;
+    manager
+        .alter_table(update::get_update_stmt_composites())
+        .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+pub(crate) fn composite_alert_migration_sql_for_test(
+    backend: sea_orm::DatabaseBackend,
+) -> Vec<String> {
+    use m20260812_000001_create_composite_alerts as migration;
+    use m20260825_000001_add_alert_pending_period_col as update;
+
+    let mut sql = vec![
+        backend
+            .build(&migration::composites_statement())
+            .to_string(),
+        backend.build(&migration::children_statement()).to_string(),
+        backend
+            .build(&migration::reverse_index_statement())
+            .to_string(),
+        backend
+            .build(&update::get_update_stmt_composites())
+            .to_string(),
+    ];
+    sql.extend(
+        migration::composite_indexes()
+            .iter()
+            .map(|statement| backend.build(statement).to_string()),
+    );
+    sql
+}
+
+/// Apply **only** the SLO tables, for targeted integration tests.
+///
+/// `Migrator::up` replays the whole chain from 2022, whose earliest migrations
+/// assume the legacy `meta` table already exists — it is created outside the
+/// migrator during normal startup. Tests that only care about the SLO tables
+/// would otherwise have to reconstruct that history, which would test the
+/// fixture rather than the schema.
+#[cfg(test)]
+pub(crate) async fn create_slo_tables_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20260727_000001_create_slo_tables::Migration
+        .up(&manager)
+        .await
+}
 
 pub struct Migrator;
 
@@ -174,24 +349,129 @@ impl MigratorTrait for Migrator {
             Box::new(m20260113_000001_add_alert_template::Migration),
             Box::new(m20260116_000001_add_enabled_to_backfill_jobs::Migration),
             Box::new(m20260119_000001_add_stat_interval_to_ratelimit::Migration),
+            Box::new(m20260121_00001_create_sourcemap_table::Migration),
             Box::new(m20260131_000001_add_unique_constraint_templates_org_name::Migration),
+            Box::new(m20260212_000001_widen_incident_correlation_key::Migration),
+            Box::new(m20260214_000001_create_incident_events_table::Migration),
+            Box::new(m20260227_000001_add_alert_creates_incident::Migration),
+            Box::new(m20260305_000001_create_trial_quota_usage_table::Migration),
+            Box::new(m20260310_000001_create_anomaly_detection_config_table::Migration),
+            Box::new(m20260310_000002_create_anomaly_detection_models_table::Migration),
+            Box::new(m20260312_000001_create_eval_templates_table::Migration),
+            Box::new(m20260317_000001_add_anomaly_detection_config_columns::Migration),
+            Box::new(m20260318_000001_recreate_service_streams_schema::Migration),
+            Box::new(m20260318_000002_drop_service_streams_dimensions::Migration),
+            Box::new(m20260318_000003_alter_alert_incidents_schema::Migration),
+            Box::new(m20260318_000004_add_set_id_to_service_streams::Migration),
+            Box::new(m20260318_000005_add_all_dimensions_to_service_streams::Migration),
+            Box::new(m20260326_000001_add_field_name_mapping_to_service_streams::Migration),
+            Box::new(m20260331_000001_create_sys_rca_agent_service_accounts::Migration),
+            Box::new(m20260402_000001_reports_add_image_fields::Migration),
+            Box::new(m20260414_000001_add_is_system_to_cipher_keys::Migration),
+            Box::new(m20260414_000002_create_org_ai_toolsets::Migration),
+            Box::new(m20260415_000001_create_model_pricing_table::Migration),
+            Box::new(m20260415_000002_add_source_to_model_pricing::Migration),
+            Box::new(m20260504_000001_add_anomaly_detection_config_folder_fk::Migration),
+            Box::new(m20260506_000001_create_org_ingestion_tokens_table::Migration),
+            Box::new(m20260401_00001_create_org_s3_table::Migration),
+            Box::new(m20260520_000001_create_providers_table::Migration),
+            Box::new(m20260520_000002_create_score_configs_table::Migration),
+            Box::new(m20260520_000003_create_scorers_table::Migration),
+            Box::new(m20260520_000004_create_online_eval_jobs_table::Migration),
+            Box::new(m20260520_000005_drop_eval_templates_table::Migration),
+            Box::new(m20260604_000001_add_kind_to_pipeline::Migration),
+            Box::new(m20260622_000001_add_org_id_to_short_urls::Migration),
+            Box::new(m20260623_000001_create_org_cleanup_tasks::Migration),
+            Box::new(m20260623_000002_add_status_and_deleted_at_to_organizations::Migration),
+            Box::new(m20260629_000001_create_gen_ai_agents_table::Migration),
+            Box::new(m20260707_000001_create_synthetics_monitors::Migration),
+            Box::new(m20260707_000002_create_synthetics_runs::Migration),
+            Box::new(m20260707_000003_create_synthetics_jobs::Migration),
+            Box::new(m20260707_000004_create_synthetics_probe_tokens::Migration),
+            Box::new(m20260710_000001_add_target_scope_to_online_eval_jobs::Migration),
+            Box::new(m20260714_000001_create_synthetics_locations::Migration),
+            Box::new(m20260714_000002_create_synthetics_agents::Migration),
+            Box::new(m20260720_000001_create_workflows_table::Migration),
+            Box::new(m20260720_000001_create_workflow_errors_table::Migration),
+            Box::new(m20260720_000001_create_workflow_run_data_table::Migration),
+            Box::new(m20260720_000001_add_alert_workflows_col::Migration),
+            Box::new(m20260723_000001_add_env_version_to_gen_ai_agents::Migration),
+            Box::new(m20260724_000001_add_name_is_default_to_synthetics_probe_tokens::Migration),
+            Box::new(m20260724_000002_add_token_id_to_synthetics_agents::Migration),
+            Box::new(m20260725_000001_create_alert_states_tables::Migration),
+            Box::new(m20260725_000002_add_threshold_and_level_columns::Migration),
+            Box::new(m20260726_000001_add_priority_and_tags_to_alerts::Migration),
+            Box::new(m20260726_000002_add_priority_and_tags_to_anomaly_config::Migration),
+            Box::new(m20260726_000003_add_group_lifecycle_columns::Migration),
+            Box::new(m20260727_000001_create_slo_tables::Migration),
+            Box::new(m20260727_000002_add_slo_columns_to_alerts::Migration),
+            Box::new(m20260728_000001_create_workflows_associations_table::Migration),
+            Box::new(m20260729_000001_add_promql_multi_alert_to_alerts::Migration),
+            Box::new(m20260730_000001_add_alert_state_to_synthetics_monitors::Migration),
+            Box::new(m20260730_000002_create_incident_integrations::Migration),
+            Box::new(m20260730_000003_create_external_alerts::Migration),
+            Box::new(m20260730_000004_add_alert_kind_to_incident_alerts::Migration),
+            Box::new(m20260731_000001_create_llm_annotation_queue_tables::Migration),
+            Box::new(m20260731_000003_create_llm_dataset_tables::Migration),
+            Box::new(m20260802_000001_add_template_kind::Migration),
+            Box::new(m20260803_000001_add_down_notified_at_to_synthetics_locations::Migration),
+            Box::new(m20260803_000001_add_destinations_to_incident_integrations::Migration),
+            Box::new(m20260804_000001_create_workflow_drafts_table::Migration),
+            Box::new(m20260809_000001_create_alert_eval_intervals_table::Migration),
+            Box::new(m20260811_000001_create_llm_experiments::Migration),
+            Box::new(m20260812_000001_add_provider_rate_limits::Migration),
+            Box::new(m20260812_000001_create_composite_alerts::Migration),
+            Box::new(m20260818_000001_create_llm_idempotency_records::Migration),
+            Box::new(m20260818_000002_create_llm_remote_tasks::Migration),
+            Box::new(m20260820_000001_add_icon_to_folders::Migration),
+            Box::new(m20260820_000003_create_llm_secrets::Migration),
+            Box::new(m20260824_000001_create_llm_playground_snapshots::Migration),
+            Box::new(m20260825_000001_add_steps_configured_to_synthetics_jobs::Migration),
+            Box::new(m20260825_000001_add_alert_pending_period_col::Migration),
+            Box::new(m20260827_000001_drop_table_action_scripts::Migration),
+            Box::new(m20260822_000001_create_status_pages_tables::Migration),
+            Box::new(m20260825_000001_create_status_page_custom_domains::Migration),
         ]
     }
 }
 
 pub fn get_text_type() -> &'static str {
-    let db_type = config::get_config().common.meta_store.as_str().into();
-    match db_type {
-        MetaStore::MySQL => "longtext",
-        _ => "text",
-    }
+    "text"
 }
 
 pub fn get_binary_type() -> &'static str {
-    let db_type = config::get_config().common.meta_store.as_str().into();
+    let db_type: MetaStore = config::get_config().common.meta_store.as_str().into();
     match db_type {
-        MetaStore::MySQL => "longblob",
         MetaStore::Sqlite => "blob",
         _ => "bytea",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_text_type_returns_text() {
+        assert_eq!(get_text_type(), "text");
+    }
+
+    #[test]
+    fn composite_alert_migration_is_registered_after_existing_migrations() {
+        let names: Vec<String> = Migrator::migrations()
+            .into_iter()
+            .map(|migration| migration.name().to_string())
+            .collect();
+        assert_eq!(
+            names.last().map(String::as_str),
+            Some("m20260825_000001_create_status_page_custom_domains")
+        );
+        assert_eq!(
+            names
+                .iter()
+                .filter(|name| name.as_str() == "m20260812_000001_create_composite_alerts")
+                .count(),
+            1
+        );
     }
 }

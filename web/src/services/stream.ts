@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -45,10 +45,7 @@ const stream = {
     }
 
     if (schema) {
-      url +=
-        url.indexOf("?") > 0
-          ? "&fetchSchema=" + schema
-          : "?fetchSchema=" + schema;
+      url += url.indexOf("?") > 0 ? "&fetchSchema=" + schema : "?fetchSchema=" + schema;
     }
     return http().get(url);
   },
@@ -62,12 +59,7 @@ const stream = {
     return http().get(url);
   },
 
-  updateSettings: (
-    org_identifier: string,
-    stream_name: string,
-    type: string,
-    data: any,
-  ) => {
+  updateSettings: (org_identifier: string, stream_name: string, type: string, data: any) => {
     let url = `/api/${org_identifier}/streams/${stream_name}/settings`;
 
     if (type != "") {
@@ -76,12 +68,7 @@ const stream = {
 
     return http().put(url, data);
   },
-  createStream: (
-    org_identifier: string,
-    stream_name: string,
-    type: string,
-    data: any,
-  ) => {
+  createStream: (org_identifier: string, stream_name: string, type: string, data: any) => {
     let url = `/api/${org_identifier}/streams/${stream_name}`;
 
     if (type != "") {
@@ -103,7 +90,6 @@ const stream = {
     regions,
     clusters,
     no_count,
-    action_id,
     traceparent,
   }: any) => {
     const fieldsString = fields.join(",");
@@ -111,7 +97,6 @@ const stream = {
     if (query_context) url = url + `&sql=${query_context}`;
     if (no_count) url = url + `&no_count=${no_count}`;
     if (query_fn?.trim()) url = url + `&query_fn=${query_fn}`;
-    if (action_id?.trim()) url = url + `&action_id=${action_id}`;
     if (type) url += "&type=" + type;
     if (regions) url += "&regions=" + regions;
     if (clusters) url += "&clusters=" + clusters;
@@ -146,13 +131,7 @@ const stream = {
     return http().get(url);
   },
 
-  labelValues: ({
-    org_identifier,
-    stream_name,
-    start_time,
-    end_time,
-    label,
-  }: any) => {
+  labelValues: ({ org_identifier, stream_name, start_time, end_time, label }: any) => {
     const url = `/api/${org_identifier}/prometheus/api/v1/label/${label}/values?&match[]=${stream_name}&start=${start_time}&end=${end_time}`;
     return http().get(url);
   },

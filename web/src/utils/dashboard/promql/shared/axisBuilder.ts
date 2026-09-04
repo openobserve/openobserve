@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,6 +14,8 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { formatUnitValue, getUnitValue } from "../../convertDataIntoUnitValue";
+import { getGridLineStyle } from "../../colorPalette";
+import { chartColor } from "@/utils/chartTheme";
 import { TOOLTIP_SCROLL_STYLE } from "./types";
 
 /**
@@ -26,6 +28,8 @@ import { TOOLTIP_SCROLL_STYLE } from "./types";
 export function buildTooltip(
   panelSchema: any,
   triggerType: "axis" | "item" = "axis",
+  store?: any,
+  hoveredSeriesState?: any,
 ): any {
   const config = panelSchema.config || {};
   const decimals = config.decimals ?? 2;
@@ -34,10 +38,19 @@ export function buildTooltip(
 
   return {
     trigger: triggerType,
+    // render into <body> so the tooltip is not clipped by the panel's
+    // overflow — same container treatment as the SQL charts
+    appendToBody: true,
+    className: "o2-echarts-tooltip",
     textStyle: {
+      color: chartColor("--color-tooltip-text"),
       fontSize: 12,
     },
     enterable: true,
+    backgroundColor: chartColor("--color-tooltip-bg"),
+    borderColor: chartColor("--color-tooltip-border"),
+    borderWidth: 1,
+    padding: [8, 12],
     extraCssText: TOOLTIP_SCROLL_STYLE,
     axisPointer: {
       type: "cross",
@@ -59,20 +72,27 @@ export function buildTooltip(
         tooltipItems.push(params[0].axisValue);
       }
 
-      // Add series data with unit formatting
+      // Sort by value and hoist the hovered series, matching SQL tooltips
+      const hoveredName = hoveredSeriesState?.value?.hoveredSeriesName;
+      params.sort(
+        (a: any, b: any) => ((b.value?.[1] ?? b.value) || 0) - ((a.value?.[1] ?? a.value) || 0),
+      );
+      const hoveredIndex = params.findIndex((it: any) => it.seriesName === hoveredName);
+      if (hoveredIndex > 0) {
+        params.unshift(params.splice(hoveredIndex, 1)[0]);
+      }
+
+      // Add series data with unit formatting; bold ONLY the hovered series
       params.forEach((param: any) => {
         if (param.seriesName) {
           const marker = param.marker || "";
           const value = param.value?.[1] ?? param.value;
 
           // Apply unit formatting
-          const formattedValue = formatUnitValue(
-            getUnitValue(value, unit, unitCustom, decimals),
-          );
+          const formattedValue = formatUnitValue(getUnitValue(value, unit, unitCustom, decimals));
 
-          tooltipItems.push(
-            `${marker} ${param.seriesName}: <strong>${formattedValue}</strong>`,
-          );
+          const row = `${marker} ${param.seriesName}: ${formattedValue}`;
+          tooltipItems.push(param.seriesName === hoveredName ? `<strong>${row}</strong>` : row);
         }
       });
 
@@ -89,11 +109,7 @@ export function buildTooltip(
  * @param hasData - Whether the chart has any data to display
  * @returns X-axis configuration object for ECharts
  */
-export function buildXAxis(
-  panelSchema: any,
-  store: any,
-  hasData: boolean = true,
-): any {
+export function buildXAxis(panelSchema: any, store: any, hasData: boolean = true): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false; // Default to true
 
@@ -109,6 +125,8 @@ export function buildXAxis(
     },
     splitLine: {
       show: showGridlines,
+      // subtle dashed grid lines, matching the SQL chart style
+      lineStyle: getGridLineStyle(store?.state?.theme),
     },
     ...(config.axis_border_show !== undefined && {
       axisLine: {
@@ -125,7 +143,7 @@ export function buildXAxis(
  * @param queryIndex - Index of the query (for multi-query support)
  * @returns Y-axis configuration object for ECharts
  */
-export function buildYAxis(panelSchema: any, queryIndex: number = 0): any {
+export function buildYAxis(panelSchema: any, queryIndex: number = 0, store?: any): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false; // Default to true
 
@@ -141,17 +159,14 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0): any {
       // Add unit formatting to Y-axis labels
       formatter: (value: any) => {
         return formatUnitValue(
-          getUnitValue(
-            value,
-            config?.unit,
-            config?.unit_custom,
-            config?.decimals,
-          ),
+          getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
         );
       },
     },
     splitLine: {
       show: showGridlines,
+      // subtle dashed grid lines, matching the SQL chart style
+      lineStyle: getGridLineStyle(store?.state?.theme),
     },
     ...(config.axis_border_show !== undefined && {
       axisLine: {
@@ -165,12 +180,7 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0): any {
         // Preserve unit formatter when axis_width is set
         formatter: (value: any) => {
           return formatUnitValue(
-            getUnitValue(
-              value,
-              config?.unit,
-              config?.unit_custom,
-              config?.decimals,
-            ),
+            getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
           );
         },
       },
@@ -206,10 +216,7 @@ export function buildYAxis(panelSchema: any, queryIndex: number = 0): any {
  * @param panelSchema - Panel configuration schema
  * @returns Category X-axis configuration object for ECharts
  */
-export function buildCategoryXAxis(
-  categories: string[],
-  panelSchema: any,
-): any {
+export function buildCategoryXAxis(categories: string[], panelSchema: any, store?: any): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false;
 
@@ -219,9 +226,13 @@ export function buildCategoryXAxis(
     axisLabel: {
       show: config.axis_label !== false,
       rotate: config.axis_label_rotate || 0,
+      // hide colliding labels instead of drawing them on top of each other
+      hideOverlap: true,
     },
     splitLine: {
       show: showGridlines,
+      // subtle dashed grid lines, matching the SQL chart style
+      lineStyle: getGridLineStyle(store?.state?.theme),
     },
     ...(config.axis_border_show !== undefined && {
       axisLine: {
@@ -238,10 +249,7 @@ export function buildCategoryXAxis(
  * @param panelSchema - Panel configuration schema
  * @returns Category Y-axis configuration object for ECharts
  */
-export function buildCategoryYAxis(
-  categories: string[],
-  panelSchema: any,
-): any {
+export function buildCategoryYAxis(categories: string[], panelSchema: any, store?: any): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false;
 
@@ -250,9 +258,13 @@ export function buildCategoryYAxis(
     data: categories,
     axisLabel: {
       show: config.axis_label !== false,
+      // hide colliding labels instead of drawing them on top of each other
+      hideOverlap: true,
     },
     splitLine: {
       show: showGridlines,
+      // subtle dashed grid lines, matching the SQL chart style
+      lineStyle: getGridLineStyle(store?.state?.theme),
     },
     ...(config.axis_border_show !== undefined && {
       axisLine: {
@@ -268,7 +280,7 @@ export function buildCategoryYAxis(
  * @param panelSchema - Panel configuration schema
  * @returns Value axis configuration object for ECharts
  */
-export function buildValueAxis(panelSchema: any): any {
+export function buildValueAxis(panelSchema: any, store?: any): any {
   const config = panelSchema.config || {};
   const showGridlines = config.show_grid !== false;
 
@@ -276,20 +288,19 @@ export function buildValueAxis(panelSchema: any): any {
     type: "value",
     axisLabel: {
       show: config.axis_label !== false,
+      // hide colliding labels instead of drawing them on top of each other
+      hideOverlap: true,
       // Add unit formatting to value axis labels
       formatter: (value: any) => {
         return formatUnitValue(
-          getUnitValue(
-            value,
-            config?.unit,
-            config?.unit_custom,
-            config?.decimals,
-          ),
+          getUnitValue(value, config?.unit, config?.unit_custom, config?.decimals),
         );
       },
     },
     splitLine: {
       show: showGridlines,
+      // subtle dashed grid lines, matching the SQL chart style
+      lineStyle: getGridLineStyle(store?.state?.theme),
     },
     ...(config.axis_border_show !== undefined && {
       axisLine: {

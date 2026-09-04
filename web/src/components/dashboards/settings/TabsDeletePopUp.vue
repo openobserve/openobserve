@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,102 +17,88 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-dialog>
-    <q-card style="width: 600px" data-test="dialog-box">
-      <q-card-section class="confirmBody">
-        <div class="head" data-test="dashboard-tab-delete-tab-head">
-          Delete
-          <span
-            style="text-decoration: underline"
-            data-test="dashboard-tab-delete-tab-name"
-            >{{
-              dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.name
-            }}</span
-          >
-        </div>
-        <div class="para" data-test="dashboard-tab-delete-tab-para">
-          This action cannot be undone. Are you sure you want to delete this
-          tab?
-        </div>
-      </q-card-section>
+  <ODialog
+    data-test="tabs-delete-popup-dialog"
+    v-model:open="open"
+    size="md"
+    :title="
+      t('dashboard.tabsDeletePopUp.deleteTitle', {
+        name: dashboardData?.tabs?.find((tab: any) => tab.tabId === tabId)?.name,
+      })
+    "
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="onCancel"
+    @click:primary="onConfirm"
+  >
+    <div data-test="dialog-box">
+      <p class="para" data-test="dashboard-tab-delete-tab-para">
+        {{ t("dashboard.tabsDeletePopUp.confirmMessage") }}
+      </p>
 
       <!-- only show if there are panels in the tab -->
       <div
-        v-if="dashboardData.tabs.find((tab: any) => tab.tabId === tabId)?.panels?.length"
-        style="padding: 10px"
+        v-if="dashboardData?.tabs?.find((tab: any) => tab.tabId === tabId)?.panels?.length"
+        class="mt-4"
         data-test="dashboard-tab-delete-tab-panels-container"
       >
-        <div class="radio-group">
-          <div style="display: flex; flex-direction: row">
-            <q-radio
-              v-model="action"
-              val="move"
-              data-test="dashboard-tab-delete-tab-panels-move"
-            >
-              Move panels to another tab
-            </q-radio>
-            <div v-if="action === 'move'" class="select-container">
-              <q-select
-                dense
-                v-model="selectedTabToMovePanels"
-                :options="moveTabOptions"
-                data-test="dashboard-tab-delete-tab-panels-move-select"
-               borderless hide-bottom-space/>
+        <div class="flex flex-col" data-test="dashboard-tab-delete-radio-group">
+          <ORadioGroup v-model="action" orientation="vertical" class="gap-4">
+            <div class="flex flex-row">
+              <ORadio
+                val="move"
+                :disabled="moveTabOptions.length === 0"
+                data-test="dashboard-tab-delete-tab-panels-move"
+                :label="t('dashboard.tabsDeletePopUp.movePanels')"
+              />
+              <div v-if="action === 'move'" class="ms-5 mb-2.5 max-w-75 min-w-50">
+                <OSelect
+                  v-model="selectedTabToMovePanels"
+                  :options="moveTabOptions"
+                  data-test="dashboard-tab-delete-tab-panels-move-select"
+                />
+              </div>
             </div>
-          </div>
-          <q-radio
-            v-model="action"
-            val="delete"
-            data-test="dashboard-tab-delete-tab-panels-delete"
-          >
-            Delete all the panels of this tab
-          </q-radio>
+            <ORadio
+              val="delete"
+              data-test="dashboard-tab-delete-tab-panels-delete"
+              :label="t('dashboard.tabsDeletePopUp.deleteAllPanels')"
+            />
+          </ORadioGroup>
         </div>
       </div>
-
-      <q-card-actions class="confirmActions">
-        <div class="button-container">
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            no-caps
-            class="q-mr-sm"
-            @click="onCancel"
-            data-test="cancel-button"
-          >
-            {{ t("confirmDialog.cancel") }}
-          </q-btn>
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            no-caps
-            class="no-border"
-            color="primary"
-            @click="onConfirm"
-            data-test="confirm-button"
-          >
-            {{ t("confirmDialog.ok") }}
-          </q-btn>
-        </div>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { onMounted } from "vue";
-import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 
 export default defineComponent({
   name: "TabsDeletePopUp",
-  emits: ["update:ok", "update:cancel"],
-  props: ["tabId", "dashboardData"],
+  components: { ODialog, ORadio, ORadioGroup, OSelect },
+  emits: ["update:ok", "update:cancel", "update:modelValue"],
+  props: {
+    tabId: { type: String },
+    dashboardData: { type: Object },
+    modelValue: { type: Boolean, default: false },
+  },
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const action = ref("move");
-    const selectedTabToMovePanels = ref({ label: "Default", value: "default" });
+    const selectedTabToMovePanels = ref<string | undefined>(undefined);
     const moveTabOptions = ref([]);
+
+    const open = computed({
+      get: () => props.modelValue ?? false,
+      set: (v: boolean) => emit("update:modelValue", v),
+    });
 
     onMounted(() => {
       // update move tab options
@@ -127,33 +113,35 @@ export default defineComponent({
         }
       });
 
-      // set action to move as default
-      action.value = "move";
-      // set selectedTabToMovePanels to [0]th value
-      selectedTabToMovePanels.value = newMoveTabOptions[0];
+      // if there are no other tabs to move panels to, force delete action
+      action.value = newMoveTabOptions.length > 0 ? "move" : "delete";
+      // set selectedTabToMovePanels to [0]th value (may be undefined if no options)
+      selectedTabToMovePanels.value = newMoveTabOptions[0]?.value;
 
-      // selectedTabToMovePanels.value = {
-      //   label: "Default",
-      //   value: "default",
-      // };
       moveTabOptions.value = newMoveTabOptions;
     });
 
     const onCancel = () => {
+      open.value = false;
       emit("update:cancel");
     };
 
     const onConfirm = () => {
       // if action is delete, then emit without passing the selectedTabToMovePanels as args
       // else pass the selectedTabToMovePanels
+      // if action is delete, then emit without passing the selectedTabToMovePanels as args
+      // else pass the selectedTabToMovePanels
       if (action.value === "delete") {
+        open.value = false;
         emit("update:ok");
         return;
       }
-      emit("update:ok", selectedTabToMovePanels.value.value);
+      open.value = false;
+      emit("update:ok", selectedTabToMovePanels.value);
     };
     return {
       t,
+      open,
       onCancel,
       onConfirm,
       action,
@@ -163,21 +151,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.q-radio {
-  margin-bottom: 10px;
-}
-
-.radio-group {
-  display: flex;
-  flex-direction: column;
-}
-
-.select-container {
-  margin-left: 20px;
-  min-width: 200px;
-  max-width: 300px;
-  margin-bottom: 10px;
-}
-</style>

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,16 +13,15 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
 import { convertPromQLData } from "@/utils/dashboard/convertPromQLData";
-import {
-  convertMultiSQLData,
-  convertSQLData,
-} from "@/utils/dashboard/convertSQLData";
-import { convertTableData } from "@/utils/dashboard/convertTableData";
+import { convertMultiSQLData } from "@/utils/dashboard/convertSQLData";
+import { convertTableData, convertMultiQueryTableData } from "@/utils/dashboard/convertTableData";
+import { convertPivotTableData } from "@/utils/dashboard/convertPivotTableData";
 import { convertGeoMapData } from "@/utils/dashboard/convertGeoMapData";
 import { convertMapsData } from "@/utils/dashboard/convertMapsData";
 import { convertSankeyData } from "./convertSankeyData";
-import { runJavaScriptCode } from "./convertCustomChartData";
+import { runJavaScriptCode, validateUserCode } from "./convertCustomChartData";
 /**
  * Converts panel data based on the panel schema and data.
  *
@@ -41,6 +40,8 @@ export const convertPanelData = async (
   chartPanelStyle: any,
   annotations: any,
   loading: any = false,
+  // Metric sparkline: per-query histogram hits (SQL metric only).
+  sparklineData?: any,
 ) => {
   // based on the panel config, using the switch calling the appropriate converter
   // based on panel Data chartType is taken for ignoring unnecessary api calls
@@ -58,6 +59,21 @@ export const convertPanelData = async (
     case "scatter":
     case "metric":
     case "gauge": {
+      // Skip conversion if no fields are selected in builder mode
+      // (prevents echarts errors like "axis.getAxesOnZeroOf is not a function")
+      // PromQL queries don't use builder fields, so skip this check for them.
+      // Custom-query panels (e.g. logs Timechart) derive axes from the
+      // SQL result asynchronously, so empty x/y is a valid transient state there.
+      const query = panelSchema?.queries?.[0];
+      if (
+        panelSchema?.queryType !== "promql" &&
+        !query?.customQuery &&
+        !query?.fields?.x?.length &&
+        !query?.fields?.y?.length
+      ) {
+        throw new Error(gt("dashboard.utils.selectRequiredFields"));
+      }
+
       if (
         // panelSchema?.fields?.stream_type == "metrics" &&
         // panelSchema?.customQuery &&
@@ -74,6 +90,8 @@ export const convertPanelData = async (
             hoveredSeriesState,
             annotations,
             metadata,
+            resultMetaData?.value,
+            loading,
           )),
         };
       } else {
@@ -91,6 +109,8 @@ export const convertPanelData = async (
               metadata,
               chartPanelStyle,
               annotations,
+              loading,
+              sparklineData,
             )),
           };
         } catch (error) {
@@ -112,10 +132,34 @@ export const convertPanelData = async (
             hoveredSeriesState,
             annotations,
             metadata,
+            resultMetaData?.value,
+            loading,
           )),
         };
       } else {
-        // SQL query type
+        // SQL query type — check for pivot mode
+        const pivotQuery = panelSchema?.queries?.[0];
+        const isPivot =
+          (pivotQuery?.fields?.x?.length ?? 0) > 0 &&
+          (pivotQuery?.fields?.breakdown?.length ?? 0) > 0 &&
+          (pivotQuery?.fields?.y?.length ?? 0) > 0;
+
+        if (isPivot) {
+          // Pivot: single query only
+          return {
+            chartType: panelSchema.type,
+            ...convertPivotTableData(panelSchema, [data[0]], store),
+          };
+        }
+
+        // Multi-query UNION mode for non-pivot tables
+        if (Array.isArray(data) && data.length > 1) {
+          return {
+            chartType: panelSchema.type,
+            ...convertMultiQueryTableData(panelSchema, data, store),
+          };
+        }
+
         return {
           chartType: panelSchema.type,
           ...convertTableData(panelSchema, data, store),
@@ -135,6 +179,8 @@ export const convertPanelData = async (
             hoveredSeriesState,
             annotations,
             metadata,
+            resultMetaData?.value,
+            loading,
           )),
         };
       } else {
@@ -158,6 +204,8 @@ export const convertPanelData = async (
             hoveredSeriesState,
             annotations,
             metadata,
+            resultMetaData?.value,
+            loading,
           )),
         };
       } else {
@@ -175,6 +223,11 @@ export const convertPanelData = async (
       };
     }
     case "custom_chart": {
+      const validationError = validateUserCode(panelSchema.customChartContent ?? "");
+      if (validationError) {
+        throw new Error(gt("dashboard.utils.unsafeCodeDetected", { error: validationError }));
+      }
+
       const hasData =
         panelSchema?.queryType === "promql"
           ? data.length > 0 && data[0].result.length > 0
@@ -189,9 +242,10 @@ export const convertPanelData = async (
         };
       } else {
         if (panelSchema?.queries?.[0]?.query?.trim() == "")
-          throw new Error("No data found");
+          throw new Error(gt("dashboard.utils.noDataFound"));
       }
     }
+    // falls through — custom chart without data resolves to the default empty result
     default: {
       return {};
     }

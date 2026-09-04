@@ -1,0 +1,55 @@
+[
+  {
+    "id": "es-path-template-from-url-full",
+    "dialect": "elasticsearch",
+    "input": {
+      "attrs": {
+        "db.system.name": "elasticsearch",
+        "http.request.method": "GET",
+        "url.full": "http://es-prod.internal:9200/logs-2026.08.07/_search?q=user_id%3A99231"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "GET /logs-?/_search",
+      "operation": "GET",
+      "stmt_class": "query",
+      "system": "elasticsearch",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "es_logs_search",
+    "literals": ["2026.08.07", "99231"],
+    "source": "authored"
+  },
+  {
+    "id": "es-path-template-from-statement-fallback",
+    "dialect": "elasticsearch",
+    "input": {
+      "attrs": {
+        "db.system": "elasticsearch",
+        "db.statement": "GET /logs-2026.08.06/_search"
+      },
+      "span_kind": 3
+    },
+    "expect": {
+      "query_norm": "GET /logs-?/_search",
+      "operation": "GET",
+      "stmt_class": "query",
+      "system": "elasticsearch",
+      "namespace": null,
+      "instance": null,
+      "env": null,
+      "status_code": null,
+      "user": null,
+      "batch_multiplier": null
+    },
+    "fingerprint_class": "es_logs_search",
+    "literals": ["2026.08.06"],
+    "source": "authored"
+  }
+]

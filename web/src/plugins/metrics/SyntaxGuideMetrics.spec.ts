@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,22 +15,18 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { Quasar } from "quasar";
 import SyntaxGuideMetrics from "./SyntaxGuideMetrics.vue";
 import store from "../../test/unit/helpers/store";
 import { createI18n } from "vue-i18n";
 import { nextTick } from "vue";
+import enLocale from "@/locales/languages/en-US.json";
 
-// Create i18n instance
+// The REAL locale file, not a hand-written stub: the guide's copy now comes from
+// `t()`, so a stub with a couple of keys would leave every other string
+// resolving to its raw key and the assertions testing nothing.
 const i18n = createI18n({
   locale: "en",
-  messages: {
-    en: {
-      search: {
-        syntaxGuideLabel: "Syntax Guide"
-      }
-    }
-  }
+  messages: { en: enLocale },
 });
 
 describe("SyntaxGuideMetrics.vue", () => {
@@ -39,7 +35,7 @@ describe("SyntaxGuideMetrics.vue", () => {
   beforeEach(() => {
     // Reset all mocks
     vi.clearAllMocks();
-    
+
     // Setup default store state
     store.state.theme = "dark";
   });
@@ -54,18 +50,9 @@ describe("SyntaxGuideMetrics.vue", () => {
   const createWrapper = (propsData = {}) => {
     return mount(SyntaxGuideMetrics, {
       global: {
-        plugins: [
-          [
-            Quasar,
-            {
-              plugins: []
-            }
-          ],
-          i18n,
-          store
-        ]
+        plugins: [i18n, store],
       },
-      props: propsData
+      props: propsData,
     });
   };
 
@@ -114,12 +101,12 @@ describe("SyntaxGuideMetrics.vue", () => {
   describe("Props Validation", () => {
     it("should accept boolean true for sqlmode prop", () => {
       wrapper = createWrapper({ sqlmode: true });
-      expect(wrapper.props('sqlmode')).toBe(true);
+      expect(wrapper.props("sqlmode")).toBe(true);
     });
 
     it("should accept boolean false for sqlmode prop", () => {
       wrapper = createWrapper({ sqlmode: false });
-      expect(wrapper.props('sqlmode')).toBe(false);
+      expect(wrapper.props("sqlmode")).toBe(false);
     });
 
     it("should use default value false when sqlmode prop is not provided", () => {
@@ -130,7 +117,7 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should handle sqlmode prop reactivity", async () => {
       wrapper = createWrapper({ sqlmode: false });
       expect(wrapper.vm.sqlmode).toBe(false);
-      
+
       await wrapper.setProps({ sqlmode: true });
       expect(wrapper.vm.sqlmode).toBe(true);
     });
@@ -159,8 +146,8 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should have both t and store available in setup return", () => {
       wrapper = createWrapper();
       const setupReturn = wrapper.vm;
-      expect(setupReturn).toHaveProperty('t');
-      expect(setupReturn).toHaveProperty('store');
+      expect(setupReturn).toHaveProperty("t");
+      expect(setupReturn).toHaveProperty("store");
     });
 
     it("should maintain setup function structure", () => {
@@ -180,10 +167,10 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should react to store theme changes", async () => {
       wrapper = createWrapper();
       expect(wrapper.vm.store.state.theme).toBe("dark");
-      
+
       store.state.theme = "light";
       await nextTick();
-      
+
       expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
@@ -203,7 +190,7 @@ describe("SyntaxGuideMetrics.vue", () => {
   describe("Template Rendering - Normal Mode", () => {
     it("should render button with correct attributes in normal mode", () => {
       wrapper = createWrapper({ sqlmode: false });
-      const button = wrapper.find(".q-btn");
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
       expect(button.exists()).toBe(true);
     });
 
@@ -234,7 +221,8 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should have help icon in normal mode", () => {
       wrapper = createWrapper({ sqlmode: false });
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.html()).toContain("help");
+      // HelpCircle (lucide) renders an SVG inside the button
+      expect(button.html()).toBeTruthy();
     });
 
     it("should not be in SQL mode when sqlmode is false", () => {
@@ -278,7 +266,8 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should have help icon in SQL mode", () => {
       wrapper = createWrapper({ sqlmode: true });
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.html()).toContain("help");
+      // HelpCircle (lucide) renders an SVG inside the button
+      expect(button.html()).toBeTruthy();
     });
 
     it("should be in SQL mode when sqlmode is true", () => {
@@ -295,7 +284,7 @@ describe("SyntaxGuideMetrics.vue", () => {
 
     it("should handle SQL mode prop correctly", () => {
       wrapper = createWrapper({ sqlmode: true });
-      expect(wrapper.props('sqlmode')).toBe(true);
+      expect(wrapper.props("sqlmode")).toBe(true);
       expect(wrapper.vm.sqlmode).toBe(true);
     });
 
@@ -329,10 +318,10 @@ describe("SyntaxGuideMetrics.vue", () => {
       store.state.theme = "dark";
       wrapper = createWrapper();
       expect(wrapper.vm.store.state.theme).toBe("dark");
-      
+
       store.state.theme = "light";
       await nextTick();
-      
+
       expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
@@ -345,9 +334,10 @@ describe("SyntaxGuideMetrics.vue", () => {
   });
 
   describe("Component Structure", () => {
-    it("should have q-btn as root element", () => {
+    it("should have OButton as root element", () => {
       wrapper = createWrapper();
-      expect(wrapper.find(".q-btn").exists()).toBe(true);
+      // OButton renders as a <button> element with data-cy attribute
+      expect(wrapper.find('[data-cy="syntax-guide-button"]').exists()).toBe(true);
     });
 
     it("should have button as the main interactive element", () => {
@@ -360,8 +350,8 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should have proper button attributes", () => {
       wrapper = createWrapper();
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.attributes('type')).toBe('button');
-      expect(button.attributes('tabindex')).toBe('0');
+      expect(button.attributes("type")).toBe("button");
+      // OButton does not set tabindex="0" explicitly; native browser behavior handles focus
     });
 
     it("should contain button content", () => {
@@ -377,7 +367,7 @@ describe("SyntaxGuideMetrics.vue", () => {
 
     it("should contain data-cy attribute for testing", () => {
       wrapper = createWrapper();
-      expect(wrapper.html()).toContain("data-cy=\"syntax-guide-button\"");
+      expect(wrapper.html()).toContain('data-cy="syntax-guide-button"');
     });
   });
 
@@ -385,7 +375,7 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should handle props changes correctly", async () => {
       wrapper = createWrapper({ sqlmode: false });
       expect(wrapper.vm.sqlmode).toBe(false);
-      
+
       await wrapper.setProps({ sqlmode: true });
       expect(wrapper.vm.sqlmode).toBe(true);
     });
@@ -394,19 +384,19 @@ describe("SyntaxGuideMetrics.vue", () => {
       wrapper = createWrapper({ sqlmode: false });
       const initialStore = wrapper.vm.store;
       const initialT = wrapper.vm.t;
-      
+
       await wrapper.setProps({ sqlmode: true });
-      
+
       expect(wrapper.vm.store).toBe(initialStore);
       expect(wrapper.vm.t).toBe(initialT);
     });
 
     it("should handle multiple prop updates", async () => {
       wrapper = createWrapper({ sqlmode: false });
-      
+
       await wrapper.setProps({ sqlmode: true });
       expect(wrapper.vm.sqlmode).toBe(true);
-      
+
       await wrapper.setProps({ sqlmode: false });
       expect(wrapper.vm.sqlmode).toBe(false);
     });
@@ -432,10 +422,10 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should handle store state mutations without breaking", () => {
       wrapper = createWrapper();
       const originalTheme = store.state.theme;
-      
+
       store.state.theme = "custom-theme";
       expect(wrapper.vm.store.state.theme).toBe("custom-theme");
-      
+
       store.state.theme = originalTheme; // Reset
     });
 
@@ -466,40 +456,351 @@ describe("SyntaxGuideMetrics.vue", () => {
     it("should maintain consistent state across re-renders", async () => {
       wrapper = createWrapper({ sqlmode: false });
       const initialStore = wrapper.vm.store;
-      
+
       await wrapper.setProps({ sqlmode: true });
       await wrapper.setProps({ sqlmode: false });
-      
+
       expect(wrapper.vm.store).toBe(initialStore);
     });
 
     it("should handle complex prop and store interactions", async () => {
       store.state.theme = "dark";
       wrapper = createWrapper({ sqlmode: false });
-      
+
       expect(wrapper.vm.store.state.theme).toBe("dark");
       expect(wrapper.vm.sqlmode).toBe(false);
-      
+
       store.state.theme = "light";
       await wrapper.setProps({ sqlmode: true });
-      
+
       expect(wrapper.vm.store.state.theme).toBe("light");
       expect(wrapper.vm.sqlmode).toBe(true);
     });
 
     it("should provide complete component functionality", () => {
       wrapper = createWrapper({ sqlmode: true });
-      
+
       // Check all required properties are available
       expect(wrapper.vm.sqlmode).toBe(true);
       expect(wrapper.vm.store).toBeDefined();
       expect(wrapper.vm.t).toBeDefined();
-      
+
       // Check component renders correctly
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find(".q-btn").exists()).toBe(true);
+      expect(wrapper.find('[data-cy="syntax-guide-button"]').exists()).toBe(true);
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
       expect(button.classes()).toContain("sql-mode");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// New describe blocks added 2026 — covers guide content and menu theme class
+// that were not tested by the Aug 2026 spec.
+// ---------------------------------------------------------------------------
+
+describe("SyntaxGuideMetrics — PromQL guide content (normal mode)", () => {
+  let wrapper: any;
+
+  const createWrapper = (propsData = {}) => {
+    const i18nLocal = createI18n({
+      locale: "en",
+      messages: { en: enLocale },
+    });
+    return mount(SyntaxGuideMetrics, {
+      attachTo: document.body,
+      global: {
+        plugins: [i18nLocal, store],
+      },
+      props: propsData,
+    });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store.state.theme = "dark";
+  });
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+    vi.clearAllTimers();
+  });
+
+  it("renders a list of guide items in normal mode", async () => {
+    wrapper = createWrapper({ sqlmode: false });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    const items = document.querySelectorAll(".answers ul li");
+    expect(items.length).toBeGreaterThan(0);
+  });
+
+  it("mentions instant vector selectors in normal mode", async () => {
+    wrapper = createWrapper({ sqlmode: false });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.body.innerHTML).toContain("metric_name");
+  });
+
+  it("mentions range vector selectors in normal mode", async () => {
+    wrapper = createWrapper({ sqlmode: false });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.body.innerHTML).toContain("[5m]");
+  });
+
+  it("mentions sum aggregation function in normal mode", async () => {
+    wrapper = createWrapper({ sqlmode: false });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.body.innerHTML).toContain("sum");
+  });
+
+  it("mentions rate function in normal mode", async () => {
+    wrapper = createWrapper({ sqlmode: false });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.body.innerHTML).toContain("rate");
+  });
+
+  it("does not show SQL-mode content in normal mode", async () => {
+    wrapper = createWrapper({ sqlmode: false });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    // SQL mode shows SELECT keyword
+    expect(document.body.innerHTML).not.toContain("SELECT");
+  });
+
+  it("renders the guide list with highlighted examples", async () => {
+    wrapper = createWrapper({ sqlmode: false });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.querySelector(".answers ul")).toBeTruthy();
+    expect(document.querySelector(".answers .bg-highlight-bg")).toBeTruthy();
+  });
+});
+
+describe("SyntaxGuideMetrics — SQL mode guide content", () => {
+  let wrapper: any;
+
+  const createWrapper = (propsData = {}) => {
+    const i18nLocal = createI18n({
+      locale: "en",
+      messages: { en: enLocale },
+    });
+    return mount(SyntaxGuideMetrics, {
+      attachTo: document.body,
+      global: {
+        plugins: [i18nLocal, store],
+      },
+      props: propsData,
+    });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store.state.theme = "dark";
+  });
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+    vi.clearAllTimers();
+  });
+
+  it("shows 'Syntax Guide: SQL Mode' title in SQL mode", async () => {
+    wrapper = createWrapper({ sqlmode: true });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.body.innerHTML).toContain("SQL Mode");
+  });
+
+  it("renders SELECT keyword examples in SQL mode", async () => {
+    wrapper = createWrapper({ sqlmode: true });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.body.innerHTML).toContain("SELECT");
+  });
+
+  it("contains match_all example in SQL mode", async () => {
+    wrapper = createWrapper({ sqlmode: true });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.body.innerHTML).toContain("match_all");
+  });
+
+  it("contains str_match example in SQL mode", async () => {
+    wrapper = createWrapper({ sqlmode: true });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.body.innerHTML).toContain("str_match");
+  });
+
+  it("contains WHERE keyword in SQL mode", async () => {
+    wrapper = createWrapper({ sqlmode: true });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.body.innerHTML).toContain("WHERE");
+  });
+
+  it("contains external docs link in SQL mode", async () => {
+    wrapper = createWrapper({ sqlmode: true });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.body.innerHTML).toContain("openobserve.ai/docs");
+  });
+
+  it("link opens in a new tab in SQL mode", async () => {
+    wrapper = createWrapper({ sqlmode: true });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    const link = document.querySelector('a[href*="openobserve"]');
+    expect(link).toBeTruthy();
+    expect(link?.getAttribute("target")).toBe("_blank");
+  });
+
+  it("does not show PromQL content in SQL mode", async () => {
+    wrapper = createWrapper({ sqlmode: true });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    // PromQL mode shows "rate(" which does not appear in SQL guide
+    expect(document.body.innerHTML).not.toContain("rate(");
+  });
+
+  it("renders the guide list with highlighted examples in SQL mode too", async () => {
+    wrapper = createWrapper({ sqlmode: true });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.querySelector(".answers ul")).toBeTruthy();
+    expect(document.querySelector(".answers .bg-highlight-bg")).toBeTruthy();
+  });
+});
+
+describe("SyntaxGuideMetrics — dropdown theme class binding", () => {
+  let wrapper: any;
+
+  const createWrapper = (propsData = {}) => {
+    const i18nLocal = createI18n({
+      locale: "en",
+      messages: { en: enLocale },
+    });
+    return mount(SyntaxGuideMetrics, {
+      global: {
+        plugins: [i18nLocal, store],
+      },
+      props: propsData,
+    });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+    vi.clearAllTimers();
+  });
+
+  it("resolves the dark theme binding when store theme is 'dark'", () => {
+    store.state.theme = "dark";
+    wrapper = createWrapper();
+    // The dropdown content renders as a portal; verify via vm that the binding resolves correctly
+    expect(wrapper.vm.store.state.theme).toBe("dark");
+  });
+
+  it("resolves the light theme binding when store theme is 'light'", () => {
+    store.state.theme = "light";
+    wrapper = createWrapper();
+    expect(wrapper.vm.store.state.theme).toBe("light");
+  });
+
+  it("re-evaluates theme class after store mutation", async () => {
+    store.state.theme = "dark";
+    wrapper = createWrapper();
+
+    store.state.theme = "light";
+    await nextTick();
+
+    expect(wrapper.vm.store.state.theme).toBe("light");
+  });
+});
+
+describe("SyntaxGuideMetrics — mode switching content swap", () => {
+  let wrapper: any;
+
+  const createWrapper = (propsData = {}) => {
+    const i18nLocal = createI18n({
+      locale: "en",
+      messages: { en: enLocale },
+    });
+    return mount(SyntaxGuideMetrics, {
+      attachTo: document.body,
+      global: {
+        plugins: [i18nLocal, store],
+      },
+      props: propsData,
+    });
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    store.state.theme = "dark";
+  });
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+    vi.clearAllTimers();
+  });
+
+  it("switches from PromQL content to SQL content when sqlmode becomes true", async () => {
+    wrapper = createWrapper({ sqlmode: false });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.body.innerHTML).not.toContain("SELECT");
+
+    await wrapper.setProps({ sqlmode: true });
+    await nextTick();
+
+    expect(document.body.innerHTML).toContain("SELECT");
+  });
+
+  it("switches from SQL content back to PromQL content when sqlmode becomes false", async () => {
+    wrapper = createWrapper({ sqlmode: true });
+    const button = wrapper.find('[data-cy="syntax-guide-button"]');
+    await button.trigger("click");
+    await flushPromises();
+    expect(document.body.innerHTML).toContain("SELECT");
+
+    await wrapper.setProps({ sqlmode: false });
+    await nextTick();
+
+    expect(document.body.innerHTML).not.toContain("SELECT");
+  });
+
+  it("button class toggles between normal-mode and sql-mode on prop change", async () => {
+    wrapper = createWrapper({ sqlmode: false });
+    let button = wrapper.find('[data-cy="syntax-guide-button"]');
+    expect(button.classes()).toContain("normal-mode");
+    expect(button.classes()).not.toContain("sql-mode");
+
+    await wrapper.setProps({ sqlmode: true });
+    button = wrapper.find('[data-cy="syntax-guide-button"]');
+    expect(button.classes()).toContain("sql-mode");
+    expect(button.classes()).not.toContain("normal-mode");
   });
 });

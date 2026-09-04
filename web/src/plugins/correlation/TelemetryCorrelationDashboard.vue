@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,152 +16,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <!-- Dialog Mode -->
-  <q-dialog
+  <ODrawer
+    data-test="telemetry-correlation-dashboard-drawer"
+    bleed
     v-if="props.mode === 'dialog'"
-    v-model="isOpen"
-    position="right"
-    full-height
-    maximized
-    transition-show="slide-left"
-    transition-hide="slide-right"
-    @hide="onClose"
+    v-model:open="isOpen"
+    side="right"
+    :width="90"
+    :title="t('correlation.correlatedStreamsFor', { service: serviceName })"
+    :sub-title="formatTimeRange(timeRange)"
+    @update:open="(v) => !v && onClose()"
   >
-    <q-card class="correlation-dashboard-card">
-      <!-- Header -->
-      <q-card-section
-        v-if="!isEmbeddedTabs"
-        class="correlation-header tw:flex tw:items-center tw:justify-between tw:py-3 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
-      >
-        <div class="tw:flex tw:items-center tw:gap-3">
-          <q-icon name="link" size="md" color="primary" />
-          <div class="tw:flex tw:flex-col tw:gap-0">
-            <span class="tw:text-lg tw:font-semibold">
-              Correlated Streams - {{ serviceName }}
-            </span>
-            <span class="tw:text-xs tw:opacity-70">
-              {{ formatTimeRange(timeRange) }}
-            </span>
-          </div>
-        </div>
+    <template #header-left>
+      <OIcon name="link" size="md" />
+    </template>
 
-        <div class="tw:flex tw:items-center tw:gap-3">
-          <q-btn
-            flat
-            round
-            dense
-            icon="close"
-            @click="isOpen = false"
-            data-test="correlation-dashboard-close"
-          />
-        </div>
-      </q-card-section>
-
-      <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
-      <div
-        class="tw:py-2 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
-      >
-        <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
-          <span class="tw:text-xs tw:font-semibold tw:opacity-70">
-            {{ t("correlation.filters") }}:
-          </span>
-          <div
-            v-for="(value, key) in pendingDimensions"
-            :key="key"
-            class="tw:flex tw:items-center tw:gap-2"
+    <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
+    <div class="border-card-glass-border border-b border-solid px-4 py-2">
+      <div class="flex flex-wrap items-center gap-3">
+        <span class="text-xs font-semibold opacity-70"> {{ t("correlation.filters") }}: </span>
+        <div v-for="(value, key) in pendingDimensions" :key="key" class="flex items-center gap-2">
+          <span
+            class="text-xs font-semibold"
+            :class="unstableDimensionKeys.has(key) ? 'opacity-60' : 'opacity-100'"
           >
-            <span
-              class="tw:text-xs tw:font-semibold"
-              :class="
-                unstableDimensionKeys.has(key)
-                  ? 'tw:opacity-60'
-                  : 'tw:opacity-100'
-              "
-            >
-              {{ key }}:
-            </span>
-            <q-select
-              v-model="pendingDimensions[key]"
-              :options="getDimensionOptions(key, value)"
-              dense
-              outlined
-              emit-value
-              map-options
-              @update:model-value="onPendingDimensionChange"
-              class="dimension-dropdown"
-              borderless
-              style="min-width: 120px"
-            />
-            <q-tooltip v-if="unstableDimensionKeys.has(key)">
-              Unstable dimension - changes on pod restart. Default: All values.
-            </q-tooltip>
-          </div>
-          <!-- Apply Button -->
-          <q-btn
-            flat
-            dense
-            no-caps
-            text-color="light-text"
-            :label="t('common.apply')"
-            :disable="!hasPendingChanges"
-            @click="applyDimensionChanges"
-            class="o2-secondary-button tw:ml-2"
-            data-test="apply-dimension-filters"
+            {{ key }}:
+          </span>
+          <OSelect
+            v-model="pendingDimensions[key]"
+            :options="getDimensionOptions(key, value)"
+            labelKey="label"
+            valueKey="value"
+            @update:model-value="onPendingDimensionChange"
+            class="dimension-dropdown"
+            style="min-width: 7.5rem"
+          />
+          <OTooltip
+            v-if="unstableDimensionKeys.has(key)"
+            :content="t('correlation.unstableDimensionNote')"
+            side="top"
           />
         </div>
+        <!-- Apply Button -->
+        <OButton
+          variant="outline"
+          size="sm-action"
+          :disabled="!hasPendingChanges"
+          @click="applyDimensionChanges"
+          class="ms-2"
+          data-test="apply-dimension-filters"
+        >
+          {{ t("common.apply") }}
+        </OButton>
       </div>
+    </div>
 
-      <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
-      <q-tabs
-        v-if="!isEmbeddedTabs"
-        v-model="activeTab"
-        dense
-        class="tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
-        active-color="primary"
-        indicator-color="primary"
-        align="left"
-      >
-        <q-tab name="logs" :label="t('common.logs')" />
-        <q-tab name="metrics" :label="t('search.metrics')" />
-        <q-tab name="traces" :label="t('menu.traces')" />
-      </q-tabs>
+    <!-- Source event + chips (dialog mode) -->
+    <CorrelationEventHeader
+      :source-event="sourceEvent"
+      :context-chips="contextChips"
+      :subject-chips="isNestedGroupMode ? [] : subjectChips"
+      v-model:active-subject="activeSubject"
+      overflow-mode="responsive"
+      :get-subject-button-label="getSubjectButtonLabel"
+    />
 
-      <!-- Tab Panels -->
-      <q-tab-panels
-        v-model="activeTab"
-        animated
-        class="correlation-content tw:flex-1 tw:overflow-auto"
-      >
+    <!-- Tabs (only in dialog mode, hidden in embedded-tabs mode) -->
+    <div class="px-page-edge">
+      <OTabs v-if="!isEmbeddedTabs" v-model="activeTab" dense bordered align="left">
+        <OTab name="logs" :label="t('common.logs')" />
+        <OTab name="metrics" :label="t('search.metrics')" />
+        <OTab name="traces" :label="t('menu.traces')" />
+      </OTabs>
+    </div>
+    <div class="correlation-content">
+      <OTabPanels v-model="activeTab" animated grow scroll="auto">
         <!-- Logs Tab Panel -->
-        <q-tab-panel name="logs" class="tw:p-0">
-          <!-- Refresh Button -->
+        <OTabPanel name="logs">
+          <!-- Refresh Button (dialog mode) -->
           <div
             v-if="logsDashboardData"
-            class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
+            class="border-card-glass-border flex justify-end border-b border-solid p-2"
           >
-            <q-btn
-              flat
-              dense
-              color="primary"
-              icon="refresh"
-              :label="t('common.refresh')"
-              @click="loadDashboard"
-              :loading="loading"
-              size="sm"
-            />
+            <OButton variant="ghost" size="sm-action" @click="loadDashboard" :loading="loading">
+              <OIcon name="refresh" size="xs" class="me-1" />
+              {{ t("common.refresh") }}
+            </OButton>
           </div>
 
           <!-- Loading State -->
-          <div
-            v-if="loading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          >
-            <q-spinner-hourglass
-              color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+          <div v-if="loading" class="flex h-full flex-col items-center justify-center gap-3 py-20">
+            <OSpinner size="sm" />
+            <div class="text-sm opacity-70">
               {{ t("correlation.loadingLogs") }}
             </div>
           </div>
@@ -178,189 +124,312 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
 
           <!-- No Logs State -->
-          <div
-            v-else
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          >
-            <q-icon
-              name="article"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.noLogsFound") }}</div>
-            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-              {{ t("correlation.service", { service: serviceName }) }}
+          <div v-else class="flex h-full flex-col items-center justify-center py-20">
+            <div class="mb-2 text-base font-medium opacity-90">
+              {{ t("correlation.noLogsFound") }}
+            </div>
+            <div class="text-sm opacity-70">
+              {{ t("correlation.noLogsDescription") }}
             </div>
           </div>
-        </q-tab-panel>
+        </OTabPanel>
 
         <!-- Metrics Tab Panel -->
-        <q-tab-panel name="metrics" class="tw:p-0">
-          <!-- Metrics Selector and Refresh Buttons -->
-          <div
-            class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:justify-end tw:gap-2"
+        <OTabPanel name="metrics" layout="flex-col" stretch class="min-h-0">
+          <!-- Two-column body: sidebar + charts (splitter matching TracesAnalysisDashboard style) -->
+          <OSplitter
+            v-model="splitterModel"
+            class="h-full max-h-full min-h-0 w-full flex-1 overflow-hidden"
           >
-            <q-btn
-              v-if="dashboardData"
-              flat
-              dense
-              color="primary"
-              icon="refresh"
-              :label="t('common.refresh')"
-              @click="loadDashboard"
-              :loading="loading"
-              size="sm"
-            />
-            <q-btn
-              outline
-              dense
-              no-caps
-              color="primary"
-              icon="show_chart"
-              :label="
-                t('correlation.metricsSelector', {
-                  selected: selectedMetricStreams.length,
-                  total: uniqueMetricStreams.length,
-                })
-              "
-              @click="showMetricSelector = true"
-              data-test="metric-selector-button"
-            >
-              <q-tooltip>{{ t("correlation.metricsTooltip") }}</q-tooltip>
-            </q-btn>
-          </div>
+            <!-- -- Left sidebar -- -->
+            <template #before>
+              <div class="bg-surface-overlay flex h-full min-h-0 flex-col">
+                <!-- Search -->
+                <div
+                  class="dimension-sidebar-search-container border-card-glass-border border-b border-solid px-1.5 py-2"
+                >
+                  <OSearchInput
+                    v-model="metricSearchText"
+                    :placeholder="t('search.searchField')"
+                    clearable
+                  />
+                </div>
 
-          <!-- Loading State -->
-          <div
-            v-if="loading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          >
-            <q-spinner-hourglass
-              color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
-              {{
-                t("correlation.loadingMetrics", {
-                  count: selectedMetricStreams.length,
-                })
-              }}
-            </div>
-          </div>
+                <!-- Grouped metric list -->
+                <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+                <div
+                  class="dimension-list-container min-h-0 flex-1 overflow-y-auto px-1.5"
+                  style="max-height: calc(100vh - 210px)"
+                >
+                  <!-- eslint-enable local/no-hardcoded-px -->
+                  <template
+                    v-if="groupedFilteredMetricStreams.groups.some((g) => g.streams.length > 0)"
+                  >
+                    <template v-for="group in groupedFilteredMetricStreams.groups" :key="group.id">
+                      <template v-if="group.streams.length > 0">
+                        <div
+                          class="bg-section-header-bg border-border-default sticky top-0 z-10 flex cursor-pointer items-center justify-between border-b border-solid px-2 py-1.5"
+                          @click="toggleGroupCollapse(group.id)"
+                        >
+                          <div
+                            class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
+                          >
+                            <OIcon
+                              :name="
+                                collapsedGroups.has(group.id) ? 'chevron-right' : 'expand-more'
+                              "
+                              size="sm"
+                              class="me-0.5"
+                            />
+                            <OIcon
+                              v-if="typeof group.icon === 'string'"
+                              :name="group.icon"
+                              size="xs"
+                              class="me-0.5"
+                            />
+                            <component v-else :is="group.icon" />
+                            <span>{{ t(group.labelKey) }}</span>
+                            <OTag type="fieldTag" class="ms-1">{{ group.streams.length }}</OTag>
+                          </div>
+                          <div class="flex gap-1">
+                            <OButton
+                              variant="ghost"
+                              size="chip"
+                              @click.stop="selectAllInGroup(group.id)"
+                              :disabled="getGroupSelectionState(group.id) === 'all'"
+                            >
+                              {{ t("correlation.all") }}
+                            </OButton>
+                            <OButton
+                              variant="ghost"
+                              size="chip"
+                              @click.stop="deselectAllInGroup(group.id)"
+                              :disabled="getGroupSelectionState(group.id) === 'none'"
+                            >
+                              {{ t("common.none") }}
+                            </OButton>
+                          </div>
+                        </div>
+                        <div
+                          v-for="stream in group.streams"
+                          v-show="!collapsedGroups.has(group.id)"
+                          :key="stream.stream_name"
+                          data-test="telemetry-correlation-metric-stream-item"
+                          class="flex cursor-pointer items-center gap-2 border-none! px-2 py-1 hover:bg-[rgba(0,0,0,0.04)] dark:hover:bg-[rgba(255,255,255,0.05)]"
+                          @click="toggleMetricStream(stream)"
+                        >
+                          <div class="flex shrink-0 items-center">
+                            <OCheckbox
+                              :model-value="
+                                selectedMetricStreams.some(
+                                  (s) => s.stream_name === stream.stream_name,
+                                )
+                              "
+                              size="xs"
+                              @update:model-value="toggleMetricStream(stream)"
+                            />
+                          </div>
+                          <div class="flex min-w-0 flex-1 flex-col">
+                            <span class="text-text-secondary! cursor-pointer truncate text-sm">{{
+                              stream.stream_name
+                            }}</span>
+                          </div>
+                        </div>
+                      </template>
+                    </template>
+                  </template>
+                  <div v-else class="px-2 pt-3 text-center">
+                    <OIcon name="info" size="sm" class="me-1 align-middle" />
+                    {{ t("search.noResult") }}
+                  </div>
+                </div>
 
-          <!-- Error State -->
-          <div
-            v-else-if="error"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          >
-            <q-icon
-              name="error_outline"
-              size="3.75rem"
-              color="negative"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base tw:mb-2">
-              {{ t("correlation.failedToLoad") }}
-            </div>
-            <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
-            <q-btn
-              outline
-              color="primary"
-              :label="t('correlation.retryButton')"
-              class="tw:mt-4"
-              @click="loadDashboard"
-            />
-          </div>
+                <!-- Footer: selected count -->
+                <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
+                  {{
+                    t("correlation.streamsSelectedCount", {
+                      selected: selectedMetricStreams.length,
+                      total: uniqueMetricStreams.length,
+                    })
+                  }}
+                </div>
+              </div>
+            </template>
 
-          <!-- Dashboard -->
-          <RenderDashboardCharts
-            v-else-if="dashboardData"
-            ref="dashboardChartsRef"
-            :key="dashboardRenderKey"
-            :dashboardData="dashboardData"
-            :currentTimeObj="currentTimeObj"
-            :viewOnly="true"
-            :allowAlertCreation="false"
-            searchType="dashboards"
-          />
+            <!-- -- Separator -- -->
+            <template #separator>
+              <div
+                class="bg-border-default h-full w-px cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]"
+              />
+            </template>
 
-          <!-- No Metrics State -->
-          <div
-            v-else
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          >
-            <q-icon
-              name="info_outline"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.noMetrics") }}</div>
-          </div>
-        </q-tab-panel>
+            <!-- -- Right area: group tabs + dashboard -- -->
+            <template #after>
+              <div class="flex h-full flex-col overflow-hidden">
+                <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
+                <OTabs
+                  v-if="isNestedGroupMode"
+                  v-model="activeOuterTab"
+                  dense
+                  align="left"
+                  class="px-page-edge border-card-glass-border shrink-0 border-b border-solid"
+                >
+                  <OTab v-for="outerGroup in groupDefs" :key="outerGroup.id" :name="outerGroup.id">
+                    <div class="flex min-w-0 flex-col items-start">
+                      <div class="flex items-center gap-1">
+                        <OIcon
+                          v-if="typeof outerGroup.icon === 'string'"
+                          :name="outerGroup.icon"
+                          size="xs"
+                        />
+                        <component v-else :is="outerGroup.icon" />
+                        <span class="whitespace-nowrap">{{ t(outerGroup.labelKey) }}</span>
+                      </div>
+                      <span
+                        v-if="outerTabResourceName[outerGroup.id]"
+                        class="max-w-40 truncate text-xs leading-tight opacity-75"
+                        :title="outerTabResourceName[outerGroup.id]"
+                        >{{ outerTabResourceName[outerGroup.id] }}</span
+                      >
+                    </div>
+                  </OTab>
+                </OTabs>
+
+                <!-- Group tabs -->
+                <OTabs
+                  v-if="nonEmptyGroupTabs.length > 0"
+                  v-model="activeMetricGroupTab"
+                  dense
+                  align="left"
+                  class="px-page-edge bg-surface-panel border-card-glass-border shrink-0 border-b border-solid"
+                >
+                  <OTab
+                    v-for="group in groupedUniqueMetricStreams.groups.filter((g) =>
+                      nonEmptyGroupTabs.includes(g.id),
+                    )"
+                    :key="group.id"
+                    :name="group.id"
+                  >
+                    <div class="flex items-center gap-1">
+                      <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
+                      <component v-else :is="group.icon" />
+                      <span>{{ t(group.labelKey) }}</span>
+                      <OTag
+                        type="tabChip"
+                        :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
+                        class="ms-1"
+                        :class="{
+                          'opacity-40':
+                            (groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0) === 0,
+                        }"
+                        >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag
+                      >
+                    </div>
+                  </OTab>
+                </OTabs>
+
+                <!-- Dashboard content -->
+                <div class="min-h-0 flex-1 overflow-auto">
+                  <div
+                    v-if="loading"
+                    class="flex h-full flex-col items-center justify-center gap-3 py-20"
+                  >
+                    <OSpinner size="sm" />
+                    <div class="text-sm opacity-70">
+                      {{
+                        t("correlation.loadingMetrics", {
+                          count: selectedMetricStreams.length,
+                        })
+                      }}
+                    </div>
+                  </div>
+                  <div
+                    v-else-if="error"
+                    class="flex h-full flex-col items-center justify-center py-20"
+                  >
+                    <div class="mb-2 text-base font-medium opacity-90">
+                      {{ t("correlation.metricsError") }}
+                    </div>
+                    <div class="mb-4 text-sm opacity-70">
+                      {{ error || t("correlation.metricsErrorDetails") }}
+                    </div>
+                    <OButton variant="ghost" size="sm-action" @click="loadDashboard">
+                      <OIcon name="refresh" size="xs" class="me-1" />
+                      {{ t("correlation.retryButton") }}
+                    </OButton>
+                  </div>
+                  <RenderDashboardCharts
+                    v-else-if="activeDashboardForGroup"
+                    ref="dashboardChartsRef"
+                    :key="activeMetricGroupTab + '_' + groupedDashboardRenderKey"
+                    :dashboardData="activeDashboardForGroup"
+                    :currentTimeObj="currentTimeObj"
+                    :viewOnly="true"
+                    :allowAlertCreation="false"
+                    searchType="dashboards"
+                  />
+                  <div
+                    v-else
+                    class="flex h-[calc(100vh-7.5rem)] flex-col items-center justify-center py-20"
+                  >
+                    <div class="mb-2 text-base font-medium opacity-90">
+                      {{ t("correlation.noMetrics") }}
+                    </div>
+                    <div class="text-sm opacity-70">
+                      {{ t("correlation.noMetricsDescription") }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </template>
+          </OSplitter>
+        </OTabPanel>
 
         <!-- Traces Tab Panel -->
-        <q-tab-panel name="traces" class="tw:p-0">
+        <OTabPanel name="traces">
           <!-- Refresh Button -->
 
           <!-- Loading State -->
           <div
             v-if="tracesLoading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="flex h-full flex-col items-center justify-center gap-3 py-20"
           >
-            <q-spinner-hourglass
-              color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.loadingTraces") }}</div>
+            <OSpinner size="sm" />
+            <div class="text-sm opacity-70">
+              {{ t("correlation.loadingTraces") }}
+            </div>
           </div>
 
           <!-- Error State -->
           <div
             v-else-if="tracesError"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+            class="flex h-full flex-col items-center justify-center py-20"
           >
-            <q-icon
-              name="error_outline"
-              size="3.75rem"
-              color="negative"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base tw:mb-2">
+            <div class="mb-2 text-base font-medium opacity-90">
               {{ t("correlation.tracesError") }}
             </div>
-            <div class="tw:text-sm tw:text-gray-500">{{ tracesError }}</div>
-            <q-btn
-              outline
-              color="primary"
-              :label="t('correlation.retryButton')"
-              class="tw:mt-4"
-              @click="loadCorrelatedTraces"
-            />
+            <div class="mb-4 text-sm opacity-70">
+              {{ tracesError || t("correlation.tracesErrorDetails") }}
+            </div>
+            <OButton variant="ghost" size="sm-action" @click="loadCorrelatedTraces">
+              <OIcon name="refresh" size="xs" class="me-1" />
+              {{ t("correlation.retryButton") }}
+            </OButton>
           </div>
 
           <!-- Direct Trace Correlation - Full Span List -->
           <div
-            v-else-if="
-              traceCorrelationMode === 'direct' && traceSpanList.length > 0
-            "
-            class="tw:h-full tw:overflow-hidden telemetry-correlation-traces"
+            v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0"
+            class="telemetry-correlation-traces h-full overflow-hidden"
           >
             <TraceDetails
               mode="embedded"
               :trace-id-prop="extractedTraceId || ''"
-              :stream-name-prop="
-                traceStreams && traceStreams[0]
-                  ? traceStreams[0].stream_name
-                  : ''
-              "
+              :stream-name-prop="sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''"
               :span-list-prop="traceSpanList"
               :start-time-prop="computedTraceStartTime"
               :end-time-prop="computedTraceEndTime"
+              :correlated-log-stream="sortedLogStreams[0] ? sortedLogStreams[0].stream_name : ''"
               :show-back-button="false"
               :show-timeline="false"
               :show-log-stream-selector="false"
@@ -374,113 +443,79 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Dimension-based Correlation - Traces List -->
           <div
-            v-else-if="
-              traceCorrelationMode === 'dimension-based' &&
-              tracesForDimensions.length > 0
-            "
-            class="tw:h-full"
+            v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0"
+            class="h-full"
           >
             <!-- Header -->
-            <div
-              class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
-            >
-              <div class="tw:flex tw:items-center tw:gap-3">
-                <q-icon name="hub" color="primary" size="1.25rem" />
-                <div class="tw:flex tw:flex-col">
-                  <span class="tw:text-sm tw:font-semibold">{{
+            <div class="border-card-glass-border bg-surface-panel border-b border-solid p-3">
+              <div class="flex items-center gap-3">
+                <OIcon name="hub" size="md" />
+                <div class="flex flex-col">
+                  <span class="text-sm font-semibold">{{
                     t("correlation.dimensionBasedCorrelation")
                   }}</span>
-                  <span class="tw:text-xs tw:text-gray-500">{{
+                  <span class="text-text-secondary text-xs">{{
                     t("correlation.tracesFromService", { service: serviceName })
                   }}</span>
                 </div>
-                <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
-                  <q-btn
-                    flat
-                    dense
-                    no-caps
-                    color="primary"
-                    icon="open_in_new"
-                    :label="t('correlation.viewInTraces')"
+                <div class="ms-auto flex items-center gap-2">
+                  <OButton
+                    variant="ghost"
+                    size="sm-action"
                     @click="openTracesPage"
                     data-test="correlation-view-traces-page"
-                    class="tw:text-xs"
+                    class="text-xs"
                   >
-                    <q-tooltip>
-                      {{ t("correlation.viewInTracesTooltip") }}
-                    </q-tooltip>
-                  </q-btn>
-                  <q-chip dense color="primary" text-color="white">
+                    <OIcon name="open-in-new" size="xs" class="me-1" />
+                    {{ t("correlation.viewInTraces") }}
+                    <OTooltip :content="t('correlation.viewInTraces')" side="top" />
+                  </OButton>
+                  <OTag type="fieldTag" value="primary">
                     {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-                  </q-chip>
+                  </OTag>
                 </div>
               </div>
             </div>
 
-            <!-- Traces List with TraceBlock -->
-            <div
-              class="tw:p-3 tw:overflow-auto"
-              style="max-height: calc(100% - 4rem)"
-            >
-              <div class="tw:space-y-2">
-                <TraceBlock
-                  v-for="(trace, index) in tracesForDimensions"
-                  :key="trace.trace_id"
-                  :item="trace"
-                  :index="index"
-                  @click="openTraceInNewWindow(trace)"
-                  data-test="correlation-trace-block"
-                />
-              </div>
+            <!-- Traces List -->
+            <div class="h-full">
+              <TracesSearchResultList
+                :hits="tracesForDimensions"
+                :loading="false"
+                :show-header="false"
+                :show-cell-actions="false"
+                @row-click="openTraceInNewWindow"
+              />
             </div>
           </div>
 
           <!-- No Traces Found State -->
-          <div
-            v-else-if="traceCorrelationMode !== null"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          >
-            <q-icon
-              name="search_off"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
+          <div v-else-if="traceCorrelationMode !== null" class="min-h-80">
+            <OEmptyState
+              size="hero"
+              illustration="trace"
+              :title="t('correlation.noTracesFound')"
+              :description="t('correlation.noTracesDescription')"
+              data-test="correlation-no-traces-state-drawer"
             />
-            <div class="tw:text-base">{{ t("correlation.noTracesFound") }}</div>
-            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-              {{
-                t("correlation.noTracesDescription", { service: serviceName })
-              }}
-            </div>
           </div>
 
           <!-- Initial State (waiting for tab to be shown) -->
-          <div
-            v-else
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          >
-            <q-icon
-              name="account_tree"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">
+          <div v-else class="flex h-full flex-col items-center justify-center py-20">
+            <div class="mb-2 text-base font-medium opacity-90">
               {{ t("correlation.correlatedTraces") }}
             </div>
-            <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-              {{
-                t("correlation.correlatedTracesFor", { service: serviceName })
-              }}
+            <div class="text-sm opacity-70">
+              {{ t("correlation.correlatedTracesFor", { service: serviceName }) }}
             </div>
           </div>
-        </q-tab-panel>
-      </q-tab-panels>
-    </q-card>
-  </q-dialog>
+        </OTabPanel>
+      </OTabPanels>
+    </div>
+  </ODrawer>
 
   <!-- Embedded Tabs Mode -->
-  <div v-else class="correlation-dashboard-embedded">
+  <div v-else class="bg-surface-panel flex h-full w-full flex-col">
     <!-- Dimensions Display - Stable (matched) and Unstable (additional) -->
     <DimensionFiltersBar
       v-if="!props.hideDimensionFilters"
@@ -489,43 +524,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :get-dimension-options="getDimensionOptions"
       :has-pending-changes="hasPendingChanges"
       :show-apply-button="true"
-      unstable-dimension-tooltip="Unstable dimension - changes on pod restart. Default: All values."
+      :unstable-dimension-tooltip="t('correlation.unstableDimensionTooltip')"
       @update:dimension="handleDimensionUpdate"
       @apply="applyDimensionChanges"
     />
 
+    <!-- Source event + chips (embedded mode) -->
+    <CorrelationEventHeader
+      :source-event="sourceEvent"
+      :context-chips="contextChips"
+      :subject-chips="isNestedGroupMode ? [] : subjectChips"
+      v-model:active-subject="activeSubject"
+      overflow-mode="responsive"
+      :get-subject-button-label="getSubjectButtonLabel"
+    />
+
     <!-- Tab Panels (no tabs in embedded mode, controlled by parent) -->
-    <q-card
-      v-model="activeTab"
-      animated
-      class="correlation-content tw:flex-1 tw:overflow-auto"
+    <OCard
+      :class="[
+        'flex min-h-0 flex-1 flex-col',
+        activeTab === 'metrics' ? 'overflow-hidden' : 'overflow-auto',
+      ]"
     >
-      <div v-if="activeTab == 'logs'" class="tw:p-0">
-        <!-- Refresh Button -->
+      <div v-if="activeTab == 'logs'" class="flex min-h-0 flex-1 flex-col">
+        <!-- Refresh Button (embedded mode) -->
         <div
           v-if="logsDashboardData"
-          class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:justify-end"
+          class="border-card-glass-border flex justify-end border-b border-solid p-2"
         >
-          <q-btn
-            flat
-            dense
-            color="primary"
-            icon="refresh"
-            :label="t('common.refresh')"
-            @click="loadDashboard"
-            :loading="loading"
-            size="sm"
-          />
+          <OButton variant="ghost" size="sm-action" @click="loadDashboard" :loading="loading">
+            <OIcon name="refresh" size="xs" class="me-1" />
+            {{ t("common.refresh") }}
+          </OButton>
         </div>
 
         <!-- Loading State -->
         <div
           v-if="loading"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
+          class="flex flex-1 flex-col items-center justify-center gap-3"
+          style="min-height: 18.75rem"
         >
-          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
-          <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-          <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
+          <OSpinner size="sm" />
+          <div class="text-sm opacity-70">
             {{ t("correlation.loadingLogs") }}
           </div>
         </div>
@@ -542,175 +582,296 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
 
         <!-- No Logs State -->
-        <div
-          v-else
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-        >
-          <q-icon
-            name="article"
-            size="3.75rem"
-            color="grey-6"
-            class="tw:mb-4"
-          />
-          <div class="tw:text-base">{{ t("correlation.noLogsFound") }}</div>
-          <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-            {{ t("correlation.service", { service: serviceName }) }}
+        <div v-else class="flex h-full flex-col items-center justify-center py-20">
+          <div class="mb-2 text-base font-medium opacity-90">
+            {{ t("correlation.noLogsFound") }}
+          </div>
+          <div class="text-sm opacity-70">
+            {{ t("correlation.noLogsDescription") }}
           </div>
         </div>
       </div>
 
-      <div v-if="activeTab == 'metrics'" class="tw:h-full">
-        <div
-          class="tw:p-2 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:flex tw:items-center tw:justify-end tw:gap-2"
+      <div
+        v-if="activeTab == 'metrics'"
+        class="metrics-correlation-dashboard flex h-full min-h-0 flex-col overflow-hidden"
+      >
+        <!-- Two-column body: sidebar + charts (splitter matching TracesAnalysisDashboard style) -->
+        <OSplitter
+          v-model="splitterModel"
+          class="h-full max-h-full min-h-0 w-full flex-1 overflow-hidden"
         >
-          <q-btn
-            v-if="dashboardData"
-            flat
-            dense
-            color="primary"
-            icon="refresh"
-            :label="t('common.refresh')"
-            @click="loadDashboard"
-            :loading="loading"
-            size="sm"
-          />
-          <q-btn
-            outline
-            dense
-            no-caps
-            color="primary"
-            icon="show_chart"
-            :label="`${selectedMetricStreams.length} of ${uniqueMetricStreams.length} Metric(s)`"
-            @click="showMetricSelector = true"
-          >
-            <q-tooltip>{{ t("correlation.metricsTooltip") }}</q-tooltip>
-          </q-btn>
-        </div>
-        <div
-          class="tw:p-0 tw:flex-1 tw:overflow-auto"
-          style="height: calc(100vh - 272px)"
-        >
-          <!-- Loading State -->
-          <div
-            v-if="loading"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          >
-            <q-spinner-hourglass
-              color="primary"
-              size="3.75rem"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.loading") }}</div>
-            <div class="tw:text-xs tw:text-gray-500 tw:mt-2">
-              {{
-                t("correlation.loadingMetrics", {
-                  count: selectedMetricStreams.length,
-                })
-              }}
+          <!-- -- Left sidebar -- -->
+          <template #before>
+            <div class="bg-surface-overlay flex h-full min-h-0 flex-col">
+              <div
+                class="dimension-sidebar-search-container border-card-glass-border border-b border-solid p-2.5"
+              >
+                <OSearchInput
+                  v-model="metricSearchText"
+                  :placeholder="t('search.searchField')"
+                  clearable
+                />
+              </div>
+
+              <!-- Grouped metric list -->
+              <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+              <div
+                class="dimension-list-container min-h-0 flex-1 overflow-y-auto"
+                style="max-height: calc(100vh - 210px)"
+              >
+                <!-- eslint-enable local/no-hardcoded-px -->
+                <template
+                  v-if="groupedFilteredMetricStreams.groups.some((g) => g.streams.length > 0)"
+                >
+                  <template v-for="group in groupedFilteredMetricStreams.groups" :key="group.id">
+                    <template v-if="group.streams.length > 0">
+                      <div
+                        class="bg-section-header-bg border-border-default sticky top-0 z-10 flex cursor-pointer items-center justify-between border-b border-solid px-2 py-1.5"
+                        @click="toggleGroupCollapse(group.id)"
+                      >
+                        <div
+                          class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
+                        >
+                          <OIcon
+                            :name="collapsedGroups.has(group.id) ? 'chevron-right' : 'expand-more'"
+                            size="sm"
+                            class="me-0.5"
+                          />
+                          <OIcon
+                            v-if="typeof group.icon === 'string'"
+                            :name="group.icon"
+                            size="xs"
+                            class="me-0.5"
+                          />
+                          <component v-else :is="group.icon" />
+                          <span>{{ t(group.labelKey) }}</span>
+                          <OTag type="fieldTag" class="ms-1">{{ group.streams.length }}</OTag>
+                        </div>
+                        <div class="flex gap-1">
+                          <OButton
+                            variant="ghost"
+                            size="chip"
+                            @click.stop="selectAllInGroup(group.id)"
+                            :disabled="getGroupSelectionState(group.id) === 'all'"
+                          >
+                            {{ t("correlation.all") }}
+                          </OButton>
+                          <OButton
+                            variant="ghost"
+                            size="chip"
+                            @click.stop="deselectAllInGroup(group.id)"
+                            :disabled="getGroupSelectionState(group.id) === 'none'"
+                          >
+                            {{ t("common.none") }}
+                          </OButton>
+                        </div>
+                      </div>
+                      <div
+                        v-for="stream in group.streams"
+                        v-show="!collapsedGroups.has(group.id)"
+                        :key="stream.stream_name"
+                        data-test="telemetry-correlation-metric-stream-item"
+                        class="flex cursor-pointer items-center gap-2 border-none! px-2 py-1 hover:bg-[rgba(0,0,0,0.04)] dark:hover:bg-[rgba(255,255,255,0.05)]"
+                        @click="toggleMetricStream(stream)"
+                      >
+                        <div class="flex shrink-0 items-center">
+                          <OCheckbox
+                            :model-value="
+                              selectedMetricStreams.some(
+                                (s) => s.stream_name === stream.stream_name,
+                              )
+                            "
+                            size="xs"
+                            @update:model-value="toggleMetricStream(stream)"
+                          />
+                        </div>
+                        <div class="flex min-w-0 flex-1 flex-col">
+                          <span class="text-text-secondary! cursor-pointer truncate text-sm">{{
+                            stream.stream_name
+                          }}</span>
+                        </div>
+                      </div>
+                    </template>
+                  </template>
+                </template>
+                <div v-else class="px-2 pt-3 text-center">
+                  <OIcon name="info" size="sm" class="me-1 align-middle" />
+                  {{ t("search.noResult") }}
+                </div>
+              </div>
+
+              <!-- Footer: selected count -->
+              <div class="border-card-glass-border border-t border-solid p-3 text-xs font-normal">
+                {{
+                  t("correlation.streamsSelectedCount", {
+                    selected: selectedMetricStreams.length,
+                    total: uniqueMetricStreams.length,
+                  })
+                }}
+              </div>
             </div>
-          </div>
+          </template>
 
-          <!-- Error State -->
-          <div
-            v-else-if="error"
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          >
-            <q-icon
-              name="error_outline"
-              size="3.75rem"
-              color="negative"
-              class="tw:mb-4"
+          <!-- -- Separator -- -->
+          <template #separator>
+            <div
+              class="bg-border-default h-full w-px cursor-col-resize dark:bg-[rgba(255,255,255,0.12)]"
             />
-            <div class="tw:text-base tw:mb-2">
-              {{ t("correlation.failedToLoad") }}
+          </template>
+
+          <!-- -- Right area: group tabs + dashboard -- -->
+          <template #after>
+            <div class="flex h-full flex-col overflow-hidden">
+              <!-- Outer Pod/Node tabs — only shown in nested K8s mode -->
+              <OTabs
+                v-if="isNestedGroupMode"
+                v-model="activeOuterTab"
+                dense
+                align="left"
+                class="border-card-glass-border shrink-0 border-b border-solid"
+              >
+                <OTab v-for="outerGroup in groupDefs" :key="outerGroup.id" :name="outerGroup.id">
+                  <div class="flex min-w-0 flex-col items-start">
+                    <div class="flex items-center gap-1">
+                      <OIcon
+                        v-if="typeof outerGroup.icon === 'string'"
+                        :name="outerGroup.icon"
+                        size="xs"
+                      />
+                      <component v-else :is="outerGroup.icon" />
+                      <span class="text-xs whitespace-nowrap">{{ t(outerGroup.labelKey) }}</span>
+                    </div>
+                    <span
+                      v-if="outerTabResourceName[outerGroup.id]"
+                      class="max-w-40 truncate text-xs leading-tight opacity-75"
+                      :title="outerTabResourceName[outerGroup.id]"
+                      >{{ outerTabResourceName[outerGroup.id] }}</span
+                    >
+                  </div>
+                </OTab>
+              </OTabs>
+
+              <!-- Group tabs -->
+              <OTabs
+                v-if="nonEmptyGroupTabs.length > 0"
+                v-model="activeMetricGroupTab"
+                dense
+                align="left"
+                class="bg-surface-panel border-card-glass-border shrink-0 border-b border-solid"
+              >
+                <OTab
+                  v-for="group in groupedUniqueMetricStreams.groups.filter((g) =>
+                    nonEmptyGroupTabs.includes(g.id),
+                  )"
+                  :key="group.id"
+                  :name="group.id"
+                >
+                  <div class="flex items-center gap-1">
+                    <component v-if="typeof group.icon !== 'string'" :is="group.icon" />
+                    <OIcon v-if="typeof group.icon === 'string'" :name="group.icon" size="xs" />
+                    <span>{{ t(group.labelKey) }}</span>
+                    <OTag
+                      type="tabChip"
+                      :value="activeMetricGroupTab === group.id ? 'active' : 'inactive'"
+                      class="ms-1"
+                      :class="{
+                        'opacity-40':
+                          (groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0) === 0,
+                      }"
+                      >{{ groupedSelectedMetricStreams.byGroup[group.id]?.length ?? 0 }}</OTag
+                    >
+                  </div>
+                </OTab>
+              </OTabs>
+
+              <!-- Dashboard content -->
+              <div class="min-h-0 flex-1 overflow-auto">
+                <div
+                  v-if="loading"
+                  class="flex h-full flex-col items-center justify-center gap-3 py-20"
+                >
+                  <OSpinner size="sm" />
+                  <div class="text-sm opacity-70">
+                    {{
+                      t("correlation.loadingMetrics", {
+                        count: selectedMetricStreams.length,
+                      })
+                    }}
+                  </div>
+                </div>
+                <div
+                  v-else-if="error"
+                  class="flex h-full flex-col items-center justify-center py-20"
+                >
+                  <div class="mb-2 text-base font-medium opacity-90">
+                    {{ t("correlation.metricsError") }}
+                  </div>
+                  <div class="mb-4 text-sm opacity-70">
+                    {{ error || t("correlation.metricsErrorDetails") }}
+                  </div>
+                  <OButton variant="ghost" size="sm-action" @click="loadDashboard">
+                    <OIcon name="refresh" size="xs" class="me-1" />
+                    {{ t("correlation.retryButton") }}
+                  </OButton>
+                </div>
+                <RenderDashboardCharts
+                  v-else-if="activeDashboardForGroup"
+                  :key="activeMetricGroupTab + '_' + groupedDashboardRenderKey"
+                  :dashboardData="activeDashboardForGroup"
+                  :currentTimeObj="currentTimeObj"
+                  :viewOnly="true"
+                  :allowAlertCreation="false"
+                  searchType="dashboards"
+                  class="border-none"
+                />
+                <div v-else class="flex h-full flex-col items-center justify-center py-20">
+                  <div class="mb-2 text-base font-medium opacity-90">
+                    {{ t("correlation.noMetrics") }}
+                  </div>
+                  <div class="text-sm opacity-70">
+                    {{ t("correlation.noMetricsDescription") }}
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="tw:text-sm tw:text-gray-500">{{ error }}</div>
-            <q-btn
-              outline
-              color="primary"
-              :label="t('correlation.retryButton')"
-              class="tw:mt-4"
-              @click="loadDashboard"
-            />
-          </div>
-
-          <!-- Dashboard -->
-          <RenderDashboardCharts
-            v-else-if="dashboardData"
-            :key="dashboardRenderKey"
-            :dashboardData="dashboardData"
-            :currentTimeObj="currentTimeObj"
-            :viewOnly="true"
-            :allowAlertCreation="false"
-            searchType="dashboards"
-          />
-
-          <!-- No Metrics State -->
-          <div
-            v-else
-            class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-          >
-            <q-icon
-              name="info_outline"
-              size="3.75rem"
-              color="grey-6"
-              class="tw:mb-4"
-            />
-            <div class="tw:text-base">{{ t("correlation.noMetrics") }}</div>
-          </div>
-        </div>
+          </template>
+        </OSplitter>
       </div>
 
-      <div v-if="activeTab == 'traces'" class="tw:h-full">
+      <div v-if="activeTab == 'traces'" class="h-full">
         <!-- Loading State -->
-        <div
-          v-if="tracesLoading"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-[calc(100vh-272px)] tw:py-20"
-        >
-          <q-spinner-hourglass color="primary" size="3.75rem" class="tw:mb-4" />
-          <div class="tw:text-base">{{ t("correlation.loadingTraces") }}</div>
+        <div v-if="tracesLoading" class="flex h-full flex-col items-center justify-center py-20">
+          <OSpinner size="xl" class="mb-4" />
+          <div class="text-base">{{ t("correlation.loadingTraces") }}</div>
         </div>
 
         <!-- Error State -->
-        <div
-          v-else-if="tracesError"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-        >
-          <q-icon
-            name="error_outline"
-            size="3.75rem"
-            color="negative"
-            class="tw:mb-4"
-          />
-          <div class="tw:text-base tw:mb-2">
+        <div v-else-if="tracesError" class="flex h-full flex-col items-center justify-center py-20">
+          <OIcon name="error-outline" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
+          <div class="mb-2 text-base">
             {{ t("correlation.tracesError") }}
           </div>
-          <div class="tw:text-sm tw:text-gray-500">{{ tracesError }}</div>
-          <q-btn
-            outline
-            color="primary"
-            :label="t('correlation.retryButton')"
-            class="tw:mt-4"
-            @click="loadCorrelatedTraces"
-          />
+          <div class="text-text-secondary text-sm">{{ tracesError }}</div>
+          <OButton variant="outline" size="sm-action" class="mt-4" @click="loadCorrelatedTraces">
+            <OIcon name="refresh" size="xs" class="me-1" />
+            {{ t("correlation.retryButton") }}
+          </OButton>
         </div>
 
         <!-- Direct Trace Correlation - Full Span List -->
         <div
-          v-else-if="
-            traceCorrelationMode === 'direct' && traceSpanList.length > 0
-          "
-          class="tw:h-full tw:overflow-hidden telemetry-correlation-traces"
+          v-else-if="traceCorrelationMode === 'direct' && traceSpanList.length > 0"
+          class="telemetry-correlation-traces h-full overflow-auto"
         >
           <TraceDetails
             mode="embedded"
             :trace-id-prop="extractedTraceId || ''"
-            :stream-name-prop="
-              traceStreams && traceStreams[0] ? traceStreams[0].stream_name : ''
-            "
+            :stream-name-prop="sortedTraceStreams[0] ? sortedTraceStreams[0].stream_name : ''"
             :span-list-prop="traceSpanList"
             :start-time-prop="computedTraceStartTime"
             :end-time-prop="computedTraceEndTime"
+            :correlated-log-stream="sortedLogStreams[0] ? sortedLogStreams[0].stream_name : ''"
             :show-back-button="false"
             :show-timeline="false"
             :show-log-stream-selector="false"
@@ -724,182 +885,176 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Dimension-based Correlation - Traces List -->
         <div
-          v-else-if="
-            traceCorrelationMode === 'dimension-based' &&
-            tracesForDimensions.length > 0
-          "
-          class="tw:h-full"
+          v-else-if="traceCorrelationMode === 'dimension-based' && tracesForDimensions.length > 0"
+          class="flex h-full flex-col"
         >
           <!-- Header -->
-          <div
-            class="tw:p-3 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] trace-header-bg"
-          >
-            <div class="tw:flex tw:items-center tw:gap-3">
-              <q-icon name="hub" color="primary" size="1.25rem" />
-              <div class="tw:flex tw:flex-col">
-                <span class="tw:text-sm tw:font-semibold">{{
+          <div class="border-card-glass-border bg-surface-panel border-b border-solid p-3">
+            <div class="flex items-center gap-3">
+              <OIcon name="hub" size="md" />
+              <div class="flex flex-col">
+                <span class="text-sm font-semibold">{{
                   t("correlation.dimensionBasedCorrelation")
                 }}</span>
-                <span class="tw:text-xs tw:text-gray-500">{{
+                <span class="text-text-secondary text-xs">{{
                   t("correlation.tracesFromService", { service: serviceName })
                 }}</span>
               </div>
-              <q-chip dense color="primary" text-color="white">
+              <OTag type="fieldTag" value="primary">
                 {{ tracesForDimensions.length }} {{ t("menu.traces") }}
-              </q-chip>
-              <div class="tw:ml-auto tw:flex tw:items-center tw:gap-2">
-                <q-btn
-                  flat
-                  dense
-                  no-caps
-                  color="primary"
-                  icon="open_in_new"
-                  :label="t('correlation.viewInTraces')"
+              </OTag>
+              <div class="ms-auto flex items-center gap-2">
+                <OButton
+                  variant="ghost"
+                  size="sm-action"
                   @click="openTracesPage"
                   data-test="correlation-view-traces-page"
-                  class="tw:text-xs"
+                  class="text-xs"
                 >
-                  <q-tooltip>
-                    {{ t("correlation.viewInTracesTooltip") }}
-                  </q-tooltip>
-                </q-btn>
+                  <OIcon name="open-in-new" size="xs" class="me-1" />
+                  {{ t("correlation.viewInTraces") }}
+                  <OTooltip :content="t('correlation.viewInTraces')" side="top" />
+                </OButton>
               </div>
             </div>
           </div>
 
-          <!-- Traces List with TraceBlock -->
-          <div
-            class="tw:p-3 tw:overflow-auto"
-            style="max-height: calc(100vh - 11rem)"
-          >
-            <div class="tw:space-y-2">
-              <TraceBlock
-                v-for="(trace, index) in tracesForDimensions"
-                :key="trace.trace_id"
-                :item="trace"
-                :index="index"
-                @click="openTraceInNewWindow(trace)"
-                data-test="correlation-trace-block"
-              />
-            </div>
+          <!-- Traces List -->
+          <div class="flex-1">
+            <TracesSearchResultList
+              :hits="tracesForDimensions"
+              :loading="false"
+              :show-header="false"
+              :show-cell-actions="false"
+              @row-click="openTraceInNewWindow"
+            />
           </div>
         </div>
 
         <!-- No Traces Found State -->
-        <div
-          v-else-if="traceCorrelationMode !== null"
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-        >
-          <q-icon
-            name="search_off"
-            size="3.75rem"
-            color="grey-6"
-            class="tw:mb-4"
+        <div v-else-if="traceCorrelationMode !== null" class="h-full">
+          <OEmptyState
+            size="hero"
+            illustration="trace"
+            :title="t('correlation.noTracesFound')"
+            :description="t('correlation.noTracesDescription')"
+            data-test="correlation-no-traces-state"
           />
-          <div class="tw:text-base">{{ t("correlation.noTracesFound") }}</div>
-          <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
-            {{ t("correlation.noTracesDescription", { service: serviceName }) }}
-          </div>
         </div>
 
         <!-- Initial State (waiting for tab to be shown) -->
-        <div
-          v-else
-          class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full tw:py-20"
-        >
-          <q-icon
-            name="account_tree"
-            size="3.75rem"
-            color="grey-6"
-            class="tw:mb-4"
-          />
-          <div class="tw:text-base">
+        <div v-else class="flex h-full flex-col items-center justify-center py-20">
+          <OIcon name="account-tree" class="mb-4" style="width: 3.75rem; height: 3.75rem" />
+          <div class="text-base">
             {{ t("correlation.correlatedTraces") }}
           </div>
-          <div class="tw:text-sm tw:text-gray-500 tw:mt-2">
+          <div class="text-text-secondary mt-2 text-sm">
             {{ t("correlation.correlatedTracesFor", { service: serviceName }) }}
           </div>
         </div>
       </div>
-    </q-card>
+    </OCard>
   </div>
 
   <!-- Metric Stream Selector Dialog -->
-  <q-dialog v-model="showMetricSelector">
-    <q-card class="metric-selector-dialog">
-      <q-card-section class="tw:p-4 tw:border-b">
-        <div class="tw:flex tw:items-center tw:justify-between tw:mb-3">
-          <div class="tw:text-base tw:font-semibold">
-            {{ t("correlation.selectMetrics") }}
-          </div>
-          <q-btn flat round dense icon="close" v-close-popup />
-        </div>
+  <ODialog
+    data-test="telemetry-correlation-dashboard-metric-selector-dialog"
+    v-model:open="showMetricSelector"
+    size="md"
+    :title="t('correlation.selectMetrics')"
+  >
+    <!-- Search Input -->
+    <OSearchInput
+      v-model="metricSearchText"
+      :placeholder="t('search.searchField')"
+      clearable
+      class="mb-3 w-full"
+    />
 
-        <!-- Search Input -->
-        <q-input
-          v-model="metricSearchText"
-          dense
-          outlined
-          :placeholder="t('search.searchField')"
-          clearable
-          class="tw:w-full"
-        >
-          <template #prepend>
-            <q-icon name="search" />
+    <div class="metric-list-container max-h-100 overflow-y-auto">
+      <template v-if="groupedFilteredMetricStreams.groups.some((g) => g.streams.length > 0)">
+        <template v-for="group in groupedFilteredMetricStreams.groups" :key="group.id">
+          <!-- Group section — hidden when no streams match -->
+          <template v-if="group.streams.length > 0">
+            <!-- Group header -->
+            <div
+              class="bg-section-header-bg border-border-default sticky top-0 z-10 flex items-center justify-between border-b border-solid px-2 py-1.5"
+            >
+              <div
+                class="text-2xs flex items-center gap-1.5 font-bold tracking-[0.05em] uppercase opacity-75"
+              >
+                <OIcon
+                  v-if="typeof group.icon === 'string'"
+                  :name="group.icon"
+                  size="xs"
+                  class="me-0.5"
+                />
+                <component v-else :is="group.icon" />
+                <span>{{ t(group.labelKey) }}</span>
+                <OTag type="fieldTag" class="ms-1">{{ group.streams.length }}</OTag>
+              </div>
+              <div class="flex gap-1">
+                <OButton
+                  variant="ghost"
+                  size="chip"
+                  @click="selectAllInGroup(group.id)"
+                  :disabled="getGroupSelectionState(group.id) === 'all'"
+                >
+                  {{ t("correlation.all") }}
+                </OButton>
+                <OButton
+                  variant="ghost"
+                  size="chip"
+                  @click="deselectAllInGroup(group.id)"
+                  :disabled="getGroupSelectionState(group.id) === 'none'"
+                >
+                  {{ t("common.none") }}
+                </OButton>
+              </div>
+            </div>
+
+            <!-- Metric items -->
+            <div
+              v-for="stream in group.streams"
+              :key="stream.stream_name"
+              class="border-border-default flex items-center gap-2 border-b border-solid px-4 py-2 hover:bg-[rgba(0,0,0,0.04)] dark:border-[rgba(255,255,255,0.1)] dark:hover:bg-[rgba(255,255,255,0.05)]"
+            >
+              <div class="flex shrink-0 items-center">
+                <OCheckbox
+                  :model-value="
+                    selectedMetricStreams.some((s) => s.stream_name === stream.stream_name)
+                  "
+                  @update:model-value="toggleMetricStream(stream)"
+                  size="xs"
+                />
+              </div>
+              <div class="flex min-w-0 flex-1 flex-col">
+                <span class="font-mono text-sm">{{ stream.stream_name }}</span>
+              </div>
+            </div>
           </template>
-        </q-input>
-      </q-card-section>
+        </template>
+      </template>
 
-      <q-card-section class="tw:p-0 metric-list-container">
-        <q-list v-if="filteredMetricStreams.length > 0">
-          <q-item
-            v-for="stream in filteredMetricStreams"
-            :key="stream.stream_name"
-            dense
-            class="metric-list-item"
-          >
-            <q-item-section side>
-              <q-checkbox
-                :model-value="
-                  selectedMetricStreams.some(
-                    (s) => s.stream_name === stream.stream_name,
-                  )
-                "
-                @update:model-value="toggleMetricStream(stream)"
-                color="primary"
-                size="xs"
-                dense
-              />
-            </q-item-section>
-            <q-item-section>
-              <q-item-label class="metric-label">{{
-                stream.stream_name
-              }}</q-item-label>
-            </q-item-section>
-          </q-item>
-        </q-list>
-
-        <!-- No results message -->
-        <div v-else class="tw:p-4 tw:text-center tw:text-gray-500">
-          {{ t("search.noResult") }}
-        </div>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+      <!-- No results message -->
+      <div v-else class="px-2 pt-3 text-center">
+        <OIcon name="info" size="sm" class="me-1 align-middle" />
+        {{ t("search.noResult") }}
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts" setup>
-import {
-  ref,
-  computed,
-  watch,
-  defineAsyncComponent,
-  provide,
-  nextTick,
-} from "vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import { ref, computed, watch, defineAsyncComponent, provide, nextTick, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
 import useNotifications from "@/composables/useNotifications";
 import useTraces from "@/composables/useTraces";
 import {
@@ -907,29 +1062,74 @@ import {
   type MetricsCorrelationConfig,
 } from "@/composables/useMetricsCorrelationDashboard";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import {
+  groupMetricsByCategory,
+  getDefaultMetricSelections,
+  type MetricGroupDefinition,
+  DEFAULT_METRIC_GROUP_DEFINITIONS,
+  K8S_METRIC_GROUP_DEFINITIONS,
+  NODE_PATTERNS,
+  POD_PATTERNS,
+} from "@/utils/metrics/metricGrouping";
 import type { StreamInfo } from "@/services/service_streams";
+import { enrichStreamsWithOverlap, sortStreamsByOverlap } from "@/utils/streamTimeOverlap";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import {
+  buildSqlCondition,
+  buildFieldToGroupIdMap,
+  applyDimensionEditsToFilters,
+  quoteSqlLiteral,
+} from "@/utils/telemetryCorrelation";
 import streamService from "@/services/stream";
 import searchService from "@/services/search";
-import { b64EncodeUnicode } from "@/utils/zincutils";
-import LogstashDatasource from "@/components/ingestion/logs/LogstashDatasource.vue";
+import { b64EncodeUnicode, getUUID, timestampToTimezoneDate } from "@/utils/zincutils";
+import {
+  buildSubjectButtons,
+  streamMatchesPatterns,
+  SUBJECT_BUTTONS_BY_SET,
+  resolveSetId,
+  type SubjectButton,
+} from "@/composables/useMetricSubjectButtons";
+import { filterByIntent, pickDefaultIntent, type IntentId } from "@/utils/metrics/metricIntent";
+import useHttpStreaming from "@/composables/useStreamingSearch";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
+import CorrelationEventHeader from "./CorrelationEventHeader.vue";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
-import TraceBlock from "@/plugins/traces/TraceBlock.vue";
+import TracesSearchResultList from "@/plugins/traces/components/TracesSearchResultList.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 const RenderDashboardCharts = defineAsyncComponent(
   () => import("@/views/Dashboards/RenderDashboardCharts.vue"),
 );
 
-interface TimeRange {
+export interface TimeRange {
   startTime: number;
   endTime: number;
 }
 
-interface Props {
+export interface TelemetryCorrelationDashboardProps {
   serviceName: string;
   matchedDimensions: Record<string, string>;
   additionalDimensions?: Record<string, string>; // Unstable dimensions (pod-id, etc.) - shown with _o2_all option
+  matchedSetId?: string; // Identity set selected by best-coverage resolution ("k8s", "aws", "gcp", "azure", ...)
+  chipDimensions?: Record<string, string>; // Semantic-id keyed dimensions for the chip row
+  sourceEvent?: {
+    timestamp?: number | string;
+    severity?: string;
+    message?: I18nText;
+  };
   metricStreams: StreamInfo[];
   logStreams?: StreamInfo[];
   traceStreams?: StreamInfo[];
@@ -941,9 +1141,14 @@ interface Props {
   mode?: "dialog" | "embedded-tabs"; // Render mode: 'dialog' = full dialog, 'embedded-tabs' = just tabs content for DetailTable
   externalActiveTab?: string; // For embedded-tabs mode, allows parent to control active tab
   hideDimensionFilters?: boolean; // Hide dimension filters in embedded-tabs mode
+  metricGroupDefinitions?: MetricGroupDefinition[]; // Override the default Infra/Network/Others groups
+  panelWidth?: number; // Override default panel width (grid units) for metric panels
+  panelHeight?: number; // Override default panel height (grid units) for metric panels
+  logsPanelWidth?: number; // Override default panel width (grid units) for logs panel
+  logsPanelHeight?: number; // Override default panel height (grid units) for logs panel
 }
 
-const props = withDefaults(defineProps<Props>(), {
+const props = withDefaults(defineProps<TelemetryCorrelationDashboardProps>(), {
   mode: "dialog",
   externalActiveTab: "logs",
 });
@@ -955,11 +1160,118 @@ const emit = defineEmits<{
 const { showErrorNotification } = useNotifications();
 const store = useStore();
 const router = useRouter();
-const { t } = useI18n();
-const { generateDashboard, generateLogsDashboard } =
-  useMetricsCorrelationDashboard();
+const { t } = useI18nTyped();
+const { generateDashboard, generateLogsDashboard } = useMetricsCorrelationDashboard(t);
 const { semanticGroups, loadSemanticGroups } = useServiceCorrelation();
 const { formatTracesMetaData } = useTraces();
+const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useHttpStreaming();
+
+// Track in-flight dimension-based trace stream so it can be cancelled on re-fetch
+let currentTracesStreamTraceId: string | null = null;
+
+// The in-flight traces stream outlives this component otherwise; cancel it on unmount.
+onUnmounted(() => {
+  if (currentTracesStreamTraceId) {
+    cancelStreamQueryBasedOnRequestId({
+      trace_id: currentTracesStreamTraceId,
+      org_id: currentOrgIdentifier.value,
+    });
+    currentTracesStreamTraceId = null;
+  }
+});
+
+// Resolved group definitions and their ids (reactive to prop changes)
+const groupDefs = computed(() => {
+  if (props.metricGroupDefinitions) return props.metricGroupDefinitions;
+  // Auto-select K8s nested definitions when the correlation matched a kubernetes identity set
+  const setId = props.matchedSetId?.toLowerCase() ?? "";
+  if (setId === "kubernetes" || setId.startsWith("k8s")) return K8S_METRIC_GROUP_DEFINITIONS;
+  return DEFAULT_METRIC_GROUP_DEFINITIONS;
+});
+
+// Nested mode: when top-level groups have children (e.g. K8s Pod/Node outer tabs)
+const isNestedGroupMode = computed(() =>
+  groupDefs.value.some((g) => g.children && g.children.length > 0),
+);
+
+const activeOuterTab = ref<string>(
+  groupDefs.value.find((g) => g.children)?.id ?? groupDefs.value[0]?.id ?? "",
+);
+
+// When matchedSetId arrives (async) groupDefs switches from flat → nested.
+// Re-initialize activeOuterTab to the first outer group so the Pods tab is selected.
+watch(isNestedGroupMode, (nested) => {
+  if (nested) {
+    activeOuterTab.value =
+      groupDefs.value.find((g) => g.children)?.id ?? groupDefs.value[0]?.id ?? "";
+  }
+});
+
+// Resolve a value for a semantic ID by checking chipDimensions directly (semantic-id key)
+// and also by looking up raw field names from semanticGroups (raw-field key).
+const resolveChipValue = (semanticId: string): string | undefined => {
+  // Try semantic-id key directly (from buildWorkloadChipDimensions)
+  const direct = props.chipDimensions?.[semanticId];
+  if (direct && direct !== SELECT_ALL_VALUE) return direct;
+  // Try raw field names (from buildChipDimensionsFromFilters)
+  const group = semanticGroups.value.find((g) => g.id === semanticId);
+  if (!group) return undefined;
+  for (const field of group.fields) {
+    const v = props.chipDimensions?.[field];
+    if (v && v !== SELECT_ALL_VALUE) return v;
+  }
+  return undefined;
+};
+
+// Map outer tab id → actual resource name (pod/node name)
+const outerTabResourceName = computed<Record<string, string | undefined>>(() => ({
+  pods: resolveChipValue("k8s-pod-name"),
+  nodes: resolveChipValue("k8s-node-name"),
+}));
+
+// Map outer tab id → subject semantic id (drives the same filtering as the "View by" chip)
+const outerTabToSubjectSemanticId: Record<string, string> = {
+  pods: "k8s-pod-name",
+  nodes: "k8s-node-name",
+};
+
+// Effective sub-groups: children of the active outer tab, or flat groupDefs
+const effectiveGroupDefs = computed(() => {
+  if (!isNestedGroupMode.value) return groupDefs.value;
+  const outer = groupDefs.value.find((g) => g.id === activeOuterTab.value);
+  return outer?.children ?? groupDefs.value;
+});
+
+const groupIds = computed(() => effectiveGroupDefs.value.map((g) => g.id));
+
+// Sort related streams so those with confirmed data overlap in props.timeRange
+// come first; streams without overlap (or missing stats) sink to the bottom.
+// Source: stream stats (doc_time_min/doc_time_max) cached in the streams store.
+const sortedMetricStreams = computed<StreamInfo[]>(() =>
+  sortStreamsByOverlap(
+    enrichStreamsWithOverlap(
+      props.metricStreams ?? [],
+      "metrics",
+      props.timeRange,
+      store.state.streams,
+    ),
+  ),
+);
+const sortedLogStreams = computed<StreamInfo[]>(() =>
+  sortStreamsByOverlap(
+    enrichStreamsWithOverlap(props.logStreams ?? [], "logs", props.timeRange, store.state.streams),
+  ),
+);
+const sortedTraceStreams = computed<StreamInfo[]>(() =>
+  sortStreamsByOverlap(
+    enrichStreamsWithOverlap(
+      props.traceStreams ?? [],
+      "traces",
+      props.timeRange,
+      store.state.streams,
+    ),
+  ),
+);
 
 // Check if embedded tabs mode
 const isEmbeddedTabs = computed(() => props.mode === "embedded-tabs");
@@ -983,14 +1295,28 @@ const dashboardChartsRef = ref<any>(null);
 const showMetricSelector = ref(false);
 const metricSearchText = ref("");
 
+// Splitter model for metrics sidebar width (percentage)
+const splitterModel = ref(25);
+
+// Group-level collapse state within the sidebar
+const collapsedGroups = ref(new Set<string>());
+const toggleGroupCollapse = (groupId: string) => {
+  const next = new Set(collapsedGroups.value);
+  if (next.has(groupId)) {
+    next.delete(groupId);
+  } else {
+    next.add(groupId);
+  }
+  collapsedGroups.value = next;
+};
+
 // Panel data caching for hide/unhide optimization
-const panelDataCache = ref<Map<string, { panel: any; timestamp: number }>>(
-  new Map(),
-);
+const panelDataCache = ref<Map<string, { panel: any; timestamp: number }>>(new Map());
 const PANEL_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache duration
 let streamChangeDebounceTimeout: any = null; // Debounce timeout for batching multiple hide/unhide operations
 const STREAM_CHANGE_DEBOUNCE_MS = 300; // 300ms debounce delay
 let wasEmptyBeforeChange = false; // Track if we're transitioning from empty state
+let suppressNextStreamReload = false; // Set when a full reload is already scheduled (e.g. chip click)
 
 // Trace correlation state
 const tracesLoading = ref(false);
@@ -1003,61 +1329,18 @@ const tracesForDimensions = ref<any[]>([]); // Traces found via dimension-based 
 // Computed properties for trace time range
 const computedTraceStartTime = computed(() => {
   if (traceSpanList.value.length === 0) return 0;
-  return Math.min(
-    ...traceSpanList.value.map((s) => Math.floor(s.start_time / 1000)),
-  );
+  return Math.min(...traceSpanList.value.map((s) => Math.floor(s.start_time / 1000)));
 });
 
 const computedTraceEndTime = computed(() => {
   if (traceSpanList.value.length === 0) return 0;
-  return Math.max(
-    ...traceSpanList.value.map((s) => Math.ceil(s.end_time / 1000)),
-  );
+  return Math.max(...traceSpanList.value.map((s) => Math.ceil(s.end_time / 1000)));
 });
 
 // Table columns for span list (direct trace correlation)
-const spanTableColumns = [
-  {
-    name: "service_name",
-    label: "Service",
-    field: "service_name",
-    align: "left" as const,
-    sortable: true,
-  },
-  {
-    name: "operation_name",
-    label: "Operation",
-    field: "operation_name",
-    align: "left" as const,
-    sortable: true,
-  },
-  {
-    name: "duration",
-    label: "Duration",
-    field: "duration",
-    align: "left" as const,
-    sortable: true,
-  },
-  {
-    name: "span_status",
-    label: "Status",
-    field: "span_status",
-    align: "left" as const,
-    sortable: true,
-  },
-  {
-    name: "start_time",
-    label: "Start Time",
-    field: "start_time",
-    align: "left" as const,
-    sortable: true,
-  },
-];
-
 // Use external tab control in embedded mode, otherwise manage internally
 const activeTab = computed({
-  get: () =>
-    isEmbeddedTabs.value ? props.externalActiveTab : internalActiveTab.value,
+  get: () => (isEmbeddedTabs.value ? props.externalActiveTab : internalActiveTab.value),
   set: (val) => {
     if (!isEmbeddedTabs.value) {
       internalActiveTab.value = val;
@@ -1067,7 +1350,7 @@ const activeTab = computed({
 const internalActiveTab = ref("logs");
 
 // Active dimensions that can be modified
-// - matchedDimensions (stable): use actual values from current row
+// - matchedDimensions (stable): use actual values from current "row"
 // - additionalDimensions (unstable): use actual values from current row (user can change to "All" if desired)
 // Applied dimensions - these are used to generate queries
 const activeDimensions = ref<Record<string, string>>({
@@ -1133,9 +1416,7 @@ const getUniqueStreams = (streams: StreamInfo[]) => {
  * - Metric filter has: { k8s_node_name: 'node-xyz' }
  * - k8s_node_name maps to 'k8s-node-id' which is in additionalDimensions -> set to SELECT_ALL_VALUE
  */
-const applyUnstableDimensionDefaults = (
-  streams: StreamInfo[],
-): StreamInfo[] => {
+const applyUnstableDimensionDefaults = (streams: StreamInfo[]): StreamInfo[] => {
   // Collect ALL unstable dimension IDs from:
   // 1. additionalDimensions (explicitly marked as unstable)
   // 2. matchedDimensions where value is already SELECT_ALL_VALUE (unstable dims with wildcard)
@@ -1160,25 +1441,20 @@ const applyUnstableDimensionDefaults = (
     return streams;
   }
 
-  // Build reverse lookup: field_name -> semantic_dimension_id
-  // Using semanticGroups from useServiceCorrelation()
-
-  const fieldToDimensionId = new Map<string, string>();
-  for (const group of semanticGroups.value) {
-    for (const field of group.fields) {
-      fieldToDimensionId.set(field, group.id);
-    }
-  }
+  // Reverse lookup: lowercased field_name -> semantic_dimension_id. Use the
+  // shared helper instead of a private case-sensitive map — mixed-case filter
+  // keys would otherwise silently miss (same defect class as F36).
+  const fieldToDimensionId = buildFieldToGroupIdMap(semanticGroups.value);
 
   const result = streams.map((stream) => {
-    const updatedFilters = { ...stream.filters };
+    const updatedFilters = { ...(stream.filters ?? {}) };
     const changedKeys: string[] = [];
     const notMatchedKeys: string[] = [];
 
     // For each filter in the stream, check if it maps to an unstable dimension
-    for (const [filterKey, filterValue] of Object.entries(stream.filters)) {
+    for (const [filterKey, filterValue] of Object.entries(stream.filters ?? {})) {
       // Look up the semantic dimension ID for this field name
-      const dimensionId = fieldToDimensionId.get(filterKey);
+      const dimensionId = fieldToDimensionId.get(filterKey.toLowerCase());
 
       if (dimensionId && unstableDimIds.has(dimensionId)) {
         // This filter's field maps to an unstable dimension - set to wildcard
@@ -1199,15 +1475,378 @@ const applyUnstableDimensionDefaults = (
 };
 
 const uniqueMetricStreams = computed(() => {
-  return getUniqueStreams(props.metricStreams);
+  const base = getUniqueStreams(sortedMetricStreams.value);
+  if (!isNestedGroupMode.value) return base;
+
+  // In nested mode (K8s), supplement correlation-returned streams with all
+  // node/pod streams from the org catalog. The _correlate API only returns
+  // streams associated with the matched service record (pod-level), so
+  // node-level metrics (k8s_node_*, system_*) are missing from the response.
+  const catalogMetrics = store.state.streams?.metrics as Record<string, any> | undefined;
+  if (!catalogMetrics) return base;
+
+  const existingNames = new Set(base.map((s) => s.stream_name));
+  const extra: StreamInfo[] = Object.keys(catalogMetrics)
+    .filter(
+      (name) =>
+        !existingNames.has(name) &&
+        (streamMatchesPatterns(name, NODE_PATTERNS) || streamMatchesPatterns(name, POD_PATTERNS)),
+    )
+    .map((name) => ({ stream_name: name, stream_type: "metrics" }));
+
+  return [...base, ...extra];
 });
 
-// Selected metric streams (default to first 6 unique streams)
-// Apply SELECT_ALL_VALUE defaults for unstable dimensions
+// Selected metric streams — declared before chip/intent block because applyActivePill references it.
 const selectedMetricStreams = ref<StreamInfo[]>(
   applyUnstableDimensionDefaults(
-    getUniqueStreams(props.metricStreams).slice(0, 6),
+    (() => {
+      const unique = getUniqueStreams(sortedMetricStreams.value);
+      const defs = groupDefs.value;
+      const defaults = getDefaultMetricSelections(defs, unique);
+      return defaults.length > 0 ? defaults : unique.slice(0, 6);
+    })(),
   ),
+);
+
+// ── Chip row & subject/intent logic ───────────────────────────────────────
+
+const LABEL_ACRONYMS = new Set([
+  "aws",
+  "ecs",
+  "gcp",
+  "iam",
+  "vpc",
+  "rds",
+  "s3",
+  "ec2",
+  "id",
+  "url",
+  "uri",
+  "ip",
+  "dns",
+  "ssl",
+  "tls",
+  "tcp",
+  "udp",
+  "api",
+  "cpu",
+  "gpu",
+  "ram",
+  "ssd",
+  "hdd",
+  "io",
+  "k8s",
+  "faas",
+  "otel",
+  "sql",
+  "http",
+  "https",
+]);
+const titleCaseWord = (w: string): string => {
+  if (!w) return w;
+  if (LABEL_ACRONYMS.has(w.toLowerCase())) return w.toUpperCase();
+  if (/^k8s$/i.test(w)) return "K8s";
+  return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase();
+};
+const titleCase = (s: string) => s.split(/\s+/).map(titleCaseWord).join(" ");
+
+const dimensionDisplayLabelCache = new Map<string, string>();
+const dimensionDisplayLabel = (key: string): string => {
+  const cached = dimensionDisplayLabelCache.get(key);
+  if (cached !== undefined) return cached;
+  const label = titleCase(key.replace(/[-_.]/g, " "));
+  dimensionDisplayLabelCache.set(key, label);
+  return label;
+};
+
+const toChipString = (v: unknown): string | null => {
+  if (v == null) return null;
+  if (typeof v === "string") return v;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return null;
+};
+const sanitizeChipDimensions = (
+  src: Record<string, unknown> | undefined | null,
+): Record<string, string> => {
+  if (!src) return {};
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(src)) {
+    const s = toChipString(v);
+    if (s !== null && s !== "") out[k] = s;
+  }
+  return out;
+};
+const chipDimensionSource = computed<Record<string, string>>(() => {
+  if (props.chipDimensions && Object.keys(props.chipDimensions).length > 0) {
+    return sanitizeChipDimensions(props.chipDimensions as Record<string, unknown>);
+  }
+  return sanitizeChipDimensions({
+    ...(props.matchedDimensions ?? {}),
+    ...(props.additionalDimensions ?? {}),
+  });
+});
+const chipDimensionKeys = computed<string[]>(() => Object.keys(chipDimensionSource.value));
+
+const fieldKeysForSemanticId = (semanticId: string): string[] => {
+  const group = semanticGroups.value.find((g) => g.id === semanticId);
+  if (!group) return semanticId in pendingDimensions.value ? [semanticId] : [];
+  const pending = group.fields.filter((f) => f in pendingDimensions.value);
+  if (pending.length > 0) return pending;
+  const avail = props.availableDimensions ?? {};
+  const sourceHit = group.fields.find(
+    (f) => avail[f] !== undefined && avail[f] !== null && avail[f] !== "",
+  );
+  return sourceHit ? [sourceHit] : [];
+};
+
+const activeChipKeysLocal = ref<Set<string>>(new Set());
+watch(
+  chipDimensionKeys,
+  (keys) => {
+    const next = new Set<string>();
+    for (const k of keys) {
+      const fields = fieldKeysForSemanticId(k);
+      if (fields.length === 0) next.add(k);
+    }
+    activeChipKeysLocal.value = next;
+  },
+  { immediate: true },
+);
+
+const originalValueForKey = (key: string): string => {
+  const v = chipDimensionSource.value[key];
+  return v !== undefined && v !== SELECT_ALL_VALUE ? v : "";
+};
+
+type ChipKind = "context" | "subject";
+type DimensionChip = {
+  key: string;
+  label: I18nText;
+  value: string;
+  kind: ChipKind;
+  active: boolean;
+  disabled?: boolean;
+};
+
+const subjectSemanticIds = computed<Set<string>>(() => {
+  if (!props.matchedSetId) return new Set();
+  const canonical = resolveSetId(props.matchedSetId);
+  const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
+  if (!specs?.length) return new Set();
+  return new Set(specs.flatMap((s) => s.semanticIds));
+});
+
+const activeSubject = ref<string | null>(null);
+
+const subjectButtons = computed<SubjectButton[]>(() =>
+  buildSubjectButtons(props.matchedSetId, semanticGroups.value),
+);
+
+const subjectMatchCounts = computed<Record<string, number>>(() => {
+  const out: Record<string, number> = {};
+  const pool = props.metricStreams ?? [];
+  if (pool.length === 0) return out;
+  const cachedSchemas = (store.state.streams?.metrics as Record<string, any> | undefined) ?? {};
+  for (const button of subjectButtons.value) {
+    if (!button.semanticIds || button.poolPatterns.length === 0) continue;
+    const subjectFieldAliases = new Set<string>();
+    for (const sid of button.semanticIds) {
+      const group = semanticGroups.value.find((g) => g.id === sid);
+      if (group) for (const f of group.fields) subjectFieldAliases.add(f);
+    }
+    const seen = new Set<string>();
+    let matchCount = 0;
+    for (const stream of pool) {
+      if (seen.has(stream.stream_name)) continue;
+      seen.add(stream.stream_name);
+      const schema = cachedSchemas[stream.stream_name]?.schema as
+        Array<{ name: string }> | undefined;
+      if (schema && schema.length > 0 && subjectFieldAliases.size > 0) {
+        if (schema.some((c) => subjectFieldAliases.has(c.name))) matchCount++;
+      } else if (streamMatchesPatterns(stream.stream_name, button.poolPatterns)) {
+        matchCount++;
+      }
+    }
+    for (const sid of button.semanticIds) out[sid] = matchCount;
+  }
+  return out;
+});
+
+const unifiedChips = computed<DimensionChip[]>(() =>
+  chipDimensionKeys.value
+    .map((key): DimensionChip => {
+      const isSubject = subjectSemanticIds.value.has(key);
+      const matchCount = isSubject ? (subjectMatchCounts.value[key] ?? 0) : 0;
+      // Context chips: active when the field key has a real value in pendingDimensions (not SELECT_ALL_VALUE)
+      const contextActive =
+        !isSubject &&
+        (() => {
+          const fields = fieldKeysForSemanticId(key);
+          if (fields.length > 0)
+            return fields.some((f) => pendingDimensions.value[f] !== SELECT_ALL_VALUE);
+          return activeChipKeysLocal.value.has(key);
+        })();
+      return {
+        key,
+        label: raw(dimensionDisplayLabel(key)),
+        value: originalValueForKey(key),
+        kind: isSubject ? "subject" : "context",
+        active: isSubject ? activeSubject.value === key : contextActive,
+        disabled: isSubject && matchCount === 0,
+      };
+    })
+    .filter((c) => {
+      if (!c.value || c.value === SELECT_ALL_VALUE) return false;
+      // Subject chips (Pod, Node, Host) are only meaningful on the metrics tab
+      if (c.kind === "subject" && activeTab.value !== "metrics") return false;
+      return true;
+    }),
+);
+
+// Helper function to get shorter label from SUBJECT_BUTTONS_BY_SET
+const getSubjectButtonLabel = (semanticId: string): string => {
+  const canonical = resolveSetId(props.matchedSetId);
+  if (!canonical) return semanticId;
+
+  const specs = SUBJECT_BUTTONS_BY_SET[canonical];
+  if (!specs) return semanticId;
+
+  const spec = specs.find((s) => s.semanticIds.includes(semanticId));
+  if (!spec) return semanticId;
+  // `label` only holds names that stay English (Pod, Cloud Run).
+  return spec.labelKey ? t(spec.labelKey) : (spec.label ?? semanticId);
+};
+
+const pinSubject = (newSubject: string | null, previousSubject: string | null) => {
+  let next = { ...pendingDimensions.value };
+  let mutated = false;
+  if (previousSubject && next[previousSubject] !== SELECT_ALL_VALUE) {
+    next[previousSubject] = SELECT_ALL_VALUE;
+    mutated = true;
+  }
+  if (newSubject) {
+    const resolved = originalValueForKey(newSubject);
+    if (resolved && next[newSubject] !== resolved) {
+      next[newSubject] = resolved;
+      mutated = true;
+    }
+  }
+  if (mutated) pendingDimensions.value = next;
+  return mutated;
+};
+
+watch(
+  [subjectSemanticIds, () => props.matchedSetId, () => props.chipDimensions, subjectMatchCounts],
+  ([sids, matchedSetId]) => {
+    let mutated = false;
+    if (activeSubject.value && sids.has(activeSubject.value)) {
+      mutated = pinSubject(activeSubject.value, null);
+    } else if (!matchedSetId) {
+      activeSubject.value = null;
+    } else {
+      const canonical = resolveSetId(matchedSetId);
+      const specs = canonical ? SUBJECT_BUTTONS_BY_SET[canonical] : undefined;
+      if (!specs?.length) {
+        activeSubject.value = null;
+      } else {
+        const counts = subjectMatchCounts.value;
+        const ordered = [
+          ...specs.filter((s) => s.defaultActive),
+          ...specs.filter((s) => !s.defaultActive),
+        ];
+        let picked: string | null = null;
+        for (const spec of ordered) {
+          const sid = spec.semanticIds[0];
+          if (sid && sids.has(sid) && (counts[sid] ?? 0) > 0) {
+            picked = sid;
+            break;
+          }
+        }
+        if (picked) {
+          activeSubject.value = picked;
+          mutated = pinSubject(picked, null);
+        }
+      }
+    }
+    if (!mutated) return;
+    activeDimensions.value = { ...pendingDimensions.value };
+    if (initialLoadCompleted.value) {
+      dashboardData.value = null;
+      nextTick(() => {
+        loadDashboard();
+      });
+    }
+  },
+  { immediate: true },
+);
+
+// Split chips by type for new UI structure
+const contextChips = computed(() => unifiedChips.value.filter((chip) => chip.kind === "context"));
+const subjectChips = computed(() => unifiedChips.value.filter((chip) => chip.kind === "subject"));
+
+// ── Intent pill row ────────────────────────────────────────────────────────
+const activeIntent = ref<IntentId>("all");
+
+const activeSubjectButtonId = computed<string | null>(() => {
+  const sid = activeSubject.value;
+  if (!sid) return null;
+  const button = subjectButtons.value.find(
+    (b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid),
+  );
+  return button?.id ?? null;
+});
+
+const applyScopeFilter = (streams: StreamInfo[]): StreamInfo[] => {
+  if (!isNestedGroupMode.value) {
+    // Non-nested: use the subject button's dimension-derived pool patterns (original behaviour)
+    const sid = activeSubject.value;
+    if (!sid || subjectButtons.value.length === 0) return streams;
+    const button = subjectButtons.value.find(
+      (b) => Array.isArray(b.semanticIds) && b.semanticIds.includes(sid),
+    );
+    if (!button || button.poolPatterns.length === 0) return streams;
+    return streams.filter((s) => streamMatchesPatterns(s.stream_name, button.poolPatterns));
+  }
+  // Nested mode: filter by stream-name patterns so node/pod tabs show the right streams
+  if (activeOuterTab.value === "nodes") {
+    return streams.filter((s) => streamMatchesPatterns(s.stream_name, NODE_PATTERNS));
+  }
+  if (activeOuterTab.value === "pods") {
+    return streams.filter((s) => streamMatchesPatterns(s.stream_name, POD_PATTERNS));
+  }
+  return streams;
+};
+
+const streamsForActivePill = computed<StreamInfo[]>(() => {
+  const scoped = applyScopeFilter(uniqueMetricStreams.value);
+  return filterByIntent(
+    scoped,
+    activeIntent.value,
+    props.matchedSetId,
+    activeSubjectButtonId.value,
+  );
+});
+
+const applyActivePill = () => {
+  selectedMetricStreams.value = applyUnstableDimensionDefaults(streamsForActivePill.value);
+};
+
+let lastIntentInitKey: string | null = null;
+watch(
+  [() => props.matchedSetId, uniqueMetricStreams, subjectButtons],
+  ([matchedSetId, streams]) => {
+    if (streams.length === 0) return;
+    const key = `${matchedSetId ?? ""}|${streams
+      .map((s) => s.stream_name)
+      .sort()
+      .join(",")}`;
+    if (lastIntentInitKey === key) return;
+    lastIntentInitKey = key;
+    activeIntent.value = pickDefaultIntent(streams, matchedSetId, activeSubjectButtonId.value);
+    applyActivePill();
+  },
+  { immediate: true },
 );
 
 // Filter metric streams based on search text
@@ -1219,10 +1858,133 @@ const filteredMetricStreams = computed(() => {
   }
 
   const searchLower = metricSearchText.value.toLowerCase();
-  return streams.filter((stream) =>
-    stream.stream_name.toLowerCase().includes(searchLower),
-  );
+  return streams.filter((stream) => stream.stream_name.toLowerCase().includes(searchLower));
 });
+
+// Group the filtered metric streams into configured categories
+// In nested mode, also apply scope filter so the sidebar shows only pod/node streams
+const groupedFilteredMetricStreams = computed(() =>
+  groupMetricsByCategory(applyScopeFilter(filteredMetricStreams.value), effectiveGroupDefs.value),
+);
+
+// Group ALL available unique metric streams — drives which tabs are visible
+// In nested mode, scope-filter so counts reflect the active outer tab
+const groupedUniqueMetricStreams = computed(() =>
+  groupMetricsByCategory(applyScopeFilter(uniqueMetricStreams.value), effectiveGroupDefs.value),
+);
+
+// Group the currently *selected* metric streams (used by the selector dialog)
+const groupedSelectedMetricStreams = computed(() =>
+  groupMetricsByCategory(selectedMetricStreams.value, effectiveGroupDefs.value),
+);
+
+// Active group tab within the metrics section
+const activeMetricGroupTab = ref<string>(effectiveGroupDefs.value[0]?.id ?? "compute");
+
+// When outer tab changes: reset inner tab + sync activeSubject for filtering
+watch(
+  activeOuterTab,
+  (tabId) => {
+    const first = effectiveGroupDefs.value[0]?.id;
+    if (first) activeMetricGroupTab.value = first;
+    // Apply the same scope filter that the "View by Pod/Node" chip would apply
+    const semanticId = outerTabToSubjectSemanticId[tabId];
+    if (semanticId) activeSubject.value = semanticId;
+  },
+  { immediate: true },
+);
+
+// Per-group dashboard data and render key
+const groupedDashboardData = ref<Partial<Record<string, any>>>({});
+const groupedDashboardRenderKey = ref(0);
+
+// Dashboard shown for the currently active group tab
+const activeDashboardForGroup = computed(
+  () => groupedDashboardData.value[activeMetricGroupTab.value] ?? null,
+);
+
+// Tabs are visible for every group that has at least one AVAILABLE metric stream
+// (not just selected ones, so all groups always appear if they have any metrics)
+const nonEmptyGroupTabs = computed(() =>
+  groupIds.value.filter((g) => (groupedUniqueMetricStreams.value.byGroup[g]?.length ?? 0) > 0),
+);
+
+/**
+ * (Re)generate per-group dashboards from the currently selected streams.
+ * Sidebar checkboxes control which metrics are selected and thus shown per group.
+ * Pure computation � no API calls. Schemas are already cached in the store.
+ */
+const regenerateGroupDashboards = (config: MetricsCorrelationConfig) => {
+  const grouped = groupMetricsByCategory(selectedMetricStreams.value, effectiveGroupDefs.value);
+  const next: Partial<Record<string, any>> = {};
+
+  for (const gId of groupIds.value) {
+    if (grouped.byGroup[gId].length > 0) {
+      next[gId] = generateDashboard(
+        grouped.byGroup[gId],
+        config,
+        store.state.theme,
+        props.panelWidth,
+        props.panelHeight,
+      );
+    }
+  }
+
+  groupedDashboardData.value = next;
+  groupedDashboardRenderKey.value++;
+
+  // If active tab is now empty, switch to the first non-empty one
+  if (!next[activeMetricGroupTab.value]) {
+    const first = groupIds.value.find((g) => next[g]);
+    if (first) activeMetricGroupTab.value = first;
+  }
+};
+
+/**
+ * Drop every rendered metric chart (both the flat and per-group dashboards).
+ * Used when the selection empties out, so the "no metrics" empty state shows
+ * instead of the previous selection's charts.
+ */
+const clearMetricDashboards = () => {
+  dashboardData.value = null;
+  dashboardRenderKey.value++;
+  groupedDashboardData.value = {};
+  groupedDashboardRenderKey.value++;
+};
+
+// Select all metrics in a group (adds any that aren't already selected)
+const selectAllInGroup = (groupId: string) => {
+  const groupStreams = groupedFilteredMetricStreams.value.byGroup[groupId];
+  const alreadySelected = new Set(selectedMetricStreams.value.map((s) => s.stream_name));
+  const toAdd = groupStreams.filter((s) => !alreadySelected.has(s.stream_name));
+  if (toAdd.length === 0) return;
+  selectedMetricStreams.value = [
+    ...selectedMetricStreams.value,
+    ...applyUnstableDimensionDefaults(toAdd),
+  ];
+};
+
+// Deselect all metrics in a group
+const deselectAllInGroup = (groupId: string) => {
+  const groupStreamNames = new Set(
+    groupedFilteredMetricStreams.value.byGroup[groupId].map((s) => s.stream_name),
+  );
+  selectedMetricStreams.value = selectedMetricStreams.value.filter(
+    (s) => !groupStreamNames.has(s.stream_name),
+  );
+};
+
+// Return selection state for a group: 'all' | 'partial' | 'none'
+const getGroupSelectionState = (groupId: string): "all" | "partial" | "none" => {
+  const groupStreams = groupedFilteredMetricStreams.value.byGroup[groupId];
+  if (groupStreams.length === 0) return "none";
+  const selectedCount = groupStreams.filter((s) =>
+    selectedMetricStreams.value.some((sel) => sel.stream_name === s.stream_name),
+  ).length;
+  if (selectedCount === 0) return "none";
+  if (selectedCount === groupStreams.length) return "all";
+  return "partial";
+};
 
 const currentOrgIdentifier = computed(() => {
   return store.state.selectedOrganization.identifier;
@@ -1244,9 +2006,7 @@ const currentTimeObj = computed(() => {
 
 // Toggle metric stream selection
 const toggleMetricStream = (stream: StreamInfo) => {
-  const index = selectedMetricStreams.value.findIndex(
-    (s) => s.stream_name === stream.stream_name,
-  );
+  const index = selectedMetricStreams.value.findIndex((s) => s.stream_name === stream.stream_name);
 
   if (index > -1) {
     // Remove stream
@@ -1256,18 +2016,14 @@ const toggleMetricStream = (stream: StreamInfo) => {
   } else {
     // Add stream - apply SELECT_ALL_VALUE defaults for unstable dimensions
     const streamsWithDefaults = applyUnstableDimensionDefaults([stream]);
-    selectedMetricStreams.value = [
-      ...selectedMetricStreams.value,
-      ...streamsWithDefaults,
-    ];
+    selectedMetricStreams.value = [...selectedMetricStreams.value, ...streamsWithDefaults];
   }
 };
 
 // Get dropdown options for a dimension
 const getDimensionOptions = (key: string, currentValue: string) => {
   // Get the original value - could be from matched (stable) or additional (unstable) dimensions
-  const originalValue =
-    props.matchedDimensions[key] || props.additionalDimensions?.[key];
+  const originalValue = props.matchedDimensions[key] || props.additionalDimensions?.[key];
   const isUnstable = unstableDimensionKeys.value.has(key);
 
   // Create options array
@@ -1281,20 +2037,18 @@ const getDimensionOptions = (key: string, currentValue: string) => {
   // Add the original value option if it exists and is not already SELECT_ALL_VALUE
   if (originalValue && originalValue !== SELECT_ALL_VALUE) {
     options.push({
-      label: isUnstable ? `${originalValue} (current)` : originalValue,
+      label: isUnstable
+        ? t("correlation.currentValueOption", { value: originalValue })
+        : raw(originalValue),
       value: originalValue,
     });
   }
 
   // Add the current value if it's different from both original and SELECT_ALL_VALUE
   // This preserves previously selected values in the dropdown
-  if (
-    currentValue &&
-    currentValue !== SELECT_ALL_VALUE &&
-    currentValue !== originalValue
-  ) {
+  if (currentValue && currentValue !== SELECT_ALL_VALUE && currentValue !== originalValue) {
     options.push({
-      label: currentValue,
+      label: raw(currentValue),
       value: currentValue,
     });
   }
@@ -1307,9 +2061,7 @@ const fetchMetricSchemas = async (streamNames: string[]) => {
   try {
     // Check if we already have schemas in store
     const cachedMetrics = store.state.streams.metrics || {};
-    const missingStreams = streamNames.filter(
-      (name) => !cachedMetrics[name]?.metrics_meta,
-    );
+    const missingStreams = streamNames.filter((name) => !cachedMetrics[name]?.metrics_meta);
 
     if (missingStreams.length === 0) {
       return cachedMetrics;
@@ -1345,22 +2097,13 @@ const fetchMetricSchemas = async (streamNames: string[]) => {
 
     return cachedMetrics;
   } catch (err) {
-    console.error(
-      "[TelemetryCorrelationDashboard] Error fetching schemas:",
-      err,
-    );
+    console.error("[TelemetryCorrelationDashboard] Error fetching schemas:", err);
     return store.state.streams.metrics || {};
   }
 };
 
 // Handle pending dimension value change from DimensionFiltersBar component
-const handleDimensionUpdate = ({
-  key,
-  value,
-}: {
-  key: string;
-  value: string;
-}) => {
+const handleDimensionUpdate = ({ key, value }: { key: string; value: string }) => {
   pendingDimensions.value[key] = value;
   // console.log("[TelemetryCorrelationDashboard] Pending dimension changed:", pendingDimensions.value);
   // No action needed - hasPendingChanges computed will update automatically
@@ -1377,35 +2120,22 @@ const applyDimensionChanges = () => {
   // Copy pending to active
   activeDimensions.value = { ...pendingDimensions.value };
 
-  // Build field_name -> dimension_id mapping from semantic groups
-  // This is the same approach as applyUnstableDimensionDefaults
-  const fieldToDimensionId = new Map<string, string>();
-  for (const group of semanticGroups.value) {
-    for (const field of group.fields) {
-      fieldToDimensionId.set(field, group.id);
-    }
-  }
+  // Build field_name -> dimension_id mapping from semantic groups.
+  // Uses the shared builder so lookups are case-insensitive and honour the
+  // backend's declaration-order priority when a field appears in two groups.
+  const fieldToDimensionId = buildFieldToGroupIdMap(semanticGroups.value);
 
-  // Update metric stream filters with new dimension values
-  // Use semantic groups to map filter field names to dimension IDs
-  selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => {
-    const updatedFilters = { ...stream.filters };
-
-    // For each filter in the stream, find its semantic dimension ID
-    // and update with the new value from activeDimensions
-    for (const [filterKey, _filterValue] of Object.entries(stream.filters)) {
-      const dimensionId = fieldToDimensionId.get(filterKey);
-      if (dimensionId && activeDimensions.value[dimensionId] !== undefined) {
-        const newValue = activeDimensions.value[dimensionId];
-        updatedFilters[filterKey] = newValue;
-      }
-    }
-
-    return {
-      ...stream,
-      filters: updatedFilters,
-    };
-  });
+  // Update metric stream filters with new dimension values.
+  // activeDimensions is raw-field-keyed in the dialog path and
+  // semantic-ID-keyed in the drawer path — the helper accepts both (F36).
+  selectedMetricStreams.value = selectedMetricStreams.value.map((stream) => ({
+    ...stream,
+    filters: applyDimensionEditsToFilters(
+      stream.filters ?? {},
+      activeDimensions.value,
+      fieldToDimensionId,
+    ),
+  }));
 
   // Note: For logs, the filters are built from config.matchedDimensions in the composable
   // which we're already updating via activeDimensions
@@ -1430,14 +2160,15 @@ const loadDashboard = async () => {
       serviceName: props.serviceName,
       matchedDimensions: activeDimensions.value,
       metricStreams: selectedMetricStreams.value,
-      logStreams: props.logStreams,
-      traceStreams: props.traceStreams,
+      logStreams: sortedLogStreams.value,
+      traceStreams: sortedTraceStreams.value,
       orgIdentifier: currentOrgIdentifier.value,
       timeRange: props.timeRange,
       sourceStream: props.sourceStream,
       sourceType: props.sourceType,
       availableDimensions: props.availableDimensions,
       metricSchemas: metricSchemas,
+      semanticGroups: semanticGroups.value,
     };
 
     // Generate metrics dashboard JSON (if we have metrics)
@@ -1445,11 +2176,19 @@ const loadDashboard = async () => {
       // selectedMetricStreams.value.forEach(s => {
       //   console.log(`  ${s.stream_name}:`, s.filters);
       // });
-      const dashboard = generateDashboard(selectedMetricStreams.value, config);
+      const dashboard = generateDashboard(
+        selectedMetricStreams.value,
+        config,
+        store.state.theme,
+        props.panelWidth,
+        props.panelHeight,
+      );
       dashboardData.value = dashboard;
       dashboardRenderKey.value++;
+      regenerateGroupDashboards(config);
     } else {
-      // console.log("[TelemetryCorrelationDashboard] No metric streams selected, skipping metrics dashboard");
+      // Nothing selected: clear rather than leave the previous charts standing.
+      clearMetricDashboards();
     }
 
     // Generate logs dashboard JSON
@@ -1463,6 +2202,8 @@ const loadDashboard = async () => {
       const logsDashboard = generateLogsDashboard(
         props.logStreams || [],
         config,
+        props.logsPanelWidth,
+        props.logsPanelHeight,
       );
       logsDashboardData.value = logsDashboard;
       logsDashboardRenderKey.value++;
@@ -1471,8 +2212,9 @@ const loadDashboard = async () => {
     }
   } catch (err: any) {
     // console.error("[TelemetryCorrelationDashboard] Error loading correlation dashboard:", err);
-    error.value = err.message || t("correlation.failedToLoad");
-    showErrorNotification(error.value);
+    const message: string = err.message || t("correlation.failedToLoad");
+    error.value = message;
+    showErrorNotification(raw(message));
   } finally {
     loading.value = false;
   }
@@ -1493,7 +2235,6 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
   try {
     // Get current panels
     const currentPanels = dashboardData.value.tabs[0].panels;
-    const existingCount = currentPanels.length;
     const timestamp = Date.now();
 
     // Separate streams into cached and new ones
@@ -1524,17 +2265,24 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
         serviceName: props.serviceName,
         matchedDimensions: activeDimensions.value,
         metricStreams: streamsNeedingGeneration,
-        logStreams: props.logStreams,
-        traceStreams: props.traceStreams,
+        logStreams: sortedLogStreams.value,
+        traceStreams: sortedTraceStreams.value,
         orgIdentifier: currentOrgIdentifier.value,
         timeRange: props.timeRange,
         sourceStream: props.sourceStream,
         sourceType: props.sourceType,
         availableDimensions: props.availableDimensions,
         metricSchemas: newSchemas,
+        semanticGroups: semanticGroups.value,
       };
 
-      const newDashboard = generateDashboard(streamsNeedingGeneration, config);
+      const newDashboard = generateDashboard(
+        streamsNeedingGeneration,
+        config,
+        store.state.theme,
+        props.panelWidth,
+        props.panelHeight,
+      );
       newPanels = newDashboard.tabs[0].panels;
     }
 
@@ -1554,14 +2302,18 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
       }
     });
 
+    const grid = 192;
     // Update layout positions for all panels being added
     allPanelsToAdd.forEach((panel: any, index: number) => {
       const uniqueId = `${panel.layout.i}_${timestamp}_${index}`;
       // Preserve original layout properties (w, h) from generateDashboard or cache
       panel.layout = {
         ...panel.layout,
-        x: (index % 3) * 64,
-        y: maxY + Math.floor(index / 3) * 16,
+        x: (index % Math.floor(grid / (props.panelWidth ?? 64))) * (props.panelWidth ?? 64),
+        y:
+          maxY +
+          Math.floor(index / Math.floor(grid / (props.panelWidth ?? 64))) *
+            (props.panelHeight ?? 16),
         i: uniqueId,
       };
       panel.id = `${panel.id}_${timestamp}`;
@@ -1581,6 +2333,23 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
 
     dashboardData.value = updatedDashboard;
 
+    // Regenerate per-group dashboards so the group tabs stay up to date
+    const groupConfig: MetricsCorrelationConfig = {
+      serviceName: props.serviceName,
+      matchedDimensions: activeDimensions.value,
+      metricStreams: selectedMetricStreams.value,
+      logStreams: sortedLogStreams.value,
+      traceStreams: sortedTraceStreams.value,
+      orgIdentifier: currentOrgIdentifier.value,
+      timeRange: props.timeRange,
+      sourceStream: props.sourceStream,
+      sourceType: props.sourceType,
+      availableDimensions: props.availableDimensions,
+      metricSchemas: store.state.streams.metrics || {},
+      semanticGroups: semanticGroups.value,
+    };
+    regenerateGroupDashboards(groupConfig);
+
     // Wait for DOM to fully update before refreshing GridStack
     await nextTick();
     await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
@@ -1595,13 +2364,6 @@ const addMetricPanels = async (addedStreams: StreamInfo[]) => {
           await dashboardChartsRef.value.refreshGridStack();
         }
       }, 100);
-    }
-
-    // Log cache usage for debugging
-    if (cachedPanels.length > 0) {
-      console.log(
-        `[TelemetryCorrelationDashboard] Reused ${cachedPanels.length} cached panel(s), generated ${newPanels.length} new panel(s)`,
-      );
     }
   } catch (err: any) {
     console.error(
@@ -1624,22 +2386,21 @@ const onClose = () => {
 // Helper function to format time range
 const formatTimeRange = (range: TimeRange) => {
   // range.startTime and range.endTime are in microseconds (16 digits)
-  // Convert to milliseconds by dividing by 1000
-  const startDate = new Date(range.startTime / 1000);
-  const endDate = new Date(range.endTime / 1000);
-
-  const formatTime = (date: Date) => {
-    const hours = String(date.getHours()).padStart(2, "0");
-    const minutes = String(date.getMinutes()).padStart(2, "0");
-    const seconds = String(date.getSeconds()).padStart(2, "0");
-    return `${hours}:${minutes}:${seconds}`;
-  };
+  // Convert to milliseconds by dividing by 1000, then render in the
+  // user-selected timezone (falls back to UTC).
+  const timezone = store.state.timezone || "UTC";
+  const formatTime = (micros: number) =>
+    timestampToTimezoneDate(Math.floor(micros / 1000), timezone, "HH:mm:ss");
 
   // Calculate duration in microseconds, then convert to minutes
   const durationMicros = range.endTime - range.startTime;
   const durationMinutes = Math.round(durationMicros / 1000 / 60000);
 
-  return `${formatTime(startDate)} - ${formatTime(endDate)} (${durationMinutes} min)`;
+  return t("correlation.timeRangeWithDuration", {
+    start: formatTime(range.startTime),
+    end: formatTime(range.endTime),
+    minutes: durationMinutes,
+  });
 };
 
 // ============= TRACE CORRELATION FUNCTIONS =============
@@ -1682,9 +2443,7 @@ const deriveFieldNameVariations = (baseFieldName: string): string[] => {
     variations.add(camelCase);
 
     // PascalCase: TraceId
-    const pascalCase = words
-      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-      .join("");
+    const pascalCase = words.map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join("");
     variations.add(pascalCase);
 
     // lowercase: traceid
@@ -1707,8 +2466,7 @@ const buildTraceIdTextPatterns = (fieldName: string): RegExp[] => {
   const patterns: RegExp[] = [];
 
   // UUID pattern: 8-4-4-4-12 hex with hyphens
-  const uuidPattern =
-    "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}";
+  const uuidPattern = "[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}";
   // Alphanumeric pattern: 16-64 chars
   const alphanumPattern = "[a-zA-Z0-9]{16,64}";
 
@@ -1721,9 +2479,7 @@ const buildTraceIdTextPatterns = (fieldName: string): RegExp[] => {
     patterns.push(new RegExp(`\\[${escaped}\\s+(${uuidPattern})\\]`, "i"));
 
     // Pattern: field_name=uuid or field_name: uuid
-    patterns.push(
-      new RegExp(`${escaped}[=:]\\s*["']?(${uuidPattern})["']?`, "i"),
-    );
+    patterns.push(new RegExp(`${escaped}[=:]\\s*["']?(${uuidPattern})["']?`, "i"));
 
     // Pattern: "field_name": "uuid" (JSON)
     patterns.push(new RegExp(`"${escaped}"\\s*:\\s*"(${uuidPattern})"`, "i"));
@@ -1733,25 +2489,15 @@ const buildTraceIdTextPatterns = (fieldName: string): RegExp[] => {
     patterns.push(new RegExp(`\\[${escaped}\\s+(${alphanumPattern})\\]`, "i"));
 
     // Pattern: [field_name abc123-suffix] - handles formats with dash suffix
-    patterns.push(
-      new RegExp(`\\[${escaped}\\s+(${alphanumPattern})(?:-[^\\]]*)?\\]`, "i"),
-    );
+    patterns.push(new RegExp(`\\[${escaped}\\s+(${alphanumPattern})(?:-[^\\]]*)?\\]`, "i"));
 
     // Pattern: field_name=abc123 or field_name: abc123 (possibly with dash suffix)
     patterns.push(
-      new RegExp(
-        `${escaped}[=:]\\s*["']?(${alphanumPattern})(?:-[^"'\\s]*)?["']?`,
-        "i",
-      ),
+      new RegExp(`${escaped}[=:]\\s*["']?(${alphanumPattern})(?:-[^"'\\s]*)?["']?`, "i"),
     );
 
     // Pattern: "field_name": "abc123" (JSON, possibly with dash suffix)
-    patterns.push(
-      new RegExp(
-        `"${escaped}"\\s*:\\s*"(${alphanumPattern})(?:-[^"]*)?\\s*"`,
-        "i",
-      ),
-    );
+    patterns.push(new RegExp(`"${escaped}"\\s*:\\s*"(${alphanumPattern})(?:-[^"]*)?\\s*"`, "i"));
   }
 
   return patterns;
@@ -1766,8 +2512,7 @@ const extractTraceIdFromText = (text: string): string | null => {
 
   // Get the configured field name, default to 'trace_id'
   const configuredFieldName =
-    store.state.organizationData?.organizationSettings?.trace_id_field_name ||
-    "trace_id";
+    store.state.organizationData?.organizationSettings?.trace_id_field_name || "trace_id";
 
   // Build patterns dynamically from the configured field name
   const patterns = buildTraceIdTextPatterns(configuredFieldName);
@@ -1797,8 +2542,7 @@ const extractTraceIdFromLog = (): string | null => {
 
   // Get the configured field name, default to 'trace_id'
   const configuredTraceIdField =
-    store.state.organizationData?.organizationSettings?.trace_id_field_name ||
-    "trace_id";
+    store.state.organizationData?.organizationSettings?.trace_id_field_name || "trace_id";
 
   // 1. First check the exact configured field name
   if (logRecord[configuredTraceIdField]) {
@@ -1836,12 +2580,7 @@ const extractTraceIdFromLog = (): string | null => {
   // Use FTS fields from props if available, otherwise fall back to default FTS fields from config
   const ftsFieldsToScan = props.ftsFields?.length
     ? props.ftsFields
-    : store.state.zoConfig?.default_fts_keys || [
-        "body",
-        "message",
-        "log",
-        "msg",
-      ];
+    : store.state.zoConfig?.default_fts_keys || ["body", "message", "log", "msg"];
 
   for (const field of ftsFieldsToScan) {
     // Check exact field name
@@ -1865,12 +2604,11 @@ const extractTraceIdFromLog = (): string | null => {
 
   // 4. Fallback: Scan ALL string fields for embedded trace_id patterns
   // This catches cases where trace_id is embedded in non-FTS fields
-  const scannedFields = new Set(ftsFieldsToScan.map((f) => f.toLowerCase()));
+  const scannedFields = new Set(ftsFieldsToScan.map((f: string) => f.toLowerCase()));
 
   for (const [key, val] of Object.entries(logRecord)) {
     // Skip fields we already scanned and non-string values
-    if (scannedFields.has(key.toLowerCase()) || typeof val !== "string")
-      continue;
+    if (scannedFields.has(key.toLowerCase()) || typeof val !== "string") continue;
 
     // Only scan fields that look like they might contain text content
     const value = String(val);
@@ -1914,9 +2652,7 @@ const isValidTraceId = (value: string): boolean => {
   // e.g., 019411a7-30e7-7e8a-a456-426614174000 (UUID v7)
   // e.g., 550e8400-e29b-41d4-a716-446655440000 (UUID v4)
   if (
-    /^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$/.test(
-      trimmed,
-    )
+    /^[a-fA-F0-9]{8}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{4}-[a-fA-F0-9]{12}$/.test(trimmed)
   ) {
     return true;
   }
@@ -1933,11 +2669,11 @@ const isValidTraceId = (value: string): boolean => {
  * Fetch full trace details (all spans) for a specific trace_id
  */
 const fetchTraceByTraceId = async (traceId: string) => {
-  if (!props.traceStreams?.length) {
+  if (!sortedTraceStreams.value.length) {
     return null;
   }
 
-  const streamName = props.traceStreams[0].stream_name;
+  const streamName = sortedTraceStreams.value[0].stream_name;
 
   // Use a wider time range when searching by specific trace_id
   // Since we have an exact trace_id, we can search across a larger window (24 hours before to now)
@@ -1954,7 +2690,7 @@ const fetchTraceByTraceId = async (traceId: string) => {
     org_identifier: currentOrgIdentifier.value,
     start_time: searchStartTime,
     end_time: searchEndTime,
-    filter: `trace_id='${traceId}'`,
+    filter: `trace_id=${quoteSqlLiteral(traceId)}`,
     size: 1,
     from: 0,
     stream_name: streamName,
@@ -1972,7 +2708,7 @@ const fetchTraceByTraceId = async (traceId: string) => {
   const query = {
     query: {
       sql: b64EncodeUnicode(
-        `SELECT * FROM "${streamName}" WHERE trace_id = '${traceId}' ORDER BY start_time`,
+        `SELECT * FROM "${streamName}" WHERE trace_id = ${quoteSqlLiteral(traceId)} ORDER BY start_time`,
       ),
       start_time: traceStartTime,
       end_time: traceEndTime,
@@ -1998,66 +2734,124 @@ const fetchTraceByTraceId = async (traceId: string) => {
 };
 
 /**
- * Fetch traces via dimension-based correlation
+ * Fetch traces via dimension-based correlation using HTTP streaming (/latest_stream)
  */
-const fetchTracesByDimensions = async () => {
-  if (!props.traceStreams?.length) {
-    return [];
+const fetchTracesByDimensions = (): Promise<any[]> => {
+  if (!sortedTraceStreams.value.length) {
+    return Promise.resolve([]);
   }
 
-  const traceStreamInfo = props.traceStreams[0];
+  const traceStreamInfo = sortedTraceStreams.value[0];
   const streamName = traceStreamInfo.stream_name;
 
-  // Build filter using ALL filters from the trace stream's filters
-  // This uses all the filters coming from the correlation API
   const filterParts: string[] = [];
-
-  // Use all filters from traceStreamInfo.filters
   if (traceStreamInfo.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(`${fieldName}='${value}'`);
+      filterParts.push(buildSqlCondition(fieldName, value));
     }
   }
-
   const filter = filterParts.join(" AND ");
 
-  const response = await searchService.get_traces({
-    org_identifier: currentOrgIdentifier.value,
-    start_time: props.timeRange.startTime,
-    end_time: props.timeRange.endTime,
-    filter: filter,
-    size: 50,
-    from: 0,
-    stream_name: streamName,
-  });
+  // Cancel any previous in-flight stream
+  if (currentTracesStreamTraceId) {
+    cancelStreamQueryBasedOnRequestId({
+      trace_id: currentTracesStreamTraceId,
+      org_id: currentOrgIdentifier.value,
+    });
+    currentTracesStreamTraceId = null;
+  }
 
-  // Format traces with service colors and proper structure for TraceBlock
-  return formatTracesMetaData(response.data?.hits || []);
+  const traceId = getUUID().replace(/-/g, "");
+  currentTracesStreamTraceId = traceId;
+
+  const accumulated: any[] = [];
+
+  return new Promise((resolve, reject) => {
+    (async () => {
+      try {
+        await fetchQueryDataWithHttpStream(
+          {
+            queryReq: {
+              stream_name: streamName,
+              filter: filter,
+              start_time: props.timeRange.startTime,
+              end_time: props.timeRange.endTime,
+              from: 0,
+              size: 10,
+            },
+            type: "traces",
+            traceId,
+            org_id: currentOrgIdentifier.value,
+          },
+          {
+            data: (_: any, response: any) => {
+              const hits: any[] = response.content?.results?.hits || [];
+              if (hits.length > 0) {
+                accumulated.push(...formatTracesMetaData(hits));
+              }
+            },
+            error: (_: any, err: any) => {
+              currentTracesStreamTraceId = null;
+              reject(err);
+            },
+            complete: () => {
+              currentTracesStreamTraceId = null;
+              resolve(accumulated);
+            },
+            reset: () => {},
+          },
+        );
+      } catch (e) {
+        currentTracesStreamTraceId = null;
+        reject(e);
+      }
+    })();
+  });
 };
 
 /**
  * Open traces screen in new window with trace_id filter
  * @param traceIdOrEvent - trace_id string to use, or event object (when called from @click without args)
  */
-const openTraceInNewWindow = (trace) => {
+const openTraceInNewWindow = (
+  trace:
+    | string
+    | {
+        trace_id?: string;
+        trace_start_time?: number;
+        trace_end_time?: number;
+      },
+) => {
   // Handle case where event object is passed instead of trace_id (e.g., from @click without args)
+  const traceObj = typeof trace === "string" ? undefined : trace;
   const traceId = typeof trace === "string" ? trace : trace.trace_id;
   const targetTraceId = traceId || extractedTraceId.value;
   if (!targetTraceId) return;
 
   const org = store.state.selectedOrganization.identifier;
-  const traceStream = props.traceStreams?.[0]?.stream_name || "default";
+  const traceStream = sortedTraceStreams.value[0]?.stream_name || "default";
+  const logStream = sortedLogStreams.value[0]?.stream_name;
 
-  // Build the URL with sql_mode and just trace_id filter
+  const queryParams: any = {
+    stream: traceStream,
+    trace_id: targetTraceId,
+    from: traceObj?.trace_start_time
+      ? traceObj.trace_start_time - 10000000
+      : props.timeRange.startTime.toString(),
+    to: traceObj?.trace_end_time
+      ? traceObj.trace_end_time + 10000000
+      : props.timeRange.endTime.toString(),
+    org_identifier: org,
+  };
+
+  // Add log_stream parameter if available for auto-selection in trace details
+  if (logStream) {
+    queryParams.log_stream = logStream;
+  }
+
   const route = router.resolve({
     name: "traceDetails",
-    query: {
-      stream: traceStream,
-      trace_id: targetTraceId,
-      from: trace.trace_start_time - 10000000,
-      to: trace.trace_end_time + 10000000,
-      org_identifier: org,
-    },
+    query: queryParams,
   });
 
   // Open in new window/tab
@@ -2069,15 +2863,15 @@ const openTraceInNewWindow = (trace) => {
  */
 const openTracesPage = () => {
   const org = store.state.selectedOrganization.identifier;
-  const traceStream = props.traceStreams?.[0]?.stream_name || "default";
+  const traceStream = sortedTraceStreams.value[0]?.stream_name || "default";
 
   // Build filter query using all filters from trace stream
   const filterParts: string[] = [];
-  const traceStreamInfo = props.traceStreams?.[0];
+  const traceStreamInfo = sortedTraceStreams.value[0];
 
   if (traceStreamInfo?.filters) {
     for (const [fieldName, value] of Object.entries(traceStreamInfo.filters)) {
-      filterParts.push(`${fieldName}='${value}'`);
+      filterParts.push(buildSqlCondition(fieldName, value));
     }
   }
 
@@ -2092,6 +2886,7 @@ const openTracesPage = () => {
       to: props.timeRange.endTime,
       query: b64EncodeUnicode(filterQuery), // Base64 encode the filter query
       org_identifier: org,
+      tab: "traces",
     },
   });
 
@@ -2135,8 +2930,9 @@ const loadCorrelatedTraces = async () => {
       tracesForDimensions.value = await fetchTracesByDimensions();
     }
   } catch (err: any) {
-    tracesError.value = err.message || "Failed to load traces";
-    showErrorNotification(tracesError.value);
+    const message: string = err.message || t("correlation.tracesError");
+    tracesError.value = message;
+    showErrorNotification(raw(message));
   } finally {
     tracesLoading.value = false;
   }
@@ -2146,11 +2942,7 @@ const loadCorrelatedTraces = async () => {
 watch(
   () => activeTab.value,
   (newTab) => {
-    if (
-      newTab === "traces" &&
-      traceCorrelationMode.value === null &&
-      !tracesLoading.value
-    ) {
+    if (newTab === "traces" && traceCorrelationMode.value === null && !tracesLoading.value) {
       loadCorrelatedTraces();
     }
   },
@@ -2169,18 +2961,12 @@ watch(
 
       // Re-apply defaults now that semantic groups are loaded
       // Check if there are ANY unstable dimensions (either in additionalDimensions OR matchedDimensions with _o2_all_)
-      const hasAdditionalDims =
-        Object.keys(props.additionalDimensions || {}).length > 0;
-      const hasUnstableInMatched = Object.values(
-        props.matchedDimensions || {},
-      ).some((v) => v === SELECT_ALL_VALUE);
-      if (
-        semanticGroups.value.length > 0 &&
-        (hasAdditionalDims || hasUnstableInMatched)
-      ) {
-        selectedMetricStreams.value = applyUnstableDimensionDefaults(
-          selectedMetricStreams.value,
-        );
+      const hasAdditionalDims = Object.keys(props.additionalDimensions || {}).length > 0;
+      const hasUnstableInMatched = Object.values(props.matchedDimensions || {}).some(
+        (v) => v === SELECT_ALL_VALUE,
+      );
+      if (semanticGroups.value.length > 0 && (hasAdditionalDims || hasUnstableInMatched)) {
+        selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
       }
 
       await loadDashboard();
@@ -2226,25 +3012,34 @@ watch(
       const currentStreams = selectedMetricStreams.value;
       const currentPanels = dashboardData.value?.tabs?.[0]?.panels || [];
 
+      // Every metric deselected: drop the charts so the empty state shows.
+      // The reload paths below are all gated on a non-empty selection, so
+      // without this the last-deselected metric's chart would linger.
+      if (currentStreams.length === 0) {
+        clearMetricDashboards();
+        suppressNextStreamReload = false;
+        return;
+      }
+
       // Get current panel stream names
       const currentPanelStreamNames = new Set(
         currentPanels
           .map((p: any) => {
             // Extract stream name from panel id or layout
-            const match =
-              p.id?.match(/^(.+?)_\d+$/) || p.layout?.i?.match(/^(.+?)_/);
+            const match = p.id?.match(/^(.+?)_\d+$/) || p.layout?.i?.match(/^(.+?)_/);
             return match ? match[1] : null;
           })
           .filter(Boolean),
       );
 
       // If no dashboard or transitioning from empty, do full reload
-      if (
-        !dashboardData.value ||
-        wasEmptyBeforeChange ||
-        currentPanels.length === 0
-      ) {
+      if (!dashboardData.value || wasEmptyBeforeChange || currentPanels.length === 0) {
         wasEmptyBeforeChange = false;
+        // Skip if a full reload is already scheduled (e.g. by onChipClick → applyDimensionChanges)
+        if (suppressNextStreamReload) {
+          suppressNextStreamReload = false;
+          return;
+        }
         if (isOpen.value && currentStreams.length > 0) {
           dashboardData.value = null;
           loadDashboard();
@@ -2258,12 +3053,9 @@ watch(
       );
 
       // Determine which panels need to be removed based on current state
-      const currentStreamNames = new Set(
-        currentStreams.map((s) => s.stream_name),
-      );
+      const currentStreamNames = new Set(currentStreams.map((s) => s.stream_name));
       const panelsToRemove = currentPanels.filter((p: any) => {
-        const match =
-          p.id?.match(/^(.+?)_\d+$/) || p.layout?.i?.match(/^(.+?)_/);
+        const match = p.id?.match(/^(.+?)_\d+$/) || p.layout?.i?.match(/^(.+?)_/);
         const streamName = match ? match[1] : null;
         return streamName && !currentStreamNames.has(streamName);
       });
@@ -2271,8 +3063,7 @@ watch(
       // Cache panels before removal
       if (panelsToRemove.length > 0) {
         panelsToRemove.forEach((panel: any) => {
-          const match =
-            panel.id?.match(/^(.+?)_\d+$/) || panel.layout?.i?.match(/^(.+?)_/);
+          const match = panel.id?.match(/^(.+?)_\d+$/) || panel.layout?.i?.match(/^(.+?)_/);
           const streamName = match ? match[1] : null;
           if (streamName) {
             panelDataCache.value.set(streamName, {
@@ -2284,7 +3075,10 @@ watch(
       }
 
       if (isOpen.value && currentStreams.length > 0) {
-        if (panelsToRemove.length > 0) {
+        if (suppressNextStreamReload) {
+          // A full reload is already scheduled (e.g. by onChipClick → applyDimensionChanges)
+          suppressNextStreamReload = false;
+        } else if (panelsToRemove.length > 0) {
           // If panels need to be removed, do full reload
           dashboardData.value = null;
           nextTick(() => {
@@ -2315,15 +3109,13 @@ watch(
       Object.keys(newAdditionalDims).length > 0 &&
       semanticGroups.value.length > 0
     ) {
-      // Update pendingDimensions with new unstable dimension values from current row
+      // Update pendingDimensions with new unstable dimension values from current "row"
       pendingDimensions.value = {
         ...props.matchedDimensions,
         ...newAdditionalDims,
       };
 
-      selectedMetricStreams.value = applyUnstableDimensionDefaults(
-        selectedMetricStreams.value,
-      );
+      selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
       if (isOpen.value) {
         loadDashboard();
       }
@@ -2342,7 +3134,7 @@ watch(
       return;
     }
 
-    // Update pendingDimensions with new matched dimension values from current row
+    // Update pendingDimensions with new matched dimension values from current "row"
     pendingDimensions.value = {
       ...newMatchedDims,
       ...(props.additionalDimensions || {}),
@@ -2352,12 +3144,28 @@ watch(
       (v) => v === SELECT_ALL_VALUE,
     );
     if (hasUnstableInMatched && semanticGroups.value.length > 0) {
-      selectedMetricStreams.value = applyUnstableDimensionDefaults(
-        selectedMetricStreams.value,
-      );
+      selectedMetricStreams.value = applyUnstableDimensionDefaults(selectedMetricStreams.value);
       if (isOpen.value) {
         loadDashboard();
       }
+    }
+  },
+);
+
+// Watch activeSubject changes from OTabs to trigger the same logic as onChipClick
+watch(
+  () => activeSubject.value,
+  (newSubject, oldSubject) => {
+    // Skip if no change or not on metrics tab
+    if (newSubject === oldSubject || activeTab.value !== "metrics") return;
+
+    // Apply the same logic as onChipClick for subject selection
+    if (newSubject) {
+      pinSubject(newSubject, oldSubject);
+      suppressNextStreamReload = true;
+      applyActivePill();
+      dashboardData.value = null;
+      applyDimensionChanges();
     }
   },
 );
@@ -2391,155 +3199,18 @@ watch(
     if (dimensionsChanged) {
       pendingDimensions.value = { ...newDimensions };
       activeDimensions.value = { ...newDimensions };
-
-      console.log(
-        "[TelemetryCorrelationDashboard] Updated dimensions from props:",
-        newDimensions,
-      );
     }
   },
   { immediate: true, deep: true },
 );
 </script>
 
-<style lang="scss" scoped>
-.correlation-dashboard-card {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 90vw;
-  max-width: 87.5rem;
-  background: #ffffff !important;
-
-  .correlation-header {
-    flex-shrink: 0;
-    background: #ffffff !important;
-    z-index: 1;
-  }
-
-  .correlation-content {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-    background: #f5f5f5 !important;
-  }
+<style scoped>
+/* keep(lib-override:o2-traces-tabs): reach child TraceDetails and O2 tab internals via :deep */
+.telemetry-correlation-traces :deep(.trace-details-content) {
+  padding: 0 !important;
 }
-
-.telemetry-correlation-traces {
-  :deep(.trace-details-content) {
-    padding: 0 !important;
-  }
-
-  :deep(.trace-combined-header-wrapper) {
-    margin-bottom: 0 !important;
-  }
-}
-
-// Metric selector dialog
-.metric-selector-dialog {
-  min-width: 25rem;
-  max-width: 31.25rem;
-}
-
-.metric-list-container {
-  max-height: 25rem;
-  overflow-y: auto;
-
-  .metric-list-item {
-    padding: 0.5rem 1rem;
-    border-bottom: 0.0625rem solid var(--q-border-color, #e0e0e0);
-
-    &:hover {
-      background-color: var(--q-hover-color, rgba(0, 0, 0, 0.04));
-    }
-
-    .metric-label {
-      font-size: 0.875rem;
-      line-height: 1.25rem;
-      font-family: monospace;
-    }
-  }
-}
-
-// Embedded mode styling
-.correlation-dashboard-embedded {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  width: 100%;
-  background: #ffffff !important;
-
-  .correlation-header {
-    flex-shrink: 0;
-    background: #ffffff !important;
-    z-index: 1;
-  }
-
-  .correlation-content {
-    flex: 1;
-    overflow: auto;
-    min-height: 0;
-    background: #f5f5f5 !important;
-  }
-}
-
-// Dimension dropdown styling
-.dimension-dropdown {
-  :deep(.q-field__control) {
-    min-height: 2rem;
-    padding: 0 0.5rem;
-  }
-
-  :deep(.q-field__native) {
-    font-size: 0.875rem;
-    padding: 0.25rem 0;
-  }
-
-  :deep(.q-field__append) {
-    padding-left: 0.25rem;
-  }
-}
-
-// Trace header background - light mode
-.trace-header-bg {
-  background: #ffffff;
-}
-
-// Dark mode support
-body.body--dark {
-  .trace-header-bg {
-    background: #1e1e1e;
-  }
-  .correlation-dashboard-embedded {
-    background: #1e1e1e !important;
-
-    .correlation-header {
-      background: #1e1e1e !important;
-    }
-
-    .correlation-content {
-      background: #2a2a2a !important;
-    }
-  }
-
-  .correlation-dashboard-card {
-    background: #1e1e1e !important;
-
-    .correlation-header {
-      background: #1e1e1e !important;
-    }
-
-    .correlation-content {
-      background: #2a2a2a !important;
-    }
-  }
-
-  .metric-list-item {
-    border-bottom-color: rgba(255, 255, 255, 0.1);
-
-    &:hover {
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-  }
+.telemetry-correlation-traces :deep(.trace-combined-header-wrapper) {
+  margin-bottom: 0 !important;
 }
 </style>

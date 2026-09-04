@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,6 +19,17 @@ export interface ServiceGraphParams {
   streamName?: string;
   startTime?: number;
   endTime?: number;
+  agentId?: string | null;
+  agentName?: string | null;
+  agentEnv?: string | null;
+}
+
+export interface EdgeTrendParams {
+  client_service?: string;
+  server_service?: string;
+  start_time?: number;
+  end_time?: number;
+  stream_name?: string;
 }
 
 const serviceGraphService = {
@@ -40,8 +51,37 @@ const serviceGraphService = {
     if (options?.endTime) {
       params.end_time = options.endTime;
     }
+    // Agent scoping is ENV-only: topology is version-agnostic, so agent_version
+    // is deliberately never sent to the backend.
+    if (options?.agentId) {
+      params.agent_id = options.agentId;
+    }
+    if (options?.agentName) {
+      params.agent_name = options.agentName;
+    }
+    if (options?.agentEnv) {
+      params.agent_env = options.agentEnv;
+    }
 
     return http().get(`/api/${orgId}/traces/service_graph/topology/current`, {
+      params,
+    });
+  },
+
+  /**
+   * Get latency trend for a specific edge (client → server).
+   * Returns raw time-series data points plus weighted-average baselines.
+   */
+  getEdgeHistory: (orgId: string, options: EdgeTrendParams) => {
+    const params: Record<string, string | number> = {};
+    if (options.client_service) params.client_service = options.client_service;
+    if (options.server_service) params.server_service = options.server_service;
+    if (options.start_time) params.start_time = options.start_time;
+    if (options.end_time) params.end_time = options.end_time;
+    if (options.stream_name && options.stream_name !== "all") {
+      params.stream_name = options.stream_name;
+    }
+    return http().get(`/api/${orgId}/traces/service_graph/edge/history`, {
       params,
     });
   },

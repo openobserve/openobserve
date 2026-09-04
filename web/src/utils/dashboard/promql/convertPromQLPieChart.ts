@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
 import { buildTooltip } from "./shared/axisBuilder";
-import { buildPieChartConfig, buildLegendConfig } from "./shared/gridBuilder";
+import { buildPieChartConfig } from "./shared/gridBuilder";
 import { getSeriesColor } from "../colorPalette";
 import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
 
@@ -52,8 +52,8 @@ export class PieConverter implements PromQLChartConverter {
       rawValues: Array<[number, string]>;
     }> = [];
 
-    processedData.forEach((queryData, qIndex) => {
-      queryData.series.forEach((seriesData, sIndex) => {
+    processedData.forEach((queryData) => {
+      queryData.series.forEach((seriesData) => {
         const value = applyAggregation(seriesData.values, aggregation);
 
         if (value < chartMin) chartMin = value;
@@ -72,9 +72,7 @@ export class PieConverter implements PromQLChartConverter {
     // Now apply colors and build data with unit formatting
     seriesDataCollection.forEach((seriesData) => {
       // Extract numeric values for color calculation
-      const numericValues = seriesData.rawValues.map(([_, val]) =>
-        parseFloat(val),
-      );
+      const numericValues = seriesData.rawValues.map(([, val]) => parseFloat(val));
 
       const color = getSeriesColor(
         config.color || null,
@@ -99,7 +97,7 @@ export class PieConverter implements PromQLChartConverter {
     }
 
     // Get dynamic radius and center position based on legend and chart alignment
-    const { radius, center } = buildPieChartConfig(
+    const { radius, center, bottom } = buildPieChartConfig(
       panelSchema,
       chartPanelRef,
       data,
@@ -134,12 +132,7 @@ export class PieConverter implements PromQLChartConverter {
                 .replace(
                   "{c}",
                   formatUnitValue(
-                    getUnitValue(
-                      params.value,
-                      config?.unit,
-                      config?.unit_custom,
-                      config?.decimals,
-                    ),
+                    getUnitValue(params.value, config?.unit, config?.unit_custom, config?.decimals),
                   ),
                 )
                 .replace("{d}", params.percent.toFixed(1));
@@ -160,14 +153,21 @@ export class PieConverter implements PromQLChartConverter {
           show: config.show_label_line !== false,
         },
 
+        // hide colliding labels and skip sliver slices (e.g. 0-value modes)
+        labelLayout: { hideOverlap: true },
+        minShowLabelAngle: 3,
+
         // Dynamic center position based on chart alignment
         center,
+
+        // Keep the pie's layout box (sectors + labels) above a bottom legend
+        ...(bottom > 0 && { bottom }),
       },
     ];
 
     const result = {
       series,
-      tooltip: buildTooltip(panelSchema, "item"),
+      tooltip: buildTooltip(panelSchema, "item", store),
       // Legend config will be applied by applyLegendConfiguration in convertPromQLChartData
       // This ensures consistent behavior with SQL charts
     };

@@ -1,0 +1,89 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "frontend" } },
+          { "key": "service.version", "value": { "stringValue": "1.0.0" } }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": { "name": "test-assist-ci-seed" },
+          "spans": [
+            {
+              "traceId": "5b8aa5a2d2c872e8321cf37308d69df2",
+              "spanId": "051581bf3cb55c13",
+              "name": "GET /api/orders",
+              "kind": 2,
+              "startTimeUnixNano": "1720000000000000000",
+              "endTimeUnixNano": "1720000000150000000",
+              "attributes": [
+                { "key": "http.method", "value": { "stringValue": "GET" } },
+                { "key": "http.route", "value": { "stringValue": "/api/orders" } },
+                { "key": "http.status_code", "value": { "intValue": 200 } }
+              ],
+              "status": { "code": 1 }
+            },
+            {
+              "traceId": "5b8aa5a2d2c872e8321cf37308d69df3",
+              "spanId": "051581bf3cb55c14",
+              "name": "POST /api/checkout",
+              "kind": 2,
+              "startTimeUnixNano": "1720000005000000000",
+              "endTimeUnixNano": "1720000005420000000",
+              "attributes": [
+                { "key": "http.method", "value": { "stringValue": "POST" } },
+                { "key": "http.route", "value": { "stringValue": "/api/checkout" } },
+                { "key": "http.status_code", "value": { "intValue": 200 } }
+              ],
+              "status": { "code": 1 }
+            },
+            {
+              "traceId": "5b8aa5a2d2c872e8321cf37308d69df4",
+              "spanId": "051581bf3cb55c15",
+              "name": "GET /api/products",
+              "kind": 2,
+              "startTimeUnixNano": "1720000010000000000",
+              "endTimeUnixNano": "1720000010080000000",
+              "attributes": [
+                { "key": "http.method", "value": { "stringValue": "GET" } },
+                { "key": "http.route", "value": { "stringValue": "/api/products" } },
+                { "key": "http.status_code", "value": { "intValue": 200 } }
+              ],
+              "status": { "code": 1 }
+            },
+            {
+              "traceId": "5b8aa5a2d2c872e8321cf37308d69df5",
+              "spanId": "051581bf3cb55c16",
+              "name": "DELETE /api/session",
+              "kind": 2,
+              "startTimeUnixNano": "1720000015000000000",
+              "endTimeUnixNano": "1720000015020000000",
+              "attributes": [
+                { "key": "http.method", "value": { "stringValue": "DELETE" } },
+                { "key": "http.route", "value": { "stringValue": "/api/session" } },
+                { "key": "http.status_code", "value": { "intValue": 204 } }
+              ],
+              "status": { "code": 1 }
+            },
+            {
+              "traceId": "5b8aa5a2d2c872e8321cf37308d69df6",
+              "spanId": "051581bf3cb55c17",
+              "name": "GET /api/health",
+              "kind": 2,
+              "startTimeUnixNano": "1720000020000000000",
+              "endTimeUnixNano": "1720000020005000000",
+              "attributes": [
+                { "key": "http.method", "value": { "stringValue": "GET" } },
+                { "key": "http.route", "value": { "stringValue": "/api/health" } },
+                { "key": "http.status_code", "value": { "intValue": 200 } }
+              ],
+              "status": { "code": 2, "message": "upstream slow" }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

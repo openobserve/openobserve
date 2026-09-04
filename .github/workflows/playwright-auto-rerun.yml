@@ -4,7 +4,9 @@ run-name: "Playwright Auto-Rerun - ${{ github.event.workflow_run.head_branch || 
 
 on:
   workflow_run:
-    workflows: ["Playwright UI Tests"]
+    workflows:
+      - "Playwright UI Tests"
+      - "Playwright Regression Tests"
     types:
       - completed
     branches:
@@ -19,6 +21,7 @@ on:
 
 jobs:
   auto_rerun_on_failure:
+    timeout-minutes: 15
     name: Auto Rerun Failed Jobs
     permissions:
       actions: write
@@ -152,7 +155,6 @@ jobs:
             echo "::notice::✅ Successfully triggered rerun of failed jobs"
             echo "::notice::Run ID: $RUN_ID"
             echo "::notice::Only failed and cancelled jobs will be rerun"
-            echo "::notice::TestDino will optimize the rerun to only execute failed tests"
             echo "$RERUN_OUTPUT"
           else
             echo "::error::❌ Failed to trigger rerun (exit code: $RERUN_EXIT_CODE)"

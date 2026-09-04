@@ -1,66 +1,36 @@
 <template>
   <div
-    class="tw:absolute tw:top-0 tw:left-0 tw:w-full tw:z-[999] tw:transition-opacity tw:duration-500 tw:ease-out"
+    class="absolute top-0 left-0 z-999 w-full transition-opacity duration-500 ease-out"
     :class="{
-      'tw:opacity-0': !loading && !isFadingOut,
-      'tw:opacity-100': loading || isFadingOut,
+      'opacity-0': !loading && !isFadingOut,
+      'opacity-100': loading || isFadingOut,
     }"
   >
-    <div
-      class="tw:w-full tw:h-[2px] tw:relative tw:overflow-x-hidden"
-      :class="
-        store.state.theme === 'dark' ? 'tw:bg-gray-700' : 'tw:bg-gray-200'
-      "
-    >
+    <div class="bg-progress-bar-track relative h-0.5 w-full overflow-x-hidden">
       <div
-        class="tw:h-full tw:relative tw:overflow-hidden"
-        :class="
-          store.state.theme === 'dark' ? 'tw:bg-[#5960B2]' : 'tw:bg-[#5960B2]'
-        "
+        class="relative h-full overflow-hidden"
+        :class="'bg-brand-indigo'"
         :style="{
           width: `${displayPercentage}%`,
-          transition: shouldAnimate
-            ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            : 'none',
+          transition: shouldAnimate ? 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
           willChange: loading ? 'width' : 'auto',
           transform: 'translateZ(0)', // Force GPU acceleration
         }"
       >
         <div
-          class="tw:absolute tw:inset-0 tw:bg-gradient-to-r tw:from-transparent tw:to-transparent "
-          :class="
-            store.state.theme === 'dark'
-              ? 'tw:via-gray-300/40'
-              : 'tw:via-white/40'
-          "
-          :style="{
-            animation: 'shimmer 1.5s infinite linear',
-            width: '200%',
-            left: '-200%',
-          }"
+          class="loading-progress__shimmer absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
         ></div>
       </div>
       <!-- Moving circle indicator -->
       <div
-        class="tw:absolute tw:top-0 tw:w-[3px] tw:h-[2px] tw:rounded-full tw:shadow-[0_0_10px_2px_rgba(89,96,178,0.5)] tw:transform tw:translate-x-[-50%]"
-        :class="
-          store.state.theme === 'dark' ? 'tw:bg-[#5960B2]' : 'tw:bg-[#5960B2]'
-        "
+        class="ring-brand-indigo/50 absolute top-0 h-0.5 w-0.75 -translate-x-1/2 transform rounded-full ring-2"
+        :class="'bg-brand-indigo'"
         :style="{
           left: `${displayPercentage}%`,
-          transition: shouldAnimate
-            ? 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
-            : 'none',
+          transition: shouldAnimate ? 'left 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
         }"
       >
-        <div
-          class="tw:absolute tw:inset-0 tw:rounded-full tw:animate-pulse"
-          :class="
-            store.state.theme === 'dark'
-              ? 'tw:bg-gray-300/20'
-              : 'tw:bg-white/20'
-          "
-        ></div>
+        <div class="loading-progress__head-glow absolute inset-0 rounded-full bg-white/20"></div>
       </div>
     </div>
   </div>
@@ -68,7 +38,6 @@
 
 <script lang="ts">
 import { defineComponent, computed, ref, watch, onUnmounted } from "vue";
-import { useStore } from "vuex";
 
 export default defineComponent({
   name: "LoadingProgress",
@@ -87,7 +56,6 @@ export default defineComponent({
   },
 
   setup(props) {
-    const store = useStore();
     const lastLoadingState = ref(props.loading);
     const internalPercentage = ref(props.loadingProgressPercentage);
     const isFadingOut = ref(false);
@@ -96,6 +64,10 @@ export default defineComponent({
     watch(
       () => props.loading,
       (newValue, oldValue) => {
+        // Remember the previous loading state so shouldAnimate can stay
+        // true through the loading -> not-loading transition.
+        lastLoadingState.value = oldValue;
+
         if (oldValue && !newValue) {
           // When loading becomes false, quickly complete to 100% and start fade out
           internalPercentage.value = 100;
@@ -115,9 +87,7 @@ export default defineComponent({
     });
 
     const shouldAnimate = computed(() => {
-      const wasLoading = lastLoadingState.value;
-      lastLoadingState.value = props.loading;
-      return props.loading || wasLoading || isFadingOut.value;
+      return props.loading || lastLoadingState.value || isFadingOut.value;
     });
 
     const displayPercentage = computed(() => {
@@ -134,7 +104,6 @@ export default defineComponent({
     });
 
     return {
-      store,
       displayPercentage,
       shouldAnimate,
       isFadingOut,
@@ -143,7 +112,24 @@ export default defineComponent({
 });
 </script>
 
-<style>
+<style scoped>
+/* keep(keyframes): the gloss sweep and the head glow belong to this progress bar
+   alone. Both `animation`s are declared here rather than on the elements (one was
+   a template `[animation:…]` utility, one an inline `:style` binding) — Vue's
+   scoped compiler rewrites `animation` only inside this block, so keeping the
+   keyframe and its reference together here is what makes the rename resolve.
+   The scoped `[data-v-*]` attribute also lifts these rules above the `inset-0`
+   utility, so the shimmer's own `left` wins regardless of stylesheet order. */
+.loading-progress__shimmer {
+  width: 200%;
+  left: -200%;
+  animation: shimmer 1.5s infinite linear;
+}
+
+.loading-progress__head-glow {
+  animation: head-glow-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 @keyframes shimmer {
   0% {
     transform: translateX(-200%);
@@ -153,7 +139,7 @@ export default defineComponent({
   }
 }
 
-@keyframes pulse {
+@keyframes head-glow-pulse {
   0%,
   100% {
     opacity: 0.2;
@@ -161,9 +147,5 @@ export default defineComponent({
   50% {
     opacity: 0.4;
   }
-}
-
-.tw:animate-pulse {
-  animation: pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 </style>

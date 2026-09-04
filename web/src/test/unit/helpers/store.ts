@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,6 +14,34 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createStore } from "vuex";
+import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
+
+// Mirror of the initial organizationData below; used by resetOrganizationData.
+const organizationObj = {
+  organizationPasscode: "",
+  allDashboardList: {},
+  rumToken: {
+    rum_token: "",
+  },
+  // Mirror of the production organizationObj — see src/stores/index.ts.
+  correlatedTracesStreams: {
+    byTraceId: {} as Record<string, { stream: string; range?: TraceTimeRange }>,
+    knownStreams: [] as string[],
+  },
+  quotaThresholdMsg: "",
+  functions: [],
+  streams: {},
+  folders: [],
+  organizationSettings: {
+    scrape_interval: 15,
+    trace_id_field_name: "trace_id",
+    span_id_field_name: "span_id",
+  },
+  isDataIngested: false,
+  allDashboardData: {},
+  foldersByType: [],
+  allReportsListByFolderId: {},
+};
 
 const store = createStore({
   state: {
@@ -22,6 +50,18 @@ const store = createStore({
 
     theme: "dark",
     timezone: "UTC",
+    loggedIn: false,
+    organizations: [] as unknown[],
+    searchCollapsibleSection: 20,
+    printMode: false,
+    savedViewFlag: false,
+    savedFunctionDialog: false,
+    hiddenMenus: [] as unknown[],
+    allApiLimitsByOrgId: {} as Record<string, unknown>,
+    allRoleLimitsByOrgIdByRole: {} as Record<string, unknown>,
+    modulesToDisplay: {} as Record<string, unknown>,
+    currentChatTimestamp: null as number | null,
+    chatUpdated: false,
     selectedOrganization: {
       label: "default Organization",
       id: 159,
@@ -46,11 +86,39 @@ const store = createStore({
       iat: 1678689753,
       family_name: "example",
       email: "example@gmail.com",
-    },
+    } as Record<string, unknown>,
     savedViewDialog: false,
     regionInfo: [],
     zoConfig: {
+      service_account_enabled: true,
+      // Enterprise-shaped by default, which is what the synthetics specs were
+      // written against. The specs that cover the OSS shape set it to false
+      // themselves.
+      synthetics_private_locations_enabled: true,
       sql_mode: false,
+      sql_reserved_keywords: [
+        "all",
+        "current_catalog",
+        "current_date",
+        "current_time",
+        "current_timestamp",
+        "current_user",
+        "distinct",
+        "end-exec",
+        "exists",
+        "false",
+        "from",
+        "interval",
+        "localtime",
+        "localtimestamp",
+        "not",
+        "null",
+        "session_user",
+        "top",
+        "trim",
+        "true",
+        "user",
+      ],
       version: "v0.2.0",
       sql_mode_manual_trigger: false,
       commit_hash: "dc2b38c0f8be27bde395922d61134f09a3b4c",
@@ -89,7 +157,7 @@ const store = createStore({
       timestamp_column: "_timestamp",
       all_fields_name: "_all",
       default_secondary_index_fields: ["level"],
-      service_graph_enabled: true,
+      default_quick_mode_fields: [],
     },
     organizationData: {
       organizationPasscode: "",
@@ -99,7 +167,7 @@ const store = createStore({
       },
       quotaThresholdMsg: "",
       functions: [],
-      streams: {},
+      streams: {} as Record<string, unknown>,
       folders: [],
       organizationSettings: {
         scrape_interval: 15,
@@ -108,8 +176,32 @@ const store = createStore({
       },
       isDataIngested: false,
       allDashboardData: {},
+      allDashboardListHash: {},
       foldersByType: [],
-    }
+      allReportsListByFolderId: {},
+      allAlertsListByFolderId: {},
+      allAlertsListByNames: {},
+    },
+    alertListFilters: {
+      searchQuery: "",
+      filterQuery: "",
+      searchAcrossFolders: false,
+    },
+    githubDashboardGallery: {
+      dashboards: [] as any[],
+      lastFetched: null as number | null,
+      cacheExpiry: 300000,
+      dashboardJsonCache: {} as Record<string, any>,
+    },
+    // Mirrors the real store's alertLibrary block. Present here so that any
+    // component reading the library cache gets a defined shape in unit tests
+    // instead of dereferencing undefined.
+    alertLibrary: {
+      manifest: null as any,
+      lastFetched: null as number | null,
+      cacheExpiry: 10 * 60 * 1000,
+      fileCache: {} as Record<string, any>,
+    },
   },
   mutations: {
     login(state, payload) {
@@ -146,11 +238,20 @@ const store = createStore({
     setOrganizationPasscode(state, payload) {
       state.organizationData.organizationPasscode = payload;
     },
-    resetOrganizationData(state, payload) {
+    resetOrganizationData(state) {
       state.organizationData = JSON.parse(JSON.stringify(organizationObj));
     },
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
+    },
+    setCorrelatedTracesStream(
+      state,
+      payload: { traceId: string; stream: string; range?: TraceTimeRange },
+    ) {
+      const cache = state.organizationData.correlatedTracesStreams;
+      if (Object.keys(cache.byTraceId).length >= 1000) cache.byTraceId = {};
+      cache.byTraceId[payload.traceId] = { stream: payload.stream, range: payload.range };
+      if (!cache.knownStreams.includes(payload.stream)) cache.knownStreams.push(payload.stream);
     },
     // setAllCurrentDashboards(state, payload) {
     //   state.allCurrentDashboards = payload;
@@ -163,6 +264,9 @@ const store = createStore({
     },
     setAllAlertsListByFolderId(state, payload) {
       state.organizationData.allAlertsListByFolderId = payload;
+    },
+    setAllReportsListByFolderId(state, payload) {
+      state.organizationData.allReportsListByFolderId = payload;
     },
     setAllAlertsListByNames(state, payload) {
       state.organizationData.allAlertsListByNames = payload;
@@ -178,9 +282,6 @@ const store = createStore({
     },
     setFunctions(state, payload) {
       state.organizationData.functions = payload;
-    },
-    setActions(state, payload) {
-      state.organizationData.actions = payload;
     },
     setStreams(state, payload) {
       state.organizationData.streams[payload.name] = payload;
@@ -207,7 +308,11 @@ const store = createStore({
       state.organizationData.folders = payload;
     },
     setFoldersByType(state, payload) {
-      state.organizationData.foldersByType = payload;
+      // Mirrors the real store: merge per type, never replace the whole map.
+      state.organizationData.foldersByType = {
+        ...state.organizationData.foldersByType,
+        ...payload,
+      };
     },
     appTheme(state, payload) {
       state.theme = payload;
@@ -257,8 +362,37 @@ const store = createStore({
     setChatUpdated(state, payload) {
       state.chatUpdated = payload;
     },
-    clearPendingShortURL(state) {
+    clearPendingShortURL() {
       // Mock mutation for tests - clears pending short URL state
+    },
+    setAlertListFilters(state, payload) {
+      state.alertListFilters = { ...state.alertListFilters, ...payload };
+    },
+    setAlertLibraryManifest(state, payload) {
+      state.alertLibrary.manifest = payload;
+      state.alertLibrary.lastFetched = Date.now();
+    },
+    setAlertLibraryFile(state, payload) {
+      state.alertLibrary.fileCache[payload.id] = payload.file;
+    },
+    // In place, leaving cacheExpiry alone — same contract as the real store.
+    clearAlertLibrary(state) {
+      state.alertLibrary.manifest = null;
+      state.alertLibrary.lastFetched = null;
+      state.alertLibrary.fileCache = {};
+    },
+    setGithubDashboardGallery(state, payload) {
+      state.githubDashboardGallery = {
+        ...state.githubDashboardGallery,
+        dashboards: payload,
+        lastFetched: Date.now(),
+      };
+    },
+    setDashboardJsonCache(state, payload) {
+      state.githubDashboardGallery.dashboardJsonCache = {
+        ...state.githubDashboardGallery.dashboardJsonCache,
+        [payload.key]: payload.json,
+      };
     },
   },
   modules: {
@@ -274,7 +408,7 @@ const store = createStore({
         },
       },
       actions: {
-        setStreams(context: any, payload: any) {
+        setStreams() {
           // Mock action for setting streams
         },
       },
@@ -284,7 +418,7 @@ const store = createStore({
       state: {
         incidents: {},
         pageBeforeSearch: 1,
-        isInitialized: false
+        isInitialized: false,
       },
       getters: {
         getIncidents(state: any) {
@@ -315,16 +449,16 @@ const store = createStore({
       },
       actions: {
         setIncidents(context: any, incidents: any) {
-          context.commit('setIncidents', incidents);
+          context.commit("setIncidents", incidents);
         },
         setPageBeforeSearch(context: any, page: number) {
-          context.commit('setPageBeforeSearch', page);
+          context.commit("setPageBeforeSearch", page);
         },
         setIsInitialized(context: any, isInitialized: boolean) {
-          context.commit('setIsInitialized', isInitialized);
+          context.commit("setIsInitialized", isInitialized);
         },
         resetIncidents(context: any) {
-          context.commit('resetIncidents');
+          context.commit("resetIncidents");
         },
       },
     },
@@ -378,6 +512,9 @@ const store = createStore({
     setAllAlertsListByFolderId(context, payload) {
       context.commit("setAllAlertsListByFolderId", payload);
     },
+    setAllReportsListByFolderId(context, payload) {
+      context.commit("setAllReportsListByFolderId", payload);
+    },
     setAllAlertsListByNames(context, payload) {
       context.commit("setAllAlertsListByNames", payload);
     },
@@ -398,9 +535,6 @@ const store = createStore({
     },
     setFunctions(context, payload) {
       context.commit("setFunctions", payload);
-    },
-    setActions(context, payload) {
-      context.commit("setActions", payload);
     },
     setStreams(context, payload) {
       context.commit("setStreams", payload);

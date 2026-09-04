@@ -1,0 +1,228 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// WorkflowCondition is a THIN WRAPPER over the shared ConditionBuilder (which
+// has its own spec). What's tested here is the wrapper's own contract:
+//   - the fields it hands down are the fired-alert payload (ALERT_PAYLOAD_FIELDS)
+//   - the saved rule is read off workflowObj.currentSelectedNodeData
+//   - submit() proxies the builder and normalizes undefined -> null
+//   - the workflow-specific guidelines slot is rendered
+// The builder is stubbed so its internals (zod/FilterGroup) aren't re-tested.
+
+import { mount } from "@vue/test-utils";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+
+vi.mock("@/utils/zincutils", () => ({
+  getImageURL: (p: string) => p,
+  getUUID: () => "uuid",
+}));
+vi.mock("@/services/workflows", () => ({ default: {} }));
+
+const builderSubmit = vi.fn();
+vi.mock("@/components/flow/forms/ConditionBuilder.vue", () => ({
+  default: {
+    name: "ConditionBuilder",
+    props: {
+      fields: { default: () => [] },
+      initialConditions: { default: null },
+      normalizeOperators: { type: Boolean, default: false },
+      normalizeColumnNames: { type: Boolean, default: false },
+      optional: { type: Boolean, default: false },
+    },
+    methods: {
+      submit: (...args: any[]) => builderSubmit(...args),
+    },
+    template: '<div class="condition-builder-stub"><slot name="guidelines" /></div>',
+  },
+}));
+
+import { workflowObj } from "@/plugins/workflows/useWorkflowCanvas";
+import { ALERT_PAYLOAD_FIELDS } from "@/plugins/workflows/alertFields";
+import { INCIDENT_PAYLOAD_FIELDS } from "@/plugins/workflows/incidentFields";
+import WorkflowCondition from "./WorkflowCondition.vue";
+
+// The condition's field options come from the CURRENT trigger's kind, so seed a
+// trigger node in the graph. Default = alert; individual tests override it.
+const seedTrigger = (kind = "alert_fired") => {
+  workflowObj.currentSelectedWorkflow.nodes = [
+    { id: "t1", data: { node_type: "workflow_trigger", trigger_kind: kind } },
+  ];
+};
+
+function createWrapper() {
+  return mount(WorkflowCondition, {
+    global: {
+      plugins: [i18n, store],
+      stubs: {
+        OIcon: { name: "OIcon", props: ["name", "size"], template: '<i :data-name="name" />' },
+      },
+    },
+  });
+}
+
+describe("WorkflowCondition", () => {
+  beforeEach(() => {
+    workflowObj.currentSelectedNodeData = null;
+    seedTrigger();
+    builderSubmit.mockReset();
+  });
+  afterEach(() => {
+    workflowObj.currentSelectedNodeData = null;
+    workflowObj.currentSelectedWorkflow.nodes = [];
+    vi.clearAllMocks();
+  });
+
+  describe("props passed to the shared ConditionBuilder", () => {
+    it("renders the body and the shared builder", () => {
+      const wrapper = createWrapper();
+      expect(wrapper.find('[data-test="workflow-condition-body"]').exists()).toBe(true);
+      expect(wrapper.findComponent({ name: "ConditionBuilder" }).exists()).toBe(true);
+    });
+
+    it("passes the fired-alert payload fields (ALERT_PAYLOAD_FIELDS) for an alert trigger", () => {
+      seedTrigger("alert_fired");
+      const wrapper = createWrapper();
+      const fields = wrapper.findComponent({ name: "ConditionBuilder" }).props("fields");
+      expect(fields).toEqual(ALERT_PAYLOAD_FIELDS);
+      // sanity: these are the flattened `meta_*` columns, not stream fields
+      expect(fields.map((f: any) => f.value)).toContain("meta_alert_name");
+    });
+
+    it("passes the incident payload fields for an incident trigger", () => {
+      seedTrigger("incident_event");
+      const wrapper = createWrapper();
+      const fields = wrapper.findComponent({ name: "ConditionBuilder" }).props("fields");
+      expect(fields).toEqual(INCIDENT_PAYLOAD_FIELDS);
+      expect(fields.map((f: any) => f.value)).toContain("meta_event_type");
+    });
+
+    it("passes no fields when the workflow has no trigger", () => {
+      workflowObj.currentSelectedWorkflow.nodes = [];
+      const wrapper = createWrapper();
+      expect(wrapper.findComponent({ name: "ConditionBuilder" }).props("fields")).toEqual([]);
+    });
+
+    it("passes null initial-conditions when there is no selected node data", () => {
+      const wrapper = createWrapper();
+      expect(
+        wrapper.findComponent({ name: "ConditionBuilder" }).props("initialConditions"),
+      ).toBeNull();
+    });
+
+    it("passes null initial-conditions when the node has no saved conditions", () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "n1",
+        data: { node_type: "condition" },
+      } as any;
+      const wrapper = createWrapper();
+      expect(
+        wrapper.findComponent({ name: "ConditionBuilder" }).props("initialConditions"),
+      ).toBeNull();
+    });
+
+    it("passes the saved rule through as initial-conditions", () => {
+      const saved = {
+        filterType: "group",
+        logicalOperator: "AND",
+        conditions: [
+          {
+            filterType: "condition",
+            column: "meta_alert_name",
+            operator: "=",
+            value: "High Error Rate",
+          },
+        ],
+      };
+      workflowObj.currentSelectedNodeData = {
+        id: "n1",
+        data: { node_type: "condition", conditions: saved },
+      } as any;
+      const wrapper = createWrapper();
+      expect(
+        wrapper.findComponent({ name: "ConditionBuilder" }).props("initialConditions"),
+      ).toEqual(saved);
+    });
+  });
+
+  describe("guidelines slot", () => {
+    it("renders the workflow-specific note inside the builder's guidelines slot", () => {
+      const wrapper = createWrapper();
+      const note = wrapper.find('[data-test="workflow-condition-note"]');
+      expect(note.exists()).toBe(true);
+      // Only the custom-column bullet remains — the null/empty value hints are
+      // obsolete now that dedicated is_null/is_empty operators exist. Count the
+      // BULLET icons specifically — the note also carries a dismiss button, so
+      // a blanket icon count breaks whenever its chrome changes.
+      expect(note.findAll('[data-name="info"]').length).toBe(1);
+    });
+  });
+
+  describe("submit()", () => {
+    // The builder is `optional`, so it returns { version, conditions, complete }.
+    // The wrapper strips `complete` (it must not persist into node data) and sets
+    // the node's incomplete flag from it.
+    it("returns { version, conditions } (complete stripped) for a complete rule", async () => {
+      workflowObj.currentSelectedNodeData = { id: "c1", data: { node_type: "condition" } } as any;
+      const conditions = { filterType: "group" };
+      builderSubmit.mockResolvedValue({ version: 2, conditions, complete: true });
+      const wrapper = createWrapper();
+      await expect((wrapper.vm as any).submit()).resolves.toEqual({ version: 2, conditions });
+      expect(builderSubmit).toHaveBeenCalledTimes(1);
+    });
+
+    it("clears meta.incomplete when the rule is complete", async () => {
+      workflowObj.currentSelectedNodeData = {
+        id: "c1",
+        data: { node_type: "condition" },
+        meta: { incomplete: "true" },
+      } as any;
+      builderSubmit.mockResolvedValue({ version: 2, conditions: {}, complete: true });
+      const wrapper = createWrapper();
+      await (wrapper.vm as any).submit();
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBeUndefined();
+    });
+
+    it("flags meta.incomplete when the rule is incomplete (placeholder)", async () => {
+      workflowObj.currentSelectedNodeData = { id: "c1", data: { node_type: "condition" } } as any;
+      builderSubmit.mockResolvedValue({ version: 2, conditions: {}, complete: false });
+      const wrapper = createWrapper();
+      const payload = await (wrapper.vm as any).submit();
+      expect(payload).toEqual({ version: 2, conditions: {} });
+      expect(workflowObj.currentSelectedNodeData.meta?.incomplete).toBe("true");
+    });
+
+    it("resolves null when the builder returns null", async () => {
+      builderSubmit.mockResolvedValue(null);
+      const wrapper = createWrapper();
+      await expect((wrapper.vm as any).submit()).resolves.toBeNull();
+    });
+  });
+
+  it("opts into custom-column normalization on the shared builder", () => {
+    const wrapper = createWrapper();
+    // ConditionBuilder normalizes dotted custom columns to the flattened form; the
+    // workflow condition turns it on (its trigger payload is flattened).
+    expect(wrapper.findComponent({ name: "ConditionBuilder" }).props("normalizeColumnNames")).toBe(
+      true,
+    );
+  });
+
+  it("renders the builder as optional (incomplete rule = placeholder)", () => {
+    const wrapper = createWrapper();
+    expect(wrapper.findComponent({ name: "ConditionBuilder" }).props("optional")).toBe(true);
+  });
+});

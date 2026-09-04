@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,51 +17,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-dialog>
-    <q-card style="width: 300px" data-test="dialog-box">
-      <q-card-section class="confirmBody">
-        <div class="head" data-test="dashboard-tab-move-title">{{ title }}</div>
-        <div class="para" data-test="dashboard-tab-move-message">
-          {{ message }}
-        </div>
-      </q-card-section>
-
-      <div
-        style="
-          display: flex;
-          flex-direction: row;
-          width: 100%;
-          height: 40px;
-          padding-left: 10px;
-          padding-right: 10px;
-          padding-top: 5px;
-        "
-      >
-        <q-select
-          dense
-          label="Select Tab"
+  <ODialog
+    data-test="single-panel-move-dialog"
+    v-model:open="open"
+    size="sm"
+    :title="title"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('dashboard.singlePanelMove.move')"
+    :primary-button-disabled="selectedMoveTabId === null"
+    @click:secondary="onCancel"
+    @click:primary="onConfirm"
+  >
+    <div>
+      <p class="text-sm">{{ message }}</p>
+      <div class="flex items-center gap-2">
+        <OSelect
+          :label="t('dashboard.singlePanelMove.selectTab')"
           v-model="selectedMoveTabId"
           :options="moveTabOptions"
-          class="select-container o2-custom-select-dashboard"
+          class="flex-1"
           data-test="dashboard-tab-move-select"
-         borderless hide-bottom-space>
-          <!-- template when on options -->
-          <template v-slot:no-option>
-            <q-item data-test="dashboard-tab-move-select-no-option">
-              <q-item-section class="text-italic text-grey">
-                No Other Tabs Available
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+          label-position="inside"
+        />
 
-        <q-btn
-          class="text-bold el-border"
-          no-caps
-          outline
-          rounded
-          icon="add"
-          style="padding: 10px; height: 40px; margin-left: 2px"
+        <OButton
+          variant="outline"
+          size="sm"
           @click="
             () => {
               isTabEditMode = false;
@@ -69,78 +50,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           "
           data-test="dashboard-tab-move-add-tab-btn"
-          ><q-tooltip>Add Tab</q-tooltip></q-btn
+          icon-left="add"
         >
-        <q-dialog
-          v-model="showAddTabDialog"
-          position="right"
-          full-height
-          maximized
-        >
-          <AddTab
-            :edit-mode="isTabEditMode"
-            :tabId="selectedTabIdToEdit"
-            :dashboard-id="currentDashboardData.data.dashboardId"
-            @refresh="refreshRequired"
-            data-test="dashboard-tab-move-add-tab-dialog"
-          />
-        </q-dialog>
+          <template #icon-left><OIcon name="add" size="sm" /></template>
+          <OTooltip :content="t('dashboard.singlePanelMove.addTab')" />
+        </OButton>
+        <AddTab
+          v-model:open="showAddTabDialog"
+          :edit-mode="isTabEditMode"
+          :tabId="selectedTabIdToEdit"
+          :dashboard-id="currentDashboardData.data.dashboardId"
+          @refresh="refreshRequired"
+          data-test="dashboard-tab-move-add-tab-dialog"
+        />
       </div>
-      <q-card-actions class="confirmActions">
-        <div class="button-container">
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            flat
-            @click="onCancel"
-            data-test="cancel-button"
-          >
-            {{ t("confirmDialog.cancel") }}
-          </q-btn>
-          <q-btn
-            v-close-popup="true"
-            unelevated
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            @click="onConfirm"
-            data-test="confirm-button"
-            :disable="selectedMoveTabId === null"
-          >
-            Move
-          </q-btn>
-        </div>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { getDashboard } from "@/utils/commons";
 import { reactive } from "vue";
 import { onMounted } from "vue";
-import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useRoute } from "vue-router";
 import { useStore } from "vuex";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "SinglePanelMove",
-  components: { AddTab },
-  emits: ["update:ok", "update:cancel", "refresh"],
-  props: ["title", "message"],
+  components: { AddTab, OButton, OSelect, ODialog, OTooltip, OIcon },
+  emits: ["update:ok", "update:cancel", "refresh", "update:modelValue"],
+  props: ["title", "message", "modelValue"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const route = useRoute();
     const action = ref("delete");
-    const selectedMoveTabId: any = ref(null);
+    const selectedMoveTabId = ref<string | null>(null);
     const showAddTabDialog = ref(false);
     const isTabEditMode = ref(false);
     const selectedTabIdToEdit = ref(null);
+
+    const open = computed({
+      get: () => !!props.modelValue,
+      set: (v: boolean) => emit("update:modelValue", v),
+    });
 
     const moveTabOptions = ref([]);
 
@@ -152,7 +113,7 @@ export default defineComponent({
       currentDashboardData.data = await getDashboard(
         store,
         route.query.dashboard,
-        route.query.folder ?? "default"
+        route.query.folder ?? "default",
       );
     };
 
@@ -180,7 +141,7 @@ export default defineComponent({
       await getTabOptions();
 
       // set selectedMoveTabId to newly created tab
-      selectedMoveTabId.value = { label: tabData.name, value: tabData.tabId };
+      selectedMoveTabId.value = tabData.tabId;
 
       // close add tab dialog
       showAddTabDialog.value = false;
@@ -190,7 +151,7 @@ export default defineComponent({
       await getTabOptions();
       // set selectedMoveTabId to first tab from move tab options
       selectedMoveTabId.value =
-        moveTabOptions.value.length > 0 ? moveTabOptions.value[0] : null;
+        moveTabOptions.value.length > 0 ? (moveTabOptions.value[0] as any).value : null;
     });
 
     const onCancel = () => {
@@ -198,10 +159,11 @@ export default defineComponent({
     };
 
     const onConfirm = () => {
-      emit("update:ok", selectedMoveTabId.value.value);
+      emit("update:ok", selectedMoveTabId.value);
     };
     return {
       t,
+      open,
       onCancel,
       onConfirm,
       action,
@@ -217,9 +179,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.select-container {
-  width: 100%;
-}
-</style>

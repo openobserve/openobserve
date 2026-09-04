@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,204 +15,276 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    data-test="report-list-page"
-    class="flex q-mt-xs"
-  >
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
-      <div class="card-container tw:mb-[0.625rem]">
-        <div class="tw:flex tw:justify-between tw:items-center tw:w-full tw:py-3 tw:px-4 tw:h-[68px]">
-          <div class="q-table__title tw:font-[600]" data-test="report-list-title">
-            {{ t("reports.header") }}
-          </div>
+  <div data-test="report-list-page" class="h-full">
+    <OPageLayout
+      bleed
+      :title="t('reports.header')"
+      title-data-test="report-list-title"
+      icon="description"
+      :subtitle="t('reports.subtitle')"
+    >
+      <template #actions>
+        <OButton
+          data-test="report-list-add-report-btn"
+          variant="primary"
+          size="sm"
+          @click="createNewReport"
+        >
+          {{ t(`reports.add`) }}
+        </OButton>
+      </template>
 
-          <div class="tw:flex tw:items-center">
-            <div class="app-tabs-container q-mr-sm">
-            <app-tabs
-              class="tabs-selection-container"
-              :tabs="tabs"
-              v-model:active-tab="activeTab"
-              @update:active-tab="filterReports"
-            />
-            </div>
-            <q-input
-              data-test="report-list-search-input"
-              v-model="filterQuery"
-              borderless
-              dense
-              class="q-ml-auto no-border o2-search-input tw:h-[36px] tw:w-[150px]"
-              :placeholder="t('reports.search')"
+      <!-- Folder rail (fixed width) + table — matches the Alerts layout. -->
+      <div data-test="report-list-splitter" class="report-list-table flex min-h-0 flex-1">
+        <!-- Left: folder list -->
+        <div class="w-rail h-full shrink-0">
+          <div class="h-full">
+            <FolderList type="reports" @update:activeFolderId="updateActiveFolderId" />
+          </div>
+        </div>
+
+        <!-- Right: report table -->
+        <div class="h-full min-w-0 flex-1">
+          <div class="bg-card-glass-bg h-full">
+            <OTable
+              data-test="report-list-table"
+              :data="visibleRows"
+              :columns="columns"
+              row-key="report_id"
+              :frame="false"
+              :loading="isLoadingReports"
+              pagination="client"
+              selection="multiple"
+              v-model:selected-ids="selectedReportIds"
+              class="h-full w-full"
+              :show-global-filter="false"
+              :enable-column-resize="true"
+              :persist-columns="true"
+              :default-columns="false"
+              show-index
+              table-id="reports-report-list"
             >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
+              <!-- Toolbar: Scheduled/Cached tabs + search (inline folder scope) + refresh -->
+              <template #toolbar>
+                <div class="flex w-full items-center gap-2">
+                  <div class="app-tabs-container">
+                    <AppTabs
+                      class="tabs-selection-container"
+                      :tabs="tabs"
+                      v-model:active-tab="activeTab"
+                      @update:active-tab="
+                        () => {
+                          invalidateFolderCache(activeFolderId);
+                          loadReports(activeFolderId);
+                        }
+                      "
+                    />
+                  </div>
+                  <div class="min-w-0 flex-1">
+                    <OInput
+                      v-model="dynamicQueryModel"
+                      :placeholder="
+                        searchAcrossFolders ? t('dashboard.searchAcross') : t('reports.search')
+                      "
+                      :clearable="searchAcrossFolders"
+                      @clear="clearSearch"
+                      data-test="report-list-search-input"
+                      class="w-full"
+                    >
+                      <template #icon-left>
+                        <OIcon name="search" size="sm" />
+                      </template>
+                      <template #icon-right>
+                        <OToggleGroup
+                          :model-value="searchAcrossFolders ? 'all' : 'this'"
+                          type="single"
+                          class="me-1 self-center"
+                          @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
+                        >
+                          <OToggleGroupItem
+                            value="this"
+                            size="xs"
+                            icon-left="folder-outline"
+                            data-test="report-list-search-scope-current"
+                            :title="t('reports.searchThisFolderTitle')"
+                            >{{ t("reports.searchThisFolder") }}</OToggleGroupItem
+                          >
+                          <OToggleGroupItem
+                            value="all"
+                            size="xs"
+                            icon-left="search"
+                            data-test="report-list-search-across-folders-toggle"
+                            :title="t('reports.searchAllFoldersTitle')"
+                            >{{ t("reports.searchAllFolders") }}</OToggleGroupItem
+                          >
+                        </OToggleGroup>
+                      </template>
+                    </OInput>
+                  </div>
+                </div>
               </template>
-            </q-input>
-            <q-btn
-              data-test="report-list-add-report-btn"
-              class="q-ml-sm o2-primary-button tw:h-[36px]"
-              flat
-              no-caps
-              :label="t(`reports.add`)"
-              @click="createNewReport"
-            />
+              <template #toolbar-trailing>
+                <OButton
+                  variant="outline"
+                  size="icon-sm"
+                  icon-left="refresh"
+                  :loading="isLoadingReports"
+                  data-test="report-list-refresh-btn"
+                  @click="
+                    () => {
+                      invalidateFolderCache(activeFolderId);
+                      loadReports(activeFolderId);
+                    }
+                  "
+                >
+                  <OTooltip
+                    side="bottom"
+                    :content="t('reports.reloadReports')"
+                    shortcut-id="reportsRefresh"
+                  />
+                </OButton>
+              </template>
+              <template #empty>
+                <OEmptyState
+                  size="hero"
+                  preset="no-reports"
+                  :filtered="!!(filterQuery || searchQuery)"
+                  @action="
+                    (id) =>
+                      id === 'clear-filters'
+                        ? ((filterQuery = ''), (searchQuery = ''))
+                        : createNewReport()
+                  "
+                />
+              </template>
+
+              <!-- Name column: badges for type/preview -->
+              <template #cell-name="{ row }">
+                <span :data-test="`report-list-name-cell-${row.name}`">{{ row.name }}</span>
+                <OTag
+                  v-if="row.dashboards?.[0]?.report_type === 'png'"
+                  type="reportTag"
+                  value="png"
+                  class="ms-1"
+                />
+                <OTag v-if="row.imagePreview" type="reportTag" value="preview" class="ms-1" />
+              </template>
+
+              <!-- Owner column -->
+              <template #cell-owner="{ row }">
+                <OUserCell :value="row.owner" />
+              </template>
+
+              <!-- Folder column -->
+              <template #cell-folder_name="{ row }">
+                {{ row.folder_name || t("common.defaultLabel") }}
+              </template>
+
+              <!-- Last triggered timestamp -->
+              <template #cell-last_triggered_at="{ row }">
+                <OTimeCell
+                  :value="row.last_triggered_at_raw"
+                  unit="us"
+                  mode="absolute"
+                  :timezone="store.state.timezone"
+                  :empty-label="t('reports.never')"
+                />
+              </template>
+
+              <!-- Actions column -->
+              <template #cell-actions="{ row }">
+                <!-- Enable/disable toggle -->
+                <div
+                  v-if="reportsStateLoadingMap[row.report_id]"
+                  data-test="report-list-toggle-report-state-loader"
+                  style="display: inline-block; width: 2.07125rem"
+                  class="flex h-auto items-center justify-center"
+                >
+                  <OSpinner size="xs" />
+                </div>
+                <OButton
+                  v-else
+                  :data-test="`report-list-${row.name}-pause-start-report`"
+                  :data-row-action="row.enabled ? 'pause' : 'resume'"
+                  :variant="row.enabled ? 'ghost-destructive' : 'ghost'"
+                  size="icon-sm"
+                  :icon-left="row.enabled ? 'pause' : 'play-arrow'"
+                  :title="row.enabled ? t('alerts.pause') : t('alerts.start')"
+                  @click="toggleReportState(row)"
+                />
+
+                <!-- Edit -->
+                <OButton
+                  :data-test="`report-list-${row.name}-edit-report`"
+                  data-row-action="edit"
+                  icon-left="edit"
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('alerts.edit')"
+                  @click="editReport(row)"
+                />
+
+                <!-- Move to folder -->
+                <OButton
+                  :data-test="`report-list-${row.name}-move-report`"
+                  icon-left="drive-file-move"
+                  variant="ghost"
+                  size="icon-sm"
+                  :title="t('reports.moveToFolder')"
+                  @click="openMoveDialog(row)"
+                />
+
+                <!-- Delete -->
+                <OButton
+                  :data-test="`report-list-${row.name}-delete-report`"
+                  data-row-action="delete"
+                  icon-left="delete"
+                  variant="ghost-destructive"
+                  size="icon-sm"
+                  :title="t('alerts.delete')"
+                  @click="confirmDeleteReport(row)"
+                />
+              </template>
+
+              <!-- Table footer: pagination + bulk actions -->
+              <template #bottom>
+                <div class="flex h-12 w-full items-center justify-between">
+                  <!-- Left: count + action buttons grouped together -->
+                  <div class="flex items-center gap-2">
+                    <div class="flex items-center text-xs font-normal whitespace-nowrap">
+                      {{ resultTotal }} {{ t("reports.header") }}
+                    </div>
+                    <OButton
+                      v-if="selectedReports.length > 0"
+                      data-test="report-list-move-reports-btn"
+                      icon-left="drive-file-move"
+                      variant="outline"
+                      size="sm-action"
+                      @click="moveMultipleReports"
+                    >
+                      {{ t("common.move") }}
+                    </OButton>
+                    <OButton
+                      v-if="selectedReports.length > 0"
+                      data-test="report-list-delete-reports-btn"
+                      icon-left="delete"
+                      variant="outline-destructive"
+                      size="sm-action"
+                      :loading="bulkDeleteLoading"
+                      @click="openBulkDeleteDialog"
+                    >
+                      {{ t("common.delete") }}
+                    </OButton>
+                  </div>
+                </div>
+              </template>
+            </OTable>
           </div>
         </div>
       </div>
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container full-width o2-quasar-table o2-row-md o2-quasar-table-header-sticky tw:h-[calc(100vh-128px)]">
-          <q-table
-            data-test="report-list-table"
-            ref="reportListTableRef"
-            :rows="visibleRows"
-            :columns="columns"
-            row-key="name"
-            :pagination="pagination"
-            :filter="filterQuery"
-            :filter-method="filterData"
-            selection="multiple"
-            v-model:selected="selectedReports"
-            style="width: 100%"
-            :style="hasVisibleRows
-                ? 'width: 100%; height: calc(100vh - 124px)'
-                : 'width: 100%'"
-            class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-          >
-            <template #no-data>
-              <NoData />
-            </template>
+    </OPageLayout>
 
-            <template v-slot:body-cell-actions="props">
-              <q-td :props="props">
-                <div
-                  v-if="reportsStateLoadingMap[props.row.uuid]"
-                  data-test="report-list-toggle-report-state-loader"
-                  style="display: inline-block; width: 33.14px; height: auto"
-                  class="flex justify-center items-center"
-                  :title="`Turning ${props.row.enabled ? 'Off' : 'On'}`"
-                >
-                  <q-circular-progress
-                    indeterminate
-                    rounded
-                    size="16px"
-                    :value="1"
-                    color="secondary"
-                  />
-                </div>
-                <q-btn
-                  v-else
-                  :data-test="`report-list-${props.row.name}-pause-start-report`"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  :color="props.row.enabled ? 'negative' : 'positive'"
-                  :icon="props.row.enabled ? outlinedPause : outlinedPlayArrow"
-                  round
-                  flat
-                  :title="props.row.enabled ? t('alerts.pause') : t('alerts.start')"
-                  @click="toggleReportState(props.row)"
-                >
-              </q-btn>
-                <q-btn
-                  :data-test="`report-list-${props.row.name}-edit-report`"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  icon="edit"
-                  :title="t('alerts.edit')"
-                  @click="editReport(props.row)"
-                >
-              </q-btn>
-                <q-btn
-                  :data-test="`report-list-${props.row.name}-delete-report`"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :icon="outlinedDelete"
-                  :title="t('alerts.delete')"
-                  @click="confirmDeleteReport(props.row)"
-                >
-              </q-btn>
-              </q-td>
-            </template>
-
-            <template v-slot:body-cell-function="props">
-              <q-td :props="props">
-                <q-tooltip>
-                  <pre>{{ props.row.sql }}</pre>
-                </q-tooltip>
-                <pre style="white-space: break-spaces">{{ props.row.sql }}</pre>
-              </q-td>
-            </template>
-
-            <template v-slot:body-selection="scope">
-              <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
-            </template>
-
-            <template #bottom="scope">
-              <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-                <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-md">
-                      {{ resultTotal }} {{ t('reports.header') }}
-                    </div>
-                <q-btn
-                  v-if="selectedReports.length > 0"
-                  data-test="report-list-delete-reports-btn"
-                  class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-                  :class="
-                    store.state.theme === 'dark'
-                      ? 'o2-secondary-button-dark'
-                      : 'o2-secondary-button-light'
-                  "
-                  no-caps
-                  dense
-                  @click="openBulkDeleteDialog"
-                >
-                  <q-icon name="delete" size="16px" />
-                  <span class="tw:ml-2">Delete</span>
-                </q-btn>
-                <QTablePagination
-                :scope="scope"
-                :position="'bottom'"
-                :resultTotal="resultTotal"
-                :perPageOptions="perPageOptions"
-                @update:changeRecordPerPage="changePagination"
-              />
-              </div>
-
-            </template>
-
-            <template v-slot:header="props">
-                <q-tr :props="props">
-                  <!-- Adding this block to render the select-all checkbox -->
-                  <q-th v-if="columns.length > 0" auto-width>
-                    <q-checkbox
-                      v-model="props.selected"
-                      size="sm"
-                      :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                      class="o2-table-checkbox"
-                    />
-                  </q-th>
-
-                  <!-- Rendering the rest of the columns -->
-                  <q-th
-                    v-for="col in props.cols"
-                    :key="col.name"
-                    :props="props"
-                    :class="col.classes"
-                    :style="col.style"
-                  >
-                    {{ col.label }}
-                  </q-th>
-                </q-tr>
-              </template>
-          </q-table>
-        </div>
-      </div>
-    </div>
-
+    <!-- Single delete confirm -->
     <ConfirmDialog
       v-model="deleteDialog.show"
       :title="deleteDialog.title"
@@ -221,525 +293,608 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @update:cancel="deleteDialog.show = false"
     />
 
+    <!-- Bulk delete confirm -->
     <ConfirmDialog
       v-model="confirmBulkDelete"
-      title="Delete Reports"
-      :message="`Are you sure you want to delete ${selectedReports.length} report(s)?`"
+      :title="t('reports.deleteReportsTitle')"
+      :message="t('reports.deleteReportsMsg', { count: selectedReports.length })"
       @update:ok="bulkDeleteReports"
       @update:cancel="confirmBulkDelete = false"
+    />
+
+    <!-- Move to folder dialog -->
+    <MoveAcrossFolders
+      v-model:open="showMoveDialog"
+      :activeFolderId="activeFolderToMove"
+      :moduleId="reportIdsToMove"
+      type="reports"
+      @updated="onMoveUpdated"
+      data-test="report-move-to-another-folder-dialog"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onBeforeMount, reactive, computed, watch } from "vue";
+import { ref, onBeforeMount, reactive, computed, watch, defineAsyncComponent } from "vue";
 import type { Ref } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-} from "@quasar/extras/material-icons-outlined";
-import { useQuasar, date, type QTableProps } from "quasar";
-import { useI18n } from "vue-i18n";
+import FolderList from "@/components/common/sidebar/FolderList.vue";
+import { convertUnixToDateFormat } from "@/utils/date";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
+import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { useI18nTyped } from "@/types/i18n";
 import reports from "@/services/reports";
-import { cloneDeep } from "lodash-es";
+import { debounce } from "lodash-es";
 import AppTabs from "@/components/common/AppTabs.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { getFoldersListByType } from "@/utils/commons";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { COL } from "@/lib/core/Table/OTable.types";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 
-const reportsTableRows: Ref<any[]> = ref([]);
+const MoveAcrossFolders = defineAsyncComponent(
+  () => import("@/components/common/sidebar/MoveAcrossFolders.vue"),
+);
 
-const { t } = useI18n();
-
+const { t } = useI18nTyped();
 const router = useRouter();
-
 const { track } = useReo();
-
-const confirmDelete = ref(false);
-
 const store = useStore();
 
-const editingReport: any = ref(null);
+// ── Folder state ──────────────────────────────────────────────────────────────
+const activeFolderId = ref<string>((router.currentRoute.value.query.folder as string) ?? "default");
+const searchAcrossFolders = ref(false);
 
-const q = useQuasar();
+const showMoveDialog = ref(false);
+const activeFolderToMove = ref("default");
+const reportIdsToMove = ref<string[]>([]);
 
-const isLoadingReports = ref(false);
-
+// ── Report list state ─────────────────────────────────────────────────────────
+const reportsTableRows: Ref<any[]> = ref([]);
+const staticReportsList: Ref<any[]> = ref([]);
+// Start in the loading state so the table shows the skeleton on first render
+// instead of briefly flashing the empty state before the fetch completes.
+const isLoadingReports = ref(true);
 const activeTab = ref("shared");
+const filterQuery = ref(""); // client-side filter within current folder
+const searchQuery = ref(""); // API search across all folders
+const cachedFolderReports = ref<any[]>([]); // current folder's reports before cross-folder search
 
-const tabs = reactive([
-  {
-    label: t("reports.scheduled"),
-    value: "shared",
+const dynamicQueryModel = computed({
+  get() {
+    return searchAcrossFolders.value ? searchQuery.value : filterQuery.value;
   },
-  {
-    label: t("reports.cached"),
-    value: "cached",
+  set(value: string) {
+    if (searchAcrossFolders.value) searchQuery.value = value;
+    else filterQuery.value = value;
   },
-]);
-
-const perPageOptions: any = [
-  { label: "20", value: 20 },
-  { label: "50", value: 50 },
-  { label: "100", value: 100 },
-  { label: "250", value: 250 },
-  { label: "500", value: 500 },
-];
-const resultTotal = ref<number>(0);
-const maxRecordToReturn = ref<number>(100);
-const selectedPerPage = ref<number>(20);
-const pagination: any = ref({
-  rowsPerPage: 20,
 });
 
+const selectedReportIds = ref<string[]>([]);
+const selectedReports = computed({
+  get: () =>
+    (reportsTableRows.value || []).filter((row: any) =>
+      selectedReportIds.value.includes(row.report_id),
+    ),
+  set: (val) => {
+    selectedReportIds.value = val.map((row: any) => row.report_id);
+  },
+});
 const reportsStateLoadingMap: Ref<{ [key: string]: boolean }> = ref({});
 
-const filterQuery = ref("");
+const tabs = reactive([
+  { label: t("reports.scheduled"), value: "shared", icon: "schedule" },
+  { label: t("reports.cached"), value: "cached", icon: "database" },
+]);
+
+const resultTotal = ref<number>(0);
 
 const deleteDialog = ref({
   show: false,
-  title: "Delete Report",
-  message: "Are you sure you want to delete report?",
-  data: "" as any,
+  title: t("reports.deleteReportTitle"),
+  message: t("reports.deleteReportMessage"),
+  data: null as any, // { report_id, name }
 });
-
 const confirmBulkDelete = ref<boolean>(false);
+const bulkDeleteLoading = ref<boolean>(false);
 
-const selectedReports = ref<any[]>([]);
+const columns = computed<OTableColumnDef[]>(() => {
+  const base: OTableColumnDef[] = [
+    {
+      id: "name",
+      header: t("alerts.name"),
+      accessorKey: "name",
+      cell: " ",
+      sortable: true,
+      resizable: true,
+      hideable: true,
+      size: COL.name,
+      minSize: 160,
+      meta: { align: "left", flex: true },
+    },
+    {
+      id: "owner",
+      header: t("alerts.owner"),
+      accessorKey: "owner",
+      sortable: true,
+      resizable: true,
+      hideable: true,
+      size: COL.owner,
+    },
+    {
+      id: "description",
+      header: t("alerts.description"),
+      accessorKey: "description",
+      sortable: false,
+      resizable: true,
+      hideable: true,
+      size: COL.description,
+      meta: { align: "left" },
+    },
+    {
+      id: "last_triggered_at",
+      header: t("alerts.lastTriggered"),
+      accessorKey: "last_triggered_at",
+      sortable: true,
+      resizable: true,
+      hideable: true,
+      size: COL.dateAbsolute,
+      meta: { align: "left" },
+    },
+    {
+      id: "actions",
+      header: t("alerts.actions"),
+      isAction: true,
+      size: 150,
+      meta: { align: "center", cellClass: "actions-column", actionCount: 4 },
+    },
+  ];
 
-const reportListTableRef: Ref<any> = ref(null);
-
-const staticReportsList: Ref<any[]> = ref([]);
-
-const columns: any = ref<QTableProps["columns"]>([
-  {
-    name: "#",
-    label: "#",
-    field: "#",
-    align: "center",
-    style: "width: 67px;",
-  },
-  {
-    name: "name",
-    field: "name",
-    label: t("alerts.name"),
-    align: "left",
-    sortable: true,
-  },
-  {
-    name: "owner",
-    field: "owner",
-    label: t("alerts.owner"),
-    align: "center",
-    sortable: true,
-    style: "width: 150px",
-  },
-  {
-    name: "description",
-    field: "description",
-    label: t("alerts.description"),
-    align: "center",
-    sortable: false,
-    style: "width: 300px",
-  },
-  {
-    name: "last_triggered_at",
-    field: "last_triggered_at",
-    label: t("alerts.lastTriggered"),
-    align: "left",
-    sortable: true,
-    style: "width: 150px",
-  },
-  {
-    name: "actions",
-    field: "actions",
-    label: t("alerts.actions"),
-    align: "center",
-    sortable: false,
-    classes: "actions-column",
-  },
-]);
-
-onBeforeMount(() => {
-  isLoadingReports.value = true;
-
-  const dismiss = q.notify({
-    spinner: true,
-    message: "Please wait while fetching reports...",
-    timeout: 2000,
-  });
-
-  reports
-    .list(store.state.selectedOrganization.identifier)
-    .then((res: any) => {
-      reportsTableRows.value = res.data.map((report: any, index: number) => ({
-        "#": index + 1,
-        ...report,
-        last_triggered_at: report.last_triggered_at
-          ? convertUnixToQuasarFormat(report.last_triggered_at)
-          : "-",
-      }));
-      resultTotal.value = reportsTableRows.value.length;
-      staticReportsList.value = JSON.parse(
-        JSON.stringify(reportsTableRows.value),
-      );
-      filterReports();
-    })
-    .catch((err) => {
-      if (err.response.status != 403) {
-        q.notify({
-          type: "negative",
-          message: err?.data?.message || "Error while fetching reports!",
-          timeout: 3000,
-        });
-      }
-    })
-    .finally(() => {
-      isLoadingReports.value = false;
-      dismiss();
+  if (searchAcrossFolders.value && searchQuery.value !== "") {
+    base.splice(2, 0, {
+      id: "folder_name",
+      header: t("reports.folder"),
+      accessorKey: "folder_name",
+      cell: " ",
+      sortable: true,
+      resizable: true,
+      hideable: true,
+      size: COL.folder,
+      meta: { align: "left" },
     });
+  }
+
+  return base;
 });
 
-const changePagination = (val: { label: string; value: any }) => {
-  selectedPerPage.value = val.value;
-  pagination.value.rowsPerPage = val.value;
-  reportListTableRef.value?.setPagination(pagination.value);
-};
-
-function convertUnixToQuasarFormat(unixMicroseconds: any) {
-  if (!unixMicroseconds) return "";
-  const unixSeconds = unixMicroseconds / 1e6;
-  const dateToFormat = new Date(unixSeconds * 1000);
-  const formattedDate = dateToFormat.toISOString();
-  return date.formatDate(formattedDate, "YYYY-MM-DDTHH:mm:ssZ");
-}
-
-
-
-const filterData = (rows: any, terms: any) => {
-  var filtered = [];
-  terms = terms.toLowerCase();
-  for (var i = 0; i < rows.length; i++) {
-    if (rows[i]["name"].toLowerCase().includes(terms)) {
-      filtered.push(rows[i]);
-    }
+// ── Load reports ──────────────────────────────────────────────────────────────
+const loadReports = async (folderId: string, nameQuery?: string) => {
+  // Use Vuex cache for folder loads (no nameQuery = normal folder navigation)
+  if (!nameQuery && store.state.organizationData.allReportsListByFolderId?.[folderId]) {
+    const cached = store.state.organizationData.allReportsListByFolderId[folderId];
+    staticReportsList.value = cached;
+    cachedFolderReports.value = cached;
+    filterReports();
+    // Data is served synchronously from cache — clear the initial loading flag
+    // so the skeleton doesn't stay stuck on a cached (re)mount.
+    isLoadingReports.value = false;
+    return;
   }
-  return filtered;
-};
 
-const toggleReportState = (report: any) => {
-  const state = report.enabled ? "Stopping" : "Starting";
-  const dismiss = q.notify({
-    message: `${state} report "${report.name}"`,
+  isLoadingReports.value = true;
+  const dismiss = toast({
+    variant: "loading",
+    message: t("toastMessages.reports.pleaseWaitWhileFetchingReports"),
+    timeout: 0,
   });
-  reportsStateLoadingMap.value[report.name] = true;
-  reports
-    .toggleReportState(
+
+  try {
+    const folder = searchAcrossFolders.value ? undefined : folderId;
+    const isCache = activeTab.value === "cached";
+    const res = await reports.listByFolderId(
       store.state.selectedOrganization.identifier,
-      report.name,
-      !report.enabled,
-    )
-    .then(() => {
-      // Create a new report object with updated enabled status
-      const updatedReport = { ...report, enabled: !report.enabled };
+      folder,
+      undefined,
+      isCache,
+      nameQuery || undefined,
+    );
 
-      // Update in staticReportsList
-      staticReportsList.value = staticReportsList.value.map((r: any) => {
-        if (r.name === report.name) {
-          return updatedReport;
-        }
-        return r;
-      });
+    const mapped = (res.data ?? []).map((report: any) => ({
+      ...report,
+      last_triggered_at_raw: report.last_triggered_at || null,
+      last_triggered_at: report.last_triggered_at
+        ? convertUnixToDateFormat(report.last_triggered_at)
+        : "-",
+    }));
 
-      // Update in reportsTableRows
-      reportsTableRows.value = reportsTableRows.value.map((r: any) => {
-        if (r.name === report.name) {
-          return { ...r, enabled: !r.enabled };
-        }
-        return r;
+    // Always cache the result — even if stale, so navigating back hits the cache
+    if (!nameQuery) {
+      store.dispatch("setAllReportsListByFolderId", {
+        ...store.state.organizationData.allReportsListByFolderId,
+        [folderId]: mapped,
       });
+    }
 
-      q.notify({
-        type: "positive",
-        message: `${
-          updatedReport.enabled ? "Started" : "Stopped"
-        } report successfully.`,
-        timeout: 2000,
-      });
-    })
-    .catch((err) => {
-      if (err.response.status != 403) {
-        q.notify({
-          type: "negative",
-          message: err?.data?.message || "Error while stopping report!",
-          timeout: 4000,
-        });
-      }
-    })
-    .finally(() => {
-      reportsStateLoadingMap.value[report.name] = false;
+    // Race condition guard: don't update UI if user moved to another folder,
+    // but data is already cached above for future use (mirrors AlertList.vue:1574)
+    if (folderId !== activeFolderId.value && !nameQuery) {
       dismiss();
-    });
+      return;
+    }
+
+    if (!nameQuery) cachedFolderReports.value = mapped;
+    staticReportsList.value = mapped;
+    filterReports();
+  } catch (err: any) {
+    if (err?.response?.status !== 403) {
+      toast({
+        variant: "error",
+        message: err?.data?.message || t("reports.fetchReportsError"),
+      });
+    }
+  } finally {
+    isLoadingReports.value = false;
+    dismiss();
+  }
 };
 
-const editReport = (report: any) => {
-  editingReport.value = cloneDeep(report);
+const invalidateFolderCache = (folderId: string) => {
+  const updated = { ...store.state.organizationData.allReportsListByFolderId };
+  delete updated[folderId];
+  store.dispatch("setAllReportsListByFolderId", updated);
+};
+
+const filterReports = () => {
+  reportsTableRows.value = [...(staticReportsList.value as any[])];
+  resultTotal.value = reportsTableRows.value.length;
+};
+
+onBeforeMount(async () => {
+  // Ensure report folders are in the store before FolderList renders
+  if (!store.state.organizationData.foldersByType?.["reports"]) {
+    await getFoldersListByType(store, "reports");
+  }
+  await loadReports(activeFolderId.value);
+});
+
+// ── Folder watchers (mirrors AlertList pattern) ───────────────────────────────
+watch(
+  () => store.state.organizationData.foldersByType?.["reports"],
+  (folders) => {
+    if (!folders) return;
+    const folderQuery = router.currentRoute.value.query.folder as string | undefined;
+    const match = folders.find((f: any) => f.folderId === folderQuery);
+    activeFolderId.value = match ? folderQuery! : "default";
+    filterReports();
+  },
+  { immediate: true },
+);
+
+watch(
+  () => activeFolderId.value,
+  async (newVal) => {
+    selectedReports.value = [];
+    if (newVal === router.currentRoute.value.query.folder) return;
+
+    if (searchAcrossFolders.value) {
+      searchAcrossFolders.value = false;
+      searchQuery.value = "";
+      filterQuery.value = "";
+    }
+
+    await loadReports(newVal);
+
+    if (router.currentRoute.value.query.folder !== activeFolderId.value) {
+      router.push({
+        name: "reports",
+        query: {
+          ...router.currentRoute.value.query,
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: activeFolderId.value,
+        },
+      });
+    }
+  },
+);
+
+watch(searchAcrossFolders, (enabled) => {
+  if (enabled) {
+    // Transfer any existing client-side filter into the cross-folder search query
+    searchQuery.value = filterQuery.value;
+    filterQuery.value = "";
+    // No API call — wait for user to type a query
+  } else {
+    // Restore the cached folder data without an API call
+    searchQuery.value = "";
+    filterQuery.value = "";
+    staticReportsList.value = cachedFolderReports.value;
+    filterReports();
+  }
+});
+
+const debouncedSearch = debounce(async (query: string) => {
+  await loadReports(activeFolderId.value, query);
+}, 600);
+
+watch(searchQuery, async (newVal) => {
+  if (!searchAcrossFolders.value) return;
+  if (!newVal) {
+    // User cleared the search — restore cached folder data
+    staticReportsList.value = cachedFolderReports.value;
+    filterReports();
+  } else {
+    await debouncedSearch(newVal);
+  }
+});
+
+const updateActiveFolderId = (folderId: string) => {
+  activeFolderId.value = folderId;
+};
+
+const clearSearch = () => {
+  searchQuery.value = "";
+  filterQuery.value = "";
+  searchAcrossFolders.value = false;
+  // watch(searchAcrossFolders) handles the restore
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const filterData = (rows: any[], terms: any) => {
+  const lc = terms.toLowerCase();
+  return rows.filter((r) => r["name"].toLowerCase().includes(lc));
+};
+
+const visibleRows = computed(() => {
+  if (!filterQuery.value || searchAcrossFolders.value) return reportsTableRows.value ?? [];
+  return filterData(reportsTableRows.value ?? [], filterQuery.value);
+});
+watch(
+  visibleRows,
+  (rows) => {
+    resultTotal.value = rows.length;
+  },
+  { immediate: true },
+);
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+const createNewReport = () => {
+  track("Button Click", { button: "Add Report", page: "Reports" });
   router.push({
     name: "createReport",
     query: {
-      name: report.name,
       org_identifier: store.state.selectedOrganization.identifier,
+      folder: activeFolderId.value,
     },
   });
 };
 
-const confirmDeleteReport = (report: any) => {
-  deleteDialog.value.show = true;
-  deleteDialog.value.message = `Are you sure you want to delete report "${report.name}"`;
-  deleteDialog.value.data = report.name;
+const editReport = (report: any) => {
+  router.push({
+    name: "createReport",
+    query: {
+      report_id: report.report_id,
+      name: report.name,
+      org_identifier: store.state.selectedOrganization.identifier,
+      folder: report.folder_id || activeFolderId.value,
+    },
+  });
 };
 
-const deleteReport = (report: any) => {
-  const dismiss = q.notify({
-    message: `Deleting report "${deleteDialog.value.data}"`,
+// Toggle enable/disable — uses report_id (v2)
+const toggleReportState = (report: any) => {
+  const dismiss = toast({
+    variant: "loading",
+    message: report.enabled
+      ? t("toastMessages.reports.stoppingReport", { name: report.name })
+      : t("toastMessages.reports.startingReport", { name: report.name }),
+    timeout: 0,
   });
+  reportsStateLoadingMap.value[report.report_id] = true;
+
   reports
-    .deleteReport(
+    .toggleReportStateById(
       store.state.selectedOrganization.identifier,
-      deleteDialog.value.data,
+      report.report_id,
+      !report.enabled,
     )
     .then(() => {
-      // Find the index of the row that matches the condition
-      // update in staticReportsList and call filterReports
-      staticReportsList.value = staticReportsList.value.filter(
-        (r: any) => r.name !== deleteDialog.value.data,
+      staticReportsList.value = staticReportsList.value.map((r: any) =>
+        r.report_id === report.report_id ? { ...r, enabled: !r.enabled } : r,
       );
-
+      invalidateFolderCache(activeFolderId.value);
       filterReports();
-
-      q.notify({
-        type: "positive",
-        message: `Delete report successfully.`,
-        timeout: 3000,
+      toast({
+        variant: "success",
+        message: !report.enabled
+          ? t("toastMessages.reports.reportStartedSuccessfully")
+          : t("toastMessages.reports.reportStoppedSuccessfully"),
       });
     })
+    .catch((err) => {
+      if (err?.response?.status !== 403) {
+        toast({
+          variant: "error",
+          message: err?.data?.message || t("reports.updateReportStateError"),
+        });
+      }
+    })
+    .finally(() => {
+      reportsStateLoadingMap.value[report.report_id] = false;
+      dismiss();
+    });
+};
+
+// Delete — uses report_id (v2)
+const confirmDeleteReport = (report: any) => {
+  deleteDialog.value.show = true;
+  deleteDialog.value.message = t("reports.deleteReportNamedMessage", {
+    name: report.name,
+  });
+  deleteDialog.value.data = { report_id: report.report_id, name: report.name };
+};
+
+const deleteReport = () => {
+  const { report_id, name } = deleteDialog.value.data;
+  const dismiss = toast({
+    variant: "loading",
+    message: t("toastMessages.reports.deletingReport", { name: name }),
+    timeout: 0,
+  });
+
+  reports
+    .deleteReportById(store.state.selectedOrganization.identifier, report_id)
+    .then(() => {
+      staticReportsList.value = staticReportsList.value.filter(
+        (r: any) => r.report_id !== report_id,
+      );
+      invalidateFolderCache(activeFolderId.value);
+      filterReports();
+      toast({ variant: "success", message: t("toastMessages.reports.reportDeletedSuccessfully") });
+    })
     .catch((err: any) => {
-      if (err.response.status != 403) {
-        q.notify({
-          type: "negative",
-          message: err?.data?.message || "Error while deleting report!",
-          timeout: 4000,
+      if (err?.response?.status !== 403) {
+        toast({
+          variant: "error",
+          message: err?.data?.message || t("reports.deleteReportError"),
         });
       }
     })
     .finally(() => dismiss());
 };
 
-const createNewReport = () => {
-  track("Button Click", {
-    button: "Add Report",
-    page: "Reports"
-  });
-  router.push({ name: "createReport", query: { org_identifier: store.state.selectedOrganization.identifier } });
-};
-
-const filterReports = () => {
-  // filter reports based on the selected tab
-  // If reports are cached, show only cached reports
-  if (activeTab.value === "cached") {
-    reportsTableRows.value = (staticReportsList.value as any).filter(
-      (report: any) => !report.destinations.length,
-    );
-  } else {
-    reportsTableRows.value = (staticReportsList.value as any).filter(
-      (report: any) => report.destinations.length,
-    );
-  }
-
-  reportsTableRows.value = reportsTableRows.value.map(
-    (report: any, index: number) => {
-      return {
-        ...report,
-        "#": index + 1,
-      };
-    },
-  ) as any[];
-
-  resultTotal.value = reportsTableRows.value.length;
-};
-
-const visibleRows = computed(() => {
-  if (!filterQuery.value) return reportsTableRows.value || [];
-  return filterData(reportsTableRows.value || [], filterQuery.value);
-});
-const hasVisibleRows = computed(() => visibleRows.value.length > 0);
-
-// Watch visibleRows to sync resultTotal with search filter
-watch(visibleRows, (newVisibleRows) => {
-  resultTotal.value = newVisibleRows.length;
-}, { immediate: true });
-
+// Bulk delete — uses report_ids (v2)
 const openBulkDeleteDialog = () => {
   confirmBulkDelete.value = true;
 };
 
 const bulkDeleteReports = async () => {
-  const dismiss = q.notify({
-    spinner: true,
-    message: "Deleting reports...",
+  bulkDeleteLoading.value = true;
+  const dismiss = toast({
+    variant: "loading",
+    message: t("toastMessages.reports.deletingReports"),
     timeout: 0,
   });
-
   try {
-    if (selectedReports.value.length === 0) {
-      q.notify({
-        type: "negative",
-        message: "No reports selected for deletion",
-        timeout: 2000,
-      });
+    if (!selectedReports.value.length) {
+      toast({ variant: "error", message: t("toastMessages.reports.noReportsSelectedForDeletion") });
       dismiss();
       return;
     }
 
-    // Extract report names for the API call (BE supports names)
-    const payload = {
-      ids: selectedReports.value.map((r: any) => r.name),
-    };
-
-    const response = await reports.bulkDelete(
+    const payload = { ids: selectedReports.value.map((r: any) => r.report_id) };
+    const response = await reports.bulkDeleteById(
       store.state.selectedOrganization.identifier,
-      payload
+      payload,
     );
-
     dismiss();
 
-    // Handle response based on successful/unsuccessful arrays
-    if (response.data) {
-      const { successful = [], unsuccessful = [] } = response.data;
-      const successCount = successful.length;
-      const failCount = unsuccessful.length;
-
-      if (failCount > 0 && successCount > 0) {
-        // Partial success
-        q.notify({
-          type: "warning",
-          message: `${successCount} report(s) deleted successfully, ${failCount} failed`,
-          timeout: 5000,
-        });
-      } else if (failCount > 0) {
-        // All failed
-        q.notify({
-          type: "negative",
-          message: `Failed to delete ${failCount} report(s)`,
-          timeout: 3000,
-        });
-      } else {
-        // All successful
-        q.notify({
-          type: "positive",
-          message: `${successCount} report(s) deleted successfully`,
-          timeout: 2000,
-        });
-      }
-
-      // Remove deleted reports from staticReportsList by name 
-      const successfulNames = new Set(successful);
-      staticReportsList.value = staticReportsList.value.filter(
-        (r: any) => !successfulNames.has(r.name)
-      );
-
-      // Refresh the table
-      filterReports();
-    } else {
-      // Fallback success message
-      q.notify({
-        type: "positive",
-        message: `${selectedReports.value.length} report(s) deleted successfully`,
-        timeout: 2000,
+    const { successful = [], unsuccessful = [] } = response.data ?? {};
+    if (unsuccessful.length && successful.length) {
+      toast({
+        variant: "warning",
+        message: t("toastMessages.reports.deletedFailed", {
+          count: successful.length,
+          failed: unsuccessful.length,
+        }),
+        timeout: 5000,
       });
-
-      // Remove all selected reports by name
-      const selectedNames = new Set(selectedReports.value.map((r: any) => r.name));
-      staticReportsList.value = staticReportsList.value.filter(
-        (r: any) => !selectedNames.has(r.name)
-      );
-
-      // Refresh the table
-      filterReports();
+    } else if (unsuccessful.length) {
+      toast({
+        variant: "error",
+        message: t("toastMessages.reports.failedToDeleteReports", { count: unsuccessful.length }),
+      });
+    } else {
+      toast({
+        variant: "success",
+        message: t("toastMessages.reports.reportsDeletedSuccessfully", {
+          count: successful.length,
+        }),
+      });
     }
 
+    const successfulIds = new Set(successful);
+    staticReportsList.value = staticReportsList.value.filter(
+      (r: any) => !successfulIds.has(r.report_id),
+    );
+    invalidateFolderCache(activeFolderId.value);
+    filterReports();
     selectedReports.value = [];
   } catch (error: any) {
     dismiss();
-    console.error("Error deleting reports:", error);
-
-    // Show error message from response if available
-    const errorMessage = error.response?.data?.message || error?.message || "Error deleting reports. Please try again.";
-    if (error.response?.status != 403 || error?.status != 403) {
-      q.notify({
-        type: "negative",
-        message: errorMessage,
-        timeout: 3000,
-      });
+    const msg =
+      error.response?.data?.message || error?.message || t("reports.bulkDeleteReportsError");
+    if (error.response?.status !== 403) {
+      toast({ variant: "error", message: msg });
     }
+  } finally {
+    bulkDeleteLoading.value = false;
   }
-
   confirmBulkDelete.value = false;
 };
 
+// Move to folder — single "row"
+const openMoveDialog = (report: any) => {
+  activeFolderToMove.value = report.folder_id || activeFolderId.value;
+  reportIdsToMove.value = [report.report_id];
+  showMoveDialog.value = true;
+};
+
+// Move to folder — bulk (selected rows)
+const moveMultipleReports = () => {
+  activeFolderToMove.value = activeFolderId.value;
+  reportIdsToMove.value = selectedReports.value.map((r: any) => r.report_id);
+  showMoveDialog.value = true;
+};
+
+const onMoveUpdated = async (fromFolder: string, toFolder: string) => {
+  showMoveDialog.value = false;
+  selectedReports.value = [];
+  reportIdsToMove.value = [];
+  // Invalidate both source and destination folder caches
+  invalidateFolderCache(fromFolder || activeFolderId.value);
+  invalidateFolderCache(toFolder);
+  await loadReports(activeFolderId.value);
+};
+
+// ── Keyboard shortcuts ────────────────────────────────────────────────────
+useShortcuts([
+  {
+    id: "reportsAdd",
+    handler: () => {
+      if (!isInputFocused()) createNewReport();
+    },
+  },
+  {
+    id: "reportsRefresh",
+    handler: () => {
+      if (!isInputFocused()) {
+        // Match the refresh button: drop the cache first so it actually reloads.
+        invalidateFolderCache(activeFolderId.value);
+        loadReports(activeFolderId.value);
+      }
+    },
+  },
+  {
+    id: "reportsFocusSearch",
+    handler: () => {
+      focusSearchInput("report-list-search-input");
+    },
+  },
+]);
 </script>
-
-<style lang="scss" scoped>
-.dark-mode {
-  background-color: $dark-page;
-
-  .report-list-tabs {
-    height: fit-content;
-
-    :deep(.rum-tabs) {
-      border: 1px solid #464646;
-    }
-
-    :deep(.rum-tab) {
-      &:hover {
-        background: #464646;
-      }
-
-      &.active {
-        background: #5960b2;
-        color: #ffffff !important;
-      }
-    }
-  }
-}
-
-.report-list-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-</style>

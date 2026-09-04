@@ -1,23 +1,29 @@
 <template>
-  <div class="group" :style="`--group-index: ${groupNestedIndex}`">
-    <div class="group-conditions">
+  <div
+    data-test="dashboard-group"
+    :style="`--group-index: ${groupNestedIndex};`"
+    class="rounded-default flex bg-[color-mix(in_srgb,var(--color-brand-indigo)_calc(5%*var(--group-index)),transparent)] p-0"
+    :class="groupNestedIndex > 0 ? 'ps-1.25' : 'ps-0'"
+  >
+    <div class="flex flex-row flex-wrap items-center" data-test="dashboard-group-conditions">
       <div
         v-for="(condition, index) in group.conditions"
         :key="index"
-        class="condition-group"
+        class="me-2.5 inline-flex min-h-8.75 items-center gap-2"
+        data-test="dashboard-group-condition-group"
       >
         <Group
           v-if="condition.filterType === 'group'"
           :group="condition"
           :group-nested-index="groupNestedIndex + 1"
-          :group-index="index"
+          :group-index="Number(index)"
           :dashboard-variables-filter-items="dashboardVariablesFilterItems"
           :schema-options="schemaOptions"
           :load-filter-item="loadFilterItem"
           :dashboard-panel-data="dashboardPanelData"
           @add-condition="addConditionToGroup"
           @add-group="addGroupToGroup"
-          @remove-group="removeGroupFromNested(index)"
+          @remove-group="removeGroupFromNested(Number(index))"
           @logical-operator-change="emitLogicalOperatorChange"
         />
         <AddCondition
@@ -27,52 +33,57 @@
           :schema-options="schemaOptions"
           :load-filter-item="loadFilterItem"
           :dashboard-panel-data="dashboardPanelData"
-          @remove-condition="removeConditionFromGroup(index)"
+          @remove-condition="removeConditionFromGroup(Number(index))"
           @logical-operator-change="emitLogicalOperatorChange"
           :condition-index="index"
         />
       </div>
-      <q-btn
-        icon="add"
-        color="primary"
-        size="xs"
-        round
-        class="add-btn"
-        data-test="dashboard-add-condition-add"
-      >
-        <q-menu v-model="showAddMenu">
-          <q-list>
-            <q-item clickable @click="emitAddCondition">
-              <q-item-section data-test="dashboard-add-group-add-condition">{{ t("common.addCondition") }}</q-item-section>
-            </q-item>
-            <q-item clickable @click="emitAddGroup">
-              <q-item-section data-test="dashboard-add-group-add-group">{{ t("common.addGroup") }}</q-item-section>
-            </q-item>
-          </q-list>
-        </q-menu>
-      </q-btn>
+      <ODropdown v-model:open="showAddMenu">
+        <template #trigger>
+          <OButton
+            variant="outline"
+            size="icon-chip"
+            data-test="dashboard-add-condition-add"
+            icon-left="add"
+          />
+        </template>
+        <ODropdownItem data-test="dashboard-add-group-add-condition" @select="emitAddCondition">
+          {{ t("common.addCondition") }}
+        </ODropdownItem>
+        <ODropdownItem data-test="dashboard-add-group-add-group" @select="emitAddGroup">
+          {{ t("common.addGroup") }}
+        </ODropdownItem>
+      </ODropdown>
     </div>
-    <div v-if="groupNestedIndex !== 0" class="group-remove">
-      <q-btn
-        flat
-        size="xs"
-        dense
+    <div
+      v-if="groupNestedIndex !== 0"
+      class="border-border-default ms-2 flex items-center justify-between border-s ps-1.5"
+    >
+      <OButton
+        variant="ghost"
+        size="icon-chip"
+        class="!w-4"
         @click="$emit('remove-group')"
-        icon="close"
         data-test="dashboard-add-group-remove"
-      />
+      >
+        <template #icon-left><OIcon name="close" size="xs" class="!size-2.5" /></template>
+      </OButton>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { useI18nTyped } from "@/types/i18n";
 import AddCondition from "./AddCondition.vue";
 
 export default defineComponent({
   name: "Group",
-  components: { AddCondition },
+  components: { AddCondition, OButton, OIcon, ODropdown, ODropdownItem },
   props: {
     group: {
       type: Object,
@@ -105,15 +116,13 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: [
-    "add-condition",
-    "add-group",
-    "remove-group",
-    "logical-operator-change",
-  ],
+  emits: ["add-condition", "add-group", "remove-group", "logical-operator-change"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const showAddMenu = ref(false);
+
+    // Same reference as props.group; mutation targets its nested fields only.
+    const groupModel = computed(() => props.group);
     const filterOptions = ["AND", "OR"];
 
     const emitAddCondition = () => {
@@ -127,7 +136,7 @@ export default defineComponent({
     };
 
     const removeConditionFromGroup = (index: number) => {
-      props.group.conditions.splice(index, 1);
+      groupModel.value.conditions.splice(index, 1);
     };
 
     const removeGroupFromNested = (groupIndex: number) => {
@@ -173,42 +182,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.group {
-  display: flex;
-  padding: 0px 0px 0px 5px;
-  background-color: rgba(89, 96, 178, calc(0.12 * var(--group-index)));
-  border-radius: 5px;
-}
-
-.group-remove {
-  border-left: 1px solid $grey-2;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.group-conditions {
-  display: flex;
-  flex-direction: row;
-  // flex-wrap: wrap;
-  overflow-x: auto;
-  align-items: center;
-}
-
-.condition-group {
-  display: inline-flex;
-  align-items: center;
-  margin-right: 10px;
-  padding: 0px 0px 0px 0px;
-  min-height: 35px;
-  gap: 8px;
-}
-
-.add-btn {
-  height: 20px;
-  width: 20px;
-  margin-right: 5px;
-}
-</style>

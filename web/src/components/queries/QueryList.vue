@@ -1,66 +1,60 @@
 <template>
-  <q-card
-    class="column full-height no-wrap"
-    style="min-width: 480px; max-width: 800px"
-  >
+  <OCard class="flex h-full flex-col flex-nowrap" style="min-width: 30rem; max-width: 50rem">
     <!-- Header -->
-    <div class="q-px-sm q-py-md">
-      <q-card-section class="q-pb-sm q-px-sm q-pt-none">
-        <div class="row items-center no-wrap">
-          <div class="col">
-            <div class="text-body1 text-bold" data-test="queryList-title-text">
-              {{ t("queries.queryList") }}123
-            </div>
+    <div class="px-2 py-3">
+      <OCardSection role="header" class="w-full">
+        <div class="flex w-full items-center justify-between">
+          <div class="text-base font-bold" data-test="queryList-title-text">
+            {{ t("queries.queryList") }}
           </div>
-          <div class="col-auto">
-            <q-btn
-              v-close-popup="true"
-              data-test="queryList-cancel"
-              round
-              flat
-              icon="cancel"
-            />
-          </div>
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            data-test="queryList-cancel"
+            @click="$emit('close')"
+            icon-left="close"
+          />
         </div>
-      </q-card-section>
-      <q-separator />
+      </OCardSection>
+      <OSeparator />
     </div>
 
-    <q-table
-      class="my-sticky-virtscroll-table"
-      virtual-scroll
-      v-model:pagination="pagination"
-      :rows-per-page-options="[0]"
-      :virtual-scroll-sticky-size-start="48"
+    <OTable
+      class="my-sticky-virtscroll-table o2-table-hide-header"
+      :data="queryRows"
+      :columns="queryListColumns"
+      :default-columns="false"
+      row-key="_rowKey"
+      pagination="none"
       dense
-      :rows="getRows(schemaData)"
-      hide-bottom
-      hide-header
-      row-key="index"
-      wrap-cells
       data-test="queryList-table"
-    >
-    </q-table>
-  </q-card>
+    />
+  </OCard>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, computed } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { timestampToTimezoneDate, durationFormatter } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { getUnitValue } from "@/utils/dashboard/convertDataIntoUnitValue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import { COL } from "@/lib/core/Table/OTable.types";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "QueryList",
-  components: {},
+  components: { OSeparator, OButton, OTable, OCard, OCardSection },
+  emits: ["save", "close"],
   props: {
     schemaData: Object,
     metaData: Object,
   },
-  emits: ["save"],
   setup(props: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const queryData = props.metaData?.queries || [];
     const store = useStore();
     const getRows = (query: any) => {
@@ -95,9 +89,7 @@ export default defineComponent({
 
       const getDuration = (createdAt: number) => {
         const currentTime = localTimeToMicroseconds();
-        const durationInSeconds = Math.floor(
-          (currentTime - createdAt) / 1000000,
-        );
+        const durationInSeconds = Math.floor((currentTime - createdAt) / 1000000);
 
         return durationFormatter(durationInSeconds);
       };
@@ -119,47 +111,68 @@ export default defineComponent({
           ? getUnitValue(query?.compressed_size, "megabytes", "", 2)
           : { value: "", unit: "" };
       const rows: any[] = [
-        ["Trace ID", query?.trace_id],
-        ["Status", query?.status],
-        ["User ID", query?.user_id],
-        ["Org ID", query?.org_id],
-        ["Stream Type", query?.stream_type],
-        ["Search Type", query?.search_type],
-        ["Query Source", query?.query_source],
+        [t("queries.traceId"), query?.trace_id],
+        [t("queries.status"), query?.status],
+        [t("queries.userId"), query?.user_id],
+        [t("queries.orgId"), query?.org_id],
+        [t("queries.streamType"), query?.stream_type],
+        [t("queries.searchType"), query?.search_type],
+        [t("queries.querySource"), query?.query_source],
         ["SQL", query?.sql],
-        ["Start Time", startTimeEntry],
-        ["End Time", endTimeEntry],
-        ["Exec. Duration", getDuration(query?.created_at)],
-        ["Query Range", queryRange(query?.start_time, query?.end_time)],
-        ["Scan Records", query?.records],
-        ["Files", query?.files],
+        [t("queries.startTime"), startTimeEntry],
+        [t("queries.endTime"), endTimeEntry],
+        [t("queries.duration"), getDuration(query?.created_at)],
+        [t("queries.queryRange"), queryRange(query?.start_time, query?.end_time)],
+        [t("queries.scanRecords"), query?.records],
+        [t("queries.files"), query?.files],
         [
-          "Original Size",
-          originalSize.value
-            ? `${originalSize.value} ${originalSize.unit}`
-            : "",
+          t("queries.originalSize"),
+          originalSize.value ? `${originalSize.value} ${originalSize.unit}` : "",
         ],
         [
-          "Compressed Size",
-          compressedSize.value
-            ? `${compressedSize.value} ${compressedSize.unit}`
-            : "",
+          t("queries.compressedSize"),
+          compressedSize.value ? `${compressedSize.value} ${compressedSize.unit}` : "",
         ],
       ];
 
       return rows;
     };
 
+    const queryRows = computed(() => {
+      const rows = getRows(props.schemaData);
+      return rows.map(([key, value]: [string, any], index: number) => ({
+        _rowKey: `row_${index}`,
+        key,
+        value,
+      }));
+    });
+
+    const queryListColumns = [
+      {
+        id: "key",
+        header: raw(""),
+        accessorKey: "key",
+        sortable: false,
+        size: COL.owner,
+        meta: { align: "left" as const },
+      },
+      {
+        id: "value",
+        header: raw(""),
+        accessorKey: "value",
+        sortable: false,
+        size: COL.description,
+        meta: { align: "left" as const, autoWidth: true },
+      },
+    ];
+
     return {
       queryData,
       t,
       getRows,
-      pagination: ref({
-        rowsPerPage: 0,
-      }),
+      queryRows,
+      queryListColumns,
     };
   },
 });
 </script>
-
-<style scoped></style>

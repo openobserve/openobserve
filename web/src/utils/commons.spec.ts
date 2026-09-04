@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,6 +20,7 @@ import {
   getAllDashboards,
   getFoldersListByType,
   getAllDashboardsByFolderId,
+  evictDashboardsFromCache,
   getTabDataFromTabId,
   addPanel,
   addVariable,
@@ -27,8 +28,6 @@ import {
   deletePanel,
   updateVariable,
   updatePanel,
-  updateDashboard,
-  getDashboard,
   deleteDashboardById,
   getPanel,
   getPanelId,
@@ -47,7 +46,9 @@ import {
   moveDashboardToAnotherFolder,
   moveModuleToAnotherFolder,
   checkIfVariablesAreLoaded,
+  getDashboard,
 } from "./commons";
+import { gt } from "@/types/i18n";
 
 // Mock dependencies
 vi.mock("../services/dashboards", () => ({
@@ -78,14 +79,8 @@ vi.mock("./dashboard/convertDashboardSchemaVersion", () => ({
   convertDashboardSchemaVersion: vi.fn((data) => data),
 }));
 
-vi.mock("quasar", () => ({
-  date: {
-    subtractFromDate: vi.fn((date, obj) => new Date(date.getTime() - 3600000)),
-  },
-}));
-
 // Mock moment globally
-global.moment = vi.fn((date) => ({
+global.moment = vi.fn(() => ({
   format: vi.fn((format) => {
     if (format === "YYYY-MM-DDThh:mm:ssZ") {
       return "2023-01-01T12:00:00Z";
@@ -134,7 +129,9 @@ describe("Commons Utility Functions", () => {
 
       const result = await modifySQLQuery(currentTimeObj, querySQL, timestampColumn);
 
-      expect(result).toContain("time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')");
+      expect(result).toContain(
+        "time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')",
+      );
       expect(result).toContain("WHERE");
       expect(result).toContain("level = 'error'");
     });
@@ -144,14 +141,17 @@ describe("Commons Utility Functions", () => {
         start_time: "2023-01-01T00:00:00Z",
         end_time: "2023-01-01T23:59:59Z",
       };
-      const querySQL = "SELECT * FROM logs WHERE time_range(_timestamp,'old_start','old_end') AND level = 'error'";
+      const querySQL =
+        "SELECT * FROM logs WHERE time_range(_timestamp,'old_start','old_end') AND level = 'error'";
       const timestampColumn = "_timestamp";
 
       const result = await modifySQLQuery(currentTimeObj, querySQL, timestampColumn);
 
       expect(result).not.toContain("old_start");
       expect(result).not.toContain("old_end");
-      expect(result).toContain("time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')");
+      expect(result).toContain(
+        "time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')",
+      );
     });
 
     it.skip("should return original query when no WHERE clause and no existing time_range", async () => {
@@ -172,12 +172,15 @@ describe("Commons Utility Functions", () => {
         start_time: "2023-01-01T00:00:00Z",
         end_time: "2023-01-01T23:59:59Z",
       };
-      const querySQL = "SELECT * FROM logs WHERE time_range(_timestamp, '2023-01-01', '2023-01-02') AND user_id = 123";
+      const querySQL =
+        "SELECT * FROM logs WHERE time_range(_timestamp, '2023-01-01', '2023-01-02') AND user_id = 123";
       const timestampColumn = "_timestamp";
 
       const result = await modifySQLQuery(currentTimeObj, querySQL, timestampColumn);
 
-      expect(result).toContain("time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')");
+      expect(result).toContain(
+        "time_range(_timestamp,'2023-01-01T12:00:00Z', '2023-01-01T12:00:00Z')",
+      );
       expect(result).toContain("user_id = 123");
     });
   });
@@ -322,7 +325,7 @@ describe("Commons Utility Functions", () => {
         "",
         "test-org",
         folderId,
-        ""
+        "",
       );
       expect(mockStore.dispatch).toHaveBeenCalledWith("setAllDashboardList", expect.any(Object));
     });
@@ -386,7 +389,7 @@ describe("Commons Utility Functions", () => {
             expect.objectContaining({ created: "2023-01-02T00:00:00Z" }),
             expect.objectContaining({ created: "2023-01-01T00:00:00Z" }),
           ]),
-        })
+        }),
       );
     });
   });
@@ -428,9 +431,7 @@ describe("Commons Utility Functions", () => {
       const type = "dashboards";
       const mockResponse = {
         data: {
-          list: [
-            { folderId: "folder1", name: "Folder 1", description: "Folder 1" },
-          ],
+          list: [{ folderId: "folder1", name: "Folder 1", description: "Folder 1" }],
         },
       };
 
@@ -496,6 +497,59 @@ describe("Commons Utility Functions", () => {
       await getAllDashboardsByFolderId(mockStore, folderId);
 
       expect(dashboardService.list).toHaveBeenCalled();
+    });
+  });
+
+  describe("evictDashboardsFromCache", () => {
+    it("should remove the given dashboards from their folder lists", () => {
+      mockStore.state.organizationData.allDashboardList = {
+        "folder-a": [{ dashboardId: "d1" }, { dashboardId: "d2" }],
+        "folder-b": [{ dashboardId: "d3" }],
+      };
+
+      evictDashboardsFromCache(
+        mockStore,
+        new Map([
+          ["folder-a", ["d1"]],
+          ["folder-b", ["d3"]],
+        ]),
+      );
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith("setAllDashboardList", {
+        "folder-a": [{ dashboardId: "d2" }],
+        "folder-b": [],
+      });
+    });
+
+    it("should leave other folders untouched", () => {
+      const untouched = [{ dashboardId: "d9" }];
+      mockStore.state.organizationData.allDashboardList = {
+        "folder-a": [{ dashboardId: "d1" }],
+        "folder-b": untouched,
+      };
+
+      evictDashboardsFromCache(mockStore, new Map([["folder-a", ["d1"]]]));
+
+      const next = mockStore.dispatch.mock.calls[0][1];
+      expect(next["folder-b"]).toBe(untouched);
+    });
+
+    it("should not dispatch when nothing matched", () => {
+      mockStore.state.organizationData.allDashboardList = {
+        "folder-a": [{ dashboardId: "d1" }],
+      };
+
+      evictDashboardsFromCache(mockStore, new Map([["folder-a", ["nope"]]]));
+
+      expect(mockStore.dispatch).not.toHaveBeenCalled();
+    });
+
+    it("should skip folders that were never fetched", () => {
+      mockStore.state.organizationData.allDashboardList = {};
+
+      evictDashboardsFromCache(mockStore, new Map([["folder-x", ["d1"]]]));
+
+      expect(mockStore.dispatch).not.toHaveBeenCalled();
     });
   });
 
@@ -762,6 +816,208 @@ describe("Commons Utility Functions", () => {
     });
   });
 
+  describe("getDashboard — reserved _timestamp alias", () => {
+    it("normalizes a _timestamp output alias, then saves and re-fetches (like duplicate panel ids)", async () => {
+      const dashboardId = "dashboard-ts";
+      const folderId = "test-folder";
+      const mockDashboard = {
+        tabs: [
+          {
+            panels: [
+              {
+                config: {},
+                queries: [
+                  {
+                    customQuery: true,
+                    query:
+                      'SELECT histogram(_timestamp) AS "_timestamp" FROM "x" GROUP BY _timestamp',
+                    fields: {
+                      x: [{ alias: "_timestamp", column: "_timestamp", isDerived: false }],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      });
+
+      const result = await getDashboard(mockStore, dashboardId, folderId);
+
+      // alias normalized in place (SQL string + field alias)
+      const query = mockDashboard.tabs[0].panels[0].queries[0];
+      expect(query.query).toContain('AS "ts"');
+      expect(query.query).toContain("GROUP BY ts");
+      expect(query.query).not.toContain('AS "_timestamp"');
+      expect(query.fields.x[0].alias).toBe("ts");
+      expect(query.fields.x[0].column).toBe("_timestamp"); // source preserved
+
+      // persisted like duplicate panel ids: saved and re-fetched
+      expect(dashboardService.save).toHaveBeenCalled();
+      expect(dashboardService.get_Dashboard).toHaveBeenCalled();
+      expect(result).toBe(mockDashboard);
+    });
+
+    it("does not save when no query uses the reserved alias", async () => {
+      const dashboardId = "dashboard-clean";
+      const mockDashboard = {
+        tabs: [
+          {
+            panels: [
+              {
+                config: {},
+                queries: [
+                  {
+                    customQuery: true,
+                    query: 'SELECT count(*) AS "ts" FROM "x"',
+                    fields: { x: [] },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+
+      await getDashboard(mockStore, dashboardId, "test-folder");
+
+      expect(dashboardService.save).not.toHaveBeenCalled();
+    });
+
+    it("uses the configured timestamp_column (zoConfig) as the reserved alias", async () => {
+      const dashboardId = "dashboard-custom-ts";
+      mockStore.state.zoConfig = { timestamp_column: "event_time" };
+      const mockDashboard = {
+        tabs: [
+          {
+            panels: [
+              {
+                config: {},
+                queries: [
+                  {
+                    customQuery: true,
+                    query:
+                      'SELECT histogram(event_time) AS "event_time" FROM "x" GROUP BY event_time',
+                    fields: {
+                      x: [{ alias: "event_time", column: "event_time", isDerived: false }],
+                    },
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({
+        data: { success: true },
+      });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      });
+
+      await getDashboard(mockStore, dashboardId, "test-folder");
+
+      const query = mockDashboard.tabs[0].panels[0].queries[0];
+      expect(query.query).toContain('AS "ts"');
+      expect(query.query).not.toContain('AS "event_time"');
+      expect(query.fields.x[0].alias).toBe("ts");
+      expect(dashboardService.save).toHaveBeenCalled();
+    });
+  });
+
+  describe("getDashboard — duplicate layout ids", () => {
+    it("reassigns duplicate layout.i per tab, then saves and re-fetches", async () => {
+      const dashboardId = "dashboard-dup-layout";
+      const mockDashboard = {
+        tabs: [
+          {
+            tabId: "tab-1",
+            panels: [
+              { id: "panel-1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } },
+              { id: "panel-2", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } },
+              { id: "panel-3", layout: { x: 0, y: 0, w: 24, h: 9, i: 2 } },
+            ],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+      (dashboardService.get_Dashboard as any).mockResolvedValue({
+        data: { version: 1, v1: mockDashboard, hash: 123 },
+      });
+
+      await getDashboard(mockStore, dashboardId, "test-folder");
+
+      const ids = mockDashboard.tabs[0].panels.map((p: any) => p.layout.i);
+      // first occurrence kept, collisions reassigned from max i (2) upward
+      expect(ids[0]).toBe(1);
+      expect(ids[2]).toBe(2);
+      expect(new Set(ids).size).toBe(ids.length); // all unique
+      expect(dashboardService.save).toHaveBeenCalled();
+      expect(dashboardService.get_Dashboard).toHaveBeenCalled();
+    });
+
+    it("dedupes layout.i independently within each tab", async () => {
+      const dashboardId = "dashboard-dup-layout-tabs";
+      const mockDashboard = {
+        tabs: [
+          {
+            tabId: "tab-1",
+            panels: [{ id: "panel-1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }],
+          },
+          {
+            tabId: "tab-2",
+            panels: [{ id: "panel-2", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } }],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+
+      await getDashboard(mockStore, dashboardId, "test-folder");
+
+      // same i across different tabs is fine (grid is per-tab) → no save
+      expect(mockDashboard.tabs[0].panels[0].layout.i).toBe(1);
+      expect(mockDashboard.tabs[1].panels[0].layout.i).toBe(1);
+      expect(dashboardService.save).not.toHaveBeenCalled();
+    });
+
+    it("does not save when all layout ids are already unique", async () => {
+      const dashboardId = "dashboard-unique-layout";
+      const mockDashboard = {
+        tabs: [
+          {
+            tabId: "tab-1",
+            panels: [
+              { id: "panel-1", layout: { x: 0, y: 0, w: 24, h: 9, i: 1 } },
+              { id: "panel-2", layout: { x: 0, y: 0, w: 24, h: 9, i: 2 } },
+            ],
+          },
+        ],
+      };
+
+      mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
+      (dashboardService.save as any).mockResolvedValue({ data: { success: true } });
+
+      await getDashboard(mockStore, dashboardId, "test-folder");
+
+      expect(dashboardService.save).not.toHaveBeenCalled();
+    });
+  });
+
   describe("addVariable", () => {
     it("should add variable to dashboard with empty variables", async () => {
       const dashboardId = "dashboard-1";
@@ -776,7 +1032,7 @@ describe("Commons Utility Functions", () => {
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
 
-      await addVariable(mockStore, dashboardId, variableData, folderId);
+      await addVariable(gt, mockStore, dashboardId, variableData, folderId);
 
       expect(mockDashboard.variables).toEqual({
         showDynamicFilters: false,
@@ -802,7 +1058,7 @@ describe("Commons Utility Functions", () => {
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
 
-      await addVariable(mockStore, dashboardId, variableData, folderId);
+      await addVariable(gt, mockStore, dashboardId, variableData, folderId);
 
       expect(mockDashboard.variables.list).toHaveLength(2);
       expect(mockDashboard.variables.list[1]).toBe(variableData);
@@ -822,9 +1078,9 @@ describe("Commons Utility Functions", () => {
 
       mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
 
-      await expect(
-        addVariable(mockStore, dashboardId, variableData, folderId)
-      ).rejects.toThrow("Variable with same name already exists");
+      await expect(addVariable(gt, mockStore, dashboardId, variableData, folderId)).rejects.toThrow(
+        "Variable with same name already exists",
+      );
     });
   });
 
@@ -875,7 +1131,7 @@ describe("Commons Utility Functions", () => {
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
 
-      await updateVariable(mockStore, dashboardId, variableName, variableData, folderId);
+      await updateVariable(gt, mockStore, dashboardId, variableName, variableData, folderId);
 
       expect(mockDashboard.variables.list[0]).toBe(variableData);
     });
@@ -898,7 +1154,7 @@ describe("Commons Utility Functions", () => {
       mockStore.state.organizationData.allDashboardData[dashboardId] = mockDashboard;
 
       await expect(
-        updateVariable(mockStore, dashboardId, variableName, variableData, folderId)
+        updateVariable(gt, mockStore, dashboardId, variableName, variableData, folderId),
       ).rejects.toThrow("Variable with same name already exists");
     });
   });
@@ -1152,7 +1408,14 @@ describe("Commons Utility Functions", () => {
         data: { version: 1, v1: mockDashboard, hash: 123 },
       });
 
-      await movePanelToAnotherTab(mockStore, dashboardId, panelId, folderId, currentTabId, moveToTabId);
+      await movePanelToAnotherTab(
+        mockStore,
+        dashboardId,
+        panelId,
+        folderId,
+        currentTabId,
+        moveToTabId,
+      );
 
       expect(mockDashboard.tabs[0].panels).toHaveLength(0); // Panel removed from original tab
       expect(mockDashboard.tabs[1].panels).toHaveLength(2); // Panel added to target tab
@@ -1241,6 +1504,7 @@ describe("Commons Utility Functions", () => {
 
       (dashboardService.new_Folder as any).mockResolvedValue(mockResponse);
       (dashboardService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
+      (commonService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
 
       const result = await createFolder(mockStore, data);
 
@@ -1254,6 +1518,7 @@ describe("Commons Utility Functions", () => {
 
       (dashboardService.edit_Folder as any).mockResolvedValue({ success: true });
       (dashboardService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
+      (commonService.list_Folders as any).mockResolvedValue({ data: { list: [] } });
 
       await updateFolder(mockStore, folderId, data);
 
@@ -1311,6 +1576,72 @@ describe("Commons Utility Functions", () => {
 
       expect(commonService.delete_Folder).toHaveBeenCalledWith("test-org", type, folderId);
     });
+
+    // The dashboards module keeps a second, legacy folder list
+    // (organizationData.folders) consumed by SelectFolderDropdown and the
+    // move-dashboard dialogs. The *ByType mutations must refresh it too, or a
+    // folder created from the shared sidebar rail never shows up in the
+    // new-dashboard folder select until a full page reload.
+    describe("legacy dashboards folder list sync", () => {
+      const newFolderList = {
+        data: {
+          list: [
+            { folderId: "default", name: "Default", description: "Default" },
+            { folderId: "zzzz", name: "zzzz", description: "" },
+          ],
+        },
+      };
+
+      beforeEach(() => {
+        (commonService.list_Folders as any).mockResolvedValue(newFolderList);
+        (dashboardService.list_Folders as any).mockResolvedValue(newFolderList);
+      });
+
+      it("createFolderByType('dashboards') refreshes the legacy folders list too", async () => {
+        (commonService.new_Folder as any).mockResolvedValue({
+          data: { folderId: "zzzz" },
+        });
+
+        await createFolderByType(mockStore, { name: "zzzz" }, "dashboards");
+
+        // byType list refreshed for the sidebar rail…
+        expect(mockStore.dispatch).toHaveBeenCalledWith("setFoldersByType", {
+          dashboards: newFolderList.data.list,
+        });
+        // …AND the legacy list refreshed for SelectFolderDropdown.
+        expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
+        expect(mockStore.dispatch).toHaveBeenCalledWith("setFolders", newFolderList.data.list);
+      });
+
+      it("updateFolderByType('dashboards') refreshes the legacy folders list too", async () => {
+        (commonService.edit_Folder as any).mockResolvedValue({ success: true });
+
+        await updateFolderByType(mockStore, "zzzz", { name: "zzzz2" }, "dashboards");
+
+        expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
+        expect(mockStore.dispatch).toHaveBeenCalledWith("setFolders", newFolderList.data.list);
+      });
+
+      it("deleteFolderByIdByType('dashboards') refreshes the legacy folders list too", async () => {
+        (commonService.delete_Folder as any).mockResolvedValue({ success: true });
+
+        await deleteFolderByIdByType(mockStore, "zzzz", "dashboards");
+
+        expect(dashboardService.list_Folders).toHaveBeenCalledWith("test-org");
+        expect(mockStore.dispatch).toHaveBeenCalledWith("setFolders", newFolderList.data.list);
+      });
+
+      it("does NOT touch the legacy dashboards list for other types", async () => {
+        (commonService.new_Folder as any).mockResolvedValue({
+          data: { folderId: "alert-folder" },
+        });
+
+        await createFolderByType(mockStore, { name: "alert folder" }, "alerts");
+
+        expect(dashboardService.list_Folders).not.toHaveBeenCalled();
+        expect(mockStore.dispatch).not.toHaveBeenCalledWith("setFolders", expect.anything());
+      });
+    });
   });
 
   describe("moveDashboardToAnotherFolder", () => {
@@ -1324,7 +1655,12 @@ describe("Commons Utility Functions", () => {
 
       await moveDashboardToAnotherFolder(mockStore, dashboardIds, from, to);
 
-      expect(dashboardService.move_Dashboard).toHaveBeenCalledWith("test-org", dashboardIds, from, to);
+      expect(dashboardService.move_Dashboard).toHaveBeenCalledWith(
+        "test-org",
+        dashboardIds,
+        from,
+        to,
+      );
     });
   });
 
@@ -1338,7 +1674,12 @@ describe("Commons Utility Functions", () => {
 
       await moveModuleToAnotherFolder(mockStore, data, type, folder_id);
 
-      expect(commonService.move_across_folders).toHaveBeenCalledWith("test-org", type, data, folder_id);
+      expect(commonService.move_across_folders).toHaveBeenCalledWith(
+        "test-org",
+        type,
+        data,
+        folder_id,
+      );
     });
   });
 });

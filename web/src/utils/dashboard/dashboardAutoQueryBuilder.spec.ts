@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi } from "vitest";
+import { describe, expect, it, beforeEach } from "vitest";
 import {
   buildSQLQueryFromInput,
   buildSQLChartQuery,
@@ -572,7 +572,7 @@ describe("dashboardAutoQueryBuilder", () => {
       };
       const result = buildSQLChartQuery(config);
       expect(result).toContain("SELECT");
-      expect(result).toContain("FROM \"logs\"");
+      expect(result).toContain('FROM "logs"');
       expect(result).toContain("GROUP BY status_alias");
     });
 
@@ -1128,7 +1128,7 @@ describe("dashboardAutoQueryBuilder", () => {
         dashboardPanelData: mockDashboardPanelData,
       };
       const result = buildSQLChartQuery(config);
-      expect(result).toContain("FROM \"logs\"");
+      expect(result).toContain('FROM "logs"');
       expect(result).toContain("INNER JOIN");
     });
 
@@ -1965,7 +1965,7 @@ describe("dashboardAutoQueryBuilder", () => {
     it("should build map chart query", () => {
       const result = mapChart(mockDashboardPanelData);
       expect(result).toContain("SELECT");
-      expect(result).toContain("FROM \"logs\"");
+      expect(result).toContain('FROM "logs"');
       expect(result).toContain("GROUP BY name_alias");
       expect(result).toContain("LIMIT 100");
     });
@@ -2080,7 +2080,7 @@ describe("dashboardAutoQueryBuilder", () => {
     it("should build geo map chart query", () => {
       const result = geoMapChart(mockDashboardPanelData);
       expect(result).toContain("SELECT");
-      expect(result).toContain("FROM \"locations\"");
+      expect(result).toContain('FROM "locations"');
       expect(result).toContain("GROUP BY lat_alias, lon_alias");
     });
 
@@ -2194,7 +2194,7 @@ describe("dashboardAutoQueryBuilder", () => {
     it("should build sankey chart query", () => {
       const result = sankeyChartQuery(mockDashboardPanelData);
       expect(result).toContain("SELECT");
-      expect(result).toContain("FROM \"flows\"");
+      expect(result).toContain('FROM "flows"');
       expect(result).toContain("GROUP BY source_alias, target_alias");
     });
 
@@ -2236,5 +2236,144 @@ describe("dashboardAutoQueryBuilder", () => {
       expect(result).toContain("SELECT");
       expect(result).toContain("source_alias");
     });
+  });
+});
+
+describe("buildSQLQueryFromInput — cast", () => {
+  const defaultStream = "aws_cost_cur";
+  const fieldArg = { type: "field", value: { field: "lineitem_usageamount" } };
+
+  it("renders a safe cast as TRY_CAST", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [fieldArg, { type: "castType", value: "DOUBLE" }],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE)");
+  });
+
+  it("renders a strict cast as CAST", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "cast",
+        args: [fieldArg, { type: "castType", value: "BIGINT" }],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("CAST(aws_cost_cur.lineitem_usageamount AS BIGINT)");
+  });
+
+  it("nests inside an aggregation", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "sum",
+        args: [
+          {
+            type: "function",
+            value: {
+              functionName: "try_cast",
+              args: [fieldArg, { type: "castType", value: "DOUBLE" }],
+            },
+          },
+        ],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("sum(TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE))");
+  });
+
+  it("nests inside a percentile, which appends its own argument", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "p95",
+        args: [
+          {
+            type: "function",
+            value: {
+              functionName: "try_cast",
+              args: [fieldArg, { type: "castType", value: "DOUBLE" }],
+            },
+          },
+        ],
+      },
+      defaultStream,
+    );
+    expect(result).toBe(
+      "approx_percentile_cont(TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE), 0.95)",
+    );
+  });
+
+  it("reads the target type by kind, not by position", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [{ type: "castType", value: "BIGINT" }, fieldArg],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS BIGINT)");
+  });
+
+  it("still casts when a saved panel carries no target type", () => {
+    const result = buildSQLQueryFromInput(
+      { functionName: "try_cast", args: [fieldArg] },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE)");
+  });
+
+  it("ignores a stray argument that is not a value or a type", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [
+          fieldArg,
+          { type: "string", value: "DOUBLE) FROM secrets --" },
+          { type: "castType", value: "DOUBLE" },
+        ],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE)");
+  });
+
+  it("returns an empty string when only a target type is present", () => {
+    const result = buildSQLQueryFromInput(
+      { functionName: "try_cast", args: [{ type: "castType", value: "DOUBLE" }] },
+      defaultStream,
+    );
+    expect(result).toBe("");
+  });
+
+  it("falls back to the default type rather than emitting an unknown one", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [fieldArg, { type: "castType", value: "DOUBLE) FROM secrets --" }],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("TRY_CAST(aws_cost_cur.lineitem_usageamount AS DOUBLE)");
+  });
+
+  it("returns an empty string when the value argument is missing", () => {
+    const result = buildSQLQueryFromInput(
+      {
+        functionName: "try_cast",
+        args: [
+          { type: "field", value: {} },
+          { type: "castType", value: "DOUBLE" },
+        ],
+      },
+      defaultStream,
+    );
+    expect(result).toBe("");
+  });
+
+  it("adds the target type argument when a saved panel omits it", () => {
+    const result = addMissingArgs({ functionName: "try_cast", args: [fieldArg] });
+    expect(result.args[1]).toEqual({ type: "castType", value: "DOUBLE" });
   });
 });

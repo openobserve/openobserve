@@ -1,0 +1,63 @@
+// Copyright 2026 OpenObserve Inc.
+
+import type { I18nText } from "@/types/i18n";
+
+export type TimeSize = "sm" | "md";
+
+export interface TimeProps {
+  /** Time string in `HH:MM` (or `HH:MM:SS` when `withSeconds`) format */
+  modelValue?: string;
+  /** Enable seconds precision (`HH:MM:SS`) */
+  withSeconds?: boolean;
+  /**
+   * Force a 24-hour clock: 00–23 header, a dual-ring hour face (1–12 outer,
+   * 13–00 inner), no AM/PM toggle, and a deterministic `HH:MM` text input —
+   * the native time input's displayed format follows the OS locale, which may
+   * be 12-hour.
+   */
+  format24?: boolean;
+  /** Minimum selectable time — `HH:MM` */
+  min?: string;
+  /** Maximum selectable time — `HH:MM` */
+  max?: string;
+  /** Step in seconds — default 60 (one minute) */
+  step?: number;
+  /** Label rendered above the field */
+  label?: I18nText;
+  /** Placeholder shown when empty */
+  placeholder?: I18nText;
+  /** Helper text below the field */
+  helpText?: I18nText;
+  /** Error message — when provided the field shows error styling */
+  errorMessage?: I18nText;
+  /** Marks the field as being in error state without a message */
+  error?: boolean;
+  /** Whether the user can clear the value */
+  clearable?: boolean;
+  /** Prevents editing */
+  readonly?: boolean;
+  /** Prevents interaction */
+  disabled?: boolean;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
+  /** Control size */
+  size?: TimeSize;
+  /** HTML id */
+  id?: string;
+  /** HTML name */
+  name?: string;
+}
+
+export interface TimeEmits {
+  (_e: "update:modelValue", _value: string): void;
+  (_e: "change", _value: string): void;
+  (_e: "clear"): void;
+  (_e: "blur", _event: FocusEvent): void;
+  (_e: "focus", _event: FocusEvent): void;
+}
+
+export interface TimeSlots {
+  label?: () => unknown;
+  /** Tooltip content — renders an info icon in the label row when provided */
+  tooltip?: () => unknown;
+}

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,87 +14,71 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="cipher-keys-add-encryption-mechanism">
-    <q-select
+  <div class="cipher-keys-add-encryption-mechanism flex flex-col gap-y-2">
+    <!-- Both selects are OForm* controls connected to the parent OForm (in
+         AddCipherKey.vue) by `name`; their rules live in AddCipherKey.schema.ts.
+         No manual error/touched refs, no validate() — the parent schema gates. -->
+    <OFormSelect
       data-test="add-cipher-key-auth-method-input"
-      v-model="frmData.key.mechanism.type"
-      :label="t('cipherKey.providerType') + ' *'"
-      color="input-border q-w-lg"
-      bg-color="input-bg"
-      class="showLabelOnTop full-width"
-      stack-label
-      outlined
-      filled
-      dense
+      name="key.mechanism.type"
+      :label="t('cipherKey.providerType')"
+      required
+      class="w-full"
       :options="providerTypeOptions"
-      option-value="value"
-      option-label="label"
-      map-options
-      emit-value
-      :rules="[(val: any) => !!val || 'Provider type is required']"
+      labelKey="label"
+      valueKey="value"
       tabindex="0"
     />
 
-    <q-select
-      v-if="frmData.key.mechanism.type === 'simple'"
+    <OFormSelect
+      v-if="mechanismType === 'simple'"
       data-test="add-cipher-algorithm-input"
-      v-model="frmData.key.mechanism.simple_algorithm"
-      :label="t('cipherKey.algorithm') + ' *'"
-      color="input-border q-w-lg"
-      bg-color="input-bg"
-      class="showLabelOnTop full-width"
-      stack-label
-      outlined
-      filled
-      dense
+      name="key.mechanism.simple_algorithm"
+      :label="t('cipherKey.algorithm')"
+      required
+      class="w-full"
       :options="plainAlgorithmOptions"
-      option-value="value"
-      option-label="label"
-      map-options
-      emit-value
-      :rules="[(val: any) => !!val || 'Algorithm is required']"
-      tabindex="1"
+      labelKey="label"
+      valueKey="value"
+      tabindex="0"
     />
-
   </div>
 </template>
 
 <script lang="ts">
-import { ref, defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, defineComponent, inject } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 
 export default defineComponent({
   name: "PageAddEncryptionMechanism",
-  props: {
-    formData: Object,
-  },
-  setup(props: any) {
-    const { t } = useI18n();
-    const frmData = ref(props.formData || {});
+  components: { OFormSelect },
+  setup() {
+    const { t } = useI18nTyped();
 
-    const providerTypeOptions = ref([
-      { value: "simple", label: "Simple" },
-      { value: "tink_keyset", label: "Tink KeySet" },
-    ]);
+    // Read the (form-owned) mechanism type reactively from the parent OForm so
+    // the conditional algorithm select shows/hides as it changes. `useStore`
+    // (NOT a snapshot of form.state.values) keeps the computed reactive.
+    const form = inject(FORM_CONTEXT_KEY, null);
+    const mechanismType = form
+      ? form.useStore((s: any) => s?.values?.key?.mechanism?.type)
+      : computed(() => "simple");
 
-    const plainAlgorithmOptions = ref([
-      { value: "aes-256-siv", label: "AES 256 SIV" },
-    ]);
+    const providerTypeOptions = [
+      { value: "simple", label: t("cipherKeys.mechanismSimple") },
+      { value: "tink_keyset", label: raw("Tink KeySet") },
+    ];
+
+    const plainAlgorithmOptions = [{ value: "aes-256-siv", label: raw("AES 256 SIV") }];
 
     return {
+      raw,
       t,
-      frmData,
+      mechanismType,
       providerTypeOptions,
       plainAlgorithmOptions,
     };
   },
 });
 </script>
-
-<style lang="scss">
-.cipher-keys-add-encryption-mechanism {
-  .q-field--labeled.showLabelOnTop .q-field__bottom {
-    padding: 0px;
-  }  
-}
-</style>

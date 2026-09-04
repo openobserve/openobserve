@@ -1,0 +1,21 @@
+{
+  "name": "openobserve-ai-review",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Multi-agent AI code review system for OpenObserve PRs",
+  "type": "module",
+  "scripts": {
+    "review": "node run-review.mjs"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@opentelemetry/api": "^1.9.1",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.219.0",
+    "@opentelemetry/resources": "^2.8.0",
+    "@opentelemetry/sdk-trace-base": "^2.8.0",
+    "@opentelemetry/sdk-trace-node": "^2.8.0",
+    "@opentelemetry/semantic-conventions": "^1.41.1"
+  }
+}

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,13 +23,7 @@ pub fn get_float_value(val: &Value) -> f64 {
         Value::String(v) => v.parse::<f64>().unwrap_or(0.0),
         // f64, i64, u64 both can be converted to f64
         Value::Number(v) => v.as_f64().unwrap_or(0.0),
-        Value::Bool(v) => {
-            if *v {
-                1.0
-            } else {
-                0.0
-            }
-        }
+        Value::Bool(v) if *v => 1.0,
         _ => 0.0,
     }
 }
@@ -42,13 +36,7 @@ pub fn get_int_value(val: &Value) -> i64 {
             Some(v) => v,
             None => v.as_f64().unwrap_or(0.0) as i64,
         },
-        Value::Bool(v) => {
-            if *v {
-                1
-            } else {
-                0
-            }
-        }
+        Value::Bool(v) if *v => 1,
         _ => 0,
     }
 }
@@ -61,13 +49,7 @@ pub fn get_uint_value(val: &Value) -> u64 {
             Some(v) => v,
             None => v.as_f64().unwrap_or(0.0) as u64,
         },
-        Value::Bool(v) => {
-            if *v {
-                1
-            } else {
-                0
-            }
-        }
+        Value::Bool(v) if *v => 1,
         _ => 0,
     }
 }
@@ -134,11 +116,17 @@ pub fn estimate_json_bytes(val: &Value) -> usize {
             }
         }
         Value::String(s) => {
-            // count the " character in string, as it will be escaped in the input json
+            // count quotes and backslashes in one pass; these add an extra byte when escaped
             // also we use bytes() here as sometimes compiler can optimize it faster with sse
             // see https://users.rust-lang.org/t/count-number-of-z-in-a-string/49763/5
-            let quote_count = s.bytes().filter(|b| *b == b'"').count();
-            let slash_count = s.bytes().filter(|b| *b == b'\\').count();
+            let (quote_count, slash_count) =
+                s.bytes()
+                    .fold((0usize, 0usize), |(quote_count, slash_count), b| {
+                        (
+                            quote_count + usize::from(b == b'"'),
+                            slash_count + usize::from(b == b'\\'),
+                        )
+                    });
             // "?"=>2
             size += s.len() + 2 + quote_count + slash_count;
         }
@@ -173,13 +161,9 @@ pub fn get_value_from_path(value: &Value, path: &str) -> Option<Value> {
         if key.is_empty() {
             continue;
         }
-        match temp.as_object() {
-            Some(map) => match map.get(key) {
-                Some(v) => temp = v,
-                None => return None,
-            },
-            None => return None,
-        }
+        let map = temp.as_object()?;
+        let val = map.get(key)?;
+        temp = val;
     }
     match rest {
         None => Some(temp.to_owned()),
@@ -301,8 +285,8 @@ mod tests {
         assert_eq!(get_float_value(&Value::String("invalid".to_string())), 0.0);
         assert_eq!(get_float_value(&Value::Number(Number::from(42))), 42.0);
         assert_eq!(
-            get_float_value(&Value::Number(Number::from_f64(3.14).unwrap())),
-            3.14
+            get_float_value(&Value::Number(Number::from_f64(3.25).unwrap())),
+            3.25
         );
         assert_eq!(get_float_value(&Value::Bool(true)), 1.0);
         assert_eq!(get_float_value(&Value::Bool(false)), 0.0);
@@ -314,7 +298,7 @@ mod tests {
         assert_eq!(get_int_value(&Value::String("invalid".to_string())), 0);
         assert_eq!(get_int_value(&Value::Number(Number::from(42))), 42);
         assert_eq!(
-            get_int_value(&Value::Number(Number::from_f64(3.14).unwrap())),
+            get_int_value(&Value::Number(Number::from_f64(3.25).unwrap())),
             3
         );
         assert_eq!(get_int_value(&Value::Bool(true)), 1);
@@ -327,7 +311,7 @@ mod tests {
         assert_eq!(get_uint_value(&Value::String("invalid".to_string())), 0);
         assert_eq!(get_uint_value(&Value::Number(Number::from(42u64))), 42);
         assert_eq!(
-            get_uint_value(&Value::Number(Number::from_f64(3.14).unwrap())),
+            get_uint_value(&Value::Number(Number::from_f64(3.25).unwrap())),
             3
         );
         assert_eq!(get_uint_value(&Value::Bool(true)), 1);
@@ -336,16 +320,16 @@ mod tests {
         assert_eq!(get_uint_value(&Value::Array(vec![])), 0);
 
         // Test get_bool_value
-        assert_eq!(get_bool_value(&Value::String("true".to_string())), true);
-        assert_eq!(get_bool_value(&Value::String("false".to_string())), false);
-        assert_eq!(get_bool_value(&Value::String("invalid".to_string())), false);
-        assert_eq!(get_bool_value(&Value::Number(Number::from(1))), true);
-        assert_eq!(get_bool_value(&Value::Number(Number::from(0))), false);
-        assert_eq!(get_bool_value(&Value::Number(Number::from(42))), true);
-        assert_eq!(get_bool_value(&Value::Bool(true)), true);
-        assert_eq!(get_bool_value(&Value::Bool(false)), false);
-        assert_eq!(get_bool_value(&Value::Null), false);
-        assert_eq!(get_bool_value(&Value::Array(vec![])), false);
+        assert!(get_bool_value(&Value::String("true".to_string())));
+        assert!(!get_bool_value(&Value::String("false".to_string())));
+        assert!(!get_bool_value(&Value::String("invalid".to_string())));
+        assert!(get_bool_value(&Value::Number(Number::from(1))));
+        assert!(!get_bool_value(&Value::Number(Number::from(0))));
+        assert!(get_bool_value(&Value::Number(Number::from(42))));
+        assert!(get_bool_value(&Value::Bool(true)));
+        assert!(!get_bool_value(&Value::Bool(false)));
+        assert!(!get_bool_value(&Value::Null));
+        assert!(!get_bool_value(&Value::Array(vec![])));
 
         // Test get_string_value
         assert_eq!(
@@ -354,8 +338,8 @@ mod tests {
         );
         assert_eq!(get_string_value(&Value::Number(Number::from(42))), "42");
         assert_eq!(
-            get_string_value(&Value::Number(Number::from_f64(3.14).unwrap())),
-            "3.14"
+            get_string_value(&Value::Number(Number::from_f64(3.25).unwrap())),
+            "3.25"
         );
         assert_eq!(get_string_value(&Value::Bool(true)), "true");
         assert_eq!(get_string_value(&Value::Bool(false)), "false");
@@ -561,5 +545,30 @@ mod tests {
         // The estimate should be close to the actual size
         assert!(estimated_size > 0);
         assert!(estimated_size <= actual_size);
+    }
+
+    #[test]
+    fn test_estimate_json_bytes_bool_false() {
+        // Bool(false) is 5 bytes, Bool(true) is 4 bytes
+        let true_val = json!(true);
+        let false_val = json!(false);
+        assert_eq!(estimate_json_bytes(&true_val), 4);
+        assert_eq!(estimate_json_bytes(&false_val), 5);
+    }
+
+    #[test]
+    fn test_estimate_json_bytes_skips_special_cols() {
+        use crate::{ALL_VALUES_COL_NAME, ORIGINAL_DATA_COL_NAME};
+        // Object fields named _original and _all_values should be skipped
+        let with_special = json!({
+            ORIGINAL_DATA_COL_NAME: "ignored_value",
+            ALL_VALUES_COL_NAME: "also_ignored",
+            "normal": "kept"
+        });
+        let without_special = json!({"normal": "kept"});
+        assert_eq!(
+            estimate_json_bytes(&with_special),
+            estimate_json_bytes(&without_special)
+        );
     }
 }

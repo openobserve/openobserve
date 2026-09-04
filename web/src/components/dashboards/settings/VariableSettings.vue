@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,8 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div>
-    <div v-if="isAddVariable" class="column full-height">
+  <div class="h-full max-h-full overflow-hidden">
+    <div v-if="isAddVariable" class="flex h-full max-h-full flex-col overflow-hidden">
       <AddSettingVariable
         v-if="isAddVariable"
         @save="handleSaveVariable"
@@ -24,241 +24,245 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :dashboardVariablesList="dashboardVariablesList"
       />
     </div>
-    <div v-else class="column full-height">
-      <DashboardHeader title="Variables">
+    <div v-else class="flex h-full max-h-full flex-col overflow-hidden">
+      <DashboardHeader :title="t('dashboard.variableSettingsPage.variables')">
         <template #right>
-          <div>
+          <div class="flex gap-2">
             <!-- show variables dependencies if variables exist -->
-            <q-btn
+            <OButton
               v-if="dashboardVariablesList.length > 0"
-              class="text-bold no-border q-ml-md o2-secondary-button tw:h-[36px]"
-              no-caps
-              no-outline
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              flat
-              label="Show Dependencies"
+              variant="outline"
+              size="sm"
               @click="showVariablesDependenciesGraphPopUp = true"
               data-test="dashboard-variable-dependencies-btn"
-            />
-            <q-btn
-              class="text-bold no-border q-ml-md o2-primary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-primary-button-dark'
-                  : 'o2-primary-button-light'
-              "
-              flat
-              :label="t(`dashboard.newVariable`)"
+              >{{ t("dashboard.showDependencies") }}</OButton
+            >
+            <OButton
+              variant="primary"
+              size="sm"
               @click="addVariables"
               data-test="dashboard-add-variable-btn"
-            />
+              >{{ t("dashboard.newVariable") }}</OButton
+            >
           </div>
         </template>
       </DashboardHeader>
-      <div>
-        <div class="variables-list-header">
-          <div class="header-item"></div>
-          <div class="header-item">#</div>
-          <div class="header-item">{{ t("dashboard.name") }}</div>
-          <div class="header-item">{{ t("dashboard.type") }}</div>
-          <div class="header-item">{{ t("dashboard.selectType") }}</div>
-          <div class="header-item">Scope</div>
-          <div class="header-item q-ml-lg q-pl-lg">
-            {{ t("dashboard.actions") }}
-          </div>
-        </div>
-
-        <draggable
-          v-model="dashboardVariablesList"
-          :options="dragOptions"
-          @end="handleDragEnd"
-          @mousedown.stop="() => {}"
-          data-test="dashboard-variable-settings-drag"
+      <div
+        ref="tableWrapper"
+        class="min-h-0 flex-1 overflow-y-auto"
+        data-test="dashboard-variable-settings-drag"
+      >
+        <OTable
+          data-test="dashboard-variables-table"
+          :data="dashboardVariablesList"
+          :columns="columns"
+          row-key="name"
+          :frame="false"
+          pagination="none"
+          sorting="none"
+          selection="none"
+          :default-columns="false"
+          :show-global-filter="false"
         >
-          <div
-            v-for="(variable, index) in dashboardVariablesList"
-            :key="variable.name"
-            class="draggable-row"
-            data-test="dashboard-variable-settings-draggable-row"
-          >
-            <div class="draggable-handle">
-              <q-icon
-                name="drag_indicator"
-                color="grey-13"
-                class="'q-mr-xs"
-                data-test="dashboard-variable-settings-drag-handle"
-              />
+          <template #empty>
+            <OEmptyState size="hero" preset="no-variables" @action="() => addVariables()" />
+          </template>
+
+          <template #cell-drag>
+            <div
+              class="variable-drag-handle flex cursor-move items-center justify-center"
+              data-test="dashboard-variable-settings-drag-handle"
+            >
+              <OIcon name="drag-indicator" size="sm" />
             </div>
-            <div class="draggable-content">
-              <div>
-                {{ index < 9 ? `0${index + 1}` : index + 1 }}
-              </div>
-              <div class="item-name">
-                <span class="item-name-text">
-                  {{ variable.name }}
-                </span>
-                <q-tooltip
-                  v-if="variable.name.length > 30"
-                  style="word-wrap: break-word; white-space: normal;"
-                  class="variable-name-tooltip"
+          </template>
+
+          <template #cell-index="{ row }">
+            {{ formatIndex(row) }}
+          </template>
+
+          <template #cell-name="{ row }">
+            <div class="item-name flex items-center gap-1.5">
+              <span class="block overflow-hidden text-ellipsis whitespace-nowrap">
+                {{ row.name }}
+              </span>
+              <OTooltip v-if="row.name.length > 30" :content="row.name" />
+              <!-- Dependency indicator: icon + count of variables this one depends
+                   on. OTooltip WRAPS the chip (default-slot mode) so the whole chip
+                   is the hover target — child mode would anchor only to the count. -->
+              <OTooltip
+                v-if="getDependencies(row).length"
+                :content="
+                  t('dashboard.variableSettingsPage.dependsOn', {
+                    names: getDependencies(row).join(', '),
+                  })
+                "
+              >
+                <span
+                  class="text-text-secondary bg-surface-subtle inline-flex shrink-0 cursor-help items-center gap-0.5 rounded-full px-1.5 py-0.5"
+                  :data-test="`dashboard-variable-${row.name}-dependencies`"
                 >
-                  {{ variable.name }}
-                </q-tooltip>
-              </div>
-              <div>
-                {{ getVariableTypeLabel(variable.type) }}
-              </div>
-              <div>
-                {{
-                  variable.multiSelect
-                    ? t("dashboard.isMultiSelect")
-                    : t("dashboard.isSingleSelect")
-                }}
-              </div>
-              <div class="item-scope">
-                <div class="scope-info">
-                  <q-badge
-                    color="primary"
-                    v-if="getScopeType(variable) === 'global'"
-                  >
-                    Global
-                  </q-badge>
-                  <q-badge
-                    color="secondary"
-                    v-else-if="getScopeType(variable) === 'tabs'"
-                  >
-                    {{ variable.tabs?.length || 0 }} Tabs
-                  </q-badge>
-                  <q-badge
-                    color="teal"
-                    v-else-if="getScopeType(variable) === 'panels'"
-                  >
-                    {{ variable.panels?.length || 0 }} Panels
-                  </q-badge>
-
-                  <q-tooltip
-                    v-if="
-                      getScopeType(variable) === 'tabs' && variable.tabs?.length
-                    "
-                  >
-                    <div>Applied to tabs:</div>
-                    <div v-for="tabId in variable.tabs" :key="tabId">
-                      {{ getTabName(tabId) }}
-                    </div>
-                  </q-tooltip>
-
-                  <q-tooltip
-                    v-if="
-                      getScopeType(variable) === 'panels' &&
-                      variable.panels?.length
-                    "
-                  >
-                    <div>Applied to panels:</div>
-                    <div v-for="panelId in variable.panels" :key="panelId">
-                      {{ getPanelName(panelId) }}
-                    </div>
-                  </q-tooltip>
-                </div>
-              </div>
-              <div class="item-actions">
-                <q-btn
-                  icon="edit"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  :title="t('dashboard.edit')"
-                  @click="editVariableFn(variable.name)"
-                  :data-test="`dashboard-edit-variable-${variable.name}`"
-                />
-                <q-btn
-                  :icon="outlinedDelete"
-                  :title="t('dashboard.delete')"
-                  padding="sm"
-                  unelevated
-                  size="sm"
-                  round
-                  flat
-                  @click.stop="
-                    showDeleteDialogFn({ row: { name: variable.name } })
-                  "
-                  data-test="dashboard-delete-variable"
-                />
-              </div>
+                  <OIcon name="account-tree" size="xs" />
+                  <span class="text-2xs leading-none">{{ getDependencies(row).length }}</span>
+                </span>
+              </OTooltip>
             </div>
-          </div>
-        </draggable>
+          </template>
+
+          <template #cell-type="{ row }">
+            {{ getVariableTypeLabel(row.type) }}
+          </template>
+
+          <template #cell-selection="{ row }">
+            {{ row.multiSelect ? t("dashboard.isMultiSelect") : t("dashboard.isSingleSelect") }}
+          </template>
+
+          <template #cell-scope="{ row }">
+            <div class="flex items-center">
+              <OTag
+                type="variableScope"
+                value="global"
+                data-test="dashboard-variable-scope-badge"
+                v-if="getScopeType(row) === 'global'"
+              />
+              <OTag
+                type="variableScope"
+                value="tabs"
+                data-test="dashboard-variable-scope-badge"
+                v-else-if="getScopeType(row) === 'tabs'"
+              >
+                {{ t("dashboard.variableSettingsPage.tabsCount", { n: row.tabs?.length || 0 }) }}
+              </OTag>
+              <OTag
+                type="variableScope"
+                value="panels"
+                data-test="dashboard-variable-scope-badge"
+                v-else-if="getScopeType(row) === 'panels'"
+              >
+                {{
+                  t("dashboard.variableSettingsPage.panelsCount", { n: row.panels?.length || 0 })
+                }}
+              </OTag>
+
+              <OTooltip v-if="getScopeType(row) === 'tabs' && row.tabs?.length">
+                <template #content>
+                  <div>{{ t("dashboard.appliedToTabs") }}</div>
+                  <div v-for="tabId in row.tabs" :key="tabId">{{ getTabName(tabId) }}</div>
+                </template>
+              </OTooltip>
+
+              <OTooltip v-if="getScopeType(row) === 'panels' && row.panels?.length">
+                <template #content>
+                  <div>{{ t("dashboard.appliedToPanels") }}</div>
+                  <div v-for="panelId in row.panels" :key="panelId">
+                    {{ getPanelName(panelId) }}
+                  </div>
+                </template>
+              </OTooltip>
+            </div>
+          </template>
+
+          <template #cell-actions="{ row }">
+            <div class="flex justify-center gap-2">
+              <OButton
+                variant="ghost"
+                size="icon"
+                :title="t('dashboard.edit')"
+                @click="editVariableFn(row.name)"
+                :data-test="`dashboard-edit-variable-${row.name}`"
+                icon-left="edit"
+              >
+              </OButton>
+              <OButton
+                variant="ghost"
+                size="icon"
+                :title="t('dashboard.delete')"
+                @click.stop="showDeleteDialogFn({ row: { name: row.name } })"
+                data-test="dashboard-delete-variable"
+              >
+                <template #icon-left><OIcon name="delete" size="sm" /></template>
+              </OButton>
+            </div>
+          </template>
+        </OTable>
 
         <ConfirmDialog
-          title="Delete Variable"
-          message="Are you sure you want to delete the variable?"
+          :title="t('dashboard.deleteVariable')"
+          :message="t('dashboard.deleteVariableMsg')"
           @update:ok="deleteVariableFn"
           @update:cancel="confirmDeleteDialog = false"
           v-model="confirmDeleteDialog"
         />
-        <q-dialog v-model="showVariablesDependenciesGraphPopUp">
-          <q-card
-            style="width: 60vw; min-width: 60vw; height: 70vh; min-height: 70vh"
-          >
-            <q-toolbar>
-              <q-toolbar-title>Variables Dependency Graph</q-toolbar-title>
-              <q-btn flat round dense icon="close" v-close-popup="true" />
-            </q-toolbar>
-            <q-card-section style="width: 100%; height: calc(100% - 50px)">
-              <VariablesDependenciesGraph
-                :variablesList="dashboardVariablesList"
-                :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-                @closePopUp="
-                  () => (showVariablesDependenciesGraphPopUp = false)
-                "
-              />
-            </q-card-section>
-          </q-card>
-        </q-dialog>
+        <ODialog
+          data-test="variable-settings-dependencies-graph-dialog"
+          v-model:open="showVariablesDependenciesGraphPopUp"
+          :width="60"
+          :title="t('dashboard.variableSettingsPage.variablesDependencyGraph')"
+        >
+          <div class="h-[60vh]">
+            <VariablesDependenciesGraph
+              :variablesList="dashboardVariablesList"
+              :class="'bg-surface-base'"
+              @closePopUp="() => (showVariablesDependenciesGraphPopUp = false)"
+            />
+          </div>
+        </ODialog>
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, onActivated, reactive, nextTick } from "vue";
-import { useI18n } from "vue-i18n";
+import {
+  defineComponent,
+  ref,
+  computed,
+  onMounted,
+  onActivated,
+  onBeforeUnmount,
+  reactive,
+  nextTick,
+} from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { buildVariablesDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { useStore } from "vuex";
 import { useRoute } from "vue-router";
-import { getImageURL } from "../../../utils/zincutils";
-import {
-  getDashboard,
-  deleteVariable,
-  updateDashboard,
-} from "../../../utils/commons";
+import { getDashboard, deleteVariable, updateDashboard } from "../../../utils/commons";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import AddSettingVariable from "./AddSettingVariable.vue";
 import DashboardHeader from "./common/DashboardHeader.vue";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
-import NoData from "../../shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import ConfirmDialog from "../../ConfirmDialog.vue";
 import VariablesDependenciesGraph from "./VariablesDependenciesGraph.vue";
 import useNotifications from "@/composables/useNotifications";
-import { VueDraggableNext } from "vue-draggable-next";
+import Sortable from "sortablejs";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL, TABLE_INDEX_COL_SIZE } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "VariableSettings",
   components: {
-    draggable: VueDraggableNext as any,
     AddSettingVariable,
-    NoData,
+    OEmptyState,
     ConfirmDialog,
     DashboardHeader,
     VariablesDependenciesGraph,
+    OButton,
+    OIcon,
+    ODialog,
+    OTag,
+    OTooltip,
+    OTable,
   },
   emits: ["save"],
   setup(props, { emit }) {
     const store: any = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const isAddVariable = ref(false);
 
@@ -266,9 +270,66 @@ export default defineComponent({
       data: {},
     });
 
-    const dragOptions = ref({
-      animation: 200,
-    });
+    // Wrapper around the global OTable; used to reach its rendered <tbody>
+    // so SortableJS can provide row drag-and-drop (OTable has no native
+    // row reorder — we layer it on without modifying OTable).
+    const tableWrapper = ref<HTMLElement | null>(null);
+    let sortableInstance: Sortable | null = null;
+
+    const columns: OTableColumnDef[] = [
+      {
+        id: "drag",
+        header: raw(""),
+        size: 32,
+        minSize: 32,
+        maxSize: 32,
+        meta: { align: "center" },
+      },
+      {
+        id: "index",
+        header: raw("#"),
+        size: TABLE_INDEX_COL_SIZE,
+        meta: { align: "left" },
+      },
+      {
+        id: "name",
+        header: t("dashboard.name"),
+        accessorKey: "name",
+        size: COL.name,
+        meta: { align: "left", isName: true },
+      },
+      {
+        id: "type",
+        header: t("dashboard.type"),
+        size: COL.type,
+        meta: { align: "left" },
+      },
+      {
+        id: "selection",
+        header: t("dashboard.selectType"),
+        size: COL.status,
+        meta: { align: "left" },
+      },
+      {
+        id: "scope",
+        header: t("dashboard.variableSettingsPage.scope"),
+        size: COL.status,
+        meta: { align: "left" },
+      },
+      {
+        id: "actions",
+        header: t("dashboard.actions"),
+        isAction: true,
+        size: 120,
+        meta: { align: "center", actionCount: 2 },
+      },
+    ];
+
+    // Zero-padded position label ("01", "02", …).
+    const formatIndex = (variable: any) => {
+      const index = dashboardVariablesList.value.indexOf(variable);
+      return index < 9 ? `0${index + 1}` : `${index + 1}`;
+    };
 
     const {
       showPositiveNotification,
@@ -277,6 +338,15 @@ export default defineComponent({
     } = useNotifications();
     // list of all variables, which will be same as the dashboard variables list
     const dashboardVariablesList: any = ref([]);
+
+    // Per-variable dependency graph — each entry's `parentVariables` are the
+    // variables that one depends on (referenced in its stream/field/filters).
+    const dependencyGraph = computed(() =>
+      buildVariablesDependencyGraph(dashboardVariablesList.value ?? []),
+    );
+    const getDependencies = (row: any): string[] =>
+      dependencyGraph.value?.[row?.name]?.parentVariables ?? [];
+
     const selectedVariable = ref(null);
     const confirmDeleteDialog = ref<boolean>(false);
     const selectedDelete: any = ref(null);
@@ -319,10 +389,8 @@ export default defineComponent({
 
     // Function to get tab name by ID
     const getTabName = (tabId: string) => {
-      const tab = dashboardVariableData.data.tabs?.find(
-        (t: any) => t.tabId === tabId,
-      );
-      return tab ? tab.name : "Deleted Tab";
+      const tab = dashboardVariableData.data.tabs?.find((t: any) => t.tabId === tabId);
+      return tab ? tab.name : t("dashboard.variableSettingsPage.deletedTab");
     };
 
     // Function to get panel name by ID
@@ -334,7 +402,7 @@ export default defineComponent({
           return `${tab.name} > ${panel.title || panel.id}`;
         }
       }
-      return "Deleted Panel";
+      return t("dashboard.variableSettingsPage.deletedPanel");
     };
 
     const handleDragEnd = async () => {
@@ -351,7 +419,7 @@ export default defineComponent({
           route.query.folder ?? "default",
         );
 
-        showPositiveNotification("Dashboard updated successfully.", {
+        showPositiveNotification(t("dashboard.variableSettingsPage.dashboardUpdatedSuccessfully"), {
           timeout: 2000,
         });
 
@@ -361,21 +429,69 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Variable reorder failed",
+              t("dashboard.variableSettingsPage.variableReorderFailed"),
+            t,
           );
         } else {
-          showErrorNotification(error?.message ?? "Variable reorder failed");
+          showErrorNotification(
+            error?.message ?? t("dashboard.variableSettingsPage.variableReorderFailed"),
+          );
         }
         await getDashboardData();
       }
     };
 
+    // Attach SortableJS to OTable's rendered <tbody> so rows can be dragged
+    // to reorder. Re-runnable: tears down any prior instance first.
+    const initSortable = async () => {
+      await nextTick();
+      const tbody = tableWrapper.value?.querySelector(
+        'tbody[data-test="o2-table-body"]',
+      ) as HTMLElement | null;
+      if (!tbody) return;
+
+      sortableInstance?.destroy();
+      sortableInstance = Sortable.create(tbody, {
+        animation: 200,
+        handle: ".variable-drag-handle",
+        onEnd: (evt: Sortable.SortableEvent) => {
+          const { oldIndex, newIndex } = evt;
+          if (oldIndex == null || newIndex == null || oldIndex === newIndex) {
+            return;
+          }
+
+          // Revert Sortable's DOM mutation so Vue stays the single source of
+          // truth, then reorder the reactive data and let Vue re-render.
+          const parent = evt.from;
+          if (newIndex > oldIndex) {
+            parent.insertBefore(evt.item, parent.children[oldIndex]);
+          } else {
+            parent.insertBefore(evt.item, parent.children[oldIndex + 1] ?? null);
+          }
+
+          const list = [...dashboardVariablesList.value];
+          const [moved] = list.splice(oldIndex, 1);
+          list.splice(newIndex, 0, moved);
+          dashboardVariablesList.value = list;
+
+          handleDragEnd();
+        },
+      });
+    };
+
     onMounted(async () => {
       await getDashboardData();
+      await initSortable();
     });
 
     onActivated(async () => {
       await getDashboardData();
+      await initSortable();
+    });
+
+    onBeforeUnmount(() => {
+      sortableInstance?.destroy();
+      sortableInstance = null;
     });
 
     const getDashboardData = async () => {
@@ -385,8 +501,7 @@ export default defineComponent({
         route.query.folder ?? "default",
       );
 
-      dashboardVariablesList.value =
-        dashboardVariableData.data?.variables?.list ?? [];
+      dashboardVariablesList.value = dashboardVariableData.data?.variables?.list ?? [];
     };
 
     const addVariables = () => {
@@ -415,7 +530,7 @@ export default defineComponent({
           emit("save");
         }
 
-        showPositiveNotification("Variable deleted successfully", {
+        showPositiveNotification(t("dashboard.variableSettingsPage.variableDeletedSuccessfully"), {
           timeout: 2000,
         });
       } catch (error: any) {
@@ -423,12 +538,16 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Variable deletion failed",
+              t("dashboard.variableSettingsPage.variableDeletionFailed"),
+            t,
           );
         } else {
-          showErrorNotification(error?.message ?? "Variable deletion failed", {
-            timeout: 2000,
-          });
+          showErrorNotification(
+            error?.message ?? t("dashboard.variableSettingsPage.variableDeletionFailed"),
+            {
+              timeout: 2000,
+            },
+          );
         }
       }
     };
@@ -444,9 +563,12 @@ export default defineComponent({
       isAddVariable.value = false;
       // Wait for the listing view to render
       await nextTick();
+      // OTable remounted with a fresh <tbody>; re-attach row dragging.
+      await initSortable();
     };
-    const goBackToDashboardList = () => {
+    const goBackToDashboardList = async () => {
       isAddVariable.value = false;
+      await initSortable();
     };
     const editVariableFn = async (name: any) => {
       selectedVariable.value = name;
@@ -460,8 +582,8 @@ export default defineComponent({
       getDashboardData,
       addVariables,
       dashboardVariablesList,
+      getDependencies,
       isAddVariable,
-      outlinedDelete,
       showDeleteDialogFn,
       confirmDeleteDialog,
       deleteVariableFn,
@@ -470,114 +592,15 @@ export default defineComponent({
       selectedVariable,
       handleSaveVariable,
       showVariablesDependenciesGraphPopUp,
-      dragOptions,
-      handleDragEnd,
       getVariableTypeLabel,
       getScopeType,
       getTabName,
       getPanelName,
+      tableWrapper,
+      columns,
+      formatIndex,
+      handleDragEnd,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.column {
-  &.full-height {
-    height: 100%;
-  }
-}
-
-.variables-list-header {
-  display: grid;
-  grid-template-columns: 48px 80px minmax(200px, 1fr) 150px 100px 100px 120px;
-  padding: 8px 0;
-  font-weight: 900;
-  border-bottom: 1px solid var(--o2-border-color);
-  background-color: var(--o2-table-header-bg);
-
-  .header-item {
-    &:first-child {
-      padding-left: 16px;
-    }
-  }
-}
-
-.draggable-row {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  align-items: center;
-  border-radius: 4px;
-  border-bottom: 1px solid var(--o2-border-color);
-  &:hover {
-    background-color: var(--o2-hover-accent);
-  }
-}
-
-.draggable-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  cursor: move;
-  box-sizing: border-box;
-}
-
-.draggable-content {
-  display: grid;
-  grid-template-columns: 80px minmax(200px, 1fr) 150px 100px 100px 120px;
-  align-items: center;
-
-  // .item-name {
-  //   padding-right: 16px;
-  // }
-
-  .item-name-text {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .item-scope {
-    .scope-info {
-      display: flex;
-      align-items: center;
-
-      .q-badge {
-        font-size: 0.8rem;
-        padding: 4px 8px;
-      }
-    }
-  }
-
-  .item-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 8px;
-
-    .q-btn {
-      transition: background-color 0.2s ease;
-
-      &:hover {
-        background-color: var(--o2-hover-accent) !important;
-      }
-    }
-  }
-}
-
-:deep(.variable-name-tooltip) {
-  max-width: 500px !important;
-  word-break: break-all;
-}
-
-:deep(.dark-mode) {
-  .draggable-row {
-    background-color: #1e1e1e;
-  }
-
-  .draggable-row:nth-child(odd) {
-    background-color: #242424;
-  }
-}
-</style>

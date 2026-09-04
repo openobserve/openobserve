@@ -11,31 +11,35 @@
  */
 
 /**
- * Static selectors - Quasar Framework UI components
+ * Static selectors - Framework UI components
  */
-const QUASAR = {
-  // Dialog components
-  DIALOG: '.q-dialog',
-  DIALOG_CARD: '.q-dialog .q-card',
+const COMPONENTS = {
+  // Dialog components — match both the legacy dialog and the new ODrawer/ODialog
+  // panels migrated for the dialog v2 UX overhaul. Many specs use this to detect "is the
+  // settings overlay still open" after `addScopedVariable` saves; the settings drawer
+  // overlay intercepts pointer events on the dashboard, so missing the new selector
+  // here causes clicks on variable dropdowns to time out.
+  DIALOG: '[data-test="dashboard-settings-drawer"], [data-o2-dialog], [data-o2-drawer]',
+  DIALOG_CARD: '[data-test="dashboard-settings-drawer"]',
 
   // Menu/Dropdown components
-  MENU: '.q-menu',
-  MENU_ITEM: '.q-item',
+  MENU: '[data-test$="-popover"]',
+  MENU_ITEM: '[data-test$="-option"]',
 
   // Form components
-  CHECKBOX: '.q-checkbox',
-  CHECKBOX_CHECKED: '.q-checkbox[aria-checked="true"]',
-  CHECKBOX_UNCHECKED: '.q-checkbox[aria-checked="false"]',
+  CHECKBOX: '[role="checkbox"]',
+  CHECKBOX_CHECKED: '[role="checkbox"][aria-checked="true"]',
+  CHECKBOX_UNCHECKED: '[role="checkbox"][aria-checked="false"]',
 
-  // Loading indicators
-  SPINNER: '.q-spinner',
-  LINEAR_PROGRESS: '.q-linear-progress',
+  // Loading indicators (legacy — kept for backward compat; prefer specific data-test selectors)
+  SPINNER: '[data-test*="loading-indicator"]',
+  LINEAR_PROGRESS: '[data-test*="loading-indicator"]',
 
-  // Chip/Badge components
-  CHIP: '.q-chip',
+  // Chip/Badge components — OBadge replaces the legacy chip; use data-test or aria where available
+  CHIP: '[data-test*="chip"], [data-test*="badge"]',
 
   // Tooltip
-  TOOLTIP: '.q-tooltip',
+  TOOLTIP: '[role="tooltip"]',
 };
 
 /**
@@ -56,7 +60,8 @@ const DASHBOARD = {
   VARIABLE_TAB: '[data-test="dashboard-settings-variable-tab"]',
   ADD_VARIABLE_BTN: '[data-test="dashboard-add-variable-btn"]',
   VARIABLE_DRAG: '[data-test="dashboard-variable-settings-drag"]',
-  VARIABLE_DRAGGABLE_ROW: '[data-test="dashboard-variable-settings-draggable-row"]',
+  // Variables list migrated to OTable; rows are `o2-table-row-{index}`.
+  VARIABLE_DRAGGABLE_ROW: '[data-test^="o2-table-row-"]',
 
   // Variable form fields
   VARIABLE_NAME: '[data-test="dashboard-variable-name"]',
@@ -84,6 +89,7 @@ const DASHBOARD = {
   PANEL_CONTAINER: '[data-test="dashboard-panel-container"]',
   PANEL_REFRESH_BTN: '[data-test="dashboard-panel-refresh-panel-btn"]',
   PANEL_ANY: '[data-test*="dashboard-panel-"]', // Wildcard match for any panel
+  GRID_STACK_ITEM: ".grid-stack-item", // Grid slot of a panel; exists even while the panel itself is lazy-unmounted
 
   // Common autocomplete
   AUTO_COMPLETE: '[data-test="common-auto-complete"]',
@@ -99,13 +105,18 @@ const DASHBOARD = {
 };
 
 /**
- * Role-based selectors (ARIA)
+ * Selectors that previously relied on raw ARIA roles. Each OSelect now forwards
+ * its parent data-test to the popover (`*-popover`) and ListboxItems
+ * (`*-option`), so consumers should prefer the field-specific data-test where
+ * possible. These generic aliases match any OSelect's dropdown surface.
+ * TODO(data-test): tooltips (OTooltip / reka TooltipContent) still need a
+ * data-test on the root content; tracked in web/src/lib/overlay/Tooltip/OTooltip.vue.
  */
 const ROLES = {
-  OPTION: '[role="option"]',
-  ROLE_OPTION: '[role="option"]', // Alias for clarity
-  LISTBOX: '[role="listbox"]',
-  ROLE_LISTBOX: '[role="listbox"]', // Alias for clarity
+  OPTION: '[data-test$="-option"]',
+  ROLE_OPTION: '[data-test$="-option"]', // Alias for clarity
+  LISTBOX: '[data-test$="-popover"]',
+  ROLE_LISTBOX: '[data-test$="-popover"]', // Alias for clarity
   TOOLTIP: '[role="tooltip"]',
 };
 
@@ -114,18 +125,20 @@ const ROLES = {
  */
 const INSPECTOR = {
   QUERY_EDITOR: '.inspector-query-editor',
+  ORIGINAL_QUERY: (index = 0) => `[data-test="query-inspector-original-query-${index}"]`,
+  EXECUTED_QUERY: (index = 0) => `[data-test="query-inspector-executed-query-${index}"]`,
 };
 
 /**
  * Combined SELECTORS export for easy access
  */
 const SELECTORS = {
-  ...QUASAR,
+  ...COMPONENTS,
   ...DASHBOARD,
   ...ROLES,
   ...INSPECTOR,
-  // Keep QUASAR as nested object for explicit access like SELECTORS.QUASAR.DIALOG
-  QUASAR,
+  // Keep COMPONENTS as nested object for explicit access like SELECTORS.COMPONENTS.DIALOG
+  COMPONENTS,
 };
 
 /**
@@ -174,7 +187,7 @@ function getDeleteVariableBtn(variableName) {
  * @returns {string} Selector string
  */
 function getVariableLoadingIndicator(variableName) {
-  return `[data-test="variable-selector-${variableName}"] .q-spinner, [data-test="variable-selector-${variableName}"] .q-linear-progress`;
+  return `[data-test="variable-selector-${variableName}"] [data-test*="loading-indicator"]`;
 }
 
 /**
@@ -197,7 +210,7 @@ function getPanelRefreshBtn(panelId) {
 
 /**
  * Get menu item by text (case-insensitive)
- * Uses filter pattern: .q-item filter hasText
+ * Uses filter pattern: option filter hasText
  * @param {string} text - Item text
  * @param {boolean} exact - Use exact match (default: true)
  * @returns {Object} Object with selector and filter pattern
@@ -207,7 +220,7 @@ function getMenuItemByText(text, exact = true) {
   const escaped = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const pattern = exact ? new RegExp(`^${escaped}$`) : new RegExp(escaped);
   return {
-    selector: QUASAR.MENU_ITEM,
+    selector: COMPONENTS.MENU_ITEM,
     filter: { hasText: pattern }
   };
 }
@@ -219,7 +232,7 @@ function getMenuItemByText(text, exact = true) {
  */
 function getDialogByText(text) {
   return {
-    selector: QUASAR.DIALOG,
+    selector: COMPONENTS.DIALOG,
     filter: { hasText: text }
   };
 }
@@ -262,7 +275,7 @@ function getTabSelector(tabTitle) {
 
 module.exports = {
   // Selector groups
-  QUASAR,
+  COMPONENTS,
   DASHBOARD,
   ROLES,
   INSPECTOR,

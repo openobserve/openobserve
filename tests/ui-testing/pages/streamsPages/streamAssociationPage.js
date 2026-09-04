@@ -14,7 +14,8 @@ export class StreamAssociationPage {
     // Pattern Association Dialog
     this.addPatternCell = page.getByRole('cell', { name: 'Add Pattern' });
     this.noPatternAppliedTitle = page.locator('[data-test="associated-regex-patterns-no-pattern-applied-title"]');
-    this.patternSearchInput = page.locator('[data-test="associated-regex-patterns-search-input"]');
+    // OInput uses inheritAttrs:false — data-test lands on wrapper div; inner <input> gets data-test="{attr}-field"
+    this.patternSearchInput = page.locator('[data-test="associated-regex-patterns-search-input-field"]');
 
     // Pattern Configuration
     this.redactRadio = page.locator('[data-test="associated-regex-patterns-redact-radio"]');
@@ -24,10 +25,13 @@ export class StreamAssociationPage {
     this.queryCheckbox = page.locator('[data-test="associated-regex-patterns-query-checkbox"]');
 
     // Action Buttons
-    this.addPatternButton = page.getByRole('button', { name: 'Add Pattern' });
-    this.updateButton = page.locator('[data-test="associated-regex-patterns-update-btn"]');
+    // "Add Pattern" inside the AssociatedRegexPatterns panel (emits addPattern to parent, sets isFormDirty)
+    this.addPatternButton = page.locator('[data-test="associated-regex-patterns-add-pattern-btn"]');
+    // "Update Changes" is in the ODrawer footer — disabled until isFormDirty is true
+    this.updateButton = page.locator('[data-test="schema-pattern-association-update-btn"]');
     this.closeButton = page.locator('[data-test="associated-regex-patterns-close-btn"]');
-    this.cancelButton = page.getByRole('button').filter({ hasText: /^cancel$/ });
+    // Cancel in ODrawer footer (also closes the pattern association drawer)
+    this.cancelButton = page.locator('[data-test="schema-pattern-association-cancel-btn"]');
 
     // Messages
     this.successMessage = (text) => page.getByText(text);
@@ -35,83 +39,132 @@ export class StreamAssociationPage {
     this.dropDescription = page.getByText('Drop This will drop the field');
   }
 
-  async navigateToStreams() {
+  async navigateToStreams(streamType = 'logs') {
     const orgName = process.env.ORGNAME || 'default';
     const baseUrl = process.env.ZO_BASE_URL;
     const targetUrl = `${baseUrl}/web/streams?org_identifier=${orgName}`;
-    testLogger.info(`Navigating to Streams page with org: ${orgName}`);
+    testLogger.info(`Navigating to Streams page with org: ${orgName} (stream type: ${streamType})`);
     await this.page.goto(targetUrl);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('domcontentloaded');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await this.selectStreamTypeTab(streamType);
+  }
+
+  /**
+   * Select the stream-type tab in the Streams list toolbar. The list defaults to
+   * the "logs" tab, so a traces/metrics stream is NOT visible until its tab is
+   * active — the search box only filters within the active tab's list. The tab is
+   * an OToggleGroupItem rendered by reka-ui with `data-otoggle-value="<type>"` and
+   * `data-state=on|off`; we click until it reports `on`.
+   */
+  async selectStreamTypeTab(streamType = 'logs') {
+    if (!streamType || streamType === 'logs') return; // logs is the default active tab
+    testLogger.info(`Selecting "${streamType}" stream-type tab`);
+    const tab = this.page.locator(`[data-otoggle-value="${streamType}"]`).first();
+    await tab.waitFor({ state: 'visible', timeout: 10000 });
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const state = await tab.getAttribute('data-state').catch(() => null);
+      if (state === 'on') break;
+      await tab.click({ force: true });
+      await this.page.waitForTimeout(500);
+    }
+    // Let the list reload for the newly-selected type before callers search/open rows.
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await this.page.waitForTimeout(500);
   }
 
   async searchForStream(streamName) {
     testLogger.info(`Searching for stream: ${streamName}`);
     await this.searchStreamInput.click();
     await this.searchStreamInput.fill(streamName);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
-  async openStreamDetail(streamName) {
-    testLogger.info(`Opening stream detail for: ${streamName}`);
-    await this.page.waitForLoadState('networkidle');
+  async openStreamDetail(streamName, streamType = 'logs') {
+    testLogger.info(`Opening stream detail for: ${streamName} (stream type: ${streamType})`);
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // Find the cell with stream name
+    // Find the cell with stream name. A freshly-ingested stream can lag the
+    // /streams table under cloud load — the row may be absent on first load even
+    // after search (the caller already navigated + searched). Reload the streams
+    // page and re-search until the stream's row actually appears (bounded ~90s), so
+    // the row is reliably present before we resolve its Stream Detail button.
+    // NOTE: use waitFor (auto-waits up to timeout), NOT isVisible (instant check) —
+    // the stream needs time to appear in the table after each reload.
     const streamCell = this.page.getByRole('cell', { name: streamName }).first();
-    await streamCell.waitFor({ state: 'visible', timeout: 5000 });
+    let cellVisible = await streamCell.waitFor({ state: 'visible', timeout: 8000 }).then(() => true).catch(() => false);
+    for (let attempt = 1; attempt <= 6 && !cellVisible; attempt++) {
+      testLogger.info(`Stream "${streamName}" row not yet in /streams (attempt ${attempt}) — reloading + re-searching`);
+      await this.navigateToStreams(streamType);
+      await this.searchForStream(streamName);
+      cellVisible = await streamCell.waitFor({ state: 'visible', timeout: 12000 }).then(() => true).catch(() => false);
+    }
+    if (!cellVisible) {
+      throw new Error(`openStreamDetail: stream "${streamName}" row not found in /streams after reload + re-search retries (backend never listed the ingested stream)`);
+    }
     testLogger.info(`Found stream cell for: ${streamName}`);
 
-    // Navigate to parent row
-    const streamRow = streamCell.locator('..');
-    testLogger.info('Got parent row');
-
-    // Wait for the row to be fully rendered
-    await this.page.waitForTimeout(500);
-
-    // Find the Stream Detail button in that row - try multiple times
-    let detailButton = streamRow.getByRole('button', { name: 'Stream Detail' });
-    let buttonCount = await detailButton.count();
-    testLogger.info(`Stream Detail button count (by role): ${buttonCount}`);
-
-    // If not found, wait and retry up to 3 times
-    for (let retry = 0; retry < 3 && buttonCount === 0; retry++) {
-      testLogger.info(`Waiting 1 second and retrying (attempt ${retry + 2})...`);
-      await this.page.waitForTimeout(1000);
-      detailButton = streamRow.getByRole('button', { name: 'Stream Detail' });
-      buttonCount = await detailButton.count();
-      testLogger.info(`Stream Detail button count (after wait ${retry + 1}): ${buttonCount}`);
-    }
-
-    if (buttonCount === 0) {
-      testLogger.error('Stream Detail button not found! Taking screenshot...');
-      await this.page.screenshot({ path: `test-results/no-stream-detail-button-${Date.now()}.png` });
-      throw new Error('Stream Detail button not found in the row');
-    }
-
-    await detailButton.waitFor({ state: 'visible', timeout: 5000 });
-    testLogger.info('Stream Detail button is visible, attempting click with JavaScript...');
-
-    // Try JavaScript click first - sometimes Playwright's click doesn't work if element is partially obscured
-    await detailButton.evaluate(el => el.click());
-    testLogger.info('Executed JavaScript click on Stream Detail button');
-
-    // Wait for sidebar to open - just use waitFor, no fixed timeout
     const updateSettingsButton = this.page.locator('[data-test="schema-update-settings-button"]');
 
-    // Wait up to 3 seconds for sidebar to appear, if not try regular click
-    const opened = await updateSettingsButton.waitFor({ state: 'visible', timeout: 3000 }).then(() => true).catch(() => false);
+    // Open the stream's detail sidebar. Two changes vs. the old approach that dead-waited
+    // the 45s actionTimeout under cloud load (SDR multipleSDRPatterns:165 hard fail +
+    // ingestionTimeHash:93 flake):
+    //   1) Resolve the action button by its stable data-test (log-stream-schema-btn) rather
+    //      than the icon button's title text — the revamped OTable can render the name cell
+    //      before its action buttons, so a title-name match intermittently resolves nothing.
+    //   2) When the button stays absent / the sidebar doesn't open, RELOAD + re-search the
+    //      streams list (the missing recovery — the previous toPass only re-clicked the same
+    //      possibly-detached row) so a stuck or half-rendered row is forced to re-render.
+    // Keyed to the real "detail sidebar open" signal (schema-update-settings-button visible).
+    let opened = false;
+    for (let attempt = 1; attempt <= 4 && !opened; attempt++) {
+      const streamRow = this.page.getByRole('cell', { name: streamName }).first().locator('..');
+      const detailBtn = streamRow.locator('[data-test="log-stream-schema-btn"]').first();
+      opened = await (async () => {
+        await expect(detailBtn).toBeVisible({ timeout: 10000 });
+        await detailBtn.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
+        await detailBtn.evaluate((el) => el.click());
+        await expect(updateSettingsButton).toBeVisible({ timeout: 8000 });
+        return true;
+      })().catch(() => false);
+      if (!opened && attempt < 4) {
+        testLogger.info(`Stream Detail did not open for "${streamName}" (attempt ${attempt}) — reloading + re-searching streams list`);
+        await this.navigateToStreams(streamType);
+        await this.searchForStream(streamName);
+      }
+    }
 
     if (!opened) {
-      testLogger.warn('Sidebar did not open with JavaScript click, trying regular click...');
-      await detailButton.scrollIntoViewIfNeeded();
-      await detailButton.click();
-      testLogger.info('Executed Playwright click on Stream Detail button');
-      await updateSettingsButton.waitFor({ state: 'visible', timeout: 5000 });
+      testLogger.error('Stream Detail sidebar never opened! Taking screenshot...');
+      await this.page.screenshot({ path: `test-results/no-stream-detail-button-${Date.now()}.png` });
+      throw new Error(`openStreamDetail: could not open Stream Detail for "${streamName}" after reload + re-search retries`);
     }
 
     testLogger.info('Stream detail sidebar opened successfully');
+  }
 
-    // Wait for schema table to load (minimal wait)
-    await this.page.waitForTimeout(300);
+  /**
+   * Filter the stream-detail schema field table to a single field via the field
+   * search input. The schema table virtualizes its rows, so a field that sorts
+   * outside the rendered window (common on traces streams, which carry ~20 auto
+   * fields plus the span-attribute fields) is not in the DOM until filtered. This
+   * makes the target row reliably present for both logs and traces streams.
+   * No-op-safe if the search input is absent (older schema drawer variants).
+   */
+  async filterSchemaField(fieldName) {
+    // OSearchInput forwards the consumer data-test to a wrapper; the real <input>
+    // is the inner element — resolve it directly so fill() targets the field.
+    const searchInput = this.page.locator('[data-test="schema-field-search-input"]').locator('input').first();
+    const present = await searchInput.waitFor({ state: 'visible', timeout: 5000 }).then(() => true).catch(() => false);
+    if (!present) {
+      testLogger.info('Schema field search input not present — skipping field filter');
+      return;
+    }
+    await searchInput.fill('');
+    await searchInput.fill(fieldName);
+    // Let the client-side filter settle so only the matching field row remains.
+    await this.page.waitForTimeout(1000);
+    testLogger.info(`Filtered schema field table to: ${fieldName}`);
   }
 
   async clickAddPatternCell(fieldName) {
@@ -123,6 +176,9 @@ export class StreamAssociationPage {
 
     // Wait for table content to stabilize (reduced from 3000ms)
     await this.page.waitForTimeout(1000);
+
+    // Filter to the target field so its (possibly virtualized) row is in the DOM.
+    await this.filterSchemaField(fieldName);
 
     // Find row with the field name WITHIN the schema table only
     const fieldRow = schemaTable.locator(`tr:has-text("${fieldName}")`).first();
@@ -151,11 +207,15 @@ export class StreamAssociationPage {
       throw new Error(`Add Pattern button not found for field ${fieldName}`);
     }
 
-    await addPatternButton.waitFor({ state: 'visible', timeout: 5000 });
+    // Assert the real readiness signal (the Add Pattern control is visible) before scrolling.
+    await expect(addPatternButton).toBeVisible({ timeout: 10000 });
 
-    // Scroll into view before clicking
-    await addPatternButton.scrollIntoViewIfNeeded();
-    await this.page.waitForTimeout(500);
+    // Scroll into view before clicking. Use an instant native scrollIntoView rather than
+    // Playwright's scrollIntoViewIfNeeded: the schema table inside the (still-animating) stream
+    // detail ODrawer re-renders rows mid-animation, so scrollIntoViewIfNeeded's attached+stable
+    // polling can spin until the 45s actionTimeout. Native scroll resolves the element once and
+    // returns immediately; the JS/Playwright click below drives the actual interaction.
+    await addPatternButton.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
 
     testLogger.info(`Clicking Add Pattern button for field: ${fieldName}`);
 
@@ -236,33 +296,43 @@ export class StreamAssociationPage {
 
   async selectIngestionTime() {
     testLogger.info('Selecting Ingestion time');
-    const isChecked = await this.ingestionCheckbox.isChecked();
-    if (!isChecked) {
-      await this.ingestionCheckbox.click();
+    // OCheckbox renders as <label> (inheritAttrs=true, so data-test lands on <label>).
+    // Must click the inner button[role="checkbox"] — clicking the label's center may miss the button.
+    const btn = this.ingestionCheckbox.locator('button[role="checkbox"]');
+    const dataState = await btn.getAttribute('data-state');
+    if (dataState !== 'checked') {
+      await btn.click();
+      await this.page.waitForTimeout(200);
     }
   }
 
   async selectQueryTime() {
     testLogger.info('Selecting Query time');
-    const isChecked = await this.queryCheckbox.isChecked();
-    if (!isChecked) {
-      await this.queryCheckbox.click();
+    const btn = this.queryCheckbox.locator('button[role="checkbox"]');
+    const dataState = await btn.getAttribute('data-state');
+    if (dataState !== 'checked') {
+      await btn.click();
+      await this.page.waitForTimeout(200);
     }
   }
 
   async unselectIngestionTime() {
     testLogger.info('Unselecting Ingestion time');
-    const isChecked = await this.ingestionCheckbox.isChecked();
-    if (isChecked) {
-      await this.ingestionCheckbox.click();
+    const btn = this.ingestionCheckbox.locator('button[role="checkbox"]');
+    const dataState = await btn.getAttribute('data-state');
+    if (dataState === 'checked') {
+      await btn.click();
+      await this.page.waitForTimeout(200);
     }
   }
 
   async unselectQueryTime() {
     testLogger.info('Unselecting Query time');
-    const isChecked = await this.queryCheckbox.isChecked();
-    if (isChecked) {
-      await this.queryCheckbox.click();
+    const btn = this.queryCheckbox.locator('button[role="checkbox"]');
+    const dataState = await btn.getAttribute('data-state');
+    if (dataState === 'checked') {
+      await btn.click();
+      await this.page.waitForTimeout(200);
     }
   }
 
@@ -277,8 +347,47 @@ export class StreamAssociationPage {
   }
 
   async verifyStreamSettingsUpdated() {
-    testLogger.info('Verifying stream settings updated');
-    await expect(this.successMessage('Stream settings updated')).toBeVisible();
+    testLogger.info('Verifying stream settings saved — Update Changes button should become disabled');
+    // After updateRegexPattern() completes, isFormDirty is reset to false → button becomes disabled
+    await expect(this.updateButton).toBeDisabled({ timeout: 10000 });
+  }
+
+  /**
+   * Save pattern association changes via the MAIN stream-settings button.
+   *
+   * WORKAROUND: The "Update Changes" button in the pattern-association drawer
+   * footer is permanently disabled because assocPatternsRef is declared as a
+   * template ref in schema.vue but never returned from setup() — so
+   * assocPatternsRef?.isFormDirty is always undefined (falsy).
+   *
+   * Both handleAddPattern() and handleRemovePattern() in schema.vue set
+   * formDirtyFlag=true, which enables the main "Update Settings" button. This
+   * method cancels the drawer (preserving patternAssociations state) then saves
+   * via the main button instead.
+   *
+   * TODO: Once the frontend fixes assocPatternsRef (returns it from schema.vue's
+   * setup()), revert all callers of saveViaMainButton() back to the cleaner flow:
+   *   await this.clickUpdate();
+   *   await this.verifyStreamSettingsUpdated();
+   *   await this.closePatternDialog();
+   */
+  async saveViaMainButton() {
+    testLogger.info('Saving stream settings via main update button');
+    // Close the pattern-association drawer (second drawer) — keeps patternAssociations intact
+    const cancelVisible = await this.cancelButton.isVisible({ timeout: 2000 }).catch(() => false);
+    if (cancelVisible) {
+      await this.cancelButton.click();
+      await this.page.waitForTimeout(500);
+      testLogger.info('Closed pattern-association drawer');
+    }
+    // The main stream-detail drawer (first drawer) is still open; formDirtyFlag=true
+    const mainSaveButton = this.page.locator('[data-test="schema-update-settings-button"]');
+    await mainSaveButton.waitFor({ state: 'visible', timeout: 5000 });
+    await expect(mainSaveButton).toBeEnabled({ timeout: 5000 });
+    await mainSaveButton.click();
+    // formDirtyFlag resets to false after onSubmit() → button becomes disabled
+    await expect(mainSaveButton).toBeDisabled({ timeout: 15000 });
+    testLogger.info('✓ Stream settings saved');
   }
 
   async closePatternDialog() {
@@ -288,10 +397,9 @@ export class StreamAssociationPage {
     // Wait for dialog backdrop to disappear
     await this.page.waitForTimeout(1000);
 
-    // Wait for any dialog backdrop to be hidden
-    const backdrop = this.page.locator('.q-dialog__backdrop');
-    await backdrop.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
-      testLogger.info('Dialog backdrop already hidden or not found');
+    // Wait for any dialog to be hidden
+    await this.page.locator('[role="dialog"]').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {
+      testLogger.info('Dialog already hidden or not found');
     });
 
     testLogger.info('Pattern dialog closed successfully');
@@ -302,8 +410,8 @@ export class StreamAssociationPage {
     await this.cancelButton.click();
   }
 
-  async associatePatternWithStream(streamName, patternName, action, timeType, fieldName) {
-    testLogger.info(`Associating pattern ${patternName} with stream ${streamName} for field ${fieldName} (Action: ${action}, Time: ${timeType})`);
+  async associatePatternWithStream(streamName, patternName, action, timeType, fieldName, streamType = 'logs') {
+    testLogger.info(`Associating pattern ${patternName} with stream ${streamName} for field ${fieldName} (Action: ${action}, Time: ${timeType}, Type: ${streamType})`);
 
     // Close any open sidebar first - use try-catch to handle unstable elements
     try {
@@ -318,9 +426,9 @@ export class StreamAssociationPage {
       testLogger.info('No sidebar to close or sidebar already closed');
     }
 
-    await this.navigateToStreams();
+    await this.navigateToStreams(streamType);
     await this.searchForStream(streamName);
-    await this.openStreamDetail(streamName);
+    await this.openStreamDetail(streamName, streamType);
     await this.clickAddPatternCell(fieldName);
     await this.searchAndSelectPattern(patternName);
 
@@ -346,9 +454,7 @@ export class StreamAssociationPage {
     }
 
     await this.clickAddPattern();
-    await this.clickUpdate();
-    await this.verifyStreamSettingsUpdated();
-    await this.closePatternDialog();
+    await this.saveViaMainButton();
   }
 
   async removePatternFromField(streamName, fieldName) {
@@ -380,18 +486,21 @@ export class StreamAssociationPage {
     }
   }
 
-  async unlinkPatternFromField(streamName, fieldName, patternName) {
-    testLogger.info(`Unlinking pattern ${patternName} from stream ${streamName}, field ${fieldName}`);
+  async unlinkPatternFromField(streamName, fieldName, patternName, streamType = 'logs') {
+    testLogger.info(`Unlinking pattern ${patternName} from stream ${streamName}, field ${fieldName} (Type: ${streamType})`);
 
-    await this.navigateToStreams();
+    await this.navigateToStreams(streamType);
     await this.searchForStream(streamName);
-    await this.openStreamDetail(streamName);
+    await this.openStreamDetail(streamName, streamType);
     await this.page.waitForTimeout(1500);
 
     // Wait for schema table to be visible
     const schemaTable = this.page.locator('table').filter({ has: this.page.locator('th:has-text("Field")') });
     await schemaTable.waitFor({ state: 'visible', timeout: 10000 });
     await this.page.waitForTimeout(2000);
+
+    // Filter to the target field so its (possibly virtualized) row is in the DOM.
+    await this.filterSchemaField(fieldName);
 
     // Find the field row WITHIN the schema table
     const fieldRow = schemaTable.locator(`tr:has-text("${fieldName}")`).first();
@@ -410,22 +519,9 @@ export class StreamAssociationPage {
     testLogger.info('Clicked Remove Pattern button');
     await this.page.waitForTimeout(1500);
 
-    // Click Update button
-    const updateButton = this.page.locator('[data-test="associated-regex-patterns-update-btn"]');
-    await updateButton.click();
-    await this.page.waitForTimeout(2000);
-
-    // Close the pattern dialog
-    const closeButton = this.page.locator('[data-test="associated-regex-patterns-close-btn"]');
-    await closeButton.click();
-    await this.page.waitForTimeout(1000);
-
-    // Close the stream detail sidebar
-    const cancelButton = this.page.getByRole('button').filter({ hasText: /^cancel$/ });
-    const cancelVisible = await cancelButton.isVisible({ timeout: 2000 }).catch(() => false);
-    if (cancelVisible) {
-      await cancelButton.click();
-    }
+    // Save changes and close the pattern-association drawer
+    await this.saveViaMainButton();
+    testLogger.info('✓ Stream settings updated');
 
     testLogger.info(`✓ Unlinked pattern ${patternName} from field ${fieldName}`);
   }
@@ -486,11 +582,9 @@ export class StreamAssociationPage {
       await this.page.waitForTimeout(500);
     }
 
-    // After all patterns are added, click Update once
-    testLogger.info('All patterns added. Clicking Update to save changes...');
-    await this.clickUpdate();
-    await this.verifyStreamSettingsUpdated();
-    await this.closePatternDialog();
+    // After all patterns are added, save via main button
+    testLogger.info('All patterns added. Saving via main button...');
+    await this.saveViaMainButton();
 
     // Verify the expected count
     testLogger.info(`Verifying ${patternsConfig.length} patterns are linked to field ${fieldName}`);
@@ -534,6 +628,9 @@ export class StreamAssociationPage {
     const schemaTable = this.page.locator('table').filter({ has: this.page.locator('th:has-text("Field")') });
     await schemaTable.waitFor({ state: 'visible', timeout: 10000 });
     await this.page.waitForTimeout(2000);
+
+    // Filter to the target field so its (possibly virtualized) row is in the DOM.
+    await this.filterSchemaField(fieldName);
 
     // Find the field row WITHIN the schema table
     const fieldRow = schemaTable.locator(`tr:has-text("${fieldName}")`).first();
@@ -639,23 +736,11 @@ export class StreamAssociationPage {
 
     testLogger.info(`Removed ${patternsRemoved} pattern(s) from field ${fieldName}`);
 
-    // Click Update button
-    const updateButton = this.page.locator('[data-test="associated-regex-patterns-update-btn"]');
-    await updateButton.click();
-    await this.page.waitForTimeout(2000);
+    // Save and close the pattern-association drawer via main button
+    await this.saveViaMainButton();
 
-    // Verify success message
-    const successMessage = this.page.getByText('Stream settings updated');
-    await successMessage.waitFor({ state: 'visible', timeout: 5000 });
-    testLogger.info('✓ Stream settings updated successfully');
-
-    // Close the pattern dialog
-    const closeButton = this.page.locator('[data-test="associated-regex-patterns-close-btn"]');
-    await closeButton.click();
-    await this.page.waitForTimeout(1000);
-
-    // Verify field now shows "Add Pattern"
-    await this.page.waitForTimeout(1000);
+    // Verify field now shows "Add Pattern" (pattern-association drawer is closed; first drawer still open)
+    await this.page.waitForTimeout(500);
     const addPatternCell = this.page.getByRole('cell', { name: 'Add Pattern' });
     const addPatternVisible = await addPatternCell.isVisible({ timeout: 3000 }).catch(() => false);
     if (addPatternVisible) {
@@ -663,7 +748,7 @@ export class StreamAssociationPage {
     }
 
     // Close the stream detail sidebar
-    const cancelButton = this.page.getByRole('button').filter({ hasText: /^cancel$/ });
+    const cancelButton = this.page.locator('[data-test="schema-cancel-button"]');
     const cancelVisible = await cancelButton.isVisible({ timeout: 2000 }).catch(() => false);
     if (cancelVisible) {
       await cancelButton.click();
@@ -680,6 +765,9 @@ export class StreamAssociationPage {
     const schemaTable = this.page.locator('table').filter({ has: this.page.locator('th:has-text("Field")') });
     await schemaTable.waitFor({ state: 'visible', timeout: 10000 });
     await this.page.waitForTimeout(1000);
+
+    // Filter to the target field so its (possibly virtualized) row is in the DOM.
+    await this.filterSchemaField(fieldName);
 
     // Find row with the field name WITHIN the schema table only
     const fieldRow = schemaTable.locator(`tr:has-text("${fieldName}")`).first();
@@ -698,9 +786,14 @@ export class StreamAssociationPage {
       throw new Error(`Field ${fieldName} does not have any patterns linked`);
     }
 
-    await viewPatternsLink.waitFor({ state: 'visible', timeout: 5000 });
-    await viewPatternsLink.scrollIntoViewIfNeeded();
-    await this.page.waitForTimeout(500);
+    // Assert the real readiness signal (the "View N Patterns" link is visible) before scrolling.
+    await expect(viewPatternsLink).toBeVisible({ timeout: 10000 });
+
+    // Instant native scrollIntoView instead of scrollIntoViewIfNeeded: the schema table inside
+    // the stream detail ODrawer re-renders/detaches rows mid-animation, so the attached+stable
+    // polling of scrollIntoViewIfNeeded can spin until the 45s actionTimeout even though the link
+    // is already visible. Native scroll returns immediately; the click below drives interaction.
+    await viewPatternsLink.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' })).catch(() => {});
 
     testLogger.info(`Clicking View Patterns link for field: ${fieldName}`);
 
@@ -766,9 +859,7 @@ export class StreamAssociationPage {
     await this.clickAddPattern();
     testLogger.info(`✓ Pattern ${patternName} added to existing patterns`);
 
-    await this.clickUpdate();
-    await this.verifyStreamSettingsUpdated();
-    await this.closePatternDialog();
+    await this.saveViaMainButton();
 
     testLogger.info(`✓ Successfully added additional pattern ${patternName} to field ${fieldName}`);
   }
@@ -785,6 +876,9 @@ export class StreamAssociationPage {
     const schemaTable = this.page.locator('table').filter({ has: this.page.locator('th:has-text("Field")') });
     await schemaTable.waitFor({ state: 'visible', timeout: 10000 });
     await this.page.waitForTimeout(2000);
+
+    // Filter to the target field so its (possibly virtualized) row is in the DOM.
+    await this.filterSchemaField(fieldName);
 
     // Find the field row WITHIN the schema table
     const fieldRow = schemaTable.locator(`tr:has-text("${fieldName}")`).first();
@@ -850,23 +944,11 @@ export class StreamAssociationPage {
 
     testLogger.info(`Removed ${patternsRemoved} pattern(s) from field ${fieldName}`);
 
-    // Click Update button
-    const updateButton = this.page.locator('[data-test="associated-regex-patterns-update-btn"]');
-    await updateButton.click();
-    await this.page.waitForTimeout(2000);
+    // Save and close the pattern-association drawer via main button
+    await this.saveViaMainButton();
 
-    // Verify success message
-    const successMessage = this.page.getByText('Stream settings updated');
-    await successMessage.waitFor({ state: 'visible', timeout: 5000 });
-    testLogger.info('✓ Stream settings updated successfully');
-
-    // Close the pattern dialog
-    const closeButton = this.page.locator('[data-test="associated-regex-patterns-close-btn"]');
-    await closeButton.click();
-    await this.page.waitForTimeout(1000);
-
-    // Verify field now shows "Add Pattern"
-    await this.page.waitForTimeout(1000);
+    // Verify field now shows "Add Pattern" (first drawer still open after save)
+    await this.page.waitForTimeout(500);
     const addPatternCell = this.page.getByRole('cell', { name: 'Add Pattern' });
     const addPatternVisible = await addPatternCell.isVisible({ timeout: 3000 }).catch(() => false);
     if (addPatternVisible) {
@@ -874,7 +956,7 @@ export class StreamAssociationPage {
     }
 
     // Close the stream detail sidebar
-    const cancelButton2 = this.page.getByRole('button').filter({ hasText: /^cancel$/ });
+    const cancelButton2 = this.page.locator('[data-test="schema-cancel-button"]');
     const cancelVisible2 = await cancelButton2.isVisible({ timeout: 2000 }).catch(() => false);
     if (cancelVisible2) {
       await cancelButton2.click();

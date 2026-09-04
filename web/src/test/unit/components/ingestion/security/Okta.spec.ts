@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,14 +16,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
 import Okta from "@/components/ingestion/security/Okta.vue";
 
 // Mock useIngestion composable
 vi.mock("@/composables/useIngestion", () => ({
   default: vi.fn(() => ({
     endpoint: "https://api.example.com/ingest",
-    securityContent: "curl -X POST https://api.example.com/ingest -d '{\"stream\": \"[STREAM_NAME]\"}' ",
+    securityContent:
+      'curl -X POST https://api.example.com/ingest -d \'{"stream": "[STREAM_NAME]"}\' ',
     securityDocURLs: {
       okta: "https://docs.example.com/okta",
       falco: "https://docs.example.com/falco",
@@ -52,7 +52,7 @@ describe("Okta.vue", () => {
   const mountComponent = () => {
     return mount(Okta, {
       global: {
-        plugins: [store, Quasar],
+        plugins: [store],
         stubs: {
           CopyContent: {
             template: '<div data-test="copy-content-stub">{{ content }}</div>',
@@ -108,16 +108,15 @@ describe("Okta.vue", () => {
     it("should apply padding class", () => {
       const wrapper = mountComponent();
 
-      expect(wrapper.find(".q-pa-sm").exists()).toBe(true);
+      expect(wrapper.find(".p-3").exists()).toBe(true);
     });
 
     it("should have link styling", () => {
       const wrapper = mountComponent();
 
       const link = wrapper.find("a");
-      expect(link.classes()).toContain("text-blue-500");
-      expect(link.classes()).toContain("hover:text-blue-600");
-      expect(link.attributes("style")).toContain("text-decoration: underline");
+      expect(link.classes()).toContain("text-text-link");
+      expect(link.classes()).toContain("underline");
     });
   });
 });

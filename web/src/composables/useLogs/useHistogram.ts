@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,31 +15,53 @@
 
 import { useStore } from "vuex";
 
-import { searchState } from "@/composables/useLogs/searchState";
+import { searchState, type HistogramTitleParts } from "@/composables/useLogs/searchState";
 
-import { INTERVAL_MAP } from "@/utils/logs/constants";
+import { INTERVAL_MAP, type IntervalMapKey } from "@/utils/logs/constants";
+
+// Severity-aware sort order for stacked histogram breakdown categories.
+// Lower index = bottom of stack (least severe), higher = top (most severe).
+// Categories not in this map fall back to alphabetical order at rank 100.
+const SEVERITY_ORDER: Record<string, number> = {
+  trace: 0,
+  debug: 1,
+  info: 2,
+  success: 3,
+  pending: 4,
+  cancelled: 5,
+  warn: 6,
+  warning: 6,
+  timeout: 7,
+  failure: 8,
+  error: 9,
+  critical: 10,
+  fatal: 11,
+};
 
 import { formatSizeFromMB, histogramDateTimezone } from "@/utils/zincutils";
+import { formatLargeNumber } from "@/utils/formatters";
 
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+
 export const useHistogram = () => {
   const store = useStore();
-  let {
-    searchObj,
-    notificationMsg,
-    histogramMappedData,
-    histogramResults,
-    searchAggData,
-  } = searchState();
+  const { t } = useI18nTyped();
+  let { searchObj, notificationMsg, histogramMappedData, histogramResults, searchAggData } =
+    searchState();
 
   const { fnParsedSQL, hasAggregation } = logsUtils();
 
-  const getHistogramTitle = () => {
+  /**
+   * The values behind the histogram summary. Single source for BOTH the title
+   * sentence and SearchResult's result chips — the chips must never be derived
+   * by parsing the rendered title, which breaks in any non-English locale.
+   */
+  const getHistogramTitleParts = (): HistogramTitleParts | null => {
     try {
       const currentPage = searchObj.data.resultGrid.currentPage - 1 || 0;
-      const startCount =
-        currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
+      const startCount = currentPage * searchObj.meta.resultGrid.rowsPerPage + 1;
       let endCount;
 
       let totalCount = Math.max(
@@ -54,17 +76,12 @@ export const useHistogram = () => {
         endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
         if (
           currentPage >=
-          (searchObj.communicationMethod === "streaming" ||
-          searchObj.meta.jobId != ""
+          (searchObj.communicationMethod === "streaming" || searchObj.meta.jobId != ""
             ? searchObj.data.queryResults?.pagination?.length
-            : searchObj.data.queryResults.partitionDetail?.paginations
-                ?.length || 0) -
+            : searchObj.data.queryResults.partitionDetail?.paginations?.length || 0) -
             1
         ) {
-          endCount = Math.min(
-            startCount + searchObj.meta.resultGrid.rowsPerPage - 1,
-            totalCount,
-          );
+          endCount = Math.min(startCount + searchObj.meta.resultGrid.rowsPerPage - 1, totalCount);
         } else {
           endCount = searchObj.meta.resultGrid.rowsPerPage * (currentPage + 1);
         }
@@ -102,108 +119,235 @@ export const useHistogram = () => {
       const scanSizeLabel =
         searchObj.data.queryResults.result_cache_ratio !== undefined &&
         searchObj.data.queryResults.result_cache_ratio > 0
-          ? "Delta Scan Size"
-          : "Scan Size";
+          ? t("search.deltaScanSize")
+          : t("search.scanSize");
 
-      let title =
-        "Showing " +
-        startCount +
-        " to " +
-        endCount +
-        " out of " +
-        totalCount.toLocaleString() +
-        plusSign +
-        " events in " +
-        searchObj.data.queryResults.took +
-        " ms.";
+      // `plusSign` is a data suffix ("1.2K+"), not copy, so it rides with the value.
+      const parts: HistogramTitleParts = {
+        start: startCount,
+        end: endCount,
+        total: formatLargeNumber(totalCount) + plusSign,
+        took: searchObj.data.queryResults.took,
+      };
 
       if (searchObj.meta.logsVisualizeToggle === "logs") {
-        title +=
-          " (" +
-          scanSizeLabel +
-          ": " +
-          formatSizeFromMB(searchObj.data.queryResults.scan_size) +
-          plusSign +
-          ")";
+        parts.scanLabel = scanSizeLabel;
+        parts.scanSize = formatSizeFromMB(searchObj.data.queryResults.scan_size) + plusSign;
       }
-      return title;
+
+      return parts;
     } catch (e: any) {
       console.error("Error while generating histogram title", e);
-      notificationMsg.value = "Error while generating histogram title.";
-      return "";
+      return null;
     }
+  };
+
+  const getHistogramTitle = (): I18nText => {
+    const parts = getHistogramTitleParts();
+    if (!parts) {
+      notificationMsg.value = t("search.histogramTitleError");
+      return raw("");
+    }
+
+    const { start, end, total, took } = parts;
+    if (parts.scanLabel !== undefined) {
+      return t("search.histogramTitleWithScan", {
+        start,
+        end,
+        total,
+        took,
+        scanLabel: parts.scanLabel,
+        scanSize: parts.scanSize,
+      });
+    }
+    return t("search.histogramTitle", { start, end, total, took });
   };
 
   const generateHistogramData = () => {
     try {
-      // searchObj.data.histogram.chartParams.title = ""
-      let num_records: number = 0;
       const unparsed_x_data: any[] = [];
       const xData: number[] = [];
       const yData: number[] = [];
-      let hasAggregationFlag = false;
 
       const parsedSQL: any = fnParsedSQL();
-      if (searchObj.meta.sqlMode && parsedSQL.hasOwnProperty("columns")) {
-        hasAggregationFlag = hasAggregation(parsedSQL.columns);
+      if (searchObj.meta.sqlMode && Object.prototype.hasOwnProperty.call(parsedSQL, "columns")) {
+        hasAggregation(parsedSQL.columns);
       }
 
       if (
-        searchObj.data.queryResults.hasOwnProperty("aggs") &&
+        Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "aggs") &&
         searchObj.data.queryResults.aggs
       ) {
-        histogramMappedData = new Map(
-          histogramResults.value.map((item: any) => [
-            item.zo_sql_key,
-            JSON.parse(JSON.stringify(item)),
-          ]),
-        );
+        // Read the breakdown field returned by the backend.
+        // When present, the histogram is rendered as a stacked bar chart grouped
+        // by this field (e.g. "severity"). When absent, falls through to the
+        // flat single-series path below.
+        const breakdownField: string | null =
+          searchObj.data.queryResults.histogram_breakdown_field ?? null;
 
-        searchObj.data.queryResults.aggs.forEach((item: any) => {
-          if (histogramMappedData.has(item.zo_sql_key)) {
-            histogramMappedData.get(item.zo_sql_key).zo_sql_num +=
-              item.zo_sql_num;
-          } else {
-            histogramMappedData.set(item.zo_sql_key, item);
-          }
-        });
+        // hasBreakdown is true only when the backend both returned a
+        // breakdown field AND the aggs actually contain zo_sql_breakdown values.
+        const hasBreakdown =
+          !!breakdownField &&
+          searchObj.data.queryResults.aggs.some((item: any) => item.zo_sql_breakdown !== undefined);
 
-        const mergedData: any = Array.from(histogramMappedData.values());
-        mergedData.map(
-          (bucket: {
-            zo_sql_key: string | number | Date;
-            zo_sql_num: string;
-          }) => {
-            num_records = num_records + parseInt(bucket.zo_sql_num, 10);
-            unparsed_x_data.push(bucket.zo_sql_key);
-            // const histDate = new Date(bucket.zo_sql_key);
-            xData.push(
-              histogramDateTimezone(bucket.zo_sql_key, store.state.timezone),
-            );
-            // xData.push(Math.floor(histDate.getTime()))
-            yData.push(parseInt(bucket.zo_sql_num, 10));
-          },
-        );
+        if (hasBreakdown) {
+          // --- Stacked breakdown path ---
+          // Uses a composite key "timestamp|||category" so that the same
+          // (timestamp, category) pair from different pages is merged correctly.
+          const breakdownMap = new Map<
+            string,
+            { zo_sql_key: string; zo_sql_breakdown: string; zo_sql_num: number }
+          >();
 
-        searchObj.data.queryResults.total = num_records;
+          // Collect every timestamp we know about — including zero-filled
+          // skeleton entries that have no breakdown — so the x-axis matches
+          // the full query range from the first render. Without this the chart
+          // would appear to grow outward from the center as partitions stream in.
+          const timestampSet = new Set<string>();
+
+          // Seed from previously accumulated pages
+          histogramResults.value.forEach((item: any) => {
+            if (item.zo_sql_key !== undefined && item.zo_sql_key !== null) {
+              timestampSet.add(item.zo_sql_key);
+            }
+            if (item.zo_sql_breakdown === undefined || item.zo_sql_breakdown === null) return;
+            const key = `${item.zo_sql_key}|||${item.zo_sql_breakdown}`;
+            breakdownMap.set(key, JSON.parse(JSON.stringify(item)));
+          });
+
+          // Merge current page aggs into the map
+          searchObj.data.queryResults.aggs.forEach((item: any) => {
+            if (item.zo_sql_key !== undefined && item.zo_sql_key !== null) {
+              timestampSet.add(item.zo_sql_key);
+            }
+            const cat = item.zo_sql_breakdown;
+            if (cat === undefined || cat === null) return;
+            const key = `${item.zo_sql_key}|||${cat}`;
+            if (breakdownMap.has(key)) {
+              breakdownMap.get(key)!.zo_sql_num += parseInt(item.zo_sql_num, 10);
+            } else {
+              breakdownMap.set(key, { ...item, zo_sql_num: parseInt(item.zo_sql_num, 10) });
+            }
+          });
+
+          // Sorted unique timestamps (ISO strings sort lexicographically = chronologically)
+          const allTimestamps = [...timestampSet].sort();
+
+          // Coerce to string — numeric breakdown values (e.g. severity=0, status=404)
+          // come back as JSON numbers. Without this, .toLowerCase() / .localeCompare()
+          // below would throw a TypeError.
+          const rawCategories = [
+            ...new Set([...breakdownMap.values()].map((r) => r.zo_sql_breakdown)),
+          ]
+            .filter((c) => c !== undefined && c !== null)
+            .map((c) => String(c));
+
+          const allCategories = rawCategories.sort((a, b) => {
+            const aRank = SEVERITY_ORDER[a.toLowerCase()] ?? 100;
+            const bRank = SEVERITY_ORDER[b.toLowerCase()] ?? 100;
+            if (aRank !== bRank) return aRank - bRank;
+            return a.localeCompare(b); // alphabetical fallback for unknowns
+          });
+
+          // Build per-category count arrays, each aligned to allTimestamps indices
+          const seriesMap = new Map<string, number[]>();
+          allCategories.forEach((cat) =>
+            seriesMap.set(cat, new Array(allTimestamps.length).fill(0)),
+          );
+
+          // Fast timestamp → index lookup to avoid repeated indexOf calls
+          const tsIndex = new Map<string, number>(allTimestamps.map((ts, i) => [ts, i]));
+
+          breakdownMap.forEach((row) => {
+            const idx = tsIndex.get(row.zo_sql_key);
+            if (idx === undefined) return;
+            const raw = row.zo_sql_breakdown;
+            if (raw === undefined || raw === null) return;
+            // Coerce to match seriesMap's string keys (handles numeric 0, booleans, etc.)
+            const cat = String(raw);
+            const bucket = seriesMap.get(cat);
+            if (bucket) bucket[idx] += row.zo_sql_num;
+          });
+
+          allTimestamps.forEach((ts) => {
+            unparsed_x_data.push(ts);
+            xData.push(histogramDateTimezone(ts, store.state.timezone));
+          });
+
+          // yData holds per-bucket totals (sum across all categories).
+          // Used only for the histogram title count, not for chart rendering.
+          allTimestamps.forEach((_, i) => {
+            yData.push([...seriesMap.values()].reduce((sum, arr) => sum + arr[i], 0));
+          });
+
+          searchObj.data.queryResults.total = yData.reduce((a, b) => a + b, 0);
+
+          searchObj.data.histogram = {
+            xData,
+            yData,
+            breakdownField, // field name used for grouping
+            breakdownSeries: seriesMap, // Map<category, counts[]> for stacked chart
+            chartParams: {
+              title: getHistogramTitle(),
+              titleParts: getHistogramTitleParts(),
+              unparsed_x_data,
+              timezone: store.state.timezone,
+            },
+            errorCode: 0,
+            errorMsg: "",
+            errorDetail: "",
+          };
+        } else {
+          // --- Single-series (flat) path ---
+          histogramMappedData = new Map(
+            histogramResults.value.map((item: any) => [
+              item.zo_sql_key,
+              JSON.parse(JSON.stringify(item)),
+            ]),
+          );
+
+          searchObj.data.queryResults.aggs.forEach((item: any) => {
+            if (histogramMappedData.has(item.zo_sql_key)) {
+              histogramMappedData.get(item.zo_sql_key).zo_sql_num += item.zo_sql_num;
+            } else {
+              histogramMappedData.set(item.zo_sql_key, item);
+            }
+          });
+
+          let num_records = 0;
+          const mergedData: any = Array.from(histogramMappedData.values());
+          mergedData.forEach(
+            (bucket: { zo_sql_key: string | number | Date; zo_sql_num: string }) => {
+              num_records = num_records + parseInt(bucket.zo_sql_num, 10);
+              unparsed_x_data.push(bucket.zo_sql_key);
+              xData.push(histogramDateTimezone(bucket.zo_sql_key, store.state.timezone));
+              yData.push(parseInt(bucket.zo_sql_num, 10));
+            },
+          );
+
+          searchObj.data.queryResults.total = num_records;
+
+          searchObj.data.histogram = {
+            xData,
+            yData,
+            breakdownField: null, // no breakdown — plain bar chart
+            breakdownSeries: null, // no breakdown — plain bar chart
+            chartParams: {
+              title: getHistogramTitle(),
+              titleParts: getHistogramTitleParts(),
+              unparsed_x_data,
+              timezone: store.state.timezone,
+            },
+            errorCode: 0,
+            errorMsg: "",
+            errorDetail: "",
+          };
+        }
       }
-
-      const chartParams = {
-        title: getHistogramTitle(),
-        unparsed_x_data: unparsed_x_data,
-        timezone: store.state.timezone,
-      };
-      searchObj.data.histogram = {
-        xData,
-        yData,
-        chartParams,
-        errorCode: 0,
-        errorMsg: "",
-        errorDetail: "",
-      };
     } catch (e: any) {
       console.error("Error while generating histogram data", e);
-      notificationMsg.value = "Error while generating histogram data.";
+      notificationMsg.value = t("search.errorWhileGeneratingHistogramData");
     }
   };
 
@@ -211,8 +355,11 @@ export const useHistogram = () => {
     searchObj.data.histogram = {
       xData: [],
       yData: [],
+      breakdownField: null,
+      breakdownSeries: null,
       chartParams: {
         title: getHistogramTitle(),
+        titleParts: getHistogramTitleParts(),
         unparsed_x_data: [],
         timezone: "",
       },
@@ -224,24 +371,20 @@ export const useHistogram = () => {
 
   const generateHistogramSkeleton = () => {
     if (
-      searchObj.data.queryResults.hasOwnProperty("aggs") &&
+      Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "aggs") &&
       searchObj.data.queryResults.aggs
     ) {
       histogramResults.value = [];
       histogramMappedData = [];
-      const intervalMs: any =
-        INTERVAL_MAP[searchObj.meta.resultGrid.chartInterval];
+      const intervalMs: number =
+        INTERVAL_MAP[searchObj.meta.resultGrid.chartInterval as IntervalMapKey];
       if (!intervalMs) {
         throw new Error("Invalid interval");
       }
-      searchObj.data.histogramInterval = searchObj.data.queryResults
-        .histogram_interval
+      searchObj.data.histogramInterval = searchObj.data.queryResults.histogram_interval
         ? searchObj.data.queryResults.histogram_interval * 1000000
         : intervalMs;
-      const date = new Date();
-      const startTimeDate = new Date(
-        searchObj.data.customDownloadQueryObj.query.start_time / 1000,
-      ); // Convert microseconds to milliseconds
+      const startTimeDate = new Date(searchObj.data.customDownloadQueryObj.query.start_time / 1000); // Convert microseconds to milliseconds
       if (searchObj.meta.resultGrid.chartInterval.includes("second")) {
         startTimeDate.setSeconds(startTimeDate.getSeconds() > 30 ? 30 : 0, 0); // Round to the nearest whole minute
       } else if (searchObj.meta.resultGrid.chartInterval.includes("1 minute")) {
@@ -250,9 +393,7 @@ export const useHistogram = () => {
       } else if (searchObj.meta.resultGrid.chartInterval.includes("minute")) {
         // startTimeDate.setSeconds(0, 0); // Round to the nearest whole minute
         startTimeDate.setMinutes(
-          parseInt(
-            searchObj.meta.resultGrid.chartInterval.replace(" minute", ""),
-          ),
+          parseInt(searchObj.meta.resultGrid.chartInterval.replace(" minute", "")),
           0,
         ); // Round to the nearest whole minute
       } else if (searchObj.meta.resultGrid.chartInterval.includes("hour")) {
@@ -263,43 +404,13 @@ export const useHistogram = () => {
         startTimeDate.setUTCHours(0, 0, 0); // Round to the nearest whole minute
         startTimeDate.setDate(startTimeDate.getDate() + 1);
       }
-
-      const startTime = startTimeDate.getTime() * 1000;
     }
-  };
-
-  const setMultiStreamHistogramQuery = (queryReq: any) => {
-    let histogramQuery = `select histogram(${store.state.zoConfig.timestamp_column}, '${searchObj.meta.resultGrid.chartInterval}') AS zo_sql_key, count(*) AS zo_sql_num from "[INDEX_NAME]" [WHERE_CLAUSE] GROUP BY zo_sql_key`;
-    let multiSql = [];
-
-    for (const stream of searchObj.data.stream.selectedStream) {
-      // one or more filter fields are missing in this stream so no need to include in histogram query
-      // this is to avoid the issue of missing fields in multi stream histogram query
-      if (
-        searchObj.data.stream.missingStreamMultiStreamFilter.includes(stream)
-      ) {
-        continue;
-      }
-      // Replace the index name and where clause in the histogram query for each stream
-      multiSql.push(
-        histogramQuery
-          .replace("[INDEX_NAME]", stream)
-          .replace(
-            "[WHERE_CLAUSE]",
-            searchObj.data.query ? "WHERE " + searchObj.data.query : "",
-          ),
-      );
-    }
-
-    return multiSql.join(" UNION ALL ");
   };
 
   // Bhargav Todo: duplicate function in index.vue
   const isHistogramEnabled = (searchObj: any) => {
     return (
-      searchObj.meta.refreshHistogram &&
-      !searchObj.loadingHistogram &&
-      searchObj.meta.showHistogram
+      searchObj.meta.refreshHistogram && !searchObj.loadingHistogram && searchObj.meta.showHistogram
     );
   };
 
@@ -582,10 +693,10 @@ export const useHistogram = () => {
 
   return {
     getHistogramTitle,
+    getHistogramTitleParts,
     generateHistogramData,
     resetHistogramWithError,
     generateHistogramSkeleton,
-    setMultiStreamHistogramQuery,
     isHistogramEnabled,
   };
 };

@@ -13,7 +13,7 @@ describe("useLoading", () => {
 
   it("should set loading to true during execution", async () => {
     const mockAsyncFunction = vi.fn(
-      () => new Promise((resolve) => setTimeout(() => resolve("success"), 100))
+      () => new Promise((resolve) => setTimeout(() => resolve("success"), 100)),
     );
     const { isLoading, execute } = useLoading(mockAsyncFunction);
 
@@ -140,7 +140,8 @@ describe("useLoading", () => {
   });
 
   it("should handle multiple consecutive executions", async () => {
-    const mockAsyncFunction = vi.fn()
+    const mockAsyncFunction = vi
+      .fn()
       .mockResolvedValueOnce("result1")
       .mockResolvedValueOnce("result2")
       .mockResolvedValueOnce("result3");
@@ -255,27 +256,27 @@ describe("useLoading", () => {
   });
 
   it("should handle rapid successive calls", async () => {
-    const mockAsyncFunction = vi.fn()
+    const mockAsyncFunction = vi
+      .fn()
       .mockResolvedValueOnce("result1")
       .mockResolvedValueOnce("result2")
       .mockResolvedValueOnce("result3");
 
     const { execute } = useLoading(mockAsyncFunction);
 
-    const promises = [
-      execute("call1"),
-      execute("call2"), 
-      execute("call3"),
-    ];
+    // The composable guards concurrent calls: only the first call executes;
+    // subsequent calls while isLoading is true return undefined immediately.
+    const promises = [execute("call1"), execute("call2"), execute("call3")];
 
     const results = await Promise.all(promises);
 
-    expect(results).toEqual(["result1", "result2", "result3"]);
-    expect(mockAsyncFunction).toHaveBeenCalledTimes(3);
+    expect(results).toEqual(["result1", undefined, undefined]);
+    expect(mockAsyncFunction).toHaveBeenCalledTimes(1);
   });
 
   it("should handle async function with mixed success and failure", async () => {
-    const mockAsyncFunction = vi.fn()
+    const mockAsyncFunction = vi
+      .fn()
       .mockResolvedValueOnce("success1")
       .mockRejectedValueOnce(new Error("error1"))
       .mockResolvedValueOnce("success2");
@@ -299,7 +300,9 @@ describe("useLoading", () => {
 
   it("should handle very large parameter lists", async () => {
     const manyParams = Array.from({ length: 100 }, (_, i) => i);
-    const mockAsyncFunction = vi.fn((...params) => Promise.resolve(params.reduce((a, b) => a + b, 0)));
+    const mockAsyncFunction = vi.fn((...params) =>
+      Promise.resolve(params.reduce((a, b) => a + b, 0)),
+    );
     const { execute } = useLoading(mockAsyncFunction);
 
     const result = await execute(...manyParams);

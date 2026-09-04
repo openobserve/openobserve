@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -65,7 +65,7 @@ fn create_destinations_table_statement() -> TableCreateStatement {
         .to_owned()
 }
 
-/// Statement to create index on on destinations_id.
+/// Statement to create index on destinations_id.
 fn create_destinations_template_id_destination_id_idx_stmnt() -> IndexCreateStatement {
     sea_query::Index::create()
         .if_not_exists()
@@ -123,28 +123,6 @@ mod tests {
             &create_destinations_template_id_destination_id_idx_stmnt()
                 .to_string(PostgresQueryBuilder),
             r#"CREATE UNIQUE INDEX IF NOT EXISTS "destinations_id_org_name_idx" ON "destinations" ("id", "name", "org")"#
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_destinations_table_statement().to_string(MysqlQueryBuilder),
-            r#"
-                CREATE TABLE IF NOT EXISTS `destinations` (
-                `id` char(27) NOT NULL PRIMARY KEY,
-                `org` varchar(100) NOT NULL,
-                `name` varchar(256) NOT NULL,
-                `module` varchar(10) NOT NULL,
-                `template_id` char(27) NULL,
-                `type` json NOT NULL,
-                CONSTRAINT `destinations_templates_fk` FOREIGN KEY (`template_id`) REFERENCES `templates` (`id`) 
-            )"#
-        );
-        assert_eq!(
-            &create_destinations_template_id_destination_id_idx_stmnt()
-                .to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `destinations_id_org_name_idx` ON `destinations` (`id`, `name`, `org`)"#
         );
     }
 

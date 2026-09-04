@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,105 +15,86 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
+  <!-- Height matches the host ODialog's own max-h-[90vh] cap (minus its body
+       padding + borders) so the dialog body never overflows. That keeps the
+       inner right-content area as the single scroller instead of stacking a
+       second scrollbar on the dialog body. -->
+  <OCard
+    class="flex h-[calc(90vh_-_2rem)] w-full flex-col overflow-hidden p-0"
     data-test="custom-chart-type-selector-popup"
-    style="
-      padding: 0;
-      width: 95vw;
-      height: calc(100vh - 57px);
-      max-width: 1800px;
-      overflow: hidden;
-    "
   >
     <!-- Header -->
-    <q-card-section>
-      <div class="flex justify-between items-center q-pa-none">
-        <div class="flex items-center q-table__title">
-          <q-icon name="bar_chart" size="sm" class="q-mr-sm" />
-          <span class="text-h6">Example of custom charts</span>
-        </div>
-        <q-space />
-        <q-input
+    <OCardSection role="header">
+      <div class="flex w-full items-center gap-3">
+        <OIcon name="bar-chart" size="sm" />
+        <span class="text-xl font-semibold whitespace-nowrap">{{
+          t("dashboard.customChartTypeSelector.exampleOfCustomCharts")
+        }}</span>
+        <OSearchInput
           v-model="searchQuery"
-          dense
-          borderless
-          placeholder="Search charts..."
-          style="min-width: 250px; border-radius: 4px; padding: 2px 8px"
+          :placeholder="t('dashboard.customChartTypeSelector.searchCharts')"
           clearable
+          class="ms-4 w-70 flex-[0_0_17.5rem]"
           @clear="searchQuery = ''"
-        >
-          <template v-slot:prepend>
-            <q-icon name="search" />
-          </template>
-        </q-input>
-        <q-btn
-          icon="close"
-          class="q-ml-xs"
-          unelevated
-          size="sm"
-          round
-          flat
+        />
+        <div class="flex-1" />
+        <OButton
+          variant="ghost"
+          size="icon"
           :title="t('dashboard.cancel')"
           @click.stop="closeDialog"
           data-test="custom-chart-type-selector-close"
+          icon-left="close"
         />
       </div>
-    </q-card-section>
+    </OCardSection>
 
-    <q-separator />
+    <OSeparator />
 
     <!-- Main Content -->
-    <q-card-section
-      class="flex"
-      style="height: calc(100% - 60px); overflow: hidden; padding: 0"
-    >
-      <div class="row no-wrap" style="height: 100%; width: 100%">
+    <OCardSection class="flex h-[calc(100%_-_3.75rem)] overflow-hidden p-0">
+      <div class="flex h-full w-full flex-nowrap">
         <!-- Left Sidebar -->
-        <q-card
-          flat
-          class="sidebar q-pa-md"
-          style="width: 160px; height: 100%; flex-shrink: 0; overflow-y: auto"
-        >
-          <div class="text-subtitle2 q-mb-md text-weight-bold">Chart Types</div>
-          <q-list dense>
-            <q-item
+        <OCard class="h-full w-40 shrink-0 overflow-y-auto p-4">
+          <div class="mb-3 text-sm font-bold font-medium">
+            {{ t("dashboard.customChartTypeSelector.chartTypes") }}
+          </div>
+          <ul class="m-0 flex list-none flex-col p-0">
+            <li
               v-for="(category, index) in chartCategories"
               :key="index"
-              clickable
-              v-ripple
-              :active="selectedCategory === category.chartLabel"
-              @click="scrollToCategory(category.chartLabel)"
-              class="sidebar-item"
-              :class="{
-                'active-category': selectedCategory === category.chartLabel,
-              }"
+              @click="scrollToCategory(category.chartLabelKey)"
+              class="rounded-default mb-1 flex cursor-pointer items-center px-3 py-2 transition-all duration-200"
+              :class="
+                selectedCategory === category.chartLabelKey
+                  ? 'bg-theme-accent text-text-inverse font-semibold'
+                  : 'hover:bg-button-ghost-hover-bg'
+              "
               data-test="chart-category-item"
             >
-              <q-item-section>
-                <q-item-label>{{ category.chartLabel }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-card>
+              <span class="text-sm">{{ t(category.chartLabelKey) }}</span>
+            </li>
+          </ul>
+        </OCard>
 
         <!-- Right Content Area -->
         <div
           ref="contentArea"
-          class="content-area q-pa-md"
-          style="flex: 1; height: 100%; overflow-y: auto; overflow-x: hidden"
+          class="h-full flex-1 overflow-x-hidden overflow-y-auto p-3"
           @scroll="handleScroll"
         >
           <!-- No Results Message -->
           <div
             v-if="filteredCategories.length === 0"
-            class="flex justify-center items-center"
-            style="height: 100%"
+            class="flex h-full items-center justify-center"
           >
             <div class="text-center">
-              <q-icon name="search_off" size="4rem" color="grey-5" />
-              <div class="text-h6 text-grey-7 q-mt-md">No results found</div>
-              <div class="text-body2 text-grey-6 q-mt-sm">
-                Try searching with different keywords
+              <OIcon class="h-16 w-16" name="search-off" />
+              <div class="text-text-muted mt-3 text-xl font-semibold">
+                {{ t("dashboard.customChartTypeSelector.noResultsFound") }}
+              </div>
+              <div class="text-text-muted mt-2 text-sm">
+                {{ t("dashboard.customChartTypeSelector.trySearchingDifferentKeywords") }}
               </div>
             </div>
           </div>
@@ -122,98 +103,98 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="(category, categoryIndex) in filteredCategories"
             :key="categoryIndex"
-            class="chart-category-section q-mb-xl"
-            :data-category="category.chartLabel"
+            class="chart-category-section mb-6 scroll-mt-5"
+            :data-category="category.chartLabelKey"
+            data-test="chart-category-section"
           >
-            <div class="text-h6 q-mb-md text-weight-medium">
-              {{ category.chartLabel }}
+            <div class="mb-3 text-xl font-medium font-semibold">
+              {{ t(category.chartLabelKey) }}
             </div>
-            <div class="row q-col-gutter-md">
+            <div class="flex gap-3">
               <div
                 v-for="(chart, chartIndex) in category.type"
                 :key="chartIndex"
                 class="col-xs-12 col-sm-6 col-md-4 col-lg-3"
               >
-                <q-card
-                  flat
-                  bordered
-                  class="chart-card cursor-pointer"
+                <OCard
+                  class="h-full cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
                   :class="{
-                    'selected-chart': selectedChart?.value === chart.value,
+                    'border-theme-accent shadow-theme-accent/30 border-2 shadow-md':
+                      selectedChart?.value === chart.value,
                   }"
                   @click="selectChart(chart)"
                   data-test="chart-type-card"
                 >
-                  <q-card-section class="q-pa-sm">
-                    <div class="chart-image-container">
+                  <OCardSection class="p-2">
+                    <div
+                      class="bg-surface-subtle rounded-default flex h-37.5 w-full items-center justify-center overflow-hidden"
+                    >
                       <img
                         :src="chart.asset"
-                        :alt="chart.label"
-                        class="chart-image"
+                        :alt="t(chart.labelKey)"
+                        class="h-full w-full object-cover"
                         loading="lazy"
                       />
                     </div>
-                  </q-card-section>
-                  <q-card-section class="q-pt-none q-px-sm q-pb-sm">
-                    <div class="text-caption text-center text-weight-medium">
-                      {{ chart.label }}
+                  </OCardSection>
+                  <OCardSection class="px-2 pt-0 pb-2">
+                    <div class="text-center text-xs font-medium">
+                      {{ t(chart.labelKey) }}
                     </div>
-                  </q-card-section>
-                </q-card>
+                  </OCardSection>
+                </OCard>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </q-card-section>
+    </OCardSection>
 
     <!-- Confirm Chart Selection Dialog -->
     <CustomChartConfirmDialog
-      title="Confirm Chart Type Selection"
-      message="By selecting this chart type, the existing chart code will be replaced by the selected chart type's code. Do you want to continue?"
+      :title="t('dashboard.customChartTypeSelector.confirmChartTypeSelection')"
+      :message="t('dashboard.customChartTypeSelector.confirmChartTypeSelectionMessage')"
       :currentQuery="currentQuery"
       @update:ok="confirmChartSelection"
       @update:cancel="cancelChartSelection"
       v-model="confirmChartSelectionDialog"
     />
-  </q-card>
+  </OCard>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  nextTick,
-  computed,
-  inject,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, onMounted, nextTick, computed, inject } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import type { ChartType, ChartCategory } from "./customChartExampleTypes";
 import { chartTypesData } from "./customChartExampleTypes";
 import CustomChartConfirmDialog from "@/components/dashboards/addPanel/customChartExamples/CustomChartConfirmDialog.vue";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
+import OCardSection from "@/lib/core/Card/OCardSection.vue";
 
 export default defineComponent({
   name: "CustomChartTypeSelector",
   components: {
+    OSeparator,
     CustomChartConfirmDialog,
+    OButton,
+    OSearchInput,
+    OCard,
+    OCardSection,
+    OIcon,
   },
   emits: ["close", "select"],
   setup(props, { emit }) {
-    const { t } = useI18n();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const { t } = useI18nTyped();
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const chartCategories = ref<ChartCategory[]>(chartTypesData.data);
-    const selectedCategory = ref<string>(
-      chartCategories.value[0]?.chartLabel || "",
-    );
+    const selectedCategory = ref<string>(chartCategories.value[0]?.chartLabelKey || "");
     const selectedChart = ref<ChartType | null>(null);
     const contentArea = ref<HTMLElement | null>(null);
     const confirmChartSelectionDialog = ref<boolean>(false);
@@ -223,9 +204,8 @@ export default defineComponent({
     // Get current query for the dialog
     const currentQuery = computed(
       () =>
-        dashboardPanelData.data.queries[
-          dashboardPanelData.layout.currentQueryIndex || 0
-        ]?.query || "",
+        dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex || 0]?.query ||
+        "",
     );
 
     // Computed property to filter categories and charts based on search query
@@ -238,8 +218,9 @@ export default defineComponent({
       const filtered: ChartCategory[] = [];
 
       chartCategories.value.forEach((category) => {
+        // Match the resolved name, not the key — users search what they can see.
         const filteredCharts = category.type.filter((chart) =>
-          chart.label.toLowerCase().includes(query),
+          t(chart.labelKey).toLowerCase().includes(query),
         );
 
         if (filteredCharts.length > 0) {
@@ -257,7 +238,7 @@ export default defineComponent({
       selectedCategory.value = category;
       if (!contentArea.value) return;
 
-      const element = contentArea.value.querySelector(
+      const element = contentArea?.value?.querySelector(
         `[data-category="${category}"]`,
       ) as HTMLElement;
       if (element) {
@@ -269,9 +250,7 @@ export default defineComponent({
       if (!contentArea.value) return;
 
       const scrollTop = contentArea.value.scrollTop;
-      const sections = contentArea.value.querySelectorAll(
-        ".chart-category-section",
-      );
+      const sections = contentArea.value.querySelectorAll(".chart-category-section");
 
       // Find which category is currently in view
       for (const section of Array.from(sections)) {
@@ -324,7 +303,7 @@ export default defineComponent({
       nextTick(() => {
         // Set first category as selected by default
         if (chartCategories.value.length > 0) {
-          selectedCategory.value = chartCategories.value[0].chartLabel;
+          selectedCategory.value = chartCategories.value[0].chartLabelKey;
         }
       });
     });
@@ -349,61 +328,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.sidebar {
-  .sidebar-item {
-    border-radius: 4px;
-    margin-bottom: 4px;
-    transition: all 0.2s ease;
-
-    &:hover {
-      background-color: rgba(0, 0, 0, 0.04);
-    }
-
-    &.active-category {
-      background-color: var(--q-primary);
-      color: white;
-      font-weight: 600;
-    }
-  }
-}
-
-.content-area {
-  .chart-category-section {
-    scroll-margin-top: 20px;
-  }
-
-  .chart-card {
-    transition: all 0.2s ease;
-    height: 100%;
-
-    &:hover {
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-      transform: translateY(-2px);
-    }
-
-    &.selected-chart {
-      border: 2px solid var(--q-primary);
-      box-shadow: 0 4px 12px rgba(var(--q-primary-rgb), 0.3);
-    }
-
-    .chart-image-container {
-      width: 100%;
-      height: 150px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background-color: #f8f8f8;
-      border-radius: 4px;
-      overflow: hidden;
-
-      .chart-image {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-      }
-    }
-  }
-}
-</style>

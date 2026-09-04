@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,13 +17,18 @@ mod entry;
 pub mod errors;
 mod immutable;
 mod memtable;
+mod pack;
 mod partition;
 mod rwmap;
 mod stream;
 mod wal;
 mod writer;
 
-use std::{fs::create_dir_all, path::PathBuf, sync::Arc};
+use std::{
+    fs::create_dir_all,
+    path::PathBuf,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use arrow_schema::Schema;
 use config::RwAHashMap;
@@ -32,7 +37,11 @@ pub use immutable::{
     check_persist_done, get_immutables_cache_stats, get_processing_tables_cache_stats,
     read_from_immutable,
 };
-use once_cell::sync::Lazy;
+pub use pack::{
+    PackSegment, PackSegmentMeta, PendingStreamStats, collect_pack_metrics,
+    get_pending_stream_stats, get_segment_index_stats, get_stream_segments, mark_segments_consumed,
+    read_from_pack, read_segment,
+};
 use snafu::ResultExt;
 use tokio::sync::{Mutex, mpsc};
 pub use wal::collect_wal_parquet_metrics;
@@ -68,8 +77,8 @@ pub struct ProcessedBatch {
     pub bytes_entries: Vec<Vec<u8>>,
     /// Arrow RecordBatch entries for Memtable writing
     pub batch_entries: Vec<Arc<entry::RecordBatchEntry>>,
-    /// Total JSON size for rotation check
-    pub entries_json_size: usize,
+    /// Total serialized WAL bytes for rotation check
+    pub entries_wal_size: usize,
     /// Total Arrow size for rotation check
     pub entries_arrow_size: usize,
 }
@@ -81,28 +90,49 @@ impl ProcessedBatch {
             entries: Vec::new(),
             bytes_entries: Vec::new(),
             batch_entries: Vec::new(),
-            entries_json_size: 0,
+            entries_wal_size: 0,
             entries_arrow_size: 0,
         }
     }
 }
 
 pub async fn init() -> errors::Result<()> {
-    // check uncompleted parquet files, need delete those files
-    wal::check_uncompleted_parquet_files().await?;
+    if !config::cluster::LOCAL_NODE.is_ingester() {
+        return Ok(());
+    }
+
+    log::info!("Start ingester init");
 
     // replay wal files to create immutable
-    let wal_dir = PathBuf::from(&config::get_config().common.data_wal_dir).join("logs");
+    let cfg = config::get_config();
+    let wal_dir = PathBuf::from(&cfg.common.data_wal_dir).join(WAL_DIR_DEFAULT_PREFIX);
     create_dir_all(&wal_dir).context(OpenDirSnafu {
         path: wal_dir.clone(),
     })?;
-    let wal_files = wal::wal_scan_files(&wal_dir, "wal")
-        .await
-        .unwrap_or_default();
+
+    // must run before pack::init and wal replay: a lock-referenced .pack.tmp
+    // is finished data, not an orphan
+    wal::check_uncompleted_lock_files().await?;
+
+    // clean orphan tmp pack files and rebuild the pack segment index
+    pack::init().await?;
+
+    // replay wal files
+    let process_start = std::time::SystemTime::now();
     tokio::task::spawn(async move {
+        // wal/files can hold millions of files, clean orphans in the background
+        if let Err(e) = wal::clean_orphan_par_files(process_start).await {
+            log::error!("Clean orphan par files error: {e}");
+        }
+        log::info!("Scanning wal files from {wal_dir:?}");
+        let wal_files = wal::wal_scan_files(&wal_dir, "wal")
+            .await
+            .unwrap_or_default();
+        log::info!("Found {} wal files to replay", wal_files.len());
         if let Err(e) = wal::replay_wal_files(wal_dir, wal_files).await {
             log::error!("replay wal files error: {e}");
         }
+        log::info!("Replay wal files done");
     });
 
     // start a job to flush memtable to immutable
@@ -125,6 +155,9 @@ pub async fn init() -> errors::Result<()> {
             log::error!("immutable persist error: {e}");
         }
     });
+
+    log::info!("Ingesters init done");
+
     Ok(())
 }
 
@@ -174,15 +207,10 @@ async fn run() -> errors::Result<()> {
     Ok(())
 }
 
+// check if the file is a wal file
 // wal file format:
 // files/{org}/{stype}/{stream}/{thread_id}/{year}/{month}/{day}/{hour}/{schema_key}/{file_name}
-pub fn is_wal_file(local_mode: bool, file: &str) -> bool {
-    // not local mode, directly return false
-    if !local_mode {
-        return false;
-    }
-
-    // local mode, check the file name format
+pub fn is_wal_file(file: &str) -> bool {
     let columns = file.split('/').collect::<Vec<_>>();
     !(columns.len() < 11
         // thread_id is impossible over 1000
@@ -199,11 +227,9 @@ mod tests {
     #[test]
     fn test_is_wal_file_wal_file() {
         assert!(is_wal_file(
-            true,
             "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
         ));
         assert!(is_wal_file(
-            true,
             "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/a=b/file.parquet"
         ));
     }
@@ -211,27 +237,22 @@ mod tests {
     #[test]
     fn test_is_wal_file_storage_file() {
         assert!(!is_wal_file(
-            true,
             "files/org/stype/stream/2025/03/24/00/file.parquet"
         ));
         assert!(!is_wal_file(
-            true,
             "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
         ));
     }
 
     #[test]
     fn test_is_wal_file_not_local_mode() {
-        assert!(!is_wal_file(
-            false,
+        assert!(is_wal_file(
             "files/org/stype/stream/0/2025/03/24/00/2adf99cbc1277d5c/file.parquet"
         ));
         assert!(!is_wal_file(
-            false,
             "files/org/stype/stream/2025/03/24/00/file.parquet"
         ));
         assert!(!is_wal_file(
-            false,
             "files/org/stype/stream/2025/03/24/00/a=b/file.parquet"
         ));
     }

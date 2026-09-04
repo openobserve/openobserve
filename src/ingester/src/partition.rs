@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -35,6 +35,7 @@ use crate::{
     ReadRecordBatchEntry,
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
+    pack::PackWriter,
 };
 
 pub(crate) struct Partition {
@@ -140,6 +141,7 @@ impl Partition {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
+        mut pack: Option<&mut PackWriter>,
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let cfg = config::get_config();
         let base_path = PathBuf::from(&cfg.common.data_wal_dir);
@@ -197,7 +199,6 @@ impl Partition {
                     } else {
                         vec![]
                     };
-
                 let batches = data
                     .iter()
                     .map(|r| {
@@ -232,6 +233,18 @@ impl Partition {
 
                 writer.close().await.context(WriteParquetRecordBatchSnafu)?;
                 file_meta.compressed_size = buf_parquet.len() as i64;
+
+                // pack mode: append the parquet bytes as a segment instead of
+                // creating one file per stream × hour
+                if let Some(w) = pack.as_deref_mut() {
+                    w.append_segment(org_id, stream_name, hour.as_ref(), &buf_parquet, &file_meta)
+                        .await?;
+                    w.stat.json_size += persist_stat.json_size;
+                    w.stat.arrow_size += persist_stat.arrow_size;
+                    w.stat.batch_num += persist_stat.batch_num;
+                    w.stat.records += persist_stat.records;
+                    continue;
+                }
 
                 // write into local file
                 let file_name =
@@ -330,5 +343,23 @@ impl PartitionFile {
 impl MemorySize for PartitionFile {
     fn mem_size(&self) -> usize {
         std::mem::size_of::<PartitionFile>() + self.data.mem_size()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_partition_new_has_empty_schema_and_files() {
+        let p = Partition::new();
+        assert!(p.schema_fields.is_empty());
+        assert!(p.files.is_empty());
+    }
+
+    #[test]
+    fn test_partition_mem_size_at_least_struct_size() {
+        let p = Partition::new();
+        assert!(p.mem_size() >= std::mem::size_of::<Partition>());
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,22 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-#![feature(variant_count)]
+#![recursion_limit = "256"]
 
-#[cfg(feature = "enterprise")]
-pub mod cipher;
 pub mod cli;
-pub mod common;
-pub mod handler;
-pub mod job;
 pub mod migration;
-pub mod router;
-pub mod service;
-
-#[cfg(feature = "enterprise")]
-pub mod super_cluster_queue;
-
-pub(crate) static USER_AGENT_REGEX_FILE: &[u8] = include_bytes!(concat!(
-    env!("CARGO_MANIFEST_DIR"),
-    "/ua_regex/regexes.yaml"
-));
+pub mod telemetry;

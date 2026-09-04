@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,170 +15,164 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="col o2-card-wrapper">
-    <div class="row items-center justify-between q-px-md q-py-sm">
+  <OCard
+    class="border-card-glass-border bg-card-glass-bg rounded-default dark:bg-surface-base dark:border-border-default flex h-full w-full flex-col border shadow-none"
+  >
+    <div class="flex items-center justify-between px-3 py-2">
       <div>
-        <div class="o2-card-title q-pt-sm">{{ t("billing.proPlanLabel") }}</div>
-        <div class="o2-card-subtitle q-mt-sm">{{ t("billing.proPlanSubtitle") }}</div>
+        <h3 class="text-text-heading m-0 pt-2 text-base leading-6 font-semibold">
+          {{ t("billing.proPlanLabel") }}
+        </h3>
+        <p class="text-text-secondary m-0 mt-2 text-sm leading-4.5 font-normal">
+          {{ t("billing.proPlanSubtitle") }}
+        </p>
       </div>
-      <q-chip
-        v-if="planType == planName"
-        color="indigo-1"
-        text-color="indigo-10"
-        :label="t('billing.subscribed')"
-        class="q-mt-sm text-caption q-px-sm q-py-md"
-        style="border-radius: 0px"
-        dense
-      />
+      <OTag v-if="planType == planName" type="billingTag" value="subscribed" class="mt-2" />
     </div>
 
-    <q-separator spaced />
+    <OSeparator class="my-2" />
 
-    <div class="q-px-md q-py-sm">
-      <div class="o2-page-subtitle1">{{ t("billing.features") }}</div>
-      <div class="o2-page-subtitle2 q-mb-md q-mt-xs">{{ t("billing.included") }}</div>
+    <div class="px-3 py-2">
+      <h4 class="text-compact text-text-heading m-0 leading-[0.983rem] font-semibold">
+        {{ t("billing.features") }}
+      </h4>
+      <p class="text-compact text-text-secondary m-0 mt-1 mb-3 leading-4.5 font-normal">
+        {{ t("billing.included") }}
+      </p>
 
-      <div v-for="(feature, index) in features" :key="index" class="row items-center justify-between q-mb-sm">
-        <div class="row items-center">
-          <q-icon v-if="feature.is_parent" name="check_circle" color="green" size="16px" class="q-mr-sm" />
-          <q-icon v-else name="" color="green" size="16px" class="q-mr-sm" />
-          <div class="o2-page-subtitle3">{{ feature.name }}</div>
+      <div
+        v-if="pricingError && !features?.length"
+        class="text-status-error-text mb-2 flex items-center"
+      >
+        <OIcon name="warning" size="sm" class="me-2" />
+        <span class="text-text-body text-base leading-5.5">{{
+          t("billing.pricingErrorMessage")
+        }}</span>
+      </div>
+      <div
+        v-for="(feature, index) in features"
+        :key="index"
+        class="mb-2 flex items-center justify-between"
+      >
+        <div class="flex items-center">
+          <OIcon
+            v-if="feature.is_parent"
+            name="check-circle"
+            size="md"
+            class="text-status-positive check-icon me-2"
+          />
+          <div class="text-text-body text-base leading-5.5" :class="{ 'ms-6': !feature.is_parent }">
+            {{ feature.name }}
+          </div>
         </div>
         <div
           v-if="feature.price !== ''"
-          class="q-mx-sm"
-          style="flex: 1; border-top: 1px dotted #454F5B; height: 0; opacity: 0.4;"
+          class="border-border-default mx-2 h-0 flex-1 border-t border-dotted opacity-40"
         ></div>
-        <div class="o2-page-subtitle3 text-bold">{{ feature.price }}</div>
+        <div class="text-text-body text-base leading-5.5 font-bold">{{ feature.price }}</div>
       </div>
     </div>
 
-    <q-separator />
+    <OSeparator />
 
-    <div class="o2-page-subtitle2 q-px-md q-pt-sm">
+    <p class="text-compact text-text-secondary m-0 px-3 pt-2 leading-4.5 font-normal">
       {{ t("billing.unlimitedNote") }}<br />
       {{ t("billing.paymentNote") }}
-    </div>
+    </p>
 
-    <div class="row justify-between q-pa-md">
+    <div class="flex justify-between p-3">
       <!-- AWS Marketplace billing - show managed externally message -->
-      <div v-if="billingProvider === 'aws'" class="full-width text-center">
-        <q-chip
-          color="green-2"
-          text-color="green-10"
-          icon="check_circle"
-          label="Managed via AWS Marketplace"
-          class="q-px-md q-py-sm"
-        />
-        <div class="text-caption text-grey-7 q-mt-sm">
-          Billing is handled through your AWS account
+      <div v-if="billingProvider === 'aws'" class="w-full text-center">
+        <OTag type="billingManagement" value="aws" class="inline-flex items-center gap-1">
+          <template #icon>
+            <OIcon name="check-circle" size="xs" />
+          </template>
+        </OTag>
+        <div class="text-text-secondary mt-2 text-xs">
+          {{ t("billing.awsManagedMessage") }}
         </div>
       </div>
-      <div v-else-if="billingProvider === 'azure'" class="full-width text-center">
-        <q-chip
-          color="green-2"
-          text-color="green-10"
-          icon="check_circle"
-          label="Managed via Azure Marketplace"
-          class="q-px-md q-py-sm"
-        />
-        <div class="text-caption text-grey-7 q-mt-sm">
-          Billing is handled through your Azure account
+      <div v-else-if="billingProvider === 'azure'" class="w-full text-center">
+        <OTag type="billingManagement" value="azure" class="inline-flex items-center gap-1">
+          <template #icon>
+            <OIcon name="check-circle" size="xs" />
+          </template>
+        </OTag>
+        <div class="text-text-secondary mt-2 text-xs">
+          {{ t("billing.azureManagedMessage") }}
+        </div>
+      </div>
+      <!-- External contract - billed offline, no Stripe portal to open -->
+      <div v-else-if="subscriptionType === 'external-contract'" class="w-full text-center">
+        <OTag type="billingManagement" value="contract" class="inline-flex items-center gap-1">
+          <template #icon>
+            <OIcon name="description" size="xs" />
+          </template>
+        </OTag>
+        <div class="text-text-secondary mt-2 text-xs">
+          {{ t("billing.contractManagedMessage") }}
         </div>
       </div>
       <!-- Stripe billing - show subscribe/manage buttons -->
-      <q-btn
+      <OButton
         v-else-if="planType == planName"
-        :label="btnCancelSubscription"
-        text-color="black"
-        class="full-width bg-grey-4 text-bold text-capitalize text-subtitle1"
-        flat
+        variant="outline"
+        size="sm-action"
+        block
         @click="cancelSubscription"
-      />
-      <q-btn
-        v-else
-        :label="btnSubscribe"
-        text-color="white"
-        class="full-width bg-primary text-bold text-capitalize text-subtitle1"
-        flat
-        @click="onSubscribe"
-      />
+      >
+        {{ btnCancelSubscription }}
+      </OButton>
+      <OButton v-else variant="primary" size="sm-action" block @click="onSubscribe">
+        {{ btnSubscribe }}
+      </OButton>
     </div>
-  </q-card>
+  </OCard>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OCard from "@/lib/core/Card/OCard.vue";
 
 export default defineComponent({
   name: "proPlan",
-  props: ["planType", "billingProvider"],
+  components: { OSeparator, OButton, OTag, OIcon, OCard },
+  props: ["planType", "billingProvider", "subscriptionType", "features", "pricingError"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const planName = "pay-as-you-go";
-    const btnCancelSubscription = ref(t('billing.manageSubscription'));
-    const btnSubscribe = ref(t('billing.subscribe'));
-
-    const features = [
-      { name: 'Ingestion (Logs, Metrics, Traces)', price: '$0.50 / GB' , is_parent: true},
-      { name: 'Query Volume', price: '$0.01 / GB' , is_parent: true},
-      { name: 'Pipelines', price: '' , is_parent: true},
-      { name: 'Data Processed', price: '$0.20 / GB' , is_parent: false},
-      { name: 'Each additional destination', price: '$0.30 / GB' , is_parent: false},
-      // { name: 'Each remote destination', price: '$0.45 per GB' , is_parent: false},
-      { name: 'Front end monitoring', price: '' , is_parent: true},
-      { name: 'Real User Monitoring (RUM)', price: '$0.15 / 1K sessions' , is_parent: false},
-      { name: 'Session Replay', price: '$1.00 / 1K sessions' , is_parent: false},
-      { name: 'Error Tracking', price: '$0.15 / 1K events' , is_parent: false},
-      { name: 'Sensitive Data Redaction', price: '$0.15 / GB' , is_parent: true},
-      
-      { name: 'Incident Management', price: '$0 during preview' , is_parent: true},
-      { name: 'O2 Assistant', price: '$0 during preview' , is_parent: true},
-      { name: 'AI SRE Agent', price: '$0 during preview' , is_parent: true},
-      { name: 'Audit Trail', price: '2% of monthly spend' , is_parent: true},
-      { name: 'Retention', price: '' , is_parent: true},
-      { name: '15-Days Retention', price: 'Included' , is_parent: false},
-      { name: 'Additional Retention', price: '$0.10 / 30 days' , is_parent: false},
-      
-      // { name: 'Action Script', price: '$1.00 / 1K runs' , is_parent: true},
-      { name: 'Unlimited Users', price: '' , is_parent: true},
-      { name: 'Role-Based Access Control (RBAC)', price: '' , is_parent: true},
-      
-      
-    ];
+    const btnCancelSubscription = ref(t("billing.manageSubscription"));
+    const btnSubscribe = ref(t("billing.subscribe"));
 
     const cancelSubscription = () => {
-      btnCancelSubscription.value = "Loading...";
-      setTimeout(function(){
-        btnCancelSubscription.value = t('billing.manageSubscription');
+      btnCancelSubscription.value = t("common.loadingEllipsis");
+      setTimeout(function () {
+        btnCancelSubscription.value = t("billing.manageSubscription");
       }, 1000);
       emit("update:cancelSubscription");
-    }
+    };
 
     const onSubscribe = () => {
-      btnSubscribe.value = "Loading...";
-      setTimeout(function(){
-        btnSubscribe.value = t('billing.subscribe');
+      btnSubscribe.value = t("common.loadingEllipsis");
+      setTimeout(function () {
+        btnSubscribe.value = t("billing.subscribe");
       }, 1000);
       emit("update:proSubscription");
-    }
+    };
 
     return {
       t,
-      features,
       cancelSubscription,
       onSubscribe,
       planName,
       btnSubscribe,
-      btnCancelSubscription
-    }
-  }
+      btnCancelSubscription,
+    };
+  },
 });
 </script>
-
-<style scoped>
-.full-width {
-  width: 100%;
-}
-</style>

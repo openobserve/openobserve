@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -18,51 +18,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <span :title="formattedExactTime">{{ relativeTime }}</span>
 </template>
 
-<script>
+<script lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
 import { timestampToTimezoneDate } from "@/utils/zincutils";
-import { ref, onMounted, onBeforeUnmount, watch, computed } from "vue";
+import { ref, onMounted, onBeforeUnmount, watch, computed, type PropType } from "vue";
 import { useStore } from "vuex";
 
 export default {
   props: {
     timestamp: {
-      type: Number,
+      type: [Number, String, Date],
       required: false, // Make the timestamp prop optional
       default: null,
     },
     fullTimePrefix: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: false,
-      default: "",
+      default: raw(""),
     },
   },
-  setup(props, { root }) {
+  setup(props) {
     const store = useStore();
 
     const relativeTime = ref("");
-    let intervalId = null;
+    let intervalId: ReturnType<typeof setInterval> | undefined;
 
-    const getBestUnit = (diffInSeconds) => {
+    // Helper to convert timestamp to number
+    const getTimestampInMs = (timestamp: number | string | Date | null) => {
+      if (!timestamp) return null;
+      if (typeof timestamp === "number") return timestamp;
+      if (typeof timestamp === "string") return new Date(timestamp).getTime();
+      if (timestamp instanceof Date) return timestamp.getTime();
+      return null;
+    };
+
+    const getBestUnit = (
+      diffInSeconds: number,
+    ): { value: number; unit: Intl.RelativeTimeFormatUnit } => {
       if (diffInSeconds < 60) return { value: diffInSeconds, unit: "second" };
-      if (diffInSeconds < 3600)
-        return { value: Math.floor(diffInSeconds / 60), unit: "minute" };
-      if (diffInSeconds < 86400)
-        return { value: Math.floor(diffInSeconds / 3600), unit: "hour" };
-      if (diffInSeconds < 2592000)
-        return { value: Math.floor(diffInSeconds / 86400), unit: "day" };
+      if (diffInSeconds < 3600) return { value: Math.floor(diffInSeconds / 60), unit: "minute" };
+      if (diffInSeconds < 86400) return { value: Math.floor(diffInSeconds / 3600), unit: "hour" };
+      if (diffInSeconds < 2592000) return { value: Math.floor(diffInSeconds / 86400), unit: "day" };
       if (diffInSeconds < 31536000)
         return { value: Math.floor(diffInSeconds / 2592000), unit: "month" };
       return { value: Math.floor(diffInSeconds / 31536000), unit: "year" };
     };
 
     const updateRelativeTime = () => {
-      if (!props.timestamp) {
+      const timestampMs = getTimestampInMs(props.timestamp);
+      if (!timestampMs) {
         relativeTime.value = "";
         return;
       }
 
       const now = Date.now();
-      const diffInSeconds = Math.floor((now - props.timestamp) / 1000);
+      const diffInSeconds = Math.floor((now - timestampMs) / 1000);
 
       const rtf = new Intl.RelativeTimeFormat("en", {
         numeric: "auto",
@@ -74,12 +84,13 @@ export default {
     };
 
     const formattedExactTime = computed(() => {
-      if (!props.timestamp) return "";
+      const timestampMs = getTimestampInMs(props.timestamp);
+      if (!timestampMs) return "";
 
       return `${props.fullTimePrefix} ${timestampToTimezoneDate(
-        props.timestamp,
+        timestampMs,
         store.state.timezone,
-        "yyyy-MM-dd HH:mm:ss.SSS"
+        "yyyy-MM-dd HH:mm:ss.SSS",
       )} ${store.state.timezone}`;
     });
 
@@ -92,7 +103,7 @@ export default {
       () => props.timestamp,
       () => {
         updateRelativeTime(); // Update immediately if the timestamp prop changes
-      }
+      },
     );
 
     onBeforeUnmount(() => {
@@ -100,6 +111,7 @@ export default {
     });
 
     return {
+      raw,
       relativeTime,
       formattedExactTime,
     };

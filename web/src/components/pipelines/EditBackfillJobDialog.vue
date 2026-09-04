@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,173 +15,147 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog
-    v-model="show"
-    position="right"
-    full-height
-    maximized
+  <ODialog
+    v-model:open="show"
+    size="sm"
+    :title="t('pipeline.editBackfillJobTitle')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('pipeline.updateJob')"
+    form-id="edit-backfill-form"
+    @click:secondary="onCancel"
     data-test="edit-backfill-job-dialog"
   >
-    <q-card class="tw-w-full" style="width: 600px">
-      <q-card-section class="q-pa-md">
-        <div class="flex items-center justify-between">
-          <div class="text-h6" data-test="dialog-title">
-            Edit Backfill Job
-          </div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
-            v-close-popup
-            data-test="close-dialog-btn"
-          />
-        </div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section class="q-pa-md">
-        <q-form @submit="onSubmit" class="tw-space-y-4">
-          <!-- Time Range Section -->
-          <div>
-            <div class="text-subtitle2 q-mb-sm">
-              Time Range <span class="text-red-600">*</span>
+    <div>
+      <!-- Advanced Options + numeric ranges + the time range are form-owned. -->
+      <OForm id="edit-backfill-form" :form="form">
+        <!-- Time Range Section (form-owned via OFormDateTimeRange). The label is
+               rendered inline beside the picker (flex row) to match the Create
+               dialog; OFormDateTimeRange's built-in label stacks, so it's omitted. -->
+        <div>
+          <div class="flex items-center gap-4">
+            <div class="text-sm font-medium whitespace-nowrap">
+              {{ t("pipeline.timeRange") }} <span class="text-status-error-text">*</span>
             </div>
-            <date-time
-              ref="dateTimeRef"
-              auto-apply
-              default-type="absolute"
-              @on:date-change="updateDateTime"
-              data-test="time-range-picker"
+            <OFormDateTimeRange
+              name="timerange"
               disable-relative
               min-date="1999/01/01"
+              auto-apply
+              data-test="time-range-picker"
             />
-            <div
-              v-if="formData.startTimeMicros <= 0 || formData.endTimeMicros <= 0"
-              class="text-caption text-red-600 q-mt-xs"
-            >
-              Please select a valid time range
-            </div>
           </div>
+          <div v-if="timerangeError" class="text-status-error-text mt-1 text-xs">
+            {{ timerangeError }}
+          </div>
+        </div>
 
-          <!-- Advanced Options -->
-          <q-expansion-item
-            v-model="showAdvanced"
-            icon="settings"
-            label="Advanced Options"
-            data-test="advanced-options-expansion"
-          >
-            <q-card flat bordered class="q-pa-md tw-space-y-4">
-              <!-- Chunk Period -->
-              <div>
-                <div class="text-caption q-mb-xs">
-                  Chunk Period (minutes)
-                  <q-icon name="info_outline" size="16px" color="grey-6">
-                    <q-tooltip>
-                      Size of each processing chunk in minutes. Default: 60
-                    </q-tooltip>
-                  </q-icon>
-                </div>
-                <q-input
-                  v-model.number="formData.chunkPeriodMinutes"
-                  type="number"
-                  outlined
-                  dense
-                  placeholder="60"
-                  :rules="[(val) => !val || (val >= 1 && val <= 1440) || 'Must be between 1 and 1440']"
-                  data-test="chunk-period-input"
-                />
+        <!-- Advanced Options -->
+        <OCollapsible
+          class="mt-2"
+          v-model="showAdvanced"
+          icon="settings"
+          :label="t('pipeline.advancedOptions')"
+          data-test="advanced-options-expansion"
+        >
+          <div class="mt-2 space-y-2 p-3">
+            <!-- Chunk Period -->
+            <div>
+              <div class="mb-1 text-xs">
+                {{ t("pipeline.chunkPeriodMinutesLabel") }}
+                <OIcon name="info-outline" size="sm" />
+                <OTooltip :content="t('pipeline.chunkPeriodDefaultTooltip')" />
               </div>
+              <OFormInput
+                name="chunkPeriodMinutes"
+                type="number"
+                :placeholder="t('pipeline.chunkPeriodDefaultPlaceholder')"
+                data-test="chunk-period-input"
+              />
+            </div>
 
-              <!-- Delay Between Chunks -->
-              <div>
-                <div class="text-caption q-mb-xs">
-                  Delay Between Chunks (seconds)
-                  <q-icon name="info_outline" size="16px" color="grey-6">
-                    <q-tooltip>
-                      Delay between processing chunks in seconds. Default: 5
-                    </q-tooltip>
-                  </q-icon>
-                </div>
-                <q-input
-                  v-model.number="formData.delayBetweenChunks"
-                  type="number"
-                  outlined
-                  dense
-                  placeholder="5"
-                  :rules="[(val) => !val || (val >= 1 && val <= 3600) || 'Must be between 1 and 3600']"
-                  data-test="delay-between-chunks-input"
-                />
+            <!-- Delay Between Chunks -->
+            <div>
+              <div class="mb-1 text-xs">
+                {{ t("pipeline.delayBetweenChunksLabel") }}
+                <OIcon name="info-outline" size="sm" />
+                <OTooltip :content="t('pipeline.chunkDelayTooltip')" />
               </div>
+              <OFormInput
+                name="delayBetweenChunks"
+                type="number"
+                :placeholder="t('pipeline.defaultDelaySecondsPlaceholder')"
+                data-test="delay-between-chunks-input"
+              />
+            </div>
 
-              <!-- Delete Before Backfill -->
-              <div>
-                <q-checkbox
-                  v-model="formData.deleteBeforeBackfill"
-                  label="Delete existing data before backfill"
-                  data-test="delete-before-backfill-checkbox"
-                />
-                <div
-                  v-if="formData.deleteBeforeBackfill"
-                  class="tw-mt-2 tw-p-3 tw-bg-orange-100 tw-rounded tw-border tw-border-orange-300"
-                >
-                  <div class="flex items-start">
-                    <q-icon name="warning" color="orange" class="q-mr-sm tw-mt-0.5" />
-                    <div class="text-caption text-orange-800">
-                      <div class="tw-font-semibold tw-mb-1">Warning: Irreversible Data Deletion</div>
-                      <div class="tw-mb-2">
-                        This will permanently delete all data in the destination stream for the specified time
-                        range before running the backfill. This action cannot be undone.
-                      </div>
-                      <div class="tw-font-semibold tw-text-xs tw-mb-1">Time Alignment Requirements (UTC):</div>
-                      <ul class="tw-ml-5 tw-space-y-0.5 tw-list-disc tw-text-xs">
-                        <li><strong>Logs</strong> streams: Times must align to hour boundaries in UTC (e.g., 10:00:00, not 10:15:00)</li>
-                        <li><strong>Metrics/Traces</strong> streams: Times must align to day boundaries in UTC (e.g., 00:00:00)</li>
-                      </ul>
+            <!-- Delete Before Backfill -->
+            <div>
+              <OFormCheckbox
+                name="deleteBeforeBackfill"
+                :label="t('pipeline.deleteDataBeforeBackfill')"
+                data-test="delete-before-backfill-checkbox"
+              />
+              <div
+                v-if="deleteBeforeBackfill"
+                class="rounded-default bg-banner-warning-bg border-banner-warning-border mt-2 border p-3"
+              >
+                <div class="flex items-start">
+                  <OIcon name="warning" size="sm" class="me-2 mt-0.5" />
+                  <div class="text-banner-warning-text text-xs">
+                    <div class="mb-1 font-semibold">
+                      {{ t("pipeline.irreversibleDeletionWarning") }}
                     </div>
+                    <div class="mb-2">
+                      {{ t("pipeline.deleteBackfillWarningMessage") }}
+                    </div>
+                    <div class="mb-1 text-xs font-semibold">
+                      {{ t("pipeline.timeAlignmentRequirements") }}
+                    </div>
+                    <ul class="ms-5 list-disc space-y-0.5 text-xs">
+                      <li>
+                        <strong>{{ t("common.logs") }}</strong>
+                        {{ t("pipeline.logsHourBoundaryNote") }}
+                      </li>
+                      <li>
+                        <strong>{{ t("pipeline.metricsTracesLabel") }}</strong>
+                        {{ t("pipeline.dayBoundaryNote") }}
+                      </li>
+                    </ul>
                   </div>
                 </div>
               </div>
-            </q-card>
-          </q-expansion-item>
-
-          <!-- Error Message -->
-          <div v-if="errorMessage" class="text-negative">
-            <q-icon name="error" class="q-mr-sm" />
-            {{ errorMessage }}
+            </div>
           </div>
+        </OCollapsible>
 
-          <!-- Form Actions -->
-          <div class="flex justify-end tw-gap-2 q-mt-md">
-            <q-btn
-              flat
-              label="Cancel"
-              color="grey-8"
-              @click="onCancel"
-              data-test="cancel-btn"
-            />
-            <q-btn
-              type="submit"
-              label="Update Job"
-              color="primary"
-              :loading="loading"
-              :disable="loading"
-              data-test="update-btn"
-            />
-          </div>
-        </q-form>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+        <!-- Error Message -->
+        <div v-if="errorMessage" class="text-status-error-text">
+          <OIcon name="error" size="sm" class="me-2" />
+          {{ errorMessage }}
+        </div>
+      </OForm>
+    </div>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
+import OFormDateTimeRange from "@/lib/forms/DateTime/OFormDateTimeRange.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import backfillService, { type BackfillJob } from "../../services/backfill";
-import DateTime from "@/components/DateTime.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { firstFieldError } from "@/lib/forms/Form/fieldError";
+import { makeBackfillSchema, type BackfillForm } from "./backfillJob.schema";
 
 interface Props {
   modelValue: boolean;
@@ -196,8 +170,10 @@ interface Emits {
 const props = defineProps<Props>();
 const emit = defineEmits<Emits>();
 
-const $q = useQuasar();
 const store = useStore();
+const { t } = useI18nTyped();
+
+const { confirm } = useConfirmDialog();
 
 const show = computed({
   get: () => props.modelValue,
@@ -205,62 +181,67 @@ const show = computed({
 });
 
 const showAdvanced = ref(false);
-const loading = ref(false);
 const errorMessage = ref("");
-const dateTimeRef = ref<InstanceType<typeof DateTime> | null>(null);
 
-const formData = ref({
-  startTimeMicros: 0,
-  endTimeMicros: 0,
-  chunkPeriodMinutes: null as number | null,
-  delayBetweenChunks: null as number | null,
+// Typed dynamic defaults for the form-owned fields (seeded from props.job). The
+// time range is an absolute range carrying the job's start/end (forces the
+// picker to absolute mode + pre-fills it).
+const backfillDefaults = computed((): BackfillForm => ({
+  timerange: {
+    type: "absolute",
+    from: props.job?.start_time,
+    to: props.job?.end_time,
+  },
+  chunkPeriodMinutes: props.job?.chunk_period_minutes || null,
+  delayBetweenChunks: props.job?.delay_between_chunks_secs || null,
+  deleteBeforeBackfill: props.job?.delete_before_backfill || false,
+}));
+
+// Blank defaults used by cancel/reset (the open-watch re-seeds from props.job).
+const blankDefaults = (): BackfillForm => ({
+  timerange: { type: "absolute", from: undefined, to: undefined },
+  chunkPeriodMinutes: null,
+  delayBetweenChunks: null,
   deleteBeforeBackfill: false,
 });
 
-// Watch for dialog opening and job changes to populate form
+// Rule ③ OWNER pattern: this component OWNS <OForm> and needs the live values
+// for the delete-warning `v-if` + the update payload, so it creates the form
+// here with useOForm and reads it reactively via form.useStore — a SINGLE
+// source of truth (no mirror, no store.subscribe).
+const form = useOForm<BackfillForm>({
+  defaultValues: backfillDefaults.value,
+  schema: makeBackfillSchema(t),
+  onSubmit: (value) => onSubmit(value),
+});
+
+const deleteBeforeBackfill = form.useStore((s: any) => s.values.deleteBeforeBackfill);
+
+// Surface the form-level `timerange` error (OFormDateTimeRange renders none).
+const timerangeErrors = form.useStore((s: any) => s.fieldMeta?.timerange?.errors ?? []);
+const timerangeError = computed(() =>
+  timerangeErrors.value.length ? String(firstFieldError(timerangeErrors.value)) : "",
+);
+
+// Watch for dialog opening and job changes to re-seed the form from props.job
+// (data arrives after mount, so reset on the next tick).
 watch(
   () => [props.modelValue, props.job] as const,
   async ([isOpen, job]) => {
     if (isOpen && job) {
-      formData.value = {
-        startTimeMicros: job.start_time,
-        endTimeMicros: job.end_time,
-        chunkPeriodMinutes: job.chunk_period_minutes || null,
-        delayBetweenChunks: job.delay_between_chunks_secs || null,
-        deleteBeforeBackfill: job.delete_before_backfill || false,
-      };
-
-      // Wait for the next tick to ensure dateTimeRef is mounted
       await nextTick();
-
-      // Set date time component with the job's time range
-      if (dateTimeRef.value) {
-        dateTimeRef.value.setCustomDate("absolute", {
-          start: job.start_time / 1000, // Convert from microseconds to milliseconds
-          end: job.end_time / 1000,
-        });
-      }
+      form.reset(backfillDefaults.value);
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
-// Handle datetime changes from the DateTime component
-const updateDateTime = (value: any) => {
-  formData.value.startTimeMicros = value.startTime;
-  formData.value.endTimeMicros = value.endTime;
-};
-
 const resetForm = () => {
-  formData.value = {
-    startTimeMicros: 0,
-    endTimeMicros: 0,
-    chunkPeriodMinutes: null,
-    delayBetweenChunks: null,
-    deleteBeforeBackfill: false,
-  };
   showAdvanced.value = false;
   errorMessage.value = "";
+  // Cancel/reset blanks the form-owned fields (the open-watch re-seeds them from
+  // props.job on the next open).
+  form.reset(blankDefaults());
 };
 
 const onCancel = () => {
@@ -268,73 +249,58 @@ const onCancel = () => {
   show.value = false;
 };
 
-const onSubmit = async () => {
+// @submit handler — OForm only calls it once the schema passes (the time-range
+// cross-field guard + chunk/delay numeric ranges live in the schema). `value`
+// is the validated, single-source-of-truth payload.
+const onSubmit = async (value: BackfillForm) => {
   errorMessage.value = "";
 
   if (!props.job) {
-    errorMessage.value = "No job selected";
-    return;
-  }
-
-  if (
-    formData.value.startTimeMicros <= 0 ||
-    formData.value.endTimeMicros <= 0
-  ) {
-    errorMessage.value = "Please select a valid time range";
-    return;
-  }
-
-  if (formData.value.startTimeMicros >= formData.value.endTimeMicros) {
-    errorMessage.value = "End time must be after start time";
+    errorMessage.value = t("pipeline.noJobSelected");
     return;
   }
 
   // Show confirmation dialog if delete_before_backfill is enabled
-  if (formData.value.deleteBeforeBackfill) {
-    $q.dialog({
-      title: "Confirm Data Deletion",
-      message:
-        "You have selected to delete existing data before backfill. This will permanently delete all data in the destination stream for the specified time range. This action CANNOT be undone or cancelled once the job is updated. Are you sure you want to proceed?",
-      cancel: {
-        label: "Cancel",
-        color: "grey-8",
-        flat: true,
-      },
-      ok: {
-        label: "Yes, Delete and Backfill",
-        color: "negative",
-      },
-      persistent: true,
-      focus: "cancel", // Focus on cancel button by default for safety
-    }).onOk(() => {
-      updateBackfillJobRequest();
+  if (value.deleteBeforeBackfill) {
+    const ok = await confirm({
+      title: t("pipeline.confirmDataDeletion"),
+      message: t("pipeline.editBackfillDeleteConfirmMessage"),
+      confirmLabel: t("pipeline.yesDeleteAndBackfill"),
     });
+    if (ok) {
+      await updateBackfillJobRequest(value);
+    }
   } else {
-    updateBackfillJobRequest();
+    await updateBackfillJobRequest(value);
   }
 };
 
-const updateBackfillJobRequest = async () => {
-  loading.value = true;
-
+const updateBackfillJobRequest = async (value: BackfillForm) => {
   try {
+    const chunkPeriodMinutes =
+      value.chunkPeriodMinutes === null || value.chunkPeriodMinutes === undefined
+        ? undefined
+        : Number(value.chunkPeriodMinutes);
+    const delayBetweenChunks =
+      value.delayBetweenChunks === null || value.delayBetweenChunks === undefined
+        ? undefined
+        : Number(value.delayBetweenChunks);
     await backfillService.updateBackfillJob({
       org_id: store.state.selectedOrganization.identifier,
       pipeline_id: props.job!.pipeline_id,
       job_id: props.job!.job_id,
       data: {
-        start_time: formData.value.startTimeMicros,
-        end_time: formData.value.endTimeMicros,
-        chunk_period_minutes: formData.value.chunkPeriodMinutes || undefined,
-        delay_between_chunks_secs: formData.value.delayBetweenChunks || undefined,
-        delete_before_backfill: formData.value.deleteBeforeBackfill,
+        start_time: value.timerange!.from as number,
+        end_time: value.timerange!.to as number,
+        chunk_period_minutes: chunkPeriodMinutes,
+        delay_between_chunks_secs: delayBetweenChunks,
+        delete_before_backfill: !!value.deleteBeforeBackfill,
       },
     });
 
-    $q.notify({
-      type: "positive",
-      message: "Backfill job updated successfully",
-      timeout: 3000,
+    toast({
+      variant: "success",
+      message: t("toastMessages.pipelines.backfillJobUpdatedSuccessfully"),
     });
 
     emit("job-updated");
@@ -343,11 +309,7 @@ const updateBackfillJobRequest = async () => {
   } catch (error: any) {
     console.error("Error updating backfill job:", error);
     errorMessage.value =
-      error?.response?.data?.error ||
-      error?.message ||
-      "Failed to update backfill job";
-  } finally {
-    loading.value = false;
+      error?.response?.data?.error || error?.message || t("pipeline.updateBackfillJobFailed");
   }
 };
 </script>

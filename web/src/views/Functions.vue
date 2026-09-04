@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,139 +15,259 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page>
-    <div class=" tw:pb-[0.625rem]">
-      <q-splitter
-        v-model="splitterModel"
-        unit="px"
-        :limits="[0, 400]"
-        class="tw:overflow-hidden logs-splitter-smooth"
+  <!-- Sections that bring their OWN page header (Functions, Enrichment Tables
+       each render a full OPageLayout) are rendered DIRECTLY — exactly like any
+       normal top-level page. Wrapping them in the shell's OPageLayout too nested
+       two page layouts and pushed their header down (a top gap). Pipelines and
+       the pipeline detail sub-pages have no own-header, so the shell owns theirs. -->
+  <RouterView v-if="sectionOwnsHeader" v-slot="{ Component }">
+    <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+  </RouterView>
+
+  <!-- Pipelines is a frequently-used workspace, so it has NO landing hub (that
+       would add a click every visit). It lands straight on the default section
+       and uses the same breadcrumb section-switcher for fast lateral nav:
+         Stream Pipelines ▾            (› Edit Pipeline on a detail page)
+       Page actions (and the detail-view teleport target) live in the bar. -->
+  <OPageLayout v-else bleed>
+    <template #header v-if="showPipelineActions || isDetailView">
+      <!-- This row hosts page actions: the pipelines-list buttons or the detail
+         teleport target. Section pages (functions/enrichment/eval) render
+         nothing here — their content components have their own headers. -->
+      <OPageHeader
+        :title="showPipelineActions ? t('menu.pipeline') : breadcrumbLabel"
+        :subtitle="
+          showPipelineActions
+            ? t('pipeline.subtitle')
+            : routeName === 'createPipeline'
+              ? breadcrumbLabel
+              : raw('')
+        "
+        :title-overflow="routeName === 'createPipeline' ? 'visible' : 'truncate'"
+        :icon="showPipelineActions ? 'lan' : undefined"
+        :back="detailBack"
+        :tabs-below="showPipelineActions"
+        class="border-border-default border-b"
       >
-        <template v-slot:before>
-          <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-            <div v-if="showSidebar" class="card-container tw:h-[calc(100vh-50px)]">
-              <q-tabs
-                v-model="activeTab"
-                indicator-color="transparent"
-                inline-label
-                vertical
-                class="card-container"
-              >
-                <q-route-tab
-                  v-if="
-                    !store.state.zoConfig?.custom_hide_menus
-                      ?.split(',')
-                      .includes('pipelines')
-                  "
-                  data-test="stream-pipelines-tab"
-                  name="streamPipelines"
-                  :to="{
-                    name: 'pipelines',
-                    query: {
-                      org_identifier: store.state.selectedOrganization.identifier,
-                    },
-                  }"
-                  :label="t('function.streamPipeline')"
-                  content-class="tab_content"
-                />
-                <q-route-tab
-                  data-test="function-stream-tab"
-                  default
-                  name="functions"
-                  :to="{
-                    name: 'functionList',
-                    query: {
-                      org_identifier: store.state.selectedOrganization.identifier,
-                    },
-                  }"
-                  :label="t('function.header')"
-                  content-class="tab_content"
-                />
-                <q-route-tab
-                  data-test="function-enrichment-table-tab"
-                  name="enrichmentTables"
-                  :to="{
-                    name: 'enrichmentTables',
-                    query: {
-                      org_identifier: store.state.selectedOrganization.identifier,
-                    },
-                  }"
-                  :label="t('function.enrichmentTables')"
-                  content-class="tab_content"
-                />
-              </q-tabs>
-            </div>
-          </div>
+        <!-- Section switcher tabs (Stream Pipelines / Functions / …) next to the
+           title on the list page; hidden on detail sub-pages (editor/history).
+           Always pass the slot so hasTabs tracks showPipelineActions reactively
+           via the slot function call instead of relying on slot presence tracking. -->
+        <template #tabs>
+          <PipelineSectionTabs v-if="showPipelineActions" />
         </template>
-        <template #separator>
-          <q-btn
-            data-test="logs-search-field-list-collapse-btn"
-            :icon="showSidebar ? 'chevron_left' : 'chevron_right'"
-            :title="showSidebar ? 'Collapse Fields' : 'Open Fields'"
-            :class="showSidebar ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-            color="primary"
-            size="sm"
-            dense
-            round
-            @click="collapseSidebar"
+        <!-- Teleport target for the create-page pipeline NAME, which IS the
+           title here (the "New pipeline" label moves to the subtitle above, as
+           on the panel/alert/function editors). The control itself is owned and
+           teleported in by PipelineEditor.vue, so it sits with the save logic
+           that validates it. -->
+        <template v-if="routeName === 'createPipeline'" #title>
+          <span id="o2-page-title" class="contents"></span>
+        </template>
+        <template #actions>
+          <template v-if="showPipelineActions">
+            <template v-if="!shouldCollapseActions">
+              <OButton
+                data-test="pipeline-list-history-btn"
+                variant="outline"
+                size="sm"
+                icon-left="history"
+                @click="goToPipelineHistory"
+              >
+                {{ t("pipeline.history") }}
+              </OButton>
+              <OButton
+                v-if="config.isEnterprise == 'true'"
+                data-test="pipeline-list-backfill-btn"
+                variant="outline"
+                size="sm"
+                icon-left="refresh"
+                @click="goToBackfillJobs"
+              >
+                {{ t("pipeline.backfill") }}
+              </OButton>
+              <OButton
+                data-test="pipeline-list-import-pipeline-btn"
+                variant="outline"
+                size="sm"
+                icon-left="upload-file"
+                @click="goToImportPipeline"
+              >
+                {{ t("pipeline.import") }}
+              </OButton>
+            </template>
+            <OButton
+              data-test="pipeline-list-add-pipeline-btn"
+              variant="primary"
+              size="sm"
+              @click="goToAddPipeline"
+            >
+              {{ t("pipeline.addPipeline") }}
+            </OButton>
+            <ODropdown v-if="shouldCollapseActions" align="end">
+              <template #trigger>
+                <OButton
+                  variant="outline"
+                  size="sm"
+                  data-test="pipeline-list-overflow-menu-btn"
+                  icon-left="menu"
+                />
+              </template>
+              <ODropdownItem
+                data-test="pipeline-list-menu-history-btn"
+                @select="goToPipelineHistory"
+              >
+                {{ t("pipeline.history") }}
+              </ODropdownItem>
+              <ODropdownItem
+                v-if="config.isEnterprise == 'true'"
+                data-test="pipeline-list-menu-backfill-btn"
+                @select="goToBackfillJobs"
+              >
+                {{ t("pipeline.backfill") }}
+              </ODropdownItem>
+              <ODropdownItem data-test="pipeline-list-menu-import-btn" @select="goToImportPipeline">
+                {{ t("pipeline.import") }}
+              </ODropdownItem>
+            </ODropdown>
+          </template>
+          <!-- Detail sub-pages (editor/history/backfill) teleport their actions
+             here, so the bar owns the single header and pages never render a 2nd. -->
+          <div
+            v-else-if="isDetailView"
+            id="o2-page-actions"
+            class="flex items-center gap-2"
+            data-test="pipeline-detail-actions"
           />
         </template>
-        <template v-slot:after>
-          <!-- :templates="templates"
-            :functionAssociatedStreams="functionAssociatedStreams"
-            @get:functionAssociatedStreams="getFunctionAssociatedStreams"
-            @get:templates="getTemplates" -->
-            <div class=" q-pt-xs">
-              <RouterView v-slot="{ Component }">
-                <component :is="Component" @sendToAiChat="sendToAiChat" />
-              </RouterView>
-            </div>
-        </template>
-      </q-splitter>
+      </OPageHeader>
+    </template>
+
+    <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <RouterView v-slot="{ Component }">
+        <component :is="Component" class="h-full" @sendToAiChat="sendToAiChat" />
+      </RouterView>
     </div>
-  </q-page>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, watch } from "vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import PipelineSectionTabs from "@/components/pipeline/PipelineSectionTabs.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import { defineComponent, ref, computed, onBeforeMount, onMounted, onUnmounted, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import config from "@/aws-exports";
 
 export default defineComponent({
   name: "AppFunctions",
+  components: {
+    OPageHeader,
+    OPageLayout,
+    PipelineSectionTabs,
+    OButton,
+    ODropdown,
+    ODropdownItem,
+  },
   emits: ["sendToAiChat"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
-    const activeTab: any = ref("streamPipelines");
-    const templates = ref([]);
-    const functionAssociatedStreams = ref([]);
-    const splitterModel = ref(220);
 
-    const lastSplitterPosition = ref(splitterModel.value);
+    // Maps each route to the Level-2 section it belongs under. Pipeline
+    // drill-down sub-pages all resolve to the Pipelines section.
+    const routeToFunctionsTab: Record<string, string> = {
+      pipelines: "streamPipelines",
+      pipelineEditor: "streamPipelines",
+      createPipeline: "streamPipelines",
+      importPipeline: "streamPipelines",
+      pipelineHistory: "streamPipelines",
+      pipelineBackfill: "streamPipelines",
+      functionList: "functions",
+      enrichmentTables: "enrichmentTables",
+    };
 
-    const showSidebar = ref(true);
+    const routeName = computed(() => router.currentRoute.value.name as string);
 
-    watch(
-      () => router.currentRoute.value,
-      (currentRoute: any) => {
-        if (
-          currentRoute.name === "functionList" &&
-          currentRoute.query.action === "add"
-        ) {
-          if (showSidebar.value) collapseSidebar();
-        }
+    const activeTab: any = ref(routeToFunctionsTab[routeName.value] ?? "streamPipelines");
+    watch(routeName, (name) => {
+      if (routeToFunctionsTab[name]) activeTab.value = routeToFunctionsTab[name];
+    });
+
+    const orgIdentifier = computed(() => store.state.selectedOrganization.identifier);
+
+    // ── Level 3 detail crumb ────────────────────────────────────────────────
+    const detailLabels: Record<string, () => I18nText> = {
+      pipelineEditor: () => {
+        const name = router.currentRoute.value.query.name as string;
+        return name ? raw(name) : t("pipeline.editPipeline");
       },
+      createPipeline: () => t("pipeline.addPipeline"),
+      importPipeline: () => t("pipeline.import"),
+      pipelineHistory: () => t("pipeline.history"),
+      pipelineBackfill: () => t("pipeline.backfill"),
+    };
+    const isDetailView = computed(() => routeName.value in detailLabels);
+    const breadcrumbLabel = computed(() => detailLabels[routeName.value]?.() ?? raw(""));
+
+    // On a detail sub-page (editor/create/history/backfill) the leading icon
+    // becomes a Back button to the pipelines list, mirroring the CRUD sub-page
+    // pattern used elsewhere. Undefined on the list page (icon stays).
+    const detailBack = computed(() =>
+      isDetailView.value
+        ? {
+            label: t("function.streamPipeline"),
+            to: {
+              name: "pipelines",
+              query: { org_identifier: orgIdentifier.value },
+            },
+          }
+        : undefined,
     );
+
+    // Header actions live on the Pipelines index page only.
+    const showPipelineActions = computed(() => routeName.value === "pipelines");
+
+    // Sections that render their OWN OPageLayout header (Functions, Enrichment
+    // Tables). They're rendered directly instead of nested inside the shell's
+    // OPageLayout, so their header sits flush at the top like any normal page.
+    const sectionOwnsHeader = computed(
+      () => routeName.value === "functionList" || routeName.value === "enrichmentTables",
+    );
+
+    // Responsive: collapse secondary actions into an overflow menu when narrow.
+    const windowWidth = ref(window.innerWidth);
+    const onWindowResize = () => {
+      windowWidth.value = window.innerWidth;
+    };
+    const shouldCollapseActions = computed(() => windowWidth.value <= 1440);
+
+    onMounted(() => {
+      window.addEventListener("resize", onWindowResize);
+    });
+    onUnmounted(() => {
+      window.removeEventListener("resize", onWindowResize);
+    });
+
+    // ── Navigation handlers ─────────────────────────────────────────────────
+    const orgQuery = () => ({ org_identifier: orgIdentifier.value });
+    const goToAddPipeline = () => router.push({ name: "createPipeline", query: orgQuery() });
+    const goToImportPipeline = () => router.push({ name: "importPipeline", query: orgQuery() });
+    const goToPipelineHistory = () => router.push({ name: "pipelineHistory", query: orgQuery() });
+    const goToBackfillJobs = () => router.push({ name: "pipelineBackfill", query: orgQuery() });
 
     watch(
       () => router.currentRoute.value.name,
-      (routeName) => {
-        // This is added to redirect to functionList if the user is on functions route
-        // This case happens when user clicks on functions from menu when he is already on functions page
-        if (routeName === "pipeline") router.back();
+      (name) => {
+        // Clicking "Pipeline" in the menu while already on the section lands
+        // on the bare parent route — bounce back to the default section.
+        if (name === "pipeline") redirectRoute();
       },
     );
 
@@ -155,20 +275,9 @@ export default defineComponent({
       redirectRoute();
     });
 
-    const collapseSidebar = () => {
-      if (showSidebar.value) lastSplitterPosition.value = splitterModel.value;
-      showSidebar.value = !showSidebar.value;
-      splitterModel.value = showSidebar.value ? lastSplitterPosition.value : 0;
-    };
-
     const redirectRoute = () => {
       if (router.currentRoute.value.name === "pipeline") {
-        router.replace({
-          name: "pipelines",
-          query: {
-            org_identifier: store.state.selectedOrganization.identifier,
-          },
-        });
+        router.replace({ name: "pipelines", query: orgQuery() });
       }
     };
 
@@ -178,56 +287,24 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       store,
-      router,
-      redirectRoute,
-      splitterModel,
-      functionAssociatedStreams,
+      config,
+      orgIdentifier,
       activeTab,
-      templates,
-      collapseSidebar,
-      showSidebar,
-      sendToAiChat
+      isDetailView,
+      breadcrumbLabel,
+      detailBack,
+      showPipelineActions,
+      sectionOwnsHeader,
+      shouldCollapseActions,
+      goToAddPipeline,
+      goToImportPipeline,
+      goToPipelineHistory,
+      goToBackfillJobs,
+      sendToAiChat,
+      routeName,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-:deep(.q-splitter__before) {
-  overflow: visible;
-}
-
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-.functions-tabs {
-  // .q-tabs_bkcss {
-  //   &--vertical {
-  //     margin: 20px 16px 0 16px;
-  //     .q-tab {
-  //       justify-content: flex-start;
-  //       padding: 0 1rem 0 1.25rem;
-  //       border-radius: 0.5rem;
-  //       margin-bottom: 0.5rem;
-  //       text-transform: capitalize;
-  //       &__content.tab_content {
-  //         .q-tab {
-  //           &__icon + &__label {
-  //             padding-left: 0.875rem;
-  //             font-weight: 600;
-  //           }
-  //         }
-  //       }
-  //       &--active {
-  //         background-color: $accent;
-  //         color: black;
-  //       }
-  //     }
-  //   }
-  // }
-}
-</style>

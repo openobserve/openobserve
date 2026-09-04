@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,87 +14,73 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-card class="o2-side-dialog column full-height">
-    <q-card-section class="q-py-md tw:w-full">
-      <div class="row items-center no-wrap q-py-sm">
-        <div class="col">
-          <div data-test="add-role-section-title" style="font-size: 18px">
-            {{ t("iam.addRole") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <q-icon
-            data-test="add-role-close-dialog-btn"
-            name="cancel"
-            class="cursor-pointer"
-            size="20px"
-            @click="emits('cancel:hideform')"
-          />
-        </div>
-      </div>
-
-      <q-separator />
-      <div data-test="add-role-section">
-        <q-input
-          v-model.trim="name"
-          :label="t('common.name') + ' *'"
-          class="showLabelOnTop tw:mt-2"
-          stack-label
-          borderless
-          dense
-          :rules="[
-            (val: any, rules: any) =>
-              !!val
-                ? isValidRoleName ||
-                  `Use alphanumeric and '_' characters only, without spaces.`
-                : t('common.nameRequired'),
-          ]"
-          maxlength="100"
+  <ODialog
+    data-test="add-role-dialog"
+    :open="open"
+    size="sm"
+    :title="t('iam.addRole')"
+    :primaryButtonLabel="t('alerts.save')"
+    :secondaryButtonLabel="t('alerts.cancel')"
+    form-id="add-role-form"
+    @click:secondary="emits('update:open', false)"
+    @update:open="emits('update:open', $event)"
+  >
+    <div data-test="add-role-section">
+      <OForm
+        id="add-role-form"
+        :schema="addRoleSchema"
+        :default-values="addRoleDefaults"
+        @submit="saveRole"
+      >
+        <OFormInput
+          name="name"
+          :label="t('common.name')"
+          required
+          class="showLabelOnTop mt-2"
+          :maxlength="100"
           data-test="add-role-rolename-input-btn"
-          hide-bottom-space
-        >
-          <template v-slot:hint>
-            Use alphanumeric and '_' characters only, without spaces.
-          </template>
-        </q-input>
+          :help-text="t('iam.nameHelpText')"
+        />
 
-        <div class="flex justify-start tw:mt-6">
-          <q-btn
-            v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            @click="emits('cancel:hideform')"
-            data-test="add-alert-cancel-btn"
-          />
-          <q-btn
-            :disable="!name || !isValidRoleName"
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('alerts.save')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            @click="saveRole"
-            data-test="add-alert-submit-btn"
-          />
+        <div data-test="add-role-start-from-section" class="mt-4">
+          <div class="mb-1 text-sm font-medium">
+            {{ t("iam.role.startFrom.label") }}
+          </div>
+          <OFormRadioGroup name="startFrom" orientation="vertical">
+            <ORadio
+              v-for="option in startFromOptions"
+              :key="option.value"
+              :val="option.value"
+              :label="option.label"
+              :data-test="`add-role-start-from-${option.value}-radio`"
+            />
+          </OFormRadioGroup>
         </div>
-      </div>
-    </q-card-section>
-  </q-card>
+      </OForm>
+    </div>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
-import { createRole, updateRole } from "@/services/iam";
-import { useQuasar } from "quasar";
-import { ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { createRole } from "@/services/iam";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormRadioGroup from "@/lib/forms/Radio/OFormRadioGroup.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import { computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { makeAddRoleSchema, type AddRoleForm } from "./AddRole.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
   role: {
     type: Object,
     default: () => null,
@@ -105,50 +91,59 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["cancel:hideform", "added:role"]);
+const emits = defineEmits(["update:open", "added:role"]);
 
 const { track } = useReo();
 
-const name = ref(props.role?.name || "");
+// "Start from" preset options — the selected value is form-owned (startFrom):
+// "custom" = empty role (default); "readonly" = seed read-only permissions
+// (AllowList + AllowGet) once the user lands on EditRole.
+const startFromOptions = computed(() => [
+  { label: t("iam.role.startFrom.custom"), value: "custom" },
+  { label: t("iam.role.startFrom.readonly"), value: "readonly" },
+]);
 
 const store = useStore();
 
-const q = useQuasar();
+const addRoleSchema = makeAddRoleSchema(t);
 
-const isValidRoleName = computed(() => {
-  const roleNameRegex = /^[a-zA-Z0-9_]+$/;
-  // Check if the role name is valid
-  return roleNameRegex.test(name.value);
-});
+// The OForm owns `name` + `startFrom`. The ODialog unmounts its body on close +
+// remounts fresh on open, so this typed computed re-seeds `:default-values` each
+// open (the optional `role` prop prefills the name; startFrom resets to "custom").
+// No local model / watch.
+const addRoleDefaults = computed((): AddRoleForm => ({
+  name: props.role?.name ?? "",
+  startFrom: "custom",
+}));
 
-const saveRole = () => {
-  if (!name.value || !isValidRoleName.value) return;
-  createRole(name.value, store.state.selectedOrganization.identifier)
-    .then(() => {
-      emits("cancel:hideform");
-      emits("added:role");
-      q.notify({
-        message: `Role "${name.value}" Created Successfully!`,
-        color: "positive",
-        position: "bottom",
-        timeout: 3000,
-      });
-    })
-    .catch((err) => {
-      if(err.response.status != 403){
-        q.notify({
+// Plain async @submit handler — the validated `value` is the source of truth.
+// The schema validates the trimmed name; trim again here so the saved value
+// matches (mirrors the old `v-model.trim`). `saveRole` always calls createRole
+// (even when prefilled in edit mode) — behavior preserved from the original.
+// Emits the "start from" preset so AppRoles can seed EditRole's permissions.
+const saveRole = async (value: AddRoleForm) => {
+  const name = value.name.trim();
+  try {
+    await createRole(name, store.state.selectedOrganization.identifier);
+    emits("update:open", false);
+    emits("added:role", { role_name: name, startFrom: value.startFrom });
+    toast({
+      message: t("iam.addRolePage.roleCreated", { name }),
+      variant: "success",
+    });
+  } catch (err: any) {
+    if (err.response?.status != 403) {
+      toast({
         message: err?.response?.data?.message,
-        color: "negative",
-        position: "bottom",
-        timeout: 3000,
+        variant: "error",
       });
-      }
-      console.log(err);
-    });
-    track("Button Click", {
-      button: "Save Role",
-      page: "Add Role"
-    });
+    }
+    console.log(err);
+  }
+
+  track("Button Click", {
+    button: "Save Role",
+    page: "Add Role",
+  });
 };
 </script>
-

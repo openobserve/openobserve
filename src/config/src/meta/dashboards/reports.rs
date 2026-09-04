@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -27,10 +27,64 @@ pub enum ReportDestination {
 }
 
 #[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq)]
+#[serde(rename_all = "lowercase")]
 pub enum ReportMediaType {
     #[default]
-    #[serde(rename = "pdf")]
-    Pdf, // Supports Pdf only
+    Pdf,
+    Png,
+    Csv,
+}
+
+impl From<i16> for ReportMediaType {
+    fn from(v: i16) -> Self {
+        match v {
+            1 => ReportMediaType::Png,
+            2 => ReportMediaType::Csv,
+            _ => ReportMediaType::Pdf,
+        }
+    }
+}
+
+impl From<ReportMediaType> for i16 {
+    fn from(t: ReportMediaType) -> i16 {
+        match t {
+            ReportMediaType::Pdf => 0,
+            ReportMediaType::Png => 1,
+            ReportMediaType::Csv => 2,
+        }
+    }
+}
+
+#[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum ReportEmailAttachmentType {
+    #[default]
+    Standard,
+    Inline,
+}
+
+impl From<i16> for ReportEmailAttachmentType {
+    fn from(v: i16) -> Self {
+        match v {
+            1 => ReportEmailAttachmentType::Inline,
+            _ => ReportEmailAttachmentType::Standard,
+        }
+    }
+}
+
+impl From<ReportEmailAttachmentType> for i16 {
+    fn from(t: ReportEmailAttachmentType) -> i16 {
+        match t {
+            ReportEmailAttachmentType::Standard => 0,
+            ReportEmailAttachmentType::Inline => 1,
+        }
+    }
+}
+
+#[derive(Serialize, Debug, Deserialize, Clone, ToSchema, PartialEq)]
+pub struct ReportAttachmentDimensions {
+    pub width: u32,
+    pub height: u32,
 }
 
 #[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq, Eq)]
@@ -51,6 +105,16 @@ pub struct ReportDashboard {
     /// The timerange of dashboard data.
     #[serde(default)]
     pub timerange: ReportTimerange,
+    /// The type of report attachment — PDF or PNG.
+    #[serde(default)]
+    pub report_type: ReportMediaType,
+    /// How the attachment is sent in the email — as a downloadable file or embedded inline.
+    #[serde(default)]
+    pub email_attachment_type: ReportEmailAttachmentType,
+    /// Optional override for the browser viewport dimensions used when capturing the report.
+    /// When `None` the report server's configured defaults are used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub attachment_dimensions: Option<ReportAttachmentDimensions>,
 }
 
 #[derive(Serialize, Debug, Default, Deserialize, Clone, ToSchema, PartialEq, Eq)]
@@ -142,8 +206,10 @@ pub struct Report {
     pub message: String,
     #[serde(default)]
     pub enabled: bool,
+    /// When `true` and the report type is PDF, a PNG screenshot is also captured and embedded
+    /// inline in the email body alongside the PDF attachment.
     #[serde(default)]
-    pub media_type: ReportMediaType,
+    pub image_preview: bool,
     #[serde(default)]
     pub timezone: String,
     /// Fixed timezone offset in minutes
@@ -156,7 +222,9 @@ pub struct Report {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = String, format = DateTime)]
     pub updated_at: Option<DateTime<FixedOffset>>,
+    #[serde(default)]
     pub owner: String,
+    #[serde(default)]
     pub last_edited_by: String,
 }
 
@@ -173,7 +241,7 @@ impl Default for Report {
             description: "".to_string(),
             message: "".to_string(),
             enabled: false,
-            media_type: ReportMediaType::default(),
+            image_preview: false,
             timezone: "".to_string(),
             tz_offset: 0, // UTC
             created_at: datetime_now(),
@@ -193,6 +261,9 @@ pub struct ReportEmailDetails {
     pub name: String,
     pub message: String,
     pub dashb_url: String,
+    /// When `true` and the report type is PDF, a PNG screenshot is embedded inline in the email.
+    #[serde(default)]
+    pub image_preview: bool,
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone)]
@@ -224,6 +295,9 @@ pub struct ListReportsParams {
     /// When set to `true` the list will only include reports that have destinations. When set to
     /// `false` the list will only include reports that do not have destinations.
     pub has_destinations: Option<bool>,
+
+    /// When set, only reports whose names contain this substring (case-insensitive) are returned.
+    pub name_substring: Option<String>,
 }
 
 impl ListReportsParams {
@@ -235,6 +309,7 @@ impl ListReportsParams {
             dashboard_snowflake_id: None,
             page_size_and_idx: None,
             has_destinations: None,
+            name_substring: None,
         }
     }
 
@@ -261,6 +336,12 @@ impl ListReportsParams {
         self.page_size_and_idx = Some((page_size, page_idx));
         self
     }
+
+    /// Filter reports by name substring (case-insensitive).
+    pub fn with_name_substring(mut self, name_substring: &str) -> Self {
+        self.name_substring = Some(name_substring.to_string());
+        self
+    }
 }
 
 /// An item in a list of reports which only includes a subset of all the report fields.
@@ -279,6 +360,7 @@ pub struct ReportListFilters {
     pub dashboard: Option<String>,
     pub folder: Option<String>,
     pub destination_less: Option<bool>,
+    pub name_substring: Option<String>,
 }
 
 impl ReportListFilters {
@@ -289,6 +371,7 @@ impl ReportListFilters {
             dashboard_snowflake_id: self.dashboard,
             has_destinations: self.destination_less.map(|v| !v),
             page_size_and_idx: None,
+            name_substring: self.name_substring,
         }
     }
 }
@@ -306,6 +389,7 @@ mod tests {
             name: "name".to_string(),
             message: "message".to_string(),
             dashb_url: "https://example.com/dashb_url".to_string(),
+            image_preview: false,
         };
         let json = serde_json::to_string(&email_details).unwrap();
         let json_using_alias = json.replace("recipients", "recepients");
@@ -349,6 +433,9 @@ mod tests {
                 id: None,
             }],
             timerange: ReportTimerange::default(),
+            report_type: ReportMediaType::default(),
+            email_attachment_type: ReportEmailAttachmentType::default(),
+            attachment_dimensions: None,
         };
 
         let serialized = serde_json::to_string(&dashboard).unwrap();
@@ -425,7 +512,6 @@ mod tests {
         assert!(report.description.is_empty());
         assert!(report.message.is_empty());
         assert!(!report.enabled);
-        assert_eq!(report.media_type, ReportMediaType::Pdf);
         assert!(report.timezone.is_empty());
         assert_eq!(report.tz_offset, 0);
         assert!(report.updated_at.is_none());
@@ -448,12 +534,15 @@ mod tests {
                 tabs: vec!["tab1".to_string()],
                 variables: vec![],
                 timerange: ReportTimerange::default(),
+                report_type: ReportMediaType::default(),
+                email_attachment_type: ReportEmailAttachmentType::default(),
+                attachment_dimensions: None,
             }],
             destinations: vec![ReportDestination::Email("test@example.com".to_string())],
             description: "Test description".to_string(),
             message: "Test message".to_string(),
             enabled: true,
-            media_type: ReportMediaType::Pdf,
+            image_preview: false,
             timezone: "UTC".to_string(),
             tz_offset: 0,
             created_at: datetime_now(),
@@ -490,7 +579,7 @@ mod tests {
             description: "Test description".to_string(),
             message: "Test message".to_string(),
             enabled: true,
-            media_type: ReportMediaType::Pdf,
+            image_preview: false,
             timezone: "UTC".to_string(),
             tz_offset: 0,
             created_at: datetime_now(),
@@ -519,6 +608,7 @@ mod tests {
             name: "test_name".to_string(),
             message: "Test message".to_string(),
             dashb_url: "https://example.com/dashboard".to_string(),
+            image_preview: false,
         };
 
         assert_eq!(email_details.recipients.len(), 2);
@@ -536,6 +626,7 @@ mod tests {
             name: "test".to_string(),
             message: "test".to_string(),
             dashb_url: "https://example.com".to_string(),
+            image_preview: false,
         };
 
         let payload = HttpReportPayload {
@@ -545,6 +636,9 @@ mod tests {
                 tabs: vec!["tab1".to_string()],
                 variables: vec![],
                 timerange: ReportTimerange::default(),
+                report_type: ReportMediaType::default(),
+                email_attachment_type: ReportEmailAttachmentType::default(),
+                attachment_dimensions: None,
             }],
             email_details: email_details.clone(),
         };
@@ -602,6 +696,7 @@ mod tests {
             dashboard: Some("dashboard_123".to_string()),
             folder: Some("folder_456".to_string()),
             destination_less: Some(true),
+            name_substring: None,
         };
 
         let params = filters.into_params("test_org");
@@ -638,13 +733,6 @@ mod tests {
         assert_eq!(ReportFrequencyType::Once, ReportFrequencyType::Once);
         assert_ne!(ReportFrequencyType::Once, ReportFrequencyType::Weeks);
         assert_ne!(ReportFrequencyType::Hours, ReportFrequencyType::Days);
-    }
-
-    #[test]
-    fn test_report_media_type_clone() {
-        let media_type = ReportMediaType::Pdf;
-        let cloned = media_type.clone();
-        assert_eq!(media_type, cloned);
     }
 
     #[test]
@@ -702,5 +790,50 @@ mod tests {
         assert_eq!(once_json, r#""once""#);
         assert_eq!(weeks_json, r#""weeks""#);
         assert_eq!(cron_json, r#""cron""#);
+    }
+
+    #[test]
+    fn test_report_dashboard_variable_id_none_absent_from_json() {
+        let v = ReportDashboardVariable {
+            key: "k".to_string(),
+            value: "v".to_string(),
+            id: None,
+        };
+        let json = serde_json::to_value(&v).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("id"));
+    }
+
+    #[test]
+    fn test_report_dashboard_variable_id_some_present_in_json() {
+        let v = ReportDashboardVariable {
+            key: "k".to_string(),
+            value: "v".to_string(),
+            id: Some("var_id_1".to_string()),
+        };
+        let json = serde_json::to_value(&v).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("id"));
+        assert_eq!(obj["id"], serde_json::json!("var_id_1"));
+    }
+
+    #[test]
+    fn test_report_dashboard_attachment_dimensions_none_absent() {
+        let d = ReportDashboard {
+            dashboard: "dash1".to_string(),
+            folder: "default".to_string(),
+            tabs: vec!["tab1".to_string()],
+            variables: vec![],
+            timerange: ReportTimerange::default(),
+            report_type: ReportMediaType::default(),
+            email_attachment_type: ReportEmailAttachmentType::default(),
+            attachment_dimensions: None,
+        };
+        let json = serde_json::to_value(&d).unwrap();
+        assert!(
+            !json
+                .as_object()
+                .unwrap()
+                .contains_key("attachment_dimensions")
+        );
     }
 }

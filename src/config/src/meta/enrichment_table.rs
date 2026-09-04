@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -201,9 +201,9 @@ mod tests {
         assert_eq!(job.total_bytes_fetched, 0);
         assert_eq!(job.total_records_processed, 0);
         assert_eq!(job.retry_count, 0);
-        assert_eq!(job.append_data, false);
+        assert!(!job.append_data);
         assert_eq!(job.last_byte_position, 0);
-        assert_eq!(job.supports_range, false);
+        assert!(!job.supports_range);
     }
 
     #[test]
@@ -300,7 +300,7 @@ mod tests {
             "url".to_string(),
             true,
         );
-        assert_eq!(job.append_data, true);
+        assert!(job.append_data);
     }
 
     #[test]

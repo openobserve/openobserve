@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -150,31 +150,6 @@ mod tests {
         assert_eq!(
             &create_dashboards_folder_id_dashboard_id_idx_stmnt().to_string(PostgresQueryBuilder),
             r#"CREATE UNIQUE INDEX IF NOT EXISTS "dashboards_folder_id_dashboard_id_idx" ON "dashboards" ("folder_id", "dashboard_id")"#
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_dashboards_table_statement().to_string(MysqlQueryBuilder),
-            r#"
-                CREATE TABLE IF NOT EXISTS `dashboards` ( 
-                `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                `dashboard_id` varchar(256) NOT NULL, 
-                `folder_id` bigint NOT NULL, 
-                `owner` varchar(256) NOT NULL, 
-                `role` varchar(256) NULL, 
-                `title` varchar(256) NOT NULL, 
-                `description` text NULL,
-                `data` json NOT NULL,
-                `version` int NOT NULL, 
-                `created_at` bigint NOT NULL, 
-                CONSTRAINT `dashboards_folders_fk` FOREIGN KEY (`folder_id`) REFERENCES `folders` (`id`) 
-            )"#
-        );
-        assert_eq!(
-            &create_dashboards_folder_id_dashboard_id_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `dashboards_folder_id_dashboard_id_idx` ON `dashboards` (`folder_id`, `dashboard_id`)"#
         );
     }
 

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,81 +16,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-splitter
-    v-model="splitterModel"
-    unit="px"
+  <DataSourceSidebarLayout
+    v-model="ingestTabType"
+    :tabs="recommendedTabs"
+    :splitter-width="270"
+    searchable
+    search-data-test="recommended-list-search-input"
+    panel-data-test="data-sources-recommended-tabs"
+    tab-data-test-prefix="ingestion-recommended-tab-"
   >
-    <template v-slot:before>
-      <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)] el-border-radius">
-          <div class="tw:overflow-hidden tw:h-full">
-            <q-input
-              data-test="recommended-list-search-input"
-              v-model="tabsFilter"
-              borderless
-              dense
-              clearable
-              :placeholder="t('common.search')"
-              class="tw:px-[0.625rem] tw:pt-[0.625rem] indexlist-search-input"
-            >
-              <template #prepend>
-                <q-icon name="search" class="cursor-pointer" />
-              </template>
-            </q-input>
-            <q-tabs
-              v-model="ingestTabType"
-              indicator-color="transparent"
-              inline-label
-              vertical
-              class="data-sources-recommended-tabs"
-            >
-              <template v-for="(tab, index) in filteredList" :key="tab.name">
-                <q-route-tab
-                  :title="tab.name"
-                  :default="index === 0"
-                  :name="tab.name"
-                  :to="tab.to"
-                  :icon="tab.icon"
-                  :label="tab.label"
-                  content-class="tab_content"
-                />
-              </template>
-            </q-tabs>
-          </div>
+    <div class="h-full w-full">
+      <div class="bg-card-glass-bg h-full">
+        <div class="h-full overflow-auto pt-1.5">
+          <router-view
+            :title="tabs"
+            :currOrgIdentifier="currOrgIdentifier"
+            :currUserEmail="currentUserEmail"
+          >
+          </router-view>
         </div>
       </div>
-    </template>
-
-    <template v-slot:after>
-      <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-        <div class=" card-container tw:h-[calc(100vh-140px)]">
-          <div class="tw:overflow-auto tw:h-full">
-            <router-view
-              :title="tabs"
-              :currOrgIdentifier="currOrgIdentifier"
-              :currUserEmail="currentUserEmail"
-            >
-            </router-view>
-          </div>
-        </div>
-      </div>
-    </template>
-  </q-splitter>
+    </div>
+  </DataSourceSidebarLayout>
 </template>
 
 <script lang="ts">
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, onUpdated, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
 import config from "@/aws-exports";
-import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "RecommendedPage",
+  components: { DataSourceSidebarLayout },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -98,18 +61,15 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const tabs = ref("");
-    const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier,
+    const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
+
+    const ingestTabType = ref(
+      resolveTab("recommended", router.currentRoute.value.name as string, "ingestFromKubernetes"),
     );
-
-    const tabsFilter = ref("");
-
-    const ingestTabType = ref("ingestFromKubernetes");
 
     onBeforeMount(() => {
       if (router.currentRoute.value.name === "recommended") {
@@ -145,7 +105,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/kubernetes.svg"),
-        label: t("ingestion.kubernetes"),
+        label: raw("Kubernetes"),
         contentClass: "tab_content",
       },
       {
@@ -157,7 +117,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/windows.svg"),
-        label: t("ingestion.windows"),
+        label: raw("Windows"),
         contentClass: "tab_content",
       },
       {
@@ -169,7 +129,19 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/common/linux.svg"),
-        label: t("ingestion.linux"),
+        label: raw("Linux"),
+        contentClass: "tab_content",
+      },
+      {
+        name: "ingestFromMacOS",
+        to: {
+          name: "ingestFromMacOS",
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        },
+        icon: "img:" + getImageURL("images/common/macos.png"),
+        label: t("ingestion.macos"),
         contentClass: "tab_content",
       },
       {
@@ -181,7 +153,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/aws.svg"),
-        label: t("ingestion.awsconfig"),
+        label: raw("Amazon Web Services(AWS)"),
         contentClass: "tab_content",
       },
       {
@@ -193,7 +165,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/gcp.svg"),
-        label: t("ingestion.gcpconfig"),
+        label: raw("Google Cloud Platform(GCP)"),
         contentClass: "tab_content",
       },
       {
@@ -205,7 +177,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/azure.png"),
-        label: t("ingestion.azure"),
+        label: raw("Microsoft Azure"),
         contentClass: "tab_content",
       },
       {
@@ -217,7 +189,7 @@ export default defineComponent({
           },
         },
         icon: "img:" + getImageURL("images/ingestion/otlp.svg"),
-        label: t("ingestion.tracesotlp"),
+        label: t("ingestion.tracesotlp", { product: raw("OpenTelemetry") }),
         contentClass: "tab_content",
       },
       {
@@ -234,17 +206,19 @@ export default defineComponent({
       },
     ];
 
-    let filteredTabs = [];
-    // create computed property to filter tabs
-    const filteredList = computed(() => {
-      if (!tabsFilter.value) {
-        return recommendedTabs;
-      }
-      filteredTabs = recommendedTabs.filter((tab) => {
-        return tab.label.toLowerCase().includes(tabsFilter.value.toLowerCase());
-      });
-
-      return filteredTabs;
+    // The MCP endpoint is served by every edition, so this pointer to the IAM
+    // setup page is unconditional.
+    recommendedTabs.push({
+      name: "recommendedMcp",
+      to: {
+        name: "recommendedMcp",
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+        },
+      },
+      icon: "mcp",
+      label: t("ingestion.mcp.shortName"),
+      contentClass: "tab_content",
     });
 
     return {
@@ -252,49 +226,14 @@ export default defineComponent({
       store,
       router,
       config,
-      splitterModel: ref(270),
       currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
       getImageURL,
       verifyOrganizationStatus,
       tabs,
       ingestTabType,
-      tabsFilter,
-      filteredList,
       recommendedTabs,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-.data-sources-recommended-tabs {
-  :deep(.q-tab) {
-    min-height: 36px;
-  }
-}
-.ingestionPage {
-  padding: 1.5rem 0 0;
-  .head {
-    padding-bottom: 1rem;
-  }
-}
-</style>
-<style lang="scss">
-.ingestionPage {
-  .q-tab-panel {
-    padding: 0 !important;
-    .tab_content {
-      .q-tab__label {
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-      }
-    }
-  }
-
-  .q-icon > img {
-    height: auto !important;
-  }
-}
-</style>

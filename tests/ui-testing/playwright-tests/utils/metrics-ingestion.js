@@ -1,4 +1,5 @@
 const testLogger = require('./test-logger');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('./cloud-auth');
 
 /**
  * OTLP Metrics Ingestion Module for OpenObserve E2E Tests
@@ -9,8 +10,9 @@ class MetricsIngestion {
     constructor() {
         // Configuration for local OpenObserve instance
         // Normalize base URL to avoid double slashes
-        const baseUrl = (process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/, ''); // Remove trailing slash if present
-        const orgName = process.env.ORGNAME || 'default';
+        // Prefer INGESTION_URL (backend API) over ZO_BASE_URL (may be a frontend dev server)
+        const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL || 'http://localhost:5080').replace(/\/$/, '');
+        const orgName = getOrgIdentifier();
 
         // If METRICS_ENDPOINT is provided, normalize it too
         let endpoint = process.env.METRICS_ENDPOINT;
@@ -21,15 +23,18 @@ class MetricsIngestion {
             endpoint = `${baseUrl}/api/${orgName}/v1/metrics`;
         }
 
-        // Require environment variables - no fallback credentials
-        if (!process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD) {
-            throw new Error('ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD environment variables must be set');
+        // On cloud, auth is handled by getAuthHeaders() (email:passcode from cloud-config.json)
+        // On self-hosted, require ZO_ROOT_USER_EMAIL/ZO_ROOT_USER_PASSWORD
+        if (!isCloudEnvironment()) {
+            if (!process.env.ZO_ROOT_USER_EMAIL || !process.env.ZO_ROOT_USER_PASSWORD) {
+                throw new Error('ZO_ROOT_USER_EMAIL and ZO_ROOT_USER_PASSWORD environment variables must be set');
+            }
         }
 
         this.config = {
             endpoint: endpoint,
-            username: process.env.ZO_ROOT_USER_EMAIL,
-            password: process.env.ZO_ROOT_USER_PASSWORD,
+            username: process.env.ZO_ROOT_USER_EMAIL || '',
+            password: process.env.ZO_ROOT_USER_PASSWORD || '',
             orgId: orgName,
             streamName: 'default'
         };
@@ -326,9 +331,12 @@ class MetricsIngestion {
     /**
      * Check if the metrics endpoint is healthy
      */
-    async checkEndpointHealth(config) {
+    async checkEndpointHealth(config, useExternal = false) {
         try {
-            const auth = Buffer.from(`${config.username}:${config.password}`).toString('base64');
+            // Use cloud-compatible auth for local, manual auth for external
+            const headers = useExternal
+                ? { 'Authorization': `Basic ${Buffer.from(`${config.username}:${config.password}`).toString('base64')}` }
+                : getAuthHeaders();
 
             // Try a simple GET to the base API endpoint
             const baseUrl = config.endpoint.replace('/v1/metrics', '');
@@ -337,9 +345,7 @@ class MetricsIngestion {
 
             const response = await fetch(baseUrl, {
                 method: 'GET',
-                headers: {
-                    'Authorization': `Basic ${auth}`
-                },
+                headers,
                 signal: controller.signal
             });
 
@@ -384,11 +390,50 @@ class MetricsIngestion {
     }
 
     /**
+     * Poll the PromQL query API until an ingested metric is actually queryable
+     * (WAL indexing lags the ingest ack). Best-effort: returns false on timeout
+     * so callers proceed and let the test's own data assertion fail loudly.
+     */
+    async waitForMetricQueryable(metricName, maxRetries = 30, interval = 1000) {
+        const base = this.config.endpoint.replace('/v1/metrics', '');
+        const url = `${base}/prometheus/api/v1/query?query=${encodeURIComponent(metricName)}`;
+        const headers = getAuthHeaders();
+        for (let i = 0; i < maxRetries; i++) {
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 5000);
+                const response = await fetch(url, { method: 'GET', headers, signal: controller.signal });
+                clearTimeout(timeoutId);
+                if (response.ok) {
+                    const body = await response.json();
+                    const result = body?.data?.result;
+                    if (Array.isArray(result) && result.length > 0) {
+                        testLogger.info(`Metric "${metricName}" queryable after ${i + 1} poll(s)`, { series: result.length });
+                        return true;
+                    }
+                }
+            } catch (error) {
+                testLogger.debug(`waitForMetricQueryable attempt ${i + 1} error`, { error: error.message });
+            }
+            await new Promise(resolve => setTimeout(resolve, interval));
+        }
+        testLogger.warn(`Metric "${metricName}" not queryable after ${maxRetries} polls`);
+        return false;
+    }
+
+    /**
      * Send metrics to OpenObserve using OTLP format with retry logic
      */
     async sendMetrics(metricsData, useExternal = false, maxRetries = 3) {
         const config = useExternal ? this.externalConfig : this.config;
-        const auth = Buffer.from(`${config.username}:${config.password}`).toString('base64');
+
+        // Use cloud-compatible auth for local, manual auth for external
+        const authHeaders = useExternal
+            ? {
+                'Content-Type': 'application/json',
+                'Authorization': `Basic ${Buffer.from(`${config.username}:${config.password}`).toString('base64')}`,
+            }
+            : getAuthHeaders();
 
         let lastError = null;
         let retryDelay = 500;
@@ -401,8 +446,7 @@ class MetricsIngestion {
                 const response = await fetch(config.endpoint, {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Basic ${auth}`,
+                        ...authHeaders,
                         'organization': config.orgId,
                         'stream-name': config.streamName
                     },

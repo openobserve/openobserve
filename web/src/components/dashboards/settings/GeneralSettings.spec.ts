@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,16 +15,13 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
-
 // Mock utilities
 vi.mock("@/utils/commons", () => ({
   getDashboard: vi.fn(),
   updateDashboard: vi.fn(),
 }));
 
-// Mock CodeQueryEditor to avoid codemirror issues
+// Mock CodeQueryEditor — mounting monaco under jsdom is not the subject here.
 vi.mock("@/components/CodeQueryEditor.vue", () => ({
   default: {
     name: "CodeQueryEditor",
@@ -37,10 +34,6 @@ import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { getDashboard, updateDashboard } from "@/utils/commons";
 import { createRouter, createWebHistory } from "vue-router";
-
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 const mockDashboardData = {
   dashboardId: "dashboard-1",
@@ -62,33 +55,28 @@ describe("GeneralSettings", () => {
   let wrapper: any;
   let router: any;
 
-  const mockRoute = {
-    query: {
-      dashboard: "dashboard-1",
-      folder: "default",
-    },
-  };
-
   beforeEach(async () => {
     vi.clearAllMocks();
 
     // Create mock router
     router = createRouter({
       history: createWebHistory(),
-      routes: [{
-        path: '/',
-        name: 'dashboard',
-        component: { template: '<div></div>' }
-      }]
+      routes: [
+        {
+          path: "/",
+          name: "dashboard",
+          component: { template: "<div></div>" },
+        },
+      ],
     });
 
     // Push route with query parameters and wait for navigation
     await router.push({
-      path: '/',
+      path: "/",
       query: {
         dashboard: "dashboard-1",
         folder: "default",
-      }
+      },
     });
     await router.isReady();
 
@@ -109,7 +97,7 @@ describe("GeneralSettings", () => {
     // Reset and configure mocks before each test
     vi.mocked(getDashboard).mockReset();
     vi.mocked(updateDashboard).mockReset();
-    
+
     vi.mocked(getDashboard).mockResolvedValue(mockData);
     vi.mocked(updateDashboard).mockResolvedValue({} as any);
 
@@ -153,14 +141,14 @@ describe("GeneralSettings", () => {
 
     // Wait for all async operations to complete
     await flushPromises();
-    await new Promise(resolve => setTimeout(resolve, 100)); // Give more time for onMounted async operations
+    await new Promise((resolve) => setTimeout(resolve, 100)); // Give more time for onMounted async operations
     await flushPromises(); // Ensure all promises are flushed
-    
+
     // Mock form validation after component is fully mounted
     if (wrapper.vm.addDashboardForm) {
       wrapper.vm.addDashboardForm.validate = vi.fn().mockResolvedValue(true);
     }
-    
+
     return wrapper;
   };
 
@@ -168,22 +156,14 @@ describe("GeneralSettings", () => {
     it("should render general settings form", async () => {
       wrapper = await createWrapper();
 
-      expect(
-        wrapper.findComponent('[data-test="dashboard-header"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper.find('[data-test="dashboard-general-setting-name"]').exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dashboard-general-setting-description"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dashboard-general-setting-dynamic-filter"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.findComponent('[data-test="dashboard-header"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-general-setting-name"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-general-setting-description"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dashboard-general-setting-dynamic-filter"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render datetime picker when dateTimeValue exists", async () => {
@@ -193,27 +173,19 @@ describe("GeneralSettings", () => {
       wrapper.vm.dateTimeValue = mockDashboardData.defaultDatetimeDuration;
       await wrapper.vm.$nextTick();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-general-setting-datetime-picker"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-general-setting-datetime-picker"]').exists()).toBe(
+        true,
+      );
       expect(wrapper.find('[data-test="datetime-picker"]').exists()).toBe(true);
     });
 
     it("should render form buttons", async () => {
       wrapper = await createWrapper();
 
-      expect(
-        wrapper
-          .find('[data-test="dashboard-general-setting-cancel-btn"]')
-          .exists(),
-      ).toBe(true);
-      expect(
-        wrapper
-          .find('[data-test="dashboard-general-setting-save-btn"]')
-          .exists(),
-      ).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-general-setting-cancel-btn"]').exists()).toBe(
+        true,
+      );
+      expect(wrapper.find('[data-test="dashboard-general-setting-save-btn"]').exists()).toBe(true);
     });
 
     it("should render dashboard header with correct title", async () => {
@@ -228,101 +200,60 @@ describe("GeneralSettings", () => {
     it("should load dashboard data on mount", async () => {
       wrapper = await createWrapper();
 
-      expect(getDashboard).toHaveBeenCalledWith(
-        store,
-        "dashboard-1",
-        "default",
-      );
+      expect(getDashboard).toHaveBeenCalledWith(store, "dashboard-1", "default");
     });
 
     it("should populate form fields with loaded data", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
+      // The form owns `name`, `description`, and `showDynamicFilters`: the async
+      // load re-baselines all of them via form.reset() (no local mirrors).
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.name).toBe(mockDashboardData.title);
+      expect(form.vm.form.state.values.description).toBe(mockDashboardData.description);
+      expect(form.vm.form.state.values.showDynamicFilters).toBe(
+        mockDashboardData.variables.showDynamicFilters,
       );
-      const descInput = wrapper.find(
-        '[data-test="dashboard-general-setting-description"]',
-      );
-
-      // Check the Vue component's model value instead of DOM element value
-      expect(wrapper.vm.dashboardData.title).toBe(mockDashboardData.title);
-      expect(wrapper.vm.dashboardData.description).toBe(mockDashboardData.description);
     });
 
     it("should handle loading errors gracefully", async () => {
       // Test error scenarios by checking component resilience
       // Since the component doesn't have built-in error handling, we expect it to maintain functionality
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      
+      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
       wrapper = await createWrapper();
 
       // Component should render even when errors might occur
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.find('[data-test="dashboard-general-setting-name"]').exists()).toBe(true);
-      
+
       consoleErrorSpy.mockRestore();
     });
   });
 
   describe("Form Validation", () => {
-    it("should require dashboard title", async () => {
+    // R3: the Save button is always enabled — the required-title rule is the Zod
+    // schema (gates submit through the form), not a disabled button.
+    it("keeps the Save button enabled when title is empty (schema gates submit)", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
-      await nameInput.setValue("");
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("name", "");
+      await wrapper.vm.$nextTick();
 
-      const saveBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-save-btn"]',
-      );
-      expect(saveBtn.element.disabled).toBe(true);
-    });
-
-    it("should enable save button when title is provided", async () => {
-      wrapper = await createWrapper();
-
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
-      await nameInput.setValue("Valid Dashboard Name");
-
-      const saveBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-save-btn"]',
-      );
+      const saveBtn = wrapper.find('[data-test="dashboard-general-setting-save-btn"]');
       expect(saveBtn.element.disabled).toBe(false);
     });
 
-    it("should validate title is not just whitespace", async () => {
+    it("keeps the Save button enabled when a title is provided", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
-      await nameInput.setValue("   ");
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("name", "Valid Dashboard Name");
+      await wrapper.vm.$nextTick();
 
-      const saveBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-save-btn"]',
-      );
-      expect(saveBtn.element.disabled).toBe(true);
-    });
-
-    it("should show validation error for empty title", async () => {
-      wrapper = await createWrapper();
-
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
-      await nameInput.setValue("");
-      await nameInput.trigger("blur");
-
-      const form = wrapper.find("form");
-      await form.trigger("submit.prevent");
-
-      // The error message is translated by the component, so we check for both key and actual text
-      const text = wrapper.text();
-      expect(text.includes("dashboard.nameRequired") || text.includes("Name is required")).toBe(true);
+      const saveBtn = wrapper.find('[data-test="dashboard-general-setting-save-btn"]');
+      expect(saveBtn.element.disabled).toBe(false);
     });
   });
 
@@ -330,37 +261,37 @@ describe("GeneralSettings", () => {
     it("should update dashboard title when input changes", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
+      const nameInput = wrapper.find('[data-test="dashboard-general-setting-name"] input');
       await nameInput.setValue("Updated Dashboard Name");
 
-      expect(wrapper.vm.dashboardData.title).toBe("Updated Dashboard Name");
+      // The form owns `name` now (no local title mirror).
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.name).toBe("Updated Dashboard Name");
     });
 
     it("should update dashboard description when input changes", async () => {
       wrapper = await createWrapper();
 
+      // Description is a textarea (multi-line) in the redesigned form.
       const descInput = wrapper.find(
-        '[data-test="dashboard-general-setting-description"]',
+        '[data-test="dashboard-general-setting-description"] textarea',
       );
       await descInput.setValue("Updated description");
 
-      expect(wrapper.vm.dashboardData.description).toBe("Updated description");
+      // The form owns `description` now — assert via the form state.
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.description).toBe("Updated description");
     });
 
     it("should toggle dynamic filters setting", async () => {
       wrapper = await createWrapper();
 
-      // Toggle the dynamic filters setting by directly setting on the component
-      const originalValue = wrapper.vm.dashboardData.showDynamicFilters;
-      wrapper.vm.dashboardData.showDynamicFilters = false;
+      // The form owns `showDynamicFilters` now — toggle via the form field.
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("showDynamicFilters", false);
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.dashboardData.showDynamicFilters).toBe(false);
-      
-      // Reset to original value
-      wrapper.vm.dashboardData.showDynamicFilters = originalValue;
+      expect(form.vm.form.state.values.showDynamicFilters).toBe(false);
     });
 
     it("should handle datetime picker changes", async () => {
@@ -370,16 +301,13 @@ describe("GeneralSettings", () => {
       wrapper.vm.dateTimeValue = {
         startTime: mockDashboardData.defaultDatetimeDuration.startTime,
         endTime: mockDashboardData.defaultDatetimeDuration.endTime,
-        relativeTimePeriod:
-          mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
+        relativeTimePeriod: mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
         valueType: mockDashboardData.defaultDatetimeDuration.type,
       };
-      
+
       await wrapper.vm.$nextTick();
 
-      const dateTimePicker = wrapper.findComponent(
-        '[data-test="datetime-picker"]',
-      );
+      const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
       const newDateTime = {
         startTime: new Date("2023-02-01T00:00:00Z"),
         endTime: new Date("2023-02-01T23:59:59Z"),
@@ -397,18 +325,14 @@ describe("GeneralSettings", () => {
     it("should save dashboard when form is submitted", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
+      // Drive the REAL submit path: type into the form-owned name field, then
+      // run the form's validate→@submit→save chain. The validated `value.name`
+      // is what reaches updateDashboard (no local title mirror).
+      const nameInput = wrapper.find('[data-test="dashboard-general-setting-name"] input');
       await nameInput.setValue("Updated Dashboard");
 
-      // Ensure form validation is properly mocked to return true
-      if (wrapper.vm.addDashboardForm?.validate) {
-        wrapper.vm.addDashboardForm.validate.mockResolvedValue(true);
-      }
-
-      // Call onSubmit method directly
-      await wrapper.vm.onSubmit();
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
       await flushPromises();
 
       expect(updateDashboard).toHaveBeenCalledWith(
@@ -427,35 +351,33 @@ describe("GeneralSettings", () => {
 
       // Mock slow API response
       vi.mocked(updateDashboard).mockImplementation(
-        () =>
-          new Promise((resolve) => setTimeout(() => resolve({} as any), 100)),
+        () => new Promise((resolve) => setTimeout(() => resolve({} as any), 100)),
       );
 
-      // Trigger the save operation directly
-      const savePromise = wrapper.vm.onSubmit();
-      await wrapper.vm.$nextTick();
+      // Drive the real form submit; OForm owns the loading state (isSubmitting),
+      // which the Save button's spinner is bound to via v-slot.
+      const form = (wrapper.findComponent({ name: "OForm" }).vm as any).form;
+      form.setFieldValue("name", "Test Dashboard");
+      const savePromise = form.handleSubmit();
+      await flushPromises();
 
       // Check loading state
-      expect(wrapper.vm.saveDashboardApi.isLoading.value).toBe(true);
-      
+      expect(form.state.isSubmitting).toBe(true);
+
       // Wait for promise to complete
       await savePromise;
+      expect(form.state.isSubmitting).toBe(false);
     });
 
     it("should handle save errors", async () => {
       // Reset updateDashboard mock and set it to reject
       vi.mocked(updateDashboard).mockReset();
       vi.mocked(updateDashboard).mockRejectedValue(new Error("Save failed"));
-      
+
       wrapper = await createWrapper();
 
-      // Ensure form validation passes
-      if (wrapper.vm.addDashboardForm?.validate) {
-        wrapper.vm.addDashboardForm.validate.mockResolvedValue(true);
-      }
-
-      // Call onSubmit directly to trigger error handling
-      await wrapper.vm.onSubmit();
+      // Call save directly to trigger error handling
+      await wrapper.vm.onSubmit({ name: "Test Dashboard" });
       await flushPromises();
 
       // The component handles errors via notifications, not console.error
@@ -466,13 +388,8 @@ describe("GeneralSettings", () => {
     it("should emit success event after successful save", async () => {
       wrapper = await createWrapper();
 
-      // Ensure form validation passes
-      if (wrapper.vm.addDashboardForm?.validate) {
-        wrapper.vm.addDashboardForm.validate.mockResolvedValue(true);
-      }
-
-      // Call onSubmit method directly
-      await wrapper.vm.onSubmit();
+      // Call save method directly (passes the validated name arg)
+      await wrapper.vm.onSubmit({ name: "Test Dashboard" });
       await flushPromises();
 
       expect(wrapper.emitted()).toHaveProperty("save");
@@ -480,17 +397,19 @@ describe("GeneralSettings", () => {
   });
 
   describe("User Actions", () => {
-    it("should close dialog when cancel button is clicked", async () => {
+    it("should emit close event when cancel button is clicked", async () => {
       wrapper = await createWrapper();
 
-      const cancelBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-cancel-btn"]',
-      );
-      // Check if the button has the close popup functionality
+      const cancelBtn = wrapper.find('[data-test="dashboard-general-setting-cancel-btn"]');
       expect(cancelBtn.exists()).toBe(true);
       expect(cancelBtn.element.tagName.toLowerCase()).toBe("button");
-    });
 
+      await cancelBtn.trigger("click");
+      await flushPromises();
+
+      expect(wrapper.emitted()).toHaveProperty("close");
+      expect(wrapper.emitted("close")).toHaveLength(1);
+    });
   });
 
   describe("Datetime Picker Integration", () => {
@@ -501,17 +420,14 @@ describe("GeneralSettings", () => {
       wrapper.vm.dateTimeValue = {
         startTime: mockDashboardData.defaultDatetimeDuration.startTime,
         endTime: mockDashboardData.defaultDatetimeDuration.endTime,
-        relativeTimePeriod:
-          mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
+        relativeTimePeriod: mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
         valueType: mockDashboardData.defaultDatetimeDuration.type,
       };
       wrapper.vm.initialTimezone = "UTC";
-      
+
       await wrapper.vm.$nextTick();
 
-      const dateTimePicker = wrapper.findComponent(
-        '[data-test="datetime-picker"]',
-      );
+      const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
       expect(dateTimePicker.props("initialTimezone")).toBe("UTC");
       expect(dateTimePicker.props("autoApplyDashboard")).toBe(true);
     });
@@ -524,16 +440,13 @@ describe("GeneralSettings", () => {
       wrapper.vm.dateTimeValue = {
         startTime: mockDashboardData.defaultDatetimeDuration.startTime,
         endTime: mockDashboardData.defaultDatetimeDuration.endTime,
-        relativeTimePeriod:
-          mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
+        relativeTimePeriod: mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
         valueType: mockDashboardData.defaultDatetimeDuration.type,
       };
-      
+
       await wrapper.vm.$nextTick();
 
-      const dateTimePicker = wrapper.findComponent(
-        '[data-test="datetime-picker"]',
-      );
+      const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
       expect(dateTimePicker.isVisible()).toBe(false);
     });
 
@@ -545,16 +458,13 @@ describe("GeneralSettings", () => {
       wrapper.vm.dateTimeValue = {
         startTime: mockDashboardData.defaultDatetimeDuration.startTime,
         endTime: mockDashboardData.defaultDatetimeDuration.endTime,
-        relativeTimePeriod:
-          mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
+        relativeTimePeriod: mockDashboardData.defaultDatetimeDuration.relativeTimePeriod,
         valueType: mockDashboardData.defaultDatetimeDuration.type,
       };
-      
+
       await wrapper.vm.$nextTick();
 
-      const dateTimePicker = wrapper.findComponent(
-        '[data-test="datetime-picker"]',
-      );
+      const dateTimePicker = wrapper.findComponent('[data-test="datetime-picker"]');
       expect(dateTimePicker.exists()).toBe(true);
     });
 
@@ -573,7 +483,6 @@ describe("GeneralSettings", () => {
     });
   });
 
-
   describe("Error Handling", () => {
     it("should handle missing dashboard data", async () => {
       // Mock getDashboard to return empty data instead of null to simulate real API behavior
@@ -586,15 +495,16 @@ describe("GeneralSettings", () => {
           endTime: null,
           relativeTimePeriod: "15m",
           type: "relative",
-        }
+        },
       });
 
       wrapper = await createWrapper();
 
-      // Should initialize with empty data
-      expect(wrapper.vm.dashboardData.title).toBe("");
-      expect(wrapper.vm.dashboardData.description).toBe("");
-      expect(wrapper.vm.dashboardData.showDynamicFilters).toBe(true);
+      // Should initialize with empty data (all three fields live in the form now)
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.name).toBe("");
+      expect(form.vm.form.state.values.description).toBe("");
+      expect(form.vm.form.state.values.showDynamicFilters).toBe(true);
     });
 
     it("should handle malformed dashboard data", async () => {
@@ -611,17 +521,18 @@ describe("GeneralSettings", () => {
           endTime: null,
           relativeTimePeriod: "15m",
           type: "relative",
-        }
+        },
       };
 
       vi.mocked(getDashboard).mockResolvedValue(malformedData);
 
       wrapper = await createWrapper();
 
-      // Should handle empty values gracefully
-      expect(wrapper.vm.dashboardData.title).toBe("");
-      expect(wrapper.vm.dashboardData.description).toBe("");
-      expect(wrapper.vm.dashboardData.showDynamicFilters).toBe(true);
+      // Should handle empty values gracefully (all three fields live in the form now)
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.name).toBe("");
+      expect(form.vm.form.state.values.description).toBe("");
+      expect(form.vm.form.state.values.showDynamicFilters).toBe(true);
     });
 
     it("should handle network errors during save", async () => {
@@ -632,17 +543,8 @@ describe("GeneralSettings", () => {
 
       wrapper = await createWrapper();
 
-      // Set up form with valid data
-      wrapper.vm.dashboardData.title = "Test Dashboard";
-      await wrapper.vm.$nextTick();
-
-      // Ensure form validation passes
-      if (wrapper.vm.addDashboardForm?.validate) {
-        wrapper.vm.addDashboardForm.validate.mockResolvedValue(true);
-      }
-
-      // Attempt to submit form by calling onSubmit directly
-      await wrapper.vm.onSubmit();
+      // Attempt to submit form by calling save directly (validated name arg)
+      await wrapper.vm.onSubmit({ name: "Test Dashboard" });
       await flushPromises();
 
       // Should handle the error
@@ -657,22 +559,16 @@ describe("GeneralSettings", () => {
       const conflictError = {
         response: {
           status: 409,
-          data: { message: "Dashboard was modified by another user" }
-        }
+          data: { message: "Dashboard was modified by another user" },
+        },
       };
-      
+
       vi.mocked(updateDashboard).mockReset();
       vi.mocked(updateDashboard).mockRejectedValueOnce(conflictError);
 
       wrapper = await createWrapper();
-      wrapper.vm.dashboardData.title = "Test Dashboard";
-      await wrapper.vm.$nextTick();
 
-      if (wrapper.vm.addDashboardForm?.validate) {
-        wrapper.vm.addDashboardForm.validate.mockResolvedValue(true);
-      }
-
-      await wrapper.vm.onSubmit();
+      await wrapper.vm.onSubmit({ name: "Test Dashboard" });
       await flushPromises();
 
       // Should handle conflict error specially
@@ -683,14 +579,15 @@ describe("GeneralSettings", () => {
     it("should handle missing variables data gracefully", async () => {
       const dataWithoutVariables = {
         ...mockDashboardData,
-        variables: undefined
+        variables: undefined,
       };
-      
+
       vi.mocked(getDashboard).mockResolvedValue(dataWithoutVariables);
       wrapper = await createWrapper();
 
-      // Should initialize showDynamicFilters to default value
-      expect(wrapper.vm.dashboardData.showDynamicFilters).toBe(false);
+      // Missing variables → form seeds showDynamicFilters to false on load.
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.showDynamicFilters).toBe(false);
     });
   });
 
@@ -698,34 +595,23 @@ describe("GeneralSettings", () => {
     it("should have proper form labels", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
-      const descInput = wrapper.find(
+      // OInput renders a <label> tag with text content
+      const nameComponent = wrapper.findComponent('[data-test="dashboard-general-setting-name"]');
+      const descComponent = wrapper.findComponent(
         '[data-test="dashboard-general-setting-description"]',
       );
 
-      // Check for label attributes or aria-label
-      const nameLabel = nameInput.attributes("label") || nameInput.attributes("aria-label");
-      const descLabel = descInput.attributes("label") || descInput.attributes("aria-label");
-
-      expect(nameLabel).toContain("Name");
-      expect(descLabel).toBeDefined();
+      expect(nameComponent.props("label")).toContain("Name");
+      expect(descComponent.props("label")).toBeDefined();
     });
-
 
     it("should have proper button roles", async () => {
       wrapper = await createWrapper();
 
-      const saveBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-save-btn"]',
-      );
-      const cancelBtn = wrapper.find(
-        '[data-test="dashboard-general-setting-cancel-btn"]',
-      );
+      const saveBtn = wrapper.find('[data-test="dashboard-general-setting-save-btn"]');
+      const cancelBtn = wrapper.find('[data-test="dashboard-general-setting-cancel-btn"]');
 
-      // Check button attributes - type for save button and role for both
-      expect(saveBtn.attributes("type")).toBe("submit");
+      // Both buttons render as <button> elements
       expect(saveBtn.element.tagName.toLowerCase()).toBe("button");
       expect(cancelBtn.element.tagName.toLowerCase()).toBe("button");
     });
@@ -737,10 +623,11 @@ describe("GeneralSettings", () => {
 
       const renderSpy = vi.spyOn(wrapper.vm, "$forceUpdate");
 
-      // Multiple prop updates using direct VM assignment
-      wrapper.vm.dashboardData.title = "New Title 1";
+      // Multiple updates to the form-owned name field
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("name", "New Title 1");
       await wrapper.vm.$nextTick();
-      wrapper.vm.dashboardData.title = "New Title 2";
+      form.vm.form.setFieldValue("name", "New Title 2");
       await wrapper.vm.$nextTick();
 
       expect(renderSpy).not.toHaveBeenCalled();
@@ -750,9 +637,7 @@ describe("GeneralSettings", () => {
     it("should debounce form input changes", async () => {
       wrapper = await createWrapper();
 
-      const nameInput = wrapper.find(
-        '[data-test="dashboard-general-setting-name"]',
-      );
+      const nameInput = wrapper.find('[data-test="dashboard-general-setting-name"] input');
 
       // Rapid input changes
       await nameInput.setValue("A");
@@ -760,8 +645,9 @@ describe("GeneralSettings", () => {
       await nameInput.setValue("ABC");
       await flushPromises();
 
-      // Should reflect the final value
-      expect(wrapper.vm.dashboardData.title).toBe("ABC");
+      // Should reflect the final value (the form owns `name`)
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.name).toBe("ABC");
     });
   });
 });

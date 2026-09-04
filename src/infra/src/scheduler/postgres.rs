@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,6 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use async_trait::async_trait;
-use bytes::Bytes;
 use chrono::Duration;
 use config::{
     metrics::DB_QUERY_NUMS,
@@ -26,10 +25,76 @@ use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_m
 use crate::{
     db::{
         self, IndexStatement,
-        postgres::{CLIENT, CLIENT_DDL, CLIENT_RO, add_column, create_index, drop_column},
+        postgres::{CLIENT_DDL, CLIENT_RO, CLIENT_RW, add_column, create_index, drop_column},
     },
     errors::{DbError, Error, Result},
 };
+
+const PULL_QUERY: &str = r#"
+WITH jobs_to_pull AS (
+    SELECT id
+    FROM scheduled_jobs
+    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
+    ORDER BY next_run_at, id
+    LIMIT $10
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE scheduled_jobs AS jobs
+SET status = $1, start_time = $2,
+    claim_epoch = claim_epoch + 1,
+    end_time = CASE
+        WHEN jobs.module = $3 THEN $4
+        ELSE $5
+    END
+FROM jobs_to_pull
+WHERE jobs.id = jobs_to_pull.id
+RETURNING jobs.*;
+"#;
+
+const PULL_QUERY_BY_MODULE: &str = r#"
+WITH jobs_to_pull AS (
+    SELECT id
+    FROM scheduled_jobs
+    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
+      AND module = $10
+    ORDER BY next_run_at, id
+    LIMIT $11
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE scheduled_jobs AS jobs
+SET status = $1, start_time = $2,
+    claim_epoch = claim_epoch + 1,
+    end_time = CASE
+        WHEN jobs.module = $3 THEN $4
+        ELSE $5
+    END
+FROM jobs_to_pull
+WHERE jobs.id = jobs_to_pull.id
+RETURNING jobs.*;
+"#;
+
+const WATCH_TIMEOUT_QUERY: &str = r#"
+WITH timed_out_jobs AS (
+    SELECT id
+    FROM scheduled_jobs
+    WHERE status = $2 AND end_time <= $3
+    ORDER BY id
+    FOR UPDATE SKIP LOCKED
+)
+UPDATE scheduled_jobs AS jobs
+SET status = $1, retries = jobs.retries + 1
+FROM timed_out_jobs
+WHERE jobs.id = timed_out_jobs.id;
+"#;
+
+const KEEP_ALIVE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
+SET end_time = CASE WHEN module = $1 THEN $2 ELSE $3 END
+WHERE id = $4 AND claim_epoch = $5 AND status = $6;"#;
+
+const COMPLETE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
+SET status = $1, retries = $2, next_run_at = $3,
+    is_realtime = $4, is_silenced = $5, data = $6
+WHERE id = $7 AND claim_epoch = $8 AND status = $9;"#;
 
 pub struct PostgresScheduler {}
 
@@ -68,7 +133,8 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     end_time     BIGINT,
     retries      INT not null,
     next_run_at  BIGINT not null,
-    data         TEXT not null
+    data         TEXT not null,
+    claim_epoch  BIGINT default 0 not null
 );
             "#,
         )
@@ -77,9 +143,23 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
 
         // create data column for old version <= 0.10.9
         add_column("scheduled_jobs", "data", "TEXT NOT NULL DEFAULT ''").await?;
+        add_column("scheduled_jobs", "claim_epoch", "BIGINT NOT NULL DEFAULT 0").await?;
 
         // drop created_at column for old version <= 0.40.0
         drop_column("scheduled_jobs", "created_at").await?;
+
+        // `scheduled_jobs` is a high-churn table: every job cycle issues several UPDATEs to the
+        // same row (pull -> Processing, keep_alive, completion, timeout). Lowering fillfactor
+        // leaves free space in each heap page so updates that don't touch an indexed column can be
+        // applied HOT (Heap-Only Tuple) — no new index entries, on-page dead-tuple pruning —
+        // cutting index/MVCC bloat from the churn. This pays off only because the pull index is
+        // keyed on `next_run_at` alone (see create_table_index): pull, keep_alive, watch_timeout
+        // and status-only completion updates all stay HOT; just the reschedule path (which
+        // rewrites the indexed `next_run_at`) drops out, which is irreducible. Idempotent metadata
+        // change; it governs future page writes and does not rewrite existing pages.
+        sqlx::query("ALTER TABLE scheduled_jobs SET (fillfactor = 80);")
+            .execute(&pool)
+            .await?;
 
         Ok(())
     }
@@ -105,6 +185,31 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
             true,
             &["org", "module", "module_key"],
         ))
+        .await?;
+
+        // Index for the hot pull predicate: `WHERE status = Waiting AND next_run_at <= now
+        // ORDER BY next_run_at`. Without it the puller does a seq scan + sort that grows with the
+        // table (and with multi-tenancy), and every autovacuum has more to do.
+        //
+        // Keyed on `next_run_at` ALONE (no `status`), deliberately:
+        //   * `status` is non-selective here — between runs a job sits in Waiting, so Waiting is
+        //     the dominant state; a partial `WHERE status = 0` index would be ~the same size as
+        //     this one while buying nothing.
+        //   * Leaving `status` out of the key/predicate/INCLUDE keeps HOT updates alive (see the
+        //     fillfactor note in create_table). The pull, watch_timeout and status-only completion
+        //     updates flip `status` but NOT `next_run_at`, so they stay HOT. Only the reschedule
+        //     path (which rewrites `next_run_at`) drops HOT — unavoidable, since the pull needs
+        //     `next_run_at` indexed. Putting `status` in the index (key, partial predicate, or
+        //     INCLUDE) would block HOT on every status flip and defeat the fillfactor change.
+        //
+        // The pull pays a few extra heap visits to filter `status` (bounded by the due +
+        // Processing set) — cheap next to the seq-scan + sort it replaces. Raw SQL since
+        // `create_index` can't emit it; `IF NOT EXISTS` keeps it idempotent across restarts.
+        let pool = CLIENT_DDL.clone();
+        sqlx::query(
+            "CREATE INDEX IF NOT EXISTS scheduled_jobs_pull_idx ON scheduled_jobs (next_run_at);",
+        )
+        .execute(&pool)
         .await?;
 
         Ok(())
@@ -139,7 +244,7 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs WHERE module = $1;"#,
     /// Pushes a Trigger job into the queue
     async fn push(&self, trigger: Trigger) -> Result<()> {
         // let db = db::get_db().await;
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         let mut tx = pool.begin().await?;
         DB_QUERY_NUMS
             .with_label_values(&["insert", "scheduled_jobs"])
@@ -176,23 +281,13 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             return Err(e.into());
         }
 
-        // For now, only send realtime alert triggers
-        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
-            let key = format!(
-                "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, &trigger.org, &trigger.module_key
-            );
-            let cluster_coordinator = db::get_coordinator().await;
-            cluster_coordinator
-                .put(&key, Bytes::from(""), true, None)
-                .await?;
-        }
+        super::emit_realtime_trigger_event(&trigger).await?;
         Ok(())
     }
 
     /// Deletes the Trigger job matching the given parameters
     async fn delete(&self, org: &str, module: TriggerModule, key: &str) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         log::debug!("Deleting scheduled job for org: {org}, module: {module}, key: {key}",);
         DB_QUERY_NUMS
             .with_label_values(&["delete", "scheduled_jobs"])
@@ -228,7 +323,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         retries: i32,
         data: Option<&str>,
     ) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
@@ -264,7 +359,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     }
 
     async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
@@ -274,7 +369,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     SET status = $1, start_time = $2, end_time = $3, retries = $4, next_run_at = $5, is_realtime = $6, is_silenced = $7, data = $8
     WHERE org = $9 AND module_key = $10 AND module = $11;"#,
             )
-            .bind(trigger.status)
+            .bind(&trigger.status)
             .bind(trigger.start_time)
             .bind(trigger.end_time)
             .bind(trigger.retries)
@@ -291,7 +386,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
     SET status = $1, retries = $2, next_run_at = $3, is_realtime = $4, is_silenced = $5, data = $6
     WHERE org = $7 AND module_key = $8 AND module = $9;"#,
             )
-            .bind(trigger.status)
+            .bind(&trigger.status)
             .bind(trigger.retries)
             .bind(trigger.next_run_at)
             .bind(trigger.is_realtime)
@@ -304,17 +399,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
         query.execute(&pool).await?;
 
-        // For now, only send realtime alert triggers
-        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
-            let key = format!(
-                "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, &trigger.org, &trigger.module_key
-            );
-            let cluster_coordinator = db::get_coordinator().await;
-            cluster_coordinator
-                .put(&key, Bytes::from(""), true, None)
-                .await?;
-        }
+        super::emit_realtime_trigger_event(&trigger).await?;
         Ok(())
     }
 
@@ -323,7 +408,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             return Ok(());
         }
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
 
         // Build bulk update query using UNNEST
         let query_builder = String::from(
@@ -382,31 +467,18 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                     .inc();
                 // Handle cluster coordinator for realtime alerts
                 for trigger in &triggers {
-                    if trigger.module == TriggerModule::Alert && trigger.is_realtime {
-                        let key = format!(
-                            "{TRIGGERS_KEY}{}/{}/{}",
-                            trigger.module, &trigger.org, &trigger.module_key
+                    if let Err(e) = super::emit_realtime_trigger_event(trigger).await {
+                        log::error!(
+                            "Error updating cluster coordinator for trigger {}/{}: {e}",
+                            trigger.org,
+                            trigger.module_key
                         );
-                        let cluster_coordinator = db::get_coordinator().await;
-                        if let Err(e) = cluster_coordinator
-                            .put(&key, Bytes::from(""), true, None)
-                            .await
-                        {
-                            log::error!(
-                                "Error updating cluster coordinator for trigger {}: {}",
-                                key,
-                                e
-                            );
-                        }
                     }
                 }
                 Ok(())
             }
             Err(e) => {
-                log::warn!(
-                    "Bulk update failed, falling back to individual updates: {}",
-                    e
-                );
+                log::warn!("Bulk update failed, falling back to individual updates: {e}");
                 // Fallback to individual updates
                 for trigger in triggers {
                     self.update_trigger(trigger, false).await?;
@@ -431,7 +503,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             return Ok(());
         }
 
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
 
         // Separate updates with and without data
         let mut updates_with_data = Vec::new();
@@ -483,8 +555,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
             if let Err(e) = query.execute(&pool).await {
                 log::warn!(
-                    "Bulk status update with data failed, falling back to individual updates: {}",
-                    e
+                    "Bulk status update with data failed, falling back to individual updates: {e}"
                 );
                 for (org, module, module_key, status, retries, data) in updates_with_data {
                     self.update_status(&org, module, &module_key, status, retries, data.as_deref())
@@ -569,7 +640,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .collect::<Vec<_>>()
                 .join(",")
         );
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         sqlx::query(&sql)
             .bind(TriggerModule::Report)
             .bind(report_max_time)
@@ -580,21 +651,79 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         Ok(())
     }
 
+    async fn keep_alive_claim(
+        &self,
+        claim: &Trigger,
+        alert_timeout: i64,
+        report_timeout: i64,
+    ) -> Result<bool> {
+        let now = now_micros();
+        let report_max_time = now
+            + Duration::try_seconds(report_timeout)
+                .ok_or_else(|| Error::Message("invalid report timeout".into()))?
+                .num_microseconds()
+                .ok_or_else(|| Error::Message("report timeout overflow".into()))?;
+        let alert_max_time = now
+            + Duration::try_seconds(alert_timeout)
+                .ok_or_else(|| Error::Message("invalid alert timeout".into()))?
+                .num_microseconds()
+                .ok_or_else(|| Error::Message("alert timeout overflow".into()))?;
+        let result = sqlx::query(KEEP_ALIVE_CLAIM_QUERY)
+            .bind(TriggerModule::Report)
+            .bind(report_max_time)
+            .bind(alert_max_time)
+            .bind(claim.id)
+            .bind(claim.claim_epoch)
+            .bind(TriggerStatus::Processing)
+            .execute(&CLIENT_RW.clone())
+            .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    async fn complete_claim(&self, trigger: Trigger) -> Result<bool> {
+        let result = sqlx::query(COMPLETE_CLAIM_QUERY)
+            .bind(&trigger.status)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(trigger.id)
+            .bind(trigger.claim_epoch)
+            .bind(TriggerStatus::Processing)
+            .execute(&CLIENT_RW.clone())
+            .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
     /// Returns the Trigger jobs with "Waiting" status.
     /// Steps:
-    /// - Read the records with status "Waiting", oldest createdAt, next_run_at <= now and limit =
-    ///   `concurrency`
-    /// - Skip locked rows and lock the read rows with "FOR UPDATE SKIP LOCKED"
+    /// - Take a global `pg_advisory_xact_lock` so only one puller across all nodes claims jobs at a
+    ///   time. This serializes the pull cluster-wide.
+    /// - Read the records with status "Waiting", next_run_at <= now, ordered by next_run_at and id,
+    ///   locking candidates with `FOR UPDATE SKIP LOCKED` and limiting to `concurrency`
     /// - Changes their statuses from "Waiting" to "Processing"
     /// - Commits as a single transaction
     /// - Returns the Trigger jobs
+    ///
+    /// Lock semantics: `pg_advisory_xact_lock` is **transaction-scoped** — it is released
+    /// automatically on COMMIT/ROLLBACK, never outliving the transaction. This is the safe variant
+    /// on pooled sqlx connections; a session-scoped lock (`pg_advisory_lock`) could leak onto a
+    /// connection returned to the pool and is deliberately avoided here.
+    ///
+    /// When `module` is `Some(m)` (per-module pullers, A3), the pull is filtered to that module
+    /// and the advisory lock key becomes `scheduler_pull_lock:{module}` (strategy C3). Different
+    /// modules hash to different lock ids, so their pullers run concurrently instead of
+    /// serializing behind one global lock; within a module the lock still gives per-module FIFO.
+    /// When `module` is `None`, the legacy global key + unfiltered pull are used unchanged.
     async fn pull(
         &self,
         concurrency: i64,
         alert_timeout: i64,
         report_timeout: i64,
+        module: Option<TriggerModule>,
     ) -> Result<Vec<Trigger>> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
 
         let now = now_micros();
         let report_max_time = now
@@ -607,26 +736,22 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
-        let query = r#"UPDATE scheduled_jobs
-SET status = $1, start_time = $2,
-    end_time = CASE
-        WHEN module = $3 THEN $4
-        ELSE $5
-    END
-WHERE id IN (
-    SELECT id
-    FROM scheduled_jobs
-    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
-    ORDER BY next_run_at
-    LIMIT $10
-)
-RETURNING *;"#;
+        let query = if module.is_some() {
+            PULL_QUERY_BY_MODULE
+        } else {
+            PULL_QUERY
+        };
 
         let mut tx = pool.begin().await?;
 
-        // Lock the table for the duration of the transaction
-        let lock_key = "scheduler_pull_lock";
-        let lock_id = config::utils::hash::gxhash::new().sum64(lock_key);
+        // Take a transaction-scoped advisory lock (not a table lock) for the duration of the
+        // transaction; auto-released on commit/rollback. Per-module key (C3) when filtering by
+        // module so modules don't serialize against each other; global key otherwise.
+        let lock_key = match &module {
+            Some(m) => format!("scheduler_pull_lock:{m}"),
+            None => "scheduler_pull_lock".to_string(),
+        };
+        let lock_id = config::utils::hash::gxhash::new().sum64(&lock_key);
         let lock_id = if lock_id > i64::MAX as u64 {
             (lock_id >> 1) as i64
         } else {
@@ -646,7 +771,7 @@ RETURNING *;"#;
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
-        let jobs: Vec<Trigger> = match sqlx::query_as::<_, Trigger>(query)
+        let mut q = sqlx::query_as::<_, Trigger>(query)
             .bind(TriggerStatus::Processing)
             .bind(now)
             .bind(TriggerModule::Report)
@@ -655,11 +780,12 @@ RETURNING *;"#;
             .bind(TriggerStatus::Waiting)
             .bind(now)
             .bind(true)
-            .bind(false)
-            .bind(concurrency)
-            .fetch_all(&mut *tx)
-            .await
-        {
+            .bind(false);
+        if let Some(m) = module {
+            q = q.bind(m);
+        }
+        q = q.bind(concurrency);
+        let jobs: Vec<Trigger> = match q.fetch_all(&mut *tx).await {
             Ok(jobs) => jobs,
             Err(e) => {
                 if let Err(e) = tx.rollback().await {
@@ -746,7 +872,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     /// Background job that frequently (30 secs interval) cleans "Completed" jobs or jobs with
     /// retries >= threshold set through environment
     async fn clean_complete(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         log::debug!("[SCHEDULER] cleaning completed jobs");
         let (include_max, mut max_retries) = get_scheduler_max_retries();
         if include_max {
@@ -769,27 +895,21 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
 
     /// Background job that watches for timeout of a job
     /// Steps:
-    /// - Select all the records with status = "Processing"
-    /// - calculate the current timestamp and difference from `start_time` of each record
-    /// - Get the record ids with difference more than the given timeout
+    /// - Select records with status = "Processing" whose `end_time` has passed
+    /// - Lock candidates in id order, skipping rows being handled by another transaction
     /// - Update their status back to "Waiting" and increase their "retries" by 1
     async fn watch_timeout(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["update", "scheduled_jobs"])
             .inc();
         let now = now_micros();
-        let res = sqlx::query(
-            r#"UPDATE scheduled_jobs
-SET status = $1, retries = retries + 1
-WHERE status = $2 AND end_time <= $3;
-                "#,
-        )
-        .bind(TriggerStatus::Waiting)
-        .bind(TriggerStatus::Processing)
-        .bind(now)
-        .execute(&pool)
-        .await?;
+        let res = sqlx::query(WATCH_TIMEOUT_QUERY)
+            .bind(TriggerStatus::Waiting)
+            .bind(TriggerStatus::Processing)
+            .bind(now)
+            .execute(&pool)
+            .await?;
         log::debug!(
             "[SCHEDULER] watch_timeout for scheduler updated {} rows",
             res.rows_affected()
@@ -826,7 +946,7 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
     }
 
     async fn clear(&self) -> Result<()> {
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         log::debug!("[SCHEDULER] clearing scheduled_jobs table");
         DB_QUERY_NUMS
             .with_label_values(&["delete", "scheduled_jobs"])
@@ -840,5 +960,63 @@ SELECT COUNT(*)::BIGINT AS num FROM scheduled_jobs;"#,
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        COMPLETE_CLAIM_QUERY, KEEP_ALIVE_CLAIM_QUERY, PULL_QUERY, PULL_QUERY_BY_MODULE,
+        PostgresScheduler, WATCH_TIMEOUT_QUERY,
+    };
+
+    #[test]
+    fn test_postgres_scheduler_new() {
+        let _scheduler = PostgresScheduler::new();
+    }
+
+    #[test]
+    fn test_postgres_scheduler_default() {
+        let _scheduler = PostgresScheduler::default();
+    }
+
+    #[test]
+    fn scheduler_updates_lock_candidates_in_a_stable_order() {
+        assert!(PULL_QUERY.contains("ORDER BY next_run_at, id"));
+        assert!(PULL_QUERY.contains("FOR UPDATE SKIP LOCKED"));
+        assert!(PULL_QUERY_BY_MODULE.contains("ORDER BY next_run_at, id"));
+        assert!(PULL_QUERY_BY_MODULE.contains("FOR UPDATE SKIP LOCKED"));
+        assert!(WATCH_TIMEOUT_QUERY.contains("ORDER BY id"));
+        assert!(WATCH_TIMEOUT_QUERY.contains("FOR UPDATE SKIP LOCKED"));
+    }
+
+    #[test]
+    fn postgres_claim_epoch_is_created_incremented_and_returned_by_claim() {
+        assert!(PULL_QUERY.contains("claim_epoch = claim_epoch + 1"));
+        assert!(PULL_QUERY_BY_MODULE.contains("claim_epoch = claim_epoch + 1"));
+        assert!(PULL_QUERY.contains("RETURNING"));
+        assert!(PULL_QUERY_BY_MODULE.contains("RETURNING"));
+    }
+
+    #[test]
+    fn postgres_composite_keepalive_and_completion_are_epoch_fenced() {
+        for (operation, query) in [
+            ("keep alive", KEEP_ALIVE_CLAIM_QUERY),
+            ("completion", COMPLETE_CLAIM_QUERY),
+        ] {
+            let compact = query.split_whitespace().collect::<Vec<_>>().join(" ");
+            assert!(
+                compact.contains("id = $"),
+                "{operation} must match the job ID"
+            );
+            assert!(
+                compact.contains("claim_epoch = $"),
+                "{operation} must match the captured epoch"
+            );
+            assert!(
+                compact.contains("status = $"),
+                "{operation} must require Processing status"
+            );
+        }
     }
 }

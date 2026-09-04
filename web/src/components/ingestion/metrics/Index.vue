@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,108 +16,128 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-splitter
-    v-model="splitterModel"
-    unit="px"
-    style="min-height: calc(100vh - 130px)"
-  >
-    <template v-slot:before>
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)]">
-          <q-tabs
-            v-model="ingestiontabs"
-            indicator-color="transparent"
-            inline-label
-            vertical
-          >
-            <q-route-tab
-              name="prometheus"
-              :to="{
-                name: 'prometheus',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/prometheus.svg')"
-              label="Prometheus"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="otelCollector"
-              :to="{
-                name: 'otelCollector',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
-              label="OTEL Collector"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="telegraf"
-              :to="{
-                name: 'telegraf',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/telegraf.png')"
-              label="Telegraf"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="cloudwatchMetrics"
-              :to="{
-                name: 'cloudwatchMetrics',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :icon="'img:' + getImageURL('images/ingestion/cloud_watch.svg')"
-              label="AWS CloudWatch Metrics"
-              content-class="tab_content"
-            />
-          </q-tabs>
-        </div>
-      </div>
+  <DataSourceSidebarLayout v-model="ingestiontabs" :splitter-width="250">
+    <template #tabs>
+      <ORouteTab
+        name="prometheus"
+        data-test="ingestion-metrics-tab-prometheus"
+        :to="{
+          name: 'prometheus',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/prometheus.svg')"
+        :label="t('ingestion.metrics.prometheus')"
+      />
+      <ORouteTab
+        name="vmagent"
+        data-test="ingestion-metrics-tab-vmagent"
+        :to="{
+          name: 'vmagent',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/vmagent.svg')"
+        :label="t('ingestion.metrics.vmagent')"
+      />
+      <ORouteTab
+        name="nightingale"
+        data-test="ingestion-metrics-tab-nightingale"
+        :to="{
+          name: 'nightingale',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/nightingale.svg')"
+        :label="t('ingestion.metrics.nightingale')"
+      />
+      <ORouteTab
+        name="categraf"
+        data-test="ingestion-metrics-tab-categraf"
+        :to="{
+          name: 'categraf',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/categraf.png')"
+        :label="t('ingestion.metrics.categraf')"
+      />
+      <ORouteTab
+        name="otelCollector"
+        :to="{
+          name: 'otelCollector',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/otlp.svg')"
+        :label="t('ingestion.metrics.otelCollector')"
+      />
+      <ORouteTab
+        name="telegraf"
+        :to="{
+          name: 'telegraf',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/telegraf.png')"
+        :label="t('ingestion.metrics.telegraf')"
+      />
+      <ORouteTab
+        name="cloudwatchMetrics"
+        :to="{
+          name: 'cloudwatchMetrics',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :icon="'img:' + getImageURL('images/ingestion/cloud_watch.svg')"
+        :label="t('ingestion.metrics.awsCloudwatchMetrics')"
+      />
     </template>
 
-    <template v-slot:after>
-      <div class="tw:w-full tw:h-full tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)]">
-          <router-view
-            :title="ingestiontabs"
-            :currOrgIdentifier="currOrgIdentifier"
-            :currUserEmail="currentUserEmail"
-            @copy-to-clipboard-fn="copyToClipboardFn"
-          >
-          </router-view>
-        </div>
+    <div class="h-full w-full">
+      <div class="bg-card-glass-bg h-full overflow-y-auto pt-0.5">
+        <router-view
+          :title="ingestiontabs"
+          :currOrgIdentifier="currOrgIdentifier"
+          :currUserEmail="currentUserEmail"
+          @copy-to-clipboard-fn="copyToClipboardFn"
+        >
+        </router-view>
       </div>
-    </template>
-  </q-splitter>
+    </div>
+  </DataSourceSidebarLayout>
 </template>
 
 <script lang="ts">
+import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
 import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 // import { config } from "../constants/config";
 import config from "../../../aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
+import { resolveTab } from "@/utils/routeTabMaps";
 
 export default defineComponent({
   name: "IngestMetrics",
-  components: {},
+  components: {
+    ORouteTab,
+    DataSourceSidebarLayout,
+  },
   data() {
-    return {
-      ingestiontabs: "",
-    };
+    return {};
   },
   props: {
     currOrgIdentifier: {
@@ -126,16 +146,21 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
     const rowData: any = ref({});
     const confirmUpdate = ref<boolean>(false);
+    const ingestiontabs = ref(
+      resolveTab("ingestMetrics", router.currentRoute.value.name as string, "prometheus"),
+    );
 
     onBeforeMount(() => {
       const ingestRoutes = [
         "prometheus",
+        "vmagent",
+        "nightingale",
+        "categraf",
         "otelCollector",
         "telegraf",
         "cloudwatchMetrics",
@@ -173,28 +198,20 @@ export default defineComponent({
     });
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText)
-        .then(() => {
-          q.notify({
-            type: "positive",
-            message: "Content Copied Successfully!",
-            timeout: 5000,
+      copyToClipboard(content.innerText, t, {
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("ingestion.copyContentError"),
+        timeout: 5000,
+      }).then((success: boolean) => {
+        if (success) {
+          segment.track("Button Click", {
+            button: "Copy to Clipboard",
+            ingestion: router.currentRoute.value.name,
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Ingestion",
           });
-        })
-        .catch(() => {
-          q.notify({
-            type: "negative",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-        });
-
-      segment.track("Button Click", {
-        button: "Copy to Clipboard",
-        ingestion: router.currentRoute.value.name,
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Ingestion",
+        }
       });
     };
 
@@ -208,23 +225,14 @@ export default defineComponent({
       router,
       config,
       rowData,
-      splitterModel: ref(250),
       currentUserEmail: store.state.userInfo.email,
       copyToClipboardFn,
       showUpdateDialogFn,
       confirmUpdate,
+      ingestiontabs,
       getImageURL,
       verifyOrganizationStatus,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-.ingestionPage {
-  padding: 1.5rem 0 0;
-  .head {
-    padding-bottom: 1rem;
-  }
-}
-</style>

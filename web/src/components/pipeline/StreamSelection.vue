@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,161 +15,118 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="full-height"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
-  >
-    <q-form @submit="savePipeline">
-      <div class="flex justify-between items-center q-px-md q-py-sm">
-        <div data-test="add-pipeline-section-title" style="font-size: 18px">
+  <div class="bg-surface-base h-full">
+    <div>
+      <div class="flex items-center justify-between px-3 py-2">
+        <div data-test="add-pipeline-section-title" style="font-size: var(--text-lg)">
           {{ t("pipeline.addPipeline") }}
         </div>
-        <q-icon
+        <OIcon
           data-test="add-pipeline-close-dialog-btn"
           name="cancel"
           class="cursor-pointer"
-          size="20px"
+          size="md"
           v-close-popup="true"
         />
       </div>
 
-      <div class="full-width bg-grey-4" style="height: 1px" />
+      <div class="bg-separator h-px w-full" />
 
-      <div class="q-px-md">
-        <div
-          data-test="add-pipeline-name-input"
-          class="alert-name-input o2-input"
-          style="padding-top: 12px"
-        >
-          <q-input
-            v-model="formData.name"
-            :label="t('alerts.name') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            :rules="[
-              (val: any, rules: any) =>
-                !!val
-                  ? isValidName ||
-                    `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-                  : t('common.nameRequired'),
-            ]"
-            tabindex="0"
-            style="min-width: 480px"
-          />
+      <!-- Inline form — the Save button lives inside the <OForm>, so Enter submits
+           natively via type="submit" (no form-id needed; R4 case 1). -->
+      <OForm id="add-pipeline-form" :form="form" v-slot="{ isSubmitting }">
+        <div class="px-3">
+          <div data-test="add-pipeline-name-input" class="alert-name-input o2-input pt-3">
+            <OFormInput
+              name="name"
+              :label="t('alerts.name')"
+              required
+              :readonly="isUpdating"
+              :disabled="isUpdating"
+              data-test="add-pipeline-name-input"
+              style="min-width: 30rem"
+            />
+          </div>
+          <div data-test="add-pipeline-description-input" class="alert-name-input o2-input mb-2">
+            <OFormInput
+              name="description"
+              :label="t('alerts.description')"
+              data-test="add-pipeline-description-input"
+              style="min-width: 30rem"
+            />
+          </div>
+          <div
+            data-test="add-pipeline-stream-type-select"
+            class="alert-stream-type o2-input me-2 mb-2 pt-0"
+          >
+            <OFormSelect
+              name="stream_type"
+              :options="streamTypes"
+              labelKey="label"
+              valueKey="value"
+              :label="t('alerts.streamType')"
+              required
+              :readonly="isUpdating"
+              :disabled="isUpdating"
+              data-test="add-pipeline-stream-type-select"
+              style="min-width: 13.75rem"
+            />
+          </div>
+          <div data-test="add-pipeline-stream-select" class="o2-input pt-0">
+            <OFormSelect
+              name="stream_name"
+              :options="indexOptions"
+              :label="t('alerts.stream_name')"
+              required
+              :loading="isFetchingStreams"
+              searchable
+              :readonly="isUpdating"
+              :disabled="isUpdating"
+              data-test="add-pipeline-stream-select"
+              style="min-width: 15.625rem"
+            />
+          </div>
         </div>
-        <div
-          data-test="add-pipeline-description-input"
-          class="alert-name-input o2-input q-mb-sm"
-        >
-          <q-input
-            v-model="formData.description"
-            :label="t('alerts.description')"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            filled
-            dense
-            tabindex="0"
-            style="min-width: 480px"
-          />
-        </div>
-        <div
-          data-test="add-pipeline-stream-type-select"
-          class="alert-stream-type o2-input q-mr-sm q-mb-sm"
-          style="padding-top: 0"
-        >
-          <q-select
-            v-model="formData.stream_type"
-            :options="streamTypes"
-            :label="t('alerts.streamType') + ' *'"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            emit-value
-            map-options
-            stack-label
-            outlined
-            filled
-            dense
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            @update:model-value="updateStreams()"
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 220px"
-          />
-        </div>
-        <div
-          data-test="add-pipeline-stream-select"
-          class="o2-input"
-          style="padding-top: 0"
-        >
-          <q-select
-            v-model="formData.stream_name"
-            :options="filteredStreams"
-            :label="t('alerts.stream_name') + ' *'"
-            :loading="isFetchingStreams"
-            :popup-content-style="{ textTransform: 'lowercase' }"
-            color="input-border"
-            bg-color="input-bg"
-            class="q-py-sm showLabelOnTop no-case"
-            filled
-            stack-label
-            dense
-            use-input
-            hide-selected
-            fill-input
-            :input-debounce="400"
-            v-bind:readonly="isUpdating"
-            v-bind:disable="isUpdating"
-            @filter="filterStreams"
-            behavior="menu"
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 250px !important"
-          />
-        </div>
-      </div>
 
-      <div class="flex justify-start q-mt-lg q-px-md">
-        <q-btn
-          v-close-popup
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          :label="t('alerts.cancel')"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          data-test="add-pipeline-cancel-btn"
-        />
-        <q-btn
-          class="o2-primary-button no-border tw:h-[36px]"
-          :label="t('alerts.save')"
-          type="submit"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          data-test="add-pipeline-submit-btn"
-        />
-      </div>
-    </q-form>
+        <div class="mt-4 flex gap-2 px-3">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            :disabled="isSubmitting"
+            data-test="add-pipeline-cancel-btn"
+            >{{ t("alerts.cancel") }}</OButton
+          >
+          <OButton
+            variant="primary"
+            size="sm-action"
+            type="submit"
+            :loading="isSubmitting"
+            data-test="add-pipeline-submit-btn"
+            >{{ t("alerts.save") }}</OButton
+          >
+        </div>
+      </OForm>
+    </div>
   </div>
 </template>
 
 <script lang="ts" setup>
 import useStreams from "@/composables/useStreams";
-import { ref, computed, type Ref } from "vue";
-import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
+import { ref, watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import {
+  makeAddPipelineSchema,
+  addPipelineDefaults,
+  type AddPipelineForm,
+} from "./StreamSelection.schema";
 
-const props = defineProps({
+defineProps({
   isUpdating: {
     type: Boolean,
     required: false,
@@ -179,44 +136,48 @@ const props = defineProps({
 
 const emit = defineEmits(["save"]);
 
-const store = useStore();
-
-const formData = ref({
-  name: "",
-  description: "",
-  stream_type: "",
-  stream_name: "",
-});
-
-const { getStreams } = useStreams();
+const { t } = useI18nTyped();
+const { getStreams } = useStreams(t);
 
 const isFetchingStreams = ref(false);
 
-const { t } = useI18n();
+// Co-located schema (factory keeps the required message i18n-driven).
+const addPipelineSchema = makeAddPipelineSchema(t);
 
-const streamTypes = ref([
-  { label: "Logs", value: "logs" },
-  { label: "Metrics", value: "metrics" },
-  { label: "Traces", value: "traces" },
-]);
-
-const filteredStreams: Ref<string[]> = ref([]);
-
-const indexOptions = ref([]);
-
-const isValidName = computed(() => {
-  const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
-  // Check if the role name is valid
-  return roleNameRegex.test(formData.value.name);
+// Rule ③ OWNER pattern: this component OWNS <OForm> and needs to read the
+// form-owned `stream_type` to drive the updateStreams() side effect, so it
+// creates the form here with useOForm and reads it reactively via form.useStore
+// — a SINGLE source of truth (no mirror ref, no store.subscribe). The form is
+// handed to <OForm :form="form">.
+const form = useOForm<AddPipelineForm>({
+  defaultValues: addPipelineDefaults(),
+  schema: addPipelineSchema,
+  onSubmit: (value) => onSubmit(value),
 });
 
+const streamTypes = ref([
+  { label: t("common.logs"), value: "logs" },
+  { label: t("common.metrics"), value: "metrics" },
+  { label: t("common.traces"), value: "traces" },
+]);
+
+const indexOptions = ref<string[]>([]);
+const filteredStreams = ref<string[]>([]);
+
+// Refetch the stream list (+ reset the dependent stream_name) for a stream_type.
+// Reads/writes the FORM-owned values (the select is form-owned now).
 const updateStreams = (resetStream = true) => {
-  if (resetStream) formData.value.stream_name = "";
-  if (!formData.value.stream_type) return Promise.resolve();
+  const streamType = form.state.values.stream_type ?? "";
+  if (resetStream) {
+    form.setFieldValue("stream_name", "", {
+      dontUpdateMeta: true,
+    });
+  }
+  if (!streamType) return Promise.resolve();
 
   isFetchingStreams.value = true;
 
-  return getStreams(formData.value.stream_type, false)
+  return getStreams(streamType, false)
     .then((res: any) => {
       indexOptions.value = res.list.map((data: any) => {
         return data.name;
@@ -227,6 +188,21 @@ const updateStreams = (resetStream = true) => {
     .catch(() => Promise.reject())
     .finally(() => (isFetchingStreams.value = false));
 };
+
+// ── Run updateStreams() when the form-owned stream_type changes ──────────────
+// (preserves the old `@update:model-value="updateStreams()"` side effect). The
+// form is the single source of truth: read `stream_type` reactively via
+// form.useStore and refetch options (+ reset stream_name) on a real change.
+// `flush: "sync"` matches the old form.store.subscribe timing: the reset runs the
+// instant stream_type changes — before any later setFieldValue("stream_name", …)
+// in the same tick can be clobbered by a late-flushed watcher.
+watch(
+  form.useStore((s: any) => s.values.stream_type),
+  (newType, prev) => {
+    if (newType !== prev) updateStreams();
+  },
+  { flush: "sync" },
+);
 
 const filterStreams = (val: string, update: any) => {
   filteredStreams.value = filterColumns(indexOptions.value, val, update);
@@ -242,16 +218,28 @@ const filterColumns = (options: any[], val: String, update: Function) => {
   }
   update(() => {
     const value = val.toLowerCase();
-    filteredOptions = options.filter(
-      (column: any) => column.toLowerCase().indexOf(value) > -1,
-    );
+    filteredOptions = options.filter((column: any) => column.toLowerCase().indexOf(value) > -1);
   });
   return filteredOptions;
 };
 
-const savePipeline = () => {
-  emit("save", formData.value);
+// @submit handler — OForm only calls it once the schema passes (name required +
+// regex, stream_type + stream_name required), so the schema gates the emit (the
+// old hand-rolled handleSave/nameError/streamTypeError/streamNameError checks are
+// gone). The parent owns the actual async save.
+const onSubmit = (value: AddPipelineForm) => {
+  emit("save", value);
 };
-</script>
 
-<style lang="scss" scoped></style>
+defineExpose({
+  form,
+  streamTypes,
+  indexOptions,
+  filteredStreams,
+  isFetchingStreams,
+  updateStreams,
+  filterStreams,
+  filterColumns,
+  onSubmit,
+});
+</script>

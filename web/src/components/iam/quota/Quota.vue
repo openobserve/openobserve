@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,49 +14,35 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 -->
-<!-- TODO: we need to completely remove the store.state.theme based styling on this page as we have moved it to central place app.scss -->
+<!-- TODO: remove the store.state.theme based styling on this page; theming is centralised in app.scss -->
 <template>
-  <q-page
-    class="quota-page text-left card-container"
-    :class="
-      store.state.theme === 'dark' ? 'dark-theme-page' : 'light-theme-page'
-    "
-    style="min-height: inherit"
+  <OPageLayout
+    class="quota-page text-left"
+    :class="isDark ? 'dark-theme-page' : 'light-theme-page'"
+    :title="t('quota.header')"
+    title-data-test="user-title-text"
+    :subtitle="t('iam.quotaPage.subtitle')"
+    icon="speed"
+    bleed
   >
-    <div :style="{ height: '100%', marginTop: 0 }" class="app-table-container">
-      <div class="card-container tw:mb-[0.625rem]">
-        <div class="q-px-md q-py-sm">
-          <div
-            class="q-table__title full-width q-pb-sm"
-            data-test="user-title-text"
-          >
-            {{ t("quota.header") }}
-          </div>
-          <div class="flex items-center justify-between full-width q-mb-sm">
+    <div :style="{ marginTop: 0 }" class="app-table-container flex min-h-0 flex-1 flex-col">
+      <div class="bg-card-glass-bg mt-2.5 mb-2.5">
+        <div class="px-3 py-2">
+          <div class="mb-2 flex w-full items-center justify-between">
             <div class="flex items-center">
-              <q-select
+              <OSelect
                 :loading="isOrgLoading"
-                v-model="selectedOrganization"
+                :model-value="selectedOrganization?.value"
                 :options="organizationToDisplay"
-                @filter="filterOrganizations"
-                placeholder="Select Organization"
-                :popup-content-style="{ textTransform: 'lowercase' }"
-                color="input-border"
-                bg-color="input-bg"
-                class="q-py-sm no-case q-mr-md input-width org-select"
-                stack-label
-                outlined
-                filled
-                dense
-                use-input
-                hide-selected
-                fill-input
-                @update:model-value="updateOrganization()"
-                :rules="[(val: any) => !!val || 'Field is required!']"
-              >
-              </q-select>
-              <div class="app-tabs-container tw:h-[36px] tw:w-fit">
-                <app-tabs
+                searchable
+                :placeholder="t('iam.quotaPage.selectOrganization')"
+                class="no-case input-width org-select me-3 w-75 py-2"
+                labelKey="label"
+                valueKey="value"
+                @update:model-value="handleOrgSelect"
+              />
+              <div class="app-tabs-container h-9 w-fit">
+                <AppTabs
                   data-test="quota-tabs"
                   class="tabs-selection-container"
                   :tabs="tabs"
@@ -66,78 +52,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <div class="flex items-center" v-if="selectedOrganization">
-              <q-btn
+              <OButton
                 v-if="!editTable"
                 data-test="edit-table-btn"
-                label="Edit Quota"
-                flat
-                class="border title-height o2-secondary-button tw:h-[36px]"
-                :class="store.state.theme == 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-                no-caps
-                :disable="activeTab == 'role-limits' && !expandedRow"
+                variant="outline"
+                size="sm"
+                :disabled="activeTab == 'role-limits' && !expandedRow"
                 @click="editTableWithInput"
               >
-                <q-icon
-                  name="edit"
-                  style="font-weight: 200; opacity: 0.7"
-                  class="q-ml-sm"
-                />
-              </q-btn>
+                {{ t("iam.quotaPage.editQuota") }}
+                <template #icon-right>
+                  <OIcon name="edit" size="sm" class="opacity-70" style="font-weight: 200" />
+                </template>
+              </OButton>
             </div>
           </div>
-          <div class="flex items-center justify-between full-width q-mb-sm">
-            <div
-              v-if="selectedOrganization && activeType == 'table'"
-              class="flex items-center"
-            >
-              <q-input
+          <div class="mb-2 flex w-full items-center justify-between">
+            <div v-if="selectedOrganization && activeType == 'table'" class="flex items-center">
+              <OSearchInput
                 data-test="pipeline-list-search-input"
                 v-model="searchQuery"
-                borderless
-                flat
-                class="no-border input-width o2-search-input"
-                :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
+                style="width: 12.5rem"
                 :placeholder="
                   {
                     'api-limits': t('quota.api-search'),
                     'role-limits': t('quota.role-search'),
                   }[activeTab]
                 "
-
-              >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
-                </template>
-              </q-input>
-              <q-select
+              />
+              <OSelect
                 v-if="activeTab == 'role-limits'"
                 :loading="isApiCategoryLoading"
-                v-model="selectedApiCategory"
-                :options="filteredApiCategoryToDisplayOptions"
-                placeholder="Select API Category"
-                color="input-border"
-                style="padding: 0px"
-                bg-color="input-bg"
-                class="no-case q-mr-md input-width q-ml-md category-select"
-                stack-label
-                outlined
-                filled
-                dense
-                use-input
-                hide-selected
-                fill-input
+                :model-value="selectedApiCategory?.value"
+                :options="apiCategories"
+                searchable
                 clearable
-                @filter="filterApiCategoriesToDisplayOptions"
-                @update:model-value="filterModulesBasedOnCategory()"
-              >
-              </q-select>
+                :placeholder="t('iam.quotaPage.selectApiCategory')"
+                class="no-case input-width category-select ms-3 me-3 w-75 p-0"
+                labelKey="label"
+                valueKey="value"
+                @update:model-value="handleApiCategorySelect"
+              />
             </div>
-            <div
-              v-if="selectedOrganization"
-              class="flex items-center float-right q-ml-auto"
-            >
-              <div class="app-tabs-container tw:h-[36px] tw:w-fit q-mr-md">
-                <app-tabs
+            <div v-if="selectedOrganization" class="float-right ms-auto flex items-center">
+              <div class="app-tabs-container me-3 h-9 w-fit">
+                <AppTabs
                   data-test="time-unit-tabs"
                   class="tabs-selection-container"
                   :tabs="timeUnitTabs"
@@ -145,8 +104,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   @update:active-tab="updateTimeUnit"
                 />
               </div>
-              <div class="app-tabs-container tw:h-[36px] tw:w-fit">
-                <app-tabs
+              <div class="app-tabs-container h-9 w-fit">
+                <AppTabs
                   data-test="table-json-type-selection-tabs"
                   class="tabs-selection-container"
                   :tabs="typeTabs"
@@ -159,298 +118,198 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
       <!-- this table for api limits -->
-      <div v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading" class="card-container tw:h-[calc(100vh-218px)]">
-      <q-table
-        :rows="apiLimitsRows"
-        :columns="generateColumns()"
-        row-key="name"
-        :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark' : 'o2-last-row-border-light'"
-        :pagination="pagination"
-        :filter="searchQuery"
-        :filter-method="filteredData"
-        v-if="activeTab == 'api-limits' && activeType == 'table' && !isApiLimitsLoading"
-        style="height: calc(100vh - 220px);"
-        dense
-      >
-        <template v-slot:header="props">
-          <q-tr :props="props" class="thead-sticky">
-            <q-th
-              v-for="col in props.cols"
-              :key="col.name"
-              :props="props"
-              :style="col.style"
-            >
-              {{ col.label }}
-            </q-th>
-          </q-tr>
-        </template>
-        <template #no-data>
-        </template>
-
-        <template #bottom="scope">
-          <q-table-pagination
-            :scope="scope"
-            :resultTotal="resultTotal"
-            position="bottom"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
-
-        <template v-slot:body-cell="props">
-          <q-td
-            :props="props"
-            v-if="editTable"
-            :style="{
-              backgroundColor:
-                editTable && props.col.name !== 'module_name'
-                  ? store.state.theme === 'dark'
-                    ? '#212121'
-                    : '#f1f1ee'
-                  : 'transparent',
-            }"
-          >
-            <div
-              v-if="
-                props.col.name != 'module_name' &&
-                props.row[props.col.name] != '-'
-              "
-              contenteditable="true"
-              debounce="500"
-              :class="{
-                'editable-cell': editTable && props.col.name !== 'module_name',
-                'edited-input': isEdited(props.row.module_name, props.col.name),
-              }"
-              @input="
-                (event: any) =>
-                  handleInputChange(
-                    '',
-                    props.row.module_name,
-                    props.row[props.col.name],
-                    props.col.name,
-                    event.target.innerText,
-                  )
-              "
-              @keypress="restrictToNumbers"
-              @paste="preventNonNumericPaste"
-            >
-              {{
-                changedValues[props.row.module_name]?.[props.col.name] ??
-                props.row[props.col.name]
-              }}
-            </div>
-            <div v-else-if="props.col.name == 'module_name'">
-              {{ props.row[props.col.name] }}
-            </div>
-            <div :disabled="true" v-else-if="props.row[props.col.name] == '-'">
-              -
-            </div>
-          </q-td>
-          <q-td :props="props" v-else>
-            <div
-              v-if="
-                props.col.name != 'module_name' &&
-                props.row[props.col.name] != '-'
-              "
-            >
-              {{ props.row[props.col.name] }}
-            </div>
-            <div v-else-if="props.col.name == 'module_name'">
-              {{ props.row[props.col.name] }}
-            </div>
-            <div v-else-if="props.row[props.col.name] == '-'">-</div>
-          </q-td>
-        </template>
-      </q-table>
-      </div>
-
-      <div v-if="isApiLimitsLoading && activeTab == 'api-limits' && activeType == 'table'" class="tw:h-[50vh] tw:flex tw:justify-center tw:items-center">
-        <q-spinner-hourglass color="primary" size="lg" />
-      </div>
       <div
-        class="card-container tw:pb-[0.625rem]"
-        v-if="activeTab == 'api-limits' && activeType == 'json'"
-        style="height: calc(100vh - 220px)"
+        v-if="activeTab == 'api-limits' && activeType == 'table'"
+        class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden"
       >
-        <query-editor
+        <OTable
+          :data="apiLimitsRows"
+          :columns="generateColumns()"
+          row-key="module_name"
+          :loading="isApiLimitsLoading"
+          :global-filter="searchQuery"
+          pagination="client"
+          :page-size="20"
+          sorting="client"
+          filter-mode="client"
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="iam-quota-api-limits"
+          :show-global-filter="false"
+        >
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-api-limits"
+              :filtered="!!searchQuery"
+              :hide-action="!searchQuery"
+              @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+            />
+          </template>
+          <template #bottom />
+          <template
+            v-for="col in apiLimitCrudColumnIds"
+            :key="col"
+            #[`cell-${col}`]="{ row, value }"
+          >
+            <div v-if="editTable" class="bg-surface-subtle">
+              <div
+                v-if="value != '-'"
+                contenteditable="true"
+                debounce="500"
+                :class="{
+                  'editable-cell': editTable,
+                  'px-2.5': editTable,
+                  'py-0': editTable && !isDark,
+                  'edited-input': isEdited(row.module_name, col),
+                  'bg-table-row-selected-bg text-table-highlight-text font-medium': isEdited(
+                    row.module_name,
+                    col,
+                  ),
+                  'p-0!': isEdited(row.module_name, col) && isDark,
+                }"
+                @input="
+                  (event: any) =>
+                    handleInputChange('', row.module_name, value, col, event.target.innerText)
+                "
+                @keypress="restrictToNumbers"
+                @paste="preventNonNumericPaste"
+              >
+                {{ changedValues[row.module_name]?.[col] ?? value }}
+              </div>
+              <div v-else>-</div>
+            </div>
+            <template v-else>
+              {{ value }}
+            </template>
+          </template>
+        </OTable>
+      </div>
+
+      <div
+        class="bg-card-glass-bg min-h-0 flex-1 pb-2.5"
+        v-if="activeTab == 'api-limits' && activeType == 'json'"
+      >
+        <QueryEditor
           data-test="json-view-roles-editor"
           ref="queryEditorRef"
           editor-id="json-view-roles-editor"
-          class="monaco-editor"
           :debounceTime="300"
           v-model:query="jsonStrToDisplay"
           language="json"
-          style="height: 100%"
+          class="h-full"
           :read-only="!editTable"
         />
       </div>
       <!-- this table for role limits -->
-       <div v-if="activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading"  class="card-container tw:h-[calc(100vh-218px)]">
-        <q-table
-          :rows="rolesLimitRows"
+      <div
+        v-if="activeTab == 'role-limits' && activeType == 'table'"
+        class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden"
+      >
+        <OTable
+          :data="rolesLimitRows"
           :columns="roleLimitsColumns"
-          row-key="name"
-          :pagination="pagination"
-          :filter="searchQuery"
-          :filter-method="filteredData"
-          dense
-          v-if="activeTab == 'role-limits' && activeType == 'table' && !isRolesLoading"
-          :class="store.state.theme == 'dark' ? 'o2-last-row-border-dark' : 'o2-last-row-border-light'"
-          :style="rolesLimitRows.length > 0 ? 'height: calc(100vh - 218px)' : ''"
+          row-key="uuid"
+          :loading="isRolesLoading"
+          :global-filter="searchQuery"
+          pagination="client"
+          :page-size="20"
+          sorting="client"
+          filter-mode="client"
+          expansion="single"
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="iam-quota-role-limits"
+          :show-global-filter="false"
+          @update:expanded-ids="handleExpandedChange"
         >
-        <template v-slot:header="props">
-          <q-tr :props="props" class="thead-sticky">
-            <q-th
-              v-for="col in props.cols"
-              :key="col.name"
-              :props="props"
-              :style="col.style"
-            >
-              {{ col.label }}
-            </q-th>
-          </q-tr>
-        </template>
-        <template #no-data></template>
-        <template #bottom="scope">
-          <q-table-pagination
-            :scope="scope"
-            :resultTotal="resultTotal"
-            position="bottom"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-        </template>
-        <template v-slot:body="props">
-          <q-tr
-            :data-test="`quota-role-list-table-${props.row.uuid}-row`"
-            :props="props"
-            style="cursor: pointer"
-          >
-            <q-td
-              v-for="col in roleLimitsColumns"
-              :key="col.name"
-              :props="props"
-              :style="col.style"
-            >
-              <template v-if="col.name == 'role_name'">
-                <q-btn
-                  dense
-                  flat
-                  size="xs"
-                  :icon="
-                    expandedRow != props.row.uuid
-                      ? 'chevron_right'
-                      : 'expand_more'
-                  "
-                  @click="triggerExpand(props)"
-                />
-                {{ props.row[col.name] }}
-              </template>
-              <template v-else> </template>
-            </q-td>
-          </q-tr>
-          <q-tr
-            v-if="!editTable && !isRoleLimitsLoading"
-            v-for="(row, index) in filteredRoleLevelModuleRows"
-            data-test="scheduled-pipeline-row-expand"
-            v-show="expandedRow === props.row.uuid"
-            :props="props"
-          >
-            <q-td v-for="col in props.cols" :key="col.name" :props="props">
-              <template v-if="col.name == 'role_name'">
-                <div style="padding-left: 20px">
-                  {{ row["module_name"] }}
-                </div>
-              </template>
-              <template v-else-if="col.name == '#'"> {{}} </template>
-              <template v-else-if="row[col.name] == '-'"> - </template>
-              <template v-else>
-                {{ row[col.name] }}
-              </template>
-            </q-td>
-          </q-tr>
-          <q-tr
-            v-if="editTable && !roleLevelLoading && !isRoleLimitsLoading"
-            v-for="(row, index) in filteredRoleLevelModuleRows"
-            data-test="scheduled-pipeline-row-expand"
-            v-show="expandedRow === props.row.uuid"
-            :props="props"
-          >
-            <q-td
-              :style="{
-                backgroundColor:
-                  editTable && col.name !== 'role_name'
-                    ? store.state.theme === 'dark'
-                      ? '#212121'
-                      : '#f1f1ee'
-                    : 'transparent',
-              }"
-              :props="props"
-              v-for="col in props.cols"
-              :key="col.name"
-              v-if="editTable"
-              style="padding-left: 8px"
-            >
-              <template v-if="col.name == 'role_name'">
-                <div style="padding-left: 20px">
-                  {{ row["module_name"] }}
-                </div>
-              </template>
-              <template v-else-if="col.name == '#'"> {{}} </template>
-              <template v-else-if="row[col.name] == '-'"> - </template>
-              <template v-else>
-                <div
-                  contenteditable="true"
-                  debounce="500"
-                  :class="{
-                    'editable-cell': editTable && col.name !== 'module_name',
-                    'edited-input': isEdited(row.module_name, col.name),
-                  }"
-                  @input="
-                    (event: any) =>
-                      handleInputChange(
-                        props.row.role_name,
-                        row.module_name,
-                        row[col.name],
-                        col.name,
-                        event.target.innerText,
-                      )
-                  "
-                  @keypress="restrictToNumbers"
-                  @paste="preventNonNumericPaste"
-                >
-                  {{ row[col.name] }}
-                </div>
-              </template>
-            </q-td>
-          </q-tr>
-          <q-tr v-if="isRoleLimitsLoading && props.row.uuid == expandedRow">
-            <q-td v-for="col in props.cols" :key="col.name">
-              <div v-if="col.name == 'create'" class="tw:h-[50vh] tw:w-full tw:flex tw:justify-center tw:items-center">
-              <q-spinner-hourglass color="primary" size="lg" />
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-role-limits"
+              :filtered="!!searchQuery"
+              :hide-action="!searchQuery"
+              @action="(id) => id === 'clear-filters' && (searchQuery = '')"
+            />
+          </template>
+          <template #bottom />
+          <template #cell-role_name="{ row }">
+            {{ row.role_name }}
+          </template>
+          <template #expansion="{ row }: { row: any }">
+            <template v-for="(moduleRow, index) in filteredRoleLevelModuleRows" :key="index">
+              <div
+                v-if="!editTable"
+                class="border-table-row-divider flex items-center border-b px-6 py-1 text-sm"
+              >
+                <span class="w-50">{{ moduleRow.module_name }}</span>
+                <span v-for="col in roleLimitCrudColumnIds" :key="col" class="flex-1 text-center">
+                  <template v-if="moduleRow[col] == '-'">-</template>
+                  <template v-else>{{ moduleRow[col] }}</template>
+                </span>
+              </div>
+              <div
+                v-else
+                class="border-table-row-divider flex items-center border-b px-6 py-1 text-sm"
+              >
+                <span class="w-50">{{ moduleRow.module_name }}</span>
+                <span v-for="col in roleLimitCrudColumnIds" :key="col" class="flex-1 text-center">
+                  <template v-if="moduleRow[col] == '-'">-</template>
+                  <div
+                    v-else
+                    contenteditable="true"
+                    debounce="500"
+                    :class="{
+                      'editable-cell': true,
+                      'px-2.5': true,
+                      'py-0': !isDark,
+                      'bg-surface-subtle': !isEdited(moduleRow.module_name, col),
+                      'edited-input': isEdited(moduleRow.module_name, col),
+                      'bg-table-row-selected-bg text-table-highlight-text font-medium': isEdited(
+                        moduleRow.module_name,
+                        col,
+                      ),
+                      'p-0!': isEdited(moduleRow.module_name, col) && isDark,
+                    }"
+                    @input="
+                      (event: any) =>
+                        handleInputChange(
+                          row.role_name,
+                          moduleRow.module_name,
+                          moduleRow[col],
+                          col,
+                          event.target.innerText,
+                        )
+                    "
+                    @keypress="restrictToNumbers"
+                    @paste="preventNonNumericPaste"
+                    class="inline-block px-2 py-0.5"
+                  >
+                    {{ changedValues[moduleRow.module_name]?.[col] ?? moduleRow[col] }}
+                  </div>
+                </span>
+              </div>
+            </template>
+            <div v-if="isRoleLimitsLoading" class="flex h-[50vh] items-center justify-center">
+              <OSpinner size="md" />
             </div>
-            </q-td>
-          </q-tr>
-        </template>
-      </q-table>
-      </div>
-      <div v-if="isRolesLoading && activeTab == 'role-limits' && activeType == 'table'" class="tw:h-[70vh] tw:flex tw:justify-center tw:items-center">
-        <q-spinner-hourglass color="primary" size="lg" />
+          </template>
+        </OTable>
       </div>
       <div
-        class="card-container"
+        class="bg-card-glass-bg min-h-0 flex-1"
         v-if="activeTab == 'role-limits' && activeType == 'json'"
-        style="height: calc(100vh - 220px)"
       >
-        <query-editor
+        <QueryEditor
           data-test="json-view-roles-editor"
           ref="queryEditorRef"
           editor-id="json-view-roles-editor"
-          class="monaco-editor"
           :debounceTime="300"
           v-model:query="jsonStrToDisplay"
           language="json"
-          style="height: 100%"
+          class="h-full"
           :read-only="!editTable"
         />
       </div>
@@ -460,111 +319,82 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           loading &&
           !apiLimitsRows.length
         "
-        class="flex justify-center items-center"
+        class="flex items-center justify-center"
       >
-        <q-spinner-hourglass color="primary" size="lg" />
+        <OSpinner size="md" />
       </div>
-      <div
-        v-else-if="
-          activeTab == 'api-limits' && !loading && !selectedOrganization
-        "
-      >
+      <div v-else-if="activeTab == 'api-limits' && !loading && !selectedOrganization">
         <NoOrganizationSelected />
       </div>
-      <div
-        v-else-if="
-          activeTab == 'role-limits' && !loading && !selectedOrganization
-        "
-      >
+      <div v-else-if="activeTab == 'role-limits' && !loading && !selectedOrganization">
         <NoOrganizationSelected />
       </div>
+
       <div
-        v-else-if="
-          activeTab == 'api-limits' && !loading && !apiLimitsRows.length && !isApiLimitsLoading
-        "
-      >
-        <NoData />
-      </div>
-      <div
-        v-else-if="
-          activeTab == 'role-limits' && !loading && !rolesLimitRows.length && !isRolesLoading
-        "
-      >
-        <NoData />
-      </div>
-      <div
-        class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md tw:py-2"
+        class="border-border-default bg-surface-base sticky top-0 bottom-0 z-1 ms-auto mt-auto flex w-full justify-end gap-2 border-t py-2 pe-3"
         v-if="editTable && activeType == 'table'"
       >
-        <q-btn
-          label="Cancel"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          @click="cancelChanges"
-        />
-        <q-btn
-          label="Save"
-          class="o2-primary-button no-border tw:h-[36px]"
-          :disable="Object.keys(changedValues).length === 0"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+        <OButton variant="outline" size="sm-action" @click="cancelChanges">
+          {{ t("iam.quotaPage.cancel") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          :disabled="Object.keys(changedValues).length === 0"
           @click="saveChanges"
-        />
+        >
+          {{ t("iam.quotaPage.save") }}
+        </OButton>
       </div>
       <div
-        class="flex justify-end w-full tw:ml-auto floating-buttons q-pr-md q-mt-md"
+        class="border-border-default bg-surface-base sticky top-0 bottom-0 z-1 ms-auto mt-auto flex w-full justify-end gap-2 border-t pe-3"
         v-if="editTable && activeType == 'json'"
       >
-        <q-btn
-          label="Cancel"
-          class="q-mr-md o2-secondary-button tw:h-[36px]"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
+        <OButton
+          variant="outline"
+          size="sm-action"
           @click="cancelJsonChanges"
-          :disable="isSavingJson"
-        />
-        <q-btn
-          :label="isSavingJson ? 'Saving Changes...' : 'Save Changes'"
-          class="o2-primary-button no-border tw:h-[36px]"
-          no-caps
-          flat
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
+          :disabled="isSavingJson"
+        >
+          {{ t("iam.quotaPage.cancel") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
           @click="saveJsonChanges"
-          :disable="isSavingJson"
-        />
+          :disabled="isSavingJson"
+        >
+          {{ isSavingJson ? t("iam.quotaPage.savingChanges") : t("iam.quotaPage.saveChanges") }}
+        </OButton>
       </div>
     </div>
 
     <ConfirmDialog
-      title="UnSaved Changes Detected"
-      message="save changes before switching tabs"
+      :title="t('iam.quotaPage.unsavedChangesDetected')"
+      :message="t('iam.quotaPage.saveBeforeSwitchingTabs')"
       @update:ok="saveChangesAndTabSwitch"
       @update:cancel="discardChangesTabSwitch"
       v-model="showConfirmDialogTabSwitch"
     />
     <ConfirmDialog
-      title="UnSaved Changes Detected"
-      message="save changes before expanding another row"
+      :title="t('iam.quotaPage.unsavedChangesDetected')"
+      :message="t('iam.quotaPage.saveBeforeExpandingRow')"
       @update:ok="saveChangesAndRoleSwitch"
       @update:cancel="discardChangesRoleSwitch"
       v-model="showConfirmDialogRowSwitch"
     />
     <ConfirmDialog
-      title="UnSaved Changes Detected"
-      message="save changes before switching Type"
+      :title="t('iam.quotaPage.unsavedChangesDetected')"
+      :message="t('iam.quotaPage.saveBeforeSwitchingType')"
       @update:ok="saveChangesAndTypeSwitch"
       @update:cancel="discardChangesTypeSwitch"
       v-model="showConfirmDialogTypeSwitch"
     />
-  </q-page>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import {
   computed,
   defineComponent,
@@ -575,49 +405,52 @@ import {
   defineAsyncComponent,
 } from "vue";
 import NoOrganizationSelected from "@/components/shared/grid/NoOrganizationSelected.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import organizationsService from "@/services/organizations";
 import AppTabs from "@/components/common/AppTabs.vue";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { getRoles } from "@/services/iam";
 import ratelimitService from "@/services/rate_limit";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 
 import useRateLimiter from "@/composables/useRateLimiter";
-import {
-  outlinedDelete,
-  outlinedPause,
-  outlinedPlayArrow,
-  outlinedFileDownload,
-  outlinedFileUpload,
-  outlinedInsertDriveFile,
-} from "@quasar/extras/material-icons-outlined";
-import AppTable from "@/components/AppTable.vue";
-import NoData from "@/components/shared/grid/NoData.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 export default defineComponent({
   name: "Quota",
   components: {
     NoOrganizationSelected,
+    OButton,
+    OSelect,
+    OSearchInput,
     AppTabs,
-    QTablePagination,
+    OPageLayout,
     ConfirmDialog,
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
-    NoData,
+    QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
+    OEmptyState,
+    OSpinner,
+    OIcon,
+    OTable,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const selectedOrganization = ref<any>(null);
     const store = useStore();
-    const $q = useQuasar();
+    const { isDark } = useTheme();
     const organizations = ref<any[]>([]);
     const isOrgLoading = ref<boolean>(false);
     const resultTotal = ref<number>(0);
-    const perPageOptions = ref<number[]>([20, 50, 100, 250, 500]);
     const {
       getApiLimitsByOrganization,
       getRoleLimitsByOrganization,
@@ -625,9 +458,6 @@ export default defineComponent({
       isRoleLimitsLoading,
       isApiLimitsLoading,
     } = useRateLimiter();
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
     const rolesLimitRows = ref<any[]>([]);
     const rolesColumns = ref<any[]>([]);
     const activeType = ref<any>("table");
@@ -635,152 +465,203 @@ export default defineComponent({
 
     const tabs = ref<any[]>([
       {
-        label: "API Limits",
+        label: t("iam.quotaPage.apiLimits"),
         value: "api-limits",
+        icon: "speed",
       },
       {
-        label: "Role Limits",
+        label: t("iam.quotaPage.roleLimits"),
         value: "role-limits",
+        icon: "shield",
       },
     ]);
 
     const timeUnitTabs = ref<any[]>([
       {
-        label: "Per Second",
+        label: t("iam.quotaPage.perSecond"),
         value: "second",
+        icon: "timer",
       },
       {
-        label: "Per Minute",
+        label: t("iam.quotaPage.perMinute"),
         value: "minute",
+        icon: "schedule",
       },
       {
-        label: "Per Hour",
+        label: t("iam.quotaPage.perHour"),
         value: "hour",
+        icon: "hourglass-empty",
       },
     ]);
 
     const typeTabs = computed(() => [
       {
-        label: "Table",
+        label: t("iam.quotaPage.table"),
         value: "table",
+        icon: "table-chart",
       },
       {
-        label: "JSON",
+        label: raw("JSON"),
         value: "json",
+        icon: "data-object",
         disabled: activeTab.value === "role-limits" && !expandedRow.value,
       },
     ]);
 
+    // The rate unit the column headers are quoted in. Untranslated: "Req/s" is the
+    // conventional symbol for a rate, and it is interpolated INTO the header message
+    // (`quota.listLimit` = "List {unit}") rather than concatenated onto it, so a
+    // locale that wants it somewhere else in the phrase can move it.
     const getTimeUnitLabel = () => {
-      const unitMap: any = {
-        second: "(Req/s)",
-        minute: "(Req/m)",
-        hour: "(Req/h)",
+      // Translated: this lands inside `quota.*Limit` as {unit}, so it is user
+      // copy, not a token. Keeping it as a TS literal moved text out of the
+      // catalogue where no translator can reach it.
+      const unitMap: Record<string, string> = {
+        second: t("quota.unitPerSecond"),
+        minute: t("quota.unitPerMinute"),
+        hour: t("quota.unitPerHour"),
       };
-      return unitMap[activeTimeUnit.value] || "(Req/s)";
+      return unitMap[activeTimeUnit.value] || t("quota.unitPerSecond");
     };
 
-    const apiLimitsColumns = computed(() => {
+    const apiLimitCrudColumnIds = computed(() =>
+      apiLimitsColumns.value.filter((c) => c.id !== "module_name").map((c) => c.id),
+    );
+
+    const roleLimitCrudColumnIds = computed(() =>
+      roleLimitsColumns.value.filter((c) => c.id !== "role_name").map((c) => c.id),
+    );
+
+    const apiLimitsColumns = computed<OTableColumnDef[]>(() => {
       const unitLabel = getTimeUnitLabel();
       return [
         {
-          name: "module_name",
-          field: "module_name",
-          label: t("quota.moduleName"),
-          align: "left",
+          id: "module_name",
+          header: t("quota.moduleName"),
+          accessorKey: "module_name",
           sortable: true,
+          resizable: true,
+          hideable: true,
+          size: COL.name,
+          minSize: 160,
+          meta: { align: "left", flex: true },
         },
         {
-          name: "list",
-          field: "list",
-          label: `${t("quota.listLimit")} ${unitLabel}`,
-          align: "center",
+          id: "list",
+          header: t("quota.listLimit", { unit: unitLabel }),
+          accessorKey: "list",
           sortable: true,
-          style: "width: 200px !important; ",
+          resizable: true,
+          hideable: true,
+          size: 200,
+          meta: { align: "right" },
         },
         {
-          name: "get",
-          field: "get",
-          label: `${t("quota.getLimit")} ${unitLabel}`,
-          align: "center",
+          id: "get",
+          header: t("quota.getLimit", { unit: unitLabel }),
+          accessorKey: "get",
           sortable: true,
-          style: "width: 200px !important; ",
+          resizable: true,
+          hideable: true,
+          size: 200,
+          meta: { align: "right" },
         },
         {
-          name: "create",
-          field: "create",
-          label: `${t("quota.createLimit")} ${unitLabel}`,
-          align: "center",
+          id: "create",
+          header: t("quota.createLimit", { unit: unitLabel }),
+          accessorKey: "create",
           sortable: true,
-          style: "width: 200px !important; ",
+          resizable: true,
+          hideable: true,
+          size: 200,
+          meta: { align: "right" },
         },
         {
-          name: "update",
-          field: "update",
-          label: `${t("quota.updateLimit")} ${unitLabel}`,
-          align: "center",
+          id: "update",
+          header: t("quota.updateLimit", { unit: unitLabel }),
+          accessorKey: "update",
           sortable: true,
-          style: "width: 200px !important; ",
+          resizable: true,
+          hideable: true,
+          size: 200,
+          meta: { align: "right" },
         },
         {
-          name: "delete",
-          field: "delete",
-          label: `${t("quota.deleteLimit")} ${unitLabel}`,
-          align: "center",
+          id: "delete",
+          header: t("quota.deleteLimit", { unit: unitLabel }),
+          accessorKey: "delete",
           sortable: true,
-          style: "width: 200px !important; ",
+          resizable: true,
+          hideable: true,
+          size: 200,
+          meta: { align: "right" },
         },
       ];
     });
-    const roleLimitsColumns = computed(() => {
+    const roleLimitsColumns = computed<OTableColumnDef[]>(() => {
       const unitLabel = getTimeUnitLabel();
       return [
         {
-          name: "role_name",
-          field: "role_name",
-          label: t("quota.roleName"),
-          align: "left",
+          id: "role_name",
+          header: t("quota.roleName"),
+          accessorKey: "role_name",
           sortable: true,
+          resizable: true,
+          hideable: true,
+          cell: (info: any) => info.getValue(),
+          size: COL.role,
+          minSize: 160,
+          meta: { align: "left", flex: true },
         },
         {
-          name: "list",
-          field: "list",
-          label: `${t("quota.listLimit")} ${unitLabel}`,
-          align: "center",
+          id: "list",
+          header: t("quota.listLimit", { unit: unitLabel }),
+          accessorKey: "list",
           sortable: true,
-          style: "width: 200px !important; ",
+          resizable: true,
+          hideable: true,
+          size: 200,
+          meta: { align: "right" },
         },
         {
-          name: "get",
-          field: "get",
-          label: `${t("quota.getLimit")} ${unitLabel}`,
-          align: "center",
+          id: "get",
+          header: t("quota.getLimit", { unit: unitLabel }),
+          accessorKey: "get",
           sortable: true,
-          style: "width: 200px !important; ",
+          resizable: true,
+          hideable: true,
+          size: 200,
+          meta: { align: "right" },
         },
         {
-          name: "create",
-          field: "create",
-          label: `${t("quota.createLimit")} ${unitLabel}`,
-          align: "center",
+          id: "create",
+          header: t("quota.createLimit", { unit: unitLabel }),
+          accessorKey: "create",
           sortable: true,
-          style: "width: 200px !important; ",
+          resizable: true,
+          hideable: true,
+          size: 200,
+          meta: { align: "right" },
         },
         {
-          name: "update",
-          field: "update",
-          label: `${t("quota.updateLimit")} ${unitLabel}`,
-          align: "center",
+          id: "update",
+          header: t("quota.updateLimit", { unit: unitLabel }),
+          accessorKey: "update",
           sortable: true,
-          style: "width: 200px !important; ",
+          resizable: true,
+          hideable: true,
+          size: 200,
+          meta: { align: "right" },
         },
         {
-          name: "delete",
-          field: "delete",
-          label: `${t("quota.deleteLimit")} ${unitLabel}`,
-          align: "center",
+          id: "delete",
+          header: t("quota.deleteLimit", { unit: unitLabel }),
+          accessorKey: "delete",
           sortable: true,
-          style: "width: 200px !important; ",
+          resizable: true,
+          hideable: true,
+          size: 200,
+          meta: { align: "right" },
         },
       ];
     });
@@ -819,8 +700,6 @@ export default defineComponent({
     const filteredApiCategoryToDisplayOptions = ref<any[]>([]);
     const apiCategories = ref<any[]>([]);
 
-    const selectedPerPage = ref<number>(20);
-    const qTable = ref<any>(null);
     const isRolesLoading = ref<boolean>(false);
 
     onMounted(async () => {
@@ -849,12 +728,9 @@ export default defineComponent({
         //these are the modules that are displayed in the dropdown
         //to select the api category that user can use to filter the api limits
         if (!store.state.modulesToDisplay[selectedOrganization.value.value]) {
-          apiCategories.value = await getModulesToDisplay(
-            selectedOrganization.value.value,
-          );
+          apiCategories.value = await getModulesToDisplay(selectedOrganization.value.value);
         } else {
-          apiCategories.value =
-            store.state.modulesToDisplay[selectedOrganization.value.value];
+          apiCategories.value = store.state.modulesToDisplay[selectedOrganization.value.value];
         }
       }
     });
@@ -893,14 +769,14 @@ export default defineComponent({
 
     const organizationToDisplay = computed(() => {
       if (activeTab.value === "api-limits") {
-        const newArray = [...filteredOrganizations.value];
+        const newArray = [...organizations.value];
         newArray.unshift({
-          label: "global rules",
+          label: t("iam.quotaPage.globalRules"),
           value: "global_rules",
         });
         return newArray;
       } else {
-        return filteredOrganizations.value;
+        return organizations.value;
       }
     });
     const updateOrganization = async () => {
@@ -913,17 +789,14 @@ export default defineComponent({
       });
 
       if (activeTab.value === "api-limits") {
-        if (
-          !store.state.allApiLimitsByOrgId[selectedOrganization.value.value]
-        ) {
+        if (!store.state.allApiLimitsByOrgId[selectedOrganization.value.value]) {
           apiLimitsRows.value = await getApiLimitsByOrganization(
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
           resultTotal.value = apiLimitsRows.value.length;
         } else {
-          apiLimitsRows.value =
-            store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
+          apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
           resultTotal.value = apiLimitsRows.value.length;
         }
       } else if (activeTab.value === "role-limits") {
@@ -944,22 +817,19 @@ export default defineComponent({
             "default",
           );
           organizations.value = response.data.data.map((org: any) => ({
-            label: org.name,
+            label: raw(org.name),
             value: org.identifier,
           }));
-          organizations.value.sort((a: any, b: any) =>
-            a.label.localeCompare(b.label),
-          );
+          organizations.value.sort((a: any, b: any) => a.label.localeCompare(b.label));
           isOrgLoading.value = false;
         } catch (error) {
           isOrgLoading.value = false;
-          console.log(error);
         } finally {
           isOrgLoading.value = false;
         }
       } else {
         organizations.value = store.state.organizations.map((org: any) => ({
-          label: org.name,
+          label: raw(org.name),
           value: org.identifier,
         }));
       }
@@ -994,16 +864,13 @@ export default defineComponent({
         await getRolesByOrganization();
       }
       if (tab === "api-limits") {
-        if (
-          !store.state.allApiLimitsByOrgId[selectedOrganization.value.value]
-        ) {
+        if (!store.state.allApiLimitsByOrgId[selectedOrganization.value.value]) {
           apiLimitsRows.value = await getApiLimitsByOrganization(
             selectedOrganization.value.value,
             activeTimeUnit.value,
           );
         } else {
-          apiLimitsRows.value =
-            store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
+          apiLimitsRows.value = store.state.allApiLimitsByOrgId[selectedOrganization.value.value];
         }
         resultTotal.value = apiLimitsRows.value.length;
       }
@@ -1056,7 +923,6 @@ export default defineComponent({
         resultTotal.value = rolesLimitRows.value.length;
         isRolesLoading.value = false;
       } catch (error) {
-        console.log(error);
         isRolesLoading.value = false;
       }
     };
@@ -1070,7 +936,7 @@ export default defineComponent({
     };
     //this is used for handling the input changes for both api limits and row limits
     const handleInputChange = (
-      roleName: any = "",
+      _roleName: any = "",
       moduleName: string,
       row: any,
       operation: string,
@@ -1139,10 +1005,9 @@ export default defineComponent({
           uploadError.value = "";
           uploadedRules.value = [];
           isBulkUpdate.value = false;
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: response.data.message,
-            timeout: 3000,
           });
         }
 
@@ -1164,12 +1029,9 @@ export default defineComponent({
         }
         changedValues.value = {};
       } catch (error: any) {
-        $q.notify({
-          type: "negative",
-          message:
-            error.response.data.message ||
-            "Error while updating rate limits rule",
-          timeout: 3000,
+        toast({
+          variant: "error",
+          message: error.response.data.message || t("iam.quotaPage.errorUpdatingRateLimits"),
         });
         console.error("Error saving changes:", error);
       }
@@ -1213,10 +1075,9 @@ export default defineComponent({
         }
         // Here you would call your API to save the changes
         if (response.status === 200) {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: response.data.message,
-            timeout: 3000,
           });
         }
 
@@ -1239,12 +1100,9 @@ export default defineComponent({
         isSavingJson.value = false;
       } catch (error: any) {
         isSavingJson.value = false;
-        $q.notify({
-          type: "negative",
-          message:
-            error.response.data.message ||
-            "Error while updating rate limits rule",
-          timeout: 3000,
+        toast({
+          variant: "error",
+          message: error.response.data.message || t("iam.quotaPage.errorUpdatingRateLimits"),
         });
         console.error("Error saving changes:", error);
       }
@@ -1252,14 +1110,13 @@ export default defineComponent({
 
     const isEdited = (moduleName: string, operation: string) => {
       return (
-        changedValues.value[moduleName] &&
-        changedValues.value[moduleName][operation] !== undefined
+        changedValues.value[moduleName] && changedValues.value[moduleName][operation] !== undefined
       );
     };
 
     const generateColumns = () => {
       if (
-        selectedOrganization.value?.hasOwnProperty("value") &&
+        Object.prototype.hasOwnProperty.call(selectedOrganization.value ?? {}, "value") &&
         selectedOrganization.value.value != ""
       ) {
         return apiLimitsColumns.value;
@@ -1270,19 +1127,16 @@ export default defineComponent({
 
     const downloadTemplate = async () => {
       try {
-        const response = await ratelimitService.download_template(
-          selectedOrganization.value.value,
-        );
-        const blob = new Blob([response.data], { type: "application/json" });
+        const response = await ratelimitService.download_template(selectedOrganization.value.value);
         const jsonData = JSON.stringify(response.data, null, 2);
-        const url = window.URL.createObjectURL(
-          new Blob([jsonData], { type: "application/json" }),
-        );
+        const url = window.URL.createObjectURL(new Blob([jsonData], { type: "application/json" }));
         const a = document.createElement("a");
         a.href = url;
         a.download = `rate_limit_template_${selectedOrganization.value.label}.json`;
         document.body.appendChild(a);
         a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
       } catch (error) {
         console.log(error);
       }
@@ -1291,10 +1145,10 @@ export default defineComponent({
     const uploadTemplate = async () => {
       const combinedJson = await convertUploadRulesToJson(uploadedRules.value);
       try {
-        const dismiss = $q.notify({
-          spinner: true,
-          message: "Please wait while uploading rules...",
-          timeout: 1000,
+        const dismiss = toast({
+          variant: "loading",
+          message: t("iam.quotaPage.uploadingRules"),
+          timeout: 0,
         });
         uploadingRules.value = true;
         const response = await ratelimitService.upload_template(
@@ -1302,10 +1156,9 @@ export default defineComponent({
           combinedJson,
         );
         if (response.status === 200) {
-          $q.notify({
-            type: "positive",
+          toast({
+            variant: "success",
             message: response.data.message,
-            timeout: 3000,
           });
         }
         uploadingRules.value = false;
@@ -1315,7 +1168,7 @@ export default defineComponent({
         dismiss();
       } catch (error) {
         uploadingRules.value = false;
-        uploadError.value = "Error while uploading rules";
+        uploadError.value = t("iam.quotaPage.errorUploadingRules");
       } finally {
         uploadingRules.value = false;
       }
@@ -1332,16 +1185,12 @@ export default defineComponent({
               try {
                 const parsedJson = JSON.parse(e.target.result);
                 // Convert to array if it's a single object
-                const jsonArray = Array.isArray(parsedJson)
-                  ? parsedJson
-                  : [parsedJson];
+                const jsonArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
                 resolve(jsonArray);
               } catch (error) {
-                $q.notify({
-                  message: `Error parsing JSON from file ${file.name}`,
-                  color: "negative",
-                  position: "bottom",
-                  timeout: 2000,
+                toast({
+                  message: t("iam.quotaPage.errorParsingJson", { name: file.name }),
+                  variant: "error",
                 });
                 resolve([]);
               }
@@ -1368,55 +1217,31 @@ export default defineComponent({
     const generateUniqueId = (row: any) => {
       return row.api_group_name + "_" + row.api_group_operation;
     };
-    const filteredData = (rows: any, terms: any) => {
-      var filtered = [];
-      terms = terms.toLowerCase();
-      if (activeTab.value === "api-limits") {
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i].module_name.toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-      } else {
-        for (var i = 0; i < rows.length; i++) {
-          if (rows[i].role_name.toLowerCase().includes(terms)) {
-            filtered.push(rows[i]);
-          }
-        }
-      }
-
-      return filtered;
-    };
-    const triggerExpand = async (props: any) => {
+    const triggerExpand = async (row: any) => {
       if (Object.keys(changedValues.value).length > 0) {
         showConfirmDialogRowSwitch.value = true;
-        toBeExpandedRow.value = props.row;
+        toBeExpandedRow.value = row;
         return;
       }
-      expandedRole.value = props.row.role_name;
-      if (expandedRow.value === props.row.uuid) {
+      expandedRole.value = row.role_name;
+      if (expandedRow.value === row.uuid) {
         expandedRow.value = null;
         openedRole.value = null;
       } else {
-        openedRole.value = props.row.role_name;
-        //expand the row at first only because we need to show the loading state for the user 
-        expandedRow.value = props.row.uuid;
-        let roleLimits: any;
+        openedRole.value = row.role_name;
+        //expand the row at first only because we need to show the loading state for the user
+        expandedRow.value = row.uuid;
         if (
-          !store.state.allRoleLimitsByOrgIdByRole[
-            selectedOrganization.value.value
-          ]?.[props.row.role_name]
+          !store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value]?.[row.role_name]
         ) {
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
             selectedOrganization.value.value,
-            props.row.role_name,
+            row.role_name,
             activeTimeUnit.value,
           );
         } else {
           roleLevelModuleRows.value =
-            store.state.allRoleLimitsByOrgIdByRole[
-              selectedOrganization.value.value
-            ][props.row.role_name];
+            store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value][row.role_name];
         }
         filterModulesBasedOnCategory();
         // Otherwise, expand the clicked row and collapse any other row
@@ -1437,10 +1262,9 @@ export default defineComponent({
       Object.keys(changedValues).forEach((moduleName: any) => {
         Object.keys(changedValues[moduleName]).forEach((operation: any) => {
           if (changedValues[moduleName][operation] === "") {
-            $q.notify({
-              type: "negative",
-              message: "some values are empty please check",
-              timeout: 3000,
+            toast({
+              variant: "error",
+              message: t("iam.quotaPage.someValuesEmpty"),
             });
             isEmpty = true;
           }
@@ -1475,9 +1299,7 @@ export default defineComponent({
 
         // Remove keys with "-" values
         const filteredItem = Object.fromEntries(
-          Object.entries(item).filter(
-            ([k, v]) => k !== "module_name" && v !== "-",
-          ),
+          Object.entries(item).filter(([k, v]) => k !== "module_name" && v !== "-"),
         );
 
         // Assign the cleaned object to the transformed key
@@ -1507,10 +1329,7 @@ export default defineComponent({
       //if the changes are not there then we need to update the active type to table mode
       else {
         //here we are checking if any changes are made to the json string so that we can show the confirm dialog
-        let isChanged = jsonDiff(
-          jsonStrToDisplay.value,
-          transformData(apiLimitsRows.value),
-        );
+        let isChanged = jsonDiff(jsonStrToDisplay.value, transformData(apiLimitsRows.value));
         if (isChanged && editTable.value) {
           //here we store the next type to be used when the user confirms the changes
           nextType.value = type.toLowerCase();
@@ -1526,11 +1345,7 @@ export default defineComponent({
 
     const populateJsonStr = () => {
       if (activeTab.value == "api-limits") {
-        jsonStrToDisplay.value = JSON.stringify(
-          transformData(apiLimitsRows.value),
-          null,
-          2,
-        );
+        jsonStrToDisplay.value = JSON.stringify(transformData(apiLimitsRows.value), null, 2);
       } else {
         jsonStrToDisplay.value = JSON.stringify(
           transformData(filteredRoleLevelModuleRows.value),
@@ -1575,19 +1390,38 @@ export default defineComponent({
     const filterApiCategoriesToDisplayOptions = (val: any, update: any) => {
       if (val.length > 0) {
         update();
-        filteredApiCategoryToDisplayOptions.value = apiCategories.value.filter(
-          (role: any) => role.label.toLowerCase().includes(val.toLowerCase()),
+        filteredApiCategoryToDisplayOptions.value = apiCategories.value.filter((role: any) =>
+          role.label.toLowerCase().includes(val.toLowerCase()),
         );
       } else {
         update();
         filteredApiCategoryToDisplayOptions.value = apiCategories.value;
       }
     };
-    const changePagination = (val: { label: string; value: any }) => {
-      //used to change the pagination of the table
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value?.setPagination(pagination.value);
+    const handleExpandedChange = (ids: string[]) => {
+      const newId = ids?.[0] ?? null;
+      if (newId === expandedRow.value) return;
+      if (newId) {
+        const row = rolesLimitRows.value.find((r: any) => r.uuid === newId);
+        if (row) triggerExpand(row);
+      } else {
+        expandedRow.value = null;
+        openedRole.value = null;
+      }
+    };
+    const handleOrgSelect = async (val: any) => {
+      if (!organizationToDisplay.value.length) {
+        selectedOrganization.value = null;
+        return;
+      }
+      selectedOrganization.value =
+        organizationToDisplay.value.find((o: any) => o.value === val) ?? null;
+      if (!selectedOrganization.value) return;
+      await updateOrganization();
+    };
+    const handleApiCategorySelect = (val: any) => {
+      selectedApiCategory.value = apiCategories.value.find((o: any) => o.value === val) ?? null;
+      filterModulesBasedOnCategory();
     };
     //here we are filtering the modules based on the selected api category
     const filterModulesBasedOnCategory = () => {
@@ -1596,8 +1430,7 @@ export default defineComponent({
       if (selectedApiCategory.value?.value) {
         filteredRoleLevelModuleRows.value = roleLevelModuleRows.value.filter(
           (row: any) =>
-            row.module_name.toLowerCase() ===
-            selectedApiCategory.value?.value.toLowerCase(),
+            row.module_name.toLowerCase() === selectedApiCategory.value?.value.toLowerCase(),
         );
       } else {
         filteredRoleLevelModuleRows.value = roleLevelModuleRows.value;
@@ -1613,13 +1446,10 @@ export default defineComponent({
       let isChanged = Object.keys(changedValues.value).length > 0;
 
       if (isChanged) {
-        $q.notify({
-          type: "warning",
-          message: "Please save or cancel your changes before switching time units",
-          timeout: 3000,
+        toast({
+          variant: "warning",
+          message: t("iam.quotaPage.saveBeforeSwitchingTimeUnits"),
         });
-        // Revert back to previous time unit
-        activeTimeUnit.value = activeTimeUnit.value;
         return;
       }
 
@@ -1643,7 +1473,8 @@ export default defineComponent({
         const storeKey = `${openedRole.value}_${newTimeUnit}`;
         if (store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value]?.[storeKey]) {
           // Use cached data
-          roleLevelModuleRows.value = store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value][storeKey];
+          roleLevelModuleRows.value =
+            store.state.allRoleLimitsByOrgIdByRole[selectedOrganization.value.value][storeKey];
         } else {
           // Fetch from API
           roleLevelModuleRows.value = await getRoleLimitsByOrganization(
@@ -1662,6 +1493,8 @@ export default defineComponent({
     };
 
     return {
+      raw,
+      isDark,
       t,
       selectedOrganization,
       organizations,
@@ -1674,12 +1507,10 @@ export default defineComponent({
       editTable,
       searchQuery,
       resultTotal,
-      perPageOptions,
       rolesLimitRows,
       rolesColumns,
       apiLimitsRows,
       apiLimitsColumns,
-      pagination,
       editTableWithInput,
       store,
       handleInputChange,
@@ -1690,10 +1521,10 @@ export default defineComponent({
       generateColumns,
       loading,
       isBulkUpdate,
-      outlinedFileDownload,
-      outlinedFileUpload,
+      outlinedFileDownload: "file-download",
+      outlinedFileUpload: "file-upload",
       uploadedRules,
-      outlinedInsertDriveFile,
+      outlinedInsertDriveFile: "insert-drive-file",
       getImageURL,
       fileListToDisplay,
       downloadTemplate,
@@ -1704,7 +1535,6 @@ export default defineComponent({
       focusedInputId,
       onFocus,
       generateUniqueId,
-      filteredData,
       roleLimitsColumns,
       triggerExpand,
       expandedRow,
@@ -1712,6 +1542,8 @@ export default defineComponent({
       roleLevelLoading,
       getRoleLimitsByOrganization,
       selectedApiCategory,
+      handleOrgSelect,
+      handleApiCategorySelect,
       rolesToBeDisplayed,
       isApiCategoryLoading,
       filteredRoleLevelModuleRows,
@@ -1740,9 +1572,6 @@ export default defineComponent({
       filterOrganizations,
       filteredApiCategoryToDisplayOptions,
       filterApiCategoriesToDisplayOptions,
-      changePagination,
-      selectedPerPage,
-      qTable,
       organizationToDisplay,
       filterModulesBasedOnCategory,
       // Expose internals for unit tests
@@ -1758,180 +1587,27 @@ export default defineComponent({
       timeUnitTabs,
       updateTimeUnit,
       getTimeUnitLabel,
+      apiLimitCrudColumnIds,
+      roleLimitCrudColumnIds,
+      handleExpandedChange,
     };
   },
 });
 </script>
 
-<style lang="scss">
-.quota-page {
-  input[type="number"]::-webkit-outer-spin-button,
-  input[type="number"]::-webkit-inner-spin-button {
-    -webkit-appearance: none;
-    margin: 0;
-  }
-  .title-height {
-    height: 40px;
-    min-height: 40px;
-  }
-  .input-width {
-    width: 300px;
-  }
-}
-.floating-buttons {
-  position: sticky;
-  bottom: 0;
-  top: 0;
-  z-index: 100; /* Ensure it stays on top of table content */
-  width: 100%;
-}
-.dark-theme-page {
-  .floating-buttons {
-    background-color: $dark;
-  }
-}
-.light-theme-page {
-  .floating-buttons {
-    background-color: $white;
-  }
-}
-.light-theme-page {
-  .editable-cell {
-    padding: 0px 10px;
-    background-color: #f1f1ee;
-  }
-  .edited-cell {
-    padding-left: 8px !important; // light blue color
-  }
-  .edited-input {
-    background-color: #bfc3f4;
-    color: black; // blue text color for edited values
-    font-weight: 500;
-  }
-  .edited-input-role-level {
-    color: #2196f3; // blue text color for edited values
-    font-weight: 500;
-  }
+<style scoped>
+/* keep(lib-override): hide number-input spinners + center non-first OTable sort-trigger headers (child DOM) */
+.quota-page :deep(input[type="number"]::-webkit-outer-spin-button),
+.quota-page :deep(input[type="number"]::-webkit-inner-spin-button) {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
-.dark-theme-page {
-  .editable-cell {
-    padding: 0px 10px;
-  }
-  .edited-cell {
-    padding-left: 8px !important;
-  }
-  .edited-input {
-    background-color: #f6f6f6;
-    color: black;
-    font-weight: 500;
-    padding: 0px !important;
-  }
-  .edited-input-role-level {
-    color: #64b5f6; // lighter blue text color for dark theme
-    font-weight: 500;
-    width: 100% !important;
-  }
-}
-.file-upload-input {
-  height: 100% !important;
-}
-
-.file-upload-input > .q-field__inner {
-  height: 100% !important;
-}
-
-.file-upload-input > .q-field__inner > .q-field__control {
-  height: 100% !important;
-}
-
-.file-upload-input
-  > .q-field__inner
-  > .q-field__control
-  .q-field__control-container {
-  height: 100% !important;
-}
-.file-upload-input
-  > .q-field__inner
-  > .q-field__control
-  .q-field__control-container
-  .q-field__label {
-  height: 100% !important;
-  width: 100% !important;
-  display: flex;
-  align-items: start;
-  justify-content: start;
-}
-.focused-input {
-  border: 1px solid #007bff; /* Customize the border color */
-  box-shadow: 0 0 5px rgba(0, 123, 255, 0.5); /* Optional: Add shadow for better focus effect */
-  width: 100% !important;
-}
-
-.expanded-content {
-  padding: 0 3rem;
-  max-height: 100vh; /* Set a fixed height for the container */
-  overflow: hidden; /* Hide overflow by default */
-}
-
-.scrollable-content {
-  width: 100%; /* Use the full width of the parent */
-  overflow-y: auto; /* Enable vertical scrolling for long content */
-  padding: 10px; /* Optional: padding for aesthetics */
-  border: 1px solid #ddd; /* Optional: border for visibility */
-  height: 100%;
-  max-height: 200px;
-  /* Use the full height of the parent */
-  text-wrap: normal;
-  background-color: #e8e8e8;
-  color: black;
-}
-.expanded-sql {
-  border-left: #7a54a2 3px solid;
-}
-
-.app-table-container {
-  .q-table{
-    thead{
-          tr {
-      background: var(--o2-table-header-bg) !important;
-    }
-    }
-  }
-  .thead-sticky,
-  .tfoot-sticky {
-    position: sticky;
-    top: 0;
-    opacity: 1;
-    z-index: 1;
-    background: #f5f5f5;
-  }
-
-  .q-table--dark .thead-sticky,
-  .q-table--dark .tfoot-sticky {
-    background: #565656 !important;
-  }
-
-  .q-table__bottom {
-    .q-table__control {
-      padding-top: 0;
-      padding-bottom: 0;
-    }
-  }
-}
-
-.editable-input {
-  height: 10px !important;
-}
-
-.category-select {
-  .q-placeholder {
-    font-size: 14px !important;
-  }
-}
-.org-select {
-  .q-placeholder {
-    font-size: 14px !important;
-  }
+.quota-page
+  :deep(
+    th:not([data-test="o2-table-th-module_name"]):not([data-test="o2-table-th-role_name"])
+      [data-test="o2-table-th-sort-trigger"]
+  ) {
+  justify-content: center;
 }
 </style>

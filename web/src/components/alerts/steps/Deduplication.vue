@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,108 +15,123 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="step-deduplication" :class="store.state.theme === 'dark' ? 'dark-mode' : 'light-mode'">
-    <div class="step-content card-container tw:px-3 tw:py-4">
-      <!-- Fingerprint Fields -->
-      <div class="tw:mb-4">
-        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
-          {{ t("alerts.deduplication.fingerprintFields") }}
-          <q-icon
-            name="info"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
-            <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-              {{ t("alerts.deduplication.fingerprintFieldsTooltip") }}
-            </q-tooltip>
-          </q-icon>
-        </div>
-        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
-          {{ t("alerts.deduplication.fingerprintFieldsHint") }}
-        </div>
-        <q-select
-          v-model="localDeduplication.fingerprint_fields"
-          :options="filteredColumns"
-          color="input-border"
-          bg-color="input-bg"
-          class="showLabelOnTop no-case fingerprint-select tw:max-w-[600px] tw:min-w-[300px]"
-          dense
-          borderless
-          multiple
-          use-chips
-          use-input
-          input-debounce="0"
-          new-value-mode="add-unique"
-          emit-value
-          map-options
-          @filter="filterColumns"
-          @update:model-value="emitUpdate"
+  <div class="step-deduplication mx-auto h-full w-full overflow-auto">
+    <!-- DESCENDANT step (Rule ③): the AddAlert orchestrator owns the ONE <OForm>
+         and provides FORM_CONTEXT_KEY. The fields below bind by nested `name=`
+         (deduplication.fingerprint_fields / .time_window_minutes) into that
+         form; flushDedup writes the derived `enabled` + sanitized time window
+         back into it (payload parity). -->
+    <div>
+      <div
+        class="step-content rounded-default bg-surface-overlay border-border-default min-h-full border"
+      >
+        <div
+          class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
         >
-          <template v-slot:hint>
-            <div class="tw:text-xs">
-              💡 Leave empty to auto-detect based on query (SQL: GROUP BY columns, PromQL: labels, Custom: condition
-              fields)
-            </div>
-          </template>
-        </q-select>
-      </div>
-
-      <!-- Time Window -->
-      <div class="tw:mb-4">
-        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
-          {{ t("alerts.deduplication.timeWindow") }}
-          <q-icon
-            name="info"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
-            <q-tooltip anchor="center right" self="center left" max-width="300px" style="font-size: 12px">
-              {{ t("alerts.deduplication.timeWindowTooltip") }}
-            </q-tooltip>
-          </q-icon>
-        </div>
-        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
-          {{ t("alerts.deduplication.timeWindowHint") }}
-        </div>
-        <div class="tw:flex tw:items-center">
-          <div class="tw:w-[210px] tw:ml-0">
-            <q-input
-              v-model.number="localDeduplication.time_window_minutes"
-              type="number"
-              dense
-              borderless
-              min="1"
-              :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
-              :class="
-                store.state.theme === 'dark' ? 'input-box-bg-dark input-border-dark' : 'input-box-bg-light input-border-light'
-              "
-              style="background: none;"
-              @update:model-value="emitUpdate"
-            />
-          </div>
           <div
-            style="min-width: 90px; margin-left: 0 !important; height: 36px; font-weight: normal"
-            :style="store.state.theme === 'dark' ? 'border: 1px solid #2c2c2c' : ''"
-            :class="store.state.theme === 'dark' ? 'bg-grey-10' : 'bg-grey-2'"
-            class="flex justify-center items-center"
-          >
-            {{ t("alerts.minutes") }}
+            class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
+          />
+          <span class="section-header-title text-compact text-text-heading font-semibold">{{
+            t("alerts.steps.deduplication")
+          }}</span>
+        </div>
+        <div class="px-3 py-2">
+          <!-- Fingerprint Fields -->
+          <div class="mb-4">
+            <div class="flex items-center pb-2 font-semibold">
+              {{ t("alerts.deduplication.fingerprintFields") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer">
+                <OTooltip
+                  :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
+                  side="right"
+                />
+              </OIcon>
+            </div>
+            <div class="text-text-secondary mb-2 text-sm">
+              {{ t("alerts.deduplication.fingerprintFieldsHint") }}
+            </div>
+            <div class="relative">
+              <OFormSelect
+                name="deduplication.fingerprint_fields"
+                :options="props.columns || []"
+                multiple
+                creatable
+                data-test="alert-dedup-fingerprint-fields"
+                class="max-w-150 min-w-75"
+                :helpText="t('alerts.deduplication.fingerprintFieldsHelp')"
+                @update:model-value="onFingerprintChange"
+                @create="addFingerprintField"
+              />
+              <OTooltip
+                v-if="fingerprintFields?.length > 0"
+                :content="fingerprintFields.join(', ')"
+                max-width="25rem"
+              />
+            </div>
+          </div>
+
+          <!-- Time Window -->
+          <div class="mb-4">
+            <div class="flex items-center pb-2 font-semibold">
+              {{ t("alerts.deduplication.timeWindow") }}
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer">
+                <OTooltip :content="t('alerts.deduplication.timeWindowTooltip')" side="right" />
+              </OIcon>
+            </div>
+            <div class="text-text-secondary mb-2 text-sm">
+              {{ t("alerts.deduplication.timeWindowHint") }}
+            </div>
+            <div class="flex items-center">
+              <div class="ms-0 w-52.5">
+                <OFormInput
+                  name="deduplication.time_window_minutes"
+                  type="number"
+                  min="1"
+                  data-test="alert-dedup-time-window"
+                  :placeholder="t('alerts.placeholders.autoUsesCheckInterval')"
+                  @update:model-value="onTimeWindowChange"
+                />
+              </div>
+              <div
+                style="
+                  min-width: 5.625rem;
+                  margin-left: 0 !important;
+                  height: 1.75rem;
+                  font-weight: normal;
+                "
+                class="bg-surface-subtle flex items-center justify-center"
+              >
+                {{ t("alerts.minutes") }}
+              </div>
+            </div>
           </div>
         </div>
+        <!-- end px-3 py-2 -->
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, watch, type PropType } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, inject, type PropType } from "vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+
+/** number | undefined — "" and non-numeric become undefined (payload parity). */
+const sanitizeTimeWindow = (val: any): number | undefined => {
+  if (val == null || val === "") return undefined;
+  const num = Number(val);
+  return isNaN(num) ? undefined : num;
+};
 
 export default defineComponent({
   name: "Step5Deduplication",
+  components: { OIcon, OFormInput, OFormSelect, OTooltip },
   props: {
     deduplication: {
       type: Object as PropType<any>,
@@ -132,145 +147,60 @@ export default defineComponent({
     },
   },
   emits: ["update:deduplication"],
-  setup(props, { emit }) {
-    const { t } = useI18n();
+  setup(props) {
+    const { t } = useI18nTyped();
     const store = useStore();
 
-    const localDeduplication = ref({
-      enabled: true,
-      fingerprint_fields: props.deduplication?.fingerprint_fields || [],
-      time_window_minutes: props.deduplication?.time_window_minutes || undefined,
-    });
+    // DESCENDANT step (Rule ③): the AddAlert orchestrator provides
+    // FORM_CONTEXT_KEY — the ONE form the fields bind into by nested `name=`.
+    const form: any = inject(FORM_CONTEXT_KEY, null);
 
-    const filteredColumns = ref(props.columns || []);
-
-    // Watch for prop changes
-    watch(
-      () => props.deduplication,
-      (newVal) => {
-        if (newVal) {
-          localDeduplication.value = {
-            enabled: true,
-            fingerprint_fields: newVal.fingerprint_fields || [],
-            time_window_minutes: newVal.time_window_minutes || undefined,
-          };
-        }
-      },
-      { deep: true }
+    // Reactive view of the selected fingerprint fields (tooltip + enabled derive).
+    const fingerprintFields = form.useStore(
+      (s: any) => (s.values?.deduplication?.fingerprint_fields ?? []) as string[],
     );
 
-    // Watch for columns prop changes
-    watch(
-      () => props.columns,
-      (newVal) => {
-        filteredColumns.value = newVal || [];
-      }
-    );
-
-    const emitUpdate = () => {
-      emit("update:deduplication", {
-        enabled: true,
-        fingerprint_fields: localDeduplication.value.fingerprint_fields,
-        time_window_minutes: localDeduplication.value.time_window_minutes,
+    // ── flushDedup — the single derive/sanitize step. Deferred to a microtask
+    //    so it runs AFTER the OForm* field.handleChange has stored the raw value
+    //    (their handler order is not guaranteed), making it fully
+    //    order-independent. It derives `enabled` (fingerprint_fields.length > 0)
+    //    and sanitizes `time_window_minutes` to number|undefined, writing both
+    //    back into the ONE form so getAlertPayload (which reads raw form
+    //    values) keeps payload parity. ─────────────────────────────────────────
+    const flushDedup = () => {
+      Promise.resolve().then(() => {
+        const d = (form.getFieldValue("deduplication") as any) ?? {};
+        const fields: string[] = Array.isArray(d.fingerprint_fields) ? d.fingerprint_fields : [];
+        const enabled = fields.length > 0;
+        const cleanWindow = sanitizeTimeWindow(d.time_window_minutes);
+        if (d.enabled !== enabled) form.setFieldValue("deduplication.enabled", enabled);
+        if (cleanWindow !== d.time_window_minutes)
+          form.setFieldValue("deduplication.time_window_minutes", cleanWindow);
       });
     };
 
-    const filterColumns = (val: string, update: any) => {
-      update(() => {
-        if (val === '') {
-          filteredColumns.value = props.columns || [];
-        } else {
-          const needle = val.toLowerCase();
-          filteredColumns.value = (props.columns || []).filter((v: any) => {
-            const str = typeof v === 'string' ? v : (v?.label || v?.value || '');
-            return str.toLowerCase().indexOf(needle) > -1;
-          });
-        }
-      });
+    const onFingerprintChange = () => flushDedup();
+    const onTimeWindowChange = () => flushDedup();
+
+    // @create only NOTIFIES (OSelect does not add the created term to the model),
+    // so add it here — matching the pre-migration addFingerprintField.
+    const addFingerprintField = (value: string) => {
+      const current = (form.getFieldValue("deduplication.fingerprint_fields") as string[]) ?? [];
+      if (!current.includes(value)) {
+        form.setFieldValue("deduplication.fingerprint_fields", [...current, value]);
+        flushDedup();
+      }
     };
 
     return {
       t,
       store,
-      localDeduplication,
-      filteredColumns,
-      emitUpdate,
-      filterColumns,
+      props,
+      fingerprintFields,
+      onFingerprintChange,
+      onTimeWindowChange,
+      addFingerprintField,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-.step-deduplication {
-  width: 100%;
-  height: 100%;
-  margin: 0 auto;
-  overflow: auto;
-
-  .step-content {
-    border-radius: 8px;
-    min-height: 100%;
-  }
-
-  &.dark-mode {
-    .step-content {
-      background-color: #212121;
-      border: 1px solid #343434;
-    }
-  }
-
-  &.light-mode {
-    .step-content {
-      background-color: #ffffff;
-      border: 1px solid #e6e6e6;
-    }
-  }
-}
-
-:deep(.fingerprint-select) {
-  .q-field__control {
-    min-height: 40px;
-  }
-
-  .q-field__control-container {
-    padding-top: 4px;
-    padding-bottom: 4px;
-    padding-right: 36px; // Reserve space for dropdown arrow
-  }
-
-  .q-field__native {
-    min-height: 32px;
-    gap: 4px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    display: flex !important;
-    flex-wrap: nowrap !important;
-
-    // Hide scrollbar but keep scrolling functionality
-    scrollbar-width: none; // Firefox
-    -ms-overflow-style: none; // IE/Edge
-
-    &::-webkit-scrollbar {
-      display: none; // Chrome/Safari/Opera
-    }
-  }
-
-  .q-chip {
-    margin: 0 !important;
-    font-size: 13px;
-    flex-shrink: 0;
-  }
-
-  // Ensure the input field stays visible and accessible
-  input {
-    min-width: 100px !important;
-    flex-shrink: 0 !important;
-  }
-
-  // Ensure dropdown icon is always visible
-  .q-field__append {
-    padding-left: 8px;
-  }
-}
-</style>

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -75,6 +75,10 @@ pub enum Error {
     NatsKJetstreamConsumerStreamError(#[from] NatsError<jetstream::consumer::StreamErrorKind>),
     #[error("Error# {0}")]
     Message(String),
+    #[error("DuplicateName# {0}")]
+    DuplicateName(String),
+    #[error("ReadOnly# {0}")]
+    ReadOnly(String),
     #[error("ErrorCode# {0}")]
     ErrorCode(ErrorCodes),
     #[error("Not implemented")]
@@ -93,9 +97,38 @@ pub enum Error {
     OtherError(#[from] anyhow::Error),
     #[error("Expired Trial Period")]
     TrialPeriodExpired,
+    #[error("QueueError# {0}")]
+    QueueError(#[from] QueueError),
 }
 
 unsafe impl Send for Error {}
+
+#[derive(ThisError, Debug)]
+pub enum QueueError {
+    #[error("queue topic {0} not found, create it first")]
+    TopicNotFound(String),
+    #[error("queue topic {0} already exists with a different configuration")]
+    TopicConfigConflict(String),
+    #[error("queue topic {0} already has an active consumer")]
+    ConsumerAlreadyActive(String),
+    #[error(
+        "queue message too large: requested {requested_bytes} bytes exceeds the total queue capacity {limit_bytes} bytes"
+    )]
+    MessageTooLarge {
+        requested_bytes: u64,
+        limit_bytes: u64,
+    },
+    #[error(
+        "queue full: requested {requested_bytes} bytes, used {used_bytes} of {limit_bytes} bytes"
+    )]
+    QueueFull {
+        requested_bytes: u64,
+        used_bytes: u64,
+        limit_bytes: u64,
+    },
+    #[error("queue is closed")]
+    QueueClosed,
+}
 
 #[derive(ThisError, Debug)]
 #[error("cannot parse \"{value}\" as {ty}")]
@@ -131,6 +164,8 @@ pub enum DbError {
     TemplateError(#[from] TemplateError),
     #[error("PutAlert# {0}")]
     PutAlert(#[from] PutAlertError),
+    #[error("PutAnomalyConfig# {0}")]
+    PutAnomalyConfig(#[from] PutAnomalyConfigError),
 }
 
 #[derive(ThisError, Debug)]
@@ -151,6 +186,12 @@ pub enum PutDashboardError {
     MissingOwner,
     #[error("error putting dashboard with missing inner data for version {0}")]
     MissingInnerData(i32),
+}
+
+#[derive(ThisError, Debug)]
+pub enum PutAnomalyConfigError {
+    #[error("error creating anomaly config with folder that does not exist")]
+    FolderDoesNotExist,
 }
 
 #[derive(ThisError, Debug)]
@@ -199,6 +240,9 @@ pub enum ErrorCodes {
     InvalidParams(String),
     RatelimitExceeded(String),
     SearchHistogramNotAvailable(String),
+    /// The o2-ai replica holding a conversation is unreachable; carries the
+    /// session id. Recoverable — the UI restores it into a fresh session.
+    AiSessionOwnerUnavailable(String),
 }
 
 impl From<sea_orm::DbErr> for Error {
@@ -237,7 +281,40 @@ impl std::fmt::Display for ErrorCodes {
     }
 }
 
+impl Error {
+    /// The HTTP status code this error maps to. This is the single source of
+    /// truth shared by the HTTP response mapping and audit logging.
+    pub fn http_status(&self) -> u16 {
+        match self {
+            Error::ErrorCode(code) => code.http_status(),
+            Error::ResourceError(_) => 503,
+            // A JSON deserialization failure means the client sent a malformed
+            // request body, so surface it as 400 rather than a 500 server error.
+            _ => 400,
+        }
+    }
+}
+
 impl ErrorCodes {
+    /// The HTTP status code this error code maps to.
+    pub fn http_status(&self) -> u16 {
+        match self {
+            ErrorCodes::SearchCancelQuery(_) | ErrorCodes::RatelimitExceeded(_) => 429,
+            ErrorCodes::SearchTimeout(_) => 408,
+            ErrorCodes::AiSessionOwnerUnavailable(_) => 409,
+            ErrorCodes::ServerInternalError(_) | ErrorCodes::SearchParquetFileNotFound => 500,
+            ErrorCodes::InvalidParams(_)
+            | ErrorCodes::SearchSQLExecuteError(_)
+            | ErrorCodes::SearchFieldHasNoCompatibleDataType(_)
+            | ErrorCodes::SearchFunctionNotDefined(_)
+            | ErrorCodes::FullTextSearchFieldNotFound
+            | ErrorCodes::SearchFieldNotFound(_)
+            | ErrorCodes::SearchSQLNotValid(_)
+            | ErrorCodes::SearchStreamNotFound(_)
+            | ErrorCodes::SearchHistogramNotAvailable(_) => 400,
+        }
+    }
+
     pub fn get_code(&self) -> u16 {
         match self {
             ErrorCodes::ServerInternalError(_) => 10001,
@@ -254,6 +331,7 @@ impl ErrorCodes {
             ErrorCodes::InvalidParams(_) => 20011,
             ErrorCodes::RatelimitExceeded(_) => 20012,
             ErrorCodes::SearchHistogramNotAvailable(_) => 20013,
+            ErrorCodes::AiSessionOwnerUnavailable(_) => 30001,
         }
     }
 
@@ -283,6 +361,9 @@ impl ErrorCodes {
             ErrorCodes::SearchHistogramNotAvailable(_) => {
                 "Search histogram not available".to_string()
             }
+            ErrorCodes::AiSessionOwnerUnavailable(_) => {
+                "The replica serving this conversation is unavailable".to_string()
+            }
         }
     }
 
@@ -302,6 +383,7 @@ impl ErrorCodes {
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
+            ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
         }
     }
 
@@ -321,6 +403,7 @@ impl ErrorCodes {
             ErrorCodes::InvalidParams(msg) => msg.to_owned(),
             ErrorCodes::RatelimitExceeded(msg) => msg.to_owned(),
             ErrorCodes::SearchHistogramNotAvailable(msg) => msg.to_owned(),
+            ErrorCodes::AiSessionOwnerUnavailable(session_id) => session_id.to_owned(),
         }
     }
 
@@ -370,6 +453,10 @@ impl ErrorCodes {
             20008 => Ok(ErrorCodes::SearchSQLExecuteError(message)),
             20009 => Ok(ErrorCodes::SearchCancelQuery(message)),
             20010 => Ok(ErrorCodes::SearchTimeout(message)),
+            20011 => Ok(ErrorCodes::InvalidParams(message)),
+            20012 => Ok(ErrorCodes::RatelimitExceeded(message)),
+            20013 => Ok(ErrorCodes::SearchHistogramNotAvailable(message)),
+            30001 => Ok(ErrorCodes::AiSessionOwnerUnavailable(message)),
             _ => Ok(ErrorCodes::ServerInternalError(json.to_string())),
         }
     }
@@ -398,6 +485,222 @@ mod tests {
         assert_eq!(
             "DbError# key /another/shrubbery does not exist",
             &err.to_string()
+        );
+    }
+
+    #[test]
+    fn test_error_codes_get_code() {
+        assert_eq!(
+            ErrorCodes::ServerInternalError("x".into()).get_code(),
+            10001
+        );
+        assert_eq!(ErrorCodes::SearchSQLNotValid("x".into()).get_code(), 20001);
+        assert_eq!(
+            ErrorCodes::SearchStreamNotFound("x".into()).get_code(),
+            20002
+        );
+        assert_eq!(ErrorCodes::FullTextSearchFieldNotFound.get_code(), 20003);
+        assert_eq!(
+            ErrorCodes::SearchFieldNotFound("x".into()).get_code(),
+            20004
+        );
+        assert_eq!(
+            ErrorCodes::SearchFunctionNotDefined("x".into()).get_code(),
+            20005
+        );
+        assert_eq!(ErrorCodes::SearchParquetFileNotFound.get_code(), 20006);
+        assert_eq!(
+            ErrorCodes::SearchFieldHasNoCompatibleDataType("x".into()).get_code(),
+            20007
+        );
+        assert_eq!(
+            ErrorCodes::SearchSQLExecuteError("x".into()).get_code(),
+            20008
+        );
+        assert_eq!(ErrorCodes::SearchCancelQuery("x".into()).get_code(), 20009);
+        assert_eq!(ErrorCodes::SearchTimeout("x".into()).get_code(), 20010);
+        assert_eq!(ErrorCodes::InvalidParams("x".into()).get_code(), 20011);
+        assert_eq!(ErrorCodes::RatelimitExceeded("x".into()).get_code(), 20012);
+        assert_eq!(
+            ErrorCodes::SearchHistogramNotAvailable("x".into()).get_code(),
+            20013
+        );
+    }
+
+    #[test]
+    fn test_error_codes_get_message() {
+        assert_eq!(
+            ErrorCodes::SearchStreamNotFound("nginx".into()).get_message(),
+            "Search stream not found: nginx"
+        );
+        assert_eq!(
+            ErrorCodes::SearchFieldNotFound("level".into()).get_message(),
+            "Search field not found: level"
+        );
+        assert_eq!(
+            ErrorCodes::FullTextSearchFieldNotFound.get_message(),
+            "Full text search field not found"
+        );
+        assert_eq!(
+            ErrorCodes::ServerInternalError("oops".into()).get_message(),
+            "Server Internal Error"
+        );
+    }
+
+    #[test]
+    fn test_error_codes_get_inner_message() {
+        assert_eq!(
+            ErrorCodes::SearchSQLNotValid("bad sql".into()).get_inner_message(),
+            "bad sql"
+        );
+        assert_eq!(
+            ErrorCodes::FullTextSearchFieldNotFound.get_inner_message(),
+            ""
+        );
+        assert_eq!(
+            ErrorCodes::SearchParquetFileNotFound.get_inner_message(),
+            ""
+        );
+        assert_eq!(
+            ErrorCodes::InvalidParams("missing field".into()).get_inner_message(),
+            "missing field"
+        );
+    }
+
+    #[test]
+    fn test_error_codes_get_error_detail() {
+        // variants where detail equals inner message
+        assert_eq!(
+            ErrorCodes::SearchSQLExecuteError("timeout".into()).get_error_detail(),
+            "timeout"
+        );
+        // variants where detail is always empty
+        assert_eq!(
+            ErrorCodes::SearchStreamNotFound("stream".into()).get_error_detail(),
+            ""
+        );
+        assert_eq!(
+            ErrorCodes::FullTextSearchFieldNotFound.get_error_detail(),
+            ""
+        );
+    }
+
+    #[test]
+    fn test_error_codes_to_json_and_from_json_roundtrip() {
+        let variants = vec![
+            ErrorCodes::ServerInternalError("internal msg".into()),
+            ErrorCodes::SearchSQLNotValid("SELECT bad".into()),
+            ErrorCodes::SearchStreamNotFound("my_stream".into()),
+            ErrorCodes::SearchSQLExecuteError("exec err".into()),
+            ErrorCodes::SearchCancelQuery("cancelled".into()),
+            ErrorCodes::SearchTimeout("timed out".into()),
+        ];
+
+        for ec in variants {
+            let json = ec.to_json();
+            let restored = ErrorCodes::from_json(&json).unwrap();
+            assert_eq!(ec.get_code(), restored.get_code());
+            assert_eq!(ec.get_inner_message(), restored.get_inner_message());
+        }
+    }
+
+    #[test]
+    fn test_error_codes_from_json_invalid_input() {
+        // non-JSON → falls back to ServerInternalError
+        let result = ErrorCodes::from_json("not json at all").unwrap();
+        assert!(matches!(result, ErrorCodes::ServerInternalError(_)));
+
+        // unknown code → falls back to ServerInternalError
+        let unknown_json = r#"{"code":99999,"message":"x","inner":"y"}"#;
+        let result = ErrorCodes::from_json(unknown_json).unwrap();
+        assert!(matches!(result, ErrorCodes::ServerInternalError(_)));
+    }
+
+    #[test]
+    fn test_error_codes_display() {
+        let ec = ErrorCodes::InvalidParams("bad input".into());
+        let s = ec.to_string();
+        // Display delegates to to_json(), so it should be valid JSON
+        let parsed: serde_json::Value = serde_json::from_str(&s).unwrap();
+        assert_eq!(parsed["code"], 20011);
+        assert_eq!(parsed["inner"], "bad input");
+    }
+
+    #[test]
+    fn test_error_codes_from_json_round_trips_20011_to_20013() {
+        for (code, expected) in [
+            (
+                20011,
+                ErrorCodes::InvalidParams("invalid_params".to_string()),
+            ),
+            (
+                20012,
+                ErrorCodes::RatelimitExceeded("rate_exceeded".to_string()),
+            ),
+            (
+                20013,
+                ErrorCodes::SearchHistogramNotAvailable("histogram_unavail".to_string()),
+            ),
+        ] {
+            let result = ErrorCodes::from_json(&expected.to_json()).unwrap();
+            assert_eq!(result.get_code(), code);
+            assert_eq!(result.get_inner_message(), expected.get_inner_message());
+        }
+    }
+
+    #[test]
+    fn test_from_get_dashboard_error_wraps_in_db_error() {
+        let e = GetDashboardError::UnsupportedVersion(99);
+        let err = Error::from(e);
+        assert!(err.to_string().contains("DbError#"));
+    }
+
+    #[test]
+    fn test_from_put_dashboard_error_wraps_in_db_error() {
+        let e = PutDashboardError::FolderDoesNotExist;
+        let err = Error::from(e);
+        assert!(err.to_string().contains("DbError#"));
+    }
+
+    #[test]
+    fn test_from_template_error_wraps_in_db_error() {
+        let e = TemplateError::ConvertingId("bad-id".to_string());
+        let err = Error::from(e);
+        assert!(err.to_string().contains("DbError#"));
+    }
+
+    #[test]
+    fn test_from_destination_error_wraps_in_db_error() {
+        let e = DestinationError::AlertDestTemplateNotFound;
+        let err = Error::from(e);
+        assert!(err.to_string().contains("DbError#"));
+    }
+
+    #[test]
+    fn test_error_codes_get_message_all_remaining_variants() {
+        assert_eq!(
+            ErrorCodes::SearchFunctionNotDefined("my_fn".into()).get_message(),
+            "Search function not defined: my_fn"
+        );
+        assert_eq!(
+            ErrorCodes::SearchParquetFileNotFound.get_message(),
+            "Search parquet file not found"
+        );
+        assert_eq!(
+            ErrorCodes::SearchFieldHasNoCompatibleDataType("ts".into()).get_message(),
+            "Search field has no compatible data type: ts"
+        );
+        assert_eq!(
+            ErrorCodes::SearchSQLExecuteError("err".into()).get_message(),
+            "Search SQL execute error"
+        );
+        assert_eq!(
+            ErrorCodes::RatelimitExceeded("too fast".into()).get_message(),
+            "Ratelimit exceeded"
+        );
+        assert_eq!(
+            ErrorCodes::SearchHistogramNotAvailable("msg".into()).get_message(),
+            "Search histogram not available"
         );
     }
 }

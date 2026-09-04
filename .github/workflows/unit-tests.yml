@@ -1,38 +1,120 @@
 name: Unit tests
 
 on:
+  # Kept as the Rust cache writer on main: caches saved from merge-queue refs are never restored by PRs.
   push:
     branches:
       - "main"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
   pull_request:
     branches:
-      - "*"
-    # paths-ignore:
-    #   - "**.md"
-    #   - "**.yml"
-    #   - "**.yaml"
+      - "**"
+    # labeled/unlabeled so adding or removing 'ready-for-ci' starts or resets CI; drafts never run paid CI.
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+  merge_group:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:
   COLUMNS: 150
   ZO_RESULT_CACHE_ENABLED: true
+  # coverage mapping needs no DWARF; dropping debuginfo (test inherits dev) cuts compile and link time
+  CARGO_PROFILE_DEV_DEBUG: "0"
 
 jobs:
-  backend_unit_tests:
+  check_changes:
+    # Paid CI runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests on the merged code.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
+    name: check_changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has_backend_changes: ${{ steps.check.outputs.has_backend_changes }}
+      has_ui_changes: ${{ steps.check.outputs.has_ui_changes }}
+    steps:
+      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      - if: github.event_name == 'pull_request'
+        run: sleep 60
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # One shared classification for every suite (see .github/actions/classify-changes); a change to
+      # this workflow file re-tests itself on top of it.
+      - uses: ./.github/actions/classify-changes
+        id: classify
+      - id: check
+        env:
+          HAS_BACKEND_CHANGES: ${{ steps.classify.outputs.run_unit_backend }}
+          HAS_UI_CHANGES: ${{ steps.classify.outputs.run_unit_ui }}
+          CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
+        run: |
+          if [ "$HAS_BACKEND_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' unit-tests.yml '; then
+            echo "has_backend_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_backend_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ "$HAS_UI_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' unit-tests.yml '; then
+            echo "has_ui_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_ui_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  backend_static_checks:
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_backend_changes == 'true'
     runs-on:
       labels: ubicloud-standard-8
     permissions:
       contents: read
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
-    # Note: Services always start regardless of conditional logic in steps.
-    # GitHub Actions does not support conditional services.
+      - uses: ./.github/actions/github-auth
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+          targets: x86_64-unknown-linux-gnu
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: unit-tests
+          save-if: false
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Simulate building frontend code
+        run: mkdir -p web/dist && touch web/dist/index.html
+
+      - name: Print rustc cfg
+        run: rustc -C target-cpu=native --print cfg
+
+      - name: Check code formatting
+        run: cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: cargo --config net.git-fetch-with-cli=true clippy --workspace --all-targets -- -W clippy::too_many_lines -W clippy::cognitive_complexity -W clippy::excessive_nesting -D warnings
+
+  backend_unit_tests_postgres:
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_backend_changes == 'true'
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions:
+      contents: read
+    env:
+      ZO_INTERNAL_GRPC_TOKEN: fake
+      ZO_TEXT_DATA_TYPE: text
+      ZO_META_STORE: postgres
+      ZO_META_POSTGRES_DSN: postgres://postgres:password@localhost:5432/postgres
     services:
       postgres:
         image: postgres:17.5-alpine3.22
@@ -42,62 +124,40 @@ jobs:
           POSTGRES_DB: postgres
         ports:
           - 5432:5432
-        # Health check that verifies postgres is ready to accept connections
         options: --health-cmd "pg_isready -U postgres" --health-interval 10s --health-timeout 5s --health-retries 10
-
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Check if API code has changes
-        id: check_changes
-        run: |
-          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qE '^src/|^Cargo\.(toml|lock)$'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
-        if: steps.check_changes.outputs.has_changes == 'true'
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-11-11
+          toolchain: nightly-2026-05-20
           targets: x86_64-unknown-linux-gnu
-      - uses: taiki-e/install-action@v2
-        if: steps.check_changes.outputs.has_changes == 'true'
+
+      - uses: taiki-e/install-action@v2.87.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
-          tool: nextest
+          tool: nextest,cargo-llvm-cov
+
       - uses: Swatinem/rust-cache@v2
-        if: steps.check_changes.outputs.has_changes == 'true'
         with:
           cache-on-failure: true
+          shared-key: unit-tests
+          # merge_group so an evicted cache self-heals from the next queue run, not only main pushes
+          save-if: ${{ github.event_name == 'merge_group' || github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
-        if: steps.check_changes.outputs.has_changes == 'true'
-        run: |
-          bash ./.github/protoc.sh
+        run: bash ./.github/protoc.sh
 
       - name: Simulate building frontend code
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: mkdir -p web/dist && touch web/dist/index.html
 
-      - name: Print rustc cfg
-        if: steps.check_changes.outputs.has_changes == 'true'
-        run: rustc -C target-cpu=native --print cfg
-
-      - name: Check code formatting
-        if: steps.check_changes.outputs.has_changes == 'true'
-        run: cargo fmt --all -- --check
-
-      - name: Run clippy
-        if: steps.check_changes.outputs.has_changes == 'true'
-        run: cargo --config net.git-fetch-with-cli=true clippy -- -D warnings
-
       - name: Wait for PostgreSQL to be ready
-        if: steps.check_changes.outputs.has_changes == 'true'
         run: |
           echo "Waiting for PostgreSQL to be fully ready..."
           for i in {1..30}; do
@@ -109,32 +169,92 @@ jobs:
             sleep 2
           done
 
-      - name: Run unit tests
-        if: steps.check_changes.outputs.has_changes == 'true'
+      - name: Run PostgreSQL unit tests
+        run: ./coverage.sh run-cov
+        env:
+          ZO_DATA_DIR: ${{ runner.temp }}/openobserve-postgres/
+
+      - name: Check PostgreSQL coverage
+        run: ./coverage.sh check
+
+  backend_unit_tests_sqlite:
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_backend_changes == 'true'
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions:
+      contents: read
+    env:
+      ZO_INTERNAL_GRPC_TOKEN: fake
+      ZO_TEXT_DATA_TYPE: text
+      ZO_META_STORE: sqlite
+      ZO_META_POSTGRES_DSN: ""
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/actions/github-auth
+      - name: Setup Rust Toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly-2026-05-20
+          targets: x86_64-unknown-linux-gnu
+
+      - uses: taiki-e/install-action@v2.87.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          tool: nextest,cargo-llvm-cov
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+          shared-key: unit-tests
+          save-if: false
+
+      - name: Install Protoc
+        run: bash ./.github/protoc.sh
+
+      - name: Simulate building frontend code
+        run: mkdir -p web/dist && touch web/dist/index.html
+
+      - name: Run SQLite unit tests
+        run: ./coverage.sh run-cov
+        env:
+          ZO_DATA_DIR: ${{ runner.temp }}/openobserve-sqlite/
+
+      - name: Check SQLite coverage
+        run: ./coverage.sh check
+
+  backend_unit_tests:
+    name: backend_unit_tests
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs:
+      - check_changes
+      - backend_static_checks
+      - backend_unit_tests_postgres
+      - backend_unit_tests_sqlite
+    if: always() && needs.check_changes.outputs.has_backend_changes == 'true'
+    steps:
+      - name: Check backend test results
         run: |
-          # required for all dbs
-          export ZO_INTERNAL_GRPC_TOKEN=fake
-          export ZO_TEXT_DATA_TYPE=text
-
-          # setup and run with postgres
-          echo "Running with postgres"
-          export ZO_META_STORE=postgres
-          export ZO_META_POSTGRES_DSN=postgres://postgres:password@localhost:5432/postgres
-          ./coverage.sh run-cov
-
-          # cleanup
-          rm -rf data ./json ./src/infra/data
-
-          # Run with sqlite
-          echo "Running with sqlite"
-          export ZO_META_STORE=sqlite
-          export ZO_META_POSTGRES_DSN=""
-          ./coverage.sh run-cov
-
-          # finally check the coverage data
-          ./coverage.sh check
+          for result in \
+            "${{ needs.backend_static_checks.result }}" \
+            "${{ needs.backend_unit_tests_postgres.result }}" \
+            "${{ needs.backend_unit_tests_sqlite.result }}"; do
+            if [ "$result" != "success" ]; then
+              echo "A backend check failed or was skipped: $result"
+              exit 1
+            fi
+          done
+          echo "All backend checks completed successfully"
 
   ui_unit_tests:
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_ui_changes == 'true'
     runs-on:
       labels: ubicloud-standard-8
     permissions:
@@ -146,41 +266,70 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check if frontend code has changes
-        id: check_changes
-        run: |
-          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -q "^web/"; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
-
+      - uses: ./.github/actions/github-auth
       - name: Setup Node.js
-        if: steps.check_changes.outputs.has_changes == 'true'
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
-          node-version: '22'
+          node-version: 24
           cache: 'npm'
           cache-dependency-path: web/package-lock.json
 
       - name: Install dependencies
-        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: web
         run: npm ci
 
       - name: Run frontend unit tests with coverage and check thresholds
-        if: steps.check_changes.outputs.has_changes == 'true'
         working-directory: web
         run: ./coverage.sh check
+
+  ui_code_quality:
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_ui_changes == 'true'
+    runs-on:
+      labels: ubicloud-standard-8
+    permissions:
+      contents: read
+
+    steps:
+      - name: Clone the current repo
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Prettier format check (any unformatted file fails)
+        working-directory: web
+        run: npm run format:check
+
+      - name: Type-check (any error fails)
+        working-directory: web
+        env:
+          # vue-tsc peaks around 3GB on this project; the runner's default heap
+          # ceiling is ~4GB, which OOMs (exit 134) instead of reporting errors.
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: npm run type-check:app
 
   unit_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [backend_unit_tests, ui_unit_tests]
-    if: always()
+    needs: [check_changes, backend_unit_tests, ui_unit_tests, ui_code_quality]
+    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
         run: |
+          if [ "${{ needs.check_changes.result }}" != "success" ]; then
+            echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
+            exit 1
+          fi
+
           if [ "${{ needs.backend_unit_tests.result }}" == "success" ] || [ "${{ needs.backend_unit_tests.result }}" == "skipped" ]; then
             echo "Backend tests passed or skipped"
           else
@@ -192,6 +341,13 @@ jobs:
             echo "UI tests passed or skipped"
           else
             echo "UI tests failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.ui_code_quality.result }}" == "success" ] || [ "${{ needs.ui_code_quality.result }}" == "skipped" ]; then
+            echo "UI code quality passed or skipped"
+          else
+            echo "UI code quality failed"
             exit 1
           fi
 

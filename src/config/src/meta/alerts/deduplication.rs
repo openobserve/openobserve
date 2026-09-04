@@ -13,13 +13,35 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use utoipa::ToSchema;
 
-// SemanticFieldGroup has been moved to config::meta::correlation::SemanticFieldGroup
-// Import it for use within this module only (for GlobalDeduplicationConfig)
-use crate::meta::correlation::SemanticFieldGroup;
 use crate::stats::MemorySize;
+
+/// Deserializes an optional i32, accepting null, integer, or empty string (as None).
+fn deserialize_optional_i32<'de, D>(deserializer: D) -> Result<Option<i32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let value = serde_json::Value::deserialize(deserializer)?;
+    match value {
+        serde_json::Value::Null => Ok(None),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(Some(i as i32))
+            } else if let Some(f) = n.as_f64() {
+                Ok(Some(f.round() as i32))
+            } else {
+                Err(serde::de::Error::custom("invalid number for i32"))
+            }
+        }
+        serde_json::Value::String(s) if s.is_empty() => Ok(None),
+        serde_json::Value::String(s) => s.parse::<i32>().map(Some).map_err(|_| {
+            serde::de::Error::custom(format!("invalid value for time_window_minutes: '{s}'"))
+        }),
+        _ => Err(serde::de::Error::custom("expected null, number, or string")),
+    }
+}
 
 /// Organization-level deduplication configuration (Global settings)
 ///
@@ -36,17 +58,6 @@ pub struct GlobalDeduplicationConfig {
     /// Enable/disable deduplication globally for this organization
     #[serde(default)]
     pub enabled: bool,
-
-    /// Semantic field groups - defines field name equivalences
-    ///
-    /// Defines how field names from different data sources map to canonical dimensions.
-    /// Example: `["host", "hostname", "server"]` all map to semantic group ID "host".
-    ///
-    /// These groups are used for:
-    /// 1. Mapping per-alert fingerprint_fields to semantic dimensions
-    /// 2. Cross-alert deduplication (if enabled)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub semantic_field_groups: Vec<SemanticFieldGroup>,
 
     /// Enable cross-alert deduplication based on shared semantic dimensions
     ///
@@ -65,7 +76,7 @@ pub struct GlobalDeduplicationConfig {
     ///
     /// When cross_alert_dedup is enabled, these semantic group IDs are used
     /// to generate fingerprints across all alerts (instead of per-alert fingerprint_fields).
-    /// Must reference IDs from semantic_field_groups.
+    /// Must reference IDs from semantic field groups (stored in system_settings).
     ///
     /// Example: ["host", "service"] means fingerprint = hash(host_value + service_value)
     /// Required when cross_alert_dedup is true.
@@ -77,24 +88,12 @@ pub struct GlobalDeduplicationConfig {
     /// Alerts with the same fingerprint within this window are suppressed.
     /// If None, defaults to 2x the alert evaluation frequency.
     /// Can be overridden per-alert.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub time_window_minutes: Option<i64>,
-
-    /// FQN (Fully Qualified Name) priority dimensions for service correlation
-    ///
-    /// Defines which semantic dimensions are used to derive the service-fqn,
-    /// in priority order. The first dimension with a value wins.
-    ///
-    /// Default priority (if empty):
-    /// 1. k8s-deployment, k8s-statefulset, k8s-daemonset, k8s-job (K8s workloads)
-    /// 2. aws-ecs-task, faas-name, gcp-cloud-run, azure-cloud-role (Cloud workloads)
-    /// 3. process-name (Bare metal)
-    /// 4. service (Fallback)
-    ///
-    /// Example custom priority: ["k8s-deployment", "aws-ecs-task", "service"]
-    /// This would skip statefulset/daemonset and use deployment directly.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub fqn_priority_dimensions: Vec<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_i32"
+    )]
+    pub time_window_minutes: Option<i32>,
 
     /// Time window for hierarchical incident upgrade (minutes)
     /// Incidents created within this window can be upgraded from weak to strong correlation keys.
@@ -128,8 +127,12 @@ pub struct DeduplicationConfig {
 
     /// Time window in minutes for deduplication
     /// If None, defaults to 2x alert frequency
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub time_window_minutes: Option<i64>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "deserialize_optional_i32"
+    )]
+    pub time_window_minutes: Option<i32>,
 
     /// Optional alert grouping configuration
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -223,21 +226,6 @@ impl GlobalDeduplicationConfig {
             return Ok(());
         }
 
-        // Validate cross-alert fingerprint groups reference existing semantic groups
-        if self.alert_dedup_enabled && !self.alert_fingerprint_groups.is_empty() {
-            let semantic_group_ids: std::collections::HashSet<_> =
-                self.semantic_field_groups.iter().map(|g| &g.id).collect();
-
-            for group_id in &self.alert_fingerprint_groups {
-                if !semantic_group_ids.contains(group_id) {
-                    return Err(format!(
-                        "Cross-alert fingerprint group '{}' not found in semantic_field_groups",
-                        group_id
-                    ));
-                }
-            }
-        }
-
         // Require at least one fingerprint group when cross-alert dedup is enabled
         if self.alert_dedup_enabled && self.alert_fingerprint_groups.is_empty() {
             return Err(
@@ -246,151 +234,17 @@ impl GlobalDeduplicationConfig {
             );
         }
 
-        // Validate semantic groups
-        if self.semantic_field_groups.len() > 50 {
-            return Err("Maximum 50 semantic groups allowed per organization".to_string());
-        }
-
-        let mut seen_ids = std::collections::HashSet::new();
-        let mut field_name_to_group: std::collections::HashMap<&String, &String> =
-            std::collections::HashMap::new();
-
-        for group in &self.semantic_field_groups {
-            // Validate ID format
-            if !SemanticFieldGroup::validate_id(&group.id) {
-                return Err(format!(
-                    "Invalid semantic group ID '{}': must be lowercase, alphanumeric, dash-separated",
-                    group.id
-                ));
-            }
-
-            // Validate ID uniqueness
-            if !seen_ids.insert(&group.id) {
-                return Err(format!("Duplicate semantic group ID: {}", group.id));
-            }
-
-            // Validate display name
-            if group.display.is_empty() {
-                return Err(format!(
-                    "Display name required for semantic group '{}'",
-                    group.id
-                ));
-            }
-
-            // Validate field names
-            if group.fields.is_empty() {
-                return Err(format!(
-                    "Semantic group '{}' must have at least one field name",
-                    group.id
-                ));
-            }
-
-            if group.fields.len() > 20 {
-                return Err(format!(
-                    "Semantic group '{}' has too many field names (max 20)",
-                    group.id
-                ));
-            }
-
-            // Track field name overlaps (warn but allow)
-            // Precedence: first-defined group wins when extracting dimensions
-            for field_name in &group.fields {
-                if let Some(existing_group_id) = field_name_to_group.get(field_name) {
-                    log::warn!(
-                        "[deduplication] Field name '{field_name}' appears in multiple semantic groups: '{existing_group_id}' and '{}'. Using first occurrence (group '{existing_group_id}').",
-                        group.id
-                    );
-                } else {
-                    field_name_to_group.insert(field_name, &group.id);
-                }
-            }
-        }
-
         Ok(())
     }
 
     pub fn default_with_presets() -> Self {
         Self {
             enabled: false,
-            semantic_field_groups: SemanticFieldGroup::load_defaults_from_file(),
             alert_dedup_enabled: false,
             alert_fingerprint_groups: vec![],
             time_window_minutes: None,
-            fqn_priority_dimensions: Self::default_fqn_priority(),
             upgrade_window_minutes: default_upgrade_window(),
         }
-    }
-
-    /// Get default FQN priority dimensions
-    ///
-    /// For OSS builds, returns empty (must be configured).
-    /// For enterprise builds, ServiceStreamsConfig provides the full default list.
-    ///
-    /// Default priority order for deriving service-fqn (first match wins):
-    /// 1. K8s workload: deployment, statefulset, daemonset, job
-    /// 2. Cloud workload: ECS task family, Lambda function, Cloud Run service
-    /// 3. Bare metal: process name
-    /// 4. Fallback: service dimension
-    pub fn default_fqn_priority() -> Vec<String> {
-        // OSS builds return empty - enterprise provides defaults via ServiceStreamsConfig
-        vec![]
-    }
-
-    /// Map a field name to its semantic group ID
-    ///
-    /// Returns the first matching semantic group ID, or None if no match.
-    /// Used for reverse lookup: actual field name → semantic dimension.
-    pub fn get_semantic_group_id(&self, field_name: &str) -> Option<&str> {
-        for group in &self.semantic_field_groups {
-            if group.fields.iter().any(|f| f == field_name) {
-                return Some(&group.id);
-            }
-        }
-        None
-    }
-
-    /// Extract semantic dimensions from a result row
-    ///
-    /// Maps actual field names to semantic group IDs and extracts their values.
-    /// Returns a map of semantic_group_id → value.
-    ///
-    /// Example:
-    /// - Input fields: ["hostname", "service_name"]
-    /// - Input row: {"hostname": "srv01", "service_name": "api", "other": "data"}
-    /// - Output: {"host": "srv01", "service": "api"}
-    pub fn extract_semantic_dimensions(
-        &self,
-        field_names: &[String],
-        result_row: &std::collections::HashMap<String, String>,
-    ) -> std::collections::HashMap<String, String> {
-        let mut dimensions = std::collections::HashMap::new();
-
-        for field_name in field_names {
-            if let Some(semantic_id) = self.get_semantic_group_id(field_name) {
-                if let Some(value) = result_row.get(field_name) {
-                    // Find the semantic group to check if normalization is needed
-                    if let Some(group) = self
-                        .semantic_field_groups
-                        .iter()
-                        .find(|g| g.id == semantic_id)
-                    {
-                        let normalized_value = if group.normalize {
-                            value.to_lowercase().trim().to_string()
-                        } else {
-                            value.clone()
-                        };
-                        dimensions.insert(semantic_id.to_string(), normalized_value);
-                    }
-                }
-            } else {
-                // Field not in semantic groups - use as-is
-                if let Some(value) = result_row.get(field_name) {
-                    dimensions.insert(field_name.clone(), value.clone());
-                }
-            }
-        }
-
-        dimensions
     }
 }
 
@@ -429,23 +283,25 @@ impl DeduplicationConfig {
     }
 }
 
+/// Whether an existing dedup reservation should suppress this notification
+/// (`alerts_2.md` §5.5 MN-6).
+///
+/// Deduplication currently records a fingerprint as *seen* the moment a row
+/// passes — before the notification is sent — so a send that then fails is
+/// suppressed as a duplicate on the retry, and the page is lost for the whole
+/// dedup window. The `notification_sent` column already exists for exactly
+/// this and has never been read.
+///
+/// The rule: a reservation suppresses only once it has been **confirmed** by a
+/// successful delivery. An unconfirmed reservation inside the window is a
+/// delivery that never landed, so the next evaluation must be allowed through.
+pub fn reservation_suppresses(notification_sent: bool, within_window: bool) -> bool {
+    within_window && notification_sent
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn test_semantic_field_group_id_validation() {
-        assert!(SemanticFieldGroup::validate_id("host"));
-        assert!(SemanticFieldGroup::validate_id("k8s-cluster"));
-        assert!(SemanticFieldGroup::validate_id("service-123"));
-
-        assert!(!SemanticFieldGroup::validate_id(""));
-        assert!(!SemanticFieldGroup::validate_id("Host"));
-        assert!(!SemanticFieldGroup::validate_id("k8s_cluster"));
-        assert!(!SemanticFieldGroup::validate_id("-host"));
-        assert!(!SemanticFieldGroup::validate_id("host-"));
-        assert!(!SemanticFieldGroup::validate_id("host--name"));
-    }
 
     #[test]
     fn test_per_alert_deduplication_config_default() {
@@ -461,48 +317,20 @@ mod tests {
         let config = GlobalDeduplicationConfig::default();
         assert!(!config.enabled);
         assert!(!config.alert_dedup_enabled);
-        assert!(config.semantic_field_groups.is_empty());
         assert_eq!(config.time_window_minutes, None);
     }
 
     #[test]
     fn test_organization_deduplication_config_validation() {
-        let mut config = GlobalDeduplicationConfig {
+        let config = GlobalDeduplicationConfig {
             enabled: true,
             alert_dedup_enabled: false,
-            semantic_field_groups: vec![
-                SemanticFieldGroup::new("service", "Service", &["service", "service_name"], true),
-                SemanticFieldGroup::new("host", "Host", &["host", "hostname"], true),
-            ],
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
-            fqn_priority_dimensions: vec![],
-            upgrade_window_minutes: default_upgrade_window(),
+            ..Default::default()
         };
 
         assert!(config.validate().is_ok());
-
-        // Test invalid ID
-        config.semantic_field_groups[0].id = "Invalid_ID".to_string();
-        assert!(config.validate().is_err());
-        config.semantic_field_groups[0].id = "service".to_string();
-
-        // Test duplicate ID
-        config.semantic_field_groups.push(SemanticFieldGroup::new(
-            "service",
-            "Service 2",
-            &["svc"],
-            true,
-        ));
-        assert!(config.validate().is_err());
-        config.semantic_field_groups.pop();
-
-        // Test overlapping field names - allowed with warning
-        config.semantic_field_groups[1]
-            .fields
-            .push("service".to_string());
-        assert!(config.validate().is_ok()); // Should succeed, just warns
-        config.semantic_field_groups[1].fields.pop();
     }
 
     #[test]
@@ -527,49 +355,13 @@ mod tests {
     }
 
     #[test]
-    fn test_organization_config_overlapping_field_names() {
-        // Test that overlapping field names are allowed (with warning)
-        // Precedence: first-defined group wins
-        let config = GlobalDeduplicationConfig {
-            enabled: true,
-            alert_dedup_enabled: false,
-            semantic_field_groups: vec![
-                SemanticFieldGroup::new(
-                    "service-primary",
-                    "Primary Service",
-                    &["service", "primary_service"],
-                    true,
-                ),
-                SemanticFieldGroup::new(
-                    "service-backup",
-                    "Backup Service",
-                    &["service", "backup_service"],
-                    true,
-                ), // "service" overlaps
-            ],
-            alert_fingerprint_groups: vec![],
-            time_window_minutes: Some(10),
-            fqn_priority_dimensions: vec![],
-            upgrade_window_minutes: default_upgrade_window(),
-        };
-
-        // Should succeed - overlaps are allowed, just logged as warnings
-        assert!(config.validate().is_ok());
-    }
-
-    #[test]
     fn test_organization_deduplication_config_serialization() {
         let config = GlobalDeduplicationConfig {
             enabled: true,
             alert_dedup_enabled: true,
-            semantic_field_groups: vec![
-                SemanticFieldGroup::new("service", "Service", &["service", "service_name"], true),
-                SemanticFieldGroup::new("host", "Host", &["host", "hostname"], true),
-            ],
             alert_fingerprint_groups: vec![],
             time_window_minutes: Some(10),
-            fqn_priority_dimensions: vec![],
-            upgrade_window_minutes: default_upgrade_window(),
+            ..Default::default()
         };
 
         let json = serde_json::to_string_pretty(&config).unwrap();
@@ -622,7 +414,7 @@ mod tests {
 
         let json = serde_json::to_value(&config).unwrap();
         assert_eq!(json["enabled"], true);
-        // semantic_field_groups should be omitted when empty
+        // semantic_field_groups no longer part of dedup config
         assert!(json.get("semantic_field_groups").is_none());
         // time_window_minutes should be omitted when None
         assert!(json.get("time_window_minutes").is_none());
@@ -634,10 +426,305 @@ mod tests {
     }
 
     #[test]
-    fn test_default_presets() {
-        // OSS builds return empty defaults - semantic groups are loaded from
-        // enterprise JSON or configured via API
-        let presets = SemanticFieldGroup::default_presets();
-        assert!(presets.is_empty());
+    fn test_send_strategy_from_str() {
+        use std::str::FromStr;
+        assert_eq!(
+            SendStrategy::from_str("first_with_count").unwrap(),
+            SendStrategy::FirstWithCount
+        );
+        assert_eq!(
+            SendStrategy::from_str("summary").unwrap(),
+            SendStrategy::Summary
+        );
+        assert_eq!(SendStrategy::from_str("all").unwrap(), SendStrategy::All);
+        // unknown → default (FirstWithCount)
+        assert_eq!(
+            SendStrategy::from_str("UNKNOWN").unwrap(),
+            SendStrategy::default()
+        );
+        assert_eq!(SendStrategy::from_str("").unwrap(), SendStrategy::default());
+    }
+
+    #[test]
+    fn test_global_dedup_config_validate_disabled_ok() {
+        let config = GlobalDeduplicationConfig {
+            enabled: false,
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_global_dedup_config_validate_cross_alert_no_groups_err() {
+        let config = GlobalDeduplicationConfig {
+            enabled: true,
+            alert_dedup_enabled: true,
+            alert_fingerprint_groups: vec![],
+            ..Default::default()
+        };
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .contains("cross_alert_fingerprint_groups")
+        );
+    }
+
+    #[test]
+    fn test_global_dedup_config_validate_cross_alert_with_groups_ok() {
+        let config = GlobalDeduplicationConfig {
+            enabled: true,
+            alert_dedup_enabled: true,
+            alert_fingerprint_groups: vec!["field1".to_string()],
+            ..Default::default()
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_global_dedup_config_default_with_presets() {
+        let config = GlobalDeduplicationConfig::default_with_presets();
+        assert!(!config.enabled);
+        assert!(!config.alert_dedup_enabled);
+        assert!(config.alert_fingerprint_groups.is_empty());
+        assert!(config.time_window_minutes.is_none());
+    }
+
+    #[test]
+    fn test_per_alert_dedup_config_validate_disabled_ok() {
+        let config = DeduplicationConfig {
+            enabled: false,
+            fingerprint_fields: vec!["field1".to_string(); 15], // > 10 but disabled
+            ..Default::default()
+        };
+        // disabled → skip all validation
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_per_alert_dedup_config_validate_grouping_zero_size_err() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec![],
+            time_window_minutes: None,
+            grouping: Some(GroupingConfig {
+                enabled: true,
+                max_group_size: 0,
+                send_strategy: SendStrategy::All,
+                group_wait_seconds: 10,
+            }),
+        };
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Max group size"));
+    }
+
+    #[test]
+    fn test_per_alert_dedup_config_validate_grouping_negative_wait_err() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec![],
+            time_window_minutes: None,
+            grouping: Some(GroupingConfig {
+                enabled: true,
+                max_group_size: 5,
+                send_strategy: SendStrategy::Summary,
+                group_wait_seconds: -1,
+            }),
+        };
+        let result = config.validate();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Group wait seconds"));
+    }
+
+    #[test]
+    fn test_per_alert_dedup_config_validate_grouping_disabled_skip() {
+        // grouping present but enabled=false → skip grouping validation
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec![],
+            time_window_minutes: None,
+            grouping: Some(GroupingConfig {
+                enabled: false,
+                max_group_size: 0, // would fail if checked
+                send_strategy: SendStrategy::All,
+                group_wait_seconds: -1, // would fail if checked
+            }),
+        };
+        assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_deduplication_config_mem_size() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec!["host".to_string(), "service".to_string()],
+            time_window_minutes: Some(5),
+            grouping: None,
+        };
+        let size = config.mem_size();
+        assert!(size >= std::mem::size_of::<DeduplicationConfig>());
+    }
+
+    #[test]
+    fn test_grouping_config_mem_size() {
+        let config = GroupingConfig::default();
+        let size = config.mem_size();
+        assert_eq!(size, std::mem::size_of::<GroupingConfig>());
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_string_number() {
+        // time_window_minutes as a JSON string containing a number
+        let json = r#"{"enabled":false,"time_window_minutes":"15"}"#;
+        let config: GlobalDeduplicationConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.time_window_minutes, Some(15));
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_empty_string_returns_none() {
+        // Empty string → None
+        let json = r#"{"enabled":false,"time_window_minutes":""}"#;
+        let config: GlobalDeduplicationConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.time_window_minutes, None);
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_null_returns_none() {
+        // null → None
+        let json = r#"{"enabled":false,"time_window_minutes":null}"#;
+        let config: GlobalDeduplicationConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(config.time_window_minutes, None);
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_invalid_string_returns_error() {
+        // Invalid string → error
+        let json = r#"{"enabled":false,"time_window_minutes":"not_a_number"}"#;
+        let result: Result<GlobalDeduplicationConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_deserialize_optional_i32_boolean_returns_error() {
+        // Boolean type → error (hits the `_ => Err` branch)
+        let json = r#"{"enabled":false,"time_window_minutes":true}"#;
+        let result: Result<GlobalDeduplicationConfig, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_deduplication_config_empty_fields_absent_from_json() {
+        let config = DeduplicationConfig::default();
+        let json = serde_json::to_value(&config).unwrap();
+        let obj = json.as_object().unwrap();
+        // Vec::is_empty → absent
+        assert!(!obj.contains_key("fingerprint_fields"));
+        // Option::is_none → absent
+        assert!(!obj.contains_key("time_window_minutes"));
+        assert!(!obj.contains_key("grouping"));
+    }
+
+    #[test]
+    fn test_deduplication_config_set_fields_present_in_json() {
+        let config = DeduplicationConfig {
+            enabled: true,
+            fingerprint_fields: vec!["host".to_string()],
+            time_window_minutes: Some(30),
+            grouping: Some(GroupingConfig {
+                enabled: true,
+                max_group_size: 10,
+                send_strategy: SendStrategy::Summary,
+                group_wait_seconds: 30,
+            }),
+        };
+        let json = serde_json::to_value(&config).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("fingerprint_fields"));
+        assert!(obj.contains_key("time_window_minutes"));
+        assert!(obj.contains_key("grouping"));
+    }
+
+    #[test]
+    fn test_global_dedup_config_empty_fields_absent_from_json() {
+        let config = GlobalDeduplicationConfig::default();
+        let json = serde_json::to_value(&config).unwrap();
+        let obj = json.as_object().unwrap();
+        // Vec::is_empty → absent
+        assert!(!obj.contains_key("alert_fingerprint_groups"));
+        // Option::is_none → absent
+        assert!(!obj.contains_key("time_window_minutes"));
+    }
+
+    #[test]
+    fn test_global_dedup_config_set_fields_present_in_json() {
+        let config = GlobalDeduplicationConfig {
+            enabled: true,
+            alert_dedup_enabled: false,
+            alert_fingerprint_groups: vec!["host".to_string()],
+            time_window_minutes: Some(60),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&config).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("alert_fingerprint_groups"));
+        assert!(obj.contains_key("time_window_minutes"));
+    }
+
+    #[test]
+    fn test_default_upgrade_window() {
+        assert_eq!(default_upgrade_window(), 30);
+    }
+
+    #[test]
+    fn test_default_max_group_size() {
+        assert_eq!(default_max_group_size(), 100);
+    }
+
+    #[test]
+    fn test_default_group_wait() {
+        assert_eq!(default_group_wait(), 30);
+    }
+
+    // ── §5.5 MN-6: reserve, then confirm on successful delivery ─────────────
+
+    #[test]
+    fn test_an_unconfirmed_reservation_does_not_suppress() {
+        // THE bug this rule exists for. The previous evaluation reserved the
+        // fingerprint and its send then failed, so nothing was delivered.
+        // Suppressing here would convert one transient webhook error into a
+        // page silently lost for the whole dedup window.
+        assert!(!reservation_suppresses(false, true));
+    }
+
+    #[test]
+    fn test_a_confirmed_reservation_inside_the_window_suppresses() {
+        // The ordinary case dedup exists for: it really was delivered.
+        assert!(reservation_suppresses(true, true));
+    }
+
+    #[test]
+    fn test_an_expired_reservation_never_suppresses() {
+        // Outside the window nothing suppresses, confirmed or not — otherwise
+        // a delivered alert could never fire again.
+        assert!(!reservation_suppresses(true, false));
+        assert!(!reservation_suppresses(false, false));
+    }
+
+    #[test]
+    fn test_confirmation_is_required_not_merely_preferred() {
+        // Stated as the invariant rather than a case list: within the window,
+        // suppression must track confirmation exactly. An implementation that
+        // ignored `notification_sent` (today's behaviour) fails this.
+        for within in [true, false] {
+            for sent in [true, false] {
+                assert_eq!(
+                    reservation_suppresses(sent, within),
+                    within && sent,
+                    "within_window={within}, notification_sent={sent}"
+                );
+            }
+        }
     }
 }

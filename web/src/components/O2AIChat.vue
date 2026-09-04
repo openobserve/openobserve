@@ -1,203 +1,200 @@
-<template>
-  <div class="chat-container" :class="[{ 'chat-open': isOpen }, store.state.theme == 'dark' ? 'dark-mode' : 'light-mode']" 
+﻿<template>
+  <div
+    class="chat-container rounded-surface text-text-body bg-card-glass-solid shadow-hover-shadow flex h-full w-full flex-col overflow-hidden shadow-md"
+    :class="[{ 'chat-open': isOpen }]"
   >
-    <div v-if="isOpen" class="chat-content-wrapper" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
-      <div class="chat-header" :style="{ height:  headerHeight ? headerHeight + 'px' : '' }">
-        <div class="chat-title tw:flex tw:justify-between tw:items-center tw:w-full">
+    <div v-if="isOpen" class="chat-content-wrapper flex h-full flex-col bg-transparent">
+      <div
+        class="chat-header border-separator bg-surface-base z-2 flex shrink-0 items-end justify-between border-b px-3 pt-0 pb-1"
+        :style="{ height: headerHeight ? headerHeight + 'px' : '' }"
+      >
+        <div class="chat-title flex w-full items-center justify-between font-bold">
+          <div class="flex items-center gap-2">
+            <div class="inline-flex h-6 w-6 overflow-hidden rounded-full">
+              <img :src="o2AiTitleLogo" class="h-full w-full object-cover" />
+            </div>
 
-          <div class="tw:flex tw:items-center tw:gap-2">
-            <q-avatar size="24px">
-              <img :src="o2AiTitleLogo" />
-            </q-avatar>
-
-            <q-btn
-              flat
-              dense
-              no-caps
-              class="chat-title-dropdown"
-              @click="loadHistory"
-            >
-              <div class="tw:flex tw:items-center tw:gap-2 tw:max-w-[220px]">
-                <span class="chat-title-text tw:text-[14px] tw:font-medium tw:truncate tw:block">
-                  {{ displayedTitle || 'New Chat' }}
-                  <q-tooltip
-                    v-if="displayedTitle && displayedTitle.length > 25"
-                    :delay="500"
-                    anchor="bottom middle"
-                    self="top middle"
-                    :offset="[0, 8]"
-                  >
-                    {{ displayedTitle }}
-                  </q-tooltip>
-                </span>
-                <q-icon name="arrow_drop_down" size="20px" class="tw:flex-shrink-0" />
-              </div>
-              <q-menu>
-                <!-- History menu with search -->
-                <div class="history-menu-container">
-                  <div class="search-history-bar-sticky">
-                    <q-input
-                      v-model="historySearchTerm"
-                      placeholder="Search chat history"
-                      dense
-                      borderless
-                      class="tw:mt-1"
+            <ODropdown @update:open="(v) => v && loadHistory()">
+              <template #trigger>
+                <OButton
+                  variant="ghost"
+                  size="sm"
+                  class="chat-title-dropdown rounded-default hover:bg-interactive-hover-bg flex h-8 min-h-8 max-w-52.5 items-center overflow-hidden px-3 py-1.5 transition-colors duration-200"
+                >
+                  <div class="flex max-w-55 items-center gap-2">
+                    <span
+                      class="chat-title-text text-text-body block max-w-45 truncate text-sm font-medium"
                     >
-                      <template #prepend>
-                        <q-icon name="search" />
-                      </template>
-                    </q-input>
+                      {{ displayedTitle || t("common.newChat") }}
+                      <OTooltip
+                        v-if="displayedTitle && displayedTitle.length > 25"
+                        :sideOffset="8"
+                        side="bottom"
+                        align="center"
+                        :content="raw(displayedTitle)"
+                      />
+                    </span>
+                    <OIcon name="arrow-drop-down" size="md" class="flex-shrink-0" />
                   </div>
-                  <div class="history-list-container">
-                    <q-list style="min-width: 200px; width: 300px; max-width: 300px; border: 1px solid var(--q-separator-color);" padding>
-                      <q-item
-                        v-for="chat in filteredChatHistory"
-                        :key="chat.id"
-                        clickable
-                        v-ripple
-                        v-close-popup
-                        @click="loadChat(chat.id)"
-                        dense
-                        class="history-item"
+                </OButton>
+              </template>
+              <div class="history-menu-container relative flex max-h-112.5 w-75 flex-col">
+                <OSearchInput
+                  v-model="historySearchTerm"
+                  :placeholder="t('aiAssistant.searchChatHistory')"
+                  class="sticky top-0 z-2 shrink-0 p-2"
+                />
+                <div
+                  class="history-list-container max-h-87.5 flex-1 overflow-x-hidden overflow-y-auto"
+                >
+                  <ODropdownItem
+                    v-for="chat in filteredChatHistory"
+                    :key="chat.id"
+                    class="history-item group relative"
+                    @select="loadChat(chat.id)"
+                  >
+                    <div class="flex w-full items-center justify-between">
+                      <div class="flex-1 overflow-hidden">
+                        <div class="text-compact truncate">
+                          {{ chat.title }}
+                        </div>
+                        <div class="text-2xs text-text-secondary">
+                          {{ formatTime(chat.timestamp) }}
+                        </div>
+                      </div>
+                      <OButton
+                        variant="ghost"
+                        size="icon-xs-circle"
+                        class="delete-history-btn opacity-0 transition-opacity duration-200 group-hover:opacity-100"
+                        @click.stop="deleteChat(chat.id)"
                       >
-                        <q-item-section>
-                          <div class="tw:flex tw:items-center tw:justify-between tw:w-full">
-                            <div class="tw:flex-1 tw:overflow-hidden">
-                              <div class="tw:text-[13px] tw:truncate">{{ chat.title }}</div>
-                              <div class="tw:text-[11px] tw:text-gray-500">{{ formatTime(chat.timestamp) }}</div>
-                            </div>
-                            <q-btn
-                              flat
-                              round
-                              dense
-                              size="xs"
-                              icon="delete"
-                              class="delete-history-btn"
-                              @click.stop="deleteChat(chat.id)"
-                            >
-                              <q-tooltip :delay="500">Delete chat</q-tooltip>
-                            </q-btn>
-                          </div>
-                        </q-item-section>
-                      </q-item>
-                      <q-item v-if="filteredChatHistory.length === 0">
-                        <q-item-section class="text-center text-grey">
-                          No matching chats found
-                        </q-item-section>
-                      </q-item>
-                    </q-list>
-                  </div>
-
-                  <!-- Clear all conversations button -->
-                  <div v-if="filteredChatHistory.length > 0" class="clear-all-container">
-                    <q-separator />
-                    <q-btn
-                      flat
-                      no-caps
-                      class="clear-all-btn"
-                      icon="delete_sweep"
-                      label="Clear all conversations"
-                      @click.stop="clearAllConversations"
-                    />
+                        <OIcon name="delete" size="sm" />
+                        <OTooltip :content="t('aiAssistant.deleteChatTooltip')" />
+                      </OButton>
+                    </div>
+                  </ODropdownItem>
+                  <div
+                    v-if="filteredChatHistory.length === 0"
+                    class="text-text-muted p-2 text-center"
+                  >
+                    {{ t("aiAssistant.noMatchingChatsFound") }}
                   </div>
                 </div>
-              </q-menu>
-            </q-btn>
+
+                <!-- Clear all conversations button -->
+                <div
+                  v-if="filteredChatHistory.length > 0"
+                  class="clear-all-container bg-surface-base shrink-0"
+                >
+                  <ODropdownSeparator />
+                  <OButton
+                    variant="ghost-destructive"
+                    class="clear-all-btn text-compact w-full justify-start px-3 py-1.5"
+                    @click.stop="clearAllConversations"
+                  >
+                    <template #icon-left>
+                      <OIcon name="delete-sweep" size="sm" />
+                    </template>
+                    {{ t("aiAssistant.clearAllConversations") }}
+                  </OButton>
+                </div>
+              </div>
+            </ODropdown>
           </div>
 
-          <div>
+          <div class="chat-header-actions flex items-center gap-1">
             <!-- Edit title button -->
-            <q-btn
+            <OButton
               v-if="currentChatId"
-              flat
-              round
-              dense
-              size="md"
-              icon="edit"
+              variant="ghost"
+              size="icon-sm"
               @click.stop="openEditTitleDialog"
             >
-              <q-tooltip :delay="500">Edit title</q-tooltip>
-            </q-btn>
-            <q-btn flat round dense size="md" icon="add" @click="addNewChat" />
-            <q-btn flat round dense size="md" icon="close" @click="$emit('close')" />
+              <OIcon name="edit" size="sm" />
+              <OTooltip :content="t('aiAssistant.editTitleTooltip')" />
+            </OButton>
+            <OButton variant="ghost" size="icon-sm" @click="addNewChat">
+              <OIcon name="add" size="sm" />
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon-sm"
+              data-test="ai-chat-expand-btn"
+              @click="toggleExpand"
+            >
+              <OIcon
+                :name="store.state.isAiChatExpanded ? 'close-fullscreen' : 'open-in-full'"
+                size="sm"
+              />
+              <OTooltip
+                :content="
+                  t('common.collapseExpandShortcut', {
+                    action: store.state.isAiChatExpanded
+                      ? t('common.collapse')
+                      : t('common.expand'),
+                    shortcut: isMac ? '⌘' : 'Ctrl+',
+                  })
+                "
+              />
+            </OButton>
+            <OButton variant="ghost" size="icon-sm" @click="$emit('close')">
+              <OIcon name="close" size="sm" />
+            </OButton>
           </div>
         </div>
       </div>
-      <q-separator class="tw:bg-[#DBDBDB]" />
 
       <!-- History Panel -->
-      <q-dialog v-model="showHistory" position="right">
-        <q-card style="width: 350px; max-width: 100vw; height: 100vh;">
-          <q-card-section class="row items-center q-pb-none">
-            <div class="text-h6">Chat History</div>
-            <q-space />
-            <q-btn icon="close" flat round dense v-close-popup />
-          </q-card-section>
-
-          <q-card-section class="q-pa-md" style="max-height: calc(100vh - 70px); overflow: auto;">
-            <q-list separator>
-              <q-item
-                v-for="chat in chatHistory"
-                :key="chat.id"
-                clickable
-                v-ripple
-                @click="loadChat(chat.id)"
-              >
-                <q-item-section>
-                  <q-item-label>{{ chat.title }}</q-item-label>
-                  <q-item-label caption>
-                    {{ new Date(chat.timestamp).toLocaleString() }}
-                  </q-item-label>
-                  <q-item-label caption>
-                    Model: {{ chat.model }}
-                  </q-item-label>
-                </q-item-section>
-              </q-item>
-            </q-list>
-          </q-card-section>
-        </q-card>
-      </q-dialog>
+      <ODrawer
+        data-test="o2-ai-chat-history-drawer"
+        bleed
+        v-model:open="showHistory"
+        size="sm"
+        :title="t('aiAssistant.chatHistory')"
+      >
+        <ul class="divide-border flex flex-col divide-y">
+          <li
+            v-for="chat in chatHistory"
+            :key="chat.id"
+            :data-test="`o2-ai-chat-history-item-${chat.id}`"
+            class="hover:bg-muted/50 flex cursor-pointer flex-col px-3 py-2"
+            @click="loadChat(chat.id)"
+          >
+            <span class="text-sm">{{ chat.title }}</span>
+            <span class="text-muted-foreground block text-xs">
+              {{ new Date(chat.timestamp).toLocaleString() }}
+            </span>
+            <span class="text-muted-foreground block text-xs">
+              {{ t("aiAssistant.modelLabel") }} {{ chat.model }}
+            </span>
+          </li>
+        </ul>
+      </ODrawer>
 
       <!-- Edit Title Dialog -->
-      <q-dialog v-model="showEditTitleDialog">
-        <q-card style="min-width: 350px">
-          <q-card-section>
-            <div class="text-h6">Edit Chat Title</div>
-          </q-card-section>
-
-          <q-card-section class="q-pt-none">
-            <q-input
-              v-model="editingTitle"
-              dense
-              borderless
-              autofocus
-              @keyup.enter="saveEditedTitle"
-              placeholder="Enter chat title"
-            />
-          </q-card-section>
-
-          <q-card-actions align="right" class="q-px-md q-pb-md">
-            <q-btn
-              label="Cancel"
-              class="o2-secondary-button"
-              no-caps
-              v-close-popup
-            />
-            <q-btn
-              label="Save"
-              class="o2-primary-button q-ml-sm"
-              no-caps
-              @click="saveEditedTitle"
-            />
-          </q-card-actions>
-        </q-card>
-      </q-dialog>
+      <ODialog
+        data-test="o2-ai-chat-edit-title-dialog"
+        v-model:open="showEditTitleDialog"
+        size="sm"
+        :title="t('aiAssistant.editChatTitle')"
+        :secondary-button-label="t('common.cancel')"
+        :primary-button-label="t('common.save')"
+        @click:secondary="showEditTitleDialog = false"
+        @click:primary="saveEditedTitle"
+      >
+        <OInput
+          v-model="editingTitle"
+          autofocus
+          @keyup.enter="saveEditedTitle"
+          :placeholder="t('aiAssistant.enterChatTitle')"
+        />
+      </ODialog>
 
       <!-- Delete Chat Confirmation Dialog -->
       <ConfirmDialog
         v-model="showDeleteChatConfirmDialog"
-        title="Delete Chat"
-        message="Are you sure you want to delete this chat? This action cannot be undone."
+        :title="t('aiAssistant.deleteChat')"
+        :message="t('aiAssistant.deleteChatConfirmMessage')"
         @update:ok="confirmDeleteChat"
         @update:cancel="showDeleteChatConfirmDialog = false"
       />
@@ -205,314 +202,1167 @@
       <!-- Clear All Conversations Confirmation Dialog -->
       <ConfirmDialog
         v-model="showClearAllConfirmDialog"
-        title="Clear All Conversations"
-        message="Are you sure you want to clear all conversations? This action cannot be undone."
+        :title="t('aiAssistant.clearAllConversationsTitle')"
+        :message="t('aiAssistant.clearAllConversationsMessage')"
         @update:ok="confirmClearAllConversations"
         @update:cancel="showClearAllConfirmDialog = false"
       />
 
-      <div class="chat-content " :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
-        <div class="messages-container " ref="messagesContainer" @scroll="checkIfShouldAutoScroll">
-          <div v-if="chatMessages.length === 0" class="welcome-section ">
-            <div class="tw:flex tw:flex-col tw:items-center tw:justify-center tw:h-full ">
-              <img :src="o2AiTitleLogo" />
-              <div class="tw:relative tw:inline-block">
-                <span class="tw:text-[14px] tw:font-[600] tw:ml-[30px] tw:text-center">O2 Assistant</span>
-                <span class="o2-ai-beta-text tw:ml-[8px]">BETA</span>
+      <!-- Image Preview Dialog -->
+      <ODialog
+        data-test="o2-ai-chat-image-preview-dialog"
+        v-model:open="showImagePreview"
+        @update:open="(v) => !v && closeImagePreview()"
+        size="lg"
+        :title="raw(previewImage?.filename)"
+      >
+        <div class="flex justify-center">
+          <img
+            v-if="previewImage"
+            :src="'data:' + previewImage.mimeType + ';base64,' + previewImage.data"
+            :alt="previewImage.filename"
+            class="max-h-[80vh] max-w-full object-contain"
+          />
+        </div>
+      </ODialog>
+
+      <div
+        class="chat-content relative flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent"
+      >
+        <div
+          class="messages-container mx-auto flex min-h-0 w-full max-w-225 flex-1 flex-col gap-4 overflow-y-auto bg-transparent p-2"
+          ref="messagesContainer"
+          @scroll="checkIfShouldAutoScroll"
+        >
+          <div
+            v-if="chatMessages.length === 0"
+            class="welcome-section rounded-default mb-0 flex flex-1 items-center justify-center bg-transparent p-0"
+          >
+            <!-- Home tab: rich V2 welcome -->
+            <O2AIHomeWelcome v-if="centeredStart" @select-prompt="selectWelcomePrompt" />
+            <!-- Sidepanel: minimal logo + title -->
+            <div v-else class="flex h-full w-full flex-col items-center justify-center">
+              <div class="flex flex-col items-center gap-2">
+                <img :src="o2AiTitleLogo" />
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-[600]">{{
+                    t("aiAssistant.welcome.taglineHighlight")
+                  }}</span>
+                  <!-- Same shared Beta tag as the Workflows screens. -->
+                  <BetaBadge />
+                </div>
               </div>
             </div>
           </div>
-          <div v-for="(message, index) in processedMessages" 
-            :key="index" 
-            class="message" 
+          <div
+            v-for="(message, index) in processedMessages"
+            :key="index"
+            class="message rounded-default border-border-default shadow-text-heading/10 border p-3 shadow-md"
             :class="[
               message.role,
-              { 'error-message': message.content.startsWith('Error:') }
-            ]">
-            <div class="message-content" >
-              <q-avatar v-if="message.role === 'user'" size="24px" :class="store.state.theme == 'dark' ? 'dark-user-avatar' : 'light-user-avatar'">
-                <q-icon size="16px" name="person" :color="store.state.theme == 'dark' ? 'white' : '#4a5568'" />
-              </q-avatar>
-              <div class="message-blocks" style="background-color: transparent;" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
+              message.role === 'user'
+                ? 'text-text-body dark:text-text-secondary ms-10 w-[calc(100%-2.5rem)] [background:var(--color-chat-bubble-ai)]'
+                : 'bg-surface-base text-text-body dark:text-text-secondary ms-0 w-full',
+              { 'error-message': message.content.startsWith('Error:') },
+            ]"
+          >
+            <div class="message-content flex w-full items-start gap-1.5">
+              <div
+                v-if="message.role === 'user'"
+                class="text-text-inverse inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full [background:var(--color-gradient-ai)]"
+              >
+                <OIcon size="sm" name="person" class="text-text-inverse" />
+              </div>
+              <div
+                class="message-blocks flex max-w-full min-w-0 flex-1 flex-col gap-0 overflow-x-auto bg-transparent wrap-break-word [word-wrap:break-word]"
+              >
                 <!-- Loading indicator inside message box for empty assistant messages -->
-                <div v-if="message.role === 'assistant' && (!message.contentBlocks || message.contentBlocks.length === 0) && (!message.content || message.content.trim() === '') && isLoading" class="inline-loading">
-                  <q-spinner-dots color="primary" size="1.5em" />
+                <div
+                  v-if="
+                    message.role === 'assistant' &&
+                    (!message.contentBlocks || message.contentBlocks.length === 0) &&
+                    (!message.content || message.content.trim() === '') &&
+                    isLoading
+                  "
+                  class="inline-loading text-text-secondary flex items-center gap-2.5 py-2 text-sm"
+                >
+                  <OSpinner variant="dots" size="sm" />
                   <span>{{ currentAnalyzingMessage }}</span>
                 </div>
                 <!-- Render contentBlocks in sequence (interleaved tool calls + text) -->
-                <template v-for="(block, blockIndex) in message.contentBlocks" :key="'cb-' + blockIndex">
+                <template
+                  v-for="(block, blockIndex) in message.contentBlocks"
+                  :key="'cb-' + blockIndex"
+                >
                   <!-- Tool call block - expandable -->
                   <div
                     v-if="block.type === 'tool_call'"
-                    class="tool-call-item"
-                    :class="[store.state.theme == 'dark' ? 'dark-mode' : 'light-mode', { 'has-details': hasToolCallDetails(block) }]"
-                    @click="hasToolCallDetails(block) && toggleToolCallExpanded(index, blockIndex)"
+                    class="tool-call-item text-text-secondary rounded-default text-compact mb-2 flex max-w-full min-w-0 flex-col px-3 py-2"
+                    :class="[
+                      { 'has-details': hasToolCallDetails(block) },
+                      {
+                        error: block.success === false && !block.pendingConfirmation,
+                      },
+                      {
+                        'pending-confirmation':
+                          block.pendingConfirmation && block.tool !== 'navigation_action',
+                      },
+                      {
+                        'pending-navigation':
+                          block.pendingConfirmation && block.tool === 'navigation_action',
+                      },
+                    ]"
+                    @click="
+                      hasToolCallDetails(block) &&
+                      !block.pendingConfirmation &&
+                      toggleToolCallExpanded(index, blockIndex)
+                    "
                   >
-                    <div class="tool-call-header">
-                      <q-icon name="check_circle" size="14px" color="positive" />
-                      <span class="tool-call-name">
-                        {{ formatToolCallMessage(block).text }}<strong v-if="formatToolCallMessage(block).highlight">{{ formatToolCallMessage(block).highlight }}</strong>{{ formatToolCallMessage(block).suffix }}
+                    <div class="tool-call-header flex items-center gap-2">
+                      <OIcon
+                        :name="
+                          block.pendingConfirmation
+                            ? block.tool === 'navigation_action'
+                              ? 'open-in-new'
+                              : 'help-outline'
+                            : block.success === false
+                              ? 'error'
+                              : 'check-circle'
+                        "
+                        size="sm"
+                        :class="
+                          block.pendingConfirmation
+                            ? block.tool === 'navigation_action'
+                              ? 'text-accent'
+                              : 'text-warning'
+                            : block.success === false
+                              ? 'text-status-negative'
+                              : 'text-status-positive'
+                        "
+                      />
+                      <span class="tool-call-name flex-1 font-medium">
+                        {{ formatToolCallMessage(block).text
+                        }}<strong v-if="formatToolCallMessage(block).highlight">{{
+                          formatToolCallMessage(block).highlight
+                        }}</strong
+                        >{{ formatToolCallMessage(block).suffix }}
                       </span>
-                      <q-icon
-                        v-if="hasToolCallDetails(block)"
-                        :name="isToolCallExpanded(index, blockIndex) ? 'expand_less' : 'expand_more'"
-                        size="16px"
-                        class="expand-icon"
+                      <!-- Navigation icon -->
+                      <OIcon
+                        v-if="block.navigationAction && !block.pendingConfirmation"
+                        name="open-in-new"
+                        size="xs"
+                        class="navigation-icon ms-auto cursor-pointer opacity-70 transition-opacity duration-200 hover:opacity-100"
+                        @click.stop="handleNavigationAction(block.navigationAction)"
+                      >
+                        <OTooltip :content="block.navigationAction.label" />
+                      </OIcon>
+                      <OIcon
+                        v-if="hasToolCallDetails(block) && !block.pendingConfirmation"
+                        :name="
+                          isToolCallExpanded(index, blockIndex) ? 'expand-less' : 'expand-more'
+                        "
+                        size="sm"
+                        class="expand-icon opacity-60 transition-transform duration-200"
                       />
                     </div>
                     <!-- Expandable details -->
-                    <div v-if="isToolCallExpanded(index, blockIndex)" class="tool-call-details" @click.stop>
-                      <div v-if="getToolCallDisplayData(block.context)?.query" class="detail-item">
-                        <div class="detail-header">
-                          <span class="detail-label">Query</span>
-                          <q-btn
-                            flat
-                            dense
-                            size="xs"
-                            icon="content_copy"
-                            class="copy-btn"
-                            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.query)"
+                    <div
+                      v-if="isToolCallExpanded(index, blockIndex)"
+                      class="tool-call-details border-border-default mt-2.5 flex min-w-0 flex-col gap-2 border-t pt-2.5"
+                      @click.stop
+                    >
+                      <!-- Error details for failed tool calls -->
+                      <template v-if="block.success === false">
+                        <div v-if="block.resultMessage" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.error")
+                          }}</span>
+                          <span
+                            class="detail-value text-status-negative max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.resultMessage }}</span
                           >
-                            <q-tooltip>Copy query</q-tooltip>
-                          </q-btn>
                         </div>
-                        <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.query }}</code>
-                      </div>
-                      <div v-if="getToolCallDisplayData(block.context)?.stream" class="detail-item">
-                        <span class="detail-label">Stream</span>
-                        <code class="detail-value">{{ getToolCallDisplayData(block.context)?.stream }}</code>
-                      </div>
-                      <div v-if="getToolCallDisplayData(block.context)?.type" class="detail-item">
-                        <span class="detail-label">Type</span>
-                        <code class="detail-value">{{ getToolCallDisplayData(block.context)?.type }}</code>
-                      </div>
-                      <div v-if="getToolCallDisplayData(block.context)?.start_time" class="detail-item">
-                        <span class="detail-label">Start</span>
-                        <span class="detail-value">{{ formatTimestamp(getToolCallDisplayData(block.context)?.start_time) }}</span>
-                      </div>
-                      <div v-if="getToolCallDisplayData(block.context)?.end_time" class="detail-item">
-                        <span class="detail-label">End</span>
-                        <span class="detail-value">{{ formatTimestamp(getToolCallDisplayData(block.context)?.end_time) }}</span>
-                      </div>
-                      <div v-if="getToolCallDisplayData(block.context)?.from !== undefined" class="detail-item">
-                        <span class="detail-label">From</span>
-                        <span class="detail-value">{{ getToolCallDisplayData(block.context)?.from }}</span>
-                      </div>
-                      <div v-if="getToolCallDisplayData(block.context)?.size !== undefined" class="detail-item">
-                        <span class="detail-label">Size</span>
-                        <span class="detail-value">{{ getToolCallDisplayData(block.context)?.size }}</span>
-                      </div>
-                      <div v-if="getToolCallDisplayData(block.context)?.query_type" class="detail-item">
-                        <span class="detail-label">Query Type</span>
-                        <code class="detail-value">{{ getToolCallDisplayData(block.context)?.query_type }}</code>
-                      </div>
-                      <div v-if="getToolCallDisplayData(block.context)?.vrl" class="detail-item">
-                        <div class="detail-header">
-                          <span class="detail-label">VRL</span>
-                          <q-btn
-                            flat
-                            dense
-                            size="xs"
-                            icon="content_copy"
-                            class="copy-btn"
-                            @click.stop="copyToClipboard(getToolCallDisplayData(block.context)?.vrl)"
+                        <div v-if="block.errorType" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.type")
+                          }}</span>
+                          <code
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.errorType }}</code
                           >
-                            <q-tooltip>Copy VRL</q-tooltip>
-                          </q-btn>
                         </div>
-                        <code class="detail-value query-value">{{ getToolCallDisplayData(block.context)?.vrl }}</code>
+                        <div v-if="block.suggestion" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.suggestion")
+                          }}</span>
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words italic opacity-85 select-text"
+                            >{{ block.suggestion }}</span
+                          >
+                        </div>
+                      </template>
+                      <!-- Summary details for successful tool calls with summary -->
+                      <template v-if="block.success !== false && block.summary">
+                        <div
+                          v-if="block.summary.count !== undefined"
+                          class="detail-item flex flex-col gap-1"
+                        >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.results")
+                          }}</span>
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.summary.count }} {{ t("aiAssistant.recordsSuffix") }}</span
+                          >
+                        </div>
+                        <div
+                          v-if="block.summary.took !== undefined"
+                          class="detail-item flex flex-col gap-1"
+                        >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.duration")
+                          }}</span>
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.summary.took }}{{ t("aiAssistant.ms") }}</span
+                          >
+                        </div>
+                        <!-- CLI tool summary (return_code / stdout_lines / stderr_lines / truncated) -->
+                        <div
+                          v-if="block.summary.return_code !== undefined"
+                          class="detail-item flex flex-col gap-1"
+                        >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.exitCode")
+                          }}</span>
+                          <code
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.summary.return_code }}</code
+                          >
+                        </div>
+                        <div
+                          v-if="block.summary.stdout_lines !== undefined"
+                          class="detail-item flex flex-col gap-1"
+                        >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.stdout")
+                          }}</span>
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.summary.stdout_lines }} {{ t("aiAssistant.lines") }}</span
+                          >
+                        </div>
+                        <div
+                          v-if="block.summary.stderr_lines"
+                          class="detail-item flex flex-col gap-1"
+                        >
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.stderr")
+                          }}</span>
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ block.summary.stderr_lines }} {{ t("aiAssistant.lines") }}</span
+                          >
+                        </div>
+                        <div v-if="block.summary.truncated" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.output")
+                          }}</span>
+                          <span
+                            class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                            >{{ t("aiAssistant.truncatedLabel") }}</span
+                          >
+                        </div>
+                      </template>
+                      <!-- Existing context details -->
+                      <div
+                        v-if="getToolCallDisplayData(block.context)?.query"
+                        class="detail-item flex flex-col gap-1"
+                      >
+                        <div class="detail-header flex items-center justify-between">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.query")
+                          }}</span>
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-circle"
+                            class="copy-btn opacity-60 hover:opacity-100"
+                            @click.stop="
+                              copyToClipboard(getToolCallDisplayData(block.context)?.query, t)
+                            "
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                            <OTooltip :content="t('aiAssistant.copyQuery')" />
+                          </OButton>
+                        </div>
+                        <code
+                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >{{ getToolCallDisplayData(block.context)?.query }}</code
+                        >
+                      </div>
+                      <div
+                        v-if="getToolCallDisplayData(block.context)?.stream"
+                        class="detail-item flex flex-col gap-1"
+                      >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.stream")
+                        }}</span>
+                        <code
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.stream }}</code
+                        >
+                      </div>
+                      <div
+                        v-if="getToolCallDisplayData(block.context)?.type"
+                        class="detail-item flex flex-col gap-1"
+                      >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("common.type")
+                        }}</span>
+                        <code
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.type }}</code
+                        >
+                      </div>
+                      <div
+                        v-if="getToolCallDisplayData(block.context)?.start_time"
+                        class="detail-item flex flex-col gap-1"
+                      >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.start")
+                        }}</span>
+                        <span
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{
+                            formatTimestamp(getToolCallDisplayData(block.context)?.start_time)
+                          }}</span
+                        >
+                      </div>
+                      <div
+                        v-if="getToolCallDisplayData(block.context)?.end_time"
+                        class="detail-item flex flex-col gap-1"
+                      >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.end")
+                        }}</span>
+                        <span
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{
+                            formatTimestamp(getToolCallDisplayData(block.context)?.end_time)
+                          }}</span
+                        >
+                      </div>
+                      <div
+                        v-if="getToolCallDisplayData(block.context)?.from !== undefined"
+                        class="detail-item flex flex-col gap-1"
+                      >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.from")
+                        }}</span>
+                        <span
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.from }}</span
+                        >
+                      </div>
+                      <div
+                        v-if="getToolCallDisplayData(block.context)?.size !== undefined"
+                        class="detail-item flex flex-col gap-1"
+                      >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.size")
+                        }}</span>
+                        <span
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.size }}</span
+                        >
+                      </div>
+                      <div
+                        v-if="getToolCallDisplayData(block.context)?.query_type"
+                        class="detail-item flex flex-col gap-1"
+                      >
+                        <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                          t("aiAssistant.queryType")
+                        }}</span>
+                        <code
+                          class="detail-value max-w-full min-w-0 text-xs [overflow-wrap:anywhere] break-words select-text"
+                          >{{ getToolCallDisplayData(block.context)?.query_type }}</code
+                        >
+                      </div>
+                      <div
+                        v-if="getToolCallDisplayData(block.context)?.vrl"
+                        class="detail-item flex flex-col gap-1"
+                      >
+                        <div class="detail-header flex items-center justify-between">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.welcome.taglineVrl")
+                          }}</span>
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-circle"
+                            class="copy-btn opacity-60 hover:opacity-100"
+                            @click.stop="
+                              copyToClipboard(getToolCallDisplayData(block.context)?.vrl, t)
+                            "
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                            <OTooltip :content="t('aiAssistant.copyVrl')" />
+                          </OButton>
+                        </div>
+                        <code
+                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >{{ getToolCallDisplayData(block.context)?.vrl }}</code
+                        >
+                      </div>
+                      <div
+                        v-if="getToolCallDisplayData(block.context)?.command"
+                        class="detail-item flex flex-col gap-1"
+                      >
+                        <div class="detail-header flex items-center justify-between">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.command")
+                          }}</span>
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-circle"
+                            class="copy-btn opacity-60 hover:opacity-100"
+                            @click.stop="
+                              copyToClipboard(getToolCallDisplayData(block.context)?.command, t)
+                            "
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                            <OTooltip :content="t('aiAssistant.copyCommand')" />
+                          </OButton>
+                        </div>
+                        <code
+                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >{{ getToolCallDisplayData(block.context)?.command }}</code
+                        >
+                      </div>
+                      <!-- Tool response: SearchSQL hits -->
+                      <template v-if="block.response && block.response.hits">
+                        <div class="detail-item flex flex-col gap-1">
+                          <div class="detail-header flex items-center justify-between">
+                            <span
+                              class="detail-label text-2xs font-semibold uppercase opacity-60"
+                              >{{ t("aiAssistant.results") }}</span
+                            >
+                            <OButton
+                              variant="ghost"
+                              size="icon-xs-circle"
+                              class="copy-btn opacity-60 hover:opacity-100"
+                              @click.stop="
+                                copyToClipboard(JSON.stringify(block.response.hits, null, 2), t)
+                              "
+                            >
+                              <OIcon name="content-copy" size="sm" />
+                              <OTooltip :content="t('aiAssistant.copyResults')" />
+                            </OButton>
+                          </div>
+                          <div
+                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >
+                            <div
+                              v-for="(hit, hIdx) in block.response.hits"
+                              :key="hIdx"
+                              class="tool-response-hit [&:not(:last-child)]:border-border-default flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1"
+                            >
+                              <span
+                                v-for="(val, key) in hit"
+                                :key="key"
+                                class="hit-field cursor-text break-all select-text"
+                              >
+                                <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
+                                {{ val }}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div class="tool-response-meta mt-1 flex flex-wrap gap-1.5">
+                          <span v-if="block.response.total !== undefined" class="context-tag"
+                            >{{ t("aiAssistant.total") }} {{ block.response.total }}</span
+                          >
+                          <span v-if="block.response.took !== undefined" class="context-tag"
+                            >{{ t("aiAssistant.took") }} {{ block.response.took
+                            }}{{ t("aiAssistant.ms") }}</span
+                          >
+                          <span v-if="block.response.hits_truncated" class="context-tag"
+                            >{{ t("aiAssistant.showingFirst") }}
+                            {{ block.response.hits.length }}</span
+                          >
+                        </div>
+                      </template>
+                      <!-- Tool response: testFunction input/output -->
+                      <template
+                        v-else-if="
+                          block.response && (block.response.input || block.response.output)
+                        "
+                      >
+                        <div v-if="block.response.input" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.inputEvents")
+                          }}</span>
+                          <div
+                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >
+                            <div
+                              v-for="(evt, eIdx) in block.response.input"
+                              :key="eIdx"
+                              class="tool-response-hit [&:not(:last-child)]:border-border-default flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1"
+                            >
+                              <span
+                                v-for="(val, key) in evt"
+                                :key="key"
+                                class="hit-field cursor-text break-all select-text"
+                              >
+                                <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
+                                {{
+                                  typeof val === "string" && val.length > 120
+                                    ? val.substring(0, 120) + "..."
+                                    : val
+                                }}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div v-if="block.response.output" class="detail-item flex flex-col gap-1">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("common.output")
+                          }}</span>
+                          <div
+                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >
+                            <div
+                              v-for="(res, rIdx) in block.response.output"
+                              :key="rIdx"
+                              class="tool-response-hit [&:not(:last-child)]:border-border-default flex flex-wrap gap-x-3 gap-y-1 py-0.5 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1"
+                            >
+                              <template v-if="res.event">
+                                <span
+                                  v-for="(val, key) in res.event"
+                                  :key="key"
+                                  class="hit-field cursor-text break-all select-text"
+                                >
+                                  <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
+                                  {{
+                                    typeof val === "string" && val.length > 120
+                                      ? val.substring(0, 120) + "..."
+                                      : val
+                                  }}
+                                </span>
+                              </template>
+                              <span
+                                v-if="res.message"
+                                class="hit-field text-status-negative cursor-text break-all select-text"
+                              >
+                                <span class="hit-key font-semibold opacity-60">{{
+                                  t("aiAssistant.errorLabel")
+                                }}</span>
+                                {{ res.message }}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                      <!-- Tool response: list items from normalized { total, items } -->
+                      <template
+                        v-else-if="
+                          block.response &&
+                          block.response.items &&
+                          Array.isArray(block.response.items)
+                        "
+                      >
+                        <div
+                          v-if="block.response.items.length > 0"
+                          class="detail-item flex flex-col gap-1"
+                        >
+                          <div class="detail-header flex items-center justify-between">
+                            <span
+                              class="detail-label text-2xs font-semibold uppercase opacity-60"
+                              >{{ t("aiAssistant.items") }}</span
+                            >
+                            <OButton
+                              variant="ghost"
+                              size="icon-xs-circle"
+                              class="copy-btn opacity-60 hover:opacity-100"
+                              @click.stop="
+                                copyToClipboard(JSON.stringify(block.response.items, null, 2), t)
+                              "
+                            >
+                              <OIcon name="content-copy" size="sm" />
+                              <OTooltip :content="t('aiAssistant.copyItems')" />
+                            </OButton>
+                          </div>
+                          <div
+                            class="tool-response-hits rounded-default flex max-h-50 flex-col gap-1 overflow-y-auto px-2 py-1.5 font-mono text-xs [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >
+                            <div
+                              v-for="(item, iIdx) in block.response.items"
+                              :key="iIdx"
+                              class="tool-response-list-item [&:not(:last-child)]:border-border-default flex flex-col gap-0.5 py-1 [&:not(:last-child)]:border-b [&:not(:last-child)]:pb-1.5"
+                            >
+                              <div
+                                v-for="(val, key) in item"
+                                :key="key"
+                                class="hit-field cursor-text break-all select-text"
+                              >
+                                <span class="hit-key font-semibold opacity-60">{{ key }}:</span>
+                                {{ typeof val === "object" ? JSON.stringify(val) : val }}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </template>
+                      <!-- Tool response: generic fallback (string or other) -->
+                      <div v-else-if="block.response" class="detail-item flex flex-col gap-1">
+                        <div class="detail-header flex items-center justify-between">
+                          <span class="detail-label text-2xs font-semibold uppercase opacity-60">{{
+                            t("aiAssistant.response")
+                          }}</span>
+                          <OButton
+                            variant="ghost"
+                            size="icon-xs-circle"
+                            class="copy-btn opacity-60 hover:opacity-100"
+                            @click.stop="
+                              copyToClipboard(
+                                typeof block.response === 'string'
+                                  ? block.response
+                                  : JSON.stringify(block.response, null, 2),
+                                t,
+                              )
+                            "
+                          >
+                            <OIcon name="content-copy" size="sm" />
+                            <OTooltip :content="t('aiAssistant.copyResponse')" />
+                          </OButton>
+                        </div>
+                        <code
+                          class="detail-value query-value rounded-default cursor-text p-2 font-mono text-xs break-all whitespace-pre-wrap select-text [background:color-mix(in_srgb,var(--color-text-heading)_5%,transparent)]"
+                          >{{
+                            typeof block.response === "string"
+                              ? block.response
+                              : JSON.stringify(block.response, null, 2)
+                          }}</code
+                        >
                       </div>
                     </div>
                   </div>
+                  <!-- Log Entry block - expandable -->
+                  <div
+                    v-else-if="block.type === 'log_entry'"
+                    class="log-entry-item rounded-default text-text-secondary dark:bg-surface-panel dark:border-border-default dark:hover:bg-surface-panel dark:hover:border-text-secondary mb-1 flex cursor-pointer flex-col px-2.5 py-1.5 text-xs [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] hover:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)] dark:border"
+                    @click="toggleLogEntryExpanded(index, blockIndex)"
+                  >
+                    <div class="log-entry-header flex items-center gap-1.5">
+                      <OIcon name="description" size="xs" />
+                      <span
+                        class="log-entry-info flex-1 overflow-hidden text-xs font-medium text-ellipsis whitespace-nowrap"
+                      >
+                        {{ block.preview }}
+                      </span>
+                      <OIcon
+                        :name="
+                          isLogEntryExpanded(index, blockIndex) ? 'expand-less' : 'expand-more'
+                        "
+                        size="sm"
+                        class="expand-icon opacity-60 transition-transform duration-200"
+                      />
+                    </div>
+                    <!-- Expandable details -->
+                    <div
+                      v-if="isLogEntryExpanded(index, blockIndex)"
+                      class="log-entry-details mt-2.5"
+                      @click.stop
+                    >
+                      <div
+                        class="log-entry-content rounded-default bg-surface-base border-border-default dark:bg-surface-panel relative overflow-hidden border shadow-sm dark:shadow-sm"
+                      >
+                        <OButton
+                          variant="ghost"
+                          size="icon-xs-circle"
+                          class="copy-btn rounded-default absolute top-2 right-2 z-1 px-2 py-1 opacity-60 [background:color-mix(in_srgb,var(--color-text-heading)_10%,transparent)] hover:opacity-100 hover:[background:color-mix(in_srgb,var(--color-text-heading)_8%,transparent)] dark:hover:[background:color-mix(in_srgb,var(--color-text-heading)_15%,transparent)]"
+                          @click.stop="copyToClipboard(block.content, t)"
+                        >
+                          <OIcon name="content-copy" size="sm" />
+                          <OTooltip :content="t('aiAssistant.copyContent')" />
+                        </OButton>
+                        <code
+                          class="log-entry-code text-2xs bg-surface-base text-text-body dark:text-text-secondary block max-h-75 cursor-text overflow-y-auto p-3 pe-10 font-mono leading-relaxed whitespace-pre-wrap select-text [word-wrap:break-word] dark:[background:var(--color-syntax-bg)]"
+                          v-html="formatLogEntryContent(block.content)"
+                        ></code>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- Stream-level error block -->
+                  <div
+                    v-else-if="block.type === 'error'"
+                    class="stream-error-block rounded-default border-border-default text-compact text-text-secondary mb-2 flex flex-col border-s-3 px-3 py-2.5 [background:color-mix(in_srgb,var(--color-status-negative)_6%,transparent)] dark:[background:color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
+                  >
+                    <div class="stream-error-header flex items-center gap-2">
+                      <OIcon name="warning" size="sm" />
+                      <span class="stream-error-message text-status-negative font-medium">{{
+                        block.message
+                      }}</span>
+                    </div>
+                    <div
+                      v-if="block.suggestion"
+                      class="stream-error-suggestion mt-1.5 ps-6 text-xs italic opacity-85"
+                    >
+                      {{ block.suggestion }}
+                    </div>
+                    <div
+                      v-if="block.recoverable"
+                      class="stream-error-recoverable text-2xs mt-1 ps-6 opacity-70"
+                    >
+                      {{ t("aiAssistant.errorMayBeTemporary") }}
+                    </div>
+                  </div>
+                  <!-- Navigation block - standalone navigation button -->
+                  <div
+                    v-else-if="block.type === 'navigation' && block.navigationAction"
+                    class="navigation-block my-1 [background:color-mix(in_srgb,var(--color-info)_8%,transparent)] dark:[background:color-mix(in_srgb,var(--color-info)_12%,transparent)]"
+                  >
+                    <OButton
+                      variant="primary"
+                      size="xs"
+                      class="navigation-block-btn text-compact"
+                      @click="handleNavigationAction(block.navigationAction)"
+                    >
+                      <template #icon-left><OIcon :name="'open-in-new'" size="sm" /></template>
+                      {{ block.navigationAction.label }}
+                    </OButton>
+                  </div>
                   <!-- Text block - render with markdown processing -->
                   <template v-else-if="block.type === 'text' && block.text">
-                    <template v-for="(textBlock, tbIndex) in processTextBlock(block.text)" :key="'tb-' + blockIndex + '-' + tbIndex">
-                      <div v-if="textBlock.type === 'code'" class="code-block">
-                        <div class="code-block-header code-block-theme">
-                          <span v-if="textBlock.language" class="code-type-label">
+                    <template
+                      v-for="(textBlock, tbIndex) in processTextBlock(block.text)"
+                      :key="'tb-' + blockIndex + '-' + tbIndex"
+                    >
+                      <div
+                        v-if="textBlock.type === 'code'"
+                        class="code-block rounded-default m-0 overflow-hidden"
+                      >
+                        <div
+                          class="code-block-header bg-surface-subtle flex items-center justify-between px-2 py-1"
+                        >
+                          <span
+                            v-if="textBlock.language"
+                            class="code-type-label rounded-default text-theme-accent dark:text-text-secondary px-1.5 py-0.5 text-xs font-semibold [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
+                          >
                             {{ getLanguageDisplay(textBlock.language) }}
                           </span>
-                          <q-btn
-                            flat
-                            dense
+                          <OButton
+                            variant="ghost"
+                            size="xs"
                             class="copy-button"
-                            no-caps
-                            color="primary"
-                            @click="copyToClipboard(textBlock.content)"
+                            @click="copyToClipboard(textBlock.content, t)"
                           >
-                            <div class="tw:flex tw:items-center">
-                              <q-icon size="16px" name="content_copy" />
-                              <span class="tw:ml-1">Copy</span>
-                            </div>
-                          </q-btn>
+                            <OIcon size="sm" name="content-copy" />
+                            <span class="ms-1">{{ t("common.copy") }}</span>
+                          </OButton>
                         </div>
                         <span class="generated-code-block">
-                          <code :class="['hljs', textBlock.language]" v-html="textBlock.highlightedContent"></code>
+                          <code
+                            :class="['hljs', textBlock.language]"
+                            v-html="textBlock.highlightedContent"
+                          ></code>
                         </span>
-                        <div class="code-block-footer code-block-theme tw:flex tw:items-center tw:justify-between tw:w-full">
-                          <q-btn
-                            flat
-                            dense
+                        <div
+                          class="code-block-footer flex w-full items-center justify-between px-2 py-1"
+                        >
+                          <OButton
+                            variant="ghost"
+                            size="xs"
                             class="retry-button"
-                            no-caps
-                            color="primary"
                             @click="retryGeneration(message)"
                           >
-                            <div class="tw:flex tw:items-center">
-                              <q-icon size="16px" name="refresh" />
-                              <span class="tw:ml-1">Retry</span>
-                            </div>
-                          </q-btn>
+                            <OIcon size="sm" name="refresh" />
+                            <span class="ms-1">{{ t("common.retry") }}</span>
+                          </OButton>
                         </div>
                       </div>
-                      <div v-else class="text-block" v-html="processHtmlBlock(textBlock.content)"></div>
+                      <div
+                        v-else
+                        class="text-block w-full max-w-full wrap-break-word [&:not(:last-child)]:mb-1"
+                        v-html="processHtmlBlock(textBlock.content)"
+                      ></div>
                     </template>
                   </template>
                 </template>
                 <!-- Fallback for messages without contentBlocks (user messages or old assistant messages) -->
                 <template v-if="!message.contentBlocks || message.contentBlocks.length === 0">
+                  <!-- Display images for user messages -->
+                  <div
+                    v-if="message.role === 'user' && message.images && message.images.length > 0"
+                    class="message-images mb-2 flex flex-wrap gap-2"
+                  >
+                    <div
+                      v-for="(img, imgIndex) in message.images"
+                      :key="'img-' + imgIndex"
+                      class="message-image-item"
+                    >
+                      <img
+                        :src="'data:' + img.mimeType + ';base64,' + img.data"
+                        :alt="img.filename"
+                        class="rounded-default border-border-default max-h-37.5 max-w-50 cursor-pointer border object-contain [transition:transform_0.2s_ease,box-shadow_0.2s_ease] hover:scale-102 hover:shadow-md"
+                        @click="openImagePreview(img)"
+                      />
+                      <OTooltip :content="raw(img.filename)" />
+                    </div>
+                  </div>
                   <template v-for="(block, blockIndex) in message.blocks" :key="'fb-' + blockIndex">
-                    <div v-if="block.type === 'code'" class="code-block">
-                      <div class="code-block-header code-block-theme">
-                        <span v-if="block.language" class="code-type-label">
+                    <div
+                      v-if="block.type === 'code'"
+                      class="code-block rounded-default m-0 overflow-hidden"
+                    >
+                      <div
+                        class="code-block-header bg-surface-subtle flex items-center justify-between px-2 py-1"
+                      >
+                        <span
+                          v-if="block.language"
+                          class="code-type-label rounded-default text-theme-accent dark:text-text-secondary px-1.5 py-0.5 text-xs font-semibold [background:color-mix(in_srgb,var(--color-theme-accent)_10%,transparent)]"
+                        >
                           {{ getLanguageDisplay(block.language) }}
                         </span>
-                        <q-btn
-                          flat
-                          dense
+                        <OButton
+                          variant="ghost"
+                          size="xs"
                           class="copy-button"
-                          no-caps
-                          color="primary"
-                          @click="copyToClipboard(block.content)"
+                          @click="copyToClipboard(block.content, t)"
                         >
-                          <div class="tw:flex tw:items-center">
-                            <q-icon size="16px" name="content_copy" />
-                            <span class="tw:ml-1">Copy</span>
-                          </div>
-                        </q-btn>
+                          <OIcon size="sm" name="content-copy" />
+                          <span class="ms-1">{{ t("common.copy") }}</span>
+                        </OButton>
                       </div>
                       <span class="generated-code-block">
-                        <code :class="['hljs', block.language]" v-html="block.highlightedContent"></code>
+                        <code
+                          :class="['hljs', block.language]"
+                          v-html="block.highlightedContent"
+                        ></code>
                       </span>
                     </div>
-                    <div v-else class="text-block" v-html="processHtmlBlock(block.content)"></div>
+                    <div
+                      v-else
+                      class="text-block w-full max-w-full wrap-break-word [&:not(:last-child)]:mb-1"
+                      v-html="processHtmlBlock(block.content)"
+                    ></div>
                   </template>
                 </template>
+                <!-- Feedback buttons for assistant messages -->
+                <div
+                  v-if="
+                    message.role === 'assistant' && message.content && message.content.trim() !== ''
+                  "
+                  class="feedback-buttons mt-1 flex items-center gap-0.5 *:transition-opacity *:duration-200 [&>*:hover]:opacity-100"
+                  :class="message.feedback ? '*:opacity-100' : '*:opacity-50'"
+                >
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-circle"
+                    :disabled="message.feedback === 'thumbs_up'"
+                    :class="message.feedback === 'thumbs_up' ? 'text-accent opacity-100!' : ''"
+                    data-test="o2-ai-chat-thumbs-up-btn"
+                    @click="likeCodeBlock(index)"
+                  >
+                    <OIcon name="thumb-up-off-alt" size="xs" />
+                    <OTooltip :content="t('aiAssistant.helpful')" />
+                  </OButton>
+                  <OButton
+                    variant="ghost"
+                    size="icon-xs-circle"
+                    :disabled="message.feedback === 'thumbs_down'"
+                    :class="message.feedback === 'thumbs_down' ? 'text-accent opacity-100!' : ''"
+                    data-test="o2-ai-chat-thumbs-down-btn"
+                    @click="dislikeCodeBlock(index)"
+                  >
+                    <OIcon name="thumb-down-off-alt" size="xs" />
+                    <OTooltip :content="t('aiAssistant.notHelpful')" />
+                  </OButton>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- Completed tool calls during streaming - keep progress visible
+               so each step stays on screen instead of flashing away while it
+               sits in pendingToolCalls waiting for the assistant's text. -->
+          <div
+            v-for="(block, pIdx) in pendingToolCalls"
+            v-show="block.type === 'tool_call'"
+            :key="'pending-tc-' + pIdx"
+            class="tool-call-indicator rounded-default border-border-default my-1 flex items-center border px-4 py-2 [background:var(--color-chat-bubble-user)]"
+          >
+            <div class="tool-call-content flex w-full items-center gap-3">
+              <OIcon :name="block.success === false ? 'error' : 'check-circle'" size="sm" />
+              <div class="tool-call-info flex min-w-0 flex-1 flex-col gap-1.5">
+                <span
+                  class="tool-call-message text-text-secondary text-sm font-medium opacity-85"
+                  >{{ block.message }}</span
+                >
               </div>
             </div>
           </div>
           <!-- Tool call indicator - shows outside message box -->
-          <div v-if="activeToolCall" class="tool-call-indicator" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
-            <div class="tool-call-content">
-              <q-spinner-dots color="primary" size="1.5em" />
-              <div class="tool-call-info">
-                <span class="tool-call-message">{{ activeToolCall.message }}</span>
-                <div v-if="getToolCallDisplayData(activeToolCall.context)" class="tool-call-context">
-                  <div v-if="getToolCallDisplayData(activeToolCall.context)?.query" class="context-item">
-                    <code class="context-query">{{ truncateQuery(getToolCallDisplayData(activeToolCall.context)?.query) }}</code>
+          <div
+            v-if="activeToolCall"
+            class="tool-call-indicator rounded-default border-border-default my-2 flex items-center border px-4 py-3 [background:var(--color-chat-bubble-user)]"
+          >
+            <div class="tool-call-content flex w-full items-center gap-3">
+              <OSpinner variant="dots" size="xs" />
+              <div class="tool-call-info flex min-w-0 flex-1 flex-col gap-1.5">
+                <span class="tool-call-message text-text-secondary text-sm font-semibold">{{
+                  activeToolCall.message
+                }}</span>
+                <div
+                  v-if="getToolCallDisplayData(activeToolCall.context)"
+                  class="tool-call-context flex flex-wrap items-center gap-2"
+                >
+                  <div
+                    v-if="getToolCallDisplayData(activeToolCall.context)?.query"
+                    class="context-item w-full"
+                  >
+                    <code
+                      class="context-query rounded-default bg-surface-base border-border-default text-text-body dark:text-text-secondary block max-w-full overflow-hidden border px-3 py-2 font-mono text-xs break-all whitespace-pre-wrap"
+                      >{{
+                        truncateQuery(getToolCallDisplayData(activeToolCall.context)?.query)
+                      }}</code
+                    >
                   </div>
-                  <span v-if="getToolCallDisplayData(activeToolCall.context)?.stream" class="context-tag">
-                    Stream: {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
+                  <div
+                    v-if="
+                      getToolCallDisplayData(activeToolCall.context)?.vrl &&
+                      !getToolCallDisplayData(activeToolCall.context)?.query
+                    "
+                    class="context-item w-full"
+                  >
+                    <code
+                      class="context-query rounded-default bg-surface-base border-border-default text-text-body dark:text-text-secondary block max-w-full overflow-hidden border px-3 py-2 font-mono text-xs break-all whitespace-pre-wrap"
+                      >{{
+                        truncateQuery(getToolCallDisplayData(activeToolCall.context)?.vrl)
+                      }}</code
+                    >
+                  </div>
+                  <span
+                    v-if="getToolCallDisplayData(activeToolCall.context)?.stream"
+                    class="context-tag text-2xs rounded-default text-ai-accent dark:text-text-secondary inline-flex items-center px-2 py-1 font-medium [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
+                  >
+                    {{ t("aiAssistant.streamPrefix") }}
+                    {{ getToolCallDisplayData(activeToolCall.context)?.stream }}
                   </span>
-                  <span v-if="getToolCallDisplayData(activeToolCall.context)?.query_type" class="context-tag">
-                    Type: {{ getToolCallDisplayData(activeToolCall.context)?.query_type }}
+                  <span
+                    v-if="getToolCallDisplayData(activeToolCall.context)?.query_type"
+                    class="context-tag text-2xs rounded-default text-ai-accent dark:text-text-secondary inline-flex items-center px-2 py-1 font-medium [background:color-mix(in_srgb,var(--color-ai-accent)_10%,transparent)] dark:[background:color-mix(in_srgb,var(--color-ai-accent)_20%,transparent)]"
+                  >
+                    {{ t("aiAssistant.typePrefix") }}
+                    {{ getToolCallDisplayData(activeToolCall.context)?.query_type }}
                   </span>
                 </div>
               </div>
             </div>
           </div>
           <!-- Standalone loading indicator - only shown when loading with no tool calls -->
-          <div v-if="isLoading && !activeToolCall" class="tool-call-indicator" :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'">
-            <div class="tool-call-content">
-              <q-spinner-dots color="primary" size="1.5em" />
-              <span class="tool-call-message">{{ currentAnalyzingMessage }}</span>
+          <div
+            v-if="isLoading && !activeToolCall"
+            class="tool-call-indicator rounded-default border-border-default my-2 flex items-center border px-4 py-3 [background:var(--color-chat-bubble-user)]"
+          >
+            <div class="tool-call-content flex w-full items-center gap-3">
+              <OSpinner variant="dots" size="xs" />
+              <span class="tool-call-message text-text-secondary text-sm font-semibold">{{
+                currentAnalyzingMessage
+              }}</span>
             </div>
           </div>
         </div>
-        
+
         <!-- Scroll to bottom button -->
-        <div 
-          v-show="showScrollToBottom" 
-          class="scroll-to-bottom-container"
+        <div
+          v-show="showScrollToBottom"
+          class="scroll-to-bottom-container pointer-events-none absolute bottom-2.5 left-1/2 z-1000 -translate-x-1/2 [transition:all_0.3s_ease]"
         >
-          <q-btn
-            round
-            flat
-            icon="arrow_downward"
-            class="scroll-to-bottom-btn"
+          <OButton
+            variant="ghost"
+            size="icon-sm"
+            class="scroll-to-bottom-btn border-text-link! text-text-link! bg-surface-base! dark:border-ai-accent! dark:text-ai-accent! dark:bg-surface-base! hover:border-text-link! hover:text-text-link! hover:bg-surface-base! dark:hover:border-ai-accent! dark:hover:text-ai-accent! dark:hover:bg-surface-base! pointer-events-auto border-2! shadow-sm [backdrop-filter:blur(0.5rem)] transition-all duration-300 hover:scale-110 hover:shadow-md active:scale-100"
             @click="scrollToBottomSmooth"
-            size="sm"
           >
-            <q-tooltip anchor="top middle" self="bottom middle">
-              Scroll to bottom
-            </q-tooltip>
-          </q-btn>
+            <OIcon name="arrow-downward" size="sm" />
+            <OTooltip side="top" align="center" :content="t('aiAssistant.scrollToBottom')" />
+          </OButton>
         </div>
       </div>
 
       <!-- Fixed loading indicator above input - only shown when scrolled up -->
       <div
         v-if="(isLoading || activeToolCall) && showScrollToBottom"
-        class="fixed-analyzing-indicator"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'light-mode'"
+        class="fixed-analyzing-indicator rounded-default border-border-default mx-4 mb-2 flex items-center justify-center border px-4 py-3 shadow-sm [background:var(--color-chat-bubble-user)]"
       >
         <!-- Show tool call if active -->
-        <div v-if="activeToolCall" class="analyzing-content">
-          <q-spinner-dots color="primary" size="1.5em" />
-          <span class="analyzing-message">{{ activeToolCall.message }}</span>
+        <div
+          v-if="activeToolCall"
+          class="analyzing-content flex w-full max-w-225 items-center gap-3"
+        >
+          <OSpinner variant="dots" size="xs" />
+          <span class="analyzing-message text-theme-accent text-sm font-medium">{{
+            activeToolCall.message
+          }}</span>
         </div>
         <!-- Show analyzing message if loading but no active tool call -->
-        <div v-else-if="isLoading" class="analyzing-content">
-          <q-spinner-dots color="primary" size="1.5em" />
-          <span class="analyzing-message">{{ currentAnalyzingMessage }}</span>
+        <div
+          v-else-if="isLoading"
+          class="analyzing-content flex w-full max-w-225 items-center gap-3"
+        >
+          <OSpinner variant="dots" size="xs" />
+          <span class="analyzing-message text-theme-accent text-sm font-medium">{{
+            currentAnalyzingMessage
+          }}</span>
         </div>
       </div>
 
-      <div class="chat-input-wrapper tw:flex tw:flex-col q-ma-md" @click="focusInput">
-        <q-input
-          ref="chatInput"
-          v-model="inputMessage"
-          placeholder="Write your prompt"
-          dense
-          :disable="isLoading"
-          rows="10"
-          @keydown="handleKeyDown"
-          type="textarea"
-          autogrow
-          :borderless="true"
-          style="max-height: 250px; overflow-y: auto; font-size: 16px;"
-          class="chat-input"
-          flat
-        >
-        </q-input>
-        <div class="tw:flex tw:items-center tw:justify-end tw:mt-2 tw:gap-2" :class="store.state.theme == 'dark' ? 'dark-mode-bottom-bar' : 'light-mode-bottom-bar'">
-          <!-- Debug info - remove this later -->
-          <!-- <div class="tw:text-xs tw:text-gray-500">Loading: {{ isLoading }}, Input: {{ inputMessage.length }}</div> -->
+      <div class="chat-input-container relative mx-auto my-2 w-full max-w-225 shrink-0 px-2">
+        <!-- Confirmation dialog -->
+        <O2AIConfirmDialog
+          :visible="pendingConfirmation !== null"
+          :confirmation="pendingConfirmation"
+          @confirm="handleToolConfirm"
+          @cancel="handleToolCancel"
+          @always-confirm="handleToolAlwaysConfirm"
+        />
 
-          <!-- Send button - shown when not loading -->
-          <q-btn
-            v-if="!isLoading"
-            :disable="!inputMessage.trim()"
-            @click="sendMessage"
-            round
-            dense
-            flat
-            class="tw:ml-1 send-button"
+        <!-- Hidden file input for image upload -->
+        <input
+          ref="imageInputRef"
+          type="file"
+          accept="image/png,image/jpeg"
+          multiple
+          class="hidden"
+          @change="handleImageSelect"
+        />
+
+        <div
+          v-if="!pendingConfirmation"
+          class="unified-input-box rounded-default bg-surface-base border-border-default focus-within:ring-accent flex flex-col gap-3 border px-2 py-1 transition-all duration-200 focus-within:border-transparent focus-within:ring-2"
+          @dragover="handleDragOver"
+          @drop="handleDrop"
+          @paste="handlePaste"
+        >
+          <!-- Image preview strip -->
+          <div
+            v-if="pendingImages.length > 0"
+            class="image-preview-strip mb-2 flex flex-wrap gap-2 py-2"
           >
-            <q-icon name="send" size="16px" color="white" />
-          </q-btn>
-          
-          <!-- Stop button - shown when loading/streaming -->
-          <q-btn
-            v-if="isLoading"
-            @click="cancelCurrentRequest"
-            round
-            dense
-            flat
-            class="tw:ml-1 stop-button"
-          >
-            <q-icon name="stop" size="16px" color="white" />
-          </q-btn>
+            <div
+              v-for="(img, index) in pendingImages"
+              :key="index"
+              class="image-preview-item relative inline-block"
+            >
+              <img
+                :src="'data:' + img.mimeType + ';base64,' + img.data"
+                :alt="img.filename"
+                class="preview-image rounded-default border-border-default h-16 w-16 border object-cover [transition:transform_0.2s_ease] hover:scale-105"
+              />
+              <OButton
+                variant="ghost"
+                size="icon-xs-circle"
+                class="image-remove-btn bg-status-negative! hover:bg-status-negative! absolute! -top-1.5! -right-1.5! z-10 h-5! min-h-5! w-5! min-w-5! p-0!"
+                @click.stop="removeImage(index)"
+              >
+                <OIcon name="close" size="xs" />
+              </OButton>
+              <OTooltip
+                :content="
+                  t('common.fileWithSize', {
+                    name: img.filename,
+                    size: (img.size / 1024).toFixed(0),
+                  })
+                "
+              />
+            </div>
+          </div>
+
+          <RichTextInput
+            ref="chatInput"
+            v-model="inputMessage"
+            :placeholder="raw(inputPlaceholder)"
+            :disabled="isLoading"
+            :theme="store.state.theme"
+            :references="contextReferences"
+            :borderless="true"
+            @keydown="handleKeyDown"
+            @submit="sendMessage"
+            @update:references="handleReferencesUpdate"
+          />
+
+          <!-- Bottom bar with buttons -->
+          <div class="input-bottom-bar flex items-center justify-between pt-2">
+            <div class="flex items-center gap-2">
+              <!-- Image upload button -->
+              <OButton
+                v-if="!isLoading"
+                @click.stop="triggerImageUpload"
+                variant="ghost"
+                size="icon-sm"
+                class="image-upload-btn opacity-70 transition-opacity duration-200 hover:opacity-100"
+              >
+                <OIcon name="image" size="sm" class="text-icon-color" />
+                <OTooltip :content="t('aiAssistant.attachImageTooltip')" />
+              </OButton>
+              <div v-else class="w-8"></div>
+
+              <!-- Auto navigation toggle button -->
+              <OButton
+                v-if="!isLoading"
+                @click.stop="isAutoNavigationEnabled = !isAutoNavigationEnabled"
+                variant="ghost"
+                size="sm"
+                class="auto-nav-toggle-btn rounded-default hover:bg-surface-subtle flex items-center gap-1.5 px-2 py-1 transition-all duration-200"
+              >
+                <OIcon
+                  :name="isAutoNavigationEnabled ? 'check-circle' : 'radio-button-unchecked'"
+                  size="sm"
+                  :class="[
+                    'auto-nav-icon',
+                    isAutoNavigationEnabled ? 'text-theme-accent!' : 'text-icon-color',
+                  ]"
+                />
+                <span
+                  class="auto-nav-label ms-1 text-xs font-medium"
+                  :class="isAutoNavigationEnabled ? 'text-theme-accent' : 'text-text-secondary'"
+                  >{{ t("aiAssistant.autoNavigation.label") }}</span
+                >
+                <OTooltip
+                  :content="
+                    isAutoNavigationEnabled
+                      ? t('aiAssistant.autoNavigation.enabledTooltip')
+                      : t('aiAssistant.autoNavigation.disabledTooltip')
+                  "
+                />
+              </OButton>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <!-- Send button - shown when not loading -->
+              <OButton
+                v-if="!isLoading"
+                :disabled="!inputMessage.trim() && pendingImages.length === 0"
+                @click="sendMessage"
+                variant="primary"
+                size="icon-xs-circle"
+                class="send-button hover:bg-gradient-ai!"
+              >
+                <OIcon name="arrow-upward" size="sm" />
+              </OButton>
+
+              <!-- Stop button - shown when loading/streaming -->
+              <OButton
+                v-if="isLoading"
+                @click="cancelCurrentRequest"
+                variant="ghost"
+                size="icon-xs-circle"
+                class="stop-button shadow-status-negative/30! hover:shadow-status-negative/40! active:shadow-status-negative/30! bg-gradient-danger! hover:bg-gradient-danger-hover! shadow-lg! [transition:all_0.3s_ease]! hover:-translate-y-px! hover:shadow-lg! active:translate-y-0! active:shadow-md!"
+              >
+                <OIcon name="stop" size="sm" />
+              </OButton>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -520,71 +1370,86 @@
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onMounted, nextTick, watch, computed, onUnmounted } from 'vue';
-import hljs from 'highlight.js';
-import 'highlight.js/styles/github.css';
-import 'highlight.js/styles/github-dark.css';
-import { marked } from 'marked';
-import { MarkedOptions } from 'marked';
-import DOMPurify from 'dompurify';
-import { useQuasar } from 'quasar';
-import { useStore } from 'vuex';
-import useAiChat from '@/composables/useAiChat';
-import { outlinedThumbUpOffAlt, outlinedThumbDownOffAlt } from '@quasar/extras/material-icons-outlined';
-import { getImageURL, getUUIDv7 } from '@/utils/zincutils';
-import { ChatMessage, ChatHistoryEntry, ToolCall, ContentBlock } from '@/types/chat';
-import ConfirmDialog from '@/components/ConfirmDialog.vue';
+import {
+  defineComponent,
+  ref,
+  reactive,
+  onMounted,
+  nextTick,
+  watch,
+  computed,
+  onUnmounted,
+} from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import { useRouter, useRoute } from "vue-router";
+import { useTypewriterPlaceholder } from "@/components/ai-assistant/welcome/useTypewriterPlaceholder";
+import hljs from "highlight.js";
+import "highlight.js/styles/github.css";
+import "highlight.js/styles/github-dark.css";
+import { marked } from "marked";
+import { MarkedOptions } from "marked";
+import DOMPurify from "dompurify";
+import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
+import useAiChat from "@/composables/useAiChat";
+import { getImageURL, getUUIDv7 } from "@/utils/zincutils";
+import { chartColor } from "@/utils/chartTheme";
+import {
+  ChatMessage,
+  ChatHistoryEntry,
+  ContentBlock,
+  NavigationAction,
+  ImageAttachment,
+  MAX_IMAGE_SIZE_BYTES,
+  ALLOWED_IMAGE_TYPES,
+} from "@/ts/interfaces/chat";
 
-// Add IndexedDB setup
-const DB_NAME = 'o2ChatDB';
-const DB_VERSION = 1;
-const STORE_NAME = 'chatHistory';
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import RichTextInput, { ReferenceChip } from "@/components/RichTextInput.vue";
+import O2AIConfirmDialog from "@/components/O2AIConfirmDialog.vue";
+import O2AIHomeWelcome from "@/components/ai-assistant/welcome/O2AIHomeWelcome.vue";
+import { useChatHistory } from "@/composables/useChatHistory";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { useAiDashboardEvents, getDashboardEventType } from "@/composables/useAiDashboardEvents";
+import OButton from "@/lib/core/Button/OButton.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
+import { UNAUTHORIZED_MESSAGE_KEY, isAuthError } from "@/utils/authErrors";
 
-const { fetchAiChat } = useAiChat();
-
-const initDB = () => {
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    //this opens / creates(if not exists) the database with the name o2ChatDB and version 1
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-
-    request.onerror = () => reject(request.error);
-    //this is called when the database is successfully opened and returns the database object
-    request.onsuccess = () => resolve(request.result);
-    //this is called when the database is created for the first time / when the version is changed
-    request.onupgradeneeded = (event: IDBVersionChangeEvent) => {
-      const db = (event.target as IDBOpenDBRequest).result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        //this creates the object store with the name chatHistory and the key is id , autoIncrement is true
-        const store = db.createObjectStore(STORE_NAME, { keyPath: 'id', autoIncrement: true });
-        //this creates the index with the name timestamp
-        store.createIndex('timestamp', 'timestamp', { unique: false });
-        //this creates the index with the name title
-        store.createIndex('title', 'title', { unique: false });
-      }
-    };
-  });
-};
+const { fetchAiChat, submitFeedback } = useAiChat();
+const { emit: emitDashboardEvent } = useAiDashboardEvents();
 
 // Register VRL as a JavaScript alias (type assertion)
-hljs.registerLanguage('vrl', () => hljs.getLanguage('javascript') as any);
+hljs.registerLanguage("vrl", () => hljs.getLanguage("javascript") as any);
 
 // Configure marked options with custom language support
 const markedOptions = {
   breaks: true,
   gfm: true,
-  langPrefix: 'hljs language-',
+  langPrefix: "hljs language-",
   headerIds: false,
   mangle: false,
   sanitize: false, // Allow HTML in markdown
   highlight: (code: string, lang: string) => {
-    if (lang === 'vrl') {
-      return hljs.highlight(code, { language: 'javascript' }).value;
+    if (lang === "vrl") {
+      return hljs.highlight(code, { language: "javascript" }).value;
     }
     if (lang && hljs.getLanguage(lang)) {
       return hljs.highlight(code, { language: lang }).value;
     }
     return hljs.highlightAuto(code).value;
-  }
+  },
 } as MarkedOptions;
 
 marked.setOptions(markedOptions);
@@ -594,15 +1459,80 @@ function renderMarkdown(content: any) {
   return marked.parse(content);
 }
 
+// --- Shared, cross-instance streaming registry ---
+// O2AIChat is instantiated more than once (the Home page's inline AI tab and
+// the sidebar panel in MainLayout are SEPARATE component instances). When the
+// user starts a chat on Home and navigates to another page, the Home instance
+// unmounts and the sidebar instance mounts — a brand new setup() scope.
+//
+// For an in-flight stream to keep rendering after that hand-off, the detach/
+// re-attach bookkeeping MUST live outside setup() so both instances see the
+// same live array + AbortController. When these were per-instance, the sidebar
+// instance's map was empty, so loadChat() never re-attached and fell back to
+// the stale IndexedDB snapshot — the stream kept running but its text never
+// rendered in the new instance. Module scope is what makes the hand-off work.
+const backgroundStreams = new Set<AbortController>();
+const MAX_BACKGROUND_STREAMS = 3;
+
+// Map sessionId → live stream context for re-attachment when a (possibly
+// different) instance loads the same session. loadChat swaps chatMessages.value
+// back to `msgs` so processStream's isActive() becomes true again and the UI
+// updates in real-time.
+const backgroundStreamMap = new Map<
+  string,
+  {
+    msgs: ChatMessage[];
+    controller: AbortController;
+    chatId: number | null;
+  }
+>();
+
+// Cross-instance streaming status, keyed by sessionId. processStream runs in the
+// closure of the instance that STARTED it, so its completion resets isLoading on
+// THAT instance's ref — not on a different instance that re-attached to the same
+// stream (e.g. the sidebar taking over from the Home tab). Each instance watches
+// this shared reactive map for its current session and clears its own streaming
+// UI when the background turn finishes, so the sidebar's loading indicator
+// doesn't hang forever after re-attaching. true = streaming, false/absent = done.
+const sessionStreamingState = reactive<Record<string, boolean>>({});
+
+// Detached streams deliberately outlive the component that started them, and
+// this registry is module scope, so nothing else will ever stop them. Call when
+// the turn is no longer authorized for what it is writing — org switch, logout
+// — never for ordinary navigation, which is the case detaching exists for.
+const abortBackgroundStreams = () => {
+  for (const controller of backgroundStreams) controller.abort();
+  backgroundStreams.clear();
+  backgroundStreamMap.clear();
+  for (const key of Object.keys(sessionStreamingState)) {
+    delete sessionStreamingState[key];
+  }
+};
+
 export default defineComponent({
-  name: 'O2AIChat',
+  name: "O2AIChat",
   components: {
+    OButton,
+    BetaBadge,
     ConfirmDialog,
+    RichTextInput,
+    O2AIConfirmDialog,
+    O2AIHomeWelcome,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
+    ODrawer,
+    ODialog,
+    OSpinner,
+    OIcon,
+    OTooltip,
+    OInput,
+    OSearchInput,
   },
   props: {
     isOpen: {
       type: Boolean,
-      default: false
+      default: false,
     },
     headerHeight: {
       type: Number,
@@ -611,39 +1541,93 @@ export default defineComponent({
     //this will be used to set the input message if the user sends the data from any page by clicking on the ai chat button
     aiChatInputContext: {
       type: String,
-      default: ''
+      default: "",
     },
     appendMode: {
       type: Boolean,
-      default: true
-    }
+      default: true,
+    },
+    aiChatPayload: {
+      type: Object as () => {
+        text: string;
+        autoSend: boolean;
+        id: number;
+      } | null,
+      default: null,
+    },
+    centeredStart: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup(props) {
-    const $q = useQuasar();
-    const inputMessage = ref(props.aiChatInputContext ? props.aiChatInputContext : '');
+    const router = useRouter();
+    const route = useRoute();
+    const inputMessage = ref(props.aiChatInputContext ? props.aiChatInputContext : "");
     const chatMessages = ref<ChatMessage[]>([]);
     const isLoading = ref(false);
     const messagesContainer = ref<HTMLElement | null>(null);
-    const chatInput = ref<HTMLElement | null>(null);
-    const scrollTimeoutId = ref<ReturnType<typeof setTimeout> | null>(null);
-    const currentStreamingMessage = ref('');
-    const currentTextSegment = ref(''); // Track current text segment (resets after each tool call)
+    const chatInput = ref<any>(null); // RichTextInput component instance
+    const currentStreamingMessage = ref("");
+    const currentTextSegment = ref(""); // Track current text segment (resets after each tool call)
     const showHistory = ref(false);
-    const chatHistory = ref<ChatHistoryEntry[]>([]);
+    // `model` is stored on persisted entries but missing from the shared interface
+    const chatHistory = ref<(ChatHistoryEntry & { model?: string })[]>([]);
     const currentChatId = ref<number | null>(null);
     const currentSessionId = ref<string | null>(null); // UUID v7 for tracking all API calls in this chat session
-    const store = useStore ();
+    const lastTraceId = ref<string | null>(null); // OTEL trace_id from last workflow for feedback correlation
+    const store = useStore();
+    const { isDark } = useTheme();
+    const { t } = useI18nTyped();
+    const isMac = navigator.platform.toUpperCase().indexOf("MAC") >= 0;
     const chatUpdated = computed(() => store.state.chatUpdated);
+
+    // Typewriter placeholder — only animates on the home tab (centeredStart) when no chat is open.
+    // On the sidepanel the placeholder stays static ("Write your prompt").
+    const typewriterPrompts = computed(() => [
+      t("aiAssistant.placeholderRotation.one"),
+      t("aiAssistant.placeholderRotation.two"),
+      t("aiAssistant.placeholderRotation.three"),
+    ]);
+    const typewriterEnabled = computed(
+      () => !!props.centeredStart && chatMessages.value.length === 0,
+    );
+    const { placeholder: typewriterPlaceholder } = useTypewriterPlaceholder(typewriterPrompts, {
+      enabled: typewriterEnabled,
+      typeSpeedMs: 85,
+      eraseSpeedMs: 45,
+      holdMs: 2800,
+      initialDelayMs: 500,
+    });
+    const inputPlaceholder = computed(() =>
+      props.centeredStart && chatMessages.value.length === 0
+        ? typewriterPlaceholder.value || t("common.writeYourPrompt")
+        : t("common.writeYourPrompt"),
+    );
+
+    // Chat history composable
+    const {
+      saveToHistory: dbSaveToHistory,
+      loadHistory: dbLoadHistory,
+      loadChat: dbLoadChat,
+      deleteChatById: dbDeleteChatById,
+      clearAllHistory: dbClearAllHistory,
+      updateChatTitle: dbUpdateChatTitle,
+    } = useChatHistory(
+      () => store.state.userInfo.email ?? "",
+      () => store.state.selectedOrganization.identifier ?? "",
+      t,
+    );
 
     const currentChatTimestamp = ref<string | null>(null);
     const saveHistoryLoading = ref(false);
-    const historySearchTerm = ref('');
+    const historySearchTerm = ref("");
     const shouldAutoScroll = ref(true);
     const showScrollToBottom = ref(false);
 
     // Edit title state
     const showEditTitleDialog = ref(false);
-    const editingTitle = ref('');
+    const editingTitle = ref("");
 
     // Clear all confirmation state
     const showClearAllConfirmDialog = ref(false);
@@ -652,17 +1636,57 @@ export default defineComponent({
     const showDeleteChatConfirmDialog = ref(false);
     const chatToDelete = ref<number | null>(null);
 
+    // Tool confirmation state (from AI agent — confirmation-required actions, inline in chat)
+    const pendingConfirmation = ref<{
+      tool: string;
+      args: Record<string, any>;
+      message: I18nText;
+      navAction?: NavigationAction;
+    } | null>(null);
+
+    // Auto navigation state - per chat ID
+    // Stores chat ID -> boolean mapping for auto navigation preference
+    const autoNavigationPreferences = ref<Map<number, boolean>>(new Map());
+
+    // Pending auto navigation preference for new chats (before chat ID is created)
+    const pendingAutoNavigation = ref(true);
+
+    // Current chat's auto navigation state (defaults to true)
+    const isAutoNavigationEnabled = computed({
+      get: () => {
+        if (!currentChatId.value) return pendingAutoNavigation.value;
+        return autoNavigationPreferences.value.get(currentChatId.value) ?? true;
+      },
+      set: (value: boolean) => {
+        if (currentChatId.value) {
+          autoNavigationPreferences.value.set(currentChatId.value, value);
+          saveAutoNavigationPreferences();
+        } else {
+          // Store temporarily for new chats
+          pendingAutoNavigation.value = value;
+        }
+      },
+    });
+
     // AI-generated chat title state
     const aiGeneratedTitle = ref<string | null>(null);
-    const displayedTitle = ref<string>('');
+    const displayedTitle = ref<string>("");
     const isTypingTitle = ref(false);
     const titleAnimationId = ref<number>(0); // Used to cancel stale animations
 
     // Track expanded tool calls by message index and block index
     const expandedToolCalls = ref<Set<string>>(new Set());
 
+    // Track expanded log entries by message index and block index
+    const expandedLogEntries = ref<Set<string>>(new Set());
+
     // Active tool call state - for showing tool progress outside message box
-    const activeToolCall = ref<{ tool: string; message: string; context: Record<string, any> } | null>(null);
+    const activeToolCall = ref<{
+      tool: string;
+      message: I18nText;
+      context: Record<string, any>;
+      call_id?: string;
+    } | null>(null);
 
     // Pending tool calls - stores tool calls that arrive before text content to avoid empty message boxes
     const pendingToolCalls = ref<ContentBlock[]>([]);
@@ -670,8 +1694,14 @@ export default defineComponent({
     // AbortController for managing request cancellation - allows users to stop ongoing AI requests
     const currentAbortController = ref<AbortController | null>(null);
 
+    // NOTE: backgroundStreams / backgroundStreamMap / MAX_BACKGROUND_STREAMS are
+    // declared at MODULE scope (above defineComponent), not here. They must be
+    // shared across all O2AIChat instances so an in-flight stream started on the
+    // Home tab keeps rendering after navigating to a page where the sidebar
+    // instance takes over. See the comment on their declaration for why.
+
     // Typewriter animation state for LLM responses
-    const displayedStreamingContent = ref('');
+    const displayedStreamingContent = ref("");
     const typewriterAnimationId = ref<number | null>(null);
     const TYPEWRITER_SPEED = 8; // ms per character - fast like ChatGPT (5-10ms range)
 
@@ -679,28 +1709,46 @@ export default defineComponent({
     const lastStreamingSaveTime = ref<number>(0);
     const STREAMING_SAVE_INTERVAL = 3000; // Save at most every 3 seconds during streaming
 
+    // Pending images for current message
+    const pendingImages = ref<ImageAttachment[]>([]);
+    const imageInputRef = ref<HTMLInputElement | null>(null);
+    // Image preview dialog state
+    const showImagePreview = ref(false);
+    const previewImage = ref<ImageAttachment | null>(null);
+
+    // Context references for rich text input chips
+    const contextReferences = ref<ReferenceChip[]>([]);
+
+    // Component readiness tracking
+    const componentReady = ref(false);
+    const pendingChips = ref<ReferenceChip[]>([]);
+
+    // Set true in onUnmounted so watchers firing during teardown don't re-attach
+    // a just-detached stream back to this dying instance (see chatUpdated watch).
+    const isUnmounting = ref(false);
+
     // Analyzing messages for loading indicator
     const ANALYZING_MESSAGES = [
-      "Analyzing...",
-      "Thinking...",
-      "Processing...",
-      "Examining data...",
-      "Reviewing context...",
-      "Formulating response...",
-      "Checking details...",
-      "Gathering insights...",
-      "Evaluating options...",
-      "Synthesizing information...",
-      "Working on it...",
-      "Almost there...",
-      "Diving deeper...",
-      "Connecting the dots...",
-      "Crunching numbers...",
-      "Exploring possibilities...",
-      "Refining answer...",
-      "Still thinking...",
-      "Making progress...",
-      "Piecing together..."
+      t("aiAssistant.aiChat.analyzingMessages.analyzing"),
+      t("aiAssistant.aiChat.analyzingMessages.thinking"),
+      t("aiAssistant.aiChat.analyzingMessages.processing"),
+      t("aiAssistant.aiChat.analyzingMessages.examiningData"),
+      t("aiAssistant.aiChat.analyzingMessages.reviewingContext"),
+      t("aiAssistant.aiChat.analyzingMessages.formulatingResponse"),
+      t("aiAssistant.aiChat.analyzingMessages.checkingDetails"),
+      t("aiAssistant.aiChat.analyzingMessages.gatheringInsights"),
+      t("aiAssistant.aiChat.analyzingMessages.evaluatingOptions"),
+      t("aiAssistant.aiChat.analyzingMessages.synthesizingInformation"),
+      t("aiAssistant.aiChat.analyzingMessages.workingOnIt"),
+      t("aiAssistant.aiChat.analyzingMessages.almostThere"),
+      t("aiAssistant.aiChat.analyzingMessages.divingDeeper"),
+      t("aiAssistant.aiChat.analyzingMessages.connectingTheDots"),
+      t("aiAssistant.aiChat.analyzingMessages.crunchingNumbers"),
+      t("aiAssistant.aiChat.analyzingMessages.exploringPossibilities"),
+      t("aiAssistant.aiChat.analyzingMessages.refiningAnswer"),
+      t("aiAssistant.aiChat.analyzingMessages.stillThinking"),
+      t("aiAssistant.aiChat.analyzingMessages.makingProgress"),
+      t("aiAssistant.aiChat.analyzingMessages.piecingTogether"),
     ];
     const currentAnalyzingMessage = ref(ANALYZING_MESSAGES[0]);
     const analyzingRotationInterval = ref<NodeJS.Timeout | null>(null);
@@ -709,9 +1757,11 @@ export default defineComponent({
      * Start rotating the analyzing message every 5 seconds
      */
     const startAnalyzingRotation = () => {
-      currentAnalyzingMessage.value = ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
+      currentAnalyzingMessage.value =
+        ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
       analyzingRotationInterval.value = setInterval(() => {
-        currentAnalyzingMessage.value = ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
+        currentAnalyzingMessage.value =
+          ANALYZING_MESSAGES[Math.floor(Math.random() * ANALYZING_MESSAGES.length)];
       }, 5000);
     };
 
@@ -744,7 +1794,7 @@ export default defineComponent({
       const currentAnimationId = ++titleAnimationId.value;
 
       isTypingTitle.value = true;
-      displayedTitle.value = '';
+      displayedTitle.value = "";
       let charIndex = 0;
 
       titleIntervalId = setInterval(() => {
@@ -782,7 +1832,7 @@ export default defineComponent({
         titleIntervalId = null;
       }
       aiGeneratedTitle.value = null;
-      displayedTitle.value = '';
+      displayedTitle.value = "";
       isTypingTitle.value = false;
     };
 
@@ -790,7 +1840,7 @@ export default defineComponent({
      * Reset typewriter animation state
      */
     const resetTypewriterState = () => {
-      displayedStreamingContent.value = '';
+      displayedStreamingContent.value = "";
       if (typewriterAnimationId.value) {
         cancelAnimationFrame(typewriterAnimationId.value);
         typewriterAnimationId.value = null;
@@ -820,17 +1870,27 @@ export default defineComponent({
 
       if (codeBlockStart) {
         // Find the closing ``` and reveal entire code block instantly
-        const codeBlockEnd = remaining.indexOf('```', codeBlockStart[0].length);
+        const codeBlockEnd = remaining.indexOf("```", codeBlockStart[0].length);
         if (codeBlockEnd !== -1) {
           const endPos = codeBlockEnd + 3;
           displayedStreamingContent.value = target.slice(0, current.length + endPos);
         } else {
           // Code block not complete yet, reveal opening and wait
-          displayedStreamingContent.value = target.slice(0, current.length + codeBlockStart[0].length);
+          displayedStreamingContent.value = target.slice(
+            0,
+            current.length + codeBlockStart[0].length,
+          );
         }
       } else {
-        // Regular text - reveal one character
-        displayedStreamingContent.value = target.slice(0, current.length + 1);
+        // Regular text - reveal one character per tick when caught up, but
+        // catch up faster when a backlog has built up (e.g. the backend
+        // delivered a large chunk in one burst). Without this, a fixed
+        // 1-char-per-tick reveal can lag the actual stream by many seconds
+        // on bursty responses, then "snap" to the full text once the stream
+        // ends and the remaining backlog is force-flushed.
+        const backlog = remaining.length;
+        const revealCount = backlog > 200 ? Math.ceil(backlog / 20) : 1;
+        displayedStreamingContent.value = target.slice(0, current.length + revealCount);
       }
 
       // Schedule next frame
@@ -842,42 +1902,27 @@ export default defineComponent({
     // Query history functionality
     const queryHistory = ref<string[]>([]);
     const historyIndex = ref(-1);
-    const HISTORY_KEY = 'ai-chat-query-history';
+    const HISTORY_KEY = "ai-chat-query-history";
     const MAX_HISTORY_SIZE = 10;
-    
-    const modelConfig: any = {
-      openai: [
-        'gpt-4.1'
-      ],
-      groq: [
-        'llama-3.3-70b-versatile',
-        'meta-llama/llama-4-scout-17b-16e-instruct',
-        'meta-llama/llama-4-maverick-17b-128e-instruct'
-      ],
-      xai: [
-        'xai/grok-3-mini-beta',
-        'xai/grok-3-latest'
-      ]
-    };
 
     const capabilities = [
-      '1. Create a SQL query for me',
-      '2. Convert this SPL query to SQL',
-      '3. What is happening on this log line',
-      '4. Write a VRL function to parse these log lines',
-      '5. What are golden signals for observability',
-      '6. How to monitor kubernetes cluster',
-      '7. How to monitor docker containers',
-      '8. How to monitor aws services',
-      '9. How to monitor azure services',
-      '10. How to monitor google cloud services'
+      "1. Create a SQL query for me",
+      "2. Convert this SPL query to SQL",
+      "3. What is happening on this log line",
+      "4. Write a VRL function to parse these log lines",
+      "5. What are golden signals for observability",
+      "6. How to monitor kubernetes cluster",
+      "7. How to monitor docker containers",
+      "8. How to monitor aws services",
+      "9. How to monitor azure services",
+      "10. How to monitor google cloud services",
     ];
 
     const formatMessage = (content: string) => {
       try {
         return renderMarkdown(content);
       } catch (e) {
-        console.error('Error formatting message:', e);
+        console.error("Error formatting message:", e);
         return content;
       }
     };
@@ -888,18 +1933,18 @@ export default defineComponent({
 
     const checkIfShouldAutoScroll = () => {
       if (!messagesContainer.value) return;
-      
+
       const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
       const threshold = getScrollThreshold();
       const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
-      
+
       shouldAutoScroll.value = isAtBottom;
-      
+
       // Show scroll to bottom button when user scrolls up significantly
       // Only show if there's enough content to scroll and user is not at bottom
       const hasScrollableContent = scrollHeight > clientHeight + 100; // At least 100px more content
       const isScrolledUp = scrollTop + clientHeight < scrollHeight - 100; // 100px from bottom
-      
+
       showScrollToBottom.value = hasScrollableContent && isScrolledUp;
     };
 
@@ -915,7 +1960,7 @@ export default defineComponent({
       if (messagesContainer.value) {
         messagesContainer.value.scrollTo({
           top: messagesContainer.value.scrollHeight,
-          behavior: 'smooth'
+          behavior: "smooth",
         });
         // Hide the button immediately when user clicks it
         showScrollToBottom.value = false;
@@ -924,12 +1969,11 @@ export default defineComponent({
       }
     };
 
-
     const scrollToLoadingIndicator = async () => {
       await nextTick();
-      const loadingElement = document.getElementById('loading-indicator');
+      const loadingElement = document.getElementById("loading-indicator");
       if (loadingElement) {
-        loadingElement.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        loadingElement.scrollIntoView({ behavior: "smooth", block: "end" });
       }
     };
 
@@ -937,23 +1981,20 @@ export default defineComponent({
      * Cancels the currently ongoing AI chat request if one exists
      * This will stop the streaming response and clean up the request state
      * Shows a user-friendly notification about the cancellation
-     * 
+     *
      * Called when user clicks the "Stop" button during message generation
      */
     const cancelCurrentRequest = async () => {
       if (currentAbortController.value) {
         currentAbortController.value.abort();
         currentAbortController.value = null;
-        
+
         // Show user notification about successful cancellation
-        $q.notify({
-          message: 'Response generation stopped',
-          color: 'secondary',
-          position: 'bottom',
-          timeout: 2000,
-          icon: 'stop'
+        toast({
+          message: t("toastMessages.components.responseGenerationStopped"),
+          variant: "info",
         });
-        
+
         // Update UI state to reflect cancellation
         isLoading.value = false;
         activeToolCall.value = null;
@@ -969,7 +2010,7 @@ export default defineComponent({
         // Handle partial message cleanup
         if (chatMessages.value.length > 0) {
           const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-          if (lastMessage.role === 'assistant') {
+          if (lastMessage.role === "assistant") {
             if (!lastMessage.content) {
               // Remove empty assistant message that was added for streaming
               chatMessages.value.pop();
@@ -977,48 +2018,187 @@ export default defineComponent({
               // Update final text in contentBlocks to show all buffered content
               if (lastMessage.contentBlocks) {
                 const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-                if (lastBlock && lastBlock.type === 'text') {
+                if (lastBlock && lastBlock.type === "text") {
                   lastBlock.text = currentTextSegment.value;
                 }
               }
               // Keep partial content but indicate it was cancelled
-              lastMessage.content += '\n\n_[Response stopped by user]_';
+              lastMessage.content = raw(
+                lastMessage.content + "\n\n_[" + t("aiAssistant.responseStoppedByUser") + "]_",
+              );
             }
           }
         }
 
+        // Persist any tool calls that completed before the user hit Stop.
+        // During the tool phase (before the assistant streams text) completed
+        // steps sit in pendingToolCalls and aren't attached to a message yet,
+        // so without this they'd vanish on cancel. Runs after the partial-
+        // message cleanup above so the empty-assistant-message pop can't drop
+        // the message we attach them to.
+        if (pendingToolCalls.value.length) {
+          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+          if (lastMessage && lastMessage.role === "assistant") {
+            if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+            // Tools ran before any text, so place them ahead of it.
+            lastMessage.contentBlocks.unshift(...pendingToolCalls.value);
+          } else {
+            const stoppedNote = `_[${t("aiAssistant.responseStoppedByUser")}]_`;
+            chatMessages.value.push({
+              role: "assistant",
+              content: raw(stoppedNote),
+              contentBlocks: [...pendingToolCalls.value, { type: "text", text: stoppedNote }],
+            });
+          }
+          pendingToolCalls.value = [];
+        }
+
         // Reset streaming state
-        currentStreamingMessage.value = '';
-        currentTextSegment.value = '';
-        displayedStreamingContent.value = '';
+        currentStreamingMessage.value = "";
+        currentTextSegment.value = "";
+        displayedStreamingContent.value = "";
 
         // Save the current state including cancellation
         await saveToHistory();
-        
+
         // Scroll to show the final state
         await scrollToBottom();
       }
     };
 
-    watch(() => props.aiChatInputContext, (newAiChatInputContext: string) => {
-      if(newAiChatInputContext) {
-        if (props.appendMode) {
-          // Append mode: add to existing input with separator if needed
-          const currentValue = inputMessage.value?.trim();
-          if (currentValue) {
-            inputMessage.value = currentValue + "\n\n" + newAiChatInputContext;
-          } else {
-            inputMessage.value = newAiChatInputContext;
-          }
-          // Scroll to show the newly appended content
-          scrollInputToBottom();
-        } else {
-          // Replace mode: replace the input
-          inputMessage.value = newAiChatInputContext;
-        }
-      }
-    });
+    // Process any pending chips that were queued before component was ready
+    const processPendingChips = () => {
+      if (pendingChips.value.length > 0) {
+        nextTick(() => {
+          if (chatInput.value && typeof chatInput.value.insertChip === "function") {
+            // Focus input first to ensure cursor is positioned correctly
+            focusInput();
 
+            // Only clear if appendMode is false and there are no existing chips
+            // Check DOM directly for existing chips instead of relying on reactive state
+            const inputElement = chatInput.value.$el || chatInput.value;
+            const editableDiv =
+              inputElement?.querySelector(".rich-text-input") ||
+              inputElement?.querySelector("[contenteditable]");
+            const hasExistingChips = editableDiv?.querySelector(".reference-chip") !== null;
+            const hasExistingText = editableDiv?.textContent?.trim().length > 0;
+
+            // Only clear if:
+            // 1. appendMode is false (user wants to replace content)
+            // 2. AND there are no existing chips
+            // 3. AND there is no existing text
+            if (!props.appendMode && !hasExistingChips && !hasExistingText) {
+              if (chatInput.value && typeof chatInput.value.clear === "function") {
+                chatInput.value.clear();
+              }
+              inputMessage.value = "";
+            }
+
+            // Insert all pending chips at the cursor position
+            pendingChips.value.forEach((chip) => {
+              chatInput.value.insertChip(chip);
+            });
+            pendingChips.value = [];
+          }
+        });
+      }
+    };
+
+    // Helper to create a better preview of content
+    const createPreview = (content: string, maxLength: number = 40): string => {
+      // Clean up content
+      let preview = content.trim();
+
+      // Try to detect JSON and create a meaningful preview
+      try {
+        const parsed = JSON.parse(content);
+        if (typeof parsed === "object" && parsed !== null) {
+          // For objects, show first few keys
+          const keys = Object.keys(parsed);
+          if (keys.length > 0) {
+            const firstKeys = keys
+              .slice(0, 3)
+              .map((k) => {
+                const val = parsed[k];
+                if (typeof val === "string") {
+                  const truncatedVal = val.length > 8 ? val.substring(0, 8) + "..." : val;
+                  return k + ': "' + truncatedVal + '"';
+                }
+                return k + ": " + String(val).substring(0, 8);
+              })
+              .join(", ");
+            const moreKeys = keys.length > 3 ? ", ..." : "";
+            preview = "{" + firstKeys + moreKeys + "}";
+          }
+        }
+      } catch {
+        // Not JSON, use plain text preview
+        // Replace newlines and multiple spaces with single space
+        preview = preview.replace(/\s+/g, " ");
+      }
+
+      // Truncate if still too long
+      if (preview.length > maxLength) {
+        preview = preview.substring(0, maxLength) + "...";
+      }
+
+      return preview;
+    };
+
+    watch(
+      () => props.aiChatInputContext,
+      (newAiChatInputContext: string) => {
+        if (newAiChatInputContext) {
+          // Create a reference chip from the context
+          const contextChip: ReferenceChip = {
+            id: `context-${Date.now()}`,
+            // Not translated: this filename is spliced verbatim into the
+            // `--- Log Entry ---` delimiter of the prompt sent to the LLM, so the
+            // delimiter must stay stable across locales.
+            filename: raw("Log Entry"),
+            preview: createPreview(newAiChatInputContext, 10),
+            fullContent: newAiChatInputContext,
+            charCount: newAiChatInputContext.length,
+            type: "context",
+          };
+
+          // Always queue the chip first for consistent behavior
+          pendingChips.value.push(contextChip);
+
+          // If component is ready, process immediately with proper timing
+          if (
+            componentReady.value &&
+            chatInput.value &&
+            typeof chatInput.value.insertChip === "function"
+          ) {
+            // Use a small delay to ensure input is focused and ready
+            nextTick(() => {
+              setTimeout(() => {
+                processPendingChips();
+              }, 50);
+            });
+          }
+          // If component not ready, chips will be processed when componentReady becomes true
+          // No fallback text needed - avoids flickering when chat opens
+        }
+      },
+    );
+
+    // Atomic payload watcher — text + autoSend arrive together, no timing race
+    watch(
+      () => props.aiChatPayload,
+      (payload) => {
+        if (!payload?.text) return;
+        if (payload.autoSend) {
+          inputMessage.value = payload.text;
+          nextTick(() => {
+            setTimeout(() => {
+              sendMessage();
+            }, 50);
+          });
+        }
+      },
+    );
 
     //fetchInitialMessage is called when the component is mounted and the isOpen prop is true
 
@@ -1027,22 +2207,134 @@ export default defineComponent({
       try {
         chatMessages.value = [];
       } catch (error) {
-        chatMessages.value = [{
-          role: 'assistant',
-          content: 'Error: Unable to connect to backend'
-        }];
-        console.error('Error fetching initial message:', error);
+        chatMessages.value = [
+          {
+            role: "assistant",
+            content: t("aiAssistant.backendConnectionError"),
+          },
+        ];
+        console.error("Error fetching initial message:", error);
       }
       isLoading.value = false;
       stopAnalyzingRotation();
       scrollToBottom();
     };
 
+    /**
+     * Extract streamed assistant text from an SSE event.
+     *
+     * The o2-ai (opencode) backend emits streamed text as
+     *   {"type":"message_delta","content":"<plain string>"}
+     * and non-streamed notices as {"type":"message","content":"..."} — the text
+     * is ALWAYS the plain-string `content` field. We also defensively accept the
+     * handful of OpenAI-compatible shapes the enterprise RCA proxy can surface
+     * (`response`, `delta.content`, `choices[].delta.content`, `text`) so an
+     * agent/proxy variant doesn't silently render nothing. Returns the text, or
+     * null when the event carries no assistant text.
+     */
+    const extractStreamText = (data: any): string | null => {
+      if (data == null || typeof data !== "object") return null;
+
+      // Canonical o2-ai chat shape.
+      if (typeof data.content === "string") return data.content;
+
+      // Defensive fallbacks (OpenAI-style / RCA proxy formats).
+      if (typeof data.response === "string") return data.response;
+      if (data.delta && typeof data.delta.content === "string") {
+        return data.delta.content;
+      }
+      const firstChoice = Array.isArray(data.choices) ? data.choices[0] : null;
+      if (firstChoice && typeof firstChoice.delta?.content === "string") {
+        return firstChoice.delta.content;
+      }
+      if (typeof data.text === "string") return data.text;
+
+      return null;
+    };
+
     const processStream = async (reader: ReadableStreamDefaultReader<Uint8Array>) => {
       const decoder = new TextDecoder();
-      let buffer = '';
+      let buffer = "";
       let messageComplete = false;
-      
+
+      // --- Stream context: captured at call time ---
+      // When the user switches sessions mid-stream, chatMessages.value gets
+      // replaced with a new array. This captured reference keeps the stream
+      // writing to the ORIGINAL array so data isn't lost.
+      const msgs = chatMessages.value;
+      let ctxSessionId = currentSessionId.value;
+      let ctxChatId = currentChatId.value;
+      let ctxTitle: string | undefined = aiGeneratedTitle.value || undefined;
+
+      // Local streaming accumulators (synced to refs only when active)
+      let streamingMsg = currentStreamingMessage.value;
+      let textSegment = currentTextSegment.value;
+
+      const isActive = () => chatMessages.value === msgs;
+
+      const syncStreamingRefs = () => {
+        if (isActive()) {
+          currentStreamingMessage.value = streamingMsg;
+          currentTextSegment.value = textSegment;
+        }
+      };
+
+      // Context-aware save: uses captured metadata when detached
+      const saveCtx = async () => {
+        if (msgs.length === 0) return;
+        if (!ctxSessionId) {
+          ctxSessionId = getUUIDv7();
+          if (isActive()) currentSessionId.value = ctxSessionId;
+        }
+        const title = isActive() ? aiGeneratedTitle.value || undefined : ctxTitle;
+        const chatId = isActive() ? currentChatId.value : ctxChatId;
+        const resultId = await dbSaveToHistory(msgs, ctxSessionId, title, chatId);
+        if (!chatId && resultId) {
+          if (isActive()) {
+            currentChatId.value = resultId;
+            // Carry the new-chat preference onto the chat id. Persist the actual
+            // value (ON by default) so an explicit user disable is honored.
+            autoNavigationPreferences.value.set(resultId, pendingAutoNavigation.value);
+            saveAutoNavigationPreferences();
+          } else {
+            ctxChatId = resultId;
+          }
+        }
+      };
+
+      let lastSaveTime = lastStreamingSaveTime.value;
+      const throttledSaveCtx = async (force = false) => {
+        const now = Date.now();
+        if (force || now - lastSaveTime >= STREAMING_SAVE_INTERVAL) {
+          lastSaveTime = now;
+          if (isActive()) lastStreamingSaveTime.value = now;
+          await saveCtx();
+        }
+      };
+
+      // Local finalizeTextBlock: operates on captured msgs, not chatMessages.value
+      const localFinalizeTextBlock = () => {
+        if (textSegment) {
+          const lm = msgs[msgs.length - 1];
+          if (lm && lm.role === "assistant" && lm.contentBlocks) {
+            const lb = lm.contentBlocks[lm.contentBlocks.length - 1];
+            if (lb && lb.type === "text") {
+              lb.text = textSegment;
+            }
+          }
+        }
+        if (isActive()) {
+          if (typewriterAnimationId.value) {
+            cancelAnimationFrame(typewriterAnimationId.value);
+            typewriterAnimationId.value = null;
+          }
+          displayedStreamingContent.value = "";
+        }
+        textSegment = "";
+        syncStreamingRefs();
+      };
+      // --- End stream context ---
+
       try {
         while (true) {
           const { done, value } = await reader.read();
@@ -1050,43 +2342,143 @@ export default defineComponent({
 
           // Append new chunk to existing buffer
           buffer += decoder.decode(value, { stream: true });
-          
+
           // Process each line that starts with 'data: '
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep last potentially incomplete line
-          
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || ""; // Keep last potentially incomplete line
+
           for (const line of lines) {
-            if (line.trim().startsWith('data: ')) {
+            if (line.trim().startsWith("data: ")) {
               try {
                 // Extract everything after 'data: ' and before any line break
-                const jsonStr = line.substring(line.indexOf('{'));
-                
+                const jsonStr = line.substring(line.indexOf("{"));
+
                 // Skip empty or invalid JSON strings
                 if (!jsonStr || !jsonStr.trim()) continue;
-                
+
                 // Try to parse the JSON, handling potential errors
                 try {
                   const data = JSON.parse(jsonStr);
 
                   // Handle title events - AI-generated chat title from first message
-                  if (data && data.type === 'title') {
-                    aiGeneratedTitle.value = data.title;
-                    animateTitle(data.title);
+                  if (data && data.type === "title") {
+                    ctxTitle = data.title;
+                    if (isActive()) {
+                      aiGeneratedTitle.value = data.title;
+                      animateTitle(data.title);
+                    }
+                    continue;
+                  }
+
+                  // Handle confirmation_required events - add inline confirmation block in chat
+                  if (data && data.type === "confirmation_required") {
+                    localFinalizeTextBlock();
+
+                    // When detached, auto-deny confirmations to unblock the stream
+                    if (!isActive()) {
+                      try {
+                        const orgId = store.state.selectedOrganization.identifier;
+                        const res = await fetch(
+                          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({ approved: false }),
+                          },
+                        );
+                        // Detached stream, so there is nothing to show the user —
+                        // but a silent failure leaves the agent paused.
+                        if (!res.ok) {
+                          console.error(
+                            `Auto-deny not registered (HTTP ${res.status}) for background stream ${ctxSessionId}`,
+                          );
+                        }
+                      } catch (error) {
+                        console.error(
+                          "Error auto-denying confirmation for background stream:",
+                          error,
+                        );
+                      }
+                      continue;
+                    }
+
+                    // Check if this is a navigation action and auto navigation is enabled
+                    if (data.tool === "navigation_action" && isAutoNavigationEnabled.value) {
+                      // Auto-approve navigation without showing confirmation
+                      try {
+                        const orgId = store.state.selectedOrganization.identifier;
+                        const res = await fetch(
+                          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${ctxSessionId}`,
+                          {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            credentials: "include",
+                            body: JSON.stringify({ approved: true }),
+                          },
+                        );
+                        if (!res.ok) {
+                          console.error(
+                            `Auto-approval not registered (HTTP ${res.status}) for session ${ctxSessionId}`,
+                          );
+                        }
+                      } catch (error) {
+                        console.error("Error auto-confirming navigation:", error);
+                      }
+                      continue;
+                    }
+
+                    // data.message is always set by the backend:
+                    // - Navigation: validated label (e.g. "View in Logs")
+                    // - Other tools: "Confirm execution of {tool}?"
+                    const confirmBlock: ContentBlock = {
+                      type: "tool_call",
+                      tool: data.tool,
+                      message: activeToolCall.value?.message || data.message,
+                      context: activeToolCall.value?.context || {},
+                      call_id: data.call_id || activeToolCall.value?.call_id || undefined,
+                      pendingConfirmation: true,
+                      confirmationMessage: data.message,
+                      confirmationArgs: data.args || {},
+                    };
+                    activeToolCall.value = null;
+
+                    let lastMessage = msgs[msgs.length - 1];
+                    if (lastMessage && lastMessage.role === "assistant") {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(confirmBlock);
+                    } else {
+                      msgs.push({
+                        role: "assistant",
+                        content: raw(""),
+                        contentBlocks: [...pendingToolCalls.value, confirmBlock],
+                      });
+                      pendingToolCalls.value = [];
+                    }
+                    pendingConfirmation.value = {
+                      tool: data.tool,
+                      args: data.args || {},
+                      message:
+                        data.message ||
+                        t("aiAssistant.aiChat.confirmToolExecution", { tool: data.tool }),
+                    };
+                    await scrollToBottom();
                     continue;
                   }
 
                   // Handle tool_call events - show spinner indicator, don't add to chat yet
-                  if (data && data.type === 'tool_call') {
+                  if (data && data.type === "tool_call") {
                     // If there's already an active tool call, complete it first
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
-                        type: 'tool_call',
+                        type: "tool_call",
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
-                        context: activeToolCall.value.context
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id,
                       };
-                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                      if (lastMessage && lastMessage.role === 'assistant') {
+                      let lastMessage = msgs[msgs.length - 1];
+                      if (lastMessage && lastMessage.role === "assistant") {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
@@ -1095,167 +2487,474 @@ export default defineComponent({
                     }
 
                     // Show active indicator (blue spinner box) - don't add to chat yet
-                    activeToolCall.value = {
-                      tool: data.tool,
-                      message: data.message,
-                      context: data.context || {}
-                    };
+                    if (isActive()) {
+                      activeToolCall.value = {
+                        tool: data.tool,
+                        message: data.message,
+                        context: data.context || {},
+                        call_id: data.call_id || undefined,
+                      };
+                    }
 
-                    // Reset text segment - next text will start a new block
-                    currentTextSegment.value = '';
-                    await scrollToBottom();
+                    localFinalizeTextBlock();
+                    if (isActive()) await scrollToBottom();
                     continue;
                   }
 
                   // Handle error events - display error message to user
-                  if (data && data.type === 'error') {
+                  if (data && data.type === "error") {
+                    // Owning replica is gone — flag and stop; sendMessage
+                    // restores the conversation once the stream ends.
+                    if (data.code === "session_owner_unavailable") {
+                      streamOwnerUnavailable.value = true;
+                      continue;
+                    }
                     // Complete any active tool call first
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                    let lastMessage = msgs[msgs.length - 1];
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
-                        type: 'tool_call',
+                        type: "tool_call",
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
-                        context: activeToolCall.value.context
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id,
                       };
-                      if (lastMessage && lastMessage.role === 'assistant') {
+                      if (lastMessage && lastMessage.role === "assistant") {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
                       }
-                      activeToolCall.value = null;
+                      if (isActive()) activeToolCall.value = null;
                     }
 
                     // Format error message with suggestion if available
                     // Handle case where error/message might be an object instead of string
-                    const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
-                    const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
+                    const rawError =
+                      data.error ?? data.message ?? t("aiAssistant.aiChat.unexpectedError");
+                    const errorText =
+                      typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
 
-                    let errorMessage = `Error: ${errorText}`;
-                    if (data.suggestion) {
+                    // Check if this is an authorization/access error
+                    const authErr = isAuthError(errorText, data.error_type);
+                    // Widened to `string`: the branded `I18nText` from t() does not survive
+                    // the `+=` below, and `data.suggestion` is server prose appended as a
+                    // separate paragraph, not a spliced sentence fragment.
+                    let errorMessage: string = authErr
+                      ? t(UNAUTHORIZED_MESSAGE_KEY)
+                      : t("common.errorPrefix", { message: errorText });
+                    if (data.suggestion && !authErr) {
                       errorMessage += `\n\n${data.suggestion}`;
                     }
 
                     // Get or create assistant message for error (reuse lastMessage)
-                    lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                    if (!lastMessage || lastMessage.role !== 'assistant') {
-                      chatMessages.value.push({
-                        role: 'assistant',
-                        content: errorMessage,
-                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: errorMessage }]
+                    lastMessage = msgs[msgs.length - 1];
+                    if (!lastMessage || lastMessage.role !== "assistant") {
+                      msgs.push({
+                        role: "assistant",
+                        content: raw(errorMessage),
+                        contentBlocks: [
+                          ...pendingToolCalls.value,
+                          { type: "text", text: errorMessage },
+                        ],
                       });
                       pendingToolCalls.value = [];
                     } else {
                       // Append error to existing message
                       if (lastMessage.content) {
-                        lastMessage.content += '\n\n' + errorMessage;
+                        lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
                       } else {
-                        lastMessage.content = errorMessage;
+                        lastMessage.content = raw(errorMessage);
                       }
                       if (!lastMessage.contentBlocks) {
                         lastMessage.contentBlocks = [];
                       }
-                      lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
+                      lastMessage.contentBlocks.push({
+                        type: "text",
+                        text: errorMessage,
+                      });
                       // Clear pending tool calls to avoid leaking into later messages
                       pendingToolCalls.value = [];
                     }
 
                     // Reset streaming state
-                    currentTextSegment.value = '';
+                    textSegment = "";
+                    syncStreamingRefs();
 
                     // Save error message to history
-                    await saveToHistory();
-                    await scrollToBottom();
+                    await saveCtx();
+                    if (isActive()) await scrollToBottom();
 
                     // Stop processing further as error occurred
                     return;
                   }
 
                   // Handle complete events - complete any active tool call
-                  if (data && data.type === 'complete') {
+                  if (data && data.type === "complete") {
+                    // Capture trace_id for feedback correlation
+                    if (data.trace_id && isActive()) {
+                      lastTraceId.value = data.trace_id;
+                    }
                     if (activeToolCall.value) {
                       const completedToolBlock: ContentBlock = {
-                        type: 'tool_call',
+                        type: "tool_call",
                         tool: activeToolCall.value.tool,
                         message: activeToolCall.value.message,
-                        context: activeToolCall.value.context
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id,
                       };
-                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                      if (lastMessage && lastMessage.role === 'assistant') {
+                      let lastMessage = msgs[msgs.length - 1];
+                      if (lastMessage && lastMessage.role === "assistant") {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
                       }
-                      activeToolCall.value = null;
+                      if (isActive()) activeToolCall.value = null;
+                    }
+                    // Flush any tool calls that completed before the assistant
+                    // produced text. With opencode, action-only turns (dashboard/
+                    // alert creation, navigation) finish without any `message`
+                    // event, so these blocks would otherwise stay stranded in
+                    // pendingToolCalls and never render — the user sees progress
+                    // "flash and disappear".
+                    if (pendingToolCalls.value.length) {
+                      let lastMessage = msgs[msgs.length - 1];
+                      if (lastMessage && lastMessage.role === "assistant") {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(...pendingToolCalls.value);
+                      } else {
+                        msgs.push({
+                          role: "assistant",
+                          content: raw(""),
+                          contentBlocks: [...pendingToolCalls.value],
+                        });
+                      }
+                      pendingToolCalls.value = [];
+                      if (isActive()) await throttledSaveCtx(true);
                     }
                     continue;
                   }
 
-                  // Handle message content (type === 'message' or legacy format with just content)
-                  if (data && typeof data.content === 'string') {
-                    // Complete any active tool call first (add green checkmark to chat)
-                    if (activeToolCall.value) {
+                  // Handle tool_result events - enrich tool call with result data
+                  if (data && data.type === "tool_result") {
+                    const resultData = {
+                      success: data.success !== false,
+                      resultMessage: data.message || "",
+                      summary: data.summary || undefined,
+                      errorType: data.error_type || undefined,
+                      suggestion: data.suggestion || undefined,
+                      details: data.details || undefined,
+                      response: data.response || undefined,
+                    };
+
+                    // Generate navigation from tool result if applicable
+                    let navigationAction: NavigationAction | null = null;
+                    if (data.success !== false && data.call_args) {
+                      navigationAction = generateNavigationFromToolResult(
+                        data.tool,
+                        data.call_args,
+                        data,
+                      );
+                    }
+
+                    // Emit dashboard event only when stream is active (foreground)
+                    if (data.success !== false && isActive()) {
+                      const resolvedToolName =
+                        data.tool && data.tool !== "tools_call" ? data.tool : "";
+                      const callArgs = data.call_args || {};
+                      const dashboardEventType = getDashboardEventType(resolvedToolName);
+                      if (dashboardEventType) {
+                        const dashboardId =
+                          callArgs.dashboard_id ||
+                          callArgs.args?.dashboard_id ||
+                          callArgs.request_body?.dashboard_id;
+                        if (dashboardId) {
+                          const folderId =
+                            callArgs.folder ||
+                            callArgs.args?.folder ||
+                            callArgs.request_body?.folder;
+                          emitDashboardEvent({
+                            type: dashboardEventType,
+                            dashboardId,
+                            folderId,
+                          });
+                        } else {
+                          console.warn(
+                            `[O2AIChat] Could not extract dashboardId from call_args for tool "${resolvedToolName}". Skipping dashboard event.`,
+                            callArgs,
+                          );
+                        }
+                      }
+                    }
+
+                    // Match by call_id if available, fall back to tool name
+                    const matchesActiveToolCall =
+                      activeToolCall.value &&
+                      ((data.call_id && activeToolCall.value.call_id === data.call_id) ||
+                        (!data.call_id && activeToolCall.value.tool === data.tool));
+
+                    // If active tool call matches, complete it with result data
+                    if (matchesActiveToolCall) {
                       const completedToolBlock: ContentBlock = {
-                        type: 'tool_call',
-                        tool: activeToolCall.value.tool,
-                        message: activeToolCall.value.message,
-                        context: activeToolCall.value.context
+                        type: "tool_call",
+                        tool: activeToolCall.value!.tool,
+                        message: activeToolCall.value!.message,
+                        context: activeToolCall.value!.context,
+                        call_id: activeToolCall.value!.call_id,
+                        ...resultData,
+                        ...(navigationAction && { navigationAction }),
                       };
-                      let lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                      if (lastMessage && lastMessage.role === 'assistant') {
+                      let lastMessage = msgs[msgs.length - 1];
+                      if (lastMessage && lastMessage.role === "assistant") {
                         if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                         lastMessage.contentBlocks.push(completedToolBlock);
                       } else {
                         pendingToolCalls.value.push(completedToolBlock);
                       }
+                      if (isActive()) activeToolCall.value = null;
+                    } else {
+                      // Tool was already completed — retroactively enrich the matching block
+                      const lastMessage = msgs[msgs.length - 1];
+                      if (lastMessage && lastMessage.contentBlocks) {
+                        for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
+                          const block = lastMessage.contentBlocks[i];
+                          const blockMatches = data.call_id
+                            ? block.call_id === data.call_id
+                            : block.type === "tool_call" &&
+                              block.tool === data.tool &&
+                              block.success === undefined;
+                          if (blockMatches) {
+                            Object.assign(block, resultData);
+                            if (navigationAction) {
+                              block.navigationAction = navigationAction;
+                            }
+                            break;
+                          }
+                        }
+                      }
+                      // Also check pending tool calls
+                      for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
+                        const block = pendingToolCalls.value[i];
+                        const blockMatches = data.call_id
+                          ? block.call_id === data.call_id
+                          : block.type === "tool_call" &&
+                            block.tool === data.tool &&
+                            block.success === undefined;
+                        if (blockMatches) {
+                          Object.assign(block, resultData);
+                          break;
+                        }
+                      }
+                    }
+                    if (isActive()) await scrollToBottom();
+                    continue;
+                  }
+
+                  // Handle navigation_action events - check auto navigation setting
+                  // (clickable buttons on tool results are generated by frontend from tool_result data)
+                  if (data && data.type === "navigation_action") {
+                    localFinalizeTextBlock();
+
+                    // Skip navigation when stream is detached (background)
+                    if (!isActive()) continue;
+
+                    const navAction: NavigationAction = {
+                      resource_type: data.resource_type,
+                      action: data.action,
+                      label: data.label,
+                      target: data.target,
+                    };
+
+                    // Check if auto navigation is enabled
+                    if (isAutoNavigationEnabled.value) {
+                      // Auto-navigate without confirmation
+                      await handleNavigationAction(navAction);
+                    } else {
+                      // Show confirmation dialog
+                      // Store the navigation action for later use
+                      const confirmBlock: ContentBlock = {
+                        type: "tool_call",
+                        tool: "navigation_action",
+                        message: data.label || t("aiAssistant.aiChat.navigateConfirmQuestion"),
+                        context: { navAction },
+                        pendingConfirmation: true,
+                        confirmationMessage: data.label,
+                        confirmationArgs: data.target || {},
+                      };
                       activeToolCall.value = null;
+
+                      let lastMessage = msgs[msgs.length - 1];
+                      if (lastMessage && lastMessage.role === "assistant") {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(confirmBlock);
+                      } else {
+                        msgs.push({
+                          role: "assistant",
+                          content: raw(""),
+                          contentBlocks: [...pendingToolCalls.value, confirmBlock],
+                        });
+                        pendingToolCalls.value = [];
+                      }
+
+                      // Set pending confirmation with navigation action data
+                      pendingConfirmation.value = {
+                        tool: "navigation_action",
+                        args: data.target || {},
+                        message: data.label || t("aiAssistant.aiChat.navigateConfirmQuestion"),
+                      };
+
+                      // Store the navigation action for later execution
+                      pendingConfirmation.value.navAction = navAction;
+
+                      await scrollToBottom();
+                    }
+                    continue;
+                  }
+
+                  // Handle error events - stream-level errors
+                  if (data && data.type === "error") {
+                    // Owning replica is gone — flag and stop; sendMessage restores
+                    // the conversation once the stream ends. Rendering the raw
+                    // error too would dead-end above the restored conversation.
+                    if (data.code === "session_owner_unavailable") {
+                      streamOwnerUnavailable.value = true;
+                      continue;
+                    }
+                    // Complete any active tool call as failed
+                    if (activeToolCall.value) {
+                      const failedToolBlock: ContentBlock = {
+                        type: "tool_call",
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id,
+                        success: false,
+                        resultMessage: data.message || t("aiAssistant.aiChat.toolExecutionFailed"),
+                        errorType: data.error_type || undefined,
+                        suggestion: data.suggestion || undefined,
+                      };
+                      let lastMessage = msgs[msgs.length - 1];
+                      if (lastMessage && lastMessage.role === "assistant") {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(failedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(failedToolBlock);
+                      }
+                      if (isActive()) activeToolCall.value = null;
                     }
 
-                    // Format code blocks with proper line breaks
-                    let content = data.content;
-                    content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
-                    content = content.replace(/([^`])\s*```/g, '$1\n```');
-
-                    // Add newline separator if starting a new text segment after tool call
-                    if (currentStreamingMessage.value && currentTextSegment.value === '') {
-                      currentStreamingMessage.value += '\n\n';
+                    // Add inline error block
+                    const rawErrorMessage =
+                      data.message || data.error || t("aiAssistant.aiChat.errorOccurred");
+                    const authErr = isAuthError(rawErrorMessage, data.error_type);
+                    const errorBlock: ContentBlock = {
+                      type: "error",
+                      message: authErr ? t(UNAUTHORIZED_MESSAGE_KEY) : rawErrorMessage,
+                      errorType: data.error_type || undefined,
+                      suggestion: authErr ? undefined : data.suggestion || undefined,
+                      recoverable: authErr ? false : (data.recoverable ?? undefined),
+                    };
+                    let lastMessage = msgs[msgs.length - 1];
+                    if (lastMessage && lastMessage.role === "assistant") {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(errorBlock);
+                    } else {
+                      msgs.push({
+                        role: "assistant",
+                        content: raw(""),
+                        contentBlocks: [...pendingToolCalls.value, errorBlock],
+                      });
+                      pendingToolCalls.value = [];
                     }
-                    // Add newline between consecutive message events if needed
-                    // (when current content doesn't end with newline and new content doesn't start with newline)
-                    else if (currentStreamingMessage.value &&
-                             !currentStreamingMessage.value.endsWith('\n') &&
-                             !content.startsWith('\n')) {
-                      currentStreamingMessage.value += '\n\n';
-                      currentTextSegment.value += '\n\n';
+                    messageComplete = true;
+                    if (isActive()) await scrollToBottom();
+                    continue;
+                  }
+
+                  // Handle streamed deltas and full/legacy message content.
+                  // Tolerant of multiple shapes (content/text/delta/nested/OpenAI)
+                  // so an agent schema change doesn't silently drop text.
+                  const streamText = extractStreamText(data);
+                  if (typeof streamText === "string") {
+                    // Complete any active tool call first (add green checkmark to chat)
+                    if (activeToolCall.value) {
+                      const completedToolBlock: ContentBlock = {
+                        type: "tool_call",
+                        tool: activeToolCall.value.tool,
+                        message: activeToolCall.value.message,
+                        context: activeToolCall.value.context,
+                        call_id: activeToolCall.value.call_id,
+                      };
+                      let lastMessage = msgs[msgs.length - 1];
+                      if (lastMessage && lastMessage.role === "assistant") {
+                        if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                        lastMessage.contentBlocks.push(completedToolBlock);
+                      } else {
+                        pendingToolCalls.value.push(completedToolBlock);
+                      }
+                      if (isActive()) activeToolCall.value = null;
+                    }
+
+                    // Deltas (append verbatim) vs full/legacy messages (reformat
+                    // code fences). o2-ai streams text as type "message_delta";
+                    // any content arriving via a non-`content` fallback field is
+                    // also an incremental delta.
+                    const isMessageDelta =
+                      data.type === "message_delta" || typeof data.content !== "string";
+
+                    // Format code blocks with proper line breaks for full/legacy
+                    // messages. Deltas must be appended exactly as received.
+                    let content = streamText;
+                    if (!isMessageDelta) {
+                      content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
+                      content = content.replace(/([^`])\s*```/g, "$1\n```");
+                    }
+
+                    if (!isMessageDelta) {
+                      // Add newline separator if starting a new text segment after tool call
+                      if (streamingMsg && textSegment === "") {
+                        streamingMsg += "\n\n";
+                      }
+                      // Add newline between consecutive full/legacy message events if needed
+                      else if (
+                        streamingMsg &&
+                        !streamingMsg.endsWith("\n") &&
+                        !content.startsWith("\n")
+                      ) {
+                        streamingMsg += "\n\n";
+                        textSegment += "\n\n";
+                      }
                     }
 
                     // Accumulate to both total content and current segment
-                    currentStreamingMessage.value += content;
-                    currentTextSegment.value += content;
+                    streamingMsg += content;
+                    textSegment += content;
+                    syncStreamingRefs();
 
                     // Start typewriter animation if not already running
-                    if (!typewriterAnimationId.value) {
+                    if (isActive() && !typewriterAnimationId.value) {
                       animateStreamingText();
                     }
 
                     // Get or create assistant message
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                    if (!lastMessage || lastMessage.role !== 'assistant') {
+                    let lastMessage = msgs[msgs.length - 1];
+                    if (!lastMessage || lastMessage.role !== "assistant") {
                       // Create new assistant message with pending tool calls + text
-                      // Use displayedStreamingContent for animated display
-                      chatMessages.value.push({
-                        role: 'assistant',
-                        content: currentStreamingMessage.value,
-                        contentBlocks: [...pendingToolCalls.value, { type: 'text', text: displayedStreamingContent.value }]
+                      msgs.push({
+                        role: "assistant",
+                        content: raw(streamingMsg),
+                        contentBlocks: [
+                          ...pendingToolCalls.value,
+                          { type: "text", text: textSegment },
+                        ],
                       });
                       pendingToolCalls.value = []; // Clear pending
                       // Save immediately when assistant message is first created to prevent data loss on reload
-                      await throttledStreamingSave(true);
+                      await throttledSaveCtx(true);
                     } else {
                       // Update existing assistant message's total content
-                      lastMessage.content = currentStreamingMessage.value;
+                      lastMessage.content = raw(streamingMsg);
 
                       // Update or add text block in contentBlocks
                       if (!lastMessage.contentBlocks) {
@@ -1263,26 +2962,30 @@ export default defineComponent({
                       }
 
                       // Find the last text block and update it, or create new one
-                      const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-                      if (lastBlock && lastBlock.type === 'text') {
-                        // Append to existing text block (same segment) - use animated content for display
-                        lastBlock.text = displayedStreamingContent.value;
+                      const lastBlock =
+                        lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+                      if (lastBlock && lastBlock.type === "text") {
+                        // Append to existing text block (same segment)
+                        lastBlock.text = textSegment;
                       } else {
                         // Add new text block (after tool call - new segment)
-                        lastMessage.contentBlocks.push({ type: 'text', text: displayedStreamingContent.value });
+                        lastMessage.contentBlocks.push({
+                          type: "text",
+                          text: textSegment,
+                        });
                       }
                       // Throttled save during streaming to preserve progress
-                      await throttledStreamingSave();
+                      await throttledSaveCtx();
                     }
                     messageComplete = true;
-                    await scrollToBottom();
+                    if (isActive()) await scrollToBottom();
                   }
                 } catch (jsonError) {
-                  console.debug('JSON parse error:', jsonError, 'for line:', jsonStr);
+                  console.debug("JSON parse error:", jsonError, "for line:", jsonStr);
                   continue;
                 }
               } catch (e) {
-                console.debug('Error processing line:', e, 'Line:', line);
+                console.debug("Error processing line:", e, "Line:", line);
                 continue;
               }
             }
@@ -1291,34 +2994,37 @@ export default defineComponent({
 
         // Process any remaining complete data in buffer
         if (buffer.trim()) {
-          const lines = buffer.split('\n');
+          const lines = buffer.split("\n");
           for (const line of lines) {
-            if (line.trim().startsWith('data: ')) {
+            if (line.trim().startsWith("data: ")) {
               try {
-                const jsonStr = line.substring(line.indexOf('{'));
+                const jsonStr = line.substring(line.indexOf("{"));
                 if (!jsonStr || !jsonStr.trim()) continue;
 
                 const data = JSON.parse(jsonStr);
 
-                // Handle title events - AI-generated chat title from first message
-                if (data && data.type === 'title') {
-                  aiGeneratedTitle.value = data.title;
-                  animateTitle(data.title);
+                // Handle title events
+                if (data && data.type === "title") {
+                  ctxTitle = data.title;
+                  if (isActive()) {
+                    aiGeneratedTitle.value = data.title;
+                    animateTitle(data.title);
+                  }
                   continue;
                 }
 
-                // Handle tool_call events - show spinner, don't add to chat yet
-                if (data && data.type === 'tool_call') {
-                  // If there's already an active tool call, complete it first
+                // Handle tool_call events
+                if (data && data.type === "tool_call") {
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
-                      type: 'tool_call',
+                      type: "tool_call",
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
-                      context: activeToolCall.value.context
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id,
                     };
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                    if (lastMessage && lastMessage.role === 'assistant') {
+                    let lastMessage = msgs[msgs.length - 1];
+                    if (lastMessage && lastMessage.role === "assistant") {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
@@ -1326,181 +3032,328 @@ export default defineComponent({
                     }
                   }
 
-                  // Set new active tool call (shows spinner indicator)
-                  activeToolCall.value = {
-                    tool: data.tool,
-                    message: data.message,
-                    context: data.context || {}
-                  };
+                  if (isActive()) {
+                    activeToolCall.value = {
+                      tool: data.tool,
+                      message: data.message,
+                      context: data.context || {},
+                      call_id: data.call_id || undefined,
+                    };
+                  }
 
-                  // Reset text segment for next text block
-                  currentTextSegment.value = '';
+                  localFinalizeTextBlock();
                   continue;
                 }
 
-                // Handle error events - display error message to user
-                if (data && data.type === 'error') {
-                  // Complete any active tool call first
-                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+                // Handle error events
+                if (data && data.type === "error") {
+                  // Owning replica is gone — flag and stop; sendMessage
+                  // restores the conversation once the stream ends.
+                  if (data.code === "session_owner_unavailable") {
+                    streamOwnerUnavailable.value = true;
+                    continue;
+                  }
+                  let lastMessage = msgs[msgs.length - 1];
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
-                      type: 'tool_call',
+                      type: "tool_call",
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
-                      context: activeToolCall.value.context
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id,
                     };
-                    if (lastMessage && lastMessage.role === 'assistant') {
+                    if (lastMessage && lastMessage.role === "assistant") {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
                     }
-                    activeToolCall.value = null;
+                    if (isActive()) activeToolCall.value = null;
                   }
 
-                  // Format error message with suggestion if available
-                  // Handle case where error/message might be an object instead of string
-                  const rawError = data.error ?? data.message ?? 'An unexpected error occurred';
-                  const errorText = typeof rawError === 'string' ? rawError : JSON.stringify(rawError, null, 2);
+                  const rawError =
+                    data.error ?? data.message ?? t("aiAssistant.aiChat.unexpectedError");
+                  const errorText =
+                    typeof rawError === "string" ? rawError : JSON.stringify(rawError, null, 2);
 
-                  let errorMessage = `Error: ${errorText}`;
-                  if (data.suggestion) {
+                  // Check if this is an authorization/access error
+                  const authErr = isAuthError(errorText, data.error_type);
+                  // Widened to `string` — see the note on the sibling handler above.
+                  let errorMessage: string = authErr
+                    ? t(UNAUTHORIZED_MESSAGE_KEY)
+                    : t("common.errorPrefix", { message: errorText });
+                  if (data.suggestion && !authErr) {
                     errorMessage += `\n\n${data.suggestion}`;
                   }
 
-                  // Get or create assistant message for error (reuse lastMessage)
-                  lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                  if (!lastMessage || lastMessage.role !== 'assistant') {
-                    chatMessages.value.push({
-                      role: 'assistant',
-                      content: errorMessage,
-                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: errorMessage }]
+                  lastMessage = msgs[msgs.length - 1];
+                  if (!lastMessage || lastMessage.role !== "assistant") {
+                    msgs.push({
+                      role: "assistant",
+                      content: raw(errorMessage),
+                      contentBlocks: [
+                        ...pendingToolCalls.value,
+                        { type: "text", text: errorMessage },
+                      ],
                     });
                     pendingToolCalls.value = [];
                   } else {
-                    // Append error to existing message
                     if (lastMessage.content) {
-                      lastMessage.content += '\n\n' + errorMessage;
+                      lastMessage.content = raw(lastMessage.content + "\n\n" + errorMessage);
                     } else {
-                      lastMessage.content = errorMessage;
+                      lastMessage.content = raw(errorMessage);
                     }
                     if (!lastMessage.contentBlocks) {
                       lastMessage.contentBlocks = [];
                     }
-                    lastMessage.contentBlocks.push({ type: 'text', text: errorMessage });
-                    // Clear pending tool calls to avoid leaking into later messages
+                    lastMessage.contentBlocks.push({
+                      type: "text",
+                      text: errorMessage,
+                    });
                     pendingToolCalls.value = [];
                   }
 
-                  // Reset streaming state
-                  currentTextSegment.value = '';
+                  textSegment = "";
+                  syncStreamingRefs();
 
-                  // Save error message to history
-                  await saveToHistory();
-                  await scrollToBottom();
-
-                  // Stop processing further as error occurred
+                  await saveCtx();
+                  if (isActive()) await scrollToBottom();
                   return;
                 }
 
-                // Handle complete events - complete any active tool call
-                if (data && data.type === 'complete') {
+                // Handle complete events
+                if (data && data.type === "complete") {
+                  if (data.trace_id && isActive()) {
+                    lastTraceId.value = data.trace_id;
+                  }
                   if (activeToolCall.value) {
                     const completedToolBlock: ContentBlock = {
-                      type: 'tool_call',
+                      type: "tool_call",
                       tool: activeToolCall.value.tool,
                       message: activeToolCall.value.message,
-                      context: activeToolCall.value.context
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id,
                     };
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                    if (lastMessage && lastMessage.role === 'assistant') {
+                    let lastMessage = msgs[msgs.length - 1];
+                    if (lastMessage && lastMessage.role === "assistant") {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
                     }
-                    activeToolCall.value = null;
+                    if (isActive()) activeToolCall.value = null;
                   }
                   continue;
                 }
 
-                // Handle message content
-                if (data && typeof data.content === 'string') {
-                  // Complete any active tool call first (add green checkmark to chat)
-                  if (activeToolCall.value) {
+                // Handle tool_result events
+                if (data && data.type === "tool_result") {
+                  const resultData = {
+                    success: data.success !== false,
+                    resultMessage: data.message || "",
+                    summary: data.summary || undefined,
+                    errorType: data.error_type || undefined,
+                    suggestion: data.suggestion || undefined,
+                    details: data.details || undefined,
+                    response: data.response || undefined,
+                  };
+
+                  const matchesActive =
+                    activeToolCall.value &&
+                    ((data.call_id && activeToolCall.value.call_id === data.call_id) ||
+                      (!data.call_id && activeToolCall.value.tool === data.tool));
+
+                  if (matchesActive) {
                     const completedToolBlock: ContentBlock = {
-                      type: 'tool_call',
-                      tool: activeToolCall.value.tool,
-                      message: activeToolCall.value.message,
-                      context: activeToolCall.value.context
+                      type: "tool_call",
+                      tool: activeToolCall.value!.tool,
+                      message: activeToolCall.value!.message,
+                      context: activeToolCall.value!.context,
+                      call_id: activeToolCall.value!.call_id,
+                      ...resultData,
                     };
-                    let lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                    if (lastMessage && lastMessage.role === 'assistant') {
+                    let lastMessage = msgs[msgs.length - 1];
+                    if (lastMessage && lastMessage.role === "assistant") {
                       if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
                       lastMessage.contentBlocks.push(completedToolBlock);
                     } else {
                       pendingToolCalls.value.push(completedToolBlock);
                     }
-                    activeToolCall.value = null;
+                    if (isActive()) activeToolCall.value = null;
+                  } else {
+                    const lastMessage = msgs[msgs.length - 1];
+                    if (lastMessage && lastMessage.contentBlocks) {
+                      for (let i = lastMessage.contentBlocks.length - 1; i >= 0; i--) {
+                        const block = lastMessage.contentBlocks[i];
+                        const blockMatches = data.call_id
+                          ? block.call_id === data.call_id
+                          : block.type === "tool_call" &&
+                            block.tool === data.tool &&
+                            block.success === undefined;
+                        if (blockMatches) {
+                          Object.assign(block, resultData);
+                          break;
+                        }
+                      }
+                    }
+                    for (let i = pendingToolCalls.value.length - 1; i >= 0; i--) {
+                      const block = pendingToolCalls.value[i];
+                      const blockMatches = data.call_id
+                        ? block.call_id === data.call_id
+                        : block.type === "tool_call" &&
+                          block.tool === data.tool &&
+                          block.success === undefined;
+                      if (blockMatches) {
+                        Object.assign(block, resultData);
+                        break;
+                      }
+                    }
+                  }
+                  continue;
+                }
+
+                // Handle error events - stream-level errors
+                if (data && data.type === "error") {
+                  // Owning replica is gone — flag and stop; sendMessage
+                  // restores the conversation once the stream ends.
+                  if (data.code === "session_owner_unavailable") {
+                    streamOwnerUnavailable.value = true;
+                    continue;
+                  }
+                  if (activeToolCall.value) {
+                    const failedToolBlock: ContentBlock = {
+                      type: "tool_call",
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id,
+                      success: false,
+                      resultMessage: data.message || t("aiAssistant.aiChat.toolExecutionFailed"),
+                      errorType: data.error_type || undefined,
+                      suggestion: data.suggestion || undefined,
+                    };
+                    let lastMessage = msgs[msgs.length - 1];
+                    if (lastMessage && lastMessage.role === "assistant") {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(failedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(failedToolBlock);
+                    }
+                    if (isActive()) activeToolCall.value = null;
                   }
 
-                  let content = data.content;
-                  content = content.replace(/```(\w*)\s*([^`])/g, '```$1\n$2');
-                  content = content.replace(/([^`])\s*```/g, '$1\n```');
-
-                  // Add newline separator if starting a new text segment after tool call
-                  if (currentStreamingMessage.value && currentTextSegment.value === '') {
-                    currentStreamingMessage.value += '\n\n';
+                  const rawErrorMessage =
+                    data.message || data.error || t("aiAssistant.aiChat.errorOccurred");
+                  const authErr = isAuthError(rawErrorMessage, data.error_type);
+                  const errorBlock: ContentBlock = {
+                    type: "error",
+                    message: authErr ? t(UNAUTHORIZED_MESSAGE_KEY) : rawErrorMessage,
+                    errorType: data.error_type || undefined,
+                    suggestion: authErr ? undefined : data.suggestion || undefined,
+                    recoverable: authErr ? false : (data.recoverable ?? undefined),
+                  };
+                  let lastMessage = msgs[msgs.length - 1];
+                  if (lastMessage && lastMessage.role === "assistant") {
+                    if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                    lastMessage.contentBlocks.push(errorBlock);
+                  } else {
+                    msgs.push({
+                      role: "assistant",
+                      content: raw(""),
+                      contentBlocks: [...pendingToolCalls.value, errorBlock],
+                    });
+                    pendingToolCalls.value = [];
                   }
-                  // Add newline between consecutive message events if needed
-                  else if (currentStreamingMessage.value &&
-                           !currentStreamingMessage.value.endsWith('\n') &&
-                           !content.startsWith('\n')) {
-                    currentStreamingMessage.value += '\n\n';
-                    currentTextSegment.value += '\n\n';
+                  messageComplete = true;
+                  continue;
+                }
+
+                // Handle streamed deltas and full/legacy message content.
+                // Tolerant of multiple event shapes (see extractStreamText).
+                const streamText = extractStreamText(data);
+                if (typeof streamText === "string") {
+                  if (activeToolCall.value) {
+                    const completedToolBlock: ContentBlock = {
+                      type: "tool_call",
+                      tool: activeToolCall.value.tool,
+                      message: activeToolCall.value.message,
+                      context: activeToolCall.value.context,
+                      call_id: activeToolCall.value.call_id,
+                    };
+                    let lastMessage = msgs[msgs.length - 1];
+                    if (lastMessage && lastMessage.role === "assistant") {
+                      if (!lastMessage.contentBlocks) lastMessage.contentBlocks = [];
+                      lastMessage.contentBlocks.push(completedToolBlock);
+                    } else {
+                      pendingToolCalls.value.push(completedToolBlock);
+                    }
+                    if (isActive()) activeToolCall.value = null;
                   }
 
-                  currentStreamingMessage.value += content;
-                  currentTextSegment.value += content;
+                  const isMessageDelta =
+                    data.type === "message_delta" || typeof data.content !== "string";
 
-                  // Start typewriter animation if not already running
-                  if (!typewriterAnimationId.value) {
+                  let content = streamText;
+                  if (!isMessageDelta) {
+                    content = content.replace(/```(\w*)\s*([^`])/g, "```$1\n$2");
+                    content = content.replace(/([^`])\s*```/g, "$1\n```");
+                  }
+
+                  if (!isMessageDelta) {
+                    if (streamingMsg && textSegment === "") {
+                      streamingMsg += "\n\n";
+                    } else if (
+                      streamingMsg &&
+                      !streamingMsg.endsWith("\n") &&
+                      !content.startsWith("\n")
+                    ) {
+                      streamingMsg += "\n\n";
+                      textSegment += "\n\n";
+                    }
+                  }
+
+                  streamingMsg += content;
+                  textSegment += content;
+                  syncStreamingRefs();
+
+                  if (isActive() && !typewriterAnimationId.value) {
                     animateStreamingText();
                   }
 
-                  let lastMessage = chatMessages.value[chatMessages.value.length - 1];
-                  if (!lastMessage || lastMessage.role !== 'assistant') {
-                    // Create new assistant message with pending tool calls + text
-                    // Use displayedStreamingContent for animated display
-                    chatMessages.value.push({
-                      role: 'assistant',
-                      content: currentStreamingMessage.value,
-                      contentBlocks: [...pendingToolCalls.value, { type: 'text', text: displayedStreamingContent.value }]
+                  let lastMessage = msgs[msgs.length - 1];
+                  if (!lastMessage || lastMessage.role !== "assistant") {
+                    msgs.push({
+                      role: "assistant",
+                      content: raw(streamingMsg),
+                      contentBlocks: [
+                        ...pendingToolCalls.value,
+                        { type: "text", text: textSegment },
+                      ],
                     });
-                    pendingToolCalls.value = []; // Clear pending
-                    // Save immediately when assistant message is first created
-                    await throttledStreamingSave(true);
+                    pendingToolCalls.value = [];
+                    await throttledSaveCtx(true);
                   } else {
-                    lastMessage.content = currentStreamingMessage.value;
+                    lastMessage.content = raw(streamingMsg);
 
                     if (!lastMessage.contentBlocks) {
                       lastMessage.contentBlocks = [];
                     }
-                    const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-                    if (lastBlock && lastBlock.type === 'text') {
-                      // Use animated content for display
-                      lastBlock.text = displayedStreamingContent.value;
+                    const lastBlock =
+                      lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+                    if (lastBlock && lastBlock.type === "text") {
+                      lastBlock.text = textSegment;
                     } else {
-                      lastMessage.contentBlocks.push({ type: 'text', text: displayedStreamingContent.value });
+                      lastMessage.contentBlocks.push({
+                        type: "text",
+                        text: textSegment,
+                      });
                     }
-                    // Throttled save during streaming
-                    await throttledStreamingSave();
+                    await throttledSaveCtx();
                   }
                   messageComplete = true;
-                  await scrollToBottom();
                 }
               } catch (e) {
-                console.debug('Error processing remaining buffer:', e);
+                console.debug("Error processing remaining buffer:", e);
                 continue;
               }
             }
@@ -1509,182 +3362,205 @@ export default defineComponent({
 
         // If we completed a message, save to history
         if (messageComplete) {
-          // Immediately show all remaining text and stop typewriter animation
-          displayedStreamingContent.value = currentTextSegment.value;
-          if (typewriterAnimationId.value) {
-            cancelAnimationFrame(typewriterAnimationId.value);
-            typewriterAnimationId.value = null;
-          }
-          // Update final text in contentBlocks
-          const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-          if (lastMessage && lastMessage.role === 'assistant' && lastMessage.contentBlocks) {
-            const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-            if (lastBlock && lastBlock.type === 'text') {
-              lastBlock.text = currentTextSegment.value;
+          if (isActive()) {
+            // Immediately show all remaining text and stop typewriter animation
+            displayedStreamingContent.value = textSegment;
+            if (typewriterAnimationId.value) {
+              cancelAnimationFrame(typewriterAnimationId.value);
+              typewriterAnimationId.value = null;
             }
           }
-          await saveToHistory();
+          // Update final text in contentBlocks
+          const lastMessage = msgs[msgs.length - 1];
+          if (lastMessage && lastMessage.role === "assistant" && lastMessage.contentBlocks) {
+            const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+            if (lastBlock && lastBlock.type === "text") {
+              lastBlock.text = textSegment;
+            }
+          }
+          await saveCtx();
         }
       } catch (error) {
         // Handle different types of errors appropriately
-        if (error instanceof Error && error.name === 'AbortError') {
+        if (error instanceof Error && error.name === "AbortError") {
           // Request was cancelled by user - this is expected behavior, not an error
+          // Do a final save for background streams before exiting
+          if (!isActive() && msgs.length > 0 && ctxSessionId) {
+            await dbSaveToHistory(msgs, ctxSessionId, ctxTitle, ctxChatId);
+          }
           return; // Exit gracefully without logging as error
         } else {
           // Genuine error occurred during stream processing
-          console.error('Error reading stream:', error);
+          console.error("Error reading stream:", error);
         }
       }
     };
 
     const saveToHistory = async () => {
       saveHistoryLoading.value = true;
-      if (chatMessages.value.length === 0) return;
-      
+      if (chatMessages.value.length === 0) {
+        saveHistoryLoading.value = false;
+        return;
+      }
+
       try {
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const DbIndexStore = transaction.objectStore(STORE_NAME);
-
-        // Prefer AI-generated title, fallback to truncated first user message
-        const firstUserMessage = chatMessages.value.find(msg => msg.role === 'user');
-        const title = aiGeneratedTitle.value || (firstUserMessage ?
-          (firstUserMessage.content.length > 40 ?
-            firstUserMessage.content.substring(0, 40) + '...' :
-            firstUserMessage.content) :
-          'New Chat');
-
-        // Create a serializable version of the messages (including contentBlocks)
-        // Use JSON parse/stringify to strip Vue reactive proxies
-        const serializableMessages = chatMessages.value.map(msg => {
-          const serialized: any = {
-            role: msg.role,
-            content: msg.content
-          };
-          if (msg.contentBlocks && msg.contentBlocks.length > 0) {
-            // Deep clone to remove Vue reactivity
-            serialized.contentBlocks = JSON.parse(JSON.stringify(msg.contentBlocks));
-          }
-          return serialized;
-        });
-
         // Generate session ID if not already set for this chat
         if (!currentSessionId.value) {
           currentSessionId.value = getUUIDv7();
         }
 
-        const chatData = {
-          timestamp: new Date().toISOString(),
+        // Prefer AI-generated title, fallback to default
+        const title = aiGeneratedTitle.value || undefined;
+
+        // Save using the composable
+        const chatId = await dbSaveToHistory(
+          chatMessages.value,
+          currentSessionId.value,
           title,
-          messages: serializableMessages,
-          sessionId: currentSessionId.value
-        };
+          currentChatId.value,
+        );
 
-        // Always use put with the current chat ID to update existing chat
-        // instead of creating a new one
-        let chatId = currentChatId.value || Date.now();
-        const request = DbIndexStore.put({ 
-          ...chatData, 
-          id: chatId // Use timestamp as ID if no current ID
-        });
+        // Update current chat ID if this is a new chat
+        if (!currentChatId.value && chatId) {
+          currentChatId.value = chatId;
 
-
-
-
-        request.onsuccess = (event: Event) => {
-          if (!currentChatId.value) {
-            currentChatId.value = (event.target as IDBRequest).result as number;
-          }
-        };
+          // Apply pending auto navigation preference to the new chat. Persist the
+          // actual value (ON by default) so an explicit user disable is honored.
+          autoNavigationPreferences.value.set(chatId, pendingAutoNavigation.value);
+          saveAutoNavigationPreferences();
+        }
       } catch (error) {
-        console.error('Error saving chat history:', error);
-      }
-      finally {
+        console.error("Error saving chat history:", error);
+      } finally {
         saveHistoryLoading.value = false;
       }
     };
 
-    /**
-     * Throttled save for streaming - saves at most every STREAMING_SAVE_INTERVAL ms
-     * This prevents data loss if the user reloads the page during streaming
-     * @param force - If true, saves immediately regardless of throttle (used for first assistant message)
-     */
-    const throttledStreamingSave = async (force: boolean = false) => {
-      const now = Date.now();
-      if (force || (now - lastStreamingSaveTime.value >= STREAMING_SAVE_INTERVAL)) {
-        lastStreamingSaveTime.value = now;
-        await saveToHistory();
-      }
-    };
-
-    const MAX_HISTORY_ITEMS = 100;
-
     const loadHistory = async () => {
       try {
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readonly');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.index('timestamp').openCursor(null, 'prev');
-        //one the promise is resolved we get the history here 
-        //this history length might be more than 100 so after resolving / finishing the indexDB call
-        // we do the filtering
-        const history: any[] = [];
-        
-        const loadResult = await new Promise((resolve, reject) => {
-          request.onsuccess = (event: Event) => {
-            const cursor = (event.target as IDBRequest).result as IDBCursorWithValue;
-            if (cursor) {
-              history.push(cursor.value);
-              cursor.continue();
-            } else {
-              resolve(history);
-            }
-          };
-          request.onerror = () => reject(request.error);
-        });
-
-        // If we have more than MAX_HISTORY_ITEMS, delete the oldest ones
-        //this will allows the user to see only top 100 chat histories and also delete the non required ones
-        //as we are not giving option to delete history manually we are doing this
-        //some times it takes time to delete the history from the indexDB so we only delete the history if user access the history menu
-        if (history.length > MAX_HISTORY_ITEMS) {
-          const itemsToDelete = history.slice(MAX_HISTORY_ITEMS);
-          const deleteTransaction = db.transaction(STORE_NAME, 'readwrite');
-          const deleteStore = deleteTransaction.objectStore(STORE_NAME);
-          
-          for (const item of itemsToDelete) {
-            deleteStore.delete(item.id);
-          }
-
-          // Wait for deletion transaction to complete
-          await new Promise((resolve, reject) => {
-            deleteTransaction.oncomplete = () => resolve(true);
-            deleteTransaction.onerror = () => reject(deleteTransaction.error);
-          });
-        }
-
-        //here we do assign the history to the actual chat history 
-        // Keep only the latest MAX_HISTORY_ITEMS
-        chatHistory.value = history.slice(0, MAX_HISTORY_ITEMS);
+        // Load history using the composable (automatically prunes to 100 items)
+        const history = await dbLoadHistory();
+        chatHistory.value = history;
         return chatHistory.value;
-
       } catch (error) {
-        console.error('Error loading chat history:', error);
+        console.error("Error loading chat history:", error);
         return [];
       }
     };
 
+    /**
+     * Detach the current streaming request so it continues in the background.
+     * processStream's captured context (msgs) keeps writing to the old array
+     * while we clear the UI for a new session. When the stream completes,
+     * processStream saves to IndexedDB via saveCtx().
+     */
+    const detachCurrentStream = () => {
+      if (!currentAbortController.value) return;
+
+      // Move controller to background set so onUnmounted can clean it up
+      // and enforce the max background stream limit.
+      if (backgroundStreams.size >= MAX_BACKGROUND_STREAMS) {
+        // Abort the oldest background stream to stay within limits
+        const oldest = backgroundStreams.values().next().value;
+        if (oldest) {
+          oldest.abort();
+          backgroundStreams.delete(oldest);
+        }
+      }
+      const detachedController = currentAbortController.value;
+      backgroundStreams.add(detachedController);
+      currentAbortController.value = null;
+
+      // Register for re-attachment: when user navigates back to this session,
+      // loadChat swaps chatMessages.value to this live array so the UI resumes.
+      if (currentSessionId.value) {
+        backgroundStreamMap.set(currentSessionId.value, {
+          msgs: chatMessages.value,
+          controller: detachedController,
+          chatId: currentChatId.value,
+        });
+      }
+
+      // Clean up UI state — processStream continues silently in background
+      isLoading.value = false;
+      activeToolCall.value = null;
+      stopAnalyzingRotation();
+      if (typewriterAnimationId.value) {
+        cancelAnimationFrame(typewriterAnimationId.value);
+        typewriterAnimationId.value = null;
+      }
+      currentStreamingMessage.value = "";
+      currentTextSegment.value = "";
+      displayedStreamingContent.value = "";
+    };
+
+    // Logout has to kill the foreground turn too, not just the detached ones.
+    // MainLayout.signout() fires this as a window event because it lives in the
+    // Options API half of that file and can't reach setup scope directly (same
+    // pattern as o2:home-switch-tab).
+    const abortAllStreams = () => {
+      abortBackgroundStreams();
+      if (currentAbortController.value) {
+        currentAbortController.value.abort();
+        currentAbortController.value = null;
+      }
+    };
+
+    const toggleExpand = () => {
+      if (!store.state.isAiChatEnabled) {
+        // Closed → Open inline sidebar
+        store.dispatch("setIsAiChatEnabled", true);
+        store.dispatch("setIsAiChatExpanded", false);
+      } else if (!store.state.isAiChatExpanded) {
+        // Inline sidebar → Expanded overlay
+        store.dispatch("setIsAiChatExpanded", true);
+      } else {
+        // Expanded overlay → Back to inline sidebar
+        store.dispatch("setIsAiChatExpanded", false);
+      }
+      window.dispatchEvent(new Event("resize"));
+    };
+
+    useShortcuts([
+      {
+        id: "aiChatClose",
+        key: "escape",
+        description: t("shortcuts.actions.aiChatClose"),
+        // Escape must close the chat even while typing a message in its input.
+        allowInInput: true,
+        handler: () => {
+          if (store.state.isAiChatEnabled) {
+            store.dispatch("setIsAiChatEnabled", false);
+            store.dispatch("setIsAiChatExpanded", false);
+            window.dispatchEvent(new Event("resize"));
+          }
+        },
+      },
+      {
+        id: "aiChatExpand",
+        key: "ctrl+b",
+        keyForMac: "meta+b",
+        description: t("shortcuts.actions.aiChatExpand"),
+        handler: toggleExpand,
+      },
+    ]);
+
     const addNewChat = () => {
+      detachCurrentStream();
+
       chatMessages.value = [];
       currentChatId.value = null;
       currentSessionId.value = null; // Will be generated on first save
+      lastTraceId.value = null; // Reset trace correlation for new chat
       showHistory.value = false;
       currentChatTimestamp.value = null;
       shouldAutoScroll.value = true; // Reset auto-scroll for new chat
       resetTitleState(); // Clear AI-generated title for new chat
       resetTypewriterState(); // Clear typewriter animation state for new chat
-      store.dispatch('setCurrentChatTimestamp', null);
-      store.dispatch('setChatUpdated', true);
+      pendingAutoNavigation.value = true; // Auto navigation is ON by default for new chats
+      showScrollToBottom.value = false; // Reset scroll-to-bottom button for new chat
+      store.dispatch("setCurrentChatTimestamp", null);
+      store.dispatch("setChatUpdated", true);
     };
 
     const openHistory = async () => {
@@ -1693,7 +3569,7 @@ export default defineComponent({
     };
 
     const openEditTitleDialog = () => {
-      editingTitle.value = displayedTitle.value || '';
+      editingTitle.value = displayedTitle.value || "";
       showEditTitleDialog.value = true;
     };
 
@@ -1704,42 +3580,20 @@ export default defineComponent({
       }
 
       try {
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const request = store.get(currentChatId.value);
+        // Update title using the composable
+        const success = await dbUpdateChatTitle(currentChatId.value, editingTitle.value.trim());
 
-        request.onsuccess = () => {
-          const chat = request.result;
-          if (chat) {
-            // Update the title
-            chat.title = editingTitle.value.trim();
-            const updateRequest = store.put(chat);
+        if (success) {
+          // Update the displayed title
+          displayedTitle.value = editingTitle.value.trim();
+          aiGeneratedTitle.value = editingTitle.value.trim();
 
-            updateRequest.onsuccess = () => {
-              // Update the displayed title
-              displayedTitle.value = editingTitle.value.trim();
-              aiGeneratedTitle.value = editingTitle.value.trim();
-
-              // Reload history to reflect changes
-              loadHistory();
-
-              showEditTitleDialog.value = false;
-            };
-
-            updateRequest.onerror = () => {
-              console.error('Error updating chat title:', updateRequest.error);
-              showEditTitleDialog.value = false;
-            };
-          }
-        };
-
-        request.onerror = () => {
-          console.error('Error retrieving chat for edit:', request.error);
-          showEditTitleDialog.value = false;
-        };
+          // Reload history to reflect changes
+          loadHistory();
+        }
       } catch (error) {
-        console.error('Error updating chat title:', error);
+        console.error("Error updating chat title:", error);
+      } finally {
         showEditTitleDialog.value = false;
       }
     };
@@ -1753,12 +3607,10 @@ export default defineComponent({
       if (!chatToDelete.value) return;
 
       try {
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const deleteRequest = store.delete(chatToDelete.value);
+        // Delete chat using the composable
+        const success = await dbDeleteChatById(chatToDelete.value);
 
-        deleteRequest.onsuccess = () => {
+        if (success) {
           // If the deleted chat is the current one, reset to new chat
           if (currentChatId.value === chatToDelete.value) {
             addNewChat();
@@ -1766,19 +3618,11 @@ export default defineComponent({
 
           // Reload history to reflect changes
           loadHistory();
-
-          // Reset state
-          chatToDelete.value = null;
-          showDeleteChatConfirmDialog.value = false;
-        };
-
-        deleteRequest.onerror = () => {
-          console.error('Error deleting chat:', deleteRequest.error);
-          chatToDelete.value = null;
-          showDeleteChatConfirmDialog.value = false;
-        };
+        }
       } catch (error) {
-        console.error('Error deleting chat:', error);
+        console.error("Error deleting chat:", error);
+      } finally {
+        // Reset state
         chatToDelete.value = null;
         showDeleteChatConfirmDialog.value = false;
       }
@@ -1788,83 +3632,584 @@ export default defineComponent({
       showClearAllConfirmDialog.value = true;
     };
 
+    /** Resolve the pendingConfirmation block — mark as success or failure */
+    const resolveConfirmationBlock = (approved: boolean) => {
+      for (const msg of chatMessages.value) {
+        if (msg.contentBlocks) {
+          for (const block of msg.contentBlocks) {
+            if (block.pendingConfirmation) {
+              block.pendingConfirmation = false;
+              if (!approved) {
+                block.success = false;
+                block.resultMessage = t("aiAssistant.aiChat.actionCancelledByUser");
+              }
+              return;
+            }
+          }
+        }
+      }
+    };
+
+    // Set by processStream when a session's owning replica is gone. The stream has
+    // already returned 200 by then, so sendMessage reads this once it ends.
+    const streamOwnerUnavailable = ref(false);
+
+    // Shown after a successful restore: only the dialogue came back, not the tool
+    // results, files or permission decisions from before the interruption.
+    const RESTORED_NOTICE =
+      "This conversation was interrupted and has been restored. Earlier messages are preserved, but any files, queries or other actions from before the interruption were not carried over.";
+
+    // Keyed on the explicit server code, never guessed from a generic failure:
+    // restoring means abandoning the current session.
+    const isSessionOwnerUnavailable = (errorBody: unknown): boolean => {
+      // `unknown`, not `any` — narrow before reading, or a non-object body throws.
+      if (typeof errorBody !== "object" || errorBody === null) return false;
+      const body = errorBody as { code?: unknown; detail?: { code?: unknown } };
+      const code = body.detail?.code ?? body.code;
+      return code === "session_owner_unavailable";
+    };
+
+    /** Surface a message inline in the transcript, as stream errors are shown. */
+    const appendErrorBlock = (message: string, recoverable = false) => {
+      const block: ContentBlock = { type: "error", message: raw(message), recoverable };
+      const msgs = chatMessages.value;
+      const last = msgs[msgs.length - 1];
+      if (last && last.role === "assistant") {
+        if (!last.contentBlocks) last.contentBlocks = [];
+        last.contentBlocks.push(block);
+      } else {
+        msgs.push({ role: "assistant", content: raw(""), contentBlocks: [block] });
+      }
+    };
+
+    /**
+     * POST a confirmation answer and report whether it landed. The response used
+     * to be discarded, so an answer reaching a replica with no record of the
+     * pending confirmation 404'd invisibly while the agent auto-denied on timeout.
+     */
+    const sendConfirmation = async (sessionId: string, approved: boolean): Promise<boolean> => {
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        const res = await fetch(
+          `${store.state.API_ENDPOINT}/api/${orgId}/ai/confirm/${sessionId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "include",
+            body: JSON.stringify({ approved }),
+          },
+        );
+
+        if (!res.ok) {
+          console.error(
+            `Confirmation not registered (HTTP ${res.status}) for session ${sessionId}`,
+          );
+          appendErrorBlock(
+            approved
+              ? "Your approval could not be delivered — the assistant may have already cancelled this action. Please check the result before retrying."
+              : "Your response could not be delivered — the assistant may have already cancelled this action.",
+          );
+          return false;
+        }
+        return true;
+      } catch (error) {
+        console.error("Error sending confirmation:", error);
+        appendErrorBlock(
+          "Your response could not be delivered. Please check your connection and try again.",
+        );
+        return false;
+      }
+    };
+
+    const handleToolConfirm = async () => {
+      resolveConfirmationBlock(true);
+
+      // Check if this is a navigation action
+      if (pendingConfirmation.value?.tool === "navigation_action") {
+        const navAction = pendingConfirmation.value?.navAction;
+        if (navAction) {
+          await handleNavigationAction(navAction);
+        }
+        pendingConfirmation.value = null;
+        return;
+      }
+
+      if (!currentSessionId.value) return;
+
+      await sendConfirmation(currentSessionId.value, true);
+      pendingConfirmation.value = null;
+    };
+
+    const handleToolCancel = async () => {
+      resolveConfirmationBlock(false);
+
+      // Check if this is a navigation action
+      if (pendingConfirmation.value?.tool === "navigation_action") {
+        // Just clear the confirmation, don't navigate
+        pendingConfirmation.value = null;
+        return;
+      }
+
+      if (!currentSessionId.value) return;
+
+      await sendConfirmation(currentSessionId.value, false);
+      pendingConfirmation.value = null;
+    };
+
+    const handleToolAlwaysConfirm = async () => {
+      // Enable auto navigation for this chat
+      isAutoNavigationEnabled.value = true;
+
+      // Then proceed with confirmation
+      resolveConfirmationBlock(true);
+
+      // Check if this is a navigation action
+      if (pendingConfirmation.value?.tool === "navigation_action") {
+        const navAction = pendingConfirmation.value?.navAction;
+        if (navAction) {
+          await handleNavigationAction(navAction);
+        }
+        pendingConfirmation.value = null;
+        return;
+      }
+
+      if (!currentSessionId.value) return;
+
+      await sendConfirmation(currentSessionId.value, true);
+      pendingConfirmation.value = null;
+    };
+
+    // Generate navigation action from tool result data (generic, pattern-based)
+    //
+    // Expected backend response format:
+    // - Search tools: Must have SQL query in callArgs.request_body.query.sql
+    // - Create/Get/Update/Delete tools: Must return {resource}_id in response
+    //   Examples: alert_id, dashboard_id, pipeline_id, stream_id, etc.
+    //   Optional fields: name, folder (will use 'default' if not provided)
+    const generateNavigationFromToolResult = (
+      toolName: string,
+      callArgs: any,
+      responseBody: any,
+    ): NavigationAction | null => {
+      if (!callArgs) {
+        return null;
+      }
+
+      // Pattern 1: Search tools (has SQL query) → load_query navigation
+      const requestBody = callArgs.request_body || {};
+      const query = requestBody.query || {};
+      const sql = query.sql || "";
+
+      if (sql) {
+        const streamType = callArgs.stream_type || "logs";
+        let streamName = callArgs.stream_name || "";
+
+        // If stream_name is not in callArgs, try to extract it from the SQL query
+        if (!streamName) {
+          // Extract stream name from FROM clause (handles quoted and unquoted table names)
+          const fromMatch = sql.match(/FROM\s+["']?([^"'\s,()]+)["']?/i);
+          if (fromMatch) {
+            streamName = fromMatch[1];
+          }
+        }
+
+        const vrlFunction =
+          query.functionContent || requestBody.function || requestBody.functionContent;
+
+        // Don't generate navigation if time range is missing
+        if (query.start_time === undefined || query.end_time === undefined) {
+          return null;
+        }
+
+        // Don't generate navigation if stream name is still missing
+        if (!streamName) {
+          return null;
+        }
+
+        const target: any = {
+          query: sql,
+          sql_mode: true,
+          from: query.start_time,
+          to: query.end_time,
+          stream: streamName.split(","),
+        };
+
+        if (vrlFunction) {
+          target.functionContent = vrlFunction;
+        }
+
+        const streamLabel =
+          { logs: t("common.logs"), metrics: t("common.metrics"), traces: t("common.traces") }[
+            streamType as string
+          ] ?? raw(streamType.charAt(0).toUpperCase() + streamType.slice(1));
+        return {
+          resource_type: streamType,
+          action: "load_query",
+          label: t("aiAssistant.viewInTarget", { target: streamLabel }),
+          target,
+        };
+      }
+
+      // Pattern 2: Create/Get tools (has ID) → navigate_direct
+      // Extract resource type from tool name (CreateAlert → alert, GetDashboard → dashboard, createPipeline → pipeline)
+      const resourceTypeMatch = toolName.match(/^(create|get|update|delete)(.+)$/i);
+      if (!resourceTypeMatch) return null;
+
+      const resourceType = resourceTypeMatch[2].toLowerCase(); // Alert → alert, Dashboard → dashboard, Pipeline → pipeline
+
+      // Parse response data - it might be in different formats
+      let parsedResponse: any = {};
+      if (responseBody) {
+        // If responseBody has a 'response' field (from SRE agent tool_result event)
+        if (responseBody.response) {
+          let responseData = responseBody.response;
+          // If response is a JSON string, parse it
+          if (typeof responseData === "string") {
+            try {
+              responseData = JSON.parse(responseData);
+            } catch (e) {
+              console.warn("[Navigation] Failed to parse response string:", e);
+            }
+          }
+          // Extract from versioned response (v8, v7, etc.) for dashboards
+          if (typeof responseData === "object" && responseData !== null) {
+            parsedResponse =
+              responseData.v8 ||
+              responseData.v7 ||
+              responseData.v6 ||
+              responseData.v5 ||
+              responseData;
+          } else {
+            parsedResponse = responseData;
+          }
+        }
+        // If responseBody has 'content' array (MCP format)
+        else if (
+          responseBody.content &&
+          Array.isArray(responseBody.content) &&
+          responseBody.content[0]?.text
+        ) {
+          try {
+            const textContent = responseBody.content[0].text;
+            const parsed = JSON.parse(textContent);
+            // Extract from versioned response (v8, v7, etc.)
+            parsedResponse = parsed.v8 || parsed.v7 || parsed.v6 || parsed.v5 || parsed;
+          } catch (e) {
+            console.warn("[Navigation] Failed to parse content text:", e);
+          }
+        }
+        // Otherwise use responseBody as-is
+        else {
+          parsedResponse = responseBody;
+        }
+      }
+
+      // Merge data from parsed response, call args, and call args request_body for ID/field lookup
+      const requestBodyFromArgs = (callArgs || {}).request_body || {};
+      const data = {
+        ...parsedResponse,
+        ...(callArgs || {}),
+        ...requestBodyFromArgs,
+      };
+
+      // Standard pattern: {resource}_id (e.g., alert_id, dashboard_id, pipeline_id)
+      const resourceIdField = `${resourceType}_id`;
+      let resourceId = data[resourceIdField] || data.id;
+
+      // Also check camelCase variants (dashboardId, alertId)
+      if (!resourceId) {
+        const camelCaseField = resourceType + "Id";
+        resourceId = data[camelCaseField];
+      }
+
+      if (!resourceId) {
+        return null;
+      }
+
+      // Build target with consistent {resource}_id pattern
+      const target: any = {
+        [resourceIdField]: resourceId, // e.g., alert_id, dashboard_id, pipeline_id
+      };
+
+      // Add name if available (required for some resources like alerts)
+      const name = data.name;
+      if (name) {
+        target.name = name;
+      }
+
+      // Add folder if available (default to 'default' for resources that use folders)
+      const folder = data.folder;
+      if (folder || resourceType === "alert" || resourceType === "dashboard") {
+        target.folder = folder || "default";
+      }
+
+      return {
+        resource_type: resourceType,
+        action: "navigate_direct",
+        label: t("aiAssistant.viewTarget", {
+          target: resourceType.charAt(0).toUpperCase() + resourceType.slice(1),
+        }),
+        target,
+      };
+    };
+
+    const handleNavigationAction = async (action: NavigationAction) => {
+      // Detach the stream before navigating: the route change can unmount/
+      // recreate this component, and onUnmounted aborts currentAbortController
+      // to avoid leaking requests. Without detaching first, that abort races
+      // an in-flight opencode turn and kills any tool calls still queued
+      // after this navigation (e.g. create dashboard -> create alert -> nav).
+      // detachCurrentStream() moves the controller to backgroundStreams so
+      // processStream keeps running and the turn finishes in the background.
+      detachCurrentStream();
+
+      // Helper to encode strings for URL (same as search history)
+      const encodeForUrl = (str: string) => btoa(unescape(encodeURIComponent(str)));
+
+      // Extract page name for success message
+      let pageName = action.label || "";
+      if (!pageName) {
+        // Fallback: use target name or resource type
+        pageName =
+          action.target.name ||
+          action.resource_type.charAt(0).toUpperCase() + action.resource_type.slice(1);
+      }
+
+      // Perform navigation FIRST
+      if (action.action === "load_query") {
+        const targetPath = `/${action.resource_type}`;
+        const target = action.target;
+
+        // Build query object similar to SearchHistory goToLogs function
+        const queryParams: Record<string, string> = {
+          org_identifier: store.state.selectedOrganization.identifier,
+          stream_type: action.resource_type, // logs, metrics, traces
+          refresh: "0",
+          sql_mode: target.sql_mode?.toString() || "false",
+          quick_mode: "false",
+          show_histogram: "true",
+          type: "ai_chat_query",
+        };
+
+        // Add stream (comma-separated if array)
+        if (target.stream) {
+          queryParams.stream = Array.isArray(target.stream)
+            ? target.stream.join(",")
+            : target.stream;
+        }
+
+        // Add time range (prefer absolute from/to over period)
+        if (target.from !== undefined && target.to !== undefined) {
+          queryParams.from = target.from.toString();
+          queryParams.to = target.to.toString();
+        } else if (target.period) {
+          queryParams.period = target.period;
+        }
+
+        // Add base64 encoded query
+        if (target.query) {
+          queryParams.query = encodeForUrl(
+            typeof target.query === "string" ? target.query : JSON.stringify(target.query),
+          );
+        }
+
+        // Add VRL function if present
+        if (target.functionContent) {
+          queryParams.functionContent = encodeForUrl(target.functionContent);
+          queryParams.fn_editor = "true";
+        } else {
+          queryParams.fn_editor = "false";
+        }
+
+        // Navigate using same pattern as search history
+        await router.push({
+          path: targetPath,
+          query: queryParams,
+        });
+      } else if (action.action === "navigate_direct") {
+        // Direct navigation - build proper URLs based on resource type
+        let path = action.target.path || `/${action.resource_type}`;
+        // navigate_direct always carries the record form of `query`
+        const targetQuery = action.target.query as Record<string, any> | undefined;
+        const queryParams: Record<string, string> = {
+          org_identifier: store.state.selectedOrganization.identifier,
+          ...targetQuery,
+        };
+
+        // Resource-type-specific URL handling
+        if (action.resource_type === "alert") {
+          path = "/alerts";
+          const alertId = action.target.alert_id || targetQuery?.alert_id;
+          if (alertId) {
+            // Navigate to specific alert with update action
+            queryParams.action = "update";
+            queryParams.alert_id = alertId;
+            queryParams.name = action.target.name || targetQuery?.name;
+          }
+          queryParams.folder = action.target.folder || targetQuery?.folder || "default";
+        } else if (action.resource_type === "dashboard") {
+          // Dashboards use /dashboards/view path
+          path = "/dashboards/view";
+          queryParams.dashboard =
+            action.target.dashboard_id || action.target.dashboardId || targetQuery?.dashboardId;
+          queryParams.folder = action.target.folder || targetQuery?.folder || "default";
+          queryParams.tab = action.target.tab || "tab-1";
+          queryParams.refresh = "Off";
+          queryParams.period = "15m";
+          queryParams.print = "false";
+        } else if (action.resource_type === "pipeline") {
+          // Pipelines use /pipeline/pipelines/edit path
+          path = "/pipeline/pipelines/edit";
+          queryParams.id = action.target.pipeline_id || action.target.id || targetQuery?.id;
+          queryParams.name = action.target.name || targetQuery?.name;
+        }
+
+        await router.push({ path, query: queryParams });
+      }
+
+      // Use setTimeout to add message AFTER navigation fully completes and settles
+      setTimeout(async () => {
+        try {
+          // Add success message AFTER navigation completes
+          const successMessage = t("aiAssistant.navigatedTo", { page: pageName });
+          let lastMessage = chatMessages.value[chatMessages.value.length - 1];
+
+          if (!lastMessage || lastMessage.role !== "assistant") {
+            // Create new assistant message
+            chatMessages.value.push({
+              role: "assistant",
+              content: raw(successMessage),
+              contentBlocks: [{ type: "text", text: successMessage }],
+            });
+          } else {
+            // Append to existing assistant message
+            if (lastMessage.content) {
+              lastMessage.content = raw(lastMessage.content + "\n\n" + successMessage);
+            } else {
+              lastMessage.content = raw(successMessage);
+            }
+            if (!lastMessage.contentBlocks) {
+              lastMessage.contentBlocks = [];
+            }
+            lastMessage.contentBlocks.push({
+              type: "text",
+              text: successMessage,
+            });
+          }
+
+          // Save to history after adding message
+          await saveToHistory();
+          await scrollToBottom();
+        } catch (error) {
+          console.error("Error adding navigation success message:", error);
+        }
+      }, 500);
+    };
+
     const confirmClearAllConversations = async () => {
       try {
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readwrite');
-        const store = transaction.objectStore(STORE_NAME);
-        const clearRequest = store.clear();
+        // Clear all history using the composable
+        const success = await dbClearAllHistory();
 
-        clearRequest.onsuccess = () => {
+        if (success) {
           // Reset to new chat
           addNewChat();
 
           // Clear the chat history array
           chatHistory.value = [];
-
-          showClearAllConfirmDialog.value = false;
-        };
-
-        clearRequest.onerror = () => {
-          console.error('Error clearing all conversations:', clearRequest.error);
-          showClearAllConfirmDialog.value = false;
-        };
+        }
       } catch (error) {
-        console.error('Error clearing all conversations:', error);
+        console.error("Error clearing all conversations:", error);
+      } finally {
         showClearAllConfirmDialog.value = false;
       }
     };
 
     const loadChat = async (chatId: number) => {
       try {
-
-        const db = await initDB();
-        const transaction = db.transaction(STORE_NAME, 'readonly');
-        const indexDbStore = transaction.objectStore(STORE_NAME);
-        if(chatId == null) {
+        if (chatId == null) {
           addNewChat();
           return;
         }
-        const request = indexDbStore.get(chatId);
 
-        request.onsuccess = async () => {
-          const chat = request.result;
-          if (chat) {
-            // Ensure messages are properly formatted (including contentBlocks)
+        // Detach any in-progress stream so it continues in the background
+        detachCurrentStream();
+
+        // Load chat using the composable
+        const chat = await dbLoadChat(chatId);
+
+        if (chat) {
+          // Check if this session has an active background stream.
+          // If so, re-attach by using the LIVE array that processStream is writing to
+          // instead of the stale IndexedDB snapshot. Setting chatMessages.value to the
+          // same array makes processStream's isActive() true again, so UI updates resume.
+          const bgCtx = chat.sessionId ? backgroundStreamMap.get(chat.sessionId) : null;
+
+          if (bgCtx) {
+            // Re-attach: use the live streaming array
+            chatMessages.value = bgCtx.msgs;
+            currentChatId.value = bgCtx.chatId || chatId;
+            currentSessionId.value = chat.sessionId || null;
+
+            // Move controller back to foreground
+            currentAbortController.value = bgCtx.controller;
+            backgroundStreams.delete(bgCtx.controller);
+            backgroundStreamMap.delete(chat.sessionId!);
+
+            // Restore streaming UI state so loading indicator shows
+            isLoading.value = true;
+            startAnalyzingRotation();
+
+            // Prime the typewriter from whatever the stream has accumulated so
+            // far, in THIS fresh instance. processStream only syncs the segment
+            // refs and (re)starts the animation on the NEXT chunk that arrives
+            // while isActive(); text already streamed before we re-attached
+            // would otherwise sit invisible until the next delta. Reveal the
+            // existing text instantly, then let the ongoing stream continue.
+            const lastMsg = chatMessages.value[chatMessages.value.length - 1];
+            if (lastMsg?.role === "assistant" && lastMsg.contentBlocks?.length) {
+              const lastBlock = lastMsg.contentBlocks[lastMsg.contentBlocks.length - 1];
+              if (lastBlock?.type === "text" && lastBlock.text) {
+                currentStreamingMessage.value = lastMsg.content || lastBlock.text;
+                currentTextSegment.value = lastBlock.text;
+                // Instant reveal (no per-char catch-up) for the backlog.
+                displayedStreamingContent.value = lastBlock.text;
+              }
+            }
+          } else {
+            // Normal load from IndexedDB snapshot (no active stream)
             const formattedMessages = chat.messages.map((msg: any) => ({
               role: msg.role,
               content: msg.content,
-              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {})
+              ...(msg.contentBlocks ? { contentBlocks: msg.contentBlocks } : {}),
+              ...(msg.images ? { images: msg.images } : {}),
+              ...(msg.feedback ? { feedback: msg.feedback } : {}),
             }));
-            
-            // Check if the last message is a user message without an assistant response
-            const lastMessage = formattedMessages[formattedMessages.length - 1];
-            
+
             chatMessages.value = formattedMessages;
             currentChatId.value = chatId;
-            currentSessionId.value = chat.sessionId || null; // Restore session ID from history
-            showHistory.value = false;
-            shouldAutoScroll.value = true; // Reset auto-scroll when loading chat
-
-            // Load title from history (no animation for existing chats)
-            displayedTitle.value = chat.title || '';
-            aiGeneratedTitle.value = chat.title || null;
-            isTypingTitle.value = false;
-
-            if(chatId !== store.state.currentChatTimestamp) {
-              store.dispatch('setCurrentChatTimestamp', chatId);
-              store.dispatch('setChatUpdated', true);
-            }
-
-
-            // Scroll to bottom after loading chat
-            await nextTick(() => {
-              scrollToBottom();
-            });
+            currentSessionId.value = chat.sessionId || null;
           }
-        };
+
+          showHistory.value = false;
+          shouldAutoScroll.value = true;
+
+          // Load title from history (no animation for existing chats)
+          displayedTitle.value = chat.title || "";
+          aiGeneratedTitle.value = chat.title || null;
+          isTypingTitle.value = false;
+
+          if (chatId !== store.state.currentChatTimestamp) {
+            store.dispatch("setCurrentChatTimestamp", chatId);
+            store.dispatch("setChatUpdated", true);
+          }
+
+          // Scroll to bottom after loading chat
+          await nextTick();
+          scrollToBottom();
+        }
       } catch (error) {
-        console.error('Error loading chat:', error);
+        console.error("Error loading chat:", error);
       }
     };
 
@@ -1874,53 +4219,94 @@ export default defineComponent({
      * Manages the complete request lifecycle from user input to streaming response
      */
     const sendMessage = async () => {
-      if (!inputMessage.value.trim() || isLoading.value) return;
+      // Allow sending with text or images (or both)
+      const hasText = inputMessage.value.trim().length > 0;
+      const hasImages = pendingImages.value.length > 0;
+      if ((!hasText && !hasImages) || isLoading.value) return;
 
+      // Get the message for backend (with unwrapped chips)
+      let backendMessage = inputMessage.value;
+      if (chatInput.value && typeof chatInput.value.getMessageForBackend === "function") {
+        backendMessage = chatInput.value.getMessageForBackend();
+      }
+
+      // Use the plain text message for display
       const userMessage = inputMessage.value;
-      
+      const messagesToSend = [...pendingImages.value]; // Capture images before clearing
+
       // Add to query history before clearing input
-      addToHistory(userMessage);
-      
+      if (hasText) {
+        addToHistory(userMessage);
+      }
+
+      // Push user message with images for display
+      // But we'll use backendMessage for the API call
       chatMessages.value.push({
-        role: 'user',
-        content: userMessage
+        role: "user",
+        content: raw(backendMessage), // Use backend message with full context
+        ...(hasImages && { images: messagesToSend }),
       });
-      inputMessage.value = '';
+      inputMessage.value = "";
+      contextReferences.value = []; // Clear reference chips
+      if (chatInput.value && typeof chatInput.value.clear === "function") {
+        chatInput.value.clear(); // Clear the rich text input
+      }
+      clearPendingImages(); // Clear pending images after capturing
       shouldAutoScroll.value = true; // Reset auto-scroll for new message
       await scrollToBottom(); // Scroll after user message
       await saveToHistory(); // Save after user message
 
       isLoading.value = true;
-      currentStreamingMessage.value = '';
-      currentTextSegment.value = '';
+      currentStreamingMessage.value = "";
+      currentTextSegment.value = "";
       resetTypewriterState(); // Reset typewriter animation for new message
       startAnalyzingRotation(); // Start rotating analyzing messages
 
+      // Mint the session id here rather than inside the try below. A new chat
+      // has none yet, and the cleanup on every exit path has to clear the flag
+      // for the SAME id we set it on — otherwise an instance that re-attached
+      // never sees the streaming->done transition and spins forever.
+      if (!currentSessionId.value) {
+        currentSessionId.value = getUUIDv7();
+      }
+      const streamSessionId = currentSessionId.value;
+
+      // Mark this session as actively streaming in the cross-instance registry
+      // so that if another instance re-attaches, it knows when to stop showing
+      // its own loading indicator (see sessionStreamingState declaration).
+      sessionStreamingState[streamSessionId] = true;
+
       // Create new AbortController for this request - enables cancellation via Stop button
       currentAbortController.value = new AbortController();
-      
+
+      // Reseed state for this turn: at most one restore attempt, and a pending
+      // notice to show once the replacement request succeeds.
+      let hasReseeded = false;
+      let reseedNotice = false;
+
+      // Clear any flag left by a previous turn that threw or was aborted before
+      // the clear at the end of the try block — a stale `true` abandons a healthy
+      // session.
+      streamOwnerUnavailable.value = false;
+
       try {
         // Don't add empty assistant message here - wait for actual content
         await scrollToLoadingIndicator(); // Scroll directly to loading indicator
-        
+
         let response: any;
         try {
-          // Ensure session ID exists for tracking this chat session
-          if (!currentSessionId.value) {
-            currentSessionId.value = getUUIDv7();
-          }
-
-          // Pass abort signal and session ID to enable request cancellation and session tracking
+          // Pass abort signal, session ID, and images to enable request cancellation and multimodal support
           response = await fetchAiChat(
             chatMessages.value,
             "",
             store.state.selectedOrganization.identifier,
             currentAbortController.value.signal,
             undefined, // explicitContext
-            currentSessionId.value // sessionId for x-o2-session-id header
+            currentSessionId.value, // sessionId for x-o2-session-id header
+            hasImages ? messagesToSend : undefined, // images for multimodal queries
           );
         } catch (error) {
-          console.error('Error fetching AI chat:', error);
+          console.error("Error fetching AI chat:", error);
           return;
         }
 
@@ -1930,39 +4316,161 @@ export default defineComponent({
         }
 
         if (!response.ok) {
-          throw response;
+          // Read the actual error body before throwing
+          let errorBody = null;
+          try {
+            errorBody = await response.json();
+          } catch (_) {
+            // body may not be JSON
+          }
+
+          // The session is gone but the transcript is still here, so resend under
+          // a fresh session and let the server seed it from those messages.
+          // Deliberately narrow — this code only, once only.
+          if (isSessionOwnerUnavailable(errorBody) && !hasReseeded) {
+            hasReseeded = true;
+            console.warn(
+              `Session ${currentSessionId.value} is no longer available; restoring the conversation in a new session.`,
+            );
+
+            // A NEW id — reusing the old one would be refused again. streamSessionId
+            // (captured above) stays pinned to the original, and cleanup keys off it.
+            currentSessionId.value = getUUIDv7();
+            reseedNotice = true;
+
+            response = await fetchAiChat(
+              chatMessages.value,
+              "",
+              store.state.selectedOrganization.identifier,
+              currentAbortController.value?.signal,
+              undefined,
+              currentSessionId.value,
+              hasImages ? messagesToSend : undefined,
+            );
+          }
+        }
+
+        // Re-check: the reseed above may have produced a fresh response.
+        if (!response.ok) {
+          let errorBody = null;
+          try {
+            errorBody = await response.json();
+          } catch (_) {
+            // body may not be JSON
+          }
+          const err: any = new Error(
+            errorBody?.message ||
+              t("aiAssistant.aiChat.serverErrorStatus", { status: response.status }),
+          );
+          err.status = response.status;
+          err.errorBody = errorBody;
+          throw err;
+        }
+
+        // Tell the user before the content arrives — continuing silently hides
+        // that the assistant lost the earlier tool results and file state.
+        if (reseedNotice) {
+          reseedNotice = false;
+          appendErrorBlock(RESTORED_NOTICE, true);
         }
 
         if (!response.body) {
-          throw new Error('No response body');
+          throw new Error("No response body");
         }
 
         const reader = response.body.getReader();
+
+        // Capture the controller, messages ref, and sessionId so we can detect
+        // detachment and clean up after processStream
+        const streamController = currentAbortController.value;
+        const streamMsgs = chatMessages.value;
+
         await processStream(reader);
 
-        store.dispatch('setCurrentChatTimestamp', currentChatId.value);
-        store.dispatch('setChatUpdated', true);
-        
+        // The streaming counterpart of the pre-stream 409 above: once the stream
+        // has opened the failure arrives as an SSE event inside a 200, so
+        // response.ok can no longer be branched on. Same recovery.
+        //
+        // Only while this turn is still on screen — if the user switched chats
+        // mid-stream, restoring would clobber THAT conversation's session id and
+        // transcript instead. They can resend from the affected chat.
+        const stillOnScreen = chatMessages.value === streamMsgs;
+        if (streamOwnerUnavailable.value && !hasReseeded && stillOnScreen) {
+          streamOwnerUnavailable.value = false;
+          hasReseeded = true;
+
+          if (streamController) backgroundStreams.delete(streamController);
+          if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
+
+          // The cross-instance streaming registry has to follow the new id, or
+          // another instance re-attaching never sees this stream finish.
+          const restoredSessionId = getUUIDv7();
+          currentSessionId.value = restoredSessionId;
+          sessionStreamingState[restoredSessionId] = true;
+
+          const retry: any = await fetchAiChat(
+            chatMessages.value,
+            "",
+            store.state.selectedOrganization.identifier,
+            currentAbortController.value?.signal,
+            undefined,
+            currentSessionId.value,
+            hasImages ? messagesToSend : undefined,
+          );
+
+          if (retry && !retry.cancelled && retry.ok && retry.body) {
+            // Announced only once the replacement request is accepted, as on the
+            // pre-stream path — otherwise the claim can turn out to be false.
+            appendErrorBlock(RESTORED_NOTICE, true);
+            await processStream(retry.body.getReader());
+          } else if (!(retry && retry.cancelled)) {
+            // The retry failed — non-OK, no body, or null (a network error).
+            // hasReseeded blocks any further attempt, so staying quiet here would
+            // end the turn with no answer and no explanation. A cancel is silent.
+            appendErrorBlock(
+              "This conversation was interrupted and could not be restored. Please try sending your message again.",
+            );
+          }
+
+          // The restored turn is done either way; clear its entry, or a
+          // re-attaching instance shows a loading indicator forever.
+          sessionStreamingState[restoredSessionId] = false;
+          backgroundStreamMap.delete(restoredSessionId);
+        }
+        streamOwnerUnavailable.value = false;
+
+        // Remove controller from background set and clean up re-attachment map
+        if (streamController) backgroundStreams.delete(streamController);
+        if (streamSessionId) backgroundStreamMap.delete(streamSessionId);
+
+        // Only update UI/store if stream was NOT detached (session is still the same)
+        const wasDetached = chatMessages.value !== streamMsgs;
+        if (!wasDetached) {
+          store.dispatch("setCurrentChatTimestamp", currentChatId.value);
+          store.dispatch("setChatUpdated", true);
+        }
       } catch (error: any) {
         // Remove the empty assistant message that was added before the error
         //this will impact in the case of error showing empty message above the error message in the chat
-        if (chatMessages.value.length > 0 && chatMessages.value[chatMessages.value.length - 1].role === 'assistant' && !chatMessages.value[chatMessages.value.length - 1].content) {
+        if (
+          chatMessages.value.length > 0 &&
+          chatMessages.value[chatMessages.value.length - 1].role === "assistant" &&
+          !chatMessages.value[chatMessages.value.length - 1].content
+        ) {
           chatMessages.value.pop();
         }
-        let errorMessage = 'Error: Unable to get response from the server. Please try again later.';
-        //we need to handle the 403 error seperately and show the error message to the user
+        let errorMessage: string;
         if (error.status === 403) {
-          chatMessages.value.push({
-            role: 'assistant',
-            content: 'Unauthorized Access: You are not authorized to perform this operation, please contact your administrator.'
-          });
+          errorMessage = t(UNAUTHORIZED_MESSAGE_KEY);
+        } else if (error.message && error.message !== "No response body") {
+          errorMessage = error.message;
         } else {
-          // Always create a new assistant message with error since we don't pre-create empty ones
-          chatMessages.value.push({
-            role: 'assistant',
-            content: errorMessage
-          });
+          errorMessage = t("aiAssistant.aiChat.serverResponseError");
         }
+        chatMessages.value.push({
+          role: "assistant",
+          content: raw(errorMessage),
+        });
         await saveToHistory(); // Save after error
       }
 
@@ -1970,99 +4478,484 @@ export default defineComponent({
       activeToolCall.value = null;
       stopAnalyzingRotation();
 
+      // Mark the session's stream as finished in the cross-instance registry so
+      // any OTHER instance that re-attached to it (e.g. the sidebar) can clear
+      // its own loading indicator. Runs on all exit paths (success/abort/error).
+      // Uses the id captured before the request, not currentSessionId — by the
+      // time an early failure lands here the user may have switched chats, and
+      // clearing the wrong session leaves the real one flagged as streaming.
+      sessionStreamingState[streamSessionId] = false;
+
       // Clean up AbortController after request completion (success or error)
       currentAbortController.value = null;
-      
+
       await scrollToBottom();
     };
 
     const selectCapability = (capability: string) => {
       // Remove the number prefix and set as input
-      inputMessage.value = capability.replace(/^\d+\.\s/, '');
+      inputMessage.value = capability.replace(/^\d+\.\s/, "");
+    };
+
+    const selectWelcomePrompt = (prompt: string) => {
+      inputMessage.value = prompt;
+      nextTick(() => {
+        chatInput.value?.focus?.();
+      });
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === "Enter" && !e.shiftKey) {
         e.preventDefault(); // Prevent the default enter behavior
         sendMessage();
-      } else if (e.key === 'ArrowUp' && isOnFirstLine(e.target as HTMLTextAreaElement)) {
+      } else if (e.key === "Backspace") {
+        // Handle backspace for RichTextInput (contenteditable)
+        const target = e.target as HTMLElement;
+        const contenteditable =
+          target.closest('[contenteditable="true"]') ||
+          target.querySelector('[contenteditable="true"]');
+
+        if (contenteditable) {
+          // Check if cursor is right after an image reference span
+          const selection = window.getSelection();
+          if (!selection || selection.rangeCount === 0) return;
+
+          const range = selection.getRangeAt(0);
+          const cursorNode = range.startContainer;
+          let imageRefSpan: Element | null = null;
+
+          // Case 1: Cursor is in a text node at position 0, check previous sibling
+          if (cursorNode.nodeType === Node.TEXT_NODE && range.startOffset === 0) {
+            const prevSibling = cursorNode.previousSibling;
+            if (prevSibling && (prevSibling as Element).classList?.contains("image-reference")) {
+              imageRefSpan = prevSibling as Element;
+            }
+          }
+          // Case 2: Cursor is in an element node, check the child before cursor
+          else if (cursorNode.nodeType === Node.ELEMENT_NODE && range.startOffset > 0) {
+            const element = cursorNode as Element;
+            const prevChild = element.childNodes[range.startOffset - 1];
+            if (prevChild && (prevChild as Element).classList?.contains("image-reference")) {
+              imageRefSpan = prevChild as Element;
+            }
+          }
+
+          // If we found an image reference to delete
+          if (imageRefSpan) {
+            e.preventDefault();
+
+            // Extract filename from the span text
+            const refText = imageRefSpan.textContent || "";
+            const match = refText.match(/@\[([^\]]+)\]/);
+
+            if (match) {
+              const filename = match[1];
+
+              // Remove the associated image from pendingImages
+              const imageIndex = pendingImages.value.findIndex((img) => img.filename === filename);
+              if (imageIndex !== -1) {
+                pendingImages.value.splice(imageIndex, 1);
+              }
+            }
+
+            // Remove the span element
+            imageRefSpan.remove();
+
+            // Trigger input event to update model
+            if (contenteditable) {
+              contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
+            }
+          }
+        } else {
+          // Legacy textarea handling
+          const textarea = e.target as HTMLTextAreaElement;
+          const cursorPos = textarea.selectionStart;
+          const text = inputMessage.value;
+
+          // Find if cursor is at the end of a @[filename] pattern
+          const textBeforeCursor = text.substring(0, cursorPos);
+          const match = textBeforeCursor.match(/@\[([^\]]+)\]$/);
+
+          if (match) {
+            e.preventDefault();
+            const filename = match[1];
+            const refStart = cursorPos - match[0].length;
+
+            // Remove the entire @[filename] reference from text
+            inputMessage.value = text.substring(0, refStart) + text.substring(cursorPos);
+
+            // Remove the associated image from pendingImages
+            const imageIndex = pendingImages.value.findIndex((img) => img.filename === filename);
+            if (imageIndex !== -1) {
+              pendingImages.value.splice(imageIndex, 1);
+            }
+
+            // Set cursor position after the deletion
+            nextTick(() => {
+              textarea.selectionStart = textarea.selectionEnd = refStart;
+            });
+          }
+        }
+      } else if (e.key === "ArrowUp") {
+        const target = e.target as HTMLElement;
+        const textarea = target.tagName === "TEXTAREA" ? (target as HTMLTextAreaElement) : null;
+        if (textarea && isOnFirstLine(textarea)) {
+          e.preventDefault();
+          navigateHistory("up");
+        }
+      } else if (e.key === "ArrowDown" && historyIndex.value > -1) {
         e.preventDefault();
-        navigateHistory('up');
-      } else if (e.key === 'ArrowDown' && historyIndex.value > -1) {
-        e.preventDefault();
-        navigateHistory('down');
+        navigateHistory("down");
       }
     };
 
     // Check if cursor is on the first line of textarea
     const isOnFirstLine = (textarea: HTMLTextAreaElement) => {
       if (!textarea) return false;
-      
+
       const cursorPosition = textarea.selectionStart;
       const textBeforeCursor = textarea.value.substring(0, cursorPosition);
-      
+
       // Check if there are any newlines before cursor position
-      return !textBeforeCursor.includes('\n');
+      return !textBeforeCursor.includes("\n");
     };
 
     // Navigate through query history
-    const navigateHistory = (direction: 'up' | 'down') => {
+    const navigateHistory = (direction: "up" | "down") => {
       if (queryHistory.value.length === 0) return;
-      
-      if (direction === 'up') {
+
+      if (direction === "up") {
         if (historyIndex.value < queryHistory.value.length - 1) {
           historyIndex.value++;
           inputMessage.value = queryHistory.value[historyIndex.value];
         }
-      } else if (direction === 'down') {
+      } else if (direction === "down") {
         if (historyIndex.value > 0) {
           historyIndex.value--;
           inputMessage.value = queryHistory.value[historyIndex.value];
         } else if (historyIndex.value === 0) {
           historyIndex.value = -1;
-          inputMessage.value = '';
+          inputMessage.value = "";
         }
       }
     };
 
     const focusInput = () => {
       if (chatInput.value) {
-        // For Quasar components, we need to call the focus method on the component
-        chatInput.value.focus();
-        // Alternative: directly focus the native textarea element
-        const textarea = chatInput.value.$el?.querySelector('textarea');
-        if (textarea) {
-          textarea.focus();
+        // For RichTextInput component, call its focusInput method
+        if (typeof chatInput.value.focusInput === "function") {
+          chatInput.value.focusInput();
+        } else {
+          // Fallback for other input types
+          chatInput.value.focus();
         }
       }
     };
 
-    // Scroll input textarea to bottom to show latest appended content
-    const scrollInputToBottom = () => {
-      // Clear any pending scroll timeout
-      if (scrollTimeoutId.value !== null) {
-        clearTimeout(scrollTimeoutId.value);
+    // Handle reference chip updates from RichTextInput
+    const handleReferencesUpdate = (refs: ReferenceChip[]) => {
+      contextReferences.value = refs;
+    };
+
+    // Image handling functions
+    const triggerImageUpload = () => {
+      imageInputRef.value?.click();
+    };
+
+    const handleImageSelect = async (event: Event) => {
+      const input = event.target as HTMLInputElement;
+      const files = input.files;
+      if (!files) return;
+
+      for (const file of Array.from(files)) {
+        await addImage(file);
+      }
+      // Reset input so the same file can be selected again
+      input.value = "";
+    };
+
+    const addImage = async (file: File): Promise<boolean> => {
+      // Validate file size first (before reading)
+      if (file.size > MAX_IMAGE_SIZE_BYTES) {
+        toast({
+          variant: "error",
+          message: t("toastMessages.components.imageExceeds2mbLimitMb", {
+            size: (file.size / 1024 / 1024).toFixed(1),
+          }),
+        });
+        return false;
       }
 
-      // Set new timeout for scroll
-      scrollTimeoutId.value = setTimeout(() => {
-        const textarea = chatInput.value?.$el?.querySelector('textarea');
-        if (!textarea) return;
+      // Basic file type check for immediate feedback (backend will detect actual type)
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type as any)) {
+        toast({
+          variant: "error",
+          message: t("toastMessages.components.onlyPngAndJpegImagesAre"),
+        });
+        return false;
+      }
 
-        textarea.focus();
-        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+      // Convert to base64
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const base64 = (e.target?.result as string).split(",")[1]; // Remove data:image/...;base64, prefix
+          const imageRef = `@[${file.name}]`;
 
-        // Scroll all scrollable parent elements
-        let element = textarea;
-        while (element && element !== document.body) {
-          if (element.scrollHeight > element.clientHeight) {
-            element.scrollTop = element.scrollHeight;
+          // Use file.type for display - backend will detect and correct actual mime type
+          pendingImages.value.push({
+            data: base64,
+            mimeType: file.type as "image/png" | "image/jpeg",
+            filename: file.name,
+            size: file.size,
+          });
+
+          // Insert image reference at cursor position
+          // Check if we're using RichTextInput (contenteditable)
+          const contenteditable =
+            chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
+            chatInput.value?.$el?.querySelector(".rich-text-input");
+
+          if (contenteditable) {
+            // RichTextInput - insert at cursor position in contenteditable
+            const selection = window.getSelection();
+            const range = selection && selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+
+            // Create a non-editable span for the image reference
+            const imageRefSpan = document.createElement("span");
+            imageRefSpan.contentEditable = "false";
+            imageRefSpan.className = "image-reference";
+            // eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom
+            imageRefSpan.style.cssText = `display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.125rem 0.375rem; margin: 0 0.125rem; background: ${chartColor("--color-status-success-bg")}; border: 1px solid ${chartColor("--color-success-200")}; border-radius: 0.25rem; font-size: var(--text-compact); color: ${chartColor("--color-status-success-text")}; user-select: none;`;
+
+            // Add image icon
+            const imageIcon = document.createElement("span");
+            imageIcon.textContent = "🖼️";
+            imageIcon.style.cssText = "font-size: var(--text-xs);";
+
+            // Add filename text
+            const filenameText = document.createElement("span");
+            filenameText.textContent = file.name;
+
+            // Add remove button
+            const removeBtn = document.createElement("button");
+            removeBtn.textContent = "×";
+            removeBtn.style.cssText = `display: flex; align-items: center; justify-content: center; width: 0.875rem; height: 0.875rem; padding: 0; margin-left: 0.125rem; background: transparent; border: none; border-radius: 0.1875rem; font-size: var(--text-base); line-height: 1; cursor: pointer; color: ${chartColor("--color-status-success-text")}; transition: all 0.15s ease;`;
+            removeBtn.onmouseover = () => {
+              removeBtn.style.background = chartColor("--color-status-negative");
+              removeBtn.style.color = chartColor("--color-white");
+            };
+            removeBtn.onmouseout = () => {
+              removeBtn.style.background = "transparent";
+              removeBtn.style.color = chartColor("--color-status-success-text");
+            };
+            removeBtn.onclick = (e) => {
+              e.preventDefault();
+              e.stopPropagation();
+
+              // Find and remove the image from pendingImages
+              const imageIndex = pendingImages.value.findIndex((img) => img.filename === file.name);
+              if (imageIndex !== -1) {
+                pendingImages.value.splice(imageIndex, 1);
+              }
+
+              // Remove the span
+              imageRefSpan.remove();
+
+              // Trigger input event
+              contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
+            };
+
+            imageRefSpan.appendChild(imageIcon);
+            imageRefSpan.appendChild(filenameText);
+            imageRefSpan.appendChild(removeBtn);
+
+            if (range && contenteditable.contains(range.startContainer)) {
+              // Insert at cursor position
+              range.deleteContents();
+
+              // Add space before if needed
+              const textBefore = range.startContainer.textContent || "";
+              if (
+                textBefore.length > 0 &&
+                !textBefore.endsWith(" ") &&
+                !textBefore.endsWith("\n")
+              ) {
+                range.insertNode(document.createTextNode(" "));
+              }
+
+              range.insertNode(imageRefSpan);
+
+              // Add space after for cursor positioning
+              const spaceAfter = document.createTextNode(" ");
+              range.setStartAfter(imageRefSpan);
+              range.insertNode(spaceAfter);
+
+              // Move cursor after the space
+              range.setStartAfter(spaceAfter);
+              range.collapse(true);
+              selection?.removeAllRanges();
+              selection?.addRange(range);
+            } else {
+              // No selection or selection outside - append to end
+              const spaceNeeded =
+                contenteditable.textContent &&
+                !contenteditable.textContent.endsWith(" ") &&
+                !contenteditable.textContent.endsWith("\n");
+              if (spaceNeeded) {
+                contenteditable.appendChild(document.createTextNode(" "));
+              }
+              contenteditable.appendChild(imageRefSpan);
+              const spaceAfter = document.createTextNode(" ");
+              contenteditable.appendChild(spaceAfter);
+
+              // Move cursor to end
+              const newRange = document.createRange();
+              newRange.setStartAfter(spaceAfter);
+              newRange.collapse(true);
+              selection?.removeAllRanges();
+              selection?.addRange(newRange);
+            }
+
+            // Trigger input event to update model
+            contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
+            focusInput();
+          } else {
+            // Legacy textarea fallback
+            const textarea = chatInput.value?.$el?.querySelector(
+              "textarea",
+            ) as HTMLTextAreaElement | null;
+            if (textarea) {
+              const start = textarea.selectionStart || 0;
+              const end = textarea.selectionEnd || 0;
+              const text = inputMessage.value;
+              const before = text.substring(0, start);
+              const after = text.substring(end);
+
+              // Add space before if needed
+              const needsSpaceBefore =
+                before.length > 0 && !before.endsWith(" ") && !before.endsWith("\n");
+              const needsSpaceAfter =
+                after.length > 0 && !after.startsWith(" ") && !after.startsWith("\n");
+
+              const insertion =
+                (needsSpaceBefore ? " " : "") + imageRef + (needsSpaceAfter ? " " : "");
+              inputMessage.value = before + insertion + after;
+
+              // Set cursor position after the inserted reference
+              nextTick(() => {
+                const newPos = start + insertion.length;
+                textarea.setSelectionRange(newPos, newPos);
+                textarea.focus();
+              });
+            } else {
+              // Final fallback: append to end
+              const currentText = inputMessage.value;
+              const separator =
+                currentText && !currentText.endsWith(" ") && !currentText.endsWith("\n") ? " " : "";
+              inputMessage.value = currentText + separator + imageRef + " ";
+            }
           }
-          element = element.parentElement;
-        }
 
-        scrollTimeoutId.value = null;
-      }, 50);
+          resolve(true);
+        };
+        reader.onerror = () => {
+          toast({
+            variant: "error",
+            message: t("toastMessages.components.failedToReadImage", { error: file.name }),
+          });
+          resolve(false);
+        };
+        reader.readAsDataURL(file);
+      });
+    };
+
+    const removeImage = (index: number) => {
+      // Get the filename before removing
+      const image = pendingImages.value[index];
+      if (image) {
+        const imageRef = `@[${image.filename}]`;
+
+        // Check if we're using RichTextInput (contenteditable)
+        const contenteditable =
+          chatInput.value?.$el?.querySelector('[contenteditable="true"]') ||
+          chatInput.value?.$el?.querySelector(".rich-text-input");
+
+        if (contenteditable) {
+          // Find and remove all image reference spans with this filename
+          const imageRefSpans = contenteditable.querySelectorAll(".image-reference");
+          imageRefSpans.forEach((span: Element) => {
+            if (span.textContent === imageRef) {
+              span.remove();
+            }
+          });
+
+          // Trigger input event to update model
+          contenteditable.dispatchEvent(new Event("input", { bubbles: true }));
+        } else {
+          // Legacy textarea - remove from text
+          inputMessage.value = inputMessage.value
+            .replace(new RegExp(`\\s*${escapeRegExp(imageRef)}\\s*`, "g"), " ")
+            .trim();
+        }
+      }
+      pendingImages.value.splice(index, 1);
+    };
+
+    // Helper to escape special regex characters
+    const escapeRegExp = (str: string) => {
+      return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    };
+
+    const clearPendingImages = () => {
+      pendingImages.value = [];
+    };
+
+    // Handle drag and drop for images
+    const handleDragOver = (event: DragEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+    };
+
+    const handleDrop = async (event: DragEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+
+      const files = event.dataTransfer?.files;
+      if (!files) return;
+
+      for (const file of Array.from(files)) {
+        if (file.type.startsWith("image/")) {
+          await addImage(file);
+        }
+      }
+    };
+
+    // Handle paste for images
+    const handlePaste = async (event: ClipboardEvent) => {
+      const items = event.clipboardData?.items;
+      if (!items) return;
+
+      for (const item of Array.from(items)) {
+        if (item.type.startsWith("image/")) {
+          const file = item.getAsFile();
+          if (file) {
+            event.preventDefault();
+            await addImage(file);
+          }
+        }
+      }
+    };
+
+    // Open image preview dialog
+    const openImagePreview = (img: ImageAttachment) => {
+      previewImage.value = img;
+      showImagePreview.value = true;
+    };
+
+    const closeImagePreview = () => {
+      showImagePreview.value = false;
+      previewImage.value = null;
     };
 
     // Load query history from localStorage
@@ -2073,7 +4966,7 @@ export default defineComponent({
           queryHistory.value = JSON.parse(stored);
         }
       } catch (error) {
-        console.error('Error loading query history:', error);
+        console.error("Error loading query history:", error);
         queryHistory.value = [];
       }
     };
@@ -2083,7 +4976,34 @@ export default defineComponent({
       try {
         localStorage.setItem(HISTORY_KEY, JSON.stringify(queryHistory.value));
       } catch (error) {
-        console.error('Error saving query history:', error);
+        console.error("Error saving query history:", error);
+      }
+    };
+
+    // Auto navigation preferences localStorage functions
+    const AUTO_NAV_KEY = "ai-chat-auto-navigation";
+
+    const loadAutoNavigationPreferences = () => {
+      try {
+        const stored = localStorage.getItem(AUTO_NAV_KEY);
+        if (stored) {
+          const data = JSON.parse(stored);
+          autoNavigationPreferences.value = new Map(
+            Object.entries(data).map(([k, v]) => [parseInt(k), v as boolean]),
+          );
+        }
+      } catch (error) {
+        console.error("Error loading auto navigation preferences:", error);
+        autoNavigationPreferences.value = new Map();
+      }
+    };
+
+    const saveAutoNavigationPreferences = () => {
+      try {
+        const data = Object.fromEntries(autoNavigationPreferences.value);
+        localStorage.setItem(AUTO_NAV_KEY, JSON.stringify(data));
+      } catch (error) {
+        console.error("Error saving auto navigation preferences:", error);
       }
     };
 
@@ -2091,34 +5011,105 @@ export default defineComponent({
     const addToHistory = (query: string) => {
       const trimmedQuery = query.trim();
       if (!trimmedQuery) return;
-      
+
       // Remove if already exists to avoid duplicates
       const existingIndex = queryHistory.value.indexOf(trimmedQuery);
       if (existingIndex > -1) {
         queryHistory.value.splice(existingIndex, 1);
       }
-      
+
       // Add to beginning of array
       queryHistory.value.unshift(trimmedQuery);
-      
+
       // Keep only last MAX_HISTORY_SIZE entries
       if (queryHistory.value.length > MAX_HISTORY_SIZE) {
         queryHistory.value = queryHistory.value.slice(0, MAX_HISTORY_SIZE);
       }
-      
+
       saveQueryHistory();
       historyIndex.value = -1; // Reset index
     };
 
     // Watch for isOpen changes to fetch initial message when opened
-    watch(() => props.isOpen, (newValue) => {
-      if (newValue) {
-        if (chatMessages.value.length === 0) {
-          fetchInitialMessage();
+    watch(
+      () => props.isOpen,
+      (newValue) => {
+        if (newValue) {
+          if (chatMessages.value.length === 0) {
+            fetchInitialMessage();
+          }
+          loadHistory(); // Load history when chat is opened
+
+          // Mark component as ready and process any pending chips
+          // Use a slight delay to ensure RichTextInput is fully mounted
+          nextTick(() => {
+            setTimeout(() => {
+              componentReady.value = true;
+              processPendingChips();
+              focusInput();
+            }, 100);
+          });
         }
-        loadHistory(); // Load history when chat is opened
-      }
-    });
+      },
+    );
+
+    // Auto-focus input when chat is expanded
+    watch(
+      () => store.state.isAiChatExpanded,
+      (isExpanded) => {
+        if (isExpanded) {
+          nextTick(() => {
+            setTimeout(() => {
+              focusInput();
+            }, 150);
+          });
+        }
+      },
+    );
+
+    // Watch for organization switches — reset current chat and reload history
+    // scoped to the new org so users never see cross-org chat history.
+    watch(
+      () => store.state.selectedOrganization?.identifier,
+      (newOrgId, oldOrgId) => {
+        if (newOrgId && newOrgId !== oldOrgId) {
+          // A turn started under the old org must not keep streaming and
+          // writing chat history after the switch.
+          abortBackgroundStreams();
+          addNewChat();
+          if (props.isOpen) {
+            loadHistory();
+          }
+        }
+      },
+    );
+
+    // When this instance has re-attached to a stream that another instance
+    // started (its processStream completion runs in the OTHER instance's
+    // closure and can't reset our isLoading), watch the shared streaming
+    // registry and clear our own streaming UI once that session finishes.
+    watch(
+      () => (currentSessionId.value ? sessionStreamingState[currentSessionId.value] : undefined),
+      (isStreaming) => {
+        // React to the session going false, not to a true->false transition: an
+        // instance that re-attached mid-stream never observed the `true`, so it
+        // would see undefined->false and skip the cleanup, spinning forever.
+        // isLoading guards against acting when we aren't showing a stream.
+        if (isStreaming === false && isLoading.value) {
+          isLoading.value = false;
+          activeToolCall.value = null;
+          stopAnalyzingRotation();
+          // The owning instance's processStream already wrote the final text
+          // into the message blocks, so this instance only clears its own
+          // typewriter UI.
+          resetTypewriterState();
+          // Reflect the completed turn into the sync handshake + history so a
+          // later mount reads the finished chat, not a mid-stream snapshot.
+          store.dispatch("setCurrentChatTimestamp", currentChatId.value);
+          nextTick(() => scrollToBottom());
+        }
+      },
+    );
 
     // Only fetch initial message if component starts as open
     onMounted(() => {
@@ -2126,18 +5117,65 @@ export default defineComponent({
         fetchInitialMessage();
         loadHistory(); // Load history on mount if chat is open
         loadChat(store.state.currentChatTimestamp);
+
+        // Mark component as ready and process any pending chips
+        // Use a slight delay to ensure RichTextInput is fully mounted
+        nextTick(() => {
+          setTimeout(() => {
+            componentReady.value = true;
+            processPendingChips();
+            focusInput();
+          }, 100);
+        });
       }
-      
+
       // Load query history from localStorage
       loadQueryHistory();
+
+      // Load auto navigation preferences from localStorage
+      loadAutoNavigationPreferences();
+
+      window.addEventListener("o2:abort-ai-streams", abortAllStreams);
     });
 
-    onUnmounted(()=>{
-      // Cancel any ongoing requests when component is unmounted to prevent memory leaks
-      if (currentAbortController.value) {
-        currentAbortController.value.abort();
-        currentAbortController.value = null;
+    onUnmounted(() => {
+      window.removeEventListener("o2:abort-ai-streams", abortAllStreams);
+      // Mark unmounting FIRST so any reactive watcher that fires during teardown
+      // (e.g. our own chatUpdated watch, triggered by the dispatch below) does
+      // not re-attach the just-detached stream back to this dying instance.
+      isUnmounting.value = true;
+
+      // Detach (not abort) any in-flight request: every mount site except
+      // MainLayout's sidebar is behind a v-if (Home's AI tab, the query-editor
+      // panels), so ordinary navigation tears this instance down and used to
+      // kill the answer mid-word. Unmount is the only hook that knows the
+      // component is actually going away — a route watcher can't tell the
+      // difference between "leaving" and "the page updated its query string".
+      const wasStreaming = !!currentAbortController.value;
+      detachCurrentStream();
+      // detachCurrentStream early-returns when no controller is set, so clear the
+      // rotation interval directly rather than relying on that path.
+      stopAnalyzingRotation();
+
+      // Home runs the chat in its own inline tab with the sidebar closed. If we
+      // leave Home mid-stream, open the sidebar so its instance can re-attach
+      // and keep rendering. Skip when we're still on Home (the user only
+      // switched Home tabs) — MainLayout keeps the sidebar closed there, so
+      // opening it would show the panel and the Home AI tab at once.
+      if (
+        wasStreaming &&
+        props.centeredStart &&
+        route.name !== "home" &&
+        !store.state.isAiChatEnabled
+      ) {
+        store.dispatch("setIsAiChatEnabled", true);
       }
+
+      // Note: background streams are intentionally NOT aborted here.
+      // detachCurrentStream() moves a turn's controller into backgroundStreams
+      // specifically so it keeps running after this component instance goes
+      // away (e.g. navigation, logout); aborting them on unmount would defeat
+      // that guarantee in exactly the scenario it exists for.
 
       // Clean up typewriter animation to prevent memory leaks
       if (typewriterAnimationId.value) {
@@ -2150,73 +5188,139 @@ export default defineComponent({
         clearInterval(titleIntervalId);
         titleIntervalId = null;
       }
-      
-      //this step is added because we are using seperate instances of o2 ai chat component to make sync between them
-      //whenever a new chat is created or a new message is sent, the currentChatTimestamp is set to the chatId
-      //so we need to make sure that the currentChatTimestamp is set to the correct chatId
-      //and the chat gets updated when the component is unmounted so that the main layout component can load the correct chat
-      store.dispatch('setCurrentChatTimestamp', currentChatId.value);
-      store.dispatch('setChatUpdated', true);      if ( store.state.currentChatTimestamp) {
-        loadChat(store.state.currentChatTimestamp);
+
+      // Clean up the trailing-edge streaming render timer. This matters more
+      // here than a typical unmount cleanup: we intentionally let the stream
+      // keep running (see detachCurrentStream above), so displayedStreamingContent
+      // may still be ticking as this instance dies and a flush is often pending.
+      // Left alone it fires after unmount and writes into this dead instance's
+      // chatMessages, keeping the whole setup closure alive across the routine
+      // home <-> sidebar hand-off.
+      if (streamingRenderFlushTimer) {
+        clearTimeout(streamingRenderFlushTimer);
+        streamingRenderFlushTimer = null;
       }
-      if(!store.state.currentChatTimestamp) {
-        addNewChat();
-      }
-    })
+      pendingStreamingRenderContent = null;
+
+      // We use separate O2AIChat instances (home inline tab + sidebar) and sync
+      // them via the store: publish which chat is current + a "chatUpdated" pulse
+      // so the SURVIVING instance loads it (its chatUpdated watch calls loadChat).
+      //
+      // CRITICAL: this dying instance must NOT call loadChat()/addNewChat() on
+      // itself here. detachCurrentStream() (above) just registered the in-flight
+      // turn in backgroundStreamMap for the survivor to re-attach to; calling
+      // loadChat() on ourselves would immediately re-attach it back to THIS
+      // instance and delete the map entry, so the survivor then finds nothing
+      // and falls back to the stale IndexedDB snapshot — the exact reason the
+      // streamed text stopped rendering after navigating away mid-stream.
+      // Only publish the handoff state; let the survivor act on it.
+      store.dispatch("setCurrentChatTimestamp", currentChatId.value);
+      store.dispatch("setChatUpdated", true);
+    });
     //this watch is added to make sure that the chat gets updated
     // when the component is unmounted so that the main layout component can load the correct chat
-      watch(chatUpdated, (newChatUpdated: boolean) => {
-        if (newChatUpdated && store.state.currentChatTimestamp) {
-          loadChat(store.state.currentChatTimestamp);
+    watch(chatUpdated, (newChatUpdated: boolean) => {
+      // A dying instance must not react to the handoff pulse it just published —
+      // otherwise it re-attaches its own detached stream and steals it from the
+      // surviving instance. Let the survivor handle it.
+      if (isUnmounting.value) return;
+      if (newChatUpdated && store.state.currentChatTimestamp) {
+        loadChat(store.state.currentChatTimestamp);
+      }
+      if (newChatUpdated && !store.state.currentChatTimestamp) {
+        addNewChat();
+      }
+      store.dispatch("setChatUpdated", false);
+    });
+
+    // Writing displayedStreamingContent into chatMessages triggers a
+    // re-render of the message list, which re-runs formatMessage() ->
+    // marked.parse() (incl. hljs.highlight for code blocks) over the WHOLE
+    // accumulated text, not just the new characters. The typewriter ticks
+    // every ~8ms; re-parsing/re-highlighting full markdown at that rate is
+    // O(n^2) over a response and eventually can't keep up with
+    // requestAnimationFrame, so the page appears to hang with data already
+    // in memory but not painted, then "snaps" to the final text once the
+    // stream ends and the last write goes through. Throttle how often the
+    // expensive reactive write happens, independent of how often the cheap
+    // per-character animation ref ticks; the animation itself stays smooth.
+    const STREAMING_RENDER_INTERVAL = 80; // ms between reactive markdown re-renders
+    let lastStreamingRenderTime = 0;
+    let pendingStreamingRenderContent: string | null = null;
+    let streamingRenderFlushTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flushStreamingRenderNow = (content: string) => {
+      lastStreamingRenderTime = Date.now();
+      pendingStreamingRenderContent = null;
+      if (streamingRenderFlushTimer) {
+        clearTimeout(streamingRenderFlushTimer);
+        streamingRenderFlushTimer = null;
+      }
+
+      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
+      if (lastMessage && lastMessage.role === "assistant" && lastMessage.contentBlocks) {
+        const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
+        if (lastBlock && lastBlock.type === "text") {
+          // Additive-only: the stream handler writes the FULL accumulated
+          // textSegment into this block as it arrives; the typewriter only
+          // reveals a prefix of it. Never let a lagging/stalled typewriter
+          // reveal (or an empty reset) shorten what's already rendered — that
+          // was a source of "text arrived but nothing/less showed". Only grow.
+          if ((content?.length || 0) >= (lastBlock.text?.length || 0)) {
+            lastBlock.text = content;
+          }
         }
-        if(newChatUpdated && !store.state.currentChatTimestamp) {
-          addNewChat();
-        }
-        store.dispatch('setChatUpdated', false);
-      });
+      }
+    };
 
     // Watch for typewriter animation updates to refresh the displayed text
     watch(displayedStreamingContent, (newContent) => {
       if (!isLoading.value) return;
+      // Don't overwrite existing text with empty string when displayedStreamingContent
+      // is reset (e.g., on tool_call). The reset signals "new segment starts" not
+      // "clear previous content".
+      if (!newContent) return;
 
-      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.contentBlocks) {
-        const lastBlock = lastMessage.contentBlocks[lastMessage.contentBlocks.length - 1];
-        if (lastBlock && lastBlock.type === 'text') {
-          lastBlock.text = newContent;
-        }
+      const now = Date.now();
+      if (now - lastStreamingRenderTime >= STREAMING_RENDER_INTERVAL) {
+        flushStreamingRenderNow(newContent);
+        return;
+      }
+
+      // Trailing edge: make sure the latest content always lands even if
+      // ticks keep arriving faster than the interval.
+      pendingStreamingRenderContent = newContent;
+      if (!streamingRenderFlushTimer) {
+        const delay = STREAMING_RENDER_INTERVAL - (now - lastStreamingRenderTime);
+        streamingRenderFlushTimer = setTimeout(() => {
+          streamingRenderFlushTimer = null;
+          if (pendingStreamingRenderContent !== null) {
+            flushStreamingRenderNow(pendingStreamingRenderContent);
+          }
+        }, delay);
       }
     });
 
-    const copyToClipboard = async (text: string) => {
-      try {
-        await navigator.clipboard.writeText(text);
-        $q.notify({
-          message: 'Code copied to clipboard',
-          color: 'positive',
-          position: 'top',
-          timeout: 1000
-        });
-      } catch (err) {
-        console.error('Failed to copy text: ', err);
-        $q.notify({
-          message: 'Failed to copy code',
-          color: 'negative',
-          position: 'top'
-        });
-      }
-    };
-
     // Filter markdown headers - convert # and ## to smaller formatting
+    // This should only process actual markdown headers, not code block comments
     const filterMarkdownHeaders = (content: string): string => {
-      // Convert # and ## at start of lines to bold format for cleaner display
-      let filtered = content;
+      // First, protect code blocks by temporarily replacing them
+      const codeBlocks: string[] = [];
+      let filtered = content.replace(/```[\s\S]*?```/g, (match) => {
+        codeBlocks.push(match);
+        return `___CODE_BLOCK_${codeBlocks.length - 1}___`;
+      });
 
-      // Convert ## headers to bold with colon
-      filtered = filtered.replace(/^## (.+)$/gm, '**$1:**');
+      // Convert ## headers to bold with colon (only outside code blocks)
+      filtered = filtered.replace(/^## (.+)$/gm, "**$1:**");
 
-      // Convert # headers to bold with colon
-      filtered = filtered.replace(/^# (.+)$/gm, '**$1:**');
+      // Convert # headers to bold with colon (only outside code blocks)
+      filtered = filtered.replace(/^# (.+)$/gm, "**$1:**");
+
+      // Restore code blocks
+      filtered = filtered.replace(/___CODE_BLOCK_(\d+)___/g, (_match, index) => {
+        return codeBlocks[parseInt(index)];
+      });
 
       return filtered;
     };
@@ -2229,26 +5333,31 @@ export default defineComponent({
       const blocks = [];
 
       for (const token of tokens) {
-        if (token.type === 'code') {
+        if (token.type === "code") {
           let codeText = token.text.trim();
-          while (codeText.startsWith('--') || codeText.startsWith('//') || codeText.startsWith('#')) {
-            codeText = codeText.split('\n').slice(1).join('\n').trim();
+          while (
+            codeText.startsWith("--") ||
+            codeText.startsWith("//") ||
+            codeText.startsWith("#")
+          ) {
+            codeText = codeText.split("\n").slice(1).join("\n").trim();
           }
 
-          const highlightedContent = token.lang && hljs.getLanguage(token.lang)
-            ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
-            : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
+          const highlightedContent =
+            token.lang && hljs.getLanguage(token.lang)
+              ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
+              : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
 
           blocks.push({
-            type: 'code',
-            language: token.lang || '',
+            type: "code",
+            language: token.lang || "",
             content: codeText,
-            highlightedContent
+            highlightedContent,
           });
         } else {
           blocks.push({
-            type: 'text',
-            content: marked.parser([token])
+            type: "text",
+            content: marked.parser([token]),
           });
         }
       }
@@ -2263,59 +5372,169 @@ export default defineComponent({
       const blocks = [];
 
       for (const token of tokens) {
-        if (token.type === 'code') {
+        if (token.type === "code") {
           // Remove comments at the beginning of code blocks
           let codeText = token.text.trim();
-          while (codeText.startsWith('--') || codeText.startsWith('//') || codeText.startsWith('#')) {
-            codeText = codeText.split('\n').slice(1).join('\n').trim();
+          while (
+            codeText.startsWith("--") ||
+            codeText.startsWith("//") ||
+            codeText.startsWith("#")
+          ) {
+            codeText = codeText.split("\n").slice(1).join("\n").trim();
           }
 
-          const highlightedContent = token.lang && hljs.getLanguage(token.lang)
-            ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
-            : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
+          const highlightedContent =
+            token.lang && hljs.getLanguage(token.lang)
+              ? DOMPurify.sanitize(hljs.highlight(codeText, { language: token.lang }).value)
+              : DOMPurify.sanitize(hljs.highlightAuto(codeText).value);
 
           blocks.push({
-            type: 'code',
-            language: token.lang || '',
+            type: "code",
+            language: token.lang || "",
             content: codeText,
-            highlightedContent
+            highlightedContent,
           });
         } else {
           blocks.push({
-            type: 'text',
-            content: marked.parser([token])
+            type: "text",
+            content: marked.parser([token]),
           });
         }
       }
-      
+
       return blocks;
     };
 
-    const processedMessages = computed(() => {
-      return chatMessages.value.map(message => ({
-        ...message,
-        blocks: processMessageContent(message.content),
-        contentBlocks: message.contentBlocks || []
-      }));
-    });
+    // Helper to format JSON with syntax highlighting
+    const formatLogEntryContent = (content: string): string => {
+      try {
+        const parsed = JSON.parse(content);
+        const formatted = JSON.stringify(parsed, null, 2);
+        // Apply syntax highlighting
+        const highlighted = formatted.replace(
+          /("(\\u[a-zA-Z0-9]{4}|\\[^u]|[^\\"])*"(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d*)?(?:[eE][+-]?\d+)?)/g,
+          (match) => {
+            let cls = "json-number";
+            if (/^"/.test(match)) {
+              if (/:$/.test(match)) {
+                cls = "json-key";
+              } else {
+                cls = "json-string";
+              }
+            } else if (/true|false/.test(match)) {
+              cls = "json-boolean";
+            } else if (/null/.test(match)) {
+              cls = "json-null";
+            }
+            return `<span class="${cls}">${match}</span>`;
+          },
+        );
+        return DOMPurify.sanitize(highlighted);
+      } catch {
+        // Not JSON, return plain text with HTML escaping
+        return DOMPurify.sanitize(
+          content
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;")
+            .replace(/\n/g, "<br>"),
+        );
+      }
+    };
 
-    // Check if there's an assistant message in progress (for loading indicator positioning)
-    const hasAssistantMessage = computed(() => {
-      const lastMessage = chatMessages.value[chatMessages.value.length - 1];
-      return lastMessage?.role === 'assistant';
+    // Parse log entries from message content and maintain order
+    const parseLogEntries = (content: string) => {
+      const logEntryPattern = /--- (.+?) (?:\(lines (\d+)-(\d+)\) )?---\n([\s\S]*?)\n--- end ---/g;
+      const orderedBlocks: any[] = [];
+      let lastIndex = 0;
+      let match;
+
+      // Reset regex state
+      logEntryPattern.lastIndex = 0;
+
+      while ((match = logEntryPattern.exec(content)) !== null) {
+        const [fullMatch, filename, lineStart, lineEnd, logContent] = match;
+        const matchIndex = match.index;
+
+        // Add text before this log entry (if any)
+        if (matchIndex > lastIndex) {
+          const textBefore = content.substring(lastIndex, matchIndex).trim();
+          if (textBefore) {
+            orderedBlocks.push({
+              type: "text",
+              text: textBefore,
+            });
+          }
+        }
+
+        // Add the log entry
+        orderedBlocks.push({
+          type: "log_entry",
+          filename,
+          lineStart: lineStart ? parseInt(lineStart) : undefined,
+          lineEnd: lineEnd ? parseInt(lineEnd) : undefined,
+          content: logContent.trim(),
+          preview: createPreview(logContent.trim(), 60),
+        });
+
+        lastIndex = matchIndex + fullMatch.length;
+      }
+
+      // Add any remaining text after the last log entry
+      if (lastIndex < content.length) {
+        const textAfter = content.substring(lastIndex).trim();
+        if (textAfter) {
+          orderedBlocks.push({
+            type: "text",
+            text: textAfter,
+          });
+        }
+      }
+
+      return orderedBlocks;
+    };
+
+    const processedMessages = computed(() => {
+      return chatMessages.value.map((message) => {
+        // For user messages, check for log entries
+        if (message.role === "user") {
+          const orderedBlocks = parseLogEntries(message.content);
+
+          // If we have ordered blocks from parsing, combine them with existing contentBlocks
+          const combinedContentBlocks =
+            orderedBlocks.length > 0
+              ? [...orderedBlocks, ...(message.contentBlocks || [])]
+              : message.contentBlocks || [];
+
+          return {
+            ...message,
+            blocks: orderedBlocks.length > 0 ? [] : processMessageContent(message.content),
+            contentBlocks: combinedContentBlocks,
+          };
+        }
+
+        // For assistant messages, keep as is
+        return {
+          ...message,
+          blocks: processMessageContent(message.content),
+          contentBlocks: message.contentBlocks || [],
+        };
+      });
     });
 
     const retryGeneration = async (message: any) => {
-      if (!message || message.role !== 'assistant') return;
-      
+      if (!message || message.role !== "assistant") return;
+
       // Find the index of this assistant message
-      const messageIndex = chatMessages.value.findIndex(m => m.content === message.content);
+      const messageIndex = chatMessages.value.findIndex((m) => m.content === message.content);
       if (messageIndex === -1) return;
 
       // Find the corresponding user message that came before this assistant message
       let userMessageIndex = messageIndex - 1;
       while (userMessageIndex >= 0) {
-        if (chatMessages.value[userMessageIndex].role === 'user') {
+        if (chatMessages.value[userMessageIndex].role === "user") {
           // Set the user message and trigger send without removing previous messages
           inputMessage.value = chatMessages.value[userMessageIndex].content;
           await sendMessage();
@@ -2327,26 +5546,25 @@ export default defineComponent({
 
     const getLanguageDisplay = (lang: string) => {
       const languageMap: { [key: string]: string } = {
-        'js': 'JavaScript',
-        'javascript': 'JavaScript',
-        'ts': 'TypeScript',
-        'typescript': 'TypeScript',
-        'python': 'Python',
-        'py': 'Python',
-        'sql': 'SQL',
-        'vrl': 'VRL',
-        'json': 'JSON',
-        'html': 'HTML',
-        'css': 'CSS',
-        'scss': 'SCSS',
-        'bash': 'Bash',
-        'shell': 'Shell',
-        'yaml': 'YAML',
-        'yml': 'YAML',
-        'markdown': 'Markdown',
-        'md': 'Markdown'
+        js: "JavaScript",
+        javascript: "JavaScript",
+        ts: "TypeScript",
+        typescript: "TypeScript",
+        python: "Python",
+        py: "Python",
+        sql: "SQL",
+        vrl: "VRL",
+        json: "JSON",
+        css: "CSS",
+        scss: "SCSS",
+        bash: "Bash",
+        shell: "Shell",
+        yaml: "YAML",
+        yml: "YAML",
+        markdown: "Markdown",
+        md: "Markdown",
       };
-      
+
       const normalizedLang = lang.toLowerCase();
       return languageMap[normalizedLang] || lang.toUpperCase();
     };
@@ -2355,8 +5573,9 @@ export default defineComponent({
       // Sanitize HTML to prevent XSS attacks
       const sanitized = DOMPurify.sanitize(content);
       // Replace pre tags with span and add our custom class
-      return sanitized.replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
-                     .replace(/<\/pre>/g, '</span>');
+      return sanitized
+        .replace(/<pre([^>]*)>/g, '<span class="generated-code-block"$1>')
+        .replace(/<\/pre>/g, "</span>");
     };
 
     const formatTime = (timestamp: string) => {
@@ -2366,21 +5585,24 @@ export default defineComponent({
 
     // Tool call context formatting helpers
     const truncateQuery = (query: string) => {
-      if (!query) return '';
+      if (!query) return "";
       const maxLength = 100;
       if (query.length <= maxLength) return query;
-      return query.substring(0, maxLength) + '...';
+      return query.substring(0, maxLength) + "...";
     };
 
     const formatContextKey = (key: string) => {
       // Convert snake_case to Title Case
-      return key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      return key
+        .split("_")
+        .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(" ");
     };
 
     const formatContextValue = (value: any) => {
-      if (typeof value === 'string') {
+      if (typeof value === "string") {
         // Truncate long strings
-        if (value.length > 30) return value.substring(0, 30) + '...';
+        if (value.length > 30) return value.substring(0, 30) + "...";
         return value;
       }
       return String(value);
@@ -2398,6 +5620,20 @@ export default defineComponent({
 
     const isToolCallExpanded = (messageIndex: number, blockIndex: number) => {
       return expandedToolCalls.value.has(`${messageIndex}-${blockIndex}`);
+    };
+
+    // Log entry expansion helpers
+    const toggleLogEntryExpanded = (messageIndex: number, blockIndex: number) => {
+      const key = `${messageIndex}-${blockIndex}`;
+      if (expandedLogEntries.value.has(key)) {
+        expandedLogEntries.value.delete(key);
+      } else {
+        expandedLogEntries.value.add(key);
+      }
+    };
+
+    const isLogEntryExpanded = (messageIndex: number, blockIndex: number) => {
+      return expandedLogEntries.value.has(`${messageIndex}-${blockIndex}`);
     };
 
     // Extract display fields from tool call context (handles different tool schemas)
@@ -2418,68 +5654,204 @@ export default defineComponent({
         if (q.vrl) data.vrl = q.vrl;
       }
 
+      // Handle testFunction context (VRL validation)
+      if (context.vrl) data.vrl = context.vrl;
+      if (context.request_body?.function) data.vrl = context.request_body.function;
+
+      // Handle flat SQL from SearchSQL enriched context
+      if (context.sql) data.query = context.sql;
+
       // Handle flat structure (StreamSchema, etc.)
       if (context.stream_name) data.stream = context.stream_name;
       if (context.type) data.type = context.type;
 
+      // CLI tools: surface the command string
+      if (context.command) data.command = context.command;
+
       return Object.keys(data).length > 0 ? data : null;
     };
 
-    const hasToolCallDetails = (block: ContentBlock) => {
+    // `response` is stamped onto blocks by the stream handler but is not part
+    // of the shared ContentBlock interface.
+    const hasToolCallDetails = (block: ContentBlock & { response?: Record<string, any> }) => {
+      // Show details for failed tools, successful tools with summary, tools with context data, or tools with response
+      if (block.success === false) return true;
+      if (block.summary) return true;
+      if (block.response) return true;
       return getToolCallDisplayData(block.context) !== null;
     };
 
-    const formatToolCallMessage = (block: ContentBlock) => {
-      // Interpolate context into message for certain tools
-      // Returns object with text and optional highlight for bold rendering
-      if (block.tool === 'StreamSchema' && block.context?.stream_name) {
-        return { text: 'Fetched ', highlight: block.context.stream_name, suffix: ' stream schema' };
+    // Splits an already-interpolated sentence around the value that renders bold,
+    // so the header stays ONE translatable sentence instead of two fragments.
+    const splitAroundHighlight = (full: string, highlight: string) => {
+      const at = full.indexOf(highlight);
+      if (at < 0) return { text: full, highlight: null as string | null, suffix: "" };
+      return {
+        text: full.slice(0, at),
+        highlight: highlight as string | null,
+        suffix: full.slice(at + highlight.length),
+      };
+    };
+
+    const formatToolCallMessage = (block: ContentBlock & { response?: Record<string, any> }) => {
+      // Show error message for failed tools
+      // Tool-specific messages (both success and error)
+      if (block.tool === "testFunction") {
+        if (block.success === false) {
+          return {
+            text: t("aiAssistant.aiChat.toolVrlValidationFailed"),
+            highlight: null,
+            suffix: "",
+          };
+        }
+        return { text: t("aiAssistant.aiChat.toolVrlValidated"), highlight: null, suffix: "" };
       }
-      if (block.tool === 'GetIncident' && block.context?.incident_id) {
-        return { text: 'Retrieved incident ', highlight: block.context.incident_id, suffix: '' };
+      if (block.tool === "SearchSQL") {
+        if (block.success === false) {
+          return {
+            text: t("aiAssistant.aiChat.toolQueryFailed"),
+            highlight: null,
+            suffix: "",
+          };
+        }
+        if (block.response?.total !== undefined) {
+          const streamType = block.context?.type || "logs";
+          return {
+            text: t("aiAssistant.aiChat.toolQueriedStream", { type: streamType }),
+            highlight: t("aiAssistant.aiChat.toolResultsCount", {
+              count: block.response.total,
+            }),
+            suffix: "",
+          };
+        }
       }
-      if (block.tool === 'GetAlert' && block.context?.alert_id) {
-        return { text: 'Fetched alert ', highlight: block.context.alert_id, suffix: '' };
+      if (block.tool === "StreamSchema" && block.context?.stream_name) {
+        const streamName = block.context.stream_name;
+        return splitAroundHighlight(
+          t("aiAssistant.aiChat.toolStreamSchema", { name: streamName }),
+          streamName,
+        );
       }
-      if (block.tool === 'GetDashboard' && block.context?.dashboard_id) {
-        return { text: 'Fetched dashboard ', highlight: block.context.dashboard_id, suffix: '' };
+      if (block.tool === "GetIncident" && block.context?.incident_id) {
+        const incidentId = block.context.incident_id;
+        return splitAroundHighlight(
+          t("aiAssistant.aiChat.toolGetIncident", { id: incidentId }),
+          incidentId,
+        );
       }
-      return { text: block.message, highlight: null, suffix: '' };
+      if (block.tool === "GetAlert" && block.context?.alert_id) {
+        const alertId = block.context.alert_id;
+        return splitAroundHighlight(t("aiAssistant.aiChat.toolGetAlert", { id: alertId }), alertId);
+      }
+      if (block.tool === "GetDashboard" && block.context?.dashboard_id) {
+        const dashboardId = block.context.dashboard_id;
+        return splitAroundHighlight(
+          t("aiAssistant.aiChat.toolGetDashboard", { id: dashboardId }),
+          dashboardId,
+        );
+      }
+      // List tools: show count from normalized { total, items } response
+      if (block.response?.total !== undefined && block.success !== false) {
+        const base = block.message || block.tool || t("aiAssistant.aiChat.toolListedFallback");
+        return {
+          text: base + " ",
+          highlight: t("aiAssistant.aiChat.toolFoundCount", { count: block.response.total }),
+          suffix: "",
+        };
+      }
+      // Generic fallback
+      if (block.success === false && block.resultMessage) {
+        // Truncate long error messages for the header
+        const msg =
+          block.resultMessage.length > 60
+            ? block.resultMessage.substring(0, 60) + "..."
+            : block.resultMessage;
+        return { text: msg, highlight: null, suffix: "" };
+      }
+      if (block.success !== false && block.summary?.count !== undefined) {
+        const base = block.message || block.tool || t("aiAssistant.aiChat.toolFallback");
+        return {
+          text: base + " ",
+          highlight: t("aiAssistant.aiChat.toolResultsCount", { count: block.summary.count }),
+          suffix: "",
+        };
+      }
+      return { text: block.message, highlight: null, suffix: "" };
     };
 
     const formatTimestamp = (timestamp: number) => {
-      if (!timestamp || timestamp === 0) return 'Not specified';
+      if (!timestamp || timestamp === 0) return t("aiAssistant.aiChat.notSpecified");
       // Timestamp is in microseconds, convert to milliseconds
       const ms = timestamp > 1e15 ? timestamp / 1000 : timestamp;
       const date = new Date(ms);
       return date.toLocaleString();
     };
 
-    const likeCodeBlock = (message: any) => {
-      // console.log('likeCodeBlock', message);
+    const likeCodeBlock = async (messageIndex: number) => {
+      const message = chatMessages.value[messageIndex];
+      if (!message || message.feedback === "thumbs_up") return;
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId) return;
+      // Each user+assistant pair = 1 query turn, so queryIndex = floor(index / 2)
+      const queryIndex = Math.floor(messageIndex / 2);
+      const success = await submitFeedback(
+        "thumbs_up",
+        orgId,
+        currentSessionId.value || undefined,
+        queryIndex,
+        lastTraceId.value || undefined,
+      );
+      if (success) {
+        message.feedback = "thumbs_up";
+        await saveToHistory();
+        toast({
+          variant: "success",
+          message: t("toastMessages.components.thanksForYourFeedback"),
+        });
+      }
     };
 
-    const dislikeCodeBlock = (message: any) => {
-      // console.log('dislikeCodeBlock', message);
+    const dislikeCodeBlock = async (messageIndex: number) => {
+      const message = chatMessages.value[messageIndex];
+      if (!message || message.feedback === "thumbs_down") return;
+      const orgId = store.state.selectedOrganization?.identifier;
+      if (!orgId) return;
+      const queryIndex = Math.floor(messageIndex / 2);
+      const success = await submitFeedback(
+        "thumbs_down",
+        orgId,
+        currentSessionId.value || undefined,
+        queryIndex,
+        lastTraceId.value || undefined,
+      );
+      if (success) {
+        message.feedback = "thumbs_down";
+        await saveToHistory();
+        toast({
+          variant: "success",
+          message: t("toastMessages.components.thanksForYourFeedback"),
+        });
+      }
     };
     const o2AiTitleLogo = computed(() => {
-      return store.state.theme == 'dark' ? getImageURL('images/common/o2_ai_logo_dark.svg') : getImageURL('images/common/o2_ai_logo.svg')
+      return isDark.value
+        ? getImageURL("images/common/o2_ai_logo_dark.svg")
+        : getImageURL("images/common/o2_ai_logo.svg");
     });
-    const getGenerateAiIcon = computed(()=> {
-      return getImageURL('images/common/ai_icon_dark.svg')
-    })
+    const getGenerateAiIcon = computed(() => {
+      return getImageURL("images/common/ai_icon_dark.svg");
+    });
 
     const filteredChatHistory = computed(() => {
       if (!historySearchTerm.value) {
         return chatHistory.value;
       }
       const searchTerm = historySearchTerm.value.toLowerCase();
-      return chatHistory.value.filter(chat => 
-        chat.title.toLowerCase().includes(searchTerm)
-      );
+      return chatHistory.value.filter((chat) => chat.title.toLowerCase().includes(searchTerm));
     });
 
     return {
+      raw,
       inputMessage,
       chatMessages,
       isLoading,
@@ -2492,10 +5864,13 @@ export default defineComponent({
       formatMessage,
       capabilities,
       selectCapability,
+      selectWelcomePrompt,
+      inputPlaceholder,
       showHistory,
       chatHistory,
       currentChatId,
       addNewChat,
+      toggleExpand,
       openHistory,
       loadChat,
       showEditTitleDialog,
@@ -2509,6 +5884,20 @@ export default defineComponent({
       clearAllConversations,
       showClearAllConfirmDialog,
       confirmClearAllConversations,
+      // Tool confirmation
+      pendingConfirmation,
+      handleToolConfirm,
+      handleToolCancel,
+      handleToolAlwaysConfirm,
+      handleNavigationAction,
+      sendConfirmation,
+      // Session restore
+      isSessionOwnerUnavailable,
+      appendErrorBlock,
+      streamOwnerUnavailable,
+      currentSessionId,
+      // Auto navigation
+      isAutoNavigationEnabled,
       processedMessages,
       pendingToolCalls,
       processTextBlock,
@@ -2519,8 +5908,7 @@ export default defineComponent({
       formatTime,
       loadHistory,
       store,
-      outlinedThumbUpOffAlt,
-      outlinedThumbDownOffAlt,
+      isMac,
       likeCodeBlock,
       dislikeCodeBlock,
       currentChatTimestamp,
@@ -2548,756 +5936,91 @@ export default defineComponent({
       formatToolCallMessage,
       formatTimestamp,
       formatContextValue,
+      expandedLogEntries,
+      toggleLogEntryExpanded,
+      isLogEntryExpanded,
+      formatLogEntryContent,
       // AI-generated title
       aiGeneratedTitle,
       displayedTitle,
       isTypingTitle,
-    }
-  }
+      // Image handling
+      pendingImages,
+      imageInputRef,
+      triggerImageUpload,
+      handleImageSelect,
+      removeImage,
+      handleDragOver,
+      handleDrop,
+      handlePaste,
+      // Image preview
+      showImagePreview,
+      previewImage,
+      openImagePreview,
+      closeImagePreview,
+      contextReferences,
+      handleReferencesUpdate,
+      t,
+    };
+  },
 });
 </script>
 
-<style lang="scss" scoped>
-.chat-container {
-  width: 100%;
-  height: calc(100vh - 50px);
-  color: var(--q-primary-text);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background-color: var(--o2-card-bg);
-  border-radius: 0.375rem;
-  box-shadow: 0 0 5px 1px var(--o2-hover-shadow);
+<style scoped>
+/* keep(generated-content): markdown/log/code markup is injected with v-html, so
+   it carries no scope attribute and cannot take utility classes — it can only be
+   reached from here through :deep().
+   keep(lib-override:hljs): highlight.js emits its own .hljs-* class names; the
+   token mapping below mirrors lib/core/Code/OCodeBlock.vue exactly (D6).
+   keep(keyframes): @keyframes and the `animation:` that consumes it must live in
+   the same block — the scoped compiler renames both together.
+   keep(complex-state): .tool-call-item's status x has-details x hover matrix and
+   .send-button's :not(.disabled):not([disabled]):not(:disabled) guard have no
+   utility equivalent (`enabled:` covers :disabled, not the .disabled class). */
 
-  .chat-content-wrapper {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    background: transparent;
-  }
-
-
-
-  .chat-header {
-    padding: 0px 12px 4px 12px;
-    display: flex;
-    justify-content: space-between;
-    align-items: end;
-    border-bottom: 1px solid var(--q-separator-color);
-    flex-shrink: 0;
-    background: var(--q-page-background);
-    z-index: 2;
-
-    .chat-title {
-      font-weight: bold;
-    }
-
-    .chat-title-dropdown {
-      padding: 6px 12px;
-      border-radius: 4px;
-      transition: background-color 0.2s;
-      max-width: 210px;
-      height: 32px;
-      min-height: 32px;
-      display: flex;
-      align-items: center;
-      overflow: hidden;
-
-      &:hover {
-        background-color: var(--q-hover-color);
-      }
-
-      span {
-        color: var(--q-primary-text);
-      }
-
-      .chat-title-text {
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        max-width: 180px;
-      }
-    }
-  }
-
-  // Chat session title with typewriter animation
-  .chat-session-title {
-    padding: 8px 16px;
-    font-size: 14px;
-    min-height: 32px;
-    display: flex;
-    align-items: center;
-    flex-shrink: 0;
-    border-bottom: 1px solid var(--q-separator-color);
-
-    &.light-mode {
-      color: #1a202c;
-      background: linear-gradient(to right, rgba(99, 102, 241, 0.08), transparent);
-    }
-
-    &.dark-mode {
-      color: #e2e8f0;
-      background: linear-gradient(to right, rgba(99, 102, 241, 0.15), transparent);
-    }
-
-    .title-text {
-      font-weight: 600;
-    }
-
-    .typing-cursor {
-      animation: blink 0.7s infinite;
-      margin-left: 2px;
-      font-weight: 400;
-    }
-  }
-
-  @keyframes blink {
-    0%, 50% { opacity: 1; }
-    51%, 100% { opacity: 0; }
-  }
-
-  .chat-content {
-    flex: 1;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    background: transparent;
-    position: relative;
-  }
-
-  .messages-container {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    background: transparent;
-    max-width: 900px;
-    margin: 0 auto;
-    width: 100%;
-  }
-
-  .welcome-section {
-    padding: 24px;
-    background: linear-gradient(to right, rgba(var(--q-primary-rgb), 0.05), rgba(var(--q-primary-rgb), 0.1));
-    border-radius: 8px;
-    margin-bottom: 24px;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  // Fixed analyzing indicator above input
-  .fixed-analyzing-indicator {
-    padding: 12px 16px;
-    margin: 0 16px 8px 16px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    animation: fadeInSlide 0.3s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-
-    &.light-mode {
-      background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
-      border: 1px solid #d0d8e8;
-    }
-
-    &.dark-mode {
-      background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
-      border: 1px solid #3a3f55;
-    }
-
-    .analyzing-content {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      max-width: 900px;
-      width: 100%;
-    }
-
-    .analyzing-message {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--q-primary);
-    }
-
-    .tool-call-info {
-      display: flex;
-      flex-direction: column;
-      gap: 6px;
-      flex: 1;
-    }
-
-    .tool-call-context-inline {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-      margin-top: 4px;
-    }
-
-    .context-query-inline {
-      font-size: 12px;
-      padding: 4px 8px;
-      border-radius: 6px;
-      background: rgba(0, 0, 0, 0.05);
-      max-width: 500px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .context-tag-inline {
-      font-size: 11px;
-      padding: 2px 8px;
-      border-radius: 4px;
-      background: rgba(var(--q-primary-rgb), 0.1);
-      color: var(--q-primary);
-      font-weight: 500;
-    }
-  }
-
-  @keyframes fadeInSlide {
-    from {
-      opacity: 0;
-      transform: translateY(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  .chat-input-wrapper {
-    padding: 4px 8px 8px 8px;
-    flex-shrink: 0;
-    display: flex;
-    justify-content: center;
-    transition: all 0.2s ease;
-
-    :deep(.q-field) {
-      max-width: 900px;
-      width: 100%;
-    }
-  
-  }
-  .light-mode .chat-input-wrapper{
-    background:#ffffff;
-    border: 1px solid #e4e7ec;
-    border-radius: 12px;
-    &:focus-within {
-      border: 1px solid transparent;
-      box-shadow: 0 0 0 2px #667eea
-    }
-  }
-  .dark-mode .chat-input-wrapper{
-    background:#191919;
-    border: 1px solid #323232;
-    border-radius: 12px;
-     &:focus-within {
-      border: 1px solid transparent;
-      box-shadow: 0 0 0 2px #5a6ec3
-    }
-  }
-
-
-.light-mode .message {
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-.dark-mode .message {
-  box-shadow: 0 1px 2px rgba(255, 255, 255, 0.1);
-}
-  .message {
-    width: 100%;
-    padding: 12px;
-    border-radius: 8px;
-
-
-
-    .message-content {
-      display: flex;
-      align-items: flex-start;
-      gap: 6px;
-      width: 100%;
-    }
-
-    .message-blocks {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      min-width: 0;
-      max-width: 100%;
-      overflow-x: auto;
-      word-wrap: break-word;
-      overflow-wrap: break-word;
-    }
-
-    .text-block {
-      width: 100%;
-      overflow-wrap: break-word;
-      max-width: 100%;
-      &:not(:last-child) {
-        margin-bottom: 4px;
-      }
-
-      :deep(pre), :deep(.generated-code-block) {
-        white-space: pre-wrap;
-        word-break: break-word;
-        overflow-wrap: break-word;
-        margin: 0;
-        padding: 0;
-        line-height: 1.4;
-        display: block;
-        max-width: 100%;
-        overflow-x: auto;
-        
-        code {
-          padding: 8px;
-          margin: 0;
-          display: block;
-          max-width: 100%;
-        }
-      }
-
-      // Heading styles - appropriately sized for chat interface
-      // Only applies within message-blocks, not globally
-      :deep(h1) {
-        font-size: 1.5rem !important;
-        font-weight: 600 !important;
-        margin: 16px 0 8px 0 !important;
-        line-height: 1.3 !important;
-      }
-      :deep(h2) {
-        font-size: 1.25rem !important;
-        font-weight: 600 !important;
-        margin: 14px 0 7px 0 !important;
-        line-height: 1.3 !important;
-      }
-      :deep(h3) {
-        font-size: 1.125rem !important;
-        font-weight: 600 !important;
-        margin: 12px 0 6px 0 !important;
-        line-height: 1.3 !important;
-      }
-      :deep(h4) {
-        font-size: 1rem !important;
-        font-weight: 600 !important;
-        margin: 10px 0 5px 0 !important;
-        line-height: 1.3 !important;
-      }
-      :deep(h5) {
-        font-size: 0.875rem !important;
-        font-weight: 600 !important;
-        margin: 8px 0 4px 0 !important;
-        line-height: 1.3 !important;
-      }
-      :deep(h6) {
-        font-size: 0.75rem !important;
-        font-weight: 600 !important;
-        margin: 8px 0 4px 0 !important;
-        line-height: 1.3 !important;
-      }
-
-      // Table styling to prevent horizontal overflow
-      :deep(table) {
-        max-width: 100%;
-        width: 100%;
-        table-layout: fixed;
-        border-collapse: collapse;
-        overflow-x: auto;
-        display: block;
-        white-space: nowrap;
-      }
-
-      :deep(table th), :deep(table td) {
-        padding: 8px 12px;
-        border: 1px solid #e2e8f0;
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        text-overflow: ellipsis;
-        overflow: hidden;
-      }
-
-      // Force break long words and URLs
-      :deep(p), :deep(div), :deep(span) {
-        word-wrap: break-word;
-        overflow-wrap: break-word;
-        word-break: break-word;
-        max-width: 100%;
-      }
-
-      // Restore list styling (Tailwind preflight removes it)
-      :deep(ol) {
-        list-style-type: decimal;
-        padding-left: 1.5em;
-        margin: 0.5em 0;
-      }
-
-      :deep(ul) {
-        list-style-type: disc;
-        padding-left: 1.5em;
-        margin: 0.5em 0;
-      }
-
-      :deep(li) {
-        margin: 0.25em 0;
-      }
-    }
-
-    .code-block {
-      border-radius: 4px;
-      overflow: hidden;
-      margin: 0;
-    }
-    // .light-mode .code-block{
-    //   border: 1px solid #eee;
-    // }
-    // .dark-mode .code-block-header{
-    //   border: 1px solid rgba(225, 225, 225, 0.14); 
-    // }
-
-    .code-block-header {
-      padding: 4px 8px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .code-type-label {
-      font-size: 12px;
-      font-weight: 600;
-      padding: 2px 6px;
-      border-radius: 4px;
-      background: rgba(var(--q-primary-rgb), 0.1);
-    }
-    .light-mode .code-type-label{
-      color: var(--q-primary);
-    }
-    .dark-mode .code-type-label{
-      color: #e2e2e2;
-    }
-
-    .generated-code-block {
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow-wrap: break-word;
-      margin: 0;
-      padding: 0;
-      line-height: 1.4;
-      code {
-        padding: 8px;
-        margin: 0;
-        display: block;
-        
-      }
-    }
-
-    .dark-mode .generated-code-block{
-      code {
-        background-color: #181a1b;
-        border: 0.5px solid #E1E1E124;
-        border-top: none;
-      }
-    }
-    .light-mode .generated-code-block{
-      code {
-        background-color: #ffffff;
-        border: 0.5px solid #00000024 ;
-        border-top: none;
-        color: black;
-      }
-    }
-
-    .code-block-footer {
-      padding: 4px 8px;
-      display: flex;
-    }
-  }
-  .light-mode .message{
-    &.user {
-      background: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
-      border: 1px solid #e0e6ff;
-      border-radius: 12px;
-      color: #2c3e50;
-      margin-left: 40px;
-      width: calc(100% - 40px);
-    }
-
-    &.assistant {
-      background: #ffffff;
-      border: 1px solid #e5e7eb;
-      border-radius: 12px;
-      color: var(--q-primary-text);
-      margin-left: 0;
-      width: 100%;
-    }
-  }
-  .dark-mode .message{
-    &.user {
-      background: linear-gradient(135deg, #2a2d47 0%, #1e213a 100%);
-      border: 1px solid #3a3d5c;
-      border-radius: 12px;
-      color: #e2e8f0;
-      margin-left: 40px;
-      width: calc(100% - 40px);
-    }
-
-    &.assistant {
-      background: #1a1a1a;
-      border: 1px solid #333333;
-      border-radius: 12px;
-      color: #e2e2e2;
-      margin-left: 0;
-      width: 100%;
-    }
-  }
-
-  ul, ol {
-    pre {
-      white-space: pre-wrap;
-      word-break: break-word;
-      overflow-wrap: break-word;
-      margin: 0;
-      padding: 0;
-      code {
-        background-color: white;
-        color: black;
-        
-      }
-    }
-  }
+/* ============================================================
+   keep(keyframes) — each consumer sits next to its @keyframes
+   ============================================================ */
+.tool-call-indicator {
+  animation: fadeIn 0.3s ease;
 }
 
-// Avatar styling for user messages
-.light-user-avatar {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  color: white;
-}
-
-.dark-user-avatar {
-  background: linear-gradient(135deg, #4c63d2 0%, #5a67d8 100%) !important;
-  color: white;
-}
-
-// Send button gradient styling
-.send-button {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  transition: all 0.3s ease !important;
-  box-shadow: 0 4px 15px 0 rgba(102, 126, 234, 0.3) !important;
-  
-  &:hover:not(.disabled):not([disabled]):not(:disabled) {
-    background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%) !important;
-    box-shadow: 0 6px 20px 0 rgba(102, 126, 234, 0.4) !important;
-    transform: translateY(-1px) !important;
-  }
-  
-  &:active:not(.disabled):not([disabled]):not(:disabled) {
-    transform: translateY(0) !important;
-    box-shadow: 0 2px 10px 0 rgba(102, 126, 234, 0.3) !important;
-  }
-
-}
-
-// Stop button gradient styling
-.stop-button {
-  background: linear-gradient(135deg, #f56565 0%, #e53e3e 100%) !important;
-  transition: all 0.3s ease !important;
-  box-shadow: 0 4px 15px 0 rgba(245, 101, 101, 0.3) !important;
-  
-  &:hover {
-    background: linear-gradient(135deg, #e53e3e 0%, #c53030 100%) !important;
-    box-shadow: 0 6px 20px 0 rgba(245, 101, 101, 0.4) !important;
-    transform: translateY(-1px) !important;
-  }
-  
-  &:active {
-    transform: translateY(0) !important;
-    box-shadow: 0 2px 10px 0 rgba(245, 101, 101, 0.3) !important;
-  }
-}
-
-.dark-mode .code-block-header{
-  background-color: #3b3b3b;
-  border: 1px 1px 0px 1px solid #e1e1e1;
-
-}
-.light-mode .code-block-header{
-  background-color: #ecf0f5;
-
-}
-
-.model-selector{
-  text-overflow: ellipsis;
-}
-.dark-mode-bottom-bar{
-  .model-selector{
-    background-color: #262626;
-    border: 1px solid #3b3b3b;
-    padding: 0px 4px;
-    border-radius: 4px;
-    padding-left: 4px;
-  }
-
-}
-
-.light-mode-bottom-bar{
-  .model-selector{
-    background-color: #ffffff;
-    border: 1px solid #bdbbbb;
-    padding: 0px 4px;
-    border-radius: 4px;
-    padding-left: 4px;
-  }
-}
-  .o2-ai-beta-text {
-    position: relative;
-    color: var(--q-primary);
-    font-size: 8px;
-    padding: 0px 4px;
-    border-radius: 10px;
-    text-align: center;
-    border: 1px solid var(--q-primary);
-    text-transform: uppercase;
-    font-weight: 600;
-    letter-spacing: 0.5px;
-    width: 34px;
-  }
-
-.history-menu-container {
-  position: relative;
-  max-height: 450px;
-  display: flex;
-  flex-direction: column;
-  width: 300px;
-}
-
-.search-history-bar-sticky {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: var(--q-page-background);
-  padding: 8px;
-  border-bottom: 1px solid var(--q-separator-color);
-  flex-shrink: 0;
-}
-
-.history-list-container {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  max-height: 350px;
-}
-
-.history-item {
-  position: relative;
-
-  .delete-history-btn {
+@keyframes fadeIn {
+  from {
     opacity: 0;
-    transition: opacity 0.2s;
+    transform: translateY(-0.625rem);
   }
-
-  &:hover .delete-history-btn {
+  to {
     opacity: 1;
-  }
-}
-
-.clear-all-container {
-  background: var(--q-page-background);
-  padding: 8px;
-  border-top: 1px solid var(--q-separator-color);
-  flex-shrink: 0;
-
-  .clear-all-btn {
-    width: 100%;
-    color: var(--q-negative);
-    font-size: 13px;
-
-    &:hover {
-      background-color: rgba(var(--q-negative-rgb), 0.1);
-    }
-  }
-}
-
-// Scroll to bottom button styling
-.scroll-to-bottom-container {
-  position: absolute;
-  bottom: 10px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1000;
-  transition: all 0.3s ease;
-  pointer-events: none;
-}
-
-.scroll-to-bottom-btn {
-  transition: all 0.3s ease;
-  animation: fadeInUp 0.3s ease;
-  pointer-events: auto;
-  backdrop-filter: blur(8px);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-  
-  body.body--light & {
-    border: 2px solid #2563eb !important;
-    color: #2563eb !important;
-    background: rgba(255, 255, 255, 0.95) !important;
-  }
-  
-  body.body--dark & {
-    border: 2px solid #667eea !important;
-    color: #667eea !important;
-    background: rgba(30, 30, 30, 0.9) !important;
-  }
-  
-  &:hover {
-    transform: scale(1.1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    
-    body.body--light & {
-      border: 2px solid #1d4ed8 !important;
-      color: #1d4ed8 !important;
-      background: rgba(255, 255, 255, 1) !important;
-    }
-    
-    body.body--dark & {
-      border: 2px solid #5a6fd8 !important;
-      color: #5a6fd8 !important;
-      background: rgba(40, 40, 40, 0.95) !important;
-    }
-  }
-  
-  &:active {
-    transform: scale(1);
-  }
-  
-  .q-icon {
-    font-size: 18px;
-    animation: bounce 2s infinite;
-    font-weight: bold;
-  }
-}
-
-// Bounce animation for the arrow icon
-@keyframes bounce {
-  0%, 20%, 50%, 80%, 100% {
     transform: translateY(0);
   }
-  40% {
-    transform: translateY(-3px);
+}
+
+.fixed-analyzing-indicator {
+  animation: fadeInSlide 0.3s ease;
+}
+
+@keyframes fadeInSlide {
+  from {
+    opacity: 0;
+    transform: translateY(-0.625rem);
   }
-  60% {
-    transform: translateY(-2px);
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-// Fade in up animation for button appearance
+/* Scroll-to-bottom button entrance. Rises from below with a slight scale-up, so
+   it is not the same curve as fadeIn/fadeInSlide above (those drop from above). */
+.scroll-to-bottom-btn {
+  animation: fadeInUp 0.3s ease;
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.9);
+    transform: translateY(0.625rem) scale(0.9);
   }
   to {
     opacity: 1;
@@ -3305,493 +6028,341 @@ export default defineComponent({
   }
 }
 
-
-// Tool call indicator styling
-.tool-call-indicator {
-  display: flex;
-  align-items: center;
-  padding: 12px 16px;
-  border-radius: 12px;
-  margin: 8px 0;
-  animation: fadeIn 0.3s ease;
-
-  &.light-mode {
-    background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
-    border: 1px solid #d0d8e8;
-  }
-
-  &.dark-mode {
-    background: linear-gradient(135deg, #1e2235 0%, #252a3d 100%);
-    border: 1px solid #3a3f55;
-  }
-
-  .tool-call-content {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    width: 100%;
-  }
-
-  .tool-call-info {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    flex: 1;
-    min-width: 0;
-  }
-
-  .tool-call-status {
-    font-size: 12px;
-    font-style: italic;
-    opacity: 0.7;
-    margin-bottom: 2px;
-
-    .light-mode & {
-      color: #6b7280;
-    }
-
-    .dark-mode & {
-      color: #9ca3af;
-    }
-  }
-
-  .tool-call-message {
-    font-weight: 600;
-    font-size: 14px;
-
-    .light-mode & {
-      color: #4a5568;
-    }
-
-    .dark-mode & {
-      color: #e2e8f0;
-    }
-  }
-
-  .tool-call-context {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    align-items: center;
-  }
-
-  .context-item {
-    width: 100%;
-  }
-
-  .context-query {
-    display: block;
-    font-family: 'Fira Code', 'Consolas', monospace;
-    font-size: 12px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    white-space: pre-wrap;
-    word-break: break-all;
-    max-width: 100%;
-    overflow: hidden;
-
-    .light-mode & {
-      background: #ffffff;
-      color: #2d3748;
-      border: 1px solid #e2e8f0;
-    }
-
-    .dark-mode & {
-      background: #1a1a1a;
-      color: #a0aec0;
-      border: 1px solid #333;
-    }
-  }
-
-  .context-tag {
-    display: inline-flex;
-    align-items: center;
-    font-size: 11px;
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-weight: 500;
-
-    .light-mode & {
-      background: rgba(102, 126, 234, 0.1);
-      color: #667eea;
-    }
-
-    .dark-mode & {
-      background: rgba(102, 126, 234, 0.2);
-      color: #a0aec0;
-    }
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-// Inline loading indicator (inside message box)
-.inline-loading {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 0;
-  color: #6b7280;
-  font-size: 14px;
-}
-
-// Tool call item - inline in chat flow (interleaved with text)
+/* ============================================================
+   keep(complex-state) — tool call status matrix.
+   Status tint x (has-details) hover x light/dark. Each status maps to its
+   semantic token; the light/dark pairs differ only in mix strength, so dark
+   overrides just the percentage.
+   ============================================================ */
 .tool-call-item {
-  display: flex;
-  flex-direction: column;
-  padding: 8px 12px;
-  border-radius: 6px;
-  font-size: 13px;
-  margin-bottom: 8px;
-
-  &.has-details {
-    cursor: pointer;
-
-    &:hover {
-      &.light-mode {
-        background: rgba(76, 175, 80, 0.12);
-      }
-      &.dark-mode {
-        background: rgba(76, 175, 80, 0.18);
-      }
-    }
-  }
-
-  &.light-mode {
-    background: rgba(76, 175, 80, 0.08);
-    color: #4a5568;
-  }
-
-  &.dark-mode {
-    background: rgba(76, 175, 80, 0.12);
-    color: #a0aec0;
-  }
-
-  // Error state styling
-  &.error {
-    &.light-mode {
-      background: rgba(244, 67, 54, 0.08);
-    }
-    &.dark-mode {
-      background: rgba(244, 67, 54, 0.12);
-    }
-  }
-
-  // Timeout state styling
-  &.timeout {
-    &.light-mode {
-      background: rgba(255, 152, 0, 0.08);
-    }
-    &.dark-mode {
-      background: rgba(255, 152, 0, 0.12);
-    }
-  }
-
-  .tool-call-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .tool-call-name {
-    font-weight: 500;
-    flex: 1;
-
-    code {
-      font-family: 'Fira Code', 'Consolas', monospace;
-      font-size: 12px;
-      padding: 1px 4px;
-      border-radius: 3px;
-
-      .light-mode & {
-        background: rgba(0, 0, 0, 0.06);
-      }
-      .dark-mode & {
-        background: rgba(255, 255, 255, 0.1);
-      }
-    }
-  }
-
-  .expand-icon {
-    opacity: 0.6;
-    transition: transform 0.2s;
-  }
-
-  .tool-call-details {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(128, 128, 128, 0.2);
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-
-    .detail-item {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .detail-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .detail-label {
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      opacity: 0.6;
-    }
-
-    .copy-btn {
-      opacity: 0.6;
-      &:hover {
-        opacity: 1;
-      }
-    }
-
-    .detail-value {
-      font-size: 12px;
-      user-select: text;
-
-      &.query-value {
-        font-family: 'Fira Code', 'Consolas', monospace;
-        padding: 8px;
-        border-radius: 4px;
-        white-space: pre-wrap;
-        word-break: break-all;
-        user-select: text;
-        cursor: text;
-
-        .light-mode & {
-          background: rgba(0, 0, 0, 0.04);
-        }
-        .dark-mode & {
-          background: rgba(255, 255, 255, 0.06);
-        }
-      }
-    }
-  }
-
-  .tool-call-error {
-    font-size: 11px;
-    color: #f44336;
-    font-style: italic;
-    max-width: 250px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .tool-call-error {
-    font-size: 11px;
-    color: #f44336;
-    font-style: italic;
-    max-width: 250px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .tool-call-query {
-    font-family: 'Fira Code', 'Consolas', monospace;
-    font-size: 11px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    max-width: 250px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-
-    .light-mode & {
-      background: rgba(0, 0, 0, 0.05);
-      color: #666;
-    }
-
-    .dark-mode & {
-      background: rgba(255, 255, 255, 0.08);
-      color: #888;
-    }
-  }
+  background: color-mix(in srgb, var(--color-status-positive) 8%, transparent);
+}
+.dark .tool-call-item {
+  background: color-mix(in srgb, var(--color-status-positive) 12%, transparent);
+}
+.tool-call-item.has-details {
+  cursor: pointer;
+}
+.tool-call-item.has-details:hover {
+  background: color-mix(in srgb, var(--color-status-positive) 12%, transparent);
+}
+.dark .tool-call-item.has-details:hover {
+  background: color-mix(in srgb, var(--color-status-positive) 18%, transparent);
 }
 
+.tool-call-item.error {
+  background: color-mix(in srgb, var(--color-status-negative) 8%, transparent);
+}
+.dark .tool-call-item.error {
+  background: color-mix(in srgb, var(--color-status-negative) 12%, transparent);
+}
+.tool-call-item.error.has-details:hover {
+  background: color-mix(in srgb, var(--color-status-negative) 15%, transparent);
+}
+.dark .tool-call-item.error.has-details:hover {
+  background: color-mix(in srgb, var(--color-status-negative) 22%, transparent);
+}
 
-// Theme-based syntax highlighting - both CSS files are loaded, we scope them by theme
-// Hide dark theme in light mode
-.light-mode {
-  // Force light theme colors to take precedence
-  :deep(.hljs) {
-    display: block;
-    overflow-x: auto;
-    padding: 0.5em;
-    color: #24292e;
-    background: #ffffff;
-  }
-  :deep(.hljs-doctag),
-  :deep(.hljs-keyword),
-  :deep(.hljs-meta .hljs-keyword),
-  :deep(.hljs-template-tag),
-  :deep(.hljs-template-variable),
-  :deep(.hljs-type),
-  :deep(.hljs-variable.language_) {
-    color: #d73a49;
-  }
-  :deep(.hljs-title),
-  :deep(.hljs-title.class_),
-  :deep(.hljs-title.class_.inherited__),
-  :deep(.hljs-title.function_) {
-    color: #6f42c1;
-  }
-  :deep(.hljs-attr),
-  :deep(.hljs-attribute),
-  :deep(.hljs-literal),
-  :deep(.hljs-meta),
-  :deep(.hljs-number),
-  :deep(.hljs-operator),
-  :deep(.hljs-variable),
-  :deep(.hljs-selector-attr),
-  :deep(.hljs-selector-class),
-  :deep(.hljs-selector-id) {
-    color: #005cc5;
-  }
-  :deep(.hljs-regexp),
-  :deep(.hljs-string),
-  :deep(.hljs-meta .hljs-string) {
-    color: #032f62;
-  }
-  :deep(.hljs-built_in),
-  :deep(.hljs-symbol) {
-    color: #e36209;
-  }
-  :deep(.hljs-comment),
-  :deep(.hljs-code),
-  :deep(.hljs-formula) {
-    color: #6a737d;
-  }
-  :deep(.hljs-name),
-  :deep(.hljs-quote),
-  :deep(.hljs-selector-tag),
-  :deep(.hljs-selector-pseudo) {
-    color: #22863a;
-  }
-  :deep(.hljs-subst) {
-    color: #24292e;
-  }
-  :deep(.hljs-section) {
-    color: #005cc5;
-    font-weight: bold;
-  }
-  :deep(.hljs-bullet) {
-    color: #735c0f;
-  }
-  :deep(.hljs-emphasis) {
-    color: #24292e;
-    font-style: italic;
-  }
-  :deep(.hljs-strong) {
-    color: #24292e;
-    font-weight: bold;
-  }
-  :deep(.hljs-addition) {
-    color: #22863a;
-    background-color: #f0fff4;
-  }
-  :deep(.hljs-deletion) {
-    color: #b31d28;
-    background-color: #ffeef0;
-  }
+.tool-call-item.timeout {
+  background: color-mix(in srgb, var(--color-warning) 8%, transparent);
 }
-// Force dark theme colors in dark mode
-.dark-mode {
-  :deep(.hljs) {
-    display: block;
-    overflow-x: auto;
-    padding: 0.5em;
-    color: #c9d1d9;
-    background: #0d1117;
-  }
-  :deep(.hljs-doctag),
-  :deep(.hljs-keyword),
-  :deep(.hljs-meta .hljs-keyword),
-  :deep(.hljs-template-tag),
-  :deep(.hljs-template-variable),
-  :deep(.hljs-type),
-  :deep(.hljs-variable.language_) {
-    color: #ff7b72;
-  }
-  :deep(.hljs-title),
-  :deep(.hljs-title.class_),
-  :deep(.hljs-title.class_.inherited__),
-  :deep(.hljs-title.function_) {
-    color: #d2a8ff;
-  }
-  :deep(.hljs-attr),
-  :deep(.hljs-attribute),
-  :deep(.hljs-literal),
-  :deep(.hljs-meta),
-  :deep(.hljs-number),
-  :deep(.hljs-operator),
-  :deep(.hljs-variable),
-  :deep(.hljs-selector-attr),
-  :deep(.hljs-selector-class),
-  :deep(.hljs-selector-id) {
-    color: #79c0ff;
-  }
-  :deep(.hljs-regexp),
-  :deep(.hljs-string),
-  :deep(.hljs-meta .hljs-string) {
-    color: #a5d6ff;
-  }
-  :deep(.hljs-built_in),
-  :deep(.hljs-symbol) {
-    color: #ffa657;
-  }
-  :deep(.hljs-comment),
-  :deep(.hljs-code),
-  :deep(.hljs-formula) {
-    color: #8b949e;
-  }
-  :deep(.hljs-name),
-  :deep(.hljs-quote),
-  :deep(.hljs-selector-tag),
-  :deep(.hljs-selector-pseudo) {
-    color: #7ee787;
-  }
-  :deep(.hljs-subst) {
-    color: #c9d1d9;
-  }
-  :deep(.hljs-section) {
-    color: #1f6feb;
-    font-weight: bold;
-  }
-  :deep(.hljs-bullet) {
-    color: #f2cc60;
-  }
-  :deep(.hljs-emphasis) {
-    color: #c9d1d9;
-    font-style: italic;
-  }
-  :deep(.hljs-strong) {
-    color: #c9d1d9;
-    font-weight: bold;
-  }
-  :deep(.hljs-addition) {
-    color: #aff5b4;
-    background-color: #033a16;
-  }
-  :deep(.hljs-deletion) {
-    color: #ffdcd7;
-    background-color: #67060c;
-  }
+.dark .tool-call-item.timeout {
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
 }
-</style> 
+.tool-call-item.timeout.has-details:hover {
+  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+}
+.dark .tool-call-item.timeout.has-details:hover {
+  background: color-mix(in srgb, var(--color-warning) 22%, transparent);
+}
+
+.tool-call-item.pending-confirmation {
+  cursor: default;
+  background: color-mix(in srgb, var(--color-warning) 12%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
+  border: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+}
+.dark .tool-call-item.pending-confirmation {
+  background: color-mix(in srgb, var(--color-warning) 15%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning) 25%, transparent);
+}
+
+.tool-call-item.pending-navigation {
+  cursor: default;
+  background: color-mix(in srgb, var(--color-info) 8%, transparent);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
+  border: 1px solid color-mix(in srgb, var(--color-info) 30%, transparent);
+}
+.dark .tool-call-item.pending-navigation {
+  background: color-mix(in srgb, var(--color-info) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-info) 25%, transparent);
+}
+
+/* ============================================================
+   keep(complex-state) — send button.
+   The enabled guard is a .disabled CLASS plus [disabled] plus :disabled;
+   Tailwind's `enabled:` variant only covers the last two.
+   ============================================================ */
+.send-button:hover:not(.disabled):not([disabled]):not(:disabled) {
+  /* The hover gradient is `hover:bg-gradient-ai!` on the button itself. It used to
+     be restated here, then dropped when the template briefly carried the gradient
+     unconditionally — and main later moved the button back to variant="primary",
+     so between the two changes the gradient stopped painting at all. */
+  box-shadow: var(--shadow-glow-xl-geom) color-mix(in srgb, var(--color-ai-accent) 40%, transparent) !important;
+  transform: translateY(-0.0625rem) !important;
+}
+.send-button:active:not(.disabled):not([disabled]):not(:disabled) {
+  transform: translateY(0) !important;
+  /* Pressed keeps the accent, dimmer than hover — NOT --shadow-glow, which is a
+     neutral black ring and turns the press state grey. */
+  box-shadow: var(--shadow-glow-press-geom)
+    color-mix(in srgb, var(--color-ai-accent) 30%, transparent) !important;
+}
+
+/* ============================================================
+   keep(generated-content) — RichTextInput is a child component, so its
+   internals carry no scope attribute of ours.
+   ============================================================ */
+.unified-input-box :deep(.rich-text-input-wrapper) {
+  width: 100%;
+  min-height: 2.5rem;
+}
+.unified-input-box :deep(.rich-text-input) {
+  padding: 0.25rem 0;
+}
+
+/* ============================================================
+   keep(generated-content) — markdown rendered from v-html inside .text-block.
+   `!important` retained: these fight the global base-elements typography layer.
+   ============================================================ */
+.text-block :deep(h1) {
+  font-size: var(--text-2xl) !important;
+  font-weight: 600 !important;
+  margin: 1rem 0 0.5rem 0 !important;
+  line-height: 1.3 !important;
+}
+.text-block :deep(h2) {
+  font-size: var(--text-xl) !important;
+  font-weight: 600 !important;
+  margin: 0.875rem 0 0.4375rem 0 !important;
+  line-height: 1.3 !important;
+}
+.text-block :deep(h3) {
+  font-size: var(--text-lg) !important;
+  font-weight: 600 !important;
+  margin: 0.75rem 0 0.375rem 0 !important;
+  line-height: 1.3 !important;
+}
+.text-block :deep(h4) {
+  font-size: var(--text-base) !important;
+  font-weight: 600 !important;
+  margin: 0.625rem 0 0.3125rem 0 !important;
+  line-height: 1.3 !important;
+}
+.text-block :deep(h5) {
+  font-size: var(--text-sm) !important;
+  font-weight: 600 !important;
+  margin: 0.5rem 0 0.25rem 0 !important;
+  line-height: 1.3 !important;
+}
+.text-block :deep(h6) {
+  font-size: var(--text-xs) !important;
+  font-weight: 600 !important;
+  margin: 0.5rem 0 0.25rem 0 !important;
+  line-height: 1.3 !important;
+}
+
+.text-block :deep(table) {
+  max-width: 100%;
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  overflow-x: auto;
+  display: block;
+  white-space: nowrap;
+}
+.text-block :deep(th),
+.text-block :deep(td) {
+  padding: 0.5rem 0.75rem;
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
+  border: 1px solid var(--color-border-default);
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.text-block :deep(p),
+.text-block :deep(div),
+.text-block :deep(span) {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  max-width: 100%;
+}
+
+.text-block :deep(ol) {
+  list-style-type: decimal;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+.text-block :deep(ul) {
+  list-style-type: disc;
+  padding-left: 1.5em;
+  margin: 0.5em 0;
+}
+.text-block :deep(li) {
+  margin: 0.25em 0;
+}
+
+/* ============================================================
+   keep(generated-content) — code blocks.
+   .generated-code-block is emitted BOTH from the template and by the markdown
+   renderer (which rewrites <pre> into <span class="generated-code-block">), so
+   it must be reachable through :deep() either way. The background/border are
+   set here rather than as utilities because they have to beat .hljs below,
+   which is unlayered and would otherwise win over @layer utilities.
+   ============================================================ */
+.message-blocks :deep(.generated-code-block),
+.text-block :deep(pre) {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  margin: 0;
+  padding: 0;
+  line-height: 1.4;
+  max-width: 100%;
+  overflow-x: auto;
+}
+.message-blocks :deep(.generated-code-block code),
+.text-block :deep(pre code) {
+  display: block;
+  padding: 0.5rem;
+  margin: 0;
+  max-width: 100%;
+  background-color: var(--color-surface-base);
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel border must not scale with text or it smears at fractional zoom */
+  border: 1px solid var(--color-border-subtle);
+  border-top: none;
+}
+
+/* Markdown lists can nest a fenced block; hljs sets the palette, these two
+   only need the reset. */
+.text-block :deep(ul pre),
+.text-block :deep(ol pre) {
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  margin: 0;
+  padding: 0;
+}
+
+/* ============================================================
+   keep(generated-content) — formatLogEntryContent() emits these json spans.
+   ============================================================ */
+.log-entry-code :deep(.json-key) {
+  color: var(--color-json-key);
+  font-weight: 600;
+}
+.log-entry-code :deep(.json-string) {
+  color: var(--color-json-string);
+}
+.log-entry-code :deep(.json-number) {
+  color: var(--color-json-number);
+}
+.log-entry-code :deep(.json-boolean) {
+  color: var(--color-json-boolean);
+  font-weight: 600;
+}
+.log-entry-code :deep(.json-null) {
+  color: var(--color-json-null);
+  font-weight: 600;
+}
+
+/* ============================================================
+   keep(lib-override:hljs) — highlight.js output. Token mapping mirrors
+   lib/core/Code/OCodeBlock.vue (D6); tokens flip via dark.css, so one rule set
+   covers both themes.
+   ============================================================ */
+.message-blocks :deep(.hljs) {
+  display: block;
+  overflow-x: auto;
+  padding: 0.5em;
+  color: var(--color-syntax-text);
+  background: var(--color-syntax-bg);
+}
+.message-blocks :deep(.hljs-doctag),
+.message-blocks :deep(.hljs-keyword),
+.message-blocks :deep(.hljs-meta .hljs-keyword),
+.message-blocks :deep(.hljs-template-tag),
+.message-blocks :deep(.hljs-template-variable),
+.message-blocks :deep(.hljs-type),
+.message-blocks :deep(.hljs-variable.language_) {
+  color: var(--color-syntax-keyword);
+}
+.message-blocks :deep(.hljs-title),
+.message-blocks :deep(.hljs-title.class_),
+.message-blocks :deep(.hljs-title.class_.inherited__),
+.message-blocks :deep(.hljs-title.function_) {
+  color: var(--color-syntax-function);
+}
+.message-blocks :deep(.hljs-attr),
+.message-blocks :deep(.hljs-attribute),
+.message-blocks :deep(.hljs-literal),
+.message-blocks :deep(.hljs-meta),
+.message-blocks :deep(.hljs-number),
+.message-blocks :deep(.hljs-operator),
+.message-blocks :deep(.hljs-variable),
+.message-blocks :deep(.hljs-selector-attr),
+.message-blocks :deep(.hljs-selector-class),
+.message-blocks :deep(.hljs-selector-id) {
+  color: var(--color-syntax-number);
+}
+.message-blocks :deep(.hljs-regexp),
+.message-blocks :deep(.hljs-string),
+.message-blocks :deep(.hljs-meta .hljs-string) {
+  color: var(--color-syntax-string);
+}
+.message-blocks :deep(.hljs-built_in),
+.message-blocks :deep(.hljs-symbol) {
+  color: var(--color-syntax-builtin);
+}
+.message-blocks :deep(.hljs-comment),
+.message-blocks :deep(.hljs-code),
+.message-blocks :deep(.hljs-formula) {
+  color: var(--color-syntax-comment);
+}
+.message-blocks :deep(.hljs-name),
+.message-blocks :deep(.hljs-quote),
+.message-blocks :deep(.hljs-selector-tag),
+.message-blocks :deep(.hljs-selector-pseudo) {
+  color: var(--color-syntax-tag);
+}
+.message-blocks :deep(.hljs-subst) {
+  color: var(--color-syntax-text);
+}
+.message-blocks :deep(.hljs-section) {
+  color: var(--color-syntax-number);
+  font-weight: 600;
+}
+.message-blocks :deep(.hljs-bullet) {
+  color: var(--color-syntax-bullet);
+}
+.message-blocks :deep(.hljs-emphasis) {
+  color: var(--color-syntax-text);
+  font-style: italic;
+}
+.message-blocks :deep(.hljs-strong) {
+  color: var(--color-syntax-text);
+  font-weight: 600;
+}
+.message-blocks :deep(.hljs-addition) {
+  color: var(--color-syntax-addition-fg);
+  background-color: var(--color-syntax-addition-bg);
+}
+.message-blocks :deep(.hljs-deletion) {
+  color: var(--color-syntax-deletion-fg);
+  background-color: var(--color-syntax-deletion-bg);
+}
+</style>

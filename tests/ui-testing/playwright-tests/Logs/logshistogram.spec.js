@@ -2,39 +2,8 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
-const logsdata = require('../../../test-data/logs_data.json');
-
-// Utility Functions
-
-// Legacy login function replaced by global authentication via navigateToBase
-
-async function ingestTestData(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(logsdata)
-    });
-    return await fetchResponse.json();
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logsdata: logsdata
-  });
-  testLogger.debug('API response received', { response });
-}
+const { ingestTestData } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe("Logs Histogram testcases", () => {
   test.describe.configure({ mode: 'parallel' });
@@ -43,39 +12,32 @@ test.describe("Logs Histogram testcases", () => {
   test.beforeEach(async ({ page }, testInfo) => {
     // Initialize test setup
     testLogger.testStart(testInfo.title, testInfo.file);
-    
+
     // Navigate to base URL with authentication
     await navigateToBase(page);
     pm = new PageManager(page);
-    
-    // Strategic post-authentication stabilization wait - this is functionally necessary
-    await page.waitForTimeout(1000);
-    
+
     // Data ingestion for histogram testing (preserve exact logic)
     await ingestTestData(page);
-    // Strategic wait for data ingestion completion - this is functionally necessary
-    await page.waitForTimeout(1000);
 
     // Navigate to logs page and setup for histogram testing
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
     );
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await page.waitForLoadState('domcontentloaded', { timeout: 30000 }).catch(() => {});
 
     await pm.logsPage.selectStream("e2e_automate");
-    await page.waitForTimeout(1000);
 
     // Wait for initial search to complete
-    const orgName = process.env.ORGNAME || 'default';
+    const orgName = getOrgIdentifier();
     const allsearch = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
-    await page.locator('[data-test="logs-search-bar-refresh-btn"]').click();
+    await pm.logsPage.clickRefreshButton();
     await allsearch;
-    await page.waitForTimeout(1000);
 
     testLogger.info('Histogram test setup completed');
   });
 
-  test.afterEach(async ({ page }) => {
+  test.afterEach(async () => {
     try {
       // await pm.commonActions.flipStreaming();
       testLogger.info('Streaming flipped after test');
@@ -85,88 +47,109 @@ test.describe("Logs Histogram testcases", () => {
   });
 
   test("Verify error handling and no results found with histogram", {
-    tag: ['@histogram', '@all', '@logs']
+    tag: ['@histogram', '@all', '@logs', '@P1']
   }, async ({ page }) => {
     testLogger.info('Testing error handling and no results found with histogram');
 
-    // Check if histogram is off and toggle it on if needed
+    const orgName = getOrgIdentifier();
+
+    // Ensure histogram is ON
     const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (!isHistogramOn) {
       await pm.logsPage.toggleHistogram();
     }
 
-    // Type invalid query and verify error
-    await pm.logsPage.clearAndFillQueryEditor("match_all('invalid')");
+    await pm.logsPage.disableAutoRun();
+
+    // Step 1: FTS mode — match_all with no-results string
+    await pm.logsPage.ensureFTSMode();
+    await pm.logsPage.clearAndFillQueryEditor("match_all('asdukiabnfnsajkn')");
+    // clearAndFillQueryEditor only fills the Monaco input; the value reaches the Vue
+    // store on a debounce. Without waiting, clickRefresh() below can run the PREVIOUS
+    // (valid) query, which returns results instead of the no-events state, so
+    // clickErrorMessage() finds no error/no-results element and throws (flaky in CI).
+    await pm.logsPage.waitForQueryEditorValue("match_all('asdukiabnfnsajkn')");
     await pm.logsPage.setDateTimeFilter();
-    await pm.logsPage.waitForTimeout(1000);
-
-    // Wait for search response before checking for error
-    const orgName = process.env.ORGNAME || 'default';
-    const searchResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
+    const ftsResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
-    await searchResponse;
-    await pm.logsPage.waitForTimeout(2000);
-
+    await ftsResponse;
     await pm.logsPage.clickErrorMessage();
-    await pm.logsPage.clickResetFilters();
 
-    // Type SQL query and verify no results
-    await pm.logsPage.clearAndFillQueryEditor("SELECT count(*) FROM 'e2e_automate' where code > 500");
-    await pm.logsPage.waitForTimeout(1000);
-
-    // Wait for search response before checking for no data
-    const sqlSearchResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
+    // Step 2: SQL mode — query that returns 0 rows
+    // Use double quotes for the table identifier (DataFusion requires this).
+    // code > 99999 is impossible for any HTTP status code so results are always 0.
+    await pm.logsPage.ensureSQLMode();
+    await pm.logsPage.clearAndFillQueryEditor('SELECT * FROM "e2e_automate" WHERE code > 99999');
+    // Ensure the new SQL query has propagated to the store before running, otherwise
+    // the prior query may execute and clickNoDataFound() won't find the empty state.
+    await pm.logsPage.waitForQueryEditorValue('code > 99999');
+    const sqlResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
-    await sqlSearchResponse;
-    await pm.logsPage.waitForTimeout(2000);
-
+    await sqlResponse;
     await pm.logsPage.clickNoDataFound();
-    await pm.logsPage.clickResultDetail();
+
+    await pm.logsPage.enableAutoRun();
 
     testLogger.info('Error handling and no results verification completed');
   });
 
   test("Verify error handling with histogram toggle off and on", {
-    tag: ['@histogram', '@all', '@logs']
+    tag: ['@histogram', '@all', '@logs', '@P1']
   }, async ({ page }) => {
     testLogger.info('Testing error handling with histogram toggle off and on');
-    
-    // Check if histogram is on and toggle it off
+
+    const orgName = getOrgIdentifier();
+
+    // Ensure histogram is OFF
     const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (isHistogramOn) {
       await pm.logsPage.toggleHistogram();
     }
 
-    // Type invalid query and verify error
-    await pm.logsPage.typeQuery("match_all('invalid')");
-    await pm.logsPage.setDateTimeFilter();
-    // Strategic 500ms wait for query processing - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
-    await pm.logsPage.clickRefresh();
-    await pm.logsPage.clickErrorMessage();
-    await pm.logsPage.clickResetFilters();
+    await pm.logsPage.disableAutoRun();
 
-    // Toggle histogram back on
+    // Step 1: FTS mode — match_all with no-results string, histogram OFF
+    await pm.logsPage.ensureFTSMode();
+    await pm.logsPage.clearAndFillQueryEditor("match_all('asdukiabnfnsajkn')");
+    // clearAndFillQueryEditor only fills the Monaco input; the value reaches the Vue
+    // store on a debounce. Without waiting, clickRefresh() below can run the PREVIOUS
+    // (valid) query, which returns results instead of the no-events state, so
+    // clickErrorMessage() finds no error/no-results element and throws (flaky in CI).
+    await pm.logsPage.waitForQueryEditorValue("match_all('asdukiabnfnsajkn')");
+    await pm.logsPage.setDateTimeFilter();
+    const ftsResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
+    await pm.logsPage.clickRefresh();
+    await ftsResponse;
+    await pm.logsPage.clickErrorMessage();
+
+    // Toggle histogram ON
     await pm.logsPage.toggleHistogram();
 
-    // Type SQL query and verify no results
-    await pm.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate' where code > 500");
-    // Strategic 500ms wait for SQL query processing - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    // Step 2: SQL mode — query that returns 0 rows, histogram ON
+    // Use double quotes for the table identifier (DataFusion requires this).
+    // code > 99999 is impossible for any HTTP status code so results are always 0.
+    await pm.logsPage.ensureSQLMode();
+    await pm.logsPage.clearAndFillQueryEditor('SELECT * FROM "e2e_automate" WHERE code > 99999');
+    // Ensure the new SQL query has propagated to the store before running, otherwise
+    // the prior query may execute and clickNoDataFound() won't find the empty state.
+    await pm.logsPage.waitForQueryEditorValue('code > 99999');
+    const sqlResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
-    // Strategic 500ms wait for SQL refresh completion - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await sqlResponse;
     await pm.logsPage.clickNoDataFound();
-    await pm.logsPage.clickResultDetail();
-    
+
+    await pm.logsPage.enableAutoRun();
+
     testLogger.info('Histogram toggle error handling verification completed');
   });
 
   test("Verify histogram toggle persistence after multiple queries", {
-    tag: ['@histogram', '@all', '@logs']
+    tag: ['@histogram', '@all', '@logs', '@P1']
   }, async ({ page }) => {
     testLogger.info('Testing histogram toggle persistence after multiple queries');
-    
+
+    const orgName = getOrgIdentifier();
+
     // Start with histogram on
     const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (!isHistogramOn) {
@@ -177,37 +160,38 @@ test.describe("Logs Histogram testcases", () => {
     await pm.logsPage.typeQuery("SELECT * FROM 'e2e_automate' LIMIT 10");
     await pm.logsPage.setDateTimeFilter();
     // Strategic 500ms wait for SQL query processing - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    const firstSearch = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
     // Strategic 500ms wait for refresh completion - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await firstSearch;
 
     // Toggle histogram off
     await pm.logsPage.toggleHistogram();
     await pm.logsPage.enableSQLMode();
     // Strategic 500ms wait for SQL mode transition - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
     await pm.logsPage.enableSQLMode();
 
     // Run second query
     await pm.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate'");
     // Strategic 500ms wait for query processing - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    const secondSearch = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
     // Strategic 500ms wait for refresh completion - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await secondSearch;
 
     // Verify histogram stays off
     await pm.logsPage.verifyHistogramState();
-    
+
     testLogger.info('Histogram persistence verification completed');
   });
 
   test("Verify histogram toggle with empty query", {
-    tag: ['@histogram', '@all', '@logs']
+    tag: ['@histogram', '@all', '@logs', '@P1']
   }, async ({ page }) => {
     testLogger.info('Testing histogram toggle with empty query');
-    
+
+    const orgName = getOrgIdentifier();
+
     // Start with histogram off
     const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (isHistogramOn) {
@@ -218,10 +202,10 @@ test.describe("Logs Histogram testcases", () => {
     await pm.logsPage.typeQuery("");
     await pm.logsPage.setDateTimeFilter();
     // Strategic 500ms wait for query processing - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    const searchResponse = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
     // Strategic 500ms wait for refresh completion - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await searchResponse;
 
     // Toggle histogram on
     await pm.logsPage.toggleHistogram();
@@ -229,15 +213,17 @@ test.describe("Logs Histogram testcases", () => {
     // Verify histogram state
     const isHistogramOnAfterToggle = await pm.logsPage.isHistogramOn();
     expect(isHistogramOnAfterToggle).toBeTruthy();
-    
+
     testLogger.info('Empty query histogram toggle verification completed');
   });
 
   test("Verify histogram toggle with complex query", {
-    tag: ['@histogram', '@all', '@logs']
+    tag: ['@histogram', '@all', '@logs', '@P1']
   }, async ({ page }) => {
     testLogger.info('Testing histogram toggle with complex query');
-    
+
+    const orgName = getOrgIdentifier();
+
     // Start with histogram on
     const isHistogramOn = await pm.logsPage.isHistogramOn();
     if (!isHistogramOn) {
@@ -248,10 +234,10 @@ test.describe("Logs Histogram testcases", () => {
     await pm.logsPage.typeQuery("SELECT * FROM 'e2e_automate' WHERE timestamp > '2024-01-01' AND code < 400 GROUP BY code ORDER BY count(*) DESC LIMIT 5");
     await pm.logsPage.setDateTimeFilter();
     // Strategic 500ms wait for complex SQL query processing - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    const complexSearch = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
     // Strategic 500ms wait for refresh completion - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await complexSearch;
 
     // Toggle histogram off and verify
     await pm.logsPage.toggleHistogram();
@@ -261,14 +247,14 @@ test.describe("Logs Histogram testcases", () => {
     // Run another query and verify histogram stays off
     await pm.logsPage.typeQuery("SELECT count(*) FROM 'e2e_automate'");
     // Strategic 500ms wait for query processing - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    const followupSearch = page.waitForResponse(`**/api/${orgName}/_search**`, { timeout: 60000 });
     await pm.logsPage.clickRefresh();
     // Strategic 500ms wait for refresh completion - this is functionally necessary
-    await pm.logsPage.waitForTimeout(500);
+    await followupSearch;
 
     const isHistogramStillOff = await pm.logsPage.isHistogramOn();
     expect(!isHistogramStillOff).toBeTruthy();
-    
+
     testLogger.info('Complex query histogram toggle verification completed');
   });
 }); 

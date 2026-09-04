@@ -1,0 +1,10 @@
+{
+  "number": 90001,
+  "title": "[fixture] Logs page should show ingested ci_seed_stream entries",
+  "body": "## Reproduction steps\n\n1. Log in to OpenObserve\n2. Navigate to Logs\n3. Select the `ci_seed_stream` stream from the stream picker\n4. Run a query over the last 15 minutes\n\n## Expected\n\nThe results table shows at least one log row from `ci_seed_stream`.\n\n## Actual\n\n(Synthetic — used to validate the test-assist CI plumbing. Expected verdict: FIXED.)",
+  "labels": [
+    {"name": "Needs-Testing"},
+    {"name": "fixture"}
+  ],
+  "comments": []
+}

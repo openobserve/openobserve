@@ -9,12 +9,8 @@ self.addEventListener("message", (e) => {
   self.postMessage({ updatedCssString, id });
 });
 
-function replaceAbsoluteUrlsWithProxies(
-  proxyUrl,
-  cssString,
-  excludedDomains = []
-) {
-  const urlRegex = /url\(\s*(['"]?)(https?:\/\/[^'"\)]+)\1\s*\)/g;
+function replaceAbsoluteUrlsWithProxies(proxyUrl, cssString, excludedDomains = []) {
+  const urlRegex = /url\(\s*(['"]?)(https?:\/\/[^'")]+)\1\s*\)/g;
 
   function replaceWithProxy(match, t1, url) {
     const isExcluded = excludedDomains.some((domain) => url.includes(domain));

@@ -4,12 +4,18 @@ on:
   issue_comment:
     types: [created, edited]
 
+# issue_comment fires for both issue and PR conversation comments, and deleting
+# each is governed by a different scope.
+permissions:
+  issues: write
+  pull-requests: write
+
 jobs:
   delete_mediafire_comments:
-    runs-on: ubicloud-standard-8
+    runs-on: ubuntu-latest
     steps:
       - name: Check for Mediafire in comments
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           private-key: ${{ secrets.PRIVATE_KEY }}
           # Set the owner, so the token can be used in all repositories

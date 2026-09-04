@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,161 +16,154 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
-    <q-select
-      style="min-width: 150px"
-      dense
-      borderless
-      hide-bottom-space
-      v-model="selectedValue"
-      :display-value="displayValue"
+    <OSelect
+      ref="selectRef"
+      :model-value="oSelectModelValue"
       :label="variableItem?.label || variableItem?.name"
-      :options="filteredOptions"
-      input-debounce="0"
-      emit-value
-      option-value="value"
-      option-label="label"
-      behavior="menu"
-      use-input
-      stack-label
-      @filter="filterOptions"
-      class="textbox col no-case o2-custom-select-dashboard"
-      :loading="variableItem.isLoading"
+      label-position="inside"
+      :options="computedOptions"
+      labelKey="label"
+      valueKey="value"
+      class="textbox no-case o2-custom-select-dashboard flex max-w-160 min-w-37.5 flex-col"
+      :loading="variableItem.isLoading && !isOpen"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
-      popup-no-route-dismiss
-      popup-content-style="z-index: 10001"
-      @popup-show="onPopupShow"
-      @popup-hide="onPopupHide"
-      @update:model-value="onUpdateValue"
+      @search="onSearch"
+      @open="onPopupShow"
+      @close="onPopupHide"
       @keydown="handleKeydown"
-      ref="selectRef"
+      @update:model-value="onUpdateValue"
     >
-      <template v-slot:no-option>
-        <template v-if="filterText">
-          <q-item clickable @click="handleCustomValue(filterText)">
-            <q-item-section>
-              <q-item-label>
-                {{ filterText }}
-                <span class="text-grey-6 q-ml-xs tw:text-xs tw:italic"
-                  >(Custom)</span
-                >
-              </q-item-label>
-            </q-item-section>
-          </q-item>
-          <q-separator />
-        </template>
-        <q-item v-else>
-          <q-item-section class="text-italic text-grey">
-            No Data Found
-          </q-item-section>
-        </q-item>
+      <template #trigger>
+        <span
+          class="text-select-text flex-1 truncate text-start text-xs leading-4 font-semibold"
+          :data-test="`variable-selector-${variableItem.name}-inner-value`"
+          >{{ displayValue }}</span
+        >
       </template>
-
-      <template v-if="filteredOptions.length > 0" v-slot:before-options>
-        <q-item>
-          <q-item-section v-if="variableItem.multiSelect" side>
-            <q-checkbox
-              v-model="isAllSelected"
+      <template #before-options>
+        <template v-if="hasVisibleFilteredOptions">
+          <!-- multiSelect: show checkbox + Select All -->
+          <div
+            v-if="variableItem.multiSelect"
+            class="flex cursor-pointer items-center gap-2 px-3 py-2"
+            @click.stop="toggleSelectAll"
+          >
+            <OCheckbox
+              :model-value="isAllSelected"
               @update:model-value="toggleSelectAll"
-              dense
-              class="q-ma-none"
               @click.stop
             />
-          </q-item-section>
-          <q-item-section @click.stop="toggleSelectAll" style="cursor: pointer">
-            <q-item-label>{{
-              variableItem.multiSelect ? "Select All" : "All"
-            }}</q-item-label>
-          </q-item-section>
-        </q-item>
-        <q-separator />
-        <template v-if="filterText">
-          <q-item clickable @click="handleCustomValue(filterText)">
-            <q-item-section>
-              <q-item-label>
-                {{ filterText }}
-                <span class="text-grey-6 q-ml-xs tw:text-xs tw:italic"
-                  >(Custom)</span
-                >
-              </q-item-label>
-            </q-item-section>
-          </q-item>
-          <q-separator />
+            <span>{{ t("dashboard.variableQueryValueSelector.selectAll") }}</span>
+          </div>
+          <!-- single-select: show plain All -->
+          <div
+            v-else
+            class="flex cursor-pointer items-center gap-2 px-3 py-2"
+            @click.stop="toggleSelectAll"
+          >
+            <span>{{ t("dashboard.variableQueryValueSelector.all") }}</span>
+          </div>
+          <OSeparator data-test="dashboard-variable-all-separator" />
         </template>
       </template>
-      <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-        <q-item v-bind="itemProps">
-          <q-item-section side v-if="variableItem.multiSelect">
-            <q-checkbox
-              :model-value="selected || isAllSelected"
-              @update:model-value="toggleOption(opt)"
-              class="q-ma-none"
-              dense
-            />
-          </q-item-section>
-          <q-item-section>
-            <q-item-label>
-              <span
-                v-html="
-                  typeof opt.value === 'string' &&
-                  opt.value.endsWith(`${CUSTOM_VALUE}`)
-                    ? `${opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), '')} (Custom)`
-                    : opt.label
-                "
-              ></span>
-            </q-item-label>
-          </q-item-section>
-        </q-item>
+      <!-- Custom suggestion rendered AFTER the matching options so real results
+           take priority. The no-match case is handled by the #empty slot below. -->
+      <template #after-options>
+        <template
+          v-if="hasVisibleFilteredOptions && currentSearchTerm && !isSearchTermExistingOption"
+        >
+          <OSeparator />
+          <div
+            class="flex cursor-pointer items-center gap-2 px-3 py-2"
+            @click.stop="handleCustomValue(currentSearchTerm)"
+          >
+            {{ currentSearchTerm }}
+            <span class="text-text-secondary text-xs italic">{{
+              t("dashboard.variableQueryValueSelector.custom")
+            }}</span>
+          </div>
+        </template>
+        <div
+          v-if="variableItem.isLoading && hasVisibleFilteredOptions"
+          class="flex items-center justify-center py-2"
+          data-test="variable-query-value-selector-loading-more"
+        >
+          <OSpinner size="sm" />
+        </div>
       </template>
-    </q-select>
+      <template #empty>
+        <div v-if="variableItem.isLoading" class="flex items-center justify-center py-3">
+          <OSpinner size="sm" />
+        </div>
+        <div
+          v-else-if="currentSearchTerm && !isSearchTermExistingOption"
+          class="text-select-text flex cursor-pointer items-center gap-2"
+          @click.stop="handleCustomValue(currentSearchTerm)"
+        >
+          {{ currentSearchTerm }}
+          <span class="text-text-secondary text-xs italic">{{
+            t("dashboard.variableQueryValueSelector.custom")
+          }}</span>
+        </div>
+        <div
+          v-else
+          class="text-text-muted flex items-center justify-center py-3 italic"
+          data-test="variable-query-value-selector-no-data"
+        >
+          {{ t("dashboard.variableQueryValueSelector.noDataFound") }}
+        </div>
+      </template>
+    </OSelect>
   </div>
 </template>
 
 <script lang="ts">
 import { SELECT_ALL_VALUE, CUSTOM_VALUE } from "@/utils/dashboard/constants";
 import { debounce } from "lodash-es";
-import {
-  defineComponent,
-  ref,
-  watch,
-  computed,
-  nextTick,
-  onUnmounted,
-} from "vue";
+import { defineComponent, ref, watch, computed, onUnmounted } from "vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
   name: "VariableQueryValueSelector",
+  components: { OSeparator, OSelect, OCheckbox, OSpinner },
   props: ["modelValue", "variableItem", "loadOptions"],
   emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {
+    const { t } = useI18nTyped();
     const selectedValue = ref(props.variableItem?.value);
-    const filterText = ref("");
+    const currentSearchTerm = ref("");
     const selectRef = ref(null);
     const isOpen = ref(false);
 
     const availableOptions = computed(() => props.variableItem?.options || []);
 
-    // Show searchResults if filterText is active, else normal options
-    const filteredOptions = computed(() => {
-      let opts = availableOptions.value.map((opt: any) => {
-        if (
-          typeof opt.value === "string" &&
-          opt.value.endsWith(`${CUSTOM_VALUE}`)
-        ) {
+    // Options with (Custom) label transformation — OSelect handles local filtering
+    const computedOptions = computed(() => {
+      return availableOptions.value.map((opt: any) => {
+        if (typeof opt.value === "string" && opt.value.endsWith(`${CUSTOM_VALUE}`)) {
           const base = opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "");
-          return { ...opt, label: `${base} (Custom)` };
+          return {
+            ...opt,
+            label: t("dashboard.variableQueryValueSelector.customValue", { value: base }),
+          };
         }
         return opt;
       });
-      if (!filterText.value) return opts;
-      return opts.filter((opt: any) =>
-        opt.label.toLowerCase().includes(filterText.value.toLowerCase()),
-      );
     });
-    const filterOptions = (val: string, update: Function) => {
-      filterText.value = val;
-      update();
+
+    // Handler for OSelect @search event
+    const onSearch = (val: string) => {
+      currentSearchTerm.value = val;
+      updateSearch(val);
     };
+
+    // Kept for backwards compat with variableItem.options watch
+    const filterText = currentSearchTerm;
 
     // set debouced filterText value that can trigger search
     const searchText = ref("");
@@ -212,23 +205,49 @@ export default defineComponent({
       updateSearch.cancel();
     });
 
+    // True when the typed search term already exists as a regular or custom option,
+    // so the #before-options "Custom" suggestion is suppressed to avoid duplicates.
+    const isSearchTermExistingOption = computed(() => {
+      const term = currentSearchTerm.value?.trim();
+      if (!term) return false;
+      return availableOptions.value.some((opt: any) => {
+        if (typeof opt.label === "string" && opt.label.trim() === term) return true;
+        if (typeof opt.value === "string" && opt.value.endsWith(`${CUSTOM_VALUE}`)) {
+          const base = opt.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "");
+          if (base === term) return true;
+        }
+        return false;
+      });
+    });
+
+    const hasVisibleFilteredOptions = computed(() => {
+      const term = currentSearchTerm.value?.trim().toLowerCase();
+      if (!term) return computedOptions.value.length > 0;
+      return computedOptions.value.some(
+        (opt: any) => typeof opt.label === "string" && opt.label.toLowerCase().includes(term),
+      );
+    });
+
     const isAllSelected = computed(() => {
       if (props.variableItem.multiSelect) {
-        return (
-          Array.isArray(selectedValue.value) &&
-          selectedValue.value?.[0] === SELECT_ALL_VALUE
-        );
+        return Array.isArray(selectedValue.value) && selectedValue.value?.[0] === SELECT_ALL_VALUE;
       }
       return selectedValue.value === SELECT_ALL_VALUE;
+    });
+
+    // When "Select All" is active, feed OSelect all individual option values so
+    // every checkbox appears ticked. Otherwise pass the real selection as-is.
+    const oSelectModelValue = computed(() => {
+      if (props.variableItem.multiSelect && isAllSelected.value) {
+        return computedOptions.value.map((opt: any) => opt.value);
+      }
+      return selectedValue.value;
     });
 
     const closePopUpWhenValueIsSet = async () => {
       filterText.value = "";
       if (selectRef.value) {
-        (selectRef.value as any).updateInputValue("");
-        (selectRef.value as any).blur();
-        await nextTick();
-        (selectRef.value as any).hidePopup();
+        (selectRef.value as any).close();
       }
     };
 
@@ -241,24 +260,20 @@ export default defineComponent({
 
       selectedValue.value = newValue;
       emit("update:modelValue", newValue);
-      await closePopUpWhenValueIsSet();
+      if (!props.variableItem.multiSelect) {
+        await closePopUpWhenValueIsSet();
+      }
     };
 
     const onUpdateValue = async (val: any) => {
       // If multiselect and user selects any regular value after SELECT_ALL, remove SELECT_ALL
-      if (
-        props.variableItem.multiSelect &&
-        Array.isArray(val) &&
-        val.length > 0
-      ) {
+      if (props.variableItem.multiSelect && Array.isArray(val) && val.length > 0) {
         // Remove SELECT_ALL if other values are selected
         if (val.includes(SELECT_ALL_VALUE) && val.length > 1) {
           val = val.filter((v) => v !== SELECT_ALL_VALUE);
         }
         // Remove custom value suffix if present
-        val = val.filter(
-          (v) => !(typeof v === "string" && v.endsWith(`${CUSTOM_VALUE}`)),
-        );
+        val = val.filter((v: any) => !(typeof v === "string" && v.endsWith(`${CUSTOM_VALUE}`)));
       }
       selectedValue.value = val;
       if (!props.variableItem.multiSelect) {
@@ -292,27 +307,36 @@ export default defineComponent({
             const firstTwoValues = selectedValue.value
               .slice(0, 2)
               .map((it: any) => {
-                if (it === "") return "<blank>";
-                if (it === SELECT_ALL_VALUE) return "<ALL>";
+                if (it === "") return t("dashboard.variableQueryValueSelector.blank");
+                if (it === SELECT_ALL_VALUE)
+                  return t("dashboard.variableQueryValueSelector.allSelected");
                 if (typeof it === "string" && it.endsWith(`${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} (Custom)`;
+                  return t("dashboard.variableQueryValueSelector.customValue", {
+                    value: it.replace(new RegExp(`${CUSTOM_VALUE}$`), ""),
+                  });
                 return it;
               })
               .join(", ");
             const remainingCount = selectedValue.value.length - 2;
-            return `${firstTwoValues} ...+${remainingCount} more`;
+            return t("dashboard.variableQueryValueSelector.moreCount", {
+              firstTwoValues,
+              remainingCount,
+            });
           } else if (
-            props.variableItem.options.length === 0 &&
+            props?.variableItem?.options?.length === 0 &&
             selectedValue.value.length === 0
           ) {
-            return "(No Data Found)";
+            return t("dashboard.variableQueryValueSelector.noDataFoundParen");
           } else {
             return selectedValue.value
               .map((it: any) => {
-                if (it === "") return "<blank>";
-                if (it === SELECT_ALL_VALUE) return "<ALL>";
+                if (it === "") return t("dashboard.variableQueryValueSelector.blank");
+                if (it === SELECT_ALL_VALUE)
+                  return t("dashboard.variableQueryValueSelector.allSelected");
                 if (typeof it === "string" && it.endsWith(`${CUSTOM_VALUE}`))
-                  return `${it.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} (Custom)`;
+                  return t("dashboard.variableQueryValueSelector.customValue", {
+                    value: it.replace(new RegExp(`${CUSTOM_VALUE}$`), ""),
+                  });
                 return it;
               })
               .join(", ");
@@ -323,43 +347,31 @@ export default defineComponent({
             props.variableItem.options &&
             props.variableItem.options.some((o: any) => o.value === "")
           ) {
-            return "<blank>";
+            return t("dashboard.variableQueryValueSelector.blank");
           }
           // Otherwise treat empty-string as unset
-          return "(No Data Found)";
+          return t("dashboard.variableQueryValueSelector.noDataFoundParen");
         } else if (selectedValue.value === SELECT_ALL_VALUE) {
-          return "<ALL>";
+          return t("dashboard.variableQueryValueSelector.allSelected");
         } else if (
           typeof selectedValue.value === "string" &&
           selectedValue.value.endsWith(`${CUSTOM_VALUE}`)
         ) {
-          return `${selectedValue.value.replace(new RegExp(`${CUSTOM_VALUE}$`), "")} (Custom)`;
+          return t("dashboard.variableQueryValueSelector.customValue", {
+            value: selectedValue.value.replace(new RegExp(`${CUSTOM_VALUE}$`), ""),
+          });
         } else {
           return selectedValue.value;
         }
-      } else if (!props.variableItem.isLoading) {
-        return "(No Data Found)";
       } else {
-        return "";
+        return t("dashboard.variableQueryValueSelector.noDataFoundParen");
       }
     });
 
     watch(
       () => props.variableItem.options,
       () => {
-        // Only update input if dropdown is open AND it's a multiSelect
-        // For single-select, don't interfere as the dropdown should close after selection
-        if (isOpen.value && selectRef.value && props.variableItem.multiSelect) {
-          nextTick(() => {
-            if (selectRef.value) {
-              if (!filterText.value) {
-                (selectRef.value as any).updateInputValue();
-              } else {
-                filterOptions(filterText.value, () => {});
-              }
-            }
-          });
-        }
+        // OSelect handles its own display — nothing to do when options reload
       },
       { deep: true },
     );
@@ -386,8 +398,7 @@ export default defineComponent({
       const inputValue = value.trim();
       // Check if value already exists in options (case-sensitive)
       const existingOption = availableOptions.value.find(
-        (opt: any) =>
-          typeof opt.label === "string" && opt.label.trim() === inputValue,
+        (opt: any) => typeof opt.label === "string" && opt.label.trim() === inputValue,
       );
       if (existingOption) {
         // Select the existing option
@@ -421,9 +432,14 @@ export default defineComponent({
     };
 
     return {
+      isOpen,
+      hasVisibleFilteredOptions,
       selectedValue,
-      filteredOptions,
-      filterOptions,
+      oSelectModelValue,
+      computedOptions,
+      onSearch,
+      currentSearchTerm,
+      isSearchTermExistingOption,
       isAllSelected,
       toggleSelectAll,
       displayValue,
@@ -433,21 +449,9 @@ export default defineComponent({
       selectRef,
       handleKeydown,
       handleCustomValue,
-      filterText,
       CUSTOM_VALUE,
+      t,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.q-select {
-  max-width: 600px;
-}
-
-:deep(.q-field__native) {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-</style>

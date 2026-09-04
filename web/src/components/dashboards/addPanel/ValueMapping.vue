@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -16,73 +16,43 @@
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600">
-      <span>Value Mappings</span>
-      <q-btn
-        no-caps
-        padding="xs"
-        class=""
-        size="sm"
-        flat
-        icon="info_outline"
-        data-test="dashboard-addpanel-config-drilldown-info"
-      >
-        <q-tooltip
-          class="bg-grey-8"
-          anchor="bottom middle"
-          self="top middle"
-          max-width="250px"
-        >
-          Enhance table readability by mapping values to custom text and
-          backgorund colors for clearer data visualization.
-        </q-tooltip>
-      </q-btn>
-    </div>
-    <q-btn
+    <OButton
+      variant="outline"
+      size="sm"
       @click="openValueMappingPopUp"
-      style="cursor: pointer; padding: 0px 5px"
-      :label="
+      data-test="dashboard-addpanel-config-value-mapping-add-btn"
+    >
+      {{
         dashboardPanelData.data.config.mappings.length
-          ? ' Edit Value Mapping'
-          : ' Add Value Mapping'
-      "
-      no-caps
-      data-test="dashboard-addpanel-config-drilldown-add-btn"
-      class="el-border"
+          ? t("dashboard.editValueMapping")
+          : t("dashboard.addValueMapping")
+      }}
+    </OButton>
+    <ValueMappingPopUp
+      :open="showValueMappingPopUp"
+      :value-mapping="JSON.parse(JSON.stringify(dashboardPanelData.data.config.mappings))"
+      @close="showValueMappingPopUp = false"
+      @save="saveValueMappingConfig"
     />
-    <q-dialog v-model="showValueMappingPopUp">
-      <ValueMappingPopUp
-        :value-mapping="
-          JSON.parse(JSON.stringify(dashboardPanelData.data.config.mappings))
-        "
-        @close="showValueMappingPopUp = false"
-        @save="saveValueMappingConfig"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-      />
-    </q-dialog>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, inject, ref } from "vue";
-import { useStore } from "vuex";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import { useI18nTyped } from "@/types/i18n";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ValueMappingPopUp from "./ValueMappingPopUp.vue";
 import { onBeforeMount } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 export default defineComponent({
   name: "ValueMapping",
-  components: { ValueMappingPopUp },
+  components: { ValueMappingPopUp, OButton },
   props: [],
   setup() {
-    const store = useStore();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard"
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey
-    );
+    const { t } = useI18nTyped();
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     const showValueMappingPopUp = ref(false);
 
@@ -103,7 +73,7 @@ export default defineComponent({
     };
 
     return {
-      store,
+      t,
       dashboardPanelData,
       showValueMappingPopUp,
       openValueMappingPopUp,
@@ -112,5 +82,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped></style>

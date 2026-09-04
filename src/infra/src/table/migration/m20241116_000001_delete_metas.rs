@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -57,14 +57,6 @@ mod tests {
         collapsed_eq!(
             &delete_meta_folders_stmnt().to_string(PostgresQueryBuilder),
             r#"DELETE FROM "meta" WHERE "module" = 'folders'"#
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &delete_meta_folders_stmnt().to_string(MysqlQueryBuilder),
-            r#"DELETE FROM `meta` WHERE `module` = 'folders'"#
         );
     }
 

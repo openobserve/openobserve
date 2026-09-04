@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,360 +17,247 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <q-table
+  <div class="rounded-default p-0" style="min-height: inherit">
+    <OTable
       data-test="log-stream-table"
-      ref="qTable"
-      v-model:selected="selected"
-      :rows="logStream"
+      :data="filteredStreamData"
       :columns="columns"
       row-key="name"
-      :pagination="pagination"
-      :filter="filterQuery"
-      :filter-method="filterData"
-      style="width: 100%"
+      selection="multiple"
+      v-model:selected-ids="selectedIds"
+      pagination="client"
+      :page-size="pageSize"
+      :page-size-options="pageSizeOptions"
+      expansion="single"
+      v-model:expanded-ids="expandedIds"
+      show-index
+      :show-global-filter="false"
+      :default-columns="false"
+      width="100%"
+      @row-click="onExpandRow"
     >
-      <template #no-data>
+      <template #empty>
         <NoData />
       </template>
-      <template v-slot:header="props">
-        <q-tr :props="props">
-          <q-th auto-width />
-          <q-th v-for="col in props.cols" :key="col.name" :props="props">
-            {{ col.label }}
-          </q-th>
-        </q-tr>
-      </template>
-      <template v-slot:body="props">
-        <q-tr
-          :data-test="`stream-association-table-${props.row.name}-row`"
-          :props="props"
-          style="cursor: pointer"
-          @click="toggleStreamRow(props)"
-        >
-          <q-td auto-width>
-            <q-btn
-              dense
-              flat
-              size="xs"
-              :icon="
-                expandedRow.name != props.row.name
-                  ? 'expand_more'
-                  : 'expand_less'
-              "
-            />
-          </q-td>
-          <q-td v-for="col in props.cols" :key="col.name" :props="props">
-            {{ col.value }}
-          </q-td>
-        </q-tr>
-        <q-tr
-          v-show="
-            expandedRow.name == props.row.name &&
-            expandedRow.stream_type === props.row.stream_type
-          "
-          :props="props"
-          no-hover
-          style="
-            height: min-content;
-            /* background-color: white; */
-            border: 1px solid black;
-          "
-        >
-          <q-td colspan="100%">
-            <div
-              v-show="loadingFunctions"
-              class="q-pl-md q-py-xs"
-              style="height: 60px"
-            >
-              <q-inner-loading
-                size="sm"
-                :showing="loadingFunctions"
-                label="Fetching functions..."
-                label-style="font-size: 1.1em"
-              />
-            </div>
-            <div v-show="!loadingFunctions">
-              <q-table
-                :data-test="`associated-functions-${props.row.name}-table`"
-                class="border"
-                hide-bottom
-                bordered
-                :rows="functionsList"
-                :columns="functionsColumns"
-                :title="t('function.associatedFunctionHeader')"
-              >
-                <template v-slot:body="props">
-                  <q-tr
-                    :data-test="`associated-function-table-${props.row.name}-row`"
-                    :props="props"
-                  >
-                    <q-td key="#" :props="props">
-                      {{ props.pageIndex + 1 }}
-                    </q-td>
-                    <q-td key="name" :props="props">
-                      {{ props.row.name }}
-                    </q-td>
-                    <q-td key="order" :props="props">
-                      {{ props.row.order }}
-                    </q-td>
-                    <q-td
-                      v-if="expandedRow.stream_type === 'logs'"
-                      key="applyBeforeFlattening"
-                      :props="props"
-                    >
-                      <q-toggle
-                        data-test="stream-association-applyBeforeFlattening-toggle"
-                        class="q-mt-sm"
-                        v-model="props.row.applyBeforeFlattening"
-                        @update:model-value="
-                          updateAssociatedFunctions(props.row)
-                        "
-                      />
-                    </q-td>
-                    <q-td key="actions" :props="props">
-                      <q-btn
-                        data-test="stream-association-delete-function-btn"
-                        :icon="outlinedDelete"
-                        :title="t('function.deleteAssociatedFunction')"
-                        class="q-ml-xs"
-                        padding="sm"
-                        unelevated
-                        size="sm"
-                        round
-                        flat
-                        @click.stop="deleteFunctionFromStream(props.row.name)"
-                      ></q-btn>
-                    </q-td>
-                  </q-tr>
-                </template>
-                <template v-slot:bottom-row>
-                  <q-tr v-if="addFunctionInProgress">
-                    <q-td></q-td>
-                    <q-td data-test="stream-association-functions-select-input">
-                      <q-select
-                        v-model="selectedFunction"
-                        option-value="name"
-                        option-label="name"
-                        :label="t('function.selectFunction')"
-                        :options="filterFunctions"
-                        :loading="addFunctionInProgressLoading"
-                        :disable="addFunctionInProgressLoading"
-                        filled
-                        borderless
-                        dense
-                        use-input
-                        hide-selected
-                        fill-input
-                        @filter="filterFn"
-                      ></q-select>
-                    </q-td>
-                    <q-td></q-td>
-                    <q-td> </q-td>
-                    <q-td></q-td>
-                  </q-tr>
-                </template>
-                <template v-slot:top>
-                  <div
-                    style="
-                      display: flex;
-                      flex-direction: row;
-                      width: 100%;
-                      justify-content: space-between;
-                    "
-                  >
-                    <div
-                      class="q-table__title row items-center"
-                      data-test="log-stream-title-text"
-                    >
-                      {{ t("function.associatedFunctionHeader") }}
-                    </div>
-                    <q-btn
-                      data-test="stream-association-associate-function-btn"
-                      color="secondary"
-                      class="q-ml-md q-mb-xs text-bold no-border"
-                      @click="addFunctionInProgress = true"
-                      no-caps
-                      >Associate Function</q-btn
-                    >
-                  </div>
-                </template>
-                <template v-slot:no-data>
-                  <div
-                    style="width: 100%; display: flex; flex-direction: column"
-                  >
-                    <div
-                      v-if="!functionsList.length && !addFunctionInProgress"
-                      style="width: 100%; text-align: center"
-                    >
-                      No functions found
-                    </div>
-                    <!-- <div>
-                    <q-btn @click="addFunctionInProgress = true" no-caps>Associate Function</q-btn>
-                  </div> -->
-                  </div>
-                </template>
-              </q-table>
-            </div>
-          </q-td>
-        </q-tr>
-      </template>
 
-      <template #top="scope">
-        <div class="q-table__title" data-test="log-stream-title-text">
-          {{ t("logStream.header") }}
-        </div>
-        <div class="q-ml-auto" data-test="stream-association-search-input">
-          <q-input
-            v-model="filterQuery"
-            borderless
-            filled
-            dense
-            class="q-mb-xs no-border"
-            :placeholder="t('logStream.search')"
+      <template #top>
+        <div class="border-border-default mb-1 flex w-full items-center border-b pb-2">
+          <div class="text-sm font-[600]" data-test="log-stream-title-text">
+            {{ t("logStream.header") }}
+          </div>
+          <div class="ms-auto" data-test="stream-association-search-input">
+            <OSearchInput v-model="filterQuery" class="mb-1" :placeholder="t('logStream.search')" />
+          </div>
+          <OButton
+            data-test="log-stream-refresh-stats-btn"
+            class="ms-3 mb-1"
+            variant="outline"
+            size="sm-action"
+            @click="getLogStream"
+            icon-left="refresh"
           >
-            <template #prepend>
-              <q-icon name="search" />
-            </template>
-          </q-input>
+            {{ t(`logStream.refreshStats`) }}
+          </OButton>
         </div>
-        <q-btn
-          data-test="log-stream-refresh-stats-btn"
-          class="q-ml-md q-mb-xs text-bold no-border"
-          padding="sm lg"
-          color="secondary"
-          no-caps
-          :label="t(`logStream.refreshStats`)"
-          @click="getLogStream"
-        />
-
-        <QTablePagination
-          data-test="log-stream-table-pagination"
-          :scope="scope"
-          :pageTitle="t('logStream.header')"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="top"
-          @update:changeRecordPerPage="changePagination"
-        />
       </template>
 
-      <template #bottom="scope">
-        <QTablePagination
-          data-test="log-stream-table-pagination"
-          :scope="scope"
-          :resultTotal="resultTotal"
-          :perPageOptions="perPageOptions"
-          position="bottom"
-          @update:changeRecordPerPage="changePagination"
-        />
+      <template #expansion>
+        <div v-show="loadingFunctions" class="py-1 ps-3" style="height: 3.75rem">
+          <OInnerLoading
+            :showing="loadingFunctions"
+            :label="t('logStream.fetchingFunctions')"
+            size="sm"
+          />
+        </div>
+        <div v-show="!loadingFunctions">
+          <OTable
+            :data-test="`associated-functions-${expandedRow.name}-table`"
+            class="border"
+            bordered
+            :data="displayFunctionsList"
+            :columns="functionsColumns"
+            pagination="none"
+            :show-global-filter="false"
+            :default-columns="false"
+          >
+            <template #top>
+              <div class="flex w-full flex-row justify-between">
+                <div class="flex items-center text-sm font-[600]" data-test="log-stream-title-text">
+                  {{ t("function.associatedFunctionHeader") }}
+                </div>
+                <OButton
+                  data-test="stream-association-associate-function-btn"
+                  variant="outline"
+                  size="sm-action"
+                  class="ms-3 mb-1"
+                  @click="addFunctionInProgress = true"
+                >
+                  {{ t("logStream.associateFunction") }}
+                </OButton>
+              </div>
+            </template>
+
+            <template #[`cell-#`]="{ row, index }">
+              <span v-if="!row._isAddRow">{{ index + 1 }}</span>
+            </template>
+
+            <template #cell-name="{ row }">
+              <span v-if="!row._isAddRow">{{ row.name }}</span>
+              <OSelect
+                v-else
+                v-model="selectedFunction"
+                data-test="stream-association-functions-select-input"
+                labelKey="name"
+                valueKey="name"
+                :label="t('function.selectFunction')"
+                :options="filterFunctions"
+                :loading="addFunctionInProgressLoading"
+                :disabled="addFunctionInProgressLoading"
+                searchable
+                @search="filterFn"
+              />
+            </template>
+
+            <template #cell-order="{ row }">
+              <span v-if="!row._isAddRow">{{ row.order }}</span>
+            </template>
+
+            <template #cell-applyBeforeFlattening="{ row }">
+              <OSwitch
+                v-if="!row._isAddRow"
+                data-test="stream-association-applyBeforeFlattening-toggle"
+                v-model="row.applyBeforeFlattening"
+                @update:model-value="updateAssociatedFunctions(row)"
+              />
+            </template>
+
+            <template #cell-actions="{ row }">
+              <OButton
+                v-if="!row._isAddRow"
+                data-test="stream-association-delete-function-btn"
+                :title="t('function.deleteAssociatedFunction')"
+                class="ms-1"
+                variant="ghost-destructive"
+                size="icon-sm"
+                icon-left="delete"
+              />
+            </template>
+
+            <template #empty>
+              <div v-if="!addFunctionInProgress" class="w-full text-center">
+                {{ t("logStream.noFunctionsFound") }}
+              </div>
+            </template>
+          </OTable>
+        </div>
       </template>
-    </q-table>
-    <q-dialog
-      v-model="showIndexSchemaDialog"
-      position="right"
-      full-height
-      maximized
+    </OTable>
+    <ODrawer
+      data-test="associated-stream-function-index-schema-drawer"
+      bleed
+      v-model:open="showIndexSchemaDialog"
+      size="lg"
     >
       <SchemaIndex v-model="schemaData" />
-    </q-dialog>
-  </q-page>
+    </ODrawer>
+  </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onActivated,
-  onMounted,
-  watch,
-  computed,
-} from "vue";
+import { defineComponent, ref, onActivated, onMounted, watch, computed } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, type QTableProps } from "quasar";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, raw } from "@/types/i18n";
 import jsTransformService from "../../services/jstransform";
 
-import QTablePagination from "../shared/grid/Pagination.vue";
 import streamService from "../../services/stream";
 import SchemaIndex from "../logstream/schema.vue";
 import NoData from "../shared/grid/NoData.vue";
 import segment from "../../services/segment_analytics";
 import { getImageURL, verifyOrganizationStatus } from "@/utils/zincutils";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import useStreams from "@/composables/useStreams";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 export default defineComponent({
   name: "PageLogStream",
-  components: { QTablePagination, SchemaIndex, NoData },
+  components: {
+    SchemaIndex,
+    NoData,
+    OButton,
+    ODrawer,
+    OInnerLoading,
+    OSwitch,
+    OSelect,
+    OSearchInput,
+    OTable,
+  },
   emits: ["update:changeRecordPerPage", "update:maxRecordToReturn"],
-  setup(props, { emit }) {
+  setup() {
     const store = useStore();
-    const { t } = useI18n();
-    const $q = useQuasar();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const logStream = ref([]);
     const showIndexSchemaDialog = ref(false);
     const schemaData = ref({ name: "", schema: [Object], stream_type: "" });
     const resultTotal = ref<number>(0);
-    const selected = ref<any>([]);
     const orgData: any = ref(store.state.selectedOrganization);
-    const qTable: any = ref(null);
+
     const previousOrgIdentifier = ref("");
     const functionsList = ref<any>([]);
-    const columns = ref<QTableProps["columns"]>([
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-      },
-      {
-        name: "name",
-        field: "name",
-        label: t("logStream.name"),
-        align: "left",
+        id: "name",
+        accessorKey: "name",
+        header: t("logStream.name"),
         sortable: true,
+        size: COL.streamName,
+        meta: { align: "left", autoWidth: true },
       },
       {
-        name: "stream_type",
-        field: "stream_type",
-        label: t("logStream.type"),
-        align: "left",
+        id: "stream_type",
+        accessorKey: "stream_type",
+        header: t("logStream.type"),
         sortable: true,
+        size: COL.streamType,
+        meta: { align: "left" },
       },
       {
-        name: "doc_num",
-        field: "doc_num",
-        label: t("logStream.docNum"),
-        align: "left",
+        id: "doc_num",
+        accessorKey: "doc_num",
+        header: t("logStream.docNum"),
         sortable: true,
+        size: COL.count,
+        meta: { align: "right" },
       },
       {
-        name: "storage_size",
-        field: "storage_size",
-        label: t("logStream.storageSize"),
-        align: "left",
+        id: "storage_size",
+        accessorKey: "storage_size",
+        header: t("logStream.storageSize"),
         sortable: true,
+        size: COL.sizeBytes,
+        meta: { align: "right" },
       },
       {
-        name: "compressed_size",
-        field: "compressed_size",
-        label: t("logStream.compressedSize"),
-        align: "left",
+        id: "compressed_size",
+        accessorKey: "compressed_size",
+        header: t("logStream.compressedSize"),
         sortable: true,
+        size: COL.sizeBytes,
+        meta: { align: "right" },
       },
-      // {
-      //   name: "actions",
-      //   field: "actions",
-      //   label: t("user.actions"),
-      //   align: "center",
-      // },
-    ]);
+    ];
     const addFunctionInProgress = ref(false);
     const addFunctionInProgressLoading = ref(false);
-    const { getStreams } = useStreams();
+    const { getStreams } = useStreams(t);
 
     let deleteStreamName = "";
     let deleteStreamType = "";
@@ -379,70 +266,117 @@ export default defineComponent({
     const allFunctionsList = ref([]);
     const selectedFunction = ref<any | null>(null);
     const filterFunctions = ref([]);
+    const selectedIds = ref<string[]>([]);
+    const filterQuery = ref("");
 
-    const functionsColumns = computed(() => {
-      return [
+    const expandedIds = computed(() => {
+      return expandedRow.value.name ? [expandedRow.value.name] : [];
+    });
+
+    const filteredStreamData = computed(() => {
+      const query = filterQuery.value.toLowerCase();
+      if (!query) return logStream.value;
+      return logStream.value.filter(
+        (row: any) =>
+          row.name.toLowerCase().includes(query) || row.stream_type.toLowerCase().includes(query),
+      );
+    });
+
+    const displayFunctionsList = computed(() => {
+      if (addFunctionInProgress.value) {
+        return [
+          {
+            _isAddRow: true,
+            name: "",
+            order: 0,
+            applyBeforeFlattening: false,
+          },
+          ...functionsList.value,
+        ];
+      }
+      return functionsList.value;
+    });
+
+    const onExpandRow = (row: any) => {
+      if (expandedRow.value.name === row.name) {
+        expandedRow.value = { name: "", stream_type: "" };
+      } else {
+        expandedRow.value.name = row.name;
+        expandedRow.value.stream_type = row.stream_type;
+      }
+      if (expandedRow.value.name) {
+        addFunctionInProgress.value = false;
+        getStreamFunctions(row.name, row.stream_type);
+      }
+    };
+
+    const functionsColumns = computed<OTableColumnDef[]>(() => {
+      const cols: OTableColumnDef[] = [
         {
-          name: "#",
-          label: "#",
-          field: "#",
-          align: "left",
+          id: "#",
+          header: raw("#"),
+          cell: " ",
+          size: 50,
+          meta: { align: "left" },
         },
         {
-          name: "name",
-          field: "name",
-          label: t("logStream.name"),
-          align: "left",
+          id: "name",
+          accessorKey: "name",
+          header: t("logStream.name"),
+          cell: " ",
           sortable: true,
+          size: COL.name,
+          meta: { align: "left", autoWidth: true },
         },
         {
-          name: "order",
-          field: "order",
-          label: "Order",
-          align: "left",
+          id: "order",
+          accessorKey: "order",
+          header: t("function.order"),
+          cell: " ",
           sortable: true,
+          size: COL.count,
+          meta: { align: "right" },
         },
         {
-          name: "applyBeforeFlattening",
-          field: "applyBeforeFlattening",
-          label: "Apply Before Flattening",
-          align: "left",
+          id: "applyBeforeFlattening",
+          accessorKey: "applyBeforeFlattening",
+          header: t("function.applyBeforeFlattening"),
+          cell: " ",
           sortable: true,
+          size: 180,
+          meta: { align: "left" },
         },
         {
-          name: "actions",
-          field: "actions",
-          label: t("user.actions"),
-          align: "left",
+          id: "actions",
+          header: t("user.actions"),
+          isAction: true,
+          size: 80,
+          meta: { align: "center", actionCount: 1 },
         },
-      ].filter((column) => {
-        if (expandedRow.value.stream_type !== "logs") {
-          return column.name !== "applyBeforeFlattening";
-        }
-        return true;
-      }) as QTableProps["columns"];
+      ];
+      if (expandedRow.value.stream_type !== "logs") {
+        return cols.filter((col) => col.id !== "applyBeforeFlattening");
+      }
+      return cols;
     });
 
     const getLogStream = () => {
       if (store.state.selectedOrganization != null) {
-        previousOrgIdentifier.value =
-          store.state.selectedOrganization.identifier;
-        const dismiss = $q.notify({
-          spinner: true,
-          message: "Please wait while loading streams...",
+        previousOrgIdentifier.value = store.state.selectedOrganization.identifier;
+        const dismiss = toast({
+          variant: "loading",
+          message: t("toastMessages.functions.pleaseWaitWhileLoadingStreams"),
+          timeout: 0,
         });
 
         getStreams("", false)
           .then((res: any) => {
-            let counter = 1;
             let doc_num = "";
             let storage_size = "";
             let compressed_size = "";
             resultTotal.value = res.list.length;
             logStream.value = res.list
-              .filter(
-                (stream: any) => stream.stream_type !== "enrichment_tables"
-              )
+              .filter((stream: any) => stream.stream_type !== "enrichment_tables")
               .map((data: any) => {
                 doc_num = "--";
                 storage_size = "--";
@@ -452,7 +386,6 @@ export default defineComponent({
                   compressed_size = data.stats.compressed_size + " MB";
                 }
                 return {
-                  "#": counter <= 9 ? `0${counter++}` : counter++,
                   name: data.name,
                   doc_num: doc_num,
                   storage_size: storage_size,
@@ -470,12 +403,11 @@ export default defineComponent({
 
             dismiss();
           })
-          .catch((err) => {
+          .catch(() => {
             dismiss();
-            $q.notify({
-              type: "negative",
-              message: "Error while pulling stream.",
-              timeout: 2000,
+            toast({
+              variant: "error",
+              message: t("toastMessages.functions.errorWhilePullingStream"),
             });
           });
       }
@@ -488,45 +420,31 @@ export default defineComponent({
       });
     };
 
-    const filterFn = (val: string, update: any) => {
-      update(() => {
-        const needle = val.toLowerCase();
-        filterFunctions.value = allFunctionsList.value
-          .filter(
-            (item: any) =>
-              !functionsList.value.some((obj: any) => obj.name === item.name)
-          ) // filter existing applied functions
-          .filter((v: any) => v.name.toLowerCase().indexOf(needle) > -1); // filter based on search term
-      });
+    const filterFn = (val: string) => {
+      const needle = val.toLowerCase();
+      filterFunctions.value = allFunctionsList.value
+        .filter((item: any) => !functionsList.value.some((obj: any) => obj.name === item.name)) // filter existing applied functions
+        .filter((v: any) => v.name.toLowerCase().indexOf(needle) > -1); // filter based on search term
     };
 
     getLogStream();
 
     const getAllFunctions = () => {
       jsTransformService
-        .list(
-          1,
-          100000,
-          "name",
-          false,
-          "",
-          store.state.selectedOrganization.identifier
-        )
+        .list(1, 100000, "name", false, "", store.state.selectedOrganization.identifier)
         .then((res: any) => {
           res.data.list.forEach((element: any) => {
-            element.applyBeforeFlattening =
-              element.applyBeforeFlattening || false;
+            element.applyBeforeFlattening = element.applyBeforeFlattening || false;
           });
           allFunctionsList.value = res.data?.list || [];
           filterFunctions.value = res.data?.list || [];
         })
         .catch((err) => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
-              JSON.stringify(err.response.data["error"]) ||
-              "Function fetching failed",
-            timeout: 2000,
+              raw(JSON.stringify(err.response.data["error"])) ||
+              t("functions.functionFetchingFailed"),
           });
         });
     };
@@ -549,13 +467,10 @@ export default defineComponent({
             expandedRow.value.name,
             expandedRow.value.stream_type,
             selectedFunction.value.name,
-            apiData
+            apiData,
           )
           .then(() => {
-            return getStreamFunctions(
-              expandedRow.value.name,
-              expandedRow.value.stream_type
-            );
+            return getStreamFunctions(expandedRow.value.name, expandedRow.value.stream_type);
           })
           .finally(() => {
             addFunctionInProgressLoading.value = false;
@@ -565,44 +480,22 @@ export default defineComponent({
       }
     });
 
-    const toggleStreamRow = (props: any) => {
-      if (expandedRow.value.name == props.row.name) {
-        expandedRow.value = { name: "", stream_type: "" };
-      } else {
-        expandedRow.value.name = props.row.name;
-        expandedRow.value.stream_type = props.row.stream_type;
-      }
-      if (expandedRow.value.name) {
-        addFunctionInProgress.value = false;
-        getStreamFunctions(props.row.name, props.row.stream_type);
-      }
-    };
-
-    const getStreamFunctions = async (
-      stream_name: any,
-      stream_type: string
-    ) => {
+    const getStreamFunctions = async (stream_name: any, stream_type: string) => {
       loadingFunctions.value = stream_name ? true : false;
       await jsTransformService
-        .stream_function(
-          store.state.selectedOrganization.identifier,
-          stream_name,
-          stream_type
-        )
+        .stream_function(store.state.selectedOrganization.identifier, stream_name, stream_type)
         .then((res: any) => {
           functionsList.value = res.data?.list || [];
           functionsList.value.forEach((element: any) => {
-            element.applyBeforeFlattening =
-              element.applyBeforeFlattening || false;
+            element.applyBeforeFlattening = element.applyBeforeFlattening || false;
           });
         })
         .catch((err) => {
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message:
-              JSON.stringify(err.response.data["error"]) ||
-              "Function creation failed",
-            timeout: 2000,
+              raw(JSON.stringify(err.response.data["error"])) ||
+              t("functions.functionCreationFailed"),
           });
         })
         .finally(() => {
@@ -616,13 +509,10 @@ export default defineComponent({
           store.state.selectedOrganization.identifier,
           expandedRow.value.name,
           expandedRow.value.stream_type,
-          functionName
+          functionName,
         )
         .then(() => {
-          return getStreamFunctions(
-            expandedRow.value.name,
-            expandedRow.value.stream_type
-          );
+          return getStreamFunctions(expandedRow.value.name, expandedRow.value.stream_type);
         })
         .finally(() => {
           addFunctionInProgressLoading.value = false;
@@ -644,48 +534,25 @@ export default defineComponent({
     //   });
     // };
 
-    const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "All", value: 0 },
-    ];
-    const maxRecordToReturn = ref<number>(100);
-    const selectedPerPage = ref<number>(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
-    };
-    const changeMaxRecordToReturn = (val: any) => {
-      maxRecordToReturn.value = val;
-    };
+    const pageSize = ref<number>(20);
+    const pageSizeOptions = [5, 10, 20, 50, 100];
 
     const deleteStream = () => {
       streamService
-        .delete(
-          store.state.selectedOrganization.identifier,
-          deleteStreamName,
-          deleteStreamType
-        )
+        .delete(store.state.selectedOrganization.identifier, deleteStreamName, deleteStreamType)
         .then((res: any) => {
           if (res.data.code == 200) {
-            $q.notify({
-              color: "positive",
-              message: "Stream deleted successfully.",
+            toast({
+              message: t("toastMessages.functions.streamDeletedSuccessfully"),
+              variant: "success",
             });
             getLogStream();
           }
         })
-        .catch((err: any) => {
-          $q.notify({
-            color: "negative",
-            message: "Error while deleting stream.",
+        .catch(() => {
+          toast({
+            message: t("toastMessages.functions.errorWhileDeletingStream"),
+            variant: "error",
           });
         });
     };
@@ -695,10 +562,7 @@ export default defineComponent({
     });
 
     onActivated(() => {
-      if (
-        previousOrgIdentifier.value !=
-        store.state.selectedOrganization.identifier
-      ) {
+      if (previousOrgIdentifier.value != store.state.selectedOrganization.identifier) {
         getLogStream();
       }
     });
@@ -710,41 +574,34 @@ export default defineComponent({
           expandedRow.value.name,
           expandedRow.value.stream_type,
           _function.name,
-          _function
+          _function,
         )
-        .then((res) => {
-          getStreamFunctions(
-            expandedRow.value.name,
-            expandedRow.value.stream_type
-          );
+        .then(() => {
+          getStreamFunctions(expandedRow.value.name, expandedRow.value.stream_type);
         });
     };
 
     return {
       t,
-      qTable,
       router,
       store,
       logStream: logStream,
       columns,
-      selected,
+      selectedIds,
       orgData,
       getLogStream: getLogStream,
-      pagination,
       resultTotal,
       // listSchema,
       deleteStream,
       schemaData,
-      perPageOptions,
-      selectedPerPage,
-      changePagination,
-      maxRecordToReturn,
       showIndexSchemaDialog,
-      changeMaxRecordToReturn,
       getStreamFunctions,
       functionsList,
       expandedRow,
-      filterQuery: ref(""),
+      expandedIds,
+      filteredStreamData,
+      displayFunctionsList,
+      filterQuery,
       functionsColumns,
       deleteFunctionFromStream,
       addFunctionInProgress,
@@ -753,21 +610,10 @@ export default defineComponent({
       filterFn,
       filterFunctions,
       addFunctionInProgressLoading,
-      toggleStreamRow,
-      outlinedDelete,
-      filterData(rows: any, terms: any) {
-        var filtered = [];
-        terms = terms.toLowerCase();
-        for (var i = 0; i < rows.length; i++) {
-          if (
-            rows[i]["name"].toLowerCase().includes(terms) ||
-            rows[i]["stream_type"].toLowerCase().includes(terms)
-          ) {
-            filtered.push(rows[i]);
-          }
-        }
-        return filtered;
-      },
+      onExpandRow,
+      pageSize,
+      pageSizeOptions,
+      delete: "delete",
       getImageURL,
       loadingFunctions,
       verifyOrganizationStatus,
@@ -781,10 +627,7 @@ export default defineComponent({
   },
   watch: {
     selectedOrg(newVal: any, oldVal: any) {
-      this.verifyOrganizationStatus(
-        this.store.state.organizations,
-        this.router
-      );
+      this.verifyOrganizationStatus(this.store.state.organizations, this.router);
       this.orgData = newVal;
       if (
         (newVal != oldVal || this.logStream.values == undefined) &&
@@ -798,43 +641,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-:deep(.q-table__top) {
-  border-bottom: 1px solid $border-color;
-  justify-content: flex-start !important;
-}
-
-:deep(.q-table__title) {
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.confirmBody {
-  padding: 11px 1.375rem 0;
-  font-size: 0.875rem;
-  text-align: center;
-  font-weight: 700;
-
-  .head {
-    line-height: 2.125rem;
-    margin-bottom: 0.5rem;
-    color: $dark-page;
-  }
-
-  .para {
-    color: $light-text;
-  }
-}
-
-.confirmActions {
-  justify-content: center;
-  padding: 1.25rem 1.375rem 1.625rem;
-  display: flex;
-
-  .q-btn {
-    font-size: 0.75rem;
-    font-weight: 700;
-  }
-}
-</style>

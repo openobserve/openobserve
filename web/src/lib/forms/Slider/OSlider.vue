@@ -1,0 +1,233 @@
+<script setup lang="ts">
+// Copyright 2026 OpenObserve Inc.
+
+import type { SliderProps, SliderEmits, SliderSlots } from "./OSlider.types";
+import { computed, useAttrs, useId } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+
+defineOptions({ inheritAttrs: false });
+const $attrs = useAttrs();
+const parentDataTest = computed(() => $attrs["data-test"] as string | undefined);
+
+// Forward tabindex to the slider input; keep it off the wrapper (avoids a double tab-stop).
+const inputTabindex = computed(() => $attrs["tabindex"] as number | string | undefined);
+const wrapperAttrs = computed(() => {
+  const { tabindex: _tabindex, ...rest } = $attrs;
+  return rest;
+});
+
+const props = withDefaults(defineProps<SliderProps>(), {
+  min: 0,
+  max: 100,
+  step: 1,
+  size: "md",
+  disabled: false,
+  showValue: false,
+});
+
+const emit = defineEmits<SliderEmits>();
+
+defineSlots<SliderSlots>();
+
+const _fallbackId = useId();
+const inputId = computed(() => props.id ?? _fallbackId);
+
+const currentValue = computed(() => {
+  const v = props.modelValue;
+  if (typeof v === "number" && !Number.isNaN(v)) return v;
+  return props.min;
+});
+
+const effectiveError = computed(() => props.errorMessage || (props.error ? " " : null) || null);
+const hasError = computed(() => !!effectiveError.value);
+
+const fillPercent = computed(() => {
+  const range = props.max - props.min;
+  if (range <= 0) return 0;
+  const pct = ((currentValue.value - props.min) / range) * 100;
+  return Math.max(0, Math.min(100, pct));
+});
+
+const trackHeight: Record<NonNullable<SliderProps["size"]>, string> = {
+  sm: "h-1",
+  md: "h-1.5",
+  lg: "h-2",
+};
+
+const thumbSize: Record<NonNullable<SliderProps["size"]>, string> = {
+  sm: "size-3",
+  md: "size-4",
+  lg: "size-5",
+};
+
+const thumbHalf: Record<NonNullable<SliderProps["size"]>, string> = {
+  sm: "0.375rem",
+  md: "0.5rem",
+  lg: "0.625rem",
+};
+
+const labelSize: Record<NonNullable<SliderProps["size"]>, string> = {
+  sm: "text-xs",
+  md: "text-xs",
+  lg: "text-sm",
+};
+
+function handleInput(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const v = Number(target.value);
+  if (!Number.isNaN(v)) {
+    emit("update:modelValue", v);
+  }
+}
+
+function handleChange(event: Event) {
+  const target = event.target as HTMLInputElement;
+  const v = Number(target.value);
+  if (!Number.isNaN(v)) {
+    emit("change", v);
+  }
+}
+
+const displayValue = computed(() => {
+  if (props.formatValue) return props.formatValue(currentValue.value);
+  return String(currentValue.value);
+});
+
+const resolvedSize = computed(() => props.size ?? "md");
+</script>
+
+<template>
+  <div v-bind="wrapperAttrs" class="flex w-full flex-col gap-1">
+    <div
+      v-if="$slots.label || label || showValue || $slots.tooltip"
+      class="flex items-center justify-between gap-2"
+    >
+      <label
+        v-if="$slots.label || label || $slots.tooltip"
+        :for="inputId"
+        :class="[
+          labelSize[resolvedSize],
+          'text-slider-label flex items-center gap-1 leading-none font-medium',
+        ]"
+      >
+        <slot name="label">{{ label }}</slot
+        ><span v-if="required" aria-hidden="true" class="select-none">*</span>
+        <OIcon
+          v-if="$slots.tooltip"
+          name="info-outline"
+          size="sm"
+          :data-test="parentDataTest ? `${parentDataTest}-info` : undefined"
+          class="text-slider-label cursor-help"
+          ><slot name="tooltip"
+        /></OIcon>
+      </label>
+      <span
+        v-if="showValue"
+        :class="[labelSize[resolvedSize], 'text-slider-value leading-none tabular-nums']"
+      >
+        {{ displayValue }}
+      </span>
+    </div>
+
+    <div
+      :class="[
+        'relative flex w-full items-center',
+        disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer',
+      ]"
+    >
+      <div
+        :class="[
+          'absolute right-0 left-0 rounded-full',
+          trackHeight[resolvedSize],
+          disabled ? 'bg-slider-disabled-track' : 'bg-slider-track',
+        ]"
+        aria-hidden="true"
+      />
+      <div
+        :class="[
+          'absolute left-0 rounded-full',
+          trackHeight[resolvedSize],
+          disabled ? 'bg-slider-disabled-track-fill' : 'bg-slider-track-fill',
+        ]"
+        :style="{ width: fillPercent + '%' }"
+        aria-hidden="true"
+      />
+
+      <input
+        :id="inputId"
+        type="range"
+        :name="name"
+        :min="min"
+        :max="max"
+        :step="step"
+        :value="currentValue"
+        :disabled="disabled"
+        :tabindex="inputTabindex"
+        :aria-invalid="hasError || undefined"
+        :class="[
+          'o2-slider-input',
+          'relative z-10 m-0 w-full appearance-none bg-transparent',
+          'ring-offset-surface-base focus-visible:ring-slider-focus-ring rounded-full ring-offset-1 transition-[box-shadow] duration-150 outline-none focus-visible:ring-2',
+          trackHeight[resolvedSize],
+          disabled ? 'cursor-not-allowed' : 'cursor-pointer',
+        ]"
+        @input="handleInput"
+        @change="handleChange"
+        @blur="emit('blur', $event)"
+        @focus="emit('focus', $event)"
+      />
+
+      <span
+        :class="[
+          'border-slider-thumb-border pointer-events-none absolute rounded-full border-2',
+          thumbSize[resolvedSize],
+          disabled ? 'bg-slider-disabled-thumb' : 'bg-slider-thumb',
+        ]"
+        :style="{
+          left: `calc(${fillPercent}% - ${thumbHalf[resolvedSize]})`,
+        }"
+        aria-hidden="true"
+      />
+    </div>
+
+    <div v-if="effectiveError || helpText" class="flex items-center justify-between gap-2">
+      <span
+        v-if="effectiveError && effectiveError.trim()"
+        class="text-slider-error-text text-xs leading-none"
+        role="alert"
+      >
+        {{ effectiveError }}
+      </span>
+      <span v-else-if="helpText" class="text-slider-value text-xs leading-none">
+        {{ helpText }}
+      </span>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+/* keep(lib-override:native-range): browser <input type=range> shadow pseudo-
+   elements. The native thumb is collapsed to 0 (a custom visual thumb is drawn
+   in the template) and the native track is cleared; not expressible as utilities. */
+.o2-slider-input::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 0;
+  height: 0;
+  background: transparent;
+  border: none;
+}
+.o2-slider-input::-moz-range-thumb {
+  appearance: none;
+  width: 0;
+  height: 0;
+  background: transparent;
+  border: none;
+}
+.o2-slider-input::-webkit-slider-runnable-track {
+  background: transparent;
+}
+.o2-slider-input::-moz-range-track {
+  background: transparent;
+}
+</style>

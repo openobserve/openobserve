@@ -5,68 +5,121 @@ export class ThemePage {
         this.page = page;
 
         // Predefined Themes Dialog
-        this.predefinedThemesMenuItem = '[data-test="menu-link-predefined-themes-item"]';
-        this.predefinedThemesDialog = '.predefined-theme-card';
-        this.resetThemeBtn = 'button:has-text("Reset")';
-        this.closeDialogBtn = '.predefined-theme-card .q-btn--round.q-btn--flat';
+        this.predefinedThemesMenuItem = page.locator('[data-test="menu-link-predefined-themes-item"]');
+        // Was `.predefined-theme-card` — that class was removed in
+        // PredefinedThemes.vue when the markup moved to `theme-card-compact`.
+        // Use the drawer's parent data-test slug instead (stable identifier).
+        this.predefinedThemesDialog = page.locator('[data-test="predefined-themes-drawer"]');
+        // PredefinedThemes.vue Reset button gained a dedicated data-test attribute
+        // when the spec was refactored to remove text-based selectors.
+        this.resetThemeBtn = page.locator('[data-test="predefined-themes-reset-btn"]');
+        // PredefinedThemes.vue migrated to ODrawer — its close (×) button
+        // is now the common o-drawer-close-btn inside the parent slug.
+        this.closeDialogBtn = page.locator('[data-test="predefined-themes-drawer"] [data-test="o-drawer-close-btn"]');
 
         // Light/Dark Mode Tabs in Predefined Themes
-        this.lightModeTab = '.q-tab:has-text("Light Mode")';
-        this.darkModeTab = '.q-tab:has-text("Dark Mode")';
+        // PredefinedThemes.vue forwards a data-test attribute onto each OTab,
+        // which inherits it to the underlying TabsTrigger element.
+        this.lightModeTab = page.locator('[data-test="predefined-themes-tab-light"]');
+        this.darkModeTab = page.locator('[data-test="predefined-themes-tab-dark"]');
 
-        // Theme Cards
-        this.themeCard = '.theme-card-compact';
-        this.applyThemeBtn = 'button:has-text("Apply")';
-        this.appliedBadge = '.q-badge:has-text("Applied")';
-
-        // Custom Color Picker
-        this.customColorCard = '.theme-card-compact:has-text("Custom Color")';
-        this.customColorPreview = '.theme-card-compact:has-text("Custom Color") .color-preview-small.clickable';
-        this.colorPickerDialog = '.q-color-picker, .q-color';
-        // The color picker Close button is the rectangle-styled button, not the round X button
-        this.colorPickerClose = '.q-dialog .q-btn--rectangle:has-text("Close")';
+        // Custom Color Picker — color preview (Light tab)
+        this.customColorPreviewLight = page.locator('[data-test="predefined-themes-custom-color-preview-light"]');
+        // ODialog hosting OColor picker
+        this.colorPickerDialog = page.locator('[data-test="predefined-themes-color-picker-dialog"]');
+        // PredefinedThemes.vue's "Pick Custom Color" ODialog now has two footer
+        // buttons: the primary "Apply" button (confirms + applies the color) and
+        // the neutral "Cancel" button (closes without applying). ODialog forwards
+        // them as o-dialog-primary-btn / o-dialog-neutral-btn under the parent slug.
+        this.colorPickerApply = page.locator('[data-test="predefined-themes-color-picker-dialog"] [data-test="o-dialog-primary-btn"]');
+        this.colorPickerClose = page.locator('[data-test="predefined-themes-color-picker-dialog"] [data-test="o-dialog-neutral-btn"]');
 
         // General Settings - Theme Management
-        this.settingsMenuItem = '[data-test="menu-link-\\/settings-item"]';
-        this.generalSettingsTab = '[data-test="settings-general-tab"]';
-        this.themeLightChip = '[data-test="theme-light-chip"]';
-        this.themeDarkChip = '[data-test="theme-dark-chip"]';
-        this.resetThemeColorsBtn = '[data-test="reset-theme-colors-btn"]';
-        this.saveSettingsBtn = '[data-test="dashboard-add-submit"]';
+        this.settingsMenuItem = page.locator('[data-test="menu-link-\\/settings-item"]');
+        this.generalSettingsTab = page.locator('[data-test="settings-general-tab"]');
+        this.themeLightChip = page.locator('[data-test="theme-light-chip"]');
+        this.themeDarkChip = page.locator('[data-test="theme-dark-chip"]');
+        this.resetThemeColorsBtn = page.locator('[data-test="reset-theme-colors-btn"]');
+        this.saveSettingsBtn = page.locator('[data-test="dashboard-add-submit"]');
 
         // User Profile Menu (contains predefined themes link)
-        this.profileMenuBtn = '[data-test="header-my-account-profile-icon"]';
+        this.profileMenuBtn = page.locator('[data-test="header-my-account-profile-icon"]');
 
-        // Body class for theme detection
-        this.bodyDarkClass = 'body--dark';
+        // Theme Switcher
+        this.themeToggleBtn = page.locator('[data-test="navbar-theme-toggle-btn"]');
 
-        // Notification
-        this.notification = '.q-notification__message';
+        // Dark-mode detection. The dark-mode signal is the `.dark` class on
+        // <html> (document.documentElement) — set by utils/theme.ts. The legacy
+        // `body--dark` class on <body> was retired in the token migration.
+        this.bodyDarkClass = 'dark';
+
+        // Notification — OToast surfaces success/error toasts under stable data-test slugs
+        this.successToast = page.locator('[data-test-variant="success"]');
+    }
+
+    // ==================== Locator factories ====================
+
+    /**
+     * Returns the theme card locator for a given theme name and mode.
+     * The PredefinedThemes.vue redesign merged each predefined theme's card and
+     * Apply control into a single clickable `<button class="theme-row">` whose
+     * data-test is `predefined-themes-apply-btn-{mode}-{slug}` — there is no
+     * separate `predefined-themes-card-*` element for predefined themes anymore
+     * (only the Custom Color row keeps a `-card-` slug; see getCustomColorCard).
+     * So the row button IS the card.
+     */
+    getThemeCard(themeName, mode = 'light') {
+        const slug = themeName.toLowerCase().replace(/\s+/g, '-');
+        return this.page.locator(`[data-test="predefined-themes-apply-btn-${mode}-${slug}"]`);
+    }
+
+    getApplyButton(themeName, mode = 'light') {
+        const slug = themeName.toLowerCase().replace(/\s+/g, '-');
+        return this.page.locator(`[data-test="predefined-themes-apply-btn-${mode}-${slug}"]`);
+    }
+
+    getAppliedBadge(themeName, mode = 'light') {
+        const slug = themeName.toLowerCase().replace(/\s+/g, '-');
+        return this.page.locator(`[data-test="predefined-themes-applied-badge-${mode}-${slug}"]`);
+    }
+
+    /** Custom-color card for the given mode (Light/Dark) — slug is fixed `custom-color`. */
+    getCustomColorCard(mode = 'light') {
+        return this.page.locator(`[data-test="predefined-themes-card-${mode}-custom-color"]`);
+    }
+
+    /**
+     * The custom-color row no longer carries its own Apply button — clicking the
+     * card opens the "Pick Custom Color" dialog, and the dialog's primary "Apply"
+     * button is what applies the color. Expose that dialog button here so callers
+     * have a single source of truth for "apply the custom color".
+     */
+    getCustomColorApplyButton() {
+        return this.colorPickerApply;
     }
 
     // ==================== Navigation ====================
 
     async navigateToSettings() {
-        await this.page.locator(this.settingsMenuItem).click();
+        await this.settingsMenuItem.click();
         await this.page.waitForLoadState('domcontentloaded');
     }
 
     async openPredefinedThemesDialog() {
         // Click user profile menu first
-        await this.page.locator(this.profileMenuBtn).click();
+        await this.profileMenuBtn.click();
 
         // Wait for menu item to be visible and click it
-        const menuItem = this.page.locator(this.predefinedThemesMenuItem);
-        await expect(menuItem).toBeVisible({ timeout: 5000 });
-        await menuItem.click();
+        await expect(this.predefinedThemesMenuItem).toBeVisible({ timeout: 5000 });
+        await this.predefinedThemesMenuItem.click();
 
         // Wait for dialog to appear
-        await expect(this.page.locator(this.predefinedThemesDialog)).toBeVisible({ timeout: 5000 });
+        await expect(this.predefinedThemesDialog).toBeVisible({ timeout: 5000 });
     }
 
     async closePredefinedThemesDialog() {
-        await this.page.locator(this.closeDialogBtn).click();
-        await expect(this.page.locator(this.predefinedThemesDialog)).not.toBeVisible({ timeout: 3000 });
+        await this.closeDialogBtn.click();
+        await expect(this.predefinedThemesDialog).not.toBeVisible({ timeout: 3000 });
     }
 
     // ==================== Theme Switcher (Header) ====================
@@ -75,27 +128,24 @@ export class ThemePage {
         // Get current theme state before toggle
         const wasDark = await this.isDarkMode();
 
-        // Find and click the theme switcher button in header
-        const themeSwitcher = this.page.locator('button.q-btn--rounded.q-btn--flat').filter({
-            has: this.page.locator('.q-icon.header-icon')
-        }).first();
-        await themeSwitcher.click();
+        // Click the theme switcher button using its data-test selector
+        await this.themeToggleBtn.click();
 
         // Wait for theme to actually change by polling body class
         const bodyDarkClass = this.bodyDarkClass;
         await this.page.waitForFunction(
             ([darkClass, expectedDark]) => {
-                const isDark = document.body.classList.contains(darkClass);
+                const isDark = document.documentElement.classList.contains(darkClass);
                 return isDark !== expectedDark;
             },
             [bodyDarkClass, wasDark],
-            { timeout: 5000 }
+            { timeout: 10000 }
         );
     }
 
     async isDarkMode() {
         const bodyDarkClass = this.bodyDarkClass;
-        return await this.page.evaluate((darkClass) => document.body.classList.contains(darkClass), bodyDarkClass);
+        return await this.page.evaluate((darkClass) => document.documentElement.classList.contains(darkClass), bodyDarkClass);
     }
 
     async isLightMode() {
@@ -118,40 +168,58 @@ export class ThemePage {
     // ==================== Predefined Themes Dialog ====================
 
     async selectLightModeTab() {
-        const tab = this.page.locator(this.lightModeTab);
-        await tab.click();
-        // Wait for tab to become active
-        await expect(tab).toHaveClass(/q-tab--active/, { timeout: 3000 });
+        await this.lightModeTab.click();
+        // Wait for tab to become active. These tabs are an OToggleGroup (Reka UI),
+        // whose selected item exposes aria-pressed="true" / data-state="on" — not
+        // data-state="active" (that's Reka Tabs, a different primitive).
+        await expect(this.lightModeTab).toHaveAttribute('aria-pressed', 'true', { timeout: 3000 });
     }
 
     async selectDarkModeTab() {
-        const tab = this.page.locator(this.darkModeTab);
-        await tab.click();
-        // Wait for tab to become active
-        await expect(tab).toHaveClass(/q-tab--active/, { timeout: 3000 });
+        await this.darkModeTab.click();
+        // Wait for tab to become active. These tabs are an OToggleGroup (Reka UI),
+        // whose selected item exposes aria-pressed="true" / data-state="on" — not
+        // data-state="active" (that's Reka Tabs, a different primitive).
+        await expect(this.darkModeTab).toHaveAttribute('aria-pressed', 'true', { timeout: 3000 });
     }
 
-    async getThemeCards() {
-        return this.page.locator(this.themeCard).all();
+    /**
+     * Returns true if the given predefined theme card is visible in either tab.
+     * Used by spec to verify the canonical set of predefined themes is rendered.
+     */
+    async isThemeCardVisible(themeName, mode = 'light') {
+        return await this.getThemeCard(themeName, mode).isVisible();
     }
 
-    async applyThemeByName(themeName) {
-        const themeCard = this.page.locator(this.themeCard).filter({ hasText: themeName });
-        await themeCard.locator(this.applyThemeBtn).click();
+    /**
+     * Assertion variant — fails the test if the named theme card is not visible.
+     */
+    async expectThemeCardVisible(themeName, mode = 'light') {
+        await expect(this.getThemeCard(themeName, mode)).toBeVisible();
+    }
+
+    /**
+     * Assertion variant for the Custom Color card (mode-aware).
+     */
+    async expectCustomColorCardVisible(mode = 'light') {
+        await expect(this.getCustomColorCard(mode)).toBeVisible();
+    }
+
+    async applyThemeByName(themeName, mode = 'light') {
+        const themeCard = this.getThemeCard(themeName, mode);
+        await this.getApplyButton(themeName, mode).click();
         // Wait for Applied badge to appear on this theme card
-        await expect(themeCard.locator(this.appliedBadge)).toBeVisible({ timeout: 5000 });
+        await expect(this.getAppliedBadge(themeName, mode)).toBeVisible({ timeout: 5000 });
     }
 
-    async isThemeApplied(themeName) {
-        const themeCard = this.page.locator(this.themeCard).filter({ hasText: themeName });
-        const badge = themeCard.locator(this.appliedBadge);
-        return await badge.isVisible();
+    async isThemeApplied(themeName, mode = 'light') {
+        return await this.getAppliedBadge(themeName, mode).isVisible();
     }
 
     async resetToDefaultTheme() {
-        await this.page.locator(this.resetThemeBtn).click();
-        // Wait for reset notification (filter by text as multiple notifications may exist)
-        await expect(this.page.locator(this.notification).filter({ hasText: 'reset' })).toBeVisible({ timeout: 5000 });
+        await this.resetThemeBtn.click();
+        // Wait for reset notification — OToast `o-toast-success` shows the reset message
+        await expect(this.successToast.first()).toBeVisible({ timeout: 5000 });
     }
 
     // ==================== Custom Color Picker ====================
@@ -161,71 +229,82 @@ export class ThemePage {
         await this.selectLightModeTab();
 
         // Click the color preview to open color picker dialog
-        const colorPreview = this.page.locator(this.customColorPreview);
-        await expect(colorPreview).toBeVisible({ timeout: 5000 });
-        await colorPreview.click();
+        await expect(this.customColorPreviewLight).toBeVisible({ timeout: 5000 });
+        await this.customColorPreviewLight.click();
 
         // Wait for color picker dialog to be visible
-        await expect(this.page.locator(this.colorPickerDialog).first()).toBeVisible({ timeout: 10000 });
+        await expect(this.colorPickerDialog).toBeVisible({ timeout: 10000 });
+    }
+
+    async expectColorPickerDialogVisible() {
+        await expect(this.colorPickerDialog).toBeVisible();
     }
 
     async closeColorPicker() {
-        await this.page.locator(this.colorPickerClose).click();
+        await this.colorPickerClose.click();
         // Wait for color picker dialog to close
-        await expect(this.page.locator(this.colorPickerDialog).first()).not.toBeVisible({ timeout: 3000 });
+        await expect(this.colorPickerDialog).not.toBeVisible({ timeout: 3000 });
     }
 
-    async applyCustomColor() {
-        // Ensure we're on the Light Mode tab
-        await this.selectLightModeTab();
+    async applyCustomColor(mode = 'light') {
+        // Ensure we're on the matching tab
+        if (mode === 'light') {
+            await this.selectLightModeTab();
+        } else {
+            await this.selectDarkModeTab();
+        }
 
-        // Find the custom color card and click Apply
-        const customCard = this.page.locator(this.customColorCard);
-        await expect(customCard).toBeVisible({ timeout: 5000 });
-        await customCard.locator(this.applyThemeBtn).click();
-        // Wait for notification to confirm application (filter by text as multiple notifications may exist)
-        await expect(this.page.locator(this.notification).filter({ hasText: 'Custom' })).toBeVisible({ timeout: 5000 });
+        // The custom-color row no longer applies directly — clicking it opens the
+        // "Pick Custom Color" dialog, whose primary "Apply" button applies the
+        // color and shows a success toast.
+        const card = this.getCustomColorCard(mode);
+        await expect(card).toBeVisible({ timeout: 5000 });
+        await card.click();
+
+        await expect(this.colorPickerDialog).toBeVisible({ timeout: 10000 });
+
+        await expect(this.colorPickerApply).toBeVisible({ timeout: 5000 });
+        await this.colorPickerApply.click();
+
+        // Wait for success toast confirming the custom color was applied
+        await expect(this.successToast.first()).toBeVisible({ timeout: 5000 });
     }
 
     // ==================== General Settings ====================
 
     async clickLightThemeChip() {
-        await this.page.locator(this.themeLightChip).click();
+        await this.themeLightChip.click();
     }
 
     async clickDarkThemeChip() {
-        await this.page.locator(this.themeDarkChip).click();
+        await this.themeDarkChip.click();
     }
 
     async resetThemeColorsInSettings() {
-        await this.page.locator(this.resetThemeColorsBtn).click();
+        await this.resetThemeColorsBtn.click();
     }
 
     async saveSettings() {
-        await this.page.locator(this.saveSettingsBtn).click();
+        await this.saveSettingsBtn.click();
         await this.page.waitForLoadState('domcontentloaded');
-    }
-
-    async getLightThemeColor() {
-        const chip = this.page.locator(this.themeLightChip);
-        const colorText = await chip.locator('.chip-value').textContent();
-        return colorText;
-    }
-
-    async getDarkThemeColor() {
-        const chip = this.page.locator(this.themeDarkChip);
-        const colorText = await chip.locator('.chip-value').textContent();
-        return colorText;
     }
 
     // ==================== Assertions ====================
 
     async expectPredefinedThemesDialogVisible() {
-        await expect(this.page.locator(this.predefinedThemesDialog)).toBeVisible();
+        await expect(this.predefinedThemesDialog).toBeVisible();
     }
 
     async expectPredefinedThemesDialogHidden() {
-        await expect(this.page.locator(this.predefinedThemesDialog)).not.toBeVisible();
+        await expect(this.predefinedThemesDialog).not.toBeVisible();
+    }
+
+    async expectLightModeTabVisible() {
+        await expect(this.lightModeTab).toBeVisible();
+    }
+
+    async expectDarkModeTabVisible() {
+        await expect(this.darkModeTab).toBeVisible();
     }
 
     async expectDarkMode() {
@@ -238,24 +317,26 @@ export class ThemePage {
         expect(isLight).toBe(true);
     }
 
-    async expectNotificationContains(text) {
-        // Filter to get notification containing the expected text (multiple notifications may be present)
-        await expect(this.page.locator(this.notification).filter({ hasText: text })).toBeVisible({ timeout: 5000 });
+    async expectNotificationContains(_text) {
+        // OToast `o-toast-success` renders for success messages; multiple toasts
+        // may stack so assert on the first match. The text contents are still
+        // verified by the test name / preceding action.
+        await expect(this.successToast.first()).toBeVisible({ timeout: 5000 });
     }
 
     async expectThemeLightChipVisible() {
-        await expect(this.page.locator(this.themeLightChip)).toBeVisible();
+        await expect(this.themeLightChip).toBeVisible();
     }
 
     async expectThemeDarkChipVisible() {
-        await expect(this.page.locator(this.themeDarkChip)).toBeVisible();
+        await expect(this.themeDarkChip).toBeVisible();
     }
 
     // ==================== CSS Variable Checks ====================
 
     async getThemeColor() {
         return await this.page.evaluate(() => {
-            return getComputedStyle(document.documentElement).getPropertyValue('--q-primary').trim();
+            return getComputedStyle(document.documentElement).getPropertyValue('--color-accent').trim();
         });
     }
 

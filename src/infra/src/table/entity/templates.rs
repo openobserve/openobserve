@@ -13,6 +13,7 @@ pub struct Model {
     pub r#type: String,
     pub body: String,
     pub title: Option<String>,
+    pub kind: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]
@@ -28,3 +29,27 @@ impl Related<super::destinations::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "tmpl-1".to_string(),
+            org: "myorg".to_string(),
+            name: "slack-template".to_string(),
+            is_default: false,
+            r#type: "slack".to_string(),
+            body: r#"{"text": "Alert: {{.Name}}"}"#.to_string(),
+            title: None,
+            kind: "custom".to_string(),
+        };
+        assert_eq!(m.id, "tmpl-1");
+        assert_eq!(m.org, "myorg");
+        assert_eq!(m.r#type, "slack");
+        assert!(!m.is_default);
+        assert!(m.title.is_none());
+    }
+}

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,41 +17,42 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import ImportRegexPattern from "@/components/settings/ImportRegexPattern.vue";
 import regexPatternsService from "@/services/regex_pattern";
-import { Notify } from "quasar";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { nextTick, ref } from "vue";
 import axios from "axios";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 
+const { mockToastFn } = vi.hoisted(() => ({
+  mockToastFn: vi.fn(),
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToastFn(...args),
+}));
+
 // Mock services
 vi.mock("@/services/regex_pattern", () => ({
   default: {
-    create: vi.fn()
-  }
+    create: vi.fn(),
+  },
 }));
 
 vi.mock("axios", () => ({
   default: {
-    get: vi.fn()
-  }
+    get: vi.fn(),
+  },
 }));
 
 // Mock utils cookies
 vi.mock("@/utils/cookies", () => ({
-  getLanguage: vi.fn(() => "en-gb")
+  getLanguage: vi.fn(() => "en-us"),
 }));
-
-installQuasar({
-  plugins: [Notify]
-});
 
 describe("ImportRegexPattern", () => {
   let wrapper: any = null;
 
   const mockProps = {
-    regexPatterns: ["existing-pattern-1", "existing-pattern-2"]
+    regexPatterns: ["existing-pattern-1", "existing-pattern-2"],
   };
 
   beforeEach(() => {
@@ -62,12 +63,20 @@ describe("ImportRegexPattern", () => {
         stubs: {
           "base-import": {
             template: '<div><slot name="output-content"></slot></div>',
-            props: ['title', 'testPrefix', 'isImporting', 'editorHeights', 'containerClass', 'containerStyle', 'tabs'],
-            emits: ['back', 'cancel', 'import', 'update:active-tab'],
+            props: [
+              "title",
+              "testPrefix",
+              "isImporting",
+              "editorHeights",
+              "containerClass",
+              "containerStyle",
+              "tabs",
+            ],
+            emits: ["back", "cancel", "import", "update:active-tab"],
             setup(_props: any, { expose }: any) {
               const jsonArrayOfObj = ref([]);
               const jsonStr = ref("");
-              const isImporting = ref(false);
+              const isImportingLocal = ref(false);
               const jsonFiles = ref(null);
               const url = ref("");
               const updateJsonArray = (arr: any[]) => {
@@ -77,28 +86,24 @@ describe("ImportRegexPattern", () => {
               expose({
                 jsonArrayOfObj,
                 jsonStr,
-                isImporting,
+                isImportingLocal,
                 jsonFiles,
                 url,
                 updateJsonArray,
               });
-              return { jsonArrayOfObj, jsonStr, isImporting, jsonFiles, url, updateJsonArray };
+              return { jsonArrayOfObj, jsonStr, isImportingLocal, jsonFiles, url, updateJsonArray };
             },
           },
-          "q-input": true,
-          "q-btn": true,
-          "q-separator": true,
-          "q-form": true,
-          "q-file": true,
           "app-tabs": {
-            template: '<div :data-test="$attrs[\'data-test\']" :class="$attrs.class"><slot></slot></div>',
-            props: ['tabs', 'activeTab'],
-            emits: ['update:active-tab']
+            template:
+              '<div :data-test="$attrs[\'data-test\']" :class="$attrs.class"><slot></slot></div>',
+            props: ["tabs", "activeTab"],
+            emits: ["update:active-tab"],
           },
-          "q-icon": true,
-          "built-in-patterns-tab": true
-        }
-      }
+          OIcon: true,
+          "built-in-patterns-tab": true,
+        },
+      },
     });
 
     // Reset mocks
@@ -137,7 +142,7 @@ describe("ImportRegexPattern", () => {
     });
 
     it("should initialize correct tabs structure", () => {
-      expect(wrapper.vm.allTabs).toEqual([
+      expect(wrapper.vm.allTabs).toMatchObject([
         {
           label: "Built-in Patterns",
           value: "import_built_in_patterns",
@@ -222,34 +227,41 @@ describe("ImportRegexPattern", () => {
 
     it("should return false for empty name", async () => {
       const result = await wrapper.vm.validateRegexPatternInputs({ name: "", pattern: ".*" }, 1);
-      
+
       expect(result).toBe(false);
-      expect(wrapper.vm.regexPatternErrorsToDisplay).toEqual([[{
-        field: 'regex_pattern_name',
-        message: 'Regex pattern - 1: name is required'
-      }]]);
+      expect(wrapper.vm.regexPatternErrorsToDisplay).toEqual([
+        [
+          {
+            field: "regex_pattern_name",
+            message: "Regex pattern - 1: name is required",
+          },
+        ],
+      ]);
     });
 
     it("should return false for whitespace-only name", async () => {
       const result = await wrapper.vm.validateRegexPatternInputs({ name: "   ", pattern: ".*" }, 1);
-      
+
       expect(result).toBe(false);
       expect(wrapper.vm.regexPatternErrorsToDisplay[0][0].message).toContain("name is required");
     });
 
     it("should return false for undefined name", async () => {
       const result = await wrapper.vm.validateRegexPatternInputs({ pattern: ".*" }, 1);
-      
+
       expect(result).toBe(false);
       expect(wrapper.vm.regexPatternErrorsToDisplay[0][0].message).toContain("name is required");
     });
 
     it("should return true for existing pattern name (duplicates allowed)", async () => {
       // Note: Duplicate pattern names are now allowed as primary key is UUID-based
-      const result = await wrapper.vm.validateRegexPatternInputs({
-        name: "existing-pattern-1",
-        pattern: ".*"
-      }, 1);
+      const result = await wrapper.vm.validateRegexPatternInputs(
+        {
+          name: "existing-pattern-1",
+          pattern: ".*",
+        },
+        1,
+      );
 
       expect(result).toBe(true);
       expect(wrapper.vm.regexPatternErrorsToDisplay).toEqual([]);
@@ -257,67 +269,87 @@ describe("ImportRegexPattern", () => {
 
     it("should return false for empty pattern", async () => {
       const result = await wrapper.vm.validateRegexPatternInputs({ name: "test", pattern: "" }, 1);
-      
+
       expect(result).toBe(false);
       expect(wrapper.vm.regexPatternErrorsToDisplay[0][0].field).toBe("regex_pattern");
       expect(wrapper.vm.regexPatternErrorsToDisplay[0][0].message).toContain("is required");
     });
 
     it("should return false for whitespace-only pattern", async () => {
-      const result = await wrapper.vm.validateRegexPatternInputs({ name: "test", pattern: "   " }, 1);
-      
+      const result = await wrapper.vm.validateRegexPatternInputs(
+        { name: "test", pattern: "   " },
+        1,
+      );
+
       expect(result).toBe(false);
       expect(wrapper.vm.regexPatternErrorsToDisplay[0][0].message).toContain("is required");
     });
 
     it("should return false for invalid description type", async () => {
-      const result = await wrapper.vm.validateRegexPatternInputs({ 
-        name: "test", 
-        pattern: ".*", 
-        description: 123 
-      }, 1);
-      
+      const result = await wrapper.vm.validateRegexPatternInputs(
+        {
+          name: "test",
+          pattern: ".*",
+          description: 123,
+        },
+        1,
+      );
+
       expect(result).toBe(false);
-      expect(wrapper.vm.regexPatternErrorsToDisplay[0][0]).toContain("description must be a string");
+      expect(wrapper.vm.regexPatternErrorsToDisplay[0][0]).toContain(
+        "description must be a string",
+      );
     });
 
     it("should return true for valid inputs with null description", async () => {
-      const result = await wrapper.vm.validateRegexPatternInputs({ 
-        name: "test-pattern", 
-        pattern: ".*", 
-        description: null 
-      }, 1);
-      
+      const result = await wrapper.vm.validateRegexPatternInputs(
+        {
+          name: "test-pattern",
+          pattern: ".*",
+          description: null,
+        },
+        1,
+      );
+
       expect(result).toBe(true);
       expect(wrapper.vm.regexPatternErrorsToDisplay).toEqual([]);
     });
 
     it("should return true for valid inputs with undefined description", async () => {
-      const result = await wrapper.vm.validateRegexPatternInputs({ 
-        name: "test-pattern", 
-        pattern: ".*", 
-        description: undefined 
-      }, 1);
-      
+      const result = await wrapper.vm.validateRegexPatternInputs(
+        {
+          name: "test-pattern",
+          pattern: ".*",
+          description: undefined,
+        },
+        1,
+      );
+
       expect(result).toBe(true);
     });
 
     it("should return true for valid inputs with string description", async () => {
-      const result = await wrapper.vm.validateRegexPatternInputs({ 
-        name: "test-pattern", 
-        pattern: ".*", 
-        description: "Test description" 
-      }, 1);
-      
+      const result = await wrapper.vm.validateRegexPatternInputs(
+        {
+          name: "test-pattern",
+          pattern: ".*",
+          description: "Test description",
+        },
+        1,
+      );
+
       expect(result).toBe(true);
     });
 
     it("should return true for valid inputs without description", async () => {
-      const result = await wrapper.vm.validateRegexPatternInputs({ 
-        name: "test-pattern", 
-        pattern: ".*" 
-      }, 1);
-      
+      const result = await wrapper.vm.validateRegexPatternInputs(
+        {
+          name: "test-pattern",
+          pattern: ".*",
+        },
+        1,
+      );
+
       expect(result).toBe(true);
     });
   });
@@ -333,58 +365,64 @@ describe("ImportRegexPattern", () => {
       const mockPayload = {
         name: "test-pattern",
         pattern: ".*",
-        description: "Test description"
+        description: "Test description",
       };
-      
+
       (regexPatternsService.create as any).mockResolvedValue({});
-      
+
       const result = await wrapper.vm.createRegexPattern(mockPayload, 1);
-      
+
       expect(result).toBe(true);
       expect(regexPatternsService.create).toHaveBeenCalledWith("default", mockPayload);
-      expect(wrapper.vm.regexPatternCreators).toEqual([{
-        success: true,
-        message: 'Regex pattern - 1: "test-pattern" created successfully \nNote: please remove the created regex pattern object test-pattern from the json file'
-      }]);
+      expect(wrapper.vm.regexPatternCreators).toEqual([
+        {
+          success: true,
+          message:
+            'Regex pattern - 1: "test-pattern" created successfully \nNote: please remove the created regex pattern object test-pattern from the json file',
+        },
+      ]);
     });
 
     it("should handle creation failure", async () => {
       const mockPayload = {
         name: "test-pattern",
         pattern: ".*",
-        description: "Test description"
+        description: "Test description",
       };
-      
+
       const mockError = {
         response: {
           data: {
-            message: "Pattern already exists"
-          }
-        }
+            message: "Pattern already exists",
+          },
+        },
       };
-      
+
       (regexPatternsService.create as any).mockRejectedValue(mockError);
-      
+
       const result = await wrapper.vm.createRegexPattern(mockPayload, 1);
-      
+
       expect(result).toBe(false);
-      expect(wrapper.vm.regexPatternCreators).toEqual([{
-        success: false,
-        message: 'Regex pattern - 1: "test-pattern" creation failed --> \n Reason: Pattern already exists'
-      }]);
+      expect(wrapper.vm.regexPatternCreators).toEqual([
+        {
+          success: false,
+          message:
+            'Regex pattern - 1: "test-pattern" creation failed --> \n Reason: Pattern already exists',
+        },
+      ]);
     });
 
     it("should handle creation failure with unknown error", async () => {
       const mockPayload = {
         name: "test-pattern",
         pattern: ".*",
-        description: null
+        description: null,
       };
-      
+
       (regexPatternsService.create as any).mockRejectedValue({});
-      
+
       const result = await wrapper.vm.createRegexPattern(mockPayload, 1);
-      
+
       expect(result).toBe(false);
       expect(wrapper.vm.regexPatternCreators[0].message).toContain("Unknown Error");
     });
@@ -400,33 +438,36 @@ describe("ImportRegexPattern", () => {
 
     it("should return false for invalid regex pattern inputs", async () => {
       const result = await wrapper.vm.processJsonObject({ name: "", pattern: ".*" }, 1);
-      
+
       expect(result).toBe(false);
     });
 
     it("should return false when validation errors exist", async () => {
       wrapper.vm.regexPatternErrorsToDisplay = [["Some error"]];
-      
+
       const result = await wrapper.vm.processJsonObject({ name: "test", pattern: ".*" }, 1);
-      
+
       expect(result).toBe(false);
     });
 
     it("should create regex pattern when validation passes", async () => {
       (regexPatternsService.create as any).mockResolvedValue({});
-      
-      const result = await wrapper.vm.processJsonObject({ 
-        name: "new-pattern", 
-        pattern: ".*" 
-      }, 1);
-      
+
+      const result = await wrapper.vm.processJsonObject(
+        {
+          name: "new-pattern",
+          pattern: ".*",
+        },
+        1,
+      );
+
       expect(result).toBe(true);
     });
 
     it("should handle errors during processing", async () => {
       // Test error handling with invalid input that will cause an error
       const result = await wrapper.vm.processJsonObject(null, 1);
-      
+
       expect(result).toBe(false);
     });
   });
@@ -442,49 +483,75 @@ describe("ImportRegexPattern", () => {
     it("should show error for empty JSON string", async () => {
       const payload = {
         jsonStr: "",
-        jsonArray: []
+        jsonArray: [],
       };
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      mockToastFn.mockClear();
 
       await wrapper.vm.importJson(payload);
+      await flushPromises();
 
-      expect(notifySpy).toHaveBeenCalledWith({
+      expect(mockToastFn).toHaveBeenCalledWith({
         message: "JSON string is empty",
-        color: "negative",
-        position: "bottom",
-        timeout: 2000,
+        variant: "error",
       });
+    });
+
+    it("should reset BaseImport isImporting flag when JSON string is empty", async () => {
+      wrapper.vm.activeTab = "import_json_file";
+      await nextTick();
+
+      const baseImportRef = wrapper.vm.$refs.baseImportRef;
+      if (baseImportRef) {
+        baseImportRef.isImportingLocal = true;
+      }
+
+      await wrapper.vm.importJson({ jsonStr: "", jsonArray: [] });
+
+      expect(baseImportRef.isImportingLocal).toBe(false);
     });
 
     it("should show error for invalid JSON", async () => {
       const payload = {
         jsonStr: "{ invalid json }",
-        jsonArray: []
+        jsonArray: [],
       };
 
-      const notifySpy = vi.spyOn(wrapper.vm.$q, "notify");
+      mockToastFn.mockClear();
 
       await wrapper.vm.importJson(payload);
+      await flushPromises();
 
-      expect(notifySpy).toHaveBeenCalledWith(
+      expect(mockToastFn).toHaveBeenCalledWith(
         expect.objectContaining({
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
-        })
+          variant: "error",
+        }),
       );
-      expect(notifySpy.mock.calls[0][0].message).toContain("JSON");
+      expect(mockToastFn.mock.calls[0][0].message).toContain("JSON");
+    });
+
+    it("should reset BaseImport isImporting flag when JSON is invalid", async () => {
+      wrapper.vm.activeTab = "import_json_file";
+      await nextTick();
+
+      const baseImportRef = wrapper.vm.$refs.baseImportRef;
+      if (baseImportRef) {
+        baseImportRef.isImportingLocal = true;
+      }
+
+      await wrapper.vm.importJson({ jsonStr: "{ invalid json }", jsonArray: [] });
+
+      expect(baseImportRef.isImportingLocal).toBe(false);
     });
 
     it("should not navigate when some imports fail", async () => {
       const jsonData = [
         { name: "", pattern: ".*1" }, // Invalid
-        { name: "pattern2", pattern: ".*2" } // Valid
+        { name: "pattern2", pattern: ".*2" }, // Valid
       ];
       const payload = {
         jsonStr: JSON.stringify(jsonData),
-        jsonArray: jsonData
+        jsonArray: jsonData,
       };
 
       (regexPatternsService.create as any).mockResolvedValue({});
@@ -521,7 +588,7 @@ describe("ImportRegexPattern", () => {
     it("should render file input when activeTab is import_json_file", async () => {
       wrapper.vm.activeTab = "import_json_file";
       await nextTick();
-      
+
       // Since components are stubbed, let's test the activeTab state instead
       expect(wrapper.vm.activeTab).toBe("import_json_file");
     });
@@ -529,7 +596,7 @@ describe("ImportRegexPattern", () => {
     it("should render URL input when activeTab is import_json_url", async () => {
       wrapper.vm.activeTab = "import_json_url";
       await nextTick();
-      
+
       // Since components are stubbed, let's test the activeTab state instead
       expect(wrapper.vm.activeTab).toBe("import_json_url");
     });
@@ -537,31 +604,30 @@ describe("ImportRegexPattern", () => {
 
   // Event Handler Tests
   describe("Event Handlers", () => {
-
     it("should call importJson when import button is clicked", async () => {
       const spy = vi.spyOn(wrapper.vm, "importJson");
-      
+
       // Call the function directly since the button is stubbed
       wrapper.vm.importJson();
-      
+
       expect(spy).toHaveBeenCalled();
     });
 
     it("should update queryEditorPlaceholderFlag on editor focus", () => {
       wrapper.vm.queryEditorPlaceholderFlag = true;
-      
+
       // Simulate editor focus
       wrapper.vm.queryEditorPlaceholderFlag = false;
-      
+
       expect(wrapper.vm.queryEditorPlaceholderFlag).toBe(false);
     });
 
     it("should update queryEditorPlaceholderFlag on editor blur", () => {
       wrapper.vm.queryEditorPlaceholderFlag = false;
-      
+
       // Simulate editor blur
       wrapper.vm.queryEditorPlaceholderFlag = true;
-      
+
       expect(wrapper.vm.queryEditorPlaceholderFlag).toBe(true);
     });
   });
@@ -571,14 +637,14 @@ describe("ImportRegexPattern", () => {
     it("should handle null jsonFiles", async () => {
       wrapper.vm.jsonFiles = null;
       await nextTick();
-      
+
       expect(wrapper.vm.jsonFiles).toBe(null);
     });
 
     it("should handle empty URL string", async () => {
       wrapper.vm.url = "";
       await nextTick();
-      
+
       expect(axios.get).not.toHaveBeenCalled();
     });
 
@@ -589,7 +655,7 @@ describe("ImportRegexPattern", () => {
 
       const largeArray = Array.from({ length: 100 }, (_, i) => ({
         name: `pattern-${i}`,
-        pattern: `.*${i}`
+        pattern: `.*${i}`,
       }));
 
       if (wrapper.vm.$refs.baseImportRef) {
@@ -610,8 +676,8 @@ describe("ImportRegexPattern", () => {
         pattern: ".*",
         metadata: {
           created: "2023-01-01",
-          tags: ["tag1", "tag2"]
-        }
+          tags: ["tag1", "tag2"],
+        },
       };
 
       if (wrapper.vm.$refs.baseImportRef) {

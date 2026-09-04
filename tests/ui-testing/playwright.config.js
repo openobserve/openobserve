@@ -19,6 +19,7 @@ if (!process.env.ZO_BASE_URL || !process.env.ZO_ROOT_USER_EMAIL || !process.env.
  */
 module.exports = defineConfig({
   testDir: './playwright-tests',
+  globalTimeout: process.env.CI ? 40 * 60 * 1000 : undefined,
   /* Output directory for test artifacts */
   outputDir: './test-results',
   /* Exclude archived tests from all test runs */
@@ -38,10 +39,13 @@ module.exports = defineConfig({
   reporter: process.env.CI
     ? [
         ['blob', { outputDir: 'blob-report' }], // Use blob reporter in CI - JSON created during merge
+        // Prints a LOUD banner to stdout whenever a test is retried (blob writes nothing to
+        // the log, so retries are otherwise invisible in the CI output). Log-only, never fails.
+        ['./playwright-tests/utils/retry-banner-reporter.js'],
       ]
     : [
         ['html', { outputFolder: 'playwright-results/html-report', open: 'never' }], // HTML reporter
-        ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for TestDino
+        ['json', { outputFile: 'playwright-results/report.json' }] // JSON reporter for downstream report consumers
       ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
@@ -77,8 +81,10 @@ module.exports = defineConfig({
       use: {
         ...devices['Desktop Chrome'],
         viewport: { width: 1500, height: 1024 },
-        // Grant clipboard permissions for share link tests
         permissions: ['clipboard-read', 'clipboard-write'],
+        launchOptions: {
+          args: process.env.CI ? ['--no-sandbox', '--disable-setuid-sandbox'] : [],
+        },
       },
     },
     //   {

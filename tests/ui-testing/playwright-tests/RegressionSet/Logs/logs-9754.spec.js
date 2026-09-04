@@ -1,0 +1,463 @@
+/**
+ * Logs Highlighting Regression Bug Tests
+ *
+ * Bug fixes for logs highlighting functionality:
+ * - #9754: Logs highlighting character loss with unclosed brackets/quotes
+ *          Characters were being dropped when log messages contained unclosed
+ *          brackets (like ANSI escape sequences) or unclosed quotes.
+ *          Example: "QueryEditor.spec.ts[2m" would lose the 's' from '.ts'
+ */
+
+const { test, expect, navigateToBase } = require('../../utils/enhanced-baseFixtures.js');
+const testLogger = require('../../utils/test-logger.js');
+const PageManager = require('../../../pages/page-manager.js');
+const { getHeaders, getIngestionUrl, sendRequest, waitForStreamData } = require('../../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../../utils/cloud-auth.js');
+
+// Test data containing edge cases for bug #9754
+// PR fixes issue when user has [ , { , < , ' , ( as single char without closing character
+const BUG_9754_TEST_LOGS = [
+  // ===== UNCLOSED SQUARE BRACKET [ =====
+  {
+    // ANSI escape sequence with file path - the 's' from '.ts' should NOT be lost
+    message: "src/plugins/logs/QueryEditor.spec.ts[2m",
+    level: "info",
+    test_case: "ansi_unclosed_bracket",
+    expected_text: "QueryEditor.spec.ts"
+  },
+  {
+    // Full ANSI log line with multiple unclosed brackets
+    message: "[90mstderr[2m | src/views/About.spec.ts[2m > [22m[2mshould mount",
+    level: "info",
+    test_case: "ansi_complex",
+    expected_text: "About.spec.ts"
+  },
+  {
+    // Bracket at end of string without closing
+    message: "content ends[",
+    level: "debug",
+    test_case: "bracket_at_end",
+    expected_text: "ends"
+  },
+  {
+    // Text immediately before unclosed bracket
+    message: "test[incomplete",
+    level: "debug",
+    test_case: "text_before_bracket",
+    expected_text: "incomplete"
+  },
+  {
+    // Multiple unclosed brackets
+    message: "test[first[second",
+    level: "debug",
+    test_case: "multiple_unclosed_brackets",
+    expected_text: "second"
+  },
+
+  // ===== UNCLOSED CURLY BRACE { =====
+  {
+    // Unclosed curly brace - last char before { should be preserved
+    message: "JSON parse error at position{",
+    level: "error",
+    test_case: "unclosed_curly_brace",
+    expected_text: "position"
+  },
+  {
+    // Object notation with unclosed brace
+    message: "Config loaded: {host: localhost, port{",
+    level: "info",
+    test_case: "unclosed_curly_nested",
+    expected_text: "port"
+  },
+
+  // ===== UNCLOSED ANGLE BRACKET < =====
+  {
+    // HTML/XML tag with unclosed angle bracket - 'v' should NOT be lost
+    message: "Invalid XML: <div<",
+    level: "error",
+    test_case: "unclosed_angle_bracket",
+    expected_text: "div"
+  },
+  {
+    // Generic type notation
+    message: "Type error: List<String<",
+    level: "error",
+    test_case: "unclosed_angle_generic",
+    expected_text: "String"
+  },
+
+  // ===== UNCLOSED SINGLE QUOTE ' =====
+  {
+    // Unclosed single quote at end
+    message: "hello world 'unclosed",
+    level: "warn",
+    test_case: "unclosed_single_quote",
+    expected_text: "unclosed"
+  },
+  {
+    // SQL query with unclosed quote
+    message: "SELECT * FROM users WHERE name = 'John",
+    level: "debug",
+    test_case: "unclosed_single_quote_sql",
+    expected_text: "John"
+  },
+
+  // ===== UNCLOSED DOUBLE QUOTE " =====
+  {
+    // Unclosed double quote at end
+    message: 'hello world "unclosed',
+    level: "warn",
+    test_case: "unclosed_double_quote",
+    expected_text: "unclosed"
+  },
+
+  // ===== UNCLOSED PARENTHESIS ( =====
+  {
+    // Function call with unclosed parenthesis - 'e' from 'parse' should NOT be lost
+    message: "Error in function parse(",
+    level: "error",
+    test_case: "unclosed_parenthesis",
+    expected_text: "parse"
+  },
+  {
+    // Math expression with unclosed paren
+    message: "Calculate: (x + y(",
+    level: "debug",
+    test_case: "unclosed_parenthesis_nested",
+    expected_text: "y"
+  },
+
+  // ===== REAL-WORLD COMBINED SCENARIOS =====
+  {
+    // Real-world vitest output with ANSI codes
+    message: "[36mINFO[0m [2024-01-15 10:30:45] src/composables/useTextHighlighter.spec.ts[2m",
+    level: "info",
+    test_case: "vitest_output",
+    expected_text: "useTextHighlighter.spec.ts"
+  },
+  {
+    // Mixed unclosed characters
+    message: "Debug: parsing config{name: 'test<value(",
+    level: "debug",
+    test_case: "mixed_unclosed_chars",
+    expected_text: "value"
+  }
+];
+
+// Per-run unique suffix: the fixed name collided with concurrent shared-org runs, so ingestion
+// hit "stream [e2e_highlighting_test] is being deleted" (another run's cleanup mid-flight). Keep
+// the e2e_ prefix so prefix-based cleanup still catches it.
+const STREAM_NAME = 'e2e_highlighting_test_' + Math.random().toString(36).slice(2, 7);
+
+// Runs in serial mode because the tests share the e2e_highlighting_test stream (the @setup
+// test ingests data the later tests query). Serial mode means a failed test retries the
+// ENTIRE block (afterAll -> beforeEach -> setup), so afterAll blocks on stream deletion to
+// guarantee each retry starts from a clean slate — otherwise setup re-ingests into a
+// still-deleting stream and gets 400 "stream is being deleted".
+test.describe("Logs Highlighting Regression Bug Fixes", () => {
+  test.describe.configure({ mode: 'serial' }); // Serial because tests depend on ingested data
+  let pm;
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    testLogger.testStart(testInfo.title, testInfo.file);
+    await navigateToBase(page);
+    pm = new PageManager(page);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    testLogger.info('Logs highlighting regression test setup completed');
+  });
+
+  // ==========================================================================
+  // Bug #9754: Logs highlighting character loss with unclosed brackets/quotes
+  // https://github.com/openobserve/openobserve/issues/9754
+  // ==========================================================================
+
+  test("should ingest test data with unclosed brackets/quotes @bug-9754 @setup", async ({ page }) => {
+    testLogger.info('Test: Ingest test data for Bug #9754');
+
+    const orgId = getOrgIdentifier();
+    const headers = getHeaders();
+    const url = getIngestionUrl(orgId, STREAM_NAME);
+
+    // Ingest the test logs.
+    // This block runs in serial mode, so any test failure triggers a full retry of the
+    // block — but the afterAll cleanup (deleteStream) from the prior attempt can still be
+    // settling server-side, making re-ingestion return 400 "stream [...] is being deleted".
+    // That cascades into every downstream test ("stream not found"/selectStream failures),
+    // so retry ingestion until the deletion settles and the stream accepts data again.
+    let response;
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      response = await sendRequest(page, url, BUG_9754_TEST_LOGS, headers);
+      const beingDeleted = JSON.stringify(response || {}).includes('is being deleted');
+      if (!beingDeleted) break;
+      testLogger.warn(`Stream "${STREAM_NAME}" still being deleted (attempt ${attempt}/5); waiting before retrying ingestion`);
+      await page.waitForTimeout(3000);
+    }
+
+    testLogger.info('Ingestion response:', response);
+
+    // Fail fast (with the actual payload) if ingestion never succeeded — sendRequest
+    // returns parsed JSON ({ code: 200, status: [...] } on success, { code: 400, ... }
+    // or { error: ... } otherwise), so don't let a non-deletion failure (auth, network,
+    // persistent deletion) slip through and surface later as a confusing "stream not found".
+    if (response?.code !== 200) {
+      throw new Error(`Ingestion into "${STREAM_NAME}" did not succeed: ${JSON.stringify(response)}`);
+    }
+
+    // Wait for data to be indexed (cloud indexing can take longer)
+    testLogger.info(`Waiting for stream "${STREAM_NAME}" to be indexed...`);
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    const streamAvailable = await pm.logsPage.waitForStreamAvailable(STREAM_NAME, 90000, 3000);
+    testLogger.info(`Stream "${STREAM_NAME}" available: ${streamAvailable}`);
+
+    // waitForStreamAvailable only confirms the stream exists in the list — it does not
+    // guarantee the ingested rows are searchable yet. Under CI load that gap left the
+    // later queries hitting an empty table (expectLogsTableVisible / selectStream flakes).
+    // Poll the search API until the rows are actually queryable before the tests run.
+    const dataReady = await waitForStreamData(page, STREAM_NAME, BUG_9754_TEST_LOGS.length, 60000);
+    testLogger.info(`Stream "${STREAM_NAME}" searchable data ready: ${dataReady}`);
+
+    testLogger.info('Test data ingested successfully');
+  });
+
+  test("should preserve characters with unclosed brackets in log display @bug-9754 @P0 @highlighting @regression", async ({ page }) => {
+    testLogger.info('Test: Verify unclosed brackets do not cause character loss (Bug #9754)');
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Select the test stream
+    await pm.logsPage.selectStream(STREAM_NAME);
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // STRONG ASSERTION: Table must be visible
+    await pm.logsPage.expectLogsTableVisible();
+
+    // Get the table content
+    const tableContent = await pm.logsPage.getLogsTableContent();
+
+    // CRITICAL ASSERTIONS for Bug #9754:
+    // The 's' from '.ts' must NOT be lost when there's an unclosed bracket
+
+    // Test case 1: ANSI escape sequence with file path
+    expect(tableContent).toContain('QueryEditor.spec.ts');
+    testLogger.info('Assertion passed: QueryEditor.spec.ts preserved');
+
+    // Test case 2: Complex ANSI log line
+    expect(tableContent).toContain('About.spec.ts');
+    testLogger.info('Assertion passed: About.spec.ts preserved');
+
+    // Test case 3: Unclosed quotes should preserve content
+    expect(tableContent).toContain('unclosed');
+    testLogger.info('Assertion passed: unclosed text preserved');
+
+    testLogger.info('PASSED: Characters preserved with unclosed brackets');
+  });
+
+  test("should preserve characters when highlighting search terms with unclosed brackets @bug-9754 @P0 @highlighting @regression", async ({ page }) => {
+    testLogger.info('Test: Verify highlighting with unclosed brackets preserves all characters (Bug #9754)');
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Select the test stream
+    await pm.logsPage.selectStream(STREAM_NAME);
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
+
+    // Add a search query that triggers highlighting
+    // Using match_all to highlight the word "spec"
+    await pm.logsPage.typeQuery("match_all('spec')");
+
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // STRONG ASSERTION: Table must be visible with results
+    await pm.logsPage.expectLogsTableVisible();
+
+    // Get the table content to verify characters are preserved
+    const tableContent = await pm.logsPage.getLogsTableContent();
+
+    // CRITICAL ASSERTIONS: File extensions must be complete
+    // The bug was that the last character before '[' was being dropped
+    expect(tableContent).toContain('.ts');
+    testLogger.info('Assertion passed: .ts extension preserved during highlighting');
+
+    // Check if highlighting is applied (informational - not a strict requirement)
+    await pm.logsPage.getHighlightedElementsCount();
+
+    // Verify the complete file names are present (the core bug fix assertion)
+    expect(tableContent).toContain('QueryEditor.spec.ts');
+    expect(tableContent).toContain('About.spec.ts');
+    testLogger.info('Assertion passed: Complete file paths preserved with highlighting query');
+
+    testLogger.info('PASSED: Highlighting preserves all characters');
+  });
+
+  test("should display complete text in log detail sidebar with unclosed brackets @bug-9754 @P1 @highlighting @regression", async ({ page }) => {
+    testLogger.info('Test: Verify log detail sidebar shows complete text (Bug #9754)');
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Select the test stream
+    await pm.logsPage.selectStream(STREAM_NAME);
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // STRONG ASSERTION: Table must be visible
+    await pm.logsPage.expectLogsTableVisible();
+
+    // Open the log detail sidebar using the proper page method
+    await pm.logsPage.openLogDetailSidebar();
+    await pm.logsPage.expectLogDetailSidebarVisible();
+
+    // Get the detail content from JSON view (default tab)
+    const detailContent = await pm.logsPage.getLogDetailJsonContentText();
+
+    // Verify content was retrieved
+    expect(detailContent).not.toBeNull();
+    expect(detailContent).toBeDefined();
+
+    // CRITICAL ASSERTIONS: Full content must be preserved in detail view
+    // At least one of our test cases should be visible
+    const hasCompleteContent =
+      detailContent?.includes('.ts') ||
+      detailContent?.includes('unclosed') ||
+      detailContent?.includes('spec');
+
+    expect(hasCompleteContent).toBe(true);
+    testLogger.info('Assertion passed: Log detail shows complete content');
+
+    // Close the sidebar
+    await pm.logsPage.closeLogDetailSidebar();
+
+    testLogger.info('PASSED: Log detail sidebar shows complete text');
+  });
+
+  test("should preserve file path characters when containing ANSI escape codes @bug-9754 @P0 @highlighting @regression", async ({ page }) => {
+    testLogger.info('Test: Verify file paths with ANSI codes preserve all characters (Bug #9754)');
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Select the test stream and search for file path content
+    await pm.logsPage.selectStream(STREAM_NAME);
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
+
+    // Search for .ts files to find our test data
+    await pm.logsPage.typeQuery("match_all('.ts')");
+
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // Get table content
+    const tableContent = await pm.logsPage.getLogsTableContent();
+
+    // CRITICAL ASSERTIONS for Bug #9754:
+    // These specific file names must be complete (not missing the 's' before '[')
+    const filePathTests = [
+      { expected: 'QueryEditor.spec.ts', description: 'QueryEditor file path' },
+      { expected: 'About.spec.ts', description: 'About file path' },
+      { expected: 'useTextHighlighter.spec.ts', description: 'useTextHighlighter file path' }
+    ];
+
+    let passedCount = 0;
+    for (const testCase of filePathTests) {
+      if (tableContent.includes(testCase.expected)) {
+        testLogger.info(`Assertion passed: ${testCase.description} (${testCase.expected})`);
+        passedCount++;
+      }
+    }
+
+    // At least one file path should be found and complete
+    expect(passedCount).toBeGreaterThan(0);
+    testLogger.info(`PASSED: ${passedCount}/${filePathTests.length} file paths verified complete`);
+  });
+
+  test("should handle multiple unclosed brackets without character loss @bug-9754 @P1 @highlighting @regression", async ({ page }) => {
+    testLogger.info('Test: Verify multiple unclosed brackets do not compound character loss (Bug #9754)');
+
+    // Navigate to logs page
+    await pm.logsPage.clickMenuLinkLogsItem();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+
+    // Select the test stream
+    await pm.logsPage.selectStream(STREAM_NAME);
+    await pm.logsPage.clickDateTimeButton();
+    await pm.logsPage.clickRelative15MinButton();
+
+    // Search for the test case with multiple unclosed brackets
+    await pm.logsPage.typeQuery("match_all('second')");
+
+    await pm.logsPage.clickRefreshButton();
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    await page.waitForTimeout(2000);
+
+    // Get table content
+    const tableContent = await pm.logsPage.getLogsTableContent();
+
+    // CRITICAL ASSERTION: The word "second" must be complete
+    // In the bug, characters before each '[' were being dropped
+    expect(tableContent).toContain('second');
+    expect(tableContent).toContain('first');
+    expect(tableContent).toContain('test');
+
+    testLogger.info('PASSED: Multiple unclosed brackets handled correctly');
+  });
+
+  test.afterEach(async () => {
+    testLogger.info('Logs highlighting regression test completed');
+  });
+
+  // Cleanup: Delete the test stream after all tests complete
+  test.afterAll(async ({ browser }) => {
+    testLogger.info('Cleaning up test stream (afterAll)');
+
+    const context = await browser.newContext();
+    const page = await context.newPage();
+    const cleanupPm = new PageManager(page);
+
+    try {
+      // Delete the test stream via API
+      const result = await cleanupPm.apiCleanup.deleteStream(STREAM_NAME);
+      testLogger.info('Stream cleanup result:', result);
+
+      // Block until the deletion has fully settled server-side. This describe runs in
+      // serial mode, so a failing test retries the WHOLE block (afterAll -> beforeEach ->
+      // setup). Without this wait, the retry's setup re-ingests while this deletion is
+      // still in-flight and gets 400 "stream [...] is being deleted", which cascades into
+      // every downstream test and makes the built-in retry useless. Waiting here lets the
+      // next attempt start from a clean slate so re-ingestion recreates the stream cleanly.
+      // Deliberately do NOT throw when the wait times out: this is an afterAll cleanup
+      // hook, so throwing would fail the whole describe even when every test passed. A
+      // slow-but-eventual deletion must not turn a green run red. If it hasn't settled,
+      // warn (so it's visible) and rely on the setup's own ingest retry loop as backstop.
+      const deleted = await cleanupPm.apiCleanup.waitForStreamDeletion(STREAM_NAME, 120000, 3000);
+      if (deleted) {
+        testLogger.info(`Test stream ${STREAM_NAME} cleanup completed (deletion settled)`);
+      } else {
+        testLogger.warn(`Test stream ${STREAM_NAME} deletion did not settle within 120s; setup's ingest retry will backstop the next attempt`);
+      }
+    } catch (error) {
+      testLogger.warn(`Failed to cleanup test stream: ${error.message}`);
+    } finally {
+      await page.close();
+      await context.close();
+    }
+  });
+});

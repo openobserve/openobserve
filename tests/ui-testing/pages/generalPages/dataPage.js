@@ -1,16 +1,16 @@
 // dataPage.js
 import { expect } from '@playwright/test';
+import { openNavFlyoutChild } from '../commonActions.js';
 
 
 export class DataPage {
     constructor(page) {
         this.page = page;
-        this.dataPageMenu = page.locator('[data-test="menu-link-\\/ingestion-item"]');
 
     }
 
     async gotoDataPage() {
-        await this.dataPageMenu.click();
+        await openNavFlyoutChild(this.page, 'ingestion');
         await expect(this.page.getByRole('main')).toContainText('Data sources');
     }
 
@@ -35,6 +35,40 @@ export class DataPage {
 
     async dataURLValidation() {
         await expect(this.page).toHaveURL(/ingestion/);
+    }
+
+    // ==========================================================================
+    // AI Integrations selectors
+    // ==========================================================================
+    get aiIntegrationFirstItem() {
+        return this.page.locator('[data-test^="ai-integrations-item-"]').first();
+    }
+
+    get aiIntegrationDetailPane() {
+        return this.page.locator('[data-test="ai-integrations-detail-pane"]');
+    }
+
+    get aiIntegrationPlaceholder() {
+        return this.page.getByText('Select an integration to view details.');
+    }
+
+    async navigateToAIIntegrations(baseUrl, orgName) {
+        const aiUrl = `${baseUrl || 'http://localhost:5080'}/web/ingestion/ai-integrations?org_identifier=${orgName || 'default'}`;
+        await this.page.goto(aiUrl, { timeout: 15000 });
+        await this.page.waitForLoadState('networkidle', { timeout: 10000 });
+    }
+
+    async clickFirstAIIntegration() {
+        await expect(this.aiIntegrationFirstItem, 'At least one AI integration should be visible').toBeVisible({ timeout: 5000 });
+        await this.aiIntegrationFirstItem.click();
+        await this.page.waitForTimeout(1500);
+    }
+
+    async verifyAIDetailRendered() {
+        await expect(this.aiIntegrationPlaceholder, 'Bug #11682: placeholder should not show after clicking an integration').not.toBeVisible({ timeout: 5000 });
+        const content = (await this.aiIntegrationDetailPane.textContent())?.trim() || '';
+        expect(content.length, 'Bug #11682: AI Integration detail should show content').toBeGreaterThan(0);
+        return content;
     }
 
 }

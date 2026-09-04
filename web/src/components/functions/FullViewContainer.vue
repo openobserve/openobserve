@@ -1,32 +1,23 @@
 <template>
-  <div
-    class="tw:py-[2px]"
-    :class="store.state.theme === 'dark' ? 'tw:bg-gray-500' : 'tw:bg-gray-200 '"
-  >
-    <div class="tw:flex tw:justify-between">
-      <div class="tw:flex tw:items-center">
-        <q-icon
+  <div class="bg-section-header-bg py-0.5">
+    <div
+      class="flex justify-between"
+      :class="{ 'items-center': minHeaderHeight }"
+      :style="minHeaderHeight ? { minHeight: minHeaderHeight } : undefined"
+    >
+      <div class="flex items-center">
+        <OIcon
           v-if="showExpandIcon"
-          name="keyboard_arrow_up"
+          name="keyboard-arrow-up"
           @click.stop="expanded = !expanded"
-          class="tw:mr-1 tw:cursor-pointer tw:transition-all"
-          :class="[
-            store.state.theme === 'dark'
-              ? 'tw:text-gray-100'
-              : 'tw:text-gray-500',
-            expanded ? 'tw:transform tw:rotate-180' : '',
-          ]"
-          size="20px"
+          class="text-text-secondary me-1 cursor-pointer transition-all"
+          :class="expanded ? 'rotate-180 transform' : ''"
+          size="md"
         />
         <div
-          @click="showExpandIcon ? expanded = !expanded : null"
-          class="tw:text-[14px] tw:font-bold"
-          :class="[
-            store.state.theme === 'dark'
-              ? 'tw:text-gray-100'
-              : 'tw:text-gray-500',
-            labelClass,
-          ]"
+          @click="showExpandIcon ? (expanded = !expanded) : null"
+          class="text-text-secondary text-sm font-bold"
+          :class="labelClass"
         >
           {{ label }}
         </div>
@@ -40,8 +31,9 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed } from "vue";
-import { useStore } from "vuex";
+import { type I18nText } from "@/types/i18n";
+import { computed, type PropType } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
   name: {
@@ -49,7 +41,7 @@ const props = defineProps({
     required: true,
   },
   label: {
-    type: String,
+    type: String as unknown as PropType<I18nText>,
     required: true,
   },
   isExpandable: {
@@ -69,16 +61,20 @@ const props = defineProps({
     default: true,
     required: false,
   },
+  // Optional fixed header-row height (e.g. "2.125rem"). When set, the title row is
+  // given this min-height and its content is vertically centered — used to keep
+  // a header bar visually aligned with sibling headers that contain taller
+  // controls (e.g. a "Run query" button). Empty = natural content height.
+  minHeaderHeight: {
+    type: String,
+    default: "",
+  },
 });
 
 const emits = defineEmits(["update:isExpanded"]);
-
-const store = useStore();
 
 const expanded = computed({
   get: () => props.isExpanded,
   set: (value) => emits("update:isExpanded", value),
 });
 </script>
-
-<style scoped lang="scss"></style>

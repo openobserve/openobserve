@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,229 +15,250 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="height: calc(100vh - 88px); min-height: inherit" >
+  <div class="flex h-full flex-col p-0">
+    <OPageLayout
+      bleed
+      v-if="!showDestinationEditor && !showImportDestination"
+      :title="t('alerts.header')"
+      title-data-test="alert-destinations-list-title"
+      icon="shield-alert-outline"
+      :subtitle="t('alerts.subtitle')"
+      tabs-below
+    >
+      <template #header-tabs>
+        <AlertSectionTabs />
+      </template>
 
-    <div v-if="!showDestinationEditor && !showImportDestination" >
-      <div class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
-      >
-        <div class="q-table__title tw:font-[600]" data-test="alert-destinations-list-title">
-            {{ t("alert_destinations.header") }}
-          </div>
-          <div class="tw:flex tw:justify-end">
-            <q-input
-              v-model="filterQuery"
-              borderless
-              dense
-              data-test="destination-list-search-input"
-              class="q-ml-auto no-border o2-search-input"
-              :placeholder="t('alert_destinations.search')"
-            >
-              <template #prepend>
-                <q-icon class="o2-search-input-icon" name="search" />
-              </template>
-            </q-input>
-          <q-btn
-            class="o2-secondary-button q-ml-sm tw:h-[36px]"
-            no-caps
-            flat
-            :label="t(`dashboard.import`)"
-            @click="importDestination"
-            data-test="destination-import"
-          />
-          <q-btn
-            data-test="alert-destination-list-add-alert-btn"
-            class="o2-primary-button q-ml-sm tw:h-[36px]"
-            no-caps
-            flat
-            :disable="!templates.length"
-            :label="t(`alert_destinations.add`)"
-            @click="editDestination(null)"
-          />
-          </div>
-      </div>
-      <q-table
-        data-test="alert-destinations-list-table"
-        ref="qTable"
-        :rows="visibleRows"
-        :columns="columns"
-        row-key="name"
-        :pagination="pagination"
-        selection="multiple"
-        v-model:selected="selectedDestinations"
-        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky"
-        :style="hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
-            : 'width: 100%'"
-      >
-        <template #no-data>
-          <div
-            v-if="!templates.length"
-            class="full-width flex column justify-center items-center text-center"
-          >
-            <div style="width: 600px" class="q-mt-xl">
-              <template v-if="!templates.length">
-                <div class="text-subtitle1">
-                  It looks like you haven't created any Templates yet. To create
-                  an Alert, you'll need to have at least one Destination and one
-                  Template in place
-                </div>
-                <q-btn
-                  class="q-mt-md"
-                  label="Create Template"
-                  size="md"
-                  color="primary"
-                  no-caps
-                  style="border-radius: 4px"
-                  @click="routeTo('alertTemplates')"
-                />
-              </template>
+      <template #actions>
+        <OButton
+          variant="outline"
+          size="sm"
+          @click="importDestination"
+          data-test="destination-import"
+          >{{ t(`dashboard.import`) }}</OButton
+        >
+        <OButton
+          data-test="alert-destination-list-add-alert-btn"
+          variant="primary"
+          size="sm"
+          icon-left="add"
+          :disabled="!templates.length"
+          @click="editDestination(null)"
+          >{{ t(`alert_destinations.add`) }}</OButton
+        >
+      </template>
+      <div class="bg-card-glass-bg min-h-0 flex-1">
+        <OTable
+          data-test="alert-destinations-list-table"
+          :data="visibleRows"
+          :columns="columns"
+          row-key="name"
+          :loading="loading"
+          :selected-ids="selectedDestinationIds"
+          selection="multiple"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[5, 10, 20, 50, 100]"
+          :footer-title="t('alert_destinations.header')"
+          sorting="client"
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="settings-alert-destinations"
+          show-index
+          :show-global-filter="false"
+          @update:selected-ids="handleSelectedIdsUpdate"
+        >
+          <template #toolbar>
+            <div class="flex w-full items-center gap-2">
+              <OToggleGroup
+                :model-value="activeTab"
+                @update:model-value="
+                  (v) => {
+                    activeTab = v as 'all' | 'prebuilt' | 'custom';
+                  }
+                "
+                data-test="destination-list-tabs"
+              >
+                <OToggleGroupItem value="all" size="sm" data-test="destination-tab-all">
+                  <template #icon-left><OIcon name="format-list-bulleted" size="sm" /></template>
+                  {{ t("alert_destinations.filterAll") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="prebuilt" size="sm" data-test="destination-tab-prebuilt">
+                  <template #icon-left><OIcon name="auto-awesome" size="sm" /></template>
+                  {{ t("alert_destinations.filterPrebuilt") }}
+                </OToggleGroupItem>
+                <OToggleGroupItem value="custom" size="sm" data-test="destination-tab-custom">
+                  <template #icon-left><OIcon name="settings" size="sm" /></template>
+                  {{ t("alert_destinations.filterCustom") }}
+                </OToggleGroupItem>
+              </OToggleGroup>
+              <OSearchInput
+                v-model="filterQuery"
+                data-test="destination-list-search-input"
+                class="flex-1"
+                :placeholder="t('alert_destinations.search')"
+              />
             </div>
-          </div>
-          <template v-else>
-            <NoData />
           </template>
-        </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:items-center tw:gap-1 tw:justify-center">
-              <q-btn
-                data-test="destination-export"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                title="Export Destination"
-                icon="download"
-                @click.stop="exportDestination(props.row)"
-              >
-              </q-btn>
-              <q-btn
-                :data-test="`alert-destination-list-${props.row.name}-update-destination`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                icon="edit"
-                :title="t('alert_destinations.edit')"
-                @click="editDestination(props.row)"
-              >
-              </q-btn>
-              <q-btn
-                :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                :icon="outlinedDelete"
-                :title="t('alert_destinations.delete')"
-                @click="conformDeleteDestination(props.row)"
-              >
-              </q-btn>
-            </div>
-          </q-td>
-        </template>
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="alert-destinations-list-refresh-btn"
+              @click="getDestinations"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="alertDestinationsRefresh"
+              />
+            </OButton>
+          </template>
 
-        <template v-slot:body-cell-type="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:items-center tw:gap-2">
-              <!-- Prebuilt Destination Badge -->
-              <template v-if="getPrebuiltTypeName(props.row)">
-                <q-badge
-                  :data-test="`destination-type-badge-${getPrebuiltTypeName(props.row)?.toLowerCase()}`"
-                  :color="'primary'"
-                  class="tw:text-xs"
-                  :label="getPrebuiltTypeName(props.row)"
-                />
-                <q-icon
-                  name="auto_awesome"
-                  size="16px"
-                  color="primary"
-                  :title="'Prebuilt ' + getPrebuiltTypeName(props.row) + ' destination'"
-                />
-              </template>
-              <!-- Custom Destination -->
-              <template v-else>
-                <q-badge
-                  data-test="destination-type-badge-custom"
-                  color="grey-6"
-                  class="tw:text-xs"
-                  :label="getCustomDestinationLabel(props.row)"
-                />
-                <q-icon
-                  name="settings"
-                  size="16px"
-                  color="grey-6"
-                  :title="getCustomDestinationLabel(props.row)"
-                />
-              </template>
-            </div>
-          </q-td>
-        </template>
-
-        <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
-        </template>
-
-        <template #bottom="scope">
-          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[200px] tw:mr-sm">
-                  {{ resultTotal }} {{ t('alert_destinations.header') }}
-                </div>
-            <q-btn
+          <template #bottom="{ totalRows }">
+            <span class="text-xs font-normal">
+              {{ totalRows.toLocaleString() }} {{ t("alert_destinations.header") }}
+            </span>
+            <OButton
               v-if="selectedDestinations.length > 0"
               data-test="destination-list-delete-destinations-btn"
-              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
-              "
-              no-caps
-              dense
+              variant="outline-destructive"
+              size="sm"
+              :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
-              <q-icon name="delete" size="16px" />
-              <span class="tw:ml-2">Delete</span>
-            </q-btn>
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-          </div>
-        </template>
-        <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-              <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
-                  v-model="props.selected"
-                  size="sm"
-                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                  class="o2-table-checkbox"
-                />
-              </q-th>
-
-              <!-- Render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
+              <template #icon-left>
+                <OIcon name="delete" size="sm" />
+              </template>
+              {{ t("common.delete") }}
+            </OButton>
           </template>
-      </q-table>
-    </div>
-    <div v-else-if="showDestinationEditor && !showImportDestination">
+
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-alert-destinations"
+              :filtered="!!filterQuery"
+              :actions="[
+                {
+                  id: 'create',
+                  icon: 'add',
+                  titleKey: 'emptyState.noAlertDestinations.action',
+                  descriptionKey: 'emptyState.noAlertDestinations.actionDesc',
+                },
+                {
+                  id: 'import',
+                  icon: 'upload-file',
+                  titleKey: 'emptyState.noAlertDestinations.import',
+                  descriptionKey: 'emptyState.noAlertDestinations.importDesc',
+                },
+              ]"
+              @action="
+                (id) =>
+                  id === 'clear-filters'
+                    ? (filterQuery = '')
+                    : id === 'import'
+                      ? importDestination()
+                      : templates.length && editDestination(null)
+              "
+            />
+          </template>
+
+          <template #cell-template="{ row }">
+            <div
+              v-if="row.template"
+              class="flex min-w-0 items-center gap-2"
+              :data-test="`destination-template-${row.name}`"
+            >
+              <span class="min-w-0 truncate" :title="row.template">{{ row.template }}</span>
+              <OTag
+                v-if="isDefaultPrebuiltTemplate(row)"
+                :data-test="`destination-template-default-badge-${row.name}`"
+                type="templateDefaultFlag"
+                value="default"
+                class="flex-shrink-0"
+              />
+            </div>
+            <span v-else class="text-text-secondary">—</span>
+          </template>
+
+          <template #cell-type="{ row }">
+            <div class="flex items-center gap-2">
+              <template v-if="getPrebuiltTypeName(row)">
+                <OTag
+                  :data-test="`destination-type-badge-${getPrebuiltTypeName(row)?.toLowerCase()}`"
+                  type="destinationKind"
+                  value="prebuilt"
+                  >{{ getPrebuiltTypeName(row) }}</OTag
+                >
+                <OIcon
+                  name="auto-awesome"
+                  size="sm"
+                  :title="t('alerts.prebuiltDestination', { type: getPrebuiltTypeName(row) })"
+                />
+              </template>
+              <template v-else>
+                <OTag
+                  data-test="destination-type-badge-custom"
+                  type="destinationKind"
+                  value="custom"
+                  >{{ getCustomDestinationLabel(row) }}</OTag
+                >
+                <OIcon name="settings" size="sm" :title="getCustomDestinationLabel(row)" />
+              </template>
+            </div>
+          </template>
+
+          <template #cell-actions="{ row }">
+            <div class="flex items-center justify-center gap-1">
+              <OButton
+                data-test="destination-export"
+                data-row-action="export"
+                variant="ghost"
+                size="icon-sm"
+                :title="t('alert_destinations.exportDestination')"
+                @click.stop="exportDestination(row)"
+              >
+                <OIcon name="download" size="sm" />
+              </OButton>
+              <OButton
+                :data-test="`alert-destination-list-${row.name}-update-destination`"
+                data-row-action="edit"
+                variant="ghost"
+                size="icon-sm"
+                :title="t('alert_destinations.edit')"
+                @click="editDestination(row)"
+              >
+                <OIcon name="edit" size="sm" />
+              </OButton>
+              <OButton
+                :data-test="`alert-destination-list-${row.name}-delete-destination`"
+                data-row-action="delete"
+                variant="ghost"
+                size="icon-sm"
+                :title="t('alert_destinations.delete')"
+                :loading="deletingDestinations.has(row.name)"
+                @click="conformDeleteDestination(row)"
+              >
+                <OIcon name="delete" size="sm" />
+              </OButton>
+            </div>
+          </template>
+
+          <template #cell-used_by="{ row }">
+            <DependencyUsageCell
+              :graph="depGraph"
+              :focus="{ kind: 'destination', name: row.name }"
+              @deleted="onDependencyDeleted"
+            />
+          </template>
+        </OTable>
+      </div>
+    </OPageLayout>
+    <div v-else-if="showDestinationEditor && !showImportDestination" class="min-h-0 flex-1">
       <AddDestination
         :is-alerts="true"
         :destination="editingDestination"
@@ -246,7 +267,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @get:destinations="getDestinations"
       />
     </div>
-    <div v-else>
+    <div v-else class="min-h-0 flex-1">
       <ImportDestination
         :destinations="destinations"
         :templates="templates"
@@ -255,36 +276,27 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <ConfirmDialog
-      title="Delete Destination"
-      message="Are you sure you want to delete destination?"
+      :title="t('alert_destinations.deleteDestinationTitle')"
+      :message="t('alert_destinations.deleteDestinationMessage')"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
     />
 
     <ConfirmDialog
-      title="Delete Destinations"
-      :message="`Are you sure you want to delete ${selectedDestinations.length} destination(s)?`"
+      :title="t('alert_destinations.deleteDestinationsTitle')"
+      :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-  </q-page>
+  </div>
 </template>
 <script lang="ts">
-import {
-  ref,
-  onBeforeMount,
-  onActivated,
-  watch,
-  defineComponent,
-  onMounted,
-  computed,
-} from "vue";
+import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
-import { useQuasar, type QTableProps } from "quasar";
-import NoData from "../shared/grid/NoData.vue";
+import { useI18nTyped } from "@/types/i18n";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { getImageURL } from "@/utils/zincutils";
 import AddDestination from "./AddDestination.vue";
 import destinationService from "@/services/alert_destination";
@@ -292,15 +304,34 @@ import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationPayload } from "@/ts/interfaces";
 import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
 import type { Template } from "@/ts/interfaces/index";
 
 import ImportDestination from "./ImportDestination.vue";
-import useActions from "@/composables/useActions";
+import DependencyUsageCell from "./DependencyUsageCell.vue";
+import useDependencyGraph, {
+  invalidateDependencyGraphCache,
+  applyDependencyDeletion,
+  depNodeId,
+} from "@/composables/alerts/useDependencyGraph";
+import type { DepNodeKind } from "@/composables/alerts/useDependencyGraph";
 import { useReo } from "@/services/reodotdev_analytics";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import AlertSectionTabs from "@/components/alerts/AlertSectionTabs.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
   visible: boolean;
@@ -309,98 +340,132 @@ interface ConformDelete {
 export default defineComponent({
   name: "PageAlerts",
   components: {
+    OIcon,
     AddDestination,
-    NoData,
+    OEmptyState,
     ConfirmDialog,
-    QTablePagination,
     ImportDestination,
+    OButton,
+    OTooltip,
+    OSearchInput,
+    OTag,
+    OTable,
+    OToggleGroup,
+    OToggleGroupItem,
+    OPageLayout,
+    AlertSectionTabs,
+    DependencyUsageCell,
   },
   setup() {
-    const qTable = ref();
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
-    const { t } = useI18n();
-    const q = useQuasar();
-    const { getAllActions } = useActions();
+    const { t } = useI18nTyped();
+    const { graph: depGraph, loadGraph: loadDepGraph } = useDependencyGraph();
     const { track } = useReo();
 
-    // Prebuilt destinations composable
     const { detectPrebuiltType, availableTypes } = usePrebuiltDestinations();
 
-    const columns: any = ref<QTableProps["columns"]>([
+    // Email destinations store recipients in emails[], not url. Method is HTTP-only.
+    const destinationUrl = (row: DestinationPayload): string =>
+      row.type === "email" ? (row.emails ?? []).join(", ") : (row.url ?? "");
+    const destinationMethod = (row: DestinationPayload): string =>
+      row.type === "email" ? "" : (row.method ?? "");
+
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px",
-      },
-      {
-        name: "name",
-        field: "name",
-        label: t("alert_destinations.name"),
-        align: "left",
+        id: "name",
+        header: t("alert_destinations.name"),
+        accessorKey: "name",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 320,
+        meta: { align: "left", flex: true },
       },
       {
-        name: "type",
-        field: "type",
-        label: "Type",
-        align: "left",
+        id: "type",
+        header: t("common.type"),
+        accessorKey: "type",
         sortable: true,
-        style: "width: 120px",
+        resizable: true,
+        hideable: true,
+        size: 170,
+        meta: { align: "left" },
       },
       {
-        name: "url",
-        field: "url",
-        label: t("alert_destinations.url"),
-        align: "left",
+        id: "url",
+        header: t("alert_destinations.urlOrRecipients"),
+        accessorFn: destinationUrl,
+        resizable: true,
+        hideable: true,
+        size: COL.url,
+        meta: { align: "left" },
+      },
+      {
+        id: "template",
+        header: t("alert_destinations.template"),
+        accessorKey: "template",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.template,
+        meta: { align: "left" },
+      },
+      {
+        id: "method",
+        header: t("alert_destinations.method"),
+        accessorFn: destinationMethod,
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.method,
+        meta: { align: "left" },
+      },
+      {
+        id: "used_by",
+        header: t("alert_dependencies.usedByColumn"),
+        cell: " ",
         sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 200,
+        meta: { align: "left" },
       },
       {
-        name: "method",
-        field: "method",
-        label: t("alert_destinations.method"),
-        align: "left",
-        sortable: true,
-        style: "width: 150px",
+        id: "actions",
+        header: t("alert_destinations.actions"),
+        isAction: true,
+        pinned: "right",
+        size: 130,
+        meta: { align: "center", actionCount: 3 },
       },
-      {
-        name: "actions",
-        field: "actions",
-        label: t("alert_destinations.actions"),
-        align: "center",
-        sortable: false,
-        classes:'actions-column'
-      },
-    ]);
+    ];
     const destinations: Ref<DestinationPayload[]> = ref([]);
-    const templates: Ref<Template[]> = ref([
-      { name: "test", body: "", type: "http" },
-    ]);
+    const templates: Ref<Template[]> = ref([{ name: "test", body: "", type: "http" }]);
     const confirmDelete: Ref<ConformDelete> = ref({
       visible: false,
       data: null,
     });
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref(false);
     const selectedDestinations = ref<any[]>([]);
     const showDestinationEditor = ref(false);
     const showImportDestination = ref(false);
     const router = useRouter();
     const filterQuery = ref("");
-    const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "All", value: 0 },
-    ];
     const resultTotal = ref(0);
-    const selectedPerPage = ref(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
+    const deletingDestinations = ref(new Set<string>());
+
+    const selectedDestinationIds = computed(() =>
+      selectedDestinations.value.map((d: any) => d.name),
+    );
+
+    const handleSelectedIdsUpdate = (ids: string[]) => {
+      const map = new Map(destinations.value.map((r: any) => [r.name, r]));
+      selectedDestinations.value = ids.map((id: any) => map.get(id)).filter(Boolean);
+    };
+
     onActivated(() => {
       getTemplates();
       if (!destinations.value.length) getDestinations();
@@ -408,7 +473,6 @@ export default defineComponent({
     onBeforeMount(() => {
       getDestinations();
       getTemplates();
-      getActions();
     });
 
     watch(
@@ -425,28 +489,41 @@ export default defineComponent({
       updateRoute();
     });
 
-    const getActions = async () => {
-      const dismiss = q.notify({
-        spinner: true,
-        message: "Please wait while loading alert destination...",
-      });
-      if (store.state.organizationData.actions.length == 0) {
-        await getAllActions()
-          .catch(() => {
-            q.notify({
-              type: "negative",
-              message: "Error while loading actions.",
-            });
-          })
-          .finally(() => dismiss());
-      }
+    // A delete is one row leaving a list the server has already confirmed. Splice
+    // it out and prune the shared dependency graph rather than refetching: a
+    // refetch blanks the table behind its spinner and a "please wait" toast, which
+    // reads as a page reload, and takes the user's scroll and page with it.
+    const dropDestinations = (names: string[]) => {
+      if (!names.length) return;
+      const gone = new Set(names);
+      destinations.value = destinations.value.filter((d: any) => !gone.has(d.name));
+      // Anything that failed to delete stays selected, so a bulk retry is one click.
+      selectedDestinations.value = selectedDestinations.value.filter((d: any) => !gone.has(d.name));
+      const org = store.state.selectedOrganization.identifier;
+      for (const name of gone)
+        depGraph.value = applyDependencyDeletion(
+          org,
+          depNodeId("destination", name),
+          depGraph.value,
+        );
     };
 
+    // Deleting an alert in the impact dialog leaves this list's rows untouched, so
+    // re-read the (already pruned) shared graph for the Used by counts instead of
+    // reloading the page's data.
+    const onDependencyDeleted = (kind: DepNodeKind) => {
+      if (kind === "destination") getDestinations();
+      else loadDepGraph(store.state.selectedOrganization.identifier);
+    };
+
+    const loading = ref(false);
     const getDestinations = () => {
-      const dismiss = q.notify({
-        spinner: true,
-        message: "Please wait while loading destinations...",
+      const dismiss = toast({
+        variant: "loading",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
+        timeout: 0,
       });
+      loading.value = true;
       destinationService
         .list({
           page_num: 1,
@@ -458,29 +535,30 @@ export default defineComponent({
         })
         .then((res) => {
           res.data = res.data.filter(
-            (destination: any) =>
-              destination.type == "http" ||
-              destination.type == "email" ||
-              destination.type === "action",
+            (destination: any) => destination.type == "http" || destination.type == "email",
           );
           resultTotal.value = res.data.length;
-          destinations.value = res.data.map((data: any, index: number) => ({
-            ...data,
-            "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
-          }));
+          destinations.value = res.data;
+          // Any destination add/edit/delete lands here on refresh — drop the
+          // shared dependency-graph cache and rebuild it so the "Used by" counts
+          // (and the impact dialog) are current.
+          invalidateDependencyGraphCache();
+          loadDepGraph(store.state.selectedOrganization.identifier);
           updateRoute();
         })
         .catch((err) => {
           if (err.response.status != 403) {
-            q.notify({
-              type: "negative",
-              message: "Error while pulling destinations.",
-              timeout: 2000,
+            toast({
+              variant: "error",
+              message: t("toastMessages.alerts.errorWhilePullingDestinations"),
             });
           }
           dismiss();
         })
-        .finally(() => dismiss());
+        .finally(() => {
+          dismiss();
+          loading.value = false;
+        });
     };
     const getTemplates = () => {
       templateService
@@ -490,25 +568,19 @@ export default defineComponent({
         .then((res) => (templates.value = res.data));
     };
     const updateRoute = () => {
-      if (router.currentRoute.value.query.action === "add")
-        editDestination(null);
+      if (router.currentRoute.value.query.action === "add") editDestination(null);
       if (router.currentRoute.value.query.action === "update")
-        editDestination(
-          getDestinationByName(router.currentRoute.value.query.name as string),
-        );
-      if (router.currentRoute.value.query.action === "import")
-        showImportDestination.value = true;
+        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
+      if (router.currentRoute.value.query.action === "import") showImportDestination.value = true;
     };
     const getDestinationByName = (name: string) => {
-      return destinations.value.find(
-        (destination) => destination.name === name,
-      );
+      return destinations.value.find((destination) => destination.name === name);
     };
     const editDestination = (destination: any) => {
       if (!destination) {
         track("Button Click", {
           button: "Add Destination",
-          page: "Alert Destinations"
+          page: "Alert Destinations",
         });
       }
       toggleDestinationEditor();
@@ -537,34 +609,34 @@ export default defineComponent({
       editingDestination.value = null;
     };
     const deleteDestination = () => {
-      if (confirmDelete.value?.data?.name) {
-        destinationService
-          .delete({
-            org_identifier: store.state.selectedOrganization.identifier,
-            destination_name: confirmDelete.value.data.name,
-          })
-          .then(() => {
-            q.notify({
-              type: "positive",
-              message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
-              timeout: 2000,
-            });
-            getDestinations();
-          })
-          .catch((err) => {
-            if (err.response.data.code === 409) {
-              const message =
-                err.response.data?.message ||
-                err.response.data?.error ||
-                "Error while deleting destination";
-              q.notify({
-                type: "negative",
-                message,
-                timeout: 2000,
-              });
-            }
+      const name = confirmDelete.value?.data?.name;
+      if (!name) return;
+      deletingDestinations.value.add(name);
+      destinationService
+        .delete({
+          org_identifier: store.state.selectedOrganization.identifier,
+          destination_name: name,
+        })
+        .then(() => {
+          toast({
+            variant: "success",
+            message: t("toastMessages.alerts.destinationDeletedSuccessfully", { name }),
           });
-      }
+          dropDestinations([name]);
+        })
+        .catch((err: any) => {
+          // A network failure has no `err.response` at all, and a non-409 code used
+          // to fall through silently; the row stays either way, so it has to say why.
+          if (err?.response?.status === 403) return;
+          const message =
+            err?.response?.data?.message ||
+            err?.response?.data?.error ||
+            t("alerts.messages.deleteDestinationFailed");
+          toast({ variant: "error", message });
+        })
+        .finally(() => {
+          deletingDestinations.value.delete(name);
+        });
     };
     const conformDeleteDestination = (destination: any) => {
       confirmDelete.value.visible = true;
@@ -583,11 +655,6 @@ export default defineComponent({
             org_identifier: store.state.selectedOrganization.identifier,
           },
         });
-    };
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
     };
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
@@ -613,21 +680,13 @@ export default defineComponent({
     const exportDestination = (row: any) => {
       const findDestination: any = getDestinationByName(row.name);
       const destinationByName = { ...findDestination };
-      if (destinationByName.hasOwnProperty("#")) delete destinationByName["#"];
       const destinationJson = JSON.stringify(destinationByName, null, 2);
       const blob = new Blob([destinationJson], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      // Create an anchor element to trigger the download
       const link = document.createElement("a");
       link.href = url;
-
-      // Set the filename of the download
       link.download = `${destinationByName.name}.json`;
-
-      // Trigger the download by simulating a click
       link.click();
-
-      // Clean up the URL object after download
       URL.revokeObjectURL(url);
     };
     const importDestination = () => {
@@ -641,137 +700,185 @@ export default defineComponent({
       });
     };
 
-    // Get display name for prebuilt destination type
+    // True when the row's template name matches the canonical `prebuilt_<type>`
+    // for its detected prebuilt type — i.e. the user kept the default rather
+    // than picking a custom template. Used to show a "Default" badge.
+    const isDefaultPrebuiltTemplate = (destination: any): boolean => {
+      const prebuiltType = detectPrebuiltType(destination);
+      if (!prebuiltType) return false;
+      return destination.template === `prebuilt_${prebuiltType}`;
+    };
+
     const getPrebuiltTypeName = (destination: DestinationPayload): string | null => {
       const prebuiltType = detectPrebuiltType(destination);
       if (!prebuiltType) return null;
 
-      const typeConfig = availableTypes.value.find(t => t.id === prebuiltType);
+      const typeConfig = availableTypes.value.find((t) => t.id === prebuiltType);
       return typeConfig ? typeConfig.name : prebuiltType;
     };
 
-    // Get display label for custom destination sub-type
     const getCustomDestinationLabel = (destination: DestinationPayload): string => {
       if (destination.type === "http") {
         return t("alert_destinations.customWebhook");
       } else if (destination.type === "email") {
         return t("alert_destinations.customEmail");
-      } else if (destination.type === "action") {
-        return t("alert_destinations.customAction");
       }
       return t("alert_destinations.custom");
     };
 
+    // Top-right tab filter — mirrors the alerts list and templates list.
+    // "prebuilt" matches any destination detectable as a prebuilt type
+    // (Slack/Opsgenie/PagerDuty/ServiceNow/etc., identified via the
+    // `prebuilt_type` metadata or URL/template pattern); "custom" is the
+    // negation, capturing user-defined HTTP/Email destinations.
+    const activeTab = ref<"all" | "prebuilt" | "custom">("all");
+
     const visibleRows = computed(() => {
-      if (!filterQuery.value) return destinations.value || [];
-      return filterData(destinations.value || [], filterQuery.value);
+      const base = destinations.value || [];
+      const byTab =
+        activeTab.value === "prebuilt"
+          ? base.filter((d: any) => !!detectPrebuiltType(d))
+          : activeTab.value === "custom"
+            ? base.filter((d: any) => !detectPrebuiltType(d))
+            : base;
+      if (!filterQuery.value) return byTab;
+      return filterData(byTab, filterQuery.value);
     });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
     const openBulkDeleteDialog = () => {
       confirmBulkDelete.value = true;
     };
 
     const bulkDeleteDestinations = async () => {
-      const dismiss = q.notify({
-        spinner: true,
-        message: "Deleting destinations...",
+      bulkDeleteLoading.value = true;
+      const dismiss = toast({
+        variant: "loading",
+        message: t("toastMessages.alerts.deletingDestinations"),
         timeout: 0,
       });
 
       try {
         if (selectedDestinations.value.length === 0) {
-          q.notify({
-            type: "negative",
-            message: "No destinations selected for deletion",
-            timeout: 2000,
+          toast({
+            variant: "error",
+            message: t("toastMessages.alerts.noDestinationsSelectedForDeletion"),
           });
           dismiss();
           return;
         }
 
-        // Extract destination names for the API call (BE supports names)
         const payload = {
           ids: selectedDestinations.value.map((d: any) => d.name),
         };
 
         const response = await destinationService.bulkDelete(
           store.state.selectedOrganization.identifier,
-          payload
+          payload,
         );
 
         dismiss();
 
-        // Handle response based on successful/unsuccessful arrays
         if (response.data) {
           const { successful = [], unsuccessful = [] } = response.data;
           const successCount = successful.length;
           const failCount = unsuccessful.length;
 
           if (failCount > 0 && successCount > 0) {
-            // Partial success
-            q.notify({
-              type: "warning",
-              message: `${successCount} destination(s) deleted successfully, ${failCount} failed`,
+            toast({
+              variant: "warning",
+              message: t("toastMessages.alerts.destinationsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
-            // All failed
-            q.notify({
-              type: "negative",
-              message: `Failed to delete ${failCount} destination(s)`,
-              timeout: 3000,
+            toast({
+              variant: "error",
+              message: t("toastMessages.alerts.failedToDeleteDestinations", { count: failCount }),
             });
           } else {
-            // All successful
-            q.notify({
-              type: "positive",
-              message: `${successCount} destination(s) deleted successfully`,
-              timeout: 2000,
+            toast({
+              variant: "success",
+              message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+                count: successCount,
+              }),
             });
           }
         } else {
-          // Fallback success message
-          q.notify({
-            type: "positive",
-            message: `${selectedDestinations.value.length} destination(s) deleted successfully`,
-            timeout: 2000,
+          toast({
+            variant: "success",
+            message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+              count: selectedDestinations.value.length,
+            }),
           });
         }
 
-        selectedDestinations.value = [];
-        // Refresh destinations list
-        getDestinations();
+        // An unrecognised shape is NOT taken as "all of them" — splicing rows the
+        // server may have kept would show a delete that never happened.
+        if (Array.isArray(response.data?.successful)) {
+          dropDestinations(response.data.successful.map((entry: any) => entry?.name ?? entry));
+        } else {
+          selectedDestinations.value = [];
+          getDestinations();
+        }
       } catch (error: any) {
         dismiss();
-        // Show error message from response if available
-        const errorMessage = error.response?.data?.message || error?.message || "Error deleting destinations. Please try again.";
+        const errorMessage =
+          error.response?.data?.message ||
+          error?.message ||
+          t("alerts.messages.bulkDeleteDestinationsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: errorMessage,
-            timeout: 3000,
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
 
       confirmBulkDelete.value = false;
     };
 
+    watch(
+      visibleRows,
+      (newVisibleRows) => {
+        resultTotal.value = newVisibleRows.length;
+      },
+      { immediate: true },
+    );
 
-    // Watch visibleRows to sync resultTotal with search filter
-    watch(visibleRows, (newVisibleRows) => {
-      resultTotal.value = newVisibleRows.length;
-    }, { immediate: true });
-
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "alertDestinationsAdd",
+        handler: () => {
+          if (!isInputFocused()) editDestination(null);
+        },
+      },
+      {
+        id: "alertDestinationsRefresh",
+        handler: () => {
+          if (!isInputFocused()) getDestinations();
+        },
+      },
+      {
+        id: "alertDestinationsFocusSearch",
+        handler: () => {
+          focusSearchInput("destination-list-search-input");
+        },
+      },
+    ]);
     return {
       t,
-      qTable,
+      depGraph,
       showDestinationEditor,
       destinations,
       columns,
       editDestination,
       getImageURL,
+      loading,
       conformDeleteDestination,
       filterQuery,
       filterData,
@@ -779,34 +886,33 @@ export default defineComponent({
       templates,
       toggleDestinationEditor,
       getDestinations,
+      onDependencyDeleted,
+      deletingDestinations,
       deleteDestination,
       cancelDeleteDestination,
       confirmDelete,
-      changePagination,
-      perPageOptions,
       resultTotal,
-      pagination,
       routeTo,
       exportDestination,
       showImportDestination,
       importDestination,
       store,
-      // Expose additional methods for testing
-      getActions,
       getTemplates,
       updateRoute,
       getDestinationByName,
       resetEditingDestination,
-      selectedPerPage,
       visibleRows,
-      hasVisibleRows,
-      outlinedDelete,
+      activeTab,
+      selectedDestinationIds,
+      handleSelectedIdsUpdate,
       openBulkDeleteDialog,
       bulkDeleteDestinations,
       confirmBulkDelete,
+      bulkDeleteLoading,
       selectedDestinations,
       getPrebuiltTypeName,
       getCustomDestinationLabel,
+      isDefaultPrebuiltTemplate,
     };
   },
 });

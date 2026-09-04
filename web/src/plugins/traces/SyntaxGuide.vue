@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,146 +15,178 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn
-    data-cy="syntax-guide-button"
-    size="sm"
-    dense
-    flat
-    class="q-pa-xs tw:cursor-pointer tw:border tw:border-[var(--o2-border-color)] tw:border-solid tw:bg-transparent! tw:w-[2rem] tw:min-h-[2rem] tw:h-[2rem] tw:rounded-[0.375rem] syntax-guide-button"
-    :class="sqlmode ? 'sql-mode' : 'normal-mode'"
-    icon="help"
-  >
-    <q-tooltip>{{ t("search.syntaxGuideLabel") }}</q-tooltip>
-    <q-menu
-      data-test="syntax-guide-menu"
-      class="syntax-guide-menu"
-      :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'"
-    >
-      <q-card flat v-if="!sqlmode">
-        <q-card-section class="syntax-guide-title">
-          <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="q-pt-none answers">
-          <div class="syntax-section">
-            <div class="syntax-guide-text">
-              <ul class="guide-list">
+  <ODropdown side="bottom" align="start">
+    <template #trigger>
+      <!-- Menu-item style: full-width, left-aligned, badge icon -->
+      <OButton
+        v-if="menuItem"
+        data-cy="syntax-guide-button"
+        variant="ghost"
+        size="sm"
+        class="rounded-default! h-auto! w-full! justify-start! gap-2! px-3! py-1.5! font-normal!"
+      >
+        <template #icon-left>
+          <span
+            class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+          >
+            <OIcon name="help" size="sm" />
+          </span>
+        </template>
+        {{ t("search.syntaxGuideLabel") }}
+      </OButton>
+      <!-- Default: compact toolbar button -->
+      <OButton
+        v-else
+        data-cy="syntax-guide-button"
+        v-bind="$attrs"
+        variant="outline"
+        size="icon-xs"
+        :class="[sqlmode ? 'sql-mode' : 'normal-mode']"
+      >
+        <OIcon name="help" size="sm" />
+        <OTooltip :content="t('search.syntaxGuideLabel')" />
+      </OButton>
+    </template>
+    <div data-test="syntax-guide-menu" class="syntax-guide-menu">
+      <div v-if="!sqlmode">
+        <div class="w-105">
+          <div class="label text-sm font-bold">{{ t("search.syntaxGuideLabel") }}</div>
+        </div>
+        <div class="border-dropdown-separator my-1 border-t" />
+        <div class="answers">
+          <div class="mb-1.25">
+            <div class="ms-1.25 text-xs">
+              <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
+                <!-- The prose in each item is translated; the query fragments next to it are
+                     NOT — they are syntax, and a translated str_match() would be a query
+                     that does not run. -->
+                <!-- eslint-disable vue/no-bare-strings-in-template -->
                 <li>
-                  For full text search of value 'error' use
-                  <span class="bg-highlight"
-                    >match_all('error') in query editor</span
+                  {{ t("search.syntaxGuide.fullText") }}
+                  <span class="bg-highlight-bg px-1.25"
+                    >match_all('error') {{ t("search.syntaxGuide.inQueryEditor") }}</span
                   >
                 </li>
                 <li>
-                  For column search of value 'error' use
-                  <span class="bg-highlight"
-                    >str_match(<b>fieldname</b>, 'error')</span
-                  >
+                  {{ t("search.syntaxGuide.column") }}
+                  <span class="bg-highlight-bg px-1.25">str_match(<b>fieldname</b>, 'error')</span>
                 </li>
                 <li>
-                  For case-insensitive column search of value 'error' use
-                  <span class="bg-highlight"
+                  {{ t("search.syntaxGuide.columnIgnoreCase") }}
+                  <span class="bg-highlight-bg px-1.25"
                     >str_match_ignore_case(<b>fieldname</b>, 'Error')</span
                   >
                 </li>
                 <li>
-                  To search value 200 for code column use
-                  <span class="bg-highlight">code=200</span>
+                  {{ t("search.syntaxGuide.code") }}
+                  <span class="bg-highlight-bg px-1.25">code=200</span>
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
-                  <span class="bg-highlight">stream='stderr'</span>
+                  {{ t("search.syntaxGuide.stream") }}
+                  <span class="bg-highlight-bg px-1.25">stream='stderr'</span>
                 </li>
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
                 <li>
-                  For additional examples,
+                  {{ t("search.syntaxGuide.moreExamples") }}
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:tw:underline text-primary"
-                    >click here</a
+                    class="text-primary hover:underline"
+                    >{{ t("search.syntaxGuide.clickHere") }}</a
                   >.
                 </li>
               </ul>
             </div>
           </div>
-        </q-card-section>
-      </q-card>
-      <q-card flat v-else>
-        <q-card-section class="syntax-guide-title">
-          <div class="label">Syntax Guide: SQL Mode</div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="q-pt-none answers">
-          <div class="syntax-section">
-            <div class="syntax-guide-text">
-              <ul class="guide-list">
+        </div>
+      </div>
+      <div v-else>
+        <div class="w-105">
+          <div class="label text-sm font-bold">{{ t("search.syntaxGuide.sqlTitle") }}</div>
+        </div>
+        <div class="border-dropdown-separator my-1 border-t" />
+        <div class="answers">
+          <div class="mb-1.25">
+            <div class="ms-1.25 text-xs">
+              <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
+                <!-- As above: the prose is translated, the SQL samples are left literal. -->
+                <!-- eslint-disable vue/no-bare-strings-in-template -->
                 <li>
-                  For full text search of value 'error' use
-                  <span class="bg-highlight"
+                  {{ t("search.syntaxGuide.fullText") }}
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
                 </li>
                 <li>
-                  For column search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    str_match(<b>fieldname</b>, 'error')</span
+                  {{ t("search.syntaxGuide.column") }}
+                  <span class="bg-highlight-bg px-1.25"
+                    >SELECT * FROM <b>stream</b> WHERE str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
-                  To search value 200 for code column use
-                  <span class="bg-highlight"
+                  {{ t("search.syntaxGuide.code") }}
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
-                  <span class="bg-highlight"
+                  {{ t("search.syntaxGuide.stream") }}
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on column
-                  log use
-                  <span class="bg-highlight"
-                    >SELECT extract_ip(log) FROM <b>stream</b> WHERE
-                    code=200</span
-                  >
+                  <!-- Both the function name and the sample are slots, so the sentence can be
+                       reordered by a translator without stranding the <i> or the space. -->
+                  <i18n-t keypath="search.syntaxGuide.queryFunction" tag="span">
+                    <template #fn>
+                      <i>extract_ip</i>
+                    </template>
+                    <template #query>
+                      <span class="bg-highlight-bg px-1.25"
+                        >SELECT extract_ip(log) FROM <b>stream</b> WHERE code=200</span
+                      >
+                    </template>
+                  </i18n-t>
                 </li>
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
                 <li>
-                  For additional examples,
+                  {{ t("search.syntaxGuide.moreExamples") }}
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:tw:underline text-primary"
-                    >click here</a
+                    class="text-primary hover:underline"
+                    >{{ t("search.syntaxGuide.clickHere") }}</a
                   >.
                 </li>
               </ul>
             </div>
           </div>
-        </q-card-section>
-      </q-card>
-    </q-menu>
-  </q-btn>
+        </div>
+      </div>
+    </div>
+  </ODropdown>
 </template>
 
 <script lang="ts">
 import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 
 export default defineComponent({
   name: "ComponentSearchSyntaxGuide",
+  components: { OButton, OTooltip, OIcon, ODropdown },
   props: {
-    sqlmode: {
-      type: Boolean,
-      default: false,
-    },
+    sqlmode: { type: Boolean, default: false },
+    menuItem: { type: Boolean, default: false },
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     return {
       t,
       store,
@@ -162,7 +194,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-@import "@/styles/logs/syntax-guide.scss";
-</style>

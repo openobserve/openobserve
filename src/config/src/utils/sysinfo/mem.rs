@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -80,5 +80,20 @@ mod tests {
     #[test]
     fn test_sysinfo_get_process_memory_usage() {
         assert!(get_process_memory_usage() > 0);
+    }
+
+    #[test]
+    fn test_sysinfo_get_free_memory() {
+        let free = get_free_memory();
+        let total = get_total_memory();
+        assert!(free <= total);
+    }
+
+    #[test]
+    fn test_sysinfo_get_memory_stats_fields_consistent() {
+        let stats = get_memory_stats();
+        assert!(stats.total_memory > 0);
+        assert!(stats.used_memory <= stats.total_memory);
+        assert!(stats.free_memory <= stats.total_memory);
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -59,7 +59,6 @@ impl super::SchemaHistory for SqliteSchemaHistory {
     ) -> Result<()> {
         let value = json::to_string(&schema)?;
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         match sqlx::query(
             r#"
 INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
@@ -71,7 +70,7 @@ INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
         .bind(stream_name)
         .bind(start_dt)
         .bind(value)
-        .execute(&*client)
+        .execute(&client)
         .await
         {
             Err(sqlx::Error::Database(e)) => {
@@ -89,7 +88,6 @@ INSERT INTO schema_history (org, stream_type, stream_name, start_dt, value)
 
 pub async fn create_table() -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
     sqlx::query(
         r#"
 CREATE TABLE IF NOT EXISTS schema_history
@@ -103,7 +101,7 @@ CREATE TABLE IF NOT EXISTS schema_history
 );
         "#,
     )
-    .execute(&*client)
+    .execute(&client)
     .await?;
 
     Ok(())
@@ -133,4 +131,19 @@ pub async fn create_table_index() -> Result<()> {
     .await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_sqlite_schema_history_new() {
+        let _history = SqliteSchemaHistory::new();
+    }
+
+    #[test]
+    fn test_sqlite_schema_history_default() {
+        let _history = SqliteSchemaHistory::default();
+    }
 }

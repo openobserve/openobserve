@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -96,28 +96,6 @@ async fn add_dedup_columns(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
                 Table::alter()
                     .table(Alerts::Table)
                     .add_column_if_not_exists(ColumnDef::new(Alerts::DedupConfig).json().null())
-                    .to_owned(),
-            )
-            .await?;
-    } else if matches!(db_backend, sea_orm::DbBackend::MySql) {
-        // MySQL doesn't support IF NOT EXISTS in ALTER TABLE
-        // But it supports multiple column additions
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Alerts::Table)
-                    .add_column(
-                        ColumnDef::new(Alerts::DedupEnabled)
-                            .boolean()
-                            .not_null()
-                            .default(false),
-                    )
-                    .add_column(
-                        ColumnDef::new(Alerts::DedupTimeWindowMinutes)
-                            .integer()
-                            .null(),
-                    )
-                    .add_column(ColumnDef::new(Alerts::DedupConfig).json().null())
                     .to_owned(),
             )
             .await?;
@@ -281,4 +259,16 @@ enum AlertDedupState {
     OccurrenceCount,
     NotificationSent,
     CreatedAt,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(Migration.name(), "m20251024_000001_add_alert_deduplication");
+    }
 }

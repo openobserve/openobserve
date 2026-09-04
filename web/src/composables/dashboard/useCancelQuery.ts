@@ -2,6 +2,7 @@ import { ref } from "vue";
 import useNotifications from "@/composables/useNotifications";
 import queryService from "../../services/search";
 import { useStore } from "vuex";
+import type { TranslateFn } from "@/types/i18n";
 
 /**
  * Provides a composable to cancel running queries.
@@ -11,9 +12,8 @@ import { useStore } from "vuex";
  *   searchRequestTraceIds: (data: any) => void,
  * }}
  */
-const useCancelQuery = () => {
-  const { showPositiveNotification, showErrorNotification } =
-    useNotifications();
+const useCancelQuery = (t: TranslateFn) => {
+  const { showPositiveNotification, showErrorNotification } = useNotifications();
   const traceIdRef: any = ref([]);
   const store = useStore();
 
@@ -32,9 +32,7 @@ const useCancelQuery = () => {
   const cancelQuery = () => {
     window.dispatchEvent(new Event("cancelQuery"));
 
-    const traceIdArray = Array.isArray(traceIdRef.value)
-      ? traceIdRef.value
-      : [];
+    const traceIdArray = Array.isArray(traceIdRef.value) ? traceIdRef.value : [];
 
     if (traceIdArray.length === 0) {
       return;
@@ -43,15 +41,12 @@ const useCancelQuery = () => {
     const tracesIdsCopy = [...traceIdArray];
 
     queryService
-      .delete_running_queries(
-        store.state.selectedOrganization.identifier,
-        traceIdArray,
-      )
+      .delete_running_queries(store.state.selectedOrganization.identifier, traceIdArray)
       .then((res) => {
         const isCancelled = res.data.some((item: any) => item.is_success);
 
         if (isCancelled) {
-          showPositiveNotification("Running query canceled successfully", {
+          showPositiveNotification(t("toastMessages.dashboard.runningQueryCanceledSuccessfully"), {
             timeout: 3000,
           });
         }
@@ -59,14 +54,14 @@ const useCancelQuery = () => {
       .catch((error) => {
         console.error("delete running queries error", error);
         showErrorNotification(
-          error.response?.data?.message || "Failed to cancel running query",
-          { timeout: 3000 },
+          error.response?.data?.message || t("dashboard.failedToCancelRunningQuery"),
+          {
+            timeout: 3000,
+          },
         );
       })
       .finally(() => {
-        traceIdRef.value = traceIdRef.value.filter(
-          (id: any) => !tracesIdsCopy.includes(id),
-        );
+        traceIdRef.value = traceIdRef.value.filter((id: any) => !tracesIdsCopy.includes(id));
       });
   };
 

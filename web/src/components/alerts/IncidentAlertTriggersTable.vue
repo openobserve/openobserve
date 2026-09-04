@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,87 +15,160 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div data-test="alert-triggers-table" class="alert-triggers-table tw:flex tw:flex-col tw:h-full tw:overflow-hidden">
-    <q-table
+  <div
+    data-test="alert-triggers-table"
+    class="alert-triggers-table flex h-full flex-col overflow-hidden"
+  >
+    <OTable
       data-test="triggers-qtable"
-      ref="qTableRef"
-      :rows="triggers"
+      :data="triggers"
       :columns="columns"
       row-key="created_at"
-      :pagination="pagination"
-      style="height: calc(100vh - 220px)"
-      flat
-      class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky tw:flex-1 o2-custom-table"
+      pagination="client"
+      :page-size="20"
+      :page-size-options="[20, 50, 100, 250, 500]"
+      sorting="client"
+      :default-columns="false"
+      :enable-column-resize="true"
+      :persist-columns="true"
+      table-id="incidents-alert-triggers"
+      :show-global-filter="false"
       @row-click="onRowClick"
     >
-      <template #no-data>
-        <div data-test="no-triggers-message" class="tw:text-center tw:py-8">
-          <span :class="isDarkMode ? 'tw:text-gray-500' : 'tw:text-gray-400'" class="tw:text-sm">
-            No triggers loaded
+      <template #empty>
+        <div data-test="no-triggers-message" class="py-8 text-center">
+          <span class="text-text-secondary text-sm">
+            {{ t("alerts.noTriggersLoaded") }}
           </span>
         </div>
       </template>
 
-      <template #body-cell-alert_name="props">
-        <q-td :props="props" data-test="alert-name-cell">
-          <span data-test="alert-name-text" :class="isDarkMode ? 'tw:text-gray-200' : 'tw:text-gray-800'" class="tw:text-xs tw:font-medium">
-            {{ props.row.alert_name }}
-          </span>
-        </q-td>
+      <template #cell-alert_name="{ row }">
+        <span data-test="alert-name-text" class="text-text-body text-xs font-medium">
+          {{ row.alert_name }}
+        </span>
       </template>
 
-      <template #body-cell-alert_fired_at="props">
-        <q-td :props="props" data-test="fired-at-cell">
-          <span data-test="fired-at-timestamp" class="tw:text-xs">
-            {{ formatTimestamp(props.row.alert_fired_at) }}
-          </span>
-        </q-td>
+      <template #cell-alert_fired_at="{ row }">
+        <span data-test="fired-at-timestamp" class="text-xs">
+          {{ formatTimestamp(row.alert_fired_at) }}
+        </span>
       </template>
 
-      <template #body-cell-correlation_reason="props">
-        <q-td :props="props" class="tw:text-right" data-test="correlation-reason-cell">
-          <q-badge
+      <template #cell-detected_source="{ row }">
+        <OTag
+          v-if="row.alert_kind === 'external' && row.detected_source"
+          data-test="trigger-source-badge"
+          variant="default-outline"
+        >
+          {{ row.detected_source }}
+        </OTag>
+        <span v-else class="text-text-secondary text-xs">—</span>
+      </template>
+
+      <template #cell-labels="{ row }">
+        <div v-if="row.labels && Object.keys(row.labels).length" class="flex flex-wrap gap-1">
+          <OTag
+            v-for="(value, key) in row.labels"
+            :key="key"
+            data-test="trigger-label-chip"
+            variant="default-outline"
+          >
+            {{ key }}={{ value }}
+          </OTag>
+        </div>
+        <span v-else class="text-text-secondary text-xs">—</span>
+      </template>
+
+      <template #cell-correlation_reason="{ row }">
+        <span class="inline-flex">
+          <OTag
             data-test="correlation-reason-badge"
-            :color="getReasonColor(props.row.correlation_reason)"
-            :label="getReasonLabel(props.row.correlation_reason)"
-            outline
+            type="correlationReason"
+            :value="row.correlation_reason"
           />
-        </q-td>
+          <OTooltip :content="raw(getReasonTooltip(row.correlation_reason))" side="top" />
+        </span>
       </template>
 
-      <template #bottom="scope">
-        <QTablePagination
-          :scope="scope"
-          :position="'bottom'"
-          :resultTotal="triggers.length"
-          :perPageOptions="perPageOptions"
-          @update:changeRecordPerPage="changePagination"
+      <template #cell-actions="{ row }">
+        <OButton
+          v-if="row.alert_kind === 'external'"
+          data-test="trigger-view-payload-btn"
+          variant="ghost"
+          size="icon-sm"
+          icon-left="visibility"
+          :title="t('alerts.incidents.viewPayload')"
+          @click.stop="openPayload(row)"
         />
       </template>
-    </q-table>
+    </OTable>
+
+    <ODialog
+      data-test="trigger-payload-dialog"
+      v-model:open="payloadDialogOpen"
+      size="md"
+      :title="t('alerts.incidents.rawPayloadTitle')"
+      :primary-button-label="t('common.close')"
+      @click:primary="payloadDialogOpen = false"
+    >
+      <div v-if="payloadLoading" class="text-text-secondary py-4 text-center text-sm">
+        {{ t("common.loading") }}
+      </div>
+      <div v-else-if="payloadError" class="text-status-error-text py-4 text-center text-sm">
+        {{ payloadError }}
+      </div>
+      <template v-else-if="payloadData">
+        <div class="text-text-secondary mb-2 text-xs">
+          <span
+            >{{ t("alerts.incidents.payloadSourceLabel") }} {{ payloadData.detected_source }}</span
+          >
+          <span v-if="payloadData.source_url" class="ms-3">{{ payloadData.source_url }}</span>
+        </div>
+        <pre
+          data-test="trigger-payload-json"
+          class="bg-surface-secondary rounded-surface max-h-[60vh] overflow-auto p-3 text-xs"
+          >{{ formattedPayload }}</pre>
+      </template>
+    </ODialog>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, PropType, ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
-import { date } from "quasar";
-import type { QTableProps } from "quasar";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
+import { defineComponent, PropType, computed, ref } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { useStore } from "vuex";
+import { formatToReadable } from "@/utils/date";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
+import incidentsService, { type ExternalAlertPayload } from "@/services/incidents";
 
 interface IncidentAlert {
   incident_id: string;
   alert_id: string;
   alert_name: string;
+  alert_kind?: "internal" | "external";
   alert_fired_at: number;
-  correlation_reason: "service_discovery" | "manual_extraction" | "temporal";
+  correlation_reason: "service_discovery" | "primary_match" | "secondary_match" | "alert_id";
   created_at: number;
+  source_url?: string | null;
+  labels?: Record<string, string> | null;
+  detected_source?: string | null;
 }
 
 export default defineComponent({
   name: "IncidentAlertTriggersTable",
   components: {
-    QTablePagination,
+    OTag,
+    OTooltip,
+    OTable,
+    OButton,
+    ODialog,
   },
   props: {
     triggers: {
@@ -107,108 +180,140 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['row-click'],
+  emits: ["row-click"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    const store = useStore();
 
-    const qTableRef = ref<any>(null);
-
-    const perPageOptions = [
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "250", value: 250 },
-      { label: "500", value: 500 },
-    ];
-
-    const pagination = ref({
-      rowsPerPage: 20,
-    });
-
-    const columns = computed<QTableProps["columns"]>(() => [
+    const columns = computed<OTableColumnDef[]>(() => [
       {
-        name: "alert_name",
-        field: "alert_name",
-        label: "Alert Name",
-        align: "left",
+        id: "alert_name",
+        header: t("alerts.incidents.alertName"),
+        accessorKey: "alert_name",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
-        name: "alert_fired_at",
-        field: "alert_fired_at",
-        label: "Fired At",
-        align: "left",
+        id: "detected_source",
+        header: t("alerts.incidents.source"),
+        accessorKey: "detected_source",
         sortable: true,
-        style: "width: 200px",
+        resizable: true,
+        hideable: true,
+        size: 120,
+        meta: { align: "left" },
       },
       {
-        name: "correlation_reason",
-        field: "correlation_reason",
-        label: "Corelation Reason",
-        align: "right",
+        id: "labels",
+        header: t("alerts.incidents.labels"),
+        accessorKey: "labels",
         sortable: false,
-        style: "width: 150px",
+        resizable: true,
+        hideable: true,
+        size: 220,
+        meta: { align: "left" },
+      },
+      {
+        id: "alert_fired_at",
+        header: t("alerts.incidents.firedAt"),
+        accessorKey: "alert_fired_at",
+        sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.date,
+        meta: { align: "left" },
+      },
+      {
+        id: "correlation_reason",
+        header: t("alerts.incidents.correlationReason"),
+        accessorKey: "correlation_reason",
+        sortable: false,
+        resizable: true,
+        hideable: true,
+        size: 150,
+        meta: { align: "left" },
+      },
+      {
+        id: "actions",
+        header: raw(""),
+        isAction: true,
+        size: 60,
+        meta: { align: "left" },
       },
     ]);
 
     const formatTimestamp = (timestamp: number) => {
-      if (!timestamp) return "N/A";
-      return date.formatDate(timestamp / 1000, "YYYY-MM-DD HH:mm:ss");
+      if (!timestamp) return raw("N/A");
+      return formatToReadable(timestamp);
     };
 
-    const getReasonColor = (reason: string) => {
+    const getReasonTooltip = (reason: string) => {
       switch (reason) {
         case "service_discovery":
-          return "blue";
-        case "manual_extraction":
-          return "purple";
-        case "temporal":
-          return "teal";
+          return t("alerts.incidents.correlationServiceDiscoveryTooltip");
+        case "primary_match":
+          return t("alerts.incidents.correlationPrimaryMatchTooltip");
+        case "secondary_match":
+          return t("alerts.incidents.correlationSecondaryMatchTooltip");
+        case "alert_id":
+          return t("alerts.incidents.correlationAlertIdTooltip");
         default:
-          return "grey";
+          return "";
       }
     };
 
-    const getReasonLabel = (reason: string) => {
-      switch (reason) {
-        case "service_discovery":
-          return t("alerts.incidents.correlationServiceDiscovery");
-        case "manual_extraction":
-          return t("alerts.incidents.correlationManualExtraction");
-        case "temporal":
-          return t("alerts.incidents.correlationTemporal");
-        default:
-          return reason;
+    const onRowClick = (row: IncidentAlert) => {
+      emit("row-click", row.alert_name);
+    };
+
+    const payloadDialogOpen = ref(false);
+    const payloadLoading = ref(false);
+    const payloadError = ref("");
+    const payloadData = ref<ExternalAlertPayload | null>(null);
+
+    const formattedPayload = computed(() => {
+      if (!payloadData.value) return "";
+      try {
+        return JSON.stringify(payloadData.value.last_payload, null, 2);
+      } catch {
+        return String(payloadData.value.last_payload);
       }
-    };
+    });
 
-    const changePagination = (val: { label: string; value: any }) => {
-      pagination.value.rowsPerPage = val.value;
-      qTableRef.value?.setPagination(pagination.value);
-    };
-
-    const onRowClick = (evt: Event, row: IncidentAlert) => {
-      emit('row-click', row.alert_name);
+    const openPayload = async (row: IncidentAlert) => {
+      payloadDialogOpen.value = true;
+      payloadLoading.value = true;
+      payloadError.value = "";
+      payloadData.value = null;
+      try {
+        const orgId = store.state.selectedOrganization.identifier;
+        const response = await incidentsService.getExternalAlertPayload(orgId, row.alert_id);
+        payloadData.value = response.data;
+      } catch (err: any) {
+        payloadError.value = err?.response?.data?.message || t("alerts.incidents.rawPayloadError");
+      } finally {
+        payloadLoading.value = false;
+      }
     };
 
     return {
-      qTableRef,
-      pagination,
-      perPageOptions,
+      raw,
+      t,
       columns,
       formatTimestamp,
-      getReasonColor,
-      getReasonLabel,
-      changePagination,
+      getReasonTooltip,
       onRowClick,
+      payloadDialogOpen,
+      payloadLoading,
+      payloadError,
+      payloadData,
+      formattedPayload,
+      openPayload,
     };
   },
 });
 </script>
-
-<style scoped>
-:deep(.q-table tbody tr) {
-  cursor: pointer;
-}
-
-</style>

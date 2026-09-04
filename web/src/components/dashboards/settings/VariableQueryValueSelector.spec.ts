@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,14 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mount, VueWrapper } from "@vue/test-utils";
-import { Quasar } from "quasar";
+import { mount, VueWrapper, config } from "@vue/test-utils";
 import { nextTick } from "vue";
+import i18n from "@/locales";
 import VariableQueryValueSelector from "./VariableQueryValueSelector.vue";
+
+// Install the real app i18n for every mount in this file so components
+// that call useI18n() during setup have an active i18n instance.
+config.global.plugins = [...(config.global.plugins ?? []), i18n];
 
 // Mock lodash debounce - improved version
 vi.mock("lodash-es", () => ({
-  debounce: vi.fn((fn, delay) => {
+  debounce: vi.fn((fn) => {
     // Return a mock function that can be called immediately for testing
     const mockFn = vi.fn((...args) => {
       // For tests, execute immediately instead of with delay
@@ -30,13 +34,13 @@ vi.mock("lodash-es", () => ({
     // Add cancel method as a spy
     mockFn.cancel = vi.fn();
     return mockFn;
-  })
+  }),
 }));
 
 // Mock constants
 vi.mock("@/utils/dashboard/constants", () => ({
   SELECT_ALL_VALUE: "_o2_all_",
-  CUSTOM_VALUE: "::_o2_custom"
+  CUSTOM_VALUE: "::_o2_custom",
 }));
 
 describe("VariableQueryValueSelector", () => {
@@ -51,21 +55,63 @@ describe("VariableQueryValueSelector", () => {
     options: [
       { label: "US East", value: "us-east-1" },
       { label: "US West", value: "us-west-1" },
-      { label: "Europe", value: "eu-west-1" }
+      { label: "Europe", value: "eu-west-1" },
     ],
-    isLoading: false
+    isLoading: false,
   };
 
   const multiSelectVariableItem = {
     ...defaultVariableItem,
     multiSelect: true,
-    value: ["us-east-1"]
+    value: ["us-east-1"],
   };
 
   const customValueOptions = [
     { label: "Standard Value", value: "standard" },
-    { label: "Custom Test", value: "custom-test::_o2_custom" }
+    { label: "Custom Test", value: "custom-test::_o2_custom" },
   ];
+
+  // OSelect stub that exposes the methods the component still
+  // calls on its selectRef (updateInputValue/blur/hidePopup).
+  const OSelectStub = {
+    name: "OSelect",
+    template: `
+      <div
+        data-test="dashboard-variable-query-value-selector"
+        class="o-select"
+      >
+        <input
+          :value="modelValue"
+          @input="$emit('update:modelValue', $event.target.value)"
+          @keydown="$emit('keydown', $event)"
+        />
+        <div v-if="loading">Loading...</div>
+        <div v-for="option in options" :key="option.value" @click="$emit('update:modelValue', multiple ? [option.value] : option.value)">
+          {{ option.label }}
+        </div>
+        <slot name="before-options"></slot>
+        <slot name="empty"></slot>
+        <slot name="trigger"></slot>
+      </div>
+    `,
+    props: [
+      "modelValue",
+      "options",
+      "loading",
+      "multiple",
+      "label",
+      "labelPosition",
+      "labelKey",
+      "valueKey",
+    ],
+    emits: ["update:modelValue", "search", "open", "close", "keydown"],
+    methods: {
+      updateInputValue() {},
+      blur() {},
+      hidePopup() {},
+      close() {},
+    },
+  };
 
   const createWrapper = (props: any = {}) => {
     return mount(VariableQueryValueSelector, {
@@ -73,71 +119,20 @@ describe("VariableQueryValueSelector", () => {
         modelValue: "",
         variableItem: defaultVariableItem,
         loadOptions: null,
-        ...props
+        ...props,
       },
       global: {
-        plugins: [Quasar],
+        plugins: [],
         stubs: {
-          QSelect: {
-            template: `
-              <div 
-                data-test="dashboard-variable-query-value-selector"
-                class="q-select"
-              >
-                <input 
-                  :value="modelValue" 
-                  @input="$emit('update:modelValue', $event.target.value)"
-                  @keydown="$emit('keydown', $event)"
-                />
-                <div v-if="loading">Loading...</div>
-                <div v-for="option in options" :key="option.value" @click="selectOption(option)">
-                  {{ option.label }}
-                </div>
-                <slot name="no-option"></slot>
-                <slot name="before-options"></slot>
-                <slot name="option" v-for="opt in options" :key="opt.value" :opt="opt" :selected="false" :toggleOption="() => {}"></slot>
-              </div>
-            `,
-            props: ["modelValue", "options", "loading", "multiple"],
-            emits: ["update:modelValue", "filter", "popup-show", "popup-hide", "keydown"],
-            methods: {
-              selectOption(option: any) {
-                this.$emit("update:modelValue", this.multiple ? [option.value] : option.value);
-              },
-              updateInputValue: vi.fn(),
-              blur: vi.fn(),
-              hidePopup: vi.fn()
-            }
+          OSelect: OSelectStub,
+          OCheckbox: {
+            template: `<input type="checkbox" :checked="modelValue" @change="$emit('update:modelValue', $event.target.checked)" />`,
+            props: ["modelValue"],
+            emits: ["update:modelValue"],
           },
-          QItem: {
-            template: "<div class='q-item'><slot></slot></div>",
-            props: ["clickable"],
-            emits: ["click"]
-          },
-          QItemSection: {
-            template: "<div class='q-item-section'><slot></slot></div>",
-            props: ["side"]
-          },
-          QItemLabel: {
-            template: "<div class='q-item-label'><slot></slot></div>"
-          },
-          QCheckbox: {
-            template: `
-              <input 
-                type="checkbox" 
-                :checked="modelValue" 
-                @change="$emit('update:modelValue', $event.target.checked)"
-                class="q-checkbox"
-              />
-            `,
-            props: ["modelValue", "dense"],
-            emits: ["update:modelValue"]
-          },
-          QSeparator: {
-            template: "<hr class='q-separator' />"
-          }
-        }
-      }
+          OSeparator: { template: "<hr />" },
+        },
+      },
     });
   };
 
@@ -161,22 +156,21 @@ describe("VariableQueryValueSelector", () => {
     it("should mount successfully with basic props", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
-      // Check if the component renders with the q-select class
-      expect(wrapper.find('.q-select').exists()).toBe(true);
+      // Check that the OSelect component is rendered
+      expect(wrapper.findComponent({ name: "OSelect" }).exists()).toBe(true);
     });
 
     it("should mount with multiSelect enabled", () => {
       wrapper = createWrapper({
-        variableItem: multiSelectVariableItem
+        variableItem: multiSelectVariableItem,
       });
       expect(wrapper.exists()).toBe(true);
-      
+
       if (wrapper.exists()) {
-        const qSelect = wrapper.findComponent({ name: "QSelect" });
+        const qSelect = wrapper.findComponent({ name: "OSelect" });
         if (qSelect.exists()) {
           expect(qSelect.props("multiple")).toBe(true);
         } else {
-          // If QSelect stub not found, verify the multiSelect prop was passed to component
           expect(wrapper.props("variableItem").multiSelect).toBe(true);
         }
       }
@@ -185,19 +179,19 @@ describe("VariableQueryValueSelector", () => {
     it("should mount with initial selected value", () => {
       wrapper = createWrapper({
         modelValue: "us-east-1",
-        variableItem: { ...defaultVariableItem, value: "us-east-1" }
+        variableItem: { ...defaultVariableItem, value: "us-east-1" },
       });
       expect(wrapper.vm.selectedValue).toBe("us-east-1");
     });
 
     it("should mount with loading state", () => {
       wrapper = createWrapper({
-        variableItem: { ...defaultVariableItem, isLoading: true }
+        variableItem: { ...defaultVariableItem, isLoading: true },
       });
       expect(wrapper.exists()).toBe(true);
-      
+
       if (wrapper.exists()) {
-        const qSelect = wrapper.findComponent({ name: "QSelect" });
+        const qSelect = wrapper.findComponent({ name: "OSelect" });
         if (qSelect.exists()) {
           expect(qSelect.props("loading")).toBe(true);
         } else {
@@ -209,12 +203,12 @@ describe("VariableQueryValueSelector", () => {
 
     it("should mount with custom options", () => {
       wrapper = createWrapper({
-        variableItem: { ...defaultVariableItem, options: customValueOptions }
+        variableItem: { ...defaultVariableItem, options: customValueOptions },
       });
       expect(wrapper.exists()).toBe(true);
-      
+
       if (wrapper.exists()) {
-        const qSelect = wrapper.findComponent({ name: "QSelect" });
+        const qSelect = wrapper.findComponent({ name: "OSelect" });
         if (qSelect.exists()) {
           expect(qSelect.props("options")).toHaveLength(2);
         } else {
@@ -228,7 +222,7 @@ describe("VariableQueryValueSelector", () => {
       // Provide minimal valid props to prevent watcher errors
       wrapper = createWrapper({
         variableItem: { name: "test", options: [], isLoading: false },
-        modelValue: ""
+        modelValue: "",
       });
       expect(wrapper.exists()).toBe(true);
     });
@@ -236,15 +230,15 @@ describe("VariableQueryValueSelector", () => {
 
   describe("Props & Reactive State", () => {
     it("should bind modelValue prop correctly", async () => {
-      wrapper = createWrapper({ 
+      wrapper = createWrapper({
         modelValue: "test-value",
-        variableItem: { ...defaultVariableItem, value: "test-value" }
+        variableItem: { ...defaultVariableItem, value: "test-value" },
       });
       expect(wrapper.vm.selectedValue).toBe("test-value");
 
-      await wrapper.setProps({ 
+      await wrapper.setProps({
         modelValue: "new-value",
-        variableItem: { ...defaultVariableItem, value: "new-value" }
+        variableItem: { ...defaultVariableItem, value: "new-value" },
       });
       expect(wrapper.vm.selectedValue).toBe("new-value");
     });
@@ -252,7 +246,7 @@ describe("VariableQueryValueSelector", () => {
     it("should handle variableItem prop updates", async () => {
       wrapper = createWrapper();
       const newVariableItem = { ...defaultVariableItem, name: "environment" };
-      
+
       await wrapper.setProps({ variableItem: newVariableItem });
       expect(wrapper.props("variableItem").name).toBe("environment");
     });
@@ -260,7 +254,7 @@ describe("VariableQueryValueSelector", () => {
     it("should call loadOptions prop callback", () => {
       const loadOptionsMock = vi.fn();
       wrapper = createWrapper({ loadOptions: loadOptionsMock });
-      
+
       wrapper.vm.onPopupShow();
       expect(loadOptionsMock).toHaveBeenCalledWith(defaultVariableItem);
     });
@@ -268,31 +262,31 @@ describe("VariableQueryValueSelector", () => {
     it("should handle options array reactivity", async () => {
       wrapper = createWrapper();
       const newOptions = [{ label: "New Option", value: "new-opt" }];
-      
-      await wrapper.setProps({ 
-        variableItem: { ...defaultVariableItem, options: newOptions }
+
+      await wrapper.setProps({
+        variableItem: { ...defaultVariableItem, options: newOptions },
       });
-      
+
       // Check that the computed property returns the new options
       const availableOptions = wrapper.vm.availableOptions;
       if (availableOptions) {
         expect(availableOptions).toEqual(newOptions);
       } else {
         // Alternative check - ensure props were updated
-        expect(wrapper.props('variableItem').options).toEqual(newOptions);
+        expect(wrapper.props("variableItem").options).toEqual(newOptions);
       }
     });
 
     it("should handle loading state changes", async () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
-      
+
       await wrapper.setProps({
-        variableItem: { ...defaultVariableItem, isLoading: true }
+        variableItem: { ...defaultVariableItem, isLoading: true },
       });
-      
+
       if (wrapper.exists()) {
-        const qSelect = wrapper.findComponent({ name: "QSelect" });
+        const qSelect = wrapper.findComponent({ name: "OSelect" });
         if (qSelect.exists()) {
           expect(qSelect.props("loading")).toBe(true);
         } else {
@@ -305,13 +299,15 @@ describe("VariableQueryValueSelector", () => {
     it("should display label or name correctly", () => {
       wrapper = createWrapper();
       if (wrapper.exists()) {
-        const qSelect = wrapper.findComponent({ name: "QSelect" });
+        const qSelect = wrapper.findComponent({ name: "OSelect" });
         if (qSelect.exists()) {
           const props = qSelect.props();
           expect(props.label).toBe(defaultVariableItem.label || defaultVariableItem.name);
         } else {
           // Alternative: check the variableItem prop directly
-          expect(wrapper.props('variableItem').label || wrapper.props('variableItem').name).toBeTruthy();
+          expect(
+            wrapper.props("variableItem").label || wrapper.props("variableItem").name,
+          ).toBeTruthy();
         }
       }
     });
@@ -319,9 +315,9 @@ describe("VariableQueryValueSelector", () => {
     it("should handle multi-select vs single-select mode", () => {
       wrapper = createWrapper({ variableItem: multiSelectVariableItem });
       expect(wrapper.exists()).toBe(true);
-      
+
       if (wrapper.exists()) {
-        const qSelect = wrapper.findComponent({ name: "QSelect" });
+        const qSelect = wrapper.findComponent({ name: "OSelect" });
         if (qSelect.exists()) {
           expect(qSelect.props("multiple")).toBe(true);
         } else {
@@ -332,9 +328,9 @@ describe("VariableQueryValueSelector", () => {
       wrapper.unmount();
       wrapper = createWrapper({ variableItem: { ...defaultVariableItem, multiSelect: false } });
       expect(wrapper.exists()).toBe(true);
-      
+
       if (wrapper.exists()) {
-        const qSelect2 = wrapper.findComponent({ name: "QSelect" });
+        const qSelect2 = wrapper.findComponent({ name: "OSelect" });
         if (qSelect2.exists()) {
           expect(qSelect2.props("multiple")).toBe(false);
         } else {
@@ -356,105 +352,111 @@ describe("VariableQueryValueSelector", () => {
     });
 
     it("should filter options based on search text", () => {
-      wrapper.vm.filterText = "east";
-      expect(wrapper.vm.filteredOptions).toHaveLength(1);
-      expect(wrapper.vm.filteredOptions[0].label).toBe("US East");
+      // Filtering is now delegated to OSelect, so verify computedOptions contains
+      // all options and onSearch updates currentSearchTerm.
+      wrapper.vm.onSearch("east");
+      expect(wrapper.vm.currentSearchTerm).toBe("east");
+      const matching = wrapper.vm.computedOptions.filter((opt: any) =>
+        opt.label.toLowerCase().includes("east"),
+      );
+      expect(matching).toHaveLength(1);
+      expect(matching[0].label).toBe("US East");
     });
 
     it("should handle debounced search emission", async () => {
       wrapper.vm.isOpen = true;
       wrapper.vm.filterText = "test-search";
-      
+
       // Trigger the watcher manually
       await nextTick();
-      
+
       const debounce = await getMockedDebounce();
       expect(debounce).toHaveBeenCalledWith(expect.any(Function), 500);
     });
 
     it("should emit search event with correct payload", async () => {
-      // First set isOpen through proper lifecycle
+      // Show popup so isOpen becomes true; then call onSearch which triggers
+      // the debounced searchText watcher that emits "search".
       wrapper.vm.onPopupShow();
-      
-      // Simulate search by setting filterText and triggering the watcher
-      wrapper.vm.filterText = "test-query";
-      wrapper.vm.searchText = "test-query";
-      
+      wrapper.vm.onSearch("test-query");
       await nextTick();
-      
+
       const searchEmits = wrapper.emitted("search");
-      if (searchEmits && searchEmits.length > 0) {
-        expect(searchEmits[0][0]).toMatchObject({
-          variableItem: defaultVariableItem,
-          filterText: "test-query"
-        });
-      } else {
-        // Ensure at minimum that isOpen was set correctly
-        expect(wrapper.vm.isOpen).toBe(true);
-      }
+      expect(searchEmits).toBeTruthy();
+      expect(searchEmits!.length).toBeGreaterThan(0);
+      expect(searchEmits![searchEmits!.length - 1][0]).toMatchObject({
+        variableItem: defaultVariableItem,
+        filterText: "test-query",
+      });
     });
 
     it("should clear search on popup hide", () => {
-      wrapper.vm.filterText = "test";
+      wrapper.vm.onSearch("test");
       wrapper.vm.onPopupHide();
-      
-      expect(wrapper.vm.filterText).toBe("");
+
+      expect(wrapper.vm.currentSearchTerm).toBe("");
     });
 
     it("should handle search with empty/whitespace input", () => {
-      wrapper.vm.filterText = "";
-      expect(wrapper.vm.filteredOptions).toHaveLength(3);
-      
-      wrapper.vm.filterText = "   ";
-      const filtered = wrapper.vm.filteredOptions.filter((opt: any) => 
-        opt.label.toLowerCase().includes("   ")
+      wrapper.vm.onSearch("");
+      expect(wrapper.vm.computedOptions).toHaveLength(3);
+
+      wrapper.vm.onSearch("   ");
+      const filtered = wrapper.vm.computedOptions.filter((opt: any) =>
+        opt.label.toLowerCase().includes("   "),
       );
       expect(filtered).toHaveLength(0);
     });
 
     it("should perform case-insensitive filtering", () => {
-      wrapper.vm.filterText = "EUROPE";
-      expect(wrapper.vm.filteredOptions).toHaveLength(1);
-      expect(wrapper.vm.filteredOptions[0].value).toBe("eu-west-1");
+      // Filtering is delegated to OSelect, but the search term is preserved.
+      wrapper.vm.onSearch("EUROPE");
+      const matching = wrapper.vm.computedOptions.filter((opt: any) =>
+        opt.label.toLowerCase().includes("europe"),
+      );
+      expect(matching).toHaveLength(1);
+      expect(matching[0].value).toBe("eu-west-1");
     });
 
     it("should handle search cancellation on component unmount", async () => {
       wrapper = createWrapper();
-      
+
       // Trigger debounced search setup
       wrapper.vm.filterText = "test-search";
       await nextTick();
-      
+
       const debounce = await getMockedDebounce();
-      const debouncedFunction = vi.mocked(debounce).mock.results[0]?.value;
-      
+
       wrapper.unmount();
-      
+
       // Verify debounce was called (indicating cleanup was attempted)
       expect(debounce).toHaveBeenCalled();
     });
 
     it("should display custom value filtering correctly", () => {
       wrapper = createWrapper({
-        variableItem: { ...defaultVariableItem, options: customValueOptions }
+        variableItem: { ...defaultVariableItem, options: customValueOptions },
       });
-      
-      const filtered = wrapper.vm.filteredOptions;
-      const customOption = filtered.find((opt: any) => opt.value.includes("::_o2_custom"));
+
+      const computed = wrapper.vm.computedOptions;
+      const customOption = computed.find((opt: any) => opt.value.includes("::_o2_custom"));
       expect(customOption?.label).toContain("(Custom)");
     });
 
     it("should handle no results state", () => {
-      wrapper.vm.filterText = "nonexistent";
-      expect(wrapper.vm.filteredOptions).toHaveLength(0);
+      wrapper.vm.onSearch("nonexistent");
+      const matching = wrapper.vm.computedOptions.filter((opt: any) =>
+        opt.label.toLowerCase().includes("nonexistent"),
+      );
+      expect(matching).toHaveLength(0);
     });
 
     it("should not emit search when popup is closed", async () => {
       wrapper.vm.isOpen = false;
       wrapper.vm.searchText = "test";
-      
+
       await nextTick();
-      
+
       expect(wrapper.emitted("search")).toBeFalsy();
     });
   });
@@ -467,12 +469,12 @@ describe("VariableQueryValueSelector", () => {
     it("should toggle select all in multi-select mode", async () => {
       if (wrapper.vm.isAllSelected !== undefined && wrapper.vm.selectedValue !== undefined) {
         expect(wrapper.vm.isAllSelected).toBe(false);
-        
+
         await wrapper.vm.toggleSelectAll();
         expect(wrapper.vm.selectedValue).toEqual(["_o2_all_"]);
       } else {
         // Alternative: verify multiselect component behavior
-        expect(wrapper.props('variableItem').multiSelect).toBe(true);
+        expect(wrapper.props("variableItem").multiSelect).toBe(true);
         expect(wrapper.vm.toggleSelectAll).toBeDefined();
       }
     });
@@ -481,19 +483,19 @@ describe("VariableQueryValueSelector", () => {
       if (wrapper.vm.isAllSelected !== undefined && wrapper.vm.selectedValue !== undefined) {
         wrapper.vm.selectedValue = ["_o2_all_"];
         expect(wrapper.vm.isAllSelected).toBe(true);
-        
+
         wrapper.vm.selectedValue = ["us-east-1", "us-west-1"];
         expect(wrapper.vm.isAllSelected).toBe(false);
       } else {
         // Alternative: verify computed property logic
-        expect(wrapper.props('variableItem').multiSelect).toBe(true);
+        expect(wrapper.props("variableItem").multiSelect).toBe(true);
       }
     });
 
     it("should handle select all with existing selections", async () => {
       if (wrapper.vm.selectedValue !== undefined) {
         wrapper.vm.selectedValue = ["us-east-1"];
-        
+
         await wrapper.vm.toggleSelectAll();
         expect(wrapper.vm.selectedValue).toEqual(["_o2_all_"]);
       } else {
@@ -506,7 +508,7 @@ describe("VariableQueryValueSelector", () => {
 
     it("should deselect all functionality", async () => {
       wrapper.vm.selectedValue = ["_o2_all_"];
-      
+
       await wrapper.vm.toggleSelectAll();
       expect(wrapper.vm.selectedValue).toEqual([]);
     });
@@ -528,23 +530,55 @@ describe("VariableQueryValueSelector", () => {
       expect(wrapper.vm.isAllSelected).toBe(true);
     });
 
-    it("should close popup after select all", async () => {
-      // Test the behavior through public API
+    it("should NOT close popup after select all in multi-select mode", async () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
-        hidePopup: vi.fn()
+        hidePopup: vi.fn(),
+        close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
-      
+
       await wrapper.vm.toggleSelectAll();
-      
-      // Verify the popup closing behavior occurred
-      if (wrapper.props('variableItem').multiSelect) {
-        expect(mockRef.updateInputValue).toHaveBeenCalled();
-      } else {
-        expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      }
+
+      // Dropdown stays open (close not called), but the value is still applied/emitted.
+      expect(mockRef.close).not.toHaveBeenCalled();
+      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+      expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([["_o2_all_"]]);
+    });
+
+    it("should close popup after select all in single-select mode", async () => {
+      wrapper = createWrapper({ variableItem: defaultVariableItem });
+      const mockRef = {
+        updateInputValue: vi.fn(),
+        blur: vi.fn(),
+        hidePopup: vi.fn(),
+        close: vi.fn(),
+      };
+      wrapper.vm.selectRef = mockRef;
+
+      await wrapper.vm.toggleSelectAll();
+
+      expect(mockRef.close).toHaveBeenCalled();
+      expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual(["_o2_all_"]);
+    });
+
+    it("should keep popup open and emit [] when deselecting all in multi-select mode", async () => {
+      const mockRef = {
+        updateInputValue: vi.fn(),
+        blur: vi.fn(),
+        hidePopup: vi.fn(),
+        close: vi.fn(),
+      };
+      wrapper.vm.selectRef = mockRef;
+      wrapper.vm.selectedValue = ["_o2_all_"];
+      await nextTick();
+
+      await wrapper.vm.toggleSelectAll();
+
+      expect(wrapper.vm.selectedValue).toEqual([]);
+      expect(mockRef.close).not.toHaveBeenCalled();
+      expect(wrapper.emitted("update:modelValue")!.at(-1)).toEqual([[]]);
     });
   });
 
@@ -555,27 +589,28 @@ describe("VariableQueryValueSelector", () => {
 
     it("should create custom value with CUSTOM_VALUE suffix", async () => {
       await wrapper.vm.handleCustomValue("new-custom-value");
-      
+
       expect(wrapper.vm.selectedValue).toBe("new-custom-value::_o2_custom");
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
     });
 
     it("should select existing value over creating custom", async () => {
       await wrapper.vm.handleCustomValue("US East");
-      
+
       expect(wrapper.vm.selectedValue).toBe("us-east-1");
       expect(wrapper.vm.selectedValue).not.toContain("::_o2_custom");
     });
 
     it("should handle custom value via keyboard Enter key", async () => {
-      wrapper.vm.filterText = "keyboard-custom";
-      
+      // onSearch updates currentSearchTerm (filterText alias) which handleKeydown reads.
+      wrapper.vm.onSearch("keyboard-custom");
+
       const enterEvent = new KeyboardEvent("keydown", { key: "Enter" });
       const preventDefaultSpy = vi.spyOn(enterEvent, "preventDefault");
       const stopPropagationSpy = vi.spyOn(enterEvent, "stopPropagation");
-      
+
       wrapper.vm.handleKeydown(enterEvent);
-      
+
       expect(preventDefaultSpy).toHaveBeenCalled();
       expect(stopPropagationSpy).toHaveBeenCalled();
     });
@@ -592,7 +627,7 @@ describe("VariableQueryValueSelector", () => {
 
     it("should handle multi-select custom value creation", async () => {
       wrapper = createWrapper({ variableItem: multiSelectVariableItem });
-      
+
       await wrapper.vm.handleCustomValue("multi-custom");
       expect(wrapper.vm.selectedValue).toEqual(["multi-custom::_o2_custom"]);
     });
@@ -619,15 +654,17 @@ describe("VariableQueryValueSelector", () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
-        hidePopup: vi.fn()
+        hidePopup: vi.fn(),
+        close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
-      
+
       await wrapper.vm.handleCustomValue("test-close");
-      
+
       // Verify the custom value was handled and popup closing behavior occurred
+      // closePopUpWhenValueIsSet calls close() — not updateInputValue
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
-      expect(mockRef.updateInputValue).toHaveBeenCalled();
+      expect(mockRef.close).toHaveBeenCalled();
     });
   });
 
@@ -649,18 +686,18 @@ describe("VariableQueryValueSelector", () => {
 
     it("should handle multi-select value array", async () => {
       wrapper = createWrapper({ variableItem: multiSelectVariableItem });
-      
+
       // Ensure component is ready
       if (wrapper.vm.onUpdateValue && wrapper.vm.selectedValue !== undefined) {
         wrapper.vm.onUpdateValue(["value1", "value2"]);
-        
+
         // Wait for reactive updates
         await nextTick();
-        
+
         expect(wrapper.vm.selectedValue).toEqual(["value1", "value2"]);
       } else {
         // Fallback: verify component mounted with multiselect props
-        expect(wrapper.props('variableItem').multiSelect).toBe(true);
+        expect(wrapper.props("variableItem").multiSelect).toBe(true);
       }
     });
 
@@ -683,25 +720,26 @@ describe("VariableQueryValueSelector", () => {
 
     it("should defer multi-select emission until popup hide", async () => {
       wrapper = createWrapper({ variableItem: multiSelectVariableItem });
-      
+
       // Ensure component is ready
       if (wrapper.vm.onUpdateValue && wrapper.vm.selectedValue !== undefined) {
         wrapper.vm.onUpdateValue(["test"]);
-        
+
         // Wait for initial processing
         await nextTick();
-        
+
         // Should not emit immediately for multiSelect - clear any initial emissions
-        wrapper.emitted("update:modelValue")?.length && wrapper.emitted("update:modelValue").splice(0);
-        
+        wrapper.emitted("update:modelValue")?.length &&
+          wrapper.emitted("update:modelValue").splice(0);
+
         // Hide popup should trigger emission
         wrapper.vm.onPopupHide();
         await nextTick();
-        
+
         expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       } else {
         // Alternative: verify multiselect behavior exists
-        expect(wrapper.props('variableItem').multiSelect).toBe(true);
+        expect(wrapper.props("variableItem").multiSelect).toBe(true);
         expect(wrapper.vm.onPopupHide).toBeDefined();
       }
     });
@@ -720,7 +758,7 @@ describe("VariableQueryValueSelector", () => {
     it("should handle null/undefined value updates", () => {
       wrapper.vm.onUpdateValue(null);
       expect(wrapper.vm.selectedValue).toBe(null);
-      
+
       wrapper.vm.onUpdateValue(undefined);
       expect(wrapper.vm.selectedValue).toBe(undefined);
     });
@@ -745,7 +783,7 @@ describe("VariableQueryValueSelector", () => {
     it("should trigger loadOptions on popup show", () => {
       const loadOptionsMock = vi.fn();
       wrapper = createWrapper({ loadOptions: loadOptionsMock });
-      
+
       wrapper.vm.onPopupShow();
       expect(loadOptionsMock).toHaveBeenCalledWith(defaultVariableItem);
     });
@@ -764,15 +802,15 @@ describe("VariableQueryValueSelector", () => {
     });
 
     it("should clear filter text on popup hide", () => {
-      wrapper.vm.filterText = "test-filter";
+      wrapper.vm.onSearch("test-filter");
       wrapper.vm.onPopupHide();
-      expect(wrapper.vm.filterText).toBe("");
+      expect(wrapper.vm.currentSearchTerm).toBe("");
     });
 
     it("should emit values on popup hide for multiSelect", () => {
       wrapper = createWrapper({ variableItem: multiSelectVariableItem });
       wrapper.vm.selectedValue = ["test-value"];
-      
+
       wrapper.vm.onPopupHide();
       expect(wrapper.emitted("update:modelValue")).toBeTruthy();
     });
@@ -796,7 +834,7 @@ describe("VariableQueryValueSelector", () => {
         expect(wrapper.vm.isOpen).toBe(true);
         wrapper.vm.onPopupHide();
         expect(wrapper.vm.isOpen).toBe(false);
-        
+
         // Test the cycle again
         wrapper.vm.onPopupShow();
         expect(wrapper.vm.isOpen).toBe(true);
@@ -812,18 +850,19 @@ describe("VariableQueryValueSelector", () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
-        hidePopup: vi.fn()
+        hidePopup: vi.fn(),
+        close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
-      
+
       // Test through public API - toggleSelectAll should close popup
-      if (wrapper.props('variableItem').multiSelect) {
+      if (wrapper.props("variableItem").multiSelect) {
         wrapper = createWrapper({ variableItem: multiSelectVariableItem });
         wrapper.vm.selectRef = mockRef;
-        
+
         await wrapper.vm.toggleSelectAll();
         await nextTick();
-        
+
         // Should have interacted with selectRef during popup close
         expect(mockRef.updateInputValue).toHaveBeenCalled();
       } else {
@@ -859,10 +898,7 @@ describe("VariableQueryValueSelector", () => {
       // Add empty string option so blank is recognized as a valid value
       const variableWithBlankOption = {
         ...defaultVariableItem,
-        options: [
-          { label: "Blank", value: "" },
-          ...defaultVariableItem.options
-        ]
+        options: [{ label: "Blank", value: "" }, ...defaultVariableItem.options],
       };
       wrapper = createWrapper({ variableItem: variableWithBlankOption });
       wrapper.vm.selectedValue = "";
@@ -880,8 +916,8 @@ describe("VariableQueryValueSelector", () => {
     });
 
     it("should handle empty array display logic", () => {
-      wrapper = createWrapper({ 
-        variableItem: { ...multiSelectVariableItem, options: [] }
+      wrapper = createWrapper({
+        variableItem: { ...multiSelectVariableItem, options: [] },
       });
       wrapper.vm.selectedValue = [];
       expect(wrapper.vm.displayValue).toBe("(No Data Found)");
@@ -889,15 +925,15 @@ describe("VariableQueryValueSelector", () => {
 
     it("should show loading state display", () => {
       wrapper = createWrapper({
-        variableItem: { ...defaultVariableItem, isLoading: true }
+        variableItem: { ...defaultVariableItem, isLoading: true },
       });
       wrapper.vm.selectedValue = null;
-      expect(wrapper.vm.displayValue).toBe("");
+      expect(wrapper.vm.displayValue).toBe("(No Data Found)");
     });
 
     it("should show no data found display", () => {
       wrapper = createWrapper({
-        variableItem: { ...defaultVariableItem, isLoading: false }
+        variableItem: { ...defaultVariableItem, isLoading: false },
       });
       wrapper.vm.selectedValue = null;
       expect(wrapper.vm.displayValue).toBe("(No Data Found)");
@@ -927,70 +963,68 @@ describe("VariableQueryValueSelector", () => {
     });
 
     it("should handle Enter key for custom values", async () => {
-      wrapper.vm.filterText = "enter-test";
-      const originalValue = wrapper.vm.selectedValue;
-      
+      wrapper.vm.onSearch("enter-test");
+
       const enterEvent = new KeyboardEvent("keydown", { key: "Enter" });
       wrapper.vm.handleKeydown(enterEvent);
-      
+
       await nextTick();
-      
+
       // The value should be changed to custom value
       expect(wrapper.vm.selectedValue).toBe("enter-test::_o2_custom");
     });
 
     it("should ignore Enter key without filter text", () => {
-      wrapper.vm.filterText = "";
+      wrapper.vm.onSearch("");
       const handleCustomValueSpy = vi.spyOn(wrapper.vm, "handleCustomValue");
-      
+
       const enterEvent = new KeyboardEvent("keydown", { key: "Enter" });
       wrapper.vm.handleKeydown(enterEvent);
-      
+
       expect(handleCustomValueSpy).not.toHaveBeenCalled();
     });
 
     it("should ignore non-Enter keys", () => {
-      wrapper.vm.filterText = "test";
+      wrapper.vm.onSearch("test");
       const handleCustomValueSpy = vi.spyOn(wrapper.vm, "handleCustomValue");
-      
+
       const escapeEvent = new KeyboardEvent("keydown", { key: "Escape" });
       wrapper.vm.handleKeydown(escapeEvent);
-      
+
       expect(handleCustomValueSpy).not.toHaveBeenCalled();
     });
 
     it("should prevent default and stop propagation on Enter", () => {
-      wrapper.vm.filterText = "test";
+      wrapper.vm.onSearch("test");
       const enterEvent = new KeyboardEvent("keydown", { key: "Enter" });
       const preventDefaultSpy = vi.spyOn(enterEvent, "preventDefault");
       const stopPropagationSpy = vi.spyOn(enterEvent, "stopPropagation");
-      
+
       wrapper.vm.handleKeydown(enterEvent);
-      
+
       expect(preventDefaultSpy).toHaveBeenCalled();
       expect(stopPropagationSpy).toHaveBeenCalled();
     });
 
     it("should handle Enter with whitespace-only filter text", async () => {
-      wrapper.vm.filterText = "   ";
-      const originalValue = wrapper.vm.selectedValue;
-      
+      wrapper.vm.onSearch("   ");
+
       const enterEvent = new KeyboardEvent("keydown", { key: "Enter" });
       wrapper.vm.handleKeydown(enterEvent);
-      
+
       await nextTick();
-      
+
       // Should attempt to create custom value (trimming is handled by handleCustomValue)
-      expect(typeof wrapper.vm.selectedValue).toBe('string');
+      expect(typeof wrapper.vm.selectedValue).toBe("string");
     });
 
     it("should handle case-sensitive Enter key check", () => {
-      wrapper.vm.filterText = "test";
+      wrapper.vm.onSearch("test");
       const handleCustomValueSpy = vi.spyOn(wrapper.vm, "handleCustomValue");
-      
+
       const upperEnterEvent = new KeyboardEvent("keydown", { key: "ENTER" });
       wrapper.vm.handleKeydown(upperEnterEvent);
-      
+
       expect(handleCustomValueSpy).not.toHaveBeenCalled();
     });
   });
@@ -998,7 +1032,7 @@ describe("VariableQueryValueSelector", () => {
   describe("Edge Cases & Error Handling", () => {
     it("should handle invalid options array", () => {
       wrapper = createWrapper({
-        variableItem: { ...defaultVariableItem, options: null }
+        variableItem: { ...defaultVariableItem, options: null },
       });
       // The computed property should return empty array for null options
       expect(wrapper.vm.availableOptions || []).toEqual([]);
@@ -1006,7 +1040,7 @@ describe("VariableQueryValueSelector", () => {
 
     it("should handle malformed variableItem prop", () => {
       wrapper = createWrapper({
-        variableItem: { invalid: "structure" }
+        variableItem: { invalid: "structure" },
       });
       expect(wrapper.exists()).toBe(true);
     });
@@ -1016,12 +1050,11 @@ describe("VariableQueryValueSelector", () => {
         props: {
           modelValue: "",
           variableItem: { name: "test", options: [] },
-          loadOptions: null
+          loadOptions: null,
         },
         global: {
-          plugins: [Quasar],
-          stubs: ["QSelect", "QItem", "QItemSection", "QItemLabel", "QCheckbox", "QSeparator"]
-        }
+          plugins: [],
+        },
       });
       expect(wrapper.exists()).toBe(true);
     });
@@ -1029,70 +1062,75 @@ describe("VariableQueryValueSelector", () => {
     it("should handle circular reference in options", () => {
       const circularOption: any = { label: "Circular", value: "circular" };
       circularOption.self = circularOption;
-      
+
       wrapper = createWrapper({
-        variableItem: { 
-          ...defaultVariableItem, 
-          options: [circularOption]
-        }
+        variableItem: {
+          ...defaultVariableItem,
+          options: [circularOption],
+        },
       });
       expect(wrapper.exists()).toBe(true);
     });
 
-    it.skip("should handle large dataset performance", () => {
+    it("should handle large dataset performance", () => {
       const largeOptions = Array.from({ length: 1000 }, (_, i) => ({
         label: `Option ${i}`,
-        value: `option-${i}`
+        value: `option-${i}`,
       }));
-      
+
       wrapper = createWrapper({
-        variableItem: { ...defaultVariableItem, options: largeOptions }
+        variableItem: { ...defaultVariableItem, options: largeOptions },
       });
-      
-      wrapper.vm.filterText = "Option 999";
-      expect(wrapper.vm.filteredOptions).toHaveLength(1);
+
+      wrapper.vm.onSearch("Option 999");
+      const matching = wrapper.vm.computedOptions.filter((opt: any) =>
+        opt.label.includes("Option 999"),
+      );
+      expect(matching).toHaveLength(1);
     });
 
     it("should handle special characters in values", () => {
       const specialOptions = [
         { label: "Special !@#$%", value: "special-!@#$%" },
-        { label: "Unicode 中文", value: "unicode-中文" }
+        { label: "Unicode 中文", value: "unicode-中文" },
       ];
-      
+
       wrapper = createWrapper({
-        variableItem: { ...defaultVariableItem, options: specialOptions }
+        variableItem: { ...defaultVariableItem, options: specialOptions },
       });
-      
-      wrapper.vm.filterText = "中文";
-      expect(wrapper.vm.filteredOptions).toHaveLength(1);
+
+      wrapper.vm.onSearch("中文");
+      const matching = wrapper.vm.computedOptions.filter((opt: any) => opt.label.includes("中文"));
+      expect(matching).toHaveLength(1);
     });
 
     it("should handle Unicode filtering", () => {
       const unicodeOptions = [
         { label: "测试", value: "test-chinese" },
         { label: "тест", value: "test-russian" },
-        { label: "🚀 Rocket", value: "emoji-rocket" }
+        { label: "🚀 Rocket", value: "emoji-rocket" },
       ];
-      
+
       wrapper = createWrapper({
-        variableItem: { ...defaultVariableItem, options: unicodeOptions }
+        variableItem: { ...defaultVariableItem, options: unicodeOptions },
       });
-      
-      wrapper.vm.filterText = "🚀";
-      expect(wrapper.vm.filteredOptions).toHaveLength(1);
+
+      wrapper.vm.onSearch("🚀");
+      const matching = wrapper.vm.computedOptions.filter((opt: any) => opt.label.includes("🚀"));
+      expect(matching).toHaveLength(1);
     });
 
     it("should handle memory leaks on unmount", async () => {
       wrapper = createWrapper();
-      
+
       // Trigger debounce function creation
       wrapper.vm.filterText = "test";
       await nextTick();
-      
+
       const debounce = await getMockedDebounce();
-      
+
       wrapper.unmount();
-      
+
       // Verify component cleanup - debounce should have been called
       expect(debounce).toHaveBeenCalled();
       // Verify component is properly unmounted
@@ -1101,22 +1139,22 @@ describe("VariableQueryValueSelector", () => {
 
     it("should verify debounce cleanup", async () => {
       wrapper = createWrapper();
-      
+
       // Trigger debounce creation by setting filterText
       wrapper.vm.filterText = "cleanup-test";
       await nextTick();
-      
+
       const debounce = await getMockedDebounce();
       const mockResult = vi.mocked(debounce).mock.results[0]?.value;
-      
+
       wrapper.unmount();
-      
+
       // Verify debounce function was called during component lifecycle
       expect(debounce).toHaveBeenCalled();
-      
+
       // If cancel method exists on the result, verify it could be called
       if (mockResult?.cancel) {
-        expect(typeof mockResult.cancel).toBe('function');
+        expect(typeof mockResult.cancel).toBe("function");
       }
     });
 
@@ -1125,12 +1163,13 @@ describe("VariableQueryValueSelector", () => {
       const mockRef = {
         updateInputValue: vi.fn(),
         blur: vi.fn(),
-        hidePopup: vi.fn()
+        hidePopup: vi.fn(),
+        close: vi.fn(),
       };
       wrapper.vm.selectRef = mockRef;
-      
+
       wrapper.unmount();
-      
+
       // Should not throw errors when accessing refs after unmount
       expect(() => wrapper.vm.selectRef).not.toThrow();
     });

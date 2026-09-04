@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,37 +15,73 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-ma-md">
-    <CopyContent class="q-mt-sm" :content="content" />
-    <div class="tw:text-[16px]">
-      <div class="tw:font-bold tw:pt-6 tw:pb-2">
-        Check further documentation at:
+  <div class="m-3 mt-1">
+    <div class="mb-4">
+      <div
+        data-test="aws-config-page-title"
+        class="text-text-heading m-0 mb-1.5 text-2xl leading-tight font-semibold"
+      >
+        {{ t("ingestion.awsSetup.title") }}
       </div>
-      <ol class="tw:list-decimal tw:pl-[27px]">
-        <li
-          v-for="awsService in awsServiceLinks"
-          :key="awsService.name"
-          class="tw:py-1"
-        >
-          <a
-            :href="awsService.link"
-            class="tw:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-            >{{ awsService.name }}</a
-          >
-        </li>
-      </ol>
+      <div data-test="aws-config-page-description" class="text-text-secondary m-0 mb-4 text-sm">
+        {{ t("ingestion.awsSetup.description") }}
+      </div>
+
+      <OTabs v-model="activeTab" dense class="aws-tabs" align="left">
+        <OTab
+          name="quick-setup"
+          :label="t('ingestion.awsSetup.quickSetup')"
+          data-test="aws-quick-setup-tab"
+        />
+        <OTab
+          name="individual-services"
+          :label="t('ingestion.awsSetup.individualServices')"
+          data-test="aws-individual-services-tab"
+        />
+      </OTabs>
+    </div>
+
+    <OSeparator class="mb-6" />
+
+    <OTabPanels v-model="activeTab" animated>
+      <OTabPanel name="quick-setup">
+        <AWSQuickSetup />
+      </OTabPanel>
+
+      <OTabPanel name="individual-services">
+        <AWSIndividualServices :initialSearch="searchQuery" />
+      </OTabPanel>
+    </OTabPanels>
+
+    <div class="mt-8">
+      <div class="mb-3">
+        <div class="text-text-heading m-0 text-base font-semibold">
+          {{ t("ingestion.awsSetup.manualTitle") }}
+        </div>
+        <div class="text-text-secondary m-0 text-sm">
+          {{ t("ingestion.awsSetup.manualDescription") }}
+        </div>
+      </div>
+      <CopyContent :content="raw(content)" />
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { defineComponent, ref, watch } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
+import { useRoute } from "vue-router";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
+import AWSQuickSetup from "./AWSQuickSetup.vue";
+import AWSIndividualServices from "./AWSIndividualServices.vue";
 
 export default defineComponent({
   name: "AWSConfig",
@@ -56,10 +92,50 @@ export default defineComponent({
     currUserEmail: {
       type: String,
     },
+    searchQuery: {
+      type: String,
+      default: "",
+    },
   },
-  components: { CopyContent },
+  components: {
+    OSeparator,
+    OTabs,
+    OTab,
+    OTabPanels,
+    OTabPanel,
+    CopyContent,
+    AWSQuickSetup,
+    AWSIndividualServices,
+  },
   setup(props) {
+    const { t } = useI18nTyped();
     const store = useStore();
+    const route = useRoute();
+
+    // If there's a search query, default to individual-services tab
+    const activeTab = ref(
+      props.searchQuery || route.query.search ? "individual-services" : "quick-setup",
+    );
+
+    // Watch for search query changes in route
+    watch(
+      () => route.query.search,
+      (newSearch) => {
+        if (newSearch) {
+          activeTab.value = "individual-services";
+        }
+      },
+    );
+
+    // Watch for searchQuery prop changes
+    watch(
+      () => props.searchQuery,
+      (newSearch) => {
+        if (newSearch) {
+          activeTab.value = "individual-services";
+        }
+      },
+    );
     // TODO OK: Create interface for ENDPOINT
     const endpoint: any = ref({
       url: "",
@@ -79,84 +155,15 @@ export default defineComponent({
     const content = `HTTP Endpoint: ${endpoint.value.url}/aws/${store.state.selectedOrganization.identifier}/default/_kinesis_firehose
 Access Key: [BASIC_PASSCODE]`;
 
-    const awsServiceLinks = [
-      {
-        name: "Application Load Balancer (ALB)",
-        link: "https://short.openobserve.ai/aws/alb",
-      },
-      {
-        name: "Cloudwatch Logs",
-        link: "https://short.openobserve.ai/aws/cloudwatch-logs",
-      },
-      {
-        name: "Cost and Usage Reports (CUR)",
-        link: "https://short.openobserve.ai/aws-cur",
-      },
-      {
-        name: "Eventbridge/Cloudwatch Events",
-        link: "https://short.openobserve.ai/aws/eventbridge",
-      },
-      {
-        name: "Cloudwatch Metrics",
-        link: "https://short.openobserve.ai/aws/cloudwatch-metrics",
-      },
-      {
-        name: "VPC Flow Logs",
-        link: "https://short.openobserve.ai/aws/vpc-flow-logs",
-      },
-      {
-        name: "EC2 Instance Logs",
-        link: "https://short.openobserve.ai/aws/ec2",
-      },
-      {
-        name: "Cognito",
-        link: "https://short.openobserve.ai/aws/cognito",
-      },
-      {
-        name: "AWS Network Firewall Logs",
-        link: "https://short.openobserve.ai/aws/network-firewall-logs",
-      },
-      {
-        name: "AWS WAF Logs",
-        link: "https://short.openobserve.ai/aws/waf",
-      },
-      {
-        name: "RDS Logs",
-        link: "https://short.openobserve.ai/aws/rds",
-      },
-      {
-        name: "DynamoDB Logs",
-        link: "https://short.openobserve.ai/aws/dynamodb",
-      },
-      {
-        name: "Route53 Logs",
-        link: "https://short.openobserve.ai/aws/route53",
-      },
-      {
-        name: "API Gateway Logs",
-        link: "https://short.openobserve.ai/aws/api-gateway",
-      },
-      {
-        name: "Cloudfront Logs",
-        link: "https://short.openobserve.ai/aws/cloudfront",
-      },
-      {
-        name: "AWS IoT",
-        link: "https://docs.aws.amazon.com/firehose/latest/dev/writing-with-iot.html",
-      },
-      {
-        name: "Other AWS Services (Via Kinesis streams)",
-        link: "https://docs.aws.amazon.com/streams/latest/dev/using-other-services.html",
-      },
-    ];
-
     return {
+      raw,
+      t,
       store,
       config,
       endpoint,
       content,
       getImageURL,
-      awsServiceLinks,
+      activeTab,
     };
   },
 });

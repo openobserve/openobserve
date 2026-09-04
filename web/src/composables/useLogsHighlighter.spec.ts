@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,7 @@
 
 import { describe, expect, it, beforeEach, vi } from "vitest";
 import { useLogsHighlighter } from "@/composables/useLogsHighlighter";
+import { gt } from "@/types/i18n";
 
 // Mock store
 const mockStore = {
@@ -62,22 +63,24 @@ vi.mock("@/utils/logs/keyValueParser", () => ({
   })),
 }));
 
+// Mock html utils
+vi.mock("@/utils/html", () => ({
+  escapeHtml: vi.fn((text) => text.replace(/</g, "&lt;").replace(/>/g, "&gt;")),
+}));
+
 // Mock textHighlighter composable
 vi.mock("@/composables/useTextHighlighter", () => ({
   useTextHighlighter: () => ({
-    processTextWithHighlights: vi.fn((text, query, colors, quotes) =>
-      `<span class="log-string">${text}</span>`
-    ),
-    extractKeywords: vi.fn((query) => query ? ["test"] : []),
+    processTextWithHighlights: vi.fn((text) => `<span class="log-string">${text}</span>`),
+    extractKeywords: vi.fn((query) => (query ? ["test"] : [])),
     splitTextByKeywords: vi.fn((text, keywords) =>
-      keywords.length ? [
-        { text: text, isHighlighted: true }
-      ] : [
-        { text: text, isHighlighted: false }
-      ]
+      keywords.length
+        ? [{ text: text, isHighlighted: true }]
+        : [{ text: text, isHighlighted: false }],
     ),
-    escapeHtml: vi.fn((text) => text.replace(/</g, "&lt;").replace(/>/g, "&gt;")),
-    isFTSColumn: vi.fn((columnId, value, keys) => keys.includes(columnId) && typeof value === "string"),
+    isFTSColumn: vi.fn(
+      (columnId, value, keys) => keys.includes(columnId) && typeof value === "string",
+    ),
   }),
 }));
 
@@ -96,6 +99,8 @@ vi.mock("vue", () => ({
   ref: vi.fn((value) => ({ value })),
   computed: vi.fn((fn) => ({ value: fn() })),
   watch: vi.fn(),
+  getCurrentInstance: vi.fn(() => null),
+  onBeforeUnmount: vi.fn(),
 }));
 
 describe("useLogsHighlighter", () => {
@@ -103,13 +108,21 @@ describe("useLogsHighlighter", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    logsHighlighter = useLogsHighlighter();
+    logsHighlighter = useLogsHighlighter(gt);
   });
 
   describe("processHitsInChunks", () => {
     const mockHits = [
-      { message: "Error occurred", level: "error", _p_timestamp: 1640995200000 },
-      { message: "Warning message", level: "warn", _p_timestamp: 1640995300000 },
+      {
+        message: "Error occurred",
+        level: "error",
+        _p_timestamp: 1640995200000,
+      },
+      {
+        message: "Warning message",
+        level: "warn",
+        _p_timestamp: 1640995300000,
+      },
       { message: "Info message", level: "info", _p_timestamp: 1640995400000 },
     ];
 
@@ -128,7 +141,7 @@ describe("useLogsHighlighter", () => {
         false,
         "match_all('error')",
         2,
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -142,7 +155,7 @@ describe("useLogsHighlighter", () => {
         false,
         "",
         50,
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -155,7 +168,7 @@ describe("useLogsHighlighter", () => {
         false,
         "",
         50,
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -168,7 +181,7 @@ describe("useLogsHighlighter", () => {
         true,
         "",
         50,
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -181,7 +194,7 @@ describe("useLogsHighlighter", () => {
         false,
         "",
         1, // Very small chunk size
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -194,7 +207,7 @@ describe("useLogsHighlighter", () => {
         false,
         "match_all('error')",
         50,
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -204,7 +217,7 @@ describe("useLogsHighlighter", () => {
       const columnsWithAccessor = [
         {
           id: "custom",
-          accessorFn: (row: any) => `${row.level}: ${row.message}`
+          accessorFn: (row: any) => `${row.level}: ${row.message}`,
         },
       ];
 
@@ -214,7 +227,7 @@ describe("useLogsHighlighter", () => {
         false,
         "",
         50,
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       expect(result).toBeDefined();
@@ -227,7 +240,7 @@ describe("useLogsHighlighter", () => {
         false,
         "",
         1, // Small chunk size to trigger multiple async operations
-        selectedStreamFtsKeys
+        selectedStreamFtsKeys,
       );
 
       // Should process all hits successfully
@@ -363,28 +376,19 @@ describe("useLogsHighlighter", () => {
 
   describe("simpleHighlight", () => {
     it("should highlight matching keywords", () => {
-      const result = logsHighlighter.simpleHighlight(
-        "error in system",
-        "match_all('error')"
-      );
+      const result = logsHighlighter.simpleHighlight("error in system", "match_all('error')");
 
       expect(result).toContain("error in system");
     });
 
     it("should handle text without keywords", () => {
-      const result = logsHighlighter.simpleHighlight(
-        "normal text",
-        ""
-      );
+      const result = logsHighlighter.simpleHighlight("normal text", "");
 
       expect(result).toContain("normal text");
     });
 
     it("should escape HTML in text", () => {
-      const result = logsHighlighter.simpleHighlight(
-        "<script>alert('xss')</script>",
-        ""
-      );
+      const result = logsHighlighter.simpleHighlight("<script>alert('xss')</script>", "");
 
       expect(result).toContain("&lt;script&gt;");
     });
@@ -448,9 +452,7 @@ describe("useLogsHighlighter", () => {
     });
 
     it("should detect UUIDs", () => {
-      const result = logsHighlighter.detectSemanticType(
-        "550e8400-e29b-41d4-a716-446655440000"
-      );
+      const result = logsHighlighter.detectSemanticType("550e8400-e29b-41d4-a716-446655440000");
       expect(result).toBe("uuid");
     });
 
@@ -483,24 +485,14 @@ describe("useLogsHighlighter", () => {
 
   describe("createStyledSpanWithClasses", () => {
     it("should create span with appropriate classes", () => {
-      const result = logsHighlighter.createStyledSpanWithClasses(
-        "192.168.1.1",
-        "ip",
-        "",
-        false
-      );
+      const result = logsHighlighter.createStyledSpanWithClasses("192.168.1.1", "ip", "", false);
 
       expect(result).toContain("log-ip");
       expect(result).toContain("192.168.1.1");
     });
 
     it("should add quotes when requested", () => {
-      const result = logsHighlighter.createStyledSpanWithClasses(
-        "test text",
-        "string",
-        "",
-        true
-      );
+      const result = logsHighlighter.createStyledSpanWithClasses("test text", "string", "", true);
 
       expect(result).toContain('"');
     });
@@ -510,7 +502,7 @@ describe("useLogsHighlighter", () => {
         "error message",
         "string",
         "match_all('error')",
-        false
+        false,
       );
 
       expect(result).toContain("error message");
@@ -585,8 +577,8 @@ describe("useLogsHighlighter", () => {
       const obj = {
         user: {
           id: 123,
-          email: "user@example.com"
-        }
+          email: "user@example.com",
+        },
       };
       const result = logsHighlighter.colorizeObjectWithClasses(obj, true, true, "");
 
@@ -643,12 +635,7 @@ describe("useLogsHighlighter", () => {
     });
 
     it("should maintain backward compatibility with createStyledSpan", () => {
-      const result = logsHighlighter.createStyledSpan(
-        "192.168.1.1",
-        "#1976d2",
-        "",
-        false
-      );
+      const result = logsHighlighter.createStyledSpan("192.168.1.1", "#1976d2", "", false);
 
       expect(result).toContain("192.168.1.1");
     });
@@ -668,14 +655,9 @@ describe("useLogsHighlighter", () => {
       ];
 
       const startTime = Date.now();
-      const result = await logsHighlighter.processHitsInChunks(
-        largeHits,
-        columns,
-        false,
-        "",
-        100,
-        ["message"]
-      );
+      const result = await logsHighlighter.processHitsInChunks(largeHits, columns, false, "", 100, [
+        "message",
+      ]);
       const endTime = Date.now();
 
       expect(result).toBeDefined();

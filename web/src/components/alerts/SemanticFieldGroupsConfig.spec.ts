@@ -1,0 +1,435 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, expect, it, vi } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
+import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+
+import SemanticFieldGroupsConfig from "@/components/alerts/SemanticFieldGroupsConfig.vue";
+
+// Minimal stub for the in-house ODrawer. Mirrors the public surface
+// the component depends on (v-model:open) so tests can deterministically
+// observe and drive open/close state without rendering teleported content.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: ["open", "width", "showClose", "persistent", "size", "title", "subTitle"],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div data-test-stub="o-drawer" :data-open="open">
+      <div data-test-stub="o-drawer-header"><slot name="header" /></div>
+      <div data-test-stub="o-drawer-body"><slot /></div>
+      <div data-test-stub="o-drawer-footer"><slot name="footer" /></div>
+    </div>
+  `,
+};
+
+const makeGroup = (overrides: Record<string, any> = {}) => ({
+  id: `group-${Math.random().toString(36).slice(2)}`,
+  display: "Test Group",
+  group: "Infrastructure",
+  fields: ["host", "service"],
+  ...overrides,
+});
+
+const sampleGroups = [
+  makeGroup({ id: "g1", display: "Host Group", group: "Infrastructure", fields: ["host"] }),
+  makeGroup({ id: "g2", display: "Service Group", group: "Infrastructure", fields: ["service"] }),
+  makeGroup({ id: "g3", display: "Region Group", group: "Cloud", fields: ["region"] }),
+];
+
+async function mountComp(props: Record<string, any> = {}) {
+  return mount(SemanticFieldGroupsConfig, {
+    props: {
+      semanticFieldGroups: sampleGroups,
+      fingerprintFields: [],
+      showFingerprintFields: false,
+      ...props,
+    },
+    global: {
+      plugins: [i18n, store],
+      stubs: {
+        ODrawer: ODrawerStub,
+        SemanticGroupItem: {
+          template: '<div data-test="semantic-group-item-stub"></div>',
+          props: ["group"],
+          emits: ["update", "delete"],
+        },
+        ImportSemanticGroupsDrawer: {
+          name: "ImportSemanticGroupsDrawer",
+          template: '<div data-test="import-drawer-stub"></div>',
+          props: ["currentGroups", "orgId", "open"],
+          emits: ["apply", "update:open"],
+        },
+      },
+    },
+  });
+}
+
+describe("SemanticFieldGroupsConfig - rendering", () => {
+  it("renders without errors", async () => {
+    const w = await mountComp();
+    expect(w.exists()).toBe(true);
+  });
+
+  it("renders the export button", async () => {
+    const w = await mountComp();
+    expect(w.find('[data-test="correlation-semanticfieldgroup-export-json-btn"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("renders the import button", async () => {
+    const w = await mountComp();
+    expect(w.find('[data-test="correlation-semanticfieldgroup-import-json-btn"]').exists()).toBe(
+      true,
+    );
+  });
+
+  it("renders the add custom group button", async () => {
+    const w = await mountComp();
+    expect(
+      w.find('[data-test="correlation-semanticfieldgroup-add-custom-group-btn"]').exists(),
+    ).toBe(true);
+  });
+
+  it("renders a category tab per category with counts", async () => {
+    const w = await mountComp();
+    await flushPromises();
+    expect(w.find('[data-test="semantic-group-category-tab-Infrastructure"]').exists()).toBe(true);
+    expect(w.find('[data-test="semantic-group-category-tab-Cloud"]').exists()).toBe(true);
+  });
+
+  it("renders the search input", async () => {
+    const w = await mountComp();
+    expect(w.find('[data-test="semantic-group-search-input"]').exists()).toBe(true);
+  });
+
+  it("hides the category strip when there are no groups", async () => {
+    const w = await mountComp({ semanticFieldGroups: [] });
+    expect(w.find('[data-test="semantic-group-search-input"]').exists()).toBe(false);
+  });
+
+  it("renders the ImportSemanticGroupsDrawer for import flow", async () => {
+    const w = await mountComp();
+    expect(w.findComponent({ name: "ImportSemanticGroupsDrawer" }).exists()).toBe(true);
+  });
+});
+
+describe("SemanticFieldGroupsConfig - group loading", () => {
+  it("loads provided groups into localGroups", async () => {
+    const w = await mountComp();
+    expect((w.vm as any).localGroups.length).toBeGreaterThan(0);
+    const ids = (w.vm as any).localGroups.map((g: any) => g.id);
+    expect(ids).toContain("g1");
+  });
+});
+
+describe("SemanticFieldGroupsConfig - categoryOptions computed", () => {
+  it("returns empty array when no groups", async () => {
+    const w = await mountComp({ semanticFieldGroups: [] });
+    expect((w.vm as any).categoryOptions).toEqual([]);
+  });
+
+  it("returns unique categories from groups", async () => {
+    const w = await mountComp();
+    const categories = (w.vm as any).categoryOptions.map((o: any) => o.value);
+    expect(categories).toContain("Infrastructure");
+    expect(categories).toContain("Cloud");
+  });
+
+  it("includes count of groups per category", async () => {
+    const w = await mountComp();
+    const infra = (w.vm as any).categoryOptions.find((o: any) => o.value === "Infrastructure");
+    expect(infra.count).toBe(2);
+  });
+
+  it("sorts categories alphabetically", async () => {
+    const w = await mountComp();
+    const cats = (w.vm as any).categoryOptions.map((o: any) => o.value);
+    const sorted = [...cats].sort();
+    expect(cats).toEqual(sorted);
+  });
+});
+
+describe("SemanticFieldGroupsConfig - filteredGroups computed", () => {
+  it("returns all groups when no category selected", async () => {
+    const w = await mountComp();
+    (w.vm as any).selectedCategory = null;
+    expect((w.vm as any).filteredGroups).toEqual((w.vm as any).localGroups);
+  });
+
+  it("filters groups by selected category", async () => {
+    const w = await mountComp();
+    (w.vm as any).selectedCategory = "Cloud";
+    const filtered = (w.vm as any).filteredGroups;
+    expect(filtered.every((g: any) => g.group === "Cloud")).toBe(true);
+  });
+
+  it("returns empty array when no groups match category", async () => {
+    const w = await mountComp();
+    (w.vm as any).selectedCategory = "NonExistent";
+    expect((w.vm as any).filteredGroups).toHaveLength(0);
+  });
+});
+
+describe("SemanticFieldGroupsConfig - search", () => {
+  it("matches groups by display name across categories", async () => {
+    const w = await mountComp();
+    (w.vm as any).selectedCategory = "Infrastructure";
+    (w.vm as any).searchQuery = "region";
+    const visible = (w.vm as any).visibleGroups;
+    expect(visible.map((g: any) => g.id)).toEqual(["g3"]);
+  });
+
+  it("matches groups by field name", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "service";
+    const ids = (w.vm as any).visibleGroups.map((g: any) => g.id);
+    expect(ids).toContain("g2");
+  });
+
+  it("matches groups by id", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "g1";
+    const ids = (w.vm as any).visibleGroups.map((g: any) => g.id);
+    expect(ids).toContain("g1");
+  });
+
+  it("is case-insensitive", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "REGION";
+    expect((w.vm as any).visibleGroups.map((g: any) => g.id)).toEqual(["g3"]);
+  });
+
+  it("orders results by category name", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "group";
+    const cats = (w.vm as any).visibleGroups.map((g: any) => g.group);
+    expect(cats).toEqual([...cats].sort());
+  });
+
+  it("tab counts flip to match counts while searching", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "region";
+    const infra = (w.vm as any).categoryTabs.find((o: any) => o.value === "Infrastructure");
+    const cloud = (w.vm as any).categoryTabs.find((o: any) => o.value === "Cloud");
+    expect(infra.count).toBe(0);
+    expect(cloud.count).toBe(1);
+  });
+
+  it("clicking a category tab clears the search", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "region";
+    (w.vm as any).onCategoryTabChange("Infrastructure");
+    expect((w.vm as any).searchQuery).toBe("");
+    expect((w.vm as any).selectedCategory).toBe("Infrastructure");
+  });
+
+  it("addGroup clears the search so the new group stays visible", async () => {
+    const w = await mountComp();
+    (w.vm as any).selectedCategory = "Infrastructure";
+    (w.vm as any).searchQuery = "region";
+    (w.vm as any).addGroup();
+    expect((w.vm as any).searchQuery).toBe("");
+    expect((w.vm as any).visibleGroups[0].display).toBe("");
+  });
+
+  it("shows the no-results message for a non-matching query", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "zzz-no-such-thing";
+    await flushPromises();
+    expect(w.find('[data-test="semantic-group-search-no-results"]').exists()).toBe(true);
+  });
+
+  it("removeGroupByFilter removes the right group from search results", async () => {
+    const w = await mountComp();
+    (w.vm as any).searchQuery = "region";
+    (w.vm as any).removeGroupByFilter(0);
+    expect((w.vm as any).localGroups.some((g: any) => g.id === "g3")).toBe(false);
+    expect((w.vm as any).localGroups.some((g: any) => g.id === "g1")).toBe(true);
+  });
+});
+
+describe("SemanticFieldGroupsConfig - addGroup", () => {
+  it("addGroup prepends a new group to localGroups", async () => {
+    const w = await mountComp();
+    const before = (w.vm as any).localGroups.length;
+    (w.vm as any).addGroup();
+    expect((w.vm as any).localGroups.length).toBe(before + 1);
+  });
+
+  it("new group has empty display name", async () => {
+    const w = await mountComp();
+    (w.vm as any).addGroup();
+    expect((w.vm as any).localGroups[0].display).toBe("");
+  });
+
+  it("new group uses current selectedCategory", async () => {
+    const w = await mountComp();
+    (w.vm as any).selectedCategory = "Infrastructure";
+    (w.vm as any).addGroup();
+    expect((w.vm as any).localGroups[0].group).toBe("Infrastructure");
+  });
+
+  it("addGroup emits update:semanticFieldGroups", async () => {
+    const w = await mountComp();
+    (w.vm as any).addGroup();
+    expect(w.emitted("update:semanticFieldGroups")).toBeTruthy();
+  });
+
+  it("new group is inserted at index 0 with empty display and fields", async () => {
+    const w = await mountComp();
+    (w.vm as any).addGroup();
+    const newGroup = (w.vm as any).localGroups[0];
+    expect(newGroup.display).toBe("");
+    expect(newGroup.fields).toHaveLength(0);
+    expect(newGroup.id).toBeTruthy();
+  });
+});
+
+describe("SemanticFieldGroupsConfig - removeGroupByFilter", () => {
+  it("removes the group at the given filtered index", async () => {
+    const w = await mountComp();
+    (w.vm as any).selectedCategory = "Infrastructure";
+    const before = (w.vm as any).localGroups.length;
+    (w.vm as any).removeGroupByFilter(0);
+    expect((w.vm as any).localGroups.length).toBe(before - 1);
+  });
+
+  it("emits update:semanticFieldGroups after removal", async () => {
+    const w = await mountComp();
+    (w.vm as any).selectedCategory = "Infrastructure";
+    (w.vm as any).removeGroupByFilter(0);
+    expect(w.emitted("update:semanticFieldGroups")).toBeTruthy();
+  });
+
+  it("removes group ID from fingerprint fields if present", async () => {
+    const w = await mountComp({ fingerprintFields: ["g1"] });
+    (w.vm as any).selectedCategory = "Infrastructure";
+    const idx = (w.vm as any).filteredGroups.findIndex((g: any) => g.id === "g1");
+    if (idx >= 0) {
+      (w.vm as any).removeGroupByFilter(idx);
+      expect((w.vm as any).localFingerprintFields).not.toContain("g1");
+    }
+  });
+});
+
+describe("SemanticFieldGroupsConfig - export groups", () => {
+  it("exportGroups creates a download link and clicks it", async () => {
+    const w = await mountComp();
+    const createObjURL = vi.fn().mockReturnValue("blob:url");
+    const revokeObjURL = vi.fn();
+    const origCreate = URL.createObjectURL;
+    const origRevoke = URL.revokeObjectURL;
+    URL.createObjectURL = createObjURL;
+    URL.revokeObjectURL = revokeObjURL;
+
+    const clickSpy = vi.fn();
+    const origCreate2 = document.createElement.bind(document);
+    vi.spyOn(document, "createElement").mockImplementation((tag: string) => {
+      const el = origCreate2(tag);
+      if (tag === "a") vi.spyOn(el as HTMLAnchorElement, "click").mockImplementation(clickSpy);
+      return el;
+    });
+
+    (w.vm as any).exportGroups();
+    expect(createObjURL).toHaveBeenCalled();
+    expect(clickSpy).toHaveBeenCalled();
+
+    URL.createObjectURL = origCreate;
+    URL.revokeObjectURL = origRevoke;
+    vi.restoreAllMocks();
+  });
+});
+
+describe("SemanticFieldGroupsConfig - import drawer", () => {
+  it("navigateToImport sets showImportDrawer to true", async () => {
+    const w = await mountComp();
+    (w.vm as any).navigateToImport();
+    expect((w.vm as any).showImportDrawer).toBe(true);
+  });
+
+  it("ImportSemanticGroupsDrawer receives open=true after navigateToImport", async () => {
+    const w = await mountComp();
+    (w.vm as any).navigateToImport();
+    await flushPromises();
+    const importDrawer = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    expect(importDrawer.props("open")).toBe(true);
+  });
+
+  it("ImportSemanticGroupsDrawer is closed by default", async () => {
+    const w = await mountComp();
+    const importDrawer = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    expect(importDrawer.props("open")).toBe(false);
+  });
+
+  it("closes drawer when ImportSemanticGroupsDrawer emits update:open=false", async () => {
+    const w = await mountComp();
+    (w.vm as any).showImportDrawer = true;
+    await flushPromises();
+    const importDrawer = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    await importDrawer.vm.$emit("update:open", false);
+    expect((w.vm as any).showImportDrawer).toBe(false);
+  });
+
+  it("renders ImportSemanticGroupsDrawer for import flow", async () => {
+    const w = await mountComp();
+    expect(w.findComponent({ name: "ImportSemanticGroupsDrawer" }).exists()).toBe(true);
+  });
+
+  it("closes drawer when child ImportSemanticGroupsDrawer emits update:open=false", async () => {
+    const w = await mountComp();
+    (w.vm as any).showImportDrawer = true;
+    await flushPromises();
+    const importChild = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    await importChild.vm.$emit("update:open", false);
+    expect((w.vm as any).showImportDrawer).toBe(false);
+  });
+
+  it("merges imported groups when ImportSemanticGroupsDrawer emits apply", async () => {
+    const w = await mountComp();
+    const importChild = w.findComponent({ name: "ImportSemanticGroupsDrawer" });
+    const imported = [makeGroup({ id: "imported-1", display: "Imported", group: "NewCat" })];
+    await importChild.vm.$emit("apply", imported);
+    expect((w.vm as any).localGroups.some((g: any) => g.id === "imported-1")).toBe(true);
+    expect(w.emitted("update:semanticFieldGroups")).toBeTruthy();
+  });
+});
+
+describe("SemanticFieldGroupsConfig - showFingerprintFields", () => {
+  it("shows fingerprint checkboxes when showFingerprintFields=true", async () => {
+    const w = await mountComp({
+      showFingerprintFields: true,
+      fingerprintFields: [],
+    });
+    expect(w.find('[data-test="fingerprint-field-checkbox-g1"]').exists()).toBe(true);
+  });
+
+  it("hides fingerprint checkboxes when showFingerprintFields=false", async () => {
+    const w = await mountComp({ showFingerprintFields: false });
+    expect(w.find('[data-test="fingerprint-field-checkbox-g1"]').exists()).toBe(false);
+  });
+});
+
+describe("SemanticFieldGroupsConfig - watcher", () => {
+  it("updates localGroups when semanticFieldGroups prop changes", async () => {
+    const w = await mountComp();
+    const newGroups = [makeGroup({ id: "new-g", display: "New Group", group: "NewCat" })];
+    await w.setProps({ semanticFieldGroups: newGroups });
+    await flushPromises();
+    expect((w.vm as any).localGroups.some((g: any) => g.id === "new-g")).toBe(true);
+  });
+});

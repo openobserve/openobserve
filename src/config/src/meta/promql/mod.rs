@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,6 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use arrow_schema::Schema;
 use hashbrown::HashMap;
 use proto::prometheus_rpc;
 use regex::Regex;
@@ -75,6 +76,49 @@ pub const BUCKET_LABEL: &str = "le";
 pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
+/// Suffix of the extra table that declares the `(__hash__, _timestamp)` file order.
+pub const HASH_SORTED_TABLE_SUFFIX: &str = "__hash_sorted";
+
+/// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
+///
+/// Values in these columns are therefore not guaranteed to be stable within a
+/// contiguous hash run. Consumers such as the metrics sidecar index must not
+/// use them to prune a run from a query; the final PromQL filter can still
+/// evaluate them against the data rows.
+pub const METRICS_HASH_EXCLUDED_LABELS: &[&str] = &[
+    VALUE_LABEL,
+    HASH_LABEL,
+    EXEMPLARS_LABEL,
+    "is_monotonic",
+    "trace_id",
+    "span_id",
+    crate::TIMESTAMP_COL_NAME,
+    crate::INDEX_FIELD_NAME_FOR_ALL,
+];
+
+#[inline]
+pub fn is_metrics_hash_excluded_label(name: &str) -> bool {
+    METRICS_HASH_EXCLUDED_LABELS.contains(&name)
+}
+
+pub fn get_metadata_from_schema(schema: &Schema) -> Option<Metadata> {
+    let metadata = schema.metadata.get(METADATA_LABEL)?;
+    let mut metadata: Metadata = match crate::utils::json::from_str(metadata) {
+        Ok(metadata) => metadata,
+        Err(e) => {
+            log::warn!("failed to parse {METADATA_LABEL} from schema: {e}, input: {metadata}");
+            return None;
+        }
+    };
+
+    // Historical schemas can contain a JSON-quoted family name. Parse it as a JSON string when
+    // possible, otherwise preserve the already-clean value.
+    let family_name = metadata.metric_family_name.trim();
+    metadata.metric_family_name = crate::utils::json::from_str::<String>(family_name)
+        .unwrap_or_else(|_| family_name.to_string());
+
+    Some(metadata)
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Metric<'a> {
@@ -492,5 +536,237 @@ mod tests {
               "error": "invalid parameter \\\"start\\\": Invalid time value for 'start': cannot parse \\\"foobar\\\" to a valid timestamp"
             }"#
         ]].assert_eq(&serde_json::to_string_pretty(&err).unwrap());
+    }
+
+    #[test]
+    fn test_metric_type_from_str() {
+        assert_eq!(MetricType::from("counter"), MetricType::Counter);
+        assert_eq!(MetricType::from("COUNTER"), MetricType::Counter);
+        assert_eq!(MetricType::from("gauge"), MetricType::Gauge);
+        assert_eq!(MetricType::from("histogram"), MetricType::Histogram);
+        assert_eq!(
+            MetricType::from("gaugehistogram"),
+            MetricType::GaugeHistogram
+        );
+        assert_eq!(
+            MetricType::from("exponentialhistogram"),
+            MetricType::ExponentialHistogram
+        );
+        assert_eq!(MetricType::from("summary"), MetricType::Summary);
+        assert_eq!(MetricType::from("info"), MetricType::Info);
+        assert_eq!(MetricType::from("stateset"), MetricType::StateSet);
+        // unknown input → Unknown
+        assert_eq!(MetricType::from("unknown"), MetricType::Unknown);
+        assert_eq!(MetricType::from("bogus"), MetricType::Unknown);
+        assert_eq!(MetricType::from(""), MetricType::Unknown);
+    }
+
+    #[test]
+    fn test_metadata_new() {
+        let md = Metadata::new("http_requests_total");
+        assert_eq!(md.metric_family_name, "http_requests_total");
+        assert_eq!(md.metric_type, MetricType::Unknown);
+        assert!(md.help.is_empty());
+        assert!(md.unit.is_empty());
+    }
+
+    #[test]
+    fn test_metadata_object_from_metadata() {
+        let md = Metadata {
+            metric_type: MetricType::Counter,
+            metric_family_name: "req_total".to_string(),
+            help: "Total requests".to_string(),
+            unit: "requests".to_string(),
+        };
+        let obj = MetadataObject::from(md);
+        let json = serde_json::to_value(&obj).unwrap();
+        assert_eq!(json["type"], "counter");
+        assert_eq!(json["help"], "Total requests");
+        assert_eq!(json["unit"], "requests");
+    }
+
+    #[test]
+    fn test_function_from_str() {
+        assert_eq!(Function::from("avg"), Function::Avg);
+        assert_eq!(Function::from("AVG"), Function::Avg);
+        assert_eq!(Function::from("sum"), Function::Sum);
+        assert_eq!(Function::from("count"), Function::Count);
+        assert_eq!(Function::from("min"), Function::Min);
+        assert_eq!(Function::from("max"), Function::Max);
+        assert_eq!(Function::from("last"), Function::Last);
+        assert_eq!(Function::from("first"), Function::First);
+    }
+
+    #[test]
+    #[should_panic(expected = "invalid downsampling function")]
+    fn test_function_from_str_invalid_panics() {
+        let _ = Function::from("median");
+    }
+
+    #[test]
+    fn test_function_fun() {
+        assert_eq!(Function::Avg.fun(), "avg");
+        assert_eq!(Function::Sum.fun(), "sum");
+        assert_eq!(Function::Count.fun(), "count");
+        assert_eq!(Function::Min.fun(), "min");
+        assert_eq!(Function::Max.fun(), "max");
+        assert_eq!(Function::Last.fun(), "last_value");
+        assert_eq!(Function::First.fun(), "first_value");
+    }
+
+    #[test]
+    fn test_downsampling_rule_is_match() {
+        use regex::Regex;
+
+        let rule_with_regex = DownsamplingRule {
+            rule: Some(Regex::new("^http_").unwrap()),
+            function: Function::Avg,
+            offset: 0,
+            step: 60,
+        };
+        assert!(rule_with_regex.is_match("http_requests_total"));
+        assert!(!rule_with_regex.is_match("grpc_requests_total"));
+
+        // no rule → always matches
+        let rule_no_regex = DownsamplingRule {
+            rule: None,
+            function: Function::Sum,
+            offset: 0,
+            step: 60,
+        };
+        assert!(rule_no_regex.is_match("anything"));
+        assert!(rule_no_regex.is_match(""));
+    }
+
+    #[test]
+    fn test_metric_type_display_exponential_histogram() {
+        assert_eq!(
+            MetricType::ExponentialHistogram.to_string(),
+            "exponentialhistogram"
+        );
+    }
+
+    #[test]
+    fn test_api_error_type_serde_all_variants() {
+        let cases = [
+            (ApiErrorType::Timeout, "\"timeout\""),
+            (ApiErrorType::Cancelled, "\"cancelled\""),
+            (ApiErrorType::Exec, "\"exec\""),
+            (ApiErrorType::BadData, "\"bad_data\""),
+            (ApiErrorType::Internal, "\"internal\""),
+            (ApiErrorType::Unavailable, "\"unavailable\""),
+            (ApiErrorType::NotFound, "\"not_found\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+        }
+    }
+
+    #[test]
+    fn test_api_func_response_with_trace_id() {
+        let ok = ApiFuncResponse::ok("data".to_owned(), Some("trace-abc".to_string()));
+        let json = serde_json::to_string(&ok).unwrap();
+        assert!(json.contains("trace-abc"));
+        assert!(json.contains("\"status\":\"success\""));
+
+        let err = ApiFuncResponse::<()>::err_internal("fail", Some("trace-xyz".to_string()));
+        let json2 = serde_json::to_string(&err).unwrap();
+        assert!(json2.contains("trace-xyz"));
+    }
+
+    #[test]
+    fn test_metric_type_empty_serde() {
+        let s = serde_json::to_string(&MetricType::Empty).unwrap();
+        assert_eq!(s, "\"\"");
+        let back: MetricType = serde_json::from_str(&s).unwrap();
+        assert_eq!(back, MetricType::Empty);
+    }
+
+    #[test]
+    fn test_metric_type_empty_display() {
+        assert_eq!(MetricType::Empty.to_string(), "empty");
+    }
+
+    #[test]
+    fn test_metric_type_all_variants_serde_roundtrip() {
+        let variants = [
+            MetricType::Unknown,
+            MetricType::Counter,
+            MetricType::Gauge,
+            MetricType::Histogram,
+            MetricType::GaugeHistogram,
+            MetricType::ExponentialHistogram,
+            MetricType::Summary,
+            MetricType::Info,
+            MetricType::StateSet,
+        ];
+        for variant in variants {
+            let s = serde_json::to_string(&variant).unwrap();
+            let back: MetricType = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_status_serde() {
+        let s = serde_json::to_string(&Status::Success).unwrap();
+        assert_eq!(s, "\"success\"");
+        let e = serde_json::to_string(&Status::Error).unwrap();
+        assert_eq!(e, "\"error\"");
+    }
+
+    #[test]
+    fn test_downsampling_rule_default() {
+        let rule = DownsamplingRule {
+            rule: None,
+            function: Function::Avg,
+            offset: 0,
+            step: 0,
+        };
+        assert!(rule.rule.is_none());
+        assert_eq!(rule.function, Function::Avg);
+    }
+
+    #[test]
+    fn test_request_range_query_skip_fields_absent_when_empty() {
+        let q = RequestRangeQuery {
+            query: None,
+            start: None,
+            end: None,
+            step: None,
+            timeout: None,
+            use_cache: None,
+            use_streaming: None,
+            search_type: None,
+            regions: vec![],
+            clusters: vec![],
+        };
+        let json = serde_json::to_value(&q).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("search_type"));
+        assert!(!obj.contains_key("regions"));
+        assert!(!obj.contains_key("clusters"));
+    }
+
+    #[test]
+    fn test_request_range_query_skip_fields_present_when_set() {
+        let q = RequestRangeQuery {
+            query: None,
+            start: None,
+            end: None,
+            step: None,
+            timeout: None,
+            use_cache: None,
+            use_streaming: None,
+            search_type: Some(SearchEventType::UI),
+            regions: vec!["us-east".to_string()],
+            clusters: vec!["c1".to_string()],
+        };
+        let json = serde_json::to_value(&q).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("search_type"));
+        assert!(obj.contains_key("regions"));
+        assert!(obj.contains_key("clusters"));
     }
 }

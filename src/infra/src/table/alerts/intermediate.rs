@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -115,6 +115,17 @@ pub struct QueryAggregation {
     pub group_by: Option<Vec<String>>,
     pub function: AggFunction,
     pub having: QueryCondition,
+    /// Warning threshold for multi-level aggregation alerts (alerts_2.md §4.4).
+    /// `#[serde(default)]` so aggregations stored before this field existed
+    /// still deserialize — absent = single-level.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warning_value: Option<f64>,
+    /// Per-group evaluation opt-in (alerts_2.md M-9). `#[serde(default)]` for
+    /// the same reason as `warning_value`: rows written before this field
+    /// existed must read back as `false`, which is what keeps every
+    /// pre-existing grouped alert on its legacy evaluation path.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub multi_alert: bool,
 }
 
 impl From<MetaAggregation> for QueryAggregation {
@@ -123,6 +134,8 @@ impl From<MetaAggregation> for QueryAggregation {
             group_by: value.group_by,
             function: value.function.into(),
             having: value.having.into(),
+            warning_value: value.warning_value,
+            multi_alert: value.multi_alert,
         }
     }
 }
@@ -133,6 +146,8 @@ impl From<QueryAggregation> for MetaAggregation {
             group_by: value.group_by,
             function: value.function.into(),
             having: value.having.into(),
+            warning_value: value.warning_value,
+            multi_alert: value.multi_alert,
         }
     }
 }
@@ -205,12 +220,16 @@ pub enum QueryType {
     Custom,
     Sql,
     Promql,
+    Slo,
 }
 
 impl QueryType {
     const CUSTOM: i16 = 0;
     const SQL: i16 = 1;
     const PROMQL: i16 = 2;
+    /// APPEND ONLY. This is the stored value in `alerts.query_type`; reusing
+    /// or reordering one would reinterpret every existing row.
+    const SLO: i16 = 3;
 }
 
 impl From<QueryType> for i16 {
@@ -219,6 +238,7 @@ impl From<QueryType> for i16 {
             QueryType::Custom => QueryType::CUSTOM,
             QueryType::Sql => QueryType::SQL,
             QueryType::Promql => QueryType::PROMQL,
+            QueryType::Slo => QueryType::SLO,
         }
     }
 }
@@ -231,6 +251,7 @@ impl TryFrom<i16> for QueryType {
             Self::CUSTOM => Ok(QueryType::Custom),
             Self::SQL => Ok(QueryType::Sql),
             Self::PROMQL => Ok(QueryType::Promql),
+            Self::SLO => Ok(QueryType::Slo),
             _ => Err(FromI16Error {
                 value,
                 ty: "QueryType".to_string(),
@@ -245,6 +266,7 @@ impl From<MetaQueryType> for QueryType {
             MetaQueryType::Custom => QueryType::Custom,
             MetaQueryType::SQL => QueryType::Sql,
             MetaQueryType::PromQL => QueryType::Promql,
+            MetaQueryType::Slo => QueryType::Slo,
         }
     }
 }
@@ -255,6 +277,7 @@ impl From<QueryType> for MetaQueryType {
             QueryType::Custom => MetaQueryType::Custom,
             QueryType::Sql => MetaQueryType::SQL,
             QueryType::Promql => MetaQueryType::PromQL,
+            QueryType::Slo => MetaQueryType::Slo,
         }
     }
 }
@@ -311,6 +334,14 @@ pub enum ConditionOperator {
     Contains,
     #[serde(rename = "not_contains")]
     NotContains,
+    #[serde(rename = "is_null")]
+    IsNull,
+    #[serde(rename = "is_not_null")]
+    IsNotNull,
+    #[serde(rename = "is_empty")]
+    IsEmpty,
+    #[serde(rename = "is_not_empty")]
+    IsNotEmpty,
 }
 
 impl From<MetaOperator> for ConditionOperator {
@@ -324,6 +355,10 @@ impl From<MetaOperator> for ConditionOperator {
             MetaOperator::LessThanEquals => Self::LessThanEquals,
             MetaOperator::Contains => Self::Contains,
             MetaOperator::NotContains => Self::NotContains,
+            MetaOperator::IsNull => Self::IsNull,
+            MetaOperator::IsNotNull => Self::IsNotNull,
+            MetaOperator::IsEmpty => Self::IsEmpty,
+            MetaOperator::IsNotEmpty => Self::IsNotEmpty,
         }
     }
 }
@@ -339,6 +374,10 @@ impl From<ConditionOperator> for MetaOperator {
             ConditionOperator::LessThanEquals => Self::LessThanEquals,
             ConditionOperator::Contains => Self::Contains,
             ConditionOperator::NotContains => Self::NotContains,
+            ConditionOperator::IsNull => Self::IsNull,
+            ConditionOperator::IsNotNull => Self::IsNotNull,
+            ConditionOperator::IsEmpty => Self::IsEmpty,
+            ConditionOperator::IsNotEmpty => Self::IsNotEmpty,
         }
     }
 }
@@ -441,6 +480,7 @@ pub enum QuerySearchEventType {
     DerivedStream,
     SearchJob,
     Download,
+    Insights,
 }
 
 impl QuerySearchEventType {
@@ -454,6 +494,7 @@ impl QuerySearchEventType {
     const DERIVED_STREAM: i16 = 7;
     const SEARCH_JOB: i16 = 8;
     const DOWNLOAD: i16 = 9;
+    const INSIGHTS: i16 = 10;
 }
 
 // Implementation for translating from intermediate representation into DB
@@ -471,6 +512,7 @@ impl From<QuerySearchEventType> for i16 {
             QuerySearchEventType::DerivedStream => QuerySearchEventType::DERIVED_STREAM,
             QuerySearchEventType::SearchJob => QuerySearchEventType::SEARCH_JOB,
             QuerySearchEventType::Download => QuerySearchEventType::DOWNLOAD,
+            QuerySearchEventType::Insights => QuerySearchEventType::INSIGHTS,
         }
     }
 }
@@ -492,6 +534,7 @@ impl TryFrom<i16> for QuerySearchEventType {
             Self::DERIVED_STREAM => Ok(QuerySearchEventType::DerivedStream),
             Self::SEARCH_JOB => Ok(QuerySearchEventType::SearchJob),
             Self::DOWNLOAD => Ok(QuerySearchEventType::Download),
+            Self::INSIGHTS => Ok(QuerySearchEventType::Insights),
             _ => Err(FromI16Error {
                 value,
                 ty: "SearchEventType".to_owned(),
@@ -513,6 +556,7 @@ impl From<MetaSearchEventType> for QuerySearchEventType {
             MetaSearchEventType::DerivedStream => Self::DerivedStream,
             MetaSearchEventType::SearchJob => Self::SearchJob,
             MetaSearchEventType::Download => Self::Download,
+            MetaSearchEventType::Insights => Self::Insights,
         }
     }
 }
@@ -530,6 +574,7 @@ impl From<QuerySearchEventType> for MetaSearchEventType {
             QuerySearchEventType::DerivedStream => Self::DerivedStream,
             QuerySearchEventType::SearchJob => Self::SearchJob,
             QuerySearchEventType::Download => Self::Download,
+            QuerySearchEventType::Insights => Self::Insights,
         }
     }
 }
@@ -539,6 +584,7 @@ pub enum StreamType {
     Logs,
     Metrics,
     Traces,
+    Profiles,
     EnrichmentTables,
     FileList,
     Metadata,
@@ -549,6 +595,7 @@ impl StreamType {
     const LOGS: &'static str = "logs";
     const METRICS: &'static str = "metrics";
     const TRACES: &'static str = "traces";
+    const PROFILES: &'static str = "profiles";
     const ENRICHMENT_TABLES: &'static str = "enrichment_tables";
     const FILE_LIST: &'static str = "file_list";
     const METADATA: &'static str = "metadata";
@@ -561,6 +608,7 @@ impl Display for StreamType {
             StreamType::Logs => StreamType::LOGS,
             StreamType::Metrics => StreamType::METRICS,
             StreamType::Traces => StreamType::TRACES,
+            StreamType::Profiles => StreamType::PROFILES,
             StreamType::EnrichmentTables => StreamType::ENRICHMENT_TABLES,
             StreamType::FileList => StreamType::FILE_LIST,
             StreamType::Metadata => StreamType::METADATA,
@@ -578,6 +626,7 @@ impl FromStr for StreamType {
             Self::LOGS => Ok(StreamType::Logs),
             Self::METRICS => Ok(StreamType::Metrics),
             Self::TRACES => Ok(StreamType::Traces),
+            Self::PROFILES => Ok(StreamType::Profiles),
             Self::ENRICHMENT_TABLES => Ok(StreamType::EnrichmentTables),
             Self::FILE_LIST => Ok(StreamType::FileList),
             Self::METADATA => Ok(StreamType::Metadata),
@@ -596,6 +645,7 @@ impl From<MetaStreamType> for StreamType {
             MetaStreamType::Logs => Self::Logs,
             MetaStreamType::Metrics => Self::Metrics,
             MetaStreamType::Traces => Self::Traces,
+            MetaStreamType::Profiles => Self::Profiles,
             MetaStreamType::ServiceGraph => Self::Metadata, // Map to Metadata for alerts
             MetaStreamType::EnrichmentTables => Self::EnrichmentTables,
             MetaStreamType::Filelist => Self::FileList,
@@ -611,6 +661,7 @@ impl From<StreamType> for MetaStreamType {
             StreamType::Logs => Self::Logs,
             StreamType::Metrics => Self::Metrics,
             StreamType::Traces => Self::Traces,
+            StreamType::Profiles => Self::Profiles,
             StreamType::EnrichmentTables => Self::EnrichmentTables,
             StreamType::FileList => Self::Filelist,
             StreamType::Metadata => Self::Metadata,
@@ -669,5 +720,804 @@ impl From<RowTemplateTypeDb> for config::meta::alerts::alert::RowTemplateType {
             RowTemplateTypeDb::String => config::meta::alerts::alert::RowTemplateType::String,
             RowTemplateTypeDb::Json => config::meta::alerts::alert::RowTemplateType::Json,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── TriggerFrequencyType ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_trigger_frequency_type_to_i16() {
+        assert_eq!(i16::from(TriggerFrequencyType::Cron), 0i16);
+        assert_eq!(i16::from(TriggerFrequencyType::Seconds), 1i16);
+    }
+
+    #[test]
+    fn test_trigger_frequency_type_try_from_i16() {
+        assert!(matches!(
+            TriggerFrequencyType::try_from(0i16),
+            Ok(TriggerFrequencyType::Cron)
+        ));
+        assert!(matches!(
+            TriggerFrequencyType::try_from(1i16),
+            Ok(TriggerFrequencyType::Seconds)
+        ));
+        assert!(TriggerFrequencyType::try_from(99i16).is_err());
+    }
+
+    #[test]
+    fn test_trigger_frequency_type_from_meta() {
+        assert!(matches!(
+            TriggerFrequencyType::from(MetaFrequencyType::Cron),
+            TriggerFrequencyType::Cron
+        ));
+        assert!(matches!(
+            TriggerFrequencyType::from(MetaFrequencyType::Minutes),
+            TriggerFrequencyType::Seconds
+        ));
+    }
+
+    #[test]
+    fn test_trigger_frequency_type_to_meta() {
+        assert!(matches!(
+            MetaFrequencyType::from(TriggerFrequencyType::Cron),
+            MetaFrequencyType::Cron
+        ));
+        assert!(matches!(
+            MetaFrequencyType::from(TriggerFrequencyType::Seconds),
+            MetaFrequencyType::Minutes
+        ));
+    }
+
+    // ── TriggerThresholdOperator ──────────────────────────────────────────────
+
+    #[test]
+    fn test_trigger_threshold_operator_display() {
+        assert_eq!(TriggerThresholdOperator::EqualTo.to_string(), "=");
+        assert_eq!(TriggerThresholdOperator::NotEqualTo.to_string(), "!=");
+        assert_eq!(TriggerThresholdOperator::GreaterThan.to_string(), ">");
+        assert_eq!(
+            TriggerThresholdOperator::GreaterThanEquals.to_string(),
+            ">="
+        );
+        assert_eq!(TriggerThresholdOperator::LessThan.to_string(), "<");
+        assert_eq!(TriggerThresholdOperator::LessThanEquals.to_string(), "<=");
+    }
+
+    #[test]
+    fn test_trigger_threshold_operator_from_str() {
+        assert!(matches!(
+            TriggerThresholdOperator::from_str("="),
+            Ok(TriggerThresholdOperator::EqualTo)
+        ));
+        assert!(matches!(
+            TriggerThresholdOperator::from_str("!="),
+            Ok(TriggerThresholdOperator::NotEqualTo)
+        ));
+        assert!(matches!(
+            TriggerThresholdOperator::from_str(">"),
+            Ok(TriggerThresholdOperator::GreaterThan)
+        ));
+        assert!(matches!(
+            TriggerThresholdOperator::from_str(">="),
+            Ok(TriggerThresholdOperator::GreaterThanEquals)
+        ));
+        assert!(matches!(
+            TriggerThresholdOperator::from_str("<"),
+            Ok(TriggerThresholdOperator::LessThan)
+        ));
+        assert!(matches!(
+            TriggerThresholdOperator::from_str("<="),
+            Ok(TriggerThresholdOperator::LessThanEquals)
+        ));
+        assert!(TriggerThresholdOperator::from_str("bad").is_err());
+    }
+
+    #[test]
+    fn test_trigger_threshold_operator_display_roundtrip() {
+        for op in [
+            TriggerThresholdOperator::EqualTo,
+            TriggerThresholdOperator::NotEqualTo,
+            TriggerThresholdOperator::GreaterThan,
+            TriggerThresholdOperator::GreaterThanEquals,
+            TriggerThresholdOperator::LessThan,
+            TriggerThresholdOperator::LessThanEquals,
+        ] {
+            let s = op.to_string();
+            let back = TriggerThresholdOperator::from_str(&s).unwrap();
+            assert_eq!(back.to_string(), s);
+        }
+    }
+
+    #[test]
+    fn test_trigger_threshold_operator_try_from_meta_operator() {
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::EqualTo).is_ok());
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::NotEqualTo).is_ok());
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::GreaterThan).is_ok());
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::GreaterThanEquals).is_ok());
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::LessThan).is_ok());
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::LessThanEquals).is_ok());
+        // non-threshold operators → Err
+        assert!(TriggerThresholdOperator::try_from(MetaOperator::Contains).is_err());
+    }
+
+    // ── AggFunction ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_agg_function_from_meta_all_variants() {
+        assert!(matches!(
+            AggFunction::from(MetaAggFunction::Avg),
+            AggFunction::Avg
+        ));
+        assert!(matches!(
+            AggFunction::from(MetaAggFunction::Min),
+            AggFunction::Min
+        ));
+        assert!(matches!(
+            AggFunction::from(MetaAggFunction::Max),
+            AggFunction::Max
+        ));
+        assert!(matches!(
+            AggFunction::from(MetaAggFunction::Sum),
+            AggFunction::Sum
+        ));
+        assert!(matches!(
+            AggFunction::from(MetaAggFunction::Count),
+            AggFunction::Count
+        ));
+        assert!(matches!(
+            AggFunction::from(MetaAggFunction::Median),
+            AggFunction::Median
+        ));
+        assert!(matches!(
+            AggFunction::from(MetaAggFunction::P50),
+            AggFunction::P50
+        ));
+        assert!(matches!(
+            AggFunction::from(MetaAggFunction::P75),
+            AggFunction::P75
+        ));
+        assert!(matches!(
+            AggFunction::from(MetaAggFunction::P90),
+            AggFunction::P90
+        ));
+        assert!(matches!(
+            AggFunction::from(MetaAggFunction::P95),
+            AggFunction::P95
+        ));
+        assert!(matches!(
+            AggFunction::from(MetaAggFunction::P99),
+            AggFunction::P99
+        ));
+    }
+
+    #[test]
+    fn test_agg_function_to_meta_all_variants() {
+        assert!(matches!(
+            MetaAggFunction::from(AggFunction::Avg),
+            MetaAggFunction::Avg
+        ));
+        assert!(matches!(
+            MetaAggFunction::from(AggFunction::Min),
+            MetaAggFunction::Min
+        ));
+        assert!(matches!(
+            MetaAggFunction::from(AggFunction::Max),
+            MetaAggFunction::Max
+        ));
+        assert!(matches!(
+            MetaAggFunction::from(AggFunction::Sum),
+            MetaAggFunction::Sum
+        ));
+        assert!(matches!(
+            MetaAggFunction::from(AggFunction::Count),
+            MetaAggFunction::Count
+        ));
+        assert!(matches!(
+            MetaAggFunction::from(AggFunction::Median),
+            MetaAggFunction::Median
+        ));
+        assert!(matches!(
+            MetaAggFunction::from(AggFunction::P50),
+            MetaAggFunction::P50
+        ));
+        assert!(matches!(
+            MetaAggFunction::from(AggFunction::P75),
+            MetaAggFunction::P75
+        ));
+        assert!(matches!(
+            MetaAggFunction::from(AggFunction::P90),
+            MetaAggFunction::P90
+        ));
+        assert!(matches!(
+            MetaAggFunction::from(AggFunction::P95),
+            MetaAggFunction::P95
+        ));
+        assert!(matches!(
+            MetaAggFunction::from(AggFunction::P99),
+            MetaAggFunction::P99
+        ));
+    }
+
+    // ── QueryType ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_query_type_to_i16() {
+        assert_eq!(i16::from(QueryType::Custom), 0i16);
+        assert_eq!(i16::from(QueryType::Sql), 1i16);
+        assert_eq!(i16::from(QueryType::Promql), 2i16);
+        assert_eq!(i16::from(QueryType::Slo), 3i16);
+    }
+
+    #[test]
+    fn test_query_type_try_from_i16() {
+        assert!(matches!(QueryType::try_from(0i16), Ok(QueryType::Custom)));
+        assert!(matches!(QueryType::try_from(1i16), Ok(QueryType::Sql)));
+        assert!(matches!(QueryType::try_from(2i16), Ok(QueryType::Promql)));
+        assert!(matches!(QueryType::try_from(3i16), Ok(QueryType::Slo)));
+        assert!(QueryType::try_from(99i16).is_err());
+    }
+
+    #[test]
+    fn test_query_type_from_meta() {
+        assert!(matches!(
+            QueryType::from(MetaQueryType::Custom),
+            QueryType::Custom
+        ));
+        assert!(matches!(
+            QueryType::from(MetaQueryType::SQL),
+            QueryType::Sql
+        ));
+        assert!(matches!(
+            QueryType::from(MetaQueryType::PromQL),
+            QueryType::Promql
+        ));
+        assert!(matches!(
+            QueryType::from(MetaQueryType::Slo),
+            QueryType::Slo
+        ));
+    }
+
+    #[test]
+    fn test_query_type_to_meta() {
+        assert!(matches!(
+            MetaQueryType::from(QueryType::Custom),
+            MetaQueryType::Custom
+        ));
+        assert!(matches!(
+            MetaQueryType::from(QueryType::Sql),
+            MetaQueryType::SQL
+        ));
+        assert!(matches!(
+            MetaQueryType::from(QueryType::Promql),
+            MetaQueryType::PromQL
+        ));
+        assert!(matches!(
+            MetaQueryType::from(QueryType::Slo),
+            MetaQueryType::Slo
+        ));
+    }
+
+    // ── QueryCompareHistoricData ──────────────────────────────────────────────
+
+    #[test]
+    fn test_query_compare_historic_data_from_meta() {
+        let meta = MetaCompareHistoricData {
+            offset: "1h".to_string(),
+        };
+        let db = QueryCompareHistoricData::from(meta);
+        assert_eq!(db.offset, "1h");
+    }
+
+    #[test]
+    fn test_query_compare_historic_data_to_meta() {
+        let db = QueryCompareHistoricData {
+            offset: "30m".to_string(),
+        };
+        let meta = MetaCompareHistoricData::from(db);
+        assert_eq!(meta.offset, "30m");
+    }
+
+    // ── ConditionOperator ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_condition_operator_from_meta_all_variants() {
+        assert!(matches!(
+            ConditionOperator::from(MetaOperator::EqualTo),
+            ConditionOperator::EqualTo
+        ));
+        assert!(matches!(
+            ConditionOperator::from(MetaOperator::NotEqualTo),
+            ConditionOperator::NotEqualTo
+        ));
+        assert!(matches!(
+            ConditionOperator::from(MetaOperator::GreaterThan),
+            ConditionOperator::GreaterThan
+        ));
+        assert!(matches!(
+            ConditionOperator::from(MetaOperator::GreaterThanEquals),
+            ConditionOperator::GreaterThanEquals
+        ));
+        assert!(matches!(
+            ConditionOperator::from(MetaOperator::LessThan),
+            ConditionOperator::LessThan
+        ));
+        assert!(matches!(
+            ConditionOperator::from(MetaOperator::LessThanEquals),
+            ConditionOperator::LessThanEquals
+        ));
+        assert!(matches!(
+            ConditionOperator::from(MetaOperator::Contains),
+            ConditionOperator::Contains
+        ));
+        assert!(matches!(
+            ConditionOperator::from(MetaOperator::NotContains),
+            ConditionOperator::NotContains
+        ));
+    }
+
+    #[test]
+    fn test_condition_operator_to_meta_all_variants() {
+        assert!(matches!(
+            MetaOperator::from(ConditionOperator::EqualTo),
+            MetaOperator::EqualTo
+        ));
+        assert!(matches!(
+            MetaOperator::from(ConditionOperator::NotEqualTo),
+            MetaOperator::NotEqualTo
+        ));
+        assert!(matches!(
+            MetaOperator::from(ConditionOperator::GreaterThan),
+            MetaOperator::GreaterThan
+        ));
+        assert!(matches!(
+            MetaOperator::from(ConditionOperator::GreaterThanEquals),
+            MetaOperator::GreaterThanEquals
+        ));
+        assert!(matches!(
+            MetaOperator::from(ConditionOperator::LessThan),
+            MetaOperator::LessThan
+        ));
+        assert!(matches!(
+            MetaOperator::from(ConditionOperator::LessThanEquals),
+            MetaOperator::LessThanEquals
+        ));
+        assert!(matches!(
+            MetaOperator::from(ConditionOperator::Contains),
+            MetaOperator::Contains
+        ));
+        assert!(matches!(
+            MetaOperator::from(ConditionOperator::NotContains),
+            MetaOperator::NotContains
+        ));
+    }
+
+    // ── QuerySearchEventType ──────────────────────────────────────────────────
+
+    #[test]
+    fn test_query_search_event_type_to_i16() {
+        assert_eq!(i16::from(QuerySearchEventType::Ui), 0i16);
+        assert_eq!(i16::from(QuerySearchEventType::Dashboards), 1i16);
+        assert_eq!(i16::from(QuerySearchEventType::Reports), 2i16);
+        assert_eq!(i16::from(QuerySearchEventType::Alerts), 3i16);
+        assert_eq!(i16::from(QuerySearchEventType::Values), 4i16);
+        assert_eq!(i16::from(QuerySearchEventType::Other), 5i16);
+        assert_eq!(i16::from(QuerySearchEventType::Rum), 6i16);
+        assert_eq!(i16::from(QuerySearchEventType::DerivedStream), 7i16);
+        assert_eq!(i16::from(QuerySearchEventType::SearchJob), 8i16);
+        assert_eq!(i16::from(QuerySearchEventType::Download), 9i16);
+        assert_eq!(i16::from(QuerySearchEventType::Insights), 10i16);
+    }
+
+    #[test]
+    fn test_query_search_event_type_try_from_i16() {
+        assert!(matches!(
+            QuerySearchEventType::try_from(0i16),
+            Ok(QuerySearchEventType::Ui)
+        ));
+        assert!(matches!(
+            QuerySearchEventType::try_from(1i16),
+            Ok(QuerySearchEventType::Dashboards)
+        ));
+        assert!(matches!(
+            QuerySearchEventType::try_from(2i16),
+            Ok(QuerySearchEventType::Reports)
+        ));
+        assert!(matches!(
+            QuerySearchEventType::try_from(3i16),
+            Ok(QuerySearchEventType::Alerts)
+        ));
+        assert!(matches!(
+            QuerySearchEventType::try_from(4i16),
+            Ok(QuerySearchEventType::Values)
+        ));
+        assert!(matches!(
+            QuerySearchEventType::try_from(5i16),
+            Ok(QuerySearchEventType::Other)
+        ));
+        assert!(matches!(
+            QuerySearchEventType::try_from(6i16),
+            Ok(QuerySearchEventType::Rum)
+        ));
+        assert!(matches!(
+            QuerySearchEventType::try_from(7i16),
+            Ok(QuerySearchEventType::DerivedStream)
+        ));
+        assert!(matches!(
+            QuerySearchEventType::try_from(8i16),
+            Ok(QuerySearchEventType::SearchJob)
+        ));
+        assert!(matches!(
+            QuerySearchEventType::try_from(9i16),
+            Ok(QuerySearchEventType::Download)
+        ));
+        assert!(matches!(
+            QuerySearchEventType::try_from(10i16),
+            Ok(QuerySearchEventType::Insights)
+        ));
+        assert!(QuerySearchEventType::try_from(99i16).is_err());
+    }
+
+    #[test]
+    fn test_query_search_event_type_from_meta() {
+        assert!(matches!(
+            QuerySearchEventType::from(MetaSearchEventType::UI),
+            QuerySearchEventType::Ui
+        ));
+        assert!(matches!(
+            QuerySearchEventType::from(MetaSearchEventType::Dashboards),
+            QuerySearchEventType::Dashboards
+        ));
+        assert!(matches!(
+            QuerySearchEventType::from(MetaSearchEventType::Reports),
+            QuerySearchEventType::Reports
+        ));
+        assert!(matches!(
+            QuerySearchEventType::from(MetaSearchEventType::Alerts),
+            QuerySearchEventType::Alerts
+        ));
+        assert!(matches!(
+            QuerySearchEventType::from(MetaSearchEventType::Values),
+            QuerySearchEventType::Values
+        ));
+        assert!(matches!(
+            QuerySearchEventType::from(MetaSearchEventType::Other),
+            QuerySearchEventType::Other
+        ));
+        assert!(matches!(
+            QuerySearchEventType::from(MetaSearchEventType::RUM),
+            QuerySearchEventType::Rum
+        ));
+        assert!(matches!(
+            QuerySearchEventType::from(MetaSearchEventType::DerivedStream),
+            QuerySearchEventType::DerivedStream
+        ));
+        assert!(matches!(
+            QuerySearchEventType::from(MetaSearchEventType::SearchJob),
+            QuerySearchEventType::SearchJob
+        ));
+        assert!(matches!(
+            QuerySearchEventType::from(MetaSearchEventType::Download),
+            QuerySearchEventType::Download
+        ));
+        assert!(matches!(
+            QuerySearchEventType::from(MetaSearchEventType::Insights),
+            QuerySearchEventType::Insights
+        ));
+    }
+
+    #[test]
+    fn test_query_search_event_type_to_meta() {
+        assert!(matches!(
+            MetaSearchEventType::from(QuerySearchEventType::Ui),
+            MetaSearchEventType::UI
+        ));
+        assert!(matches!(
+            MetaSearchEventType::from(QuerySearchEventType::Dashboards),
+            MetaSearchEventType::Dashboards
+        ));
+        assert!(matches!(
+            MetaSearchEventType::from(QuerySearchEventType::Reports),
+            MetaSearchEventType::Reports
+        ));
+        assert!(matches!(
+            MetaSearchEventType::from(QuerySearchEventType::Alerts),
+            MetaSearchEventType::Alerts
+        ));
+        assert!(matches!(
+            MetaSearchEventType::from(QuerySearchEventType::Values),
+            MetaSearchEventType::Values
+        ));
+        assert!(matches!(
+            MetaSearchEventType::from(QuerySearchEventType::Other),
+            MetaSearchEventType::Other
+        ));
+        assert!(matches!(
+            MetaSearchEventType::from(QuerySearchEventType::Rum),
+            MetaSearchEventType::RUM
+        ));
+        assert!(matches!(
+            MetaSearchEventType::from(QuerySearchEventType::DerivedStream),
+            MetaSearchEventType::DerivedStream
+        ));
+        assert!(matches!(
+            MetaSearchEventType::from(QuerySearchEventType::SearchJob),
+            MetaSearchEventType::SearchJob
+        ));
+        assert!(matches!(
+            MetaSearchEventType::from(QuerySearchEventType::Download),
+            MetaSearchEventType::Download
+        ));
+        assert!(matches!(
+            MetaSearchEventType::from(QuerySearchEventType::Insights),
+            MetaSearchEventType::Insights
+        ));
+    }
+
+    // ── StreamType ───────────────────────────────────────────────────────────
+
+    #[test]
+    fn test_stream_type_display() {
+        assert_eq!(StreamType::Logs.to_string(), "logs");
+        assert_eq!(StreamType::Metrics.to_string(), "metrics");
+        assert_eq!(StreamType::Traces.to_string(), "traces");
+        assert_eq!(
+            StreamType::EnrichmentTables.to_string(),
+            "enrichment_tables"
+        );
+        assert_eq!(StreamType::FileList.to_string(), "file_list");
+        assert_eq!(StreamType::Metadata.to_string(), "metadata");
+        assert_eq!(StreamType::Index.to_string(), "index");
+    }
+
+    #[test]
+    fn test_stream_type_from_str() {
+        assert!(matches!(StreamType::from_str("logs"), Ok(StreamType::Logs)));
+        assert!(matches!(
+            StreamType::from_str("metrics"),
+            Ok(StreamType::Metrics)
+        ));
+        assert!(matches!(
+            StreamType::from_str("traces"),
+            Ok(StreamType::Traces)
+        ));
+        assert!(matches!(
+            StreamType::from_str("enrichment_tables"),
+            Ok(StreamType::EnrichmentTables)
+        ));
+        assert!(matches!(
+            StreamType::from_str("file_list"),
+            Ok(StreamType::FileList)
+        ));
+        assert!(matches!(
+            StreamType::from_str("metadata"),
+            Ok(StreamType::Metadata)
+        ));
+        assert!(matches!(
+            StreamType::from_str("index"),
+            Ok(StreamType::Index)
+        ));
+        assert!(StreamType::from_str("unknown").is_err());
+    }
+
+    #[test]
+    fn test_stream_type_from_meta() {
+        assert!(matches!(
+            StreamType::from(MetaStreamType::Logs),
+            StreamType::Logs
+        ));
+        assert!(matches!(
+            StreamType::from(MetaStreamType::Metrics),
+            StreamType::Metrics
+        ));
+        assert!(matches!(
+            StreamType::from(MetaStreamType::Traces),
+            StreamType::Traces
+        ));
+        assert!(matches!(
+            StreamType::from(MetaStreamType::EnrichmentTables),
+            StreamType::EnrichmentTables
+        ));
+        assert!(matches!(
+            StreamType::from(MetaStreamType::Filelist),
+            StreamType::FileList
+        ));
+        assert!(matches!(
+            StreamType::from(MetaStreamType::Metadata),
+            StreamType::Metadata
+        ));
+        assert!(matches!(
+            StreamType::from(MetaStreamType::Index),
+            StreamType::Index
+        ));
+    }
+
+    #[test]
+    fn test_stream_type_to_meta() {
+        assert!(matches!(
+            MetaStreamType::from(StreamType::Logs),
+            MetaStreamType::Logs
+        ));
+        assert!(matches!(
+            MetaStreamType::from(StreamType::Metrics),
+            MetaStreamType::Metrics
+        ));
+        assert!(matches!(
+            MetaStreamType::from(StreamType::Traces),
+            MetaStreamType::Traces
+        ));
+        assert!(matches!(
+            MetaStreamType::from(StreamType::EnrichmentTables),
+            MetaStreamType::EnrichmentTables
+        ));
+        assert!(matches!(
+            MetaStreamType::from(StreamType::FileList),
+            MetaStreamType::Filelist
+        ));
+        assert!(matches!(
+            MetaStreamType::from(StreamType::Metadata),
+            MetaStreamType::Metadata
+        ));
+        assert!(matches!(
+            MetaStreamType::from(StreamType::Index),
+            MetaStreamType::Index
+        ));
+    }
+
+    // ── RowTemplateTypeDb ────────────────────────────────────────────────────
+
+    #[test]
+    fn test_row_template_type_to_i16() {
+        assert_eq!(i16::from(RowTemplateTypeDb::String), 0i16);
+        assert_eq!(i16::from(RowTemplateTypeDb::Json), 1i16);
+    }
+
+    #[test]
+    fn test_row_template_type_try_from_i16() {
+        assert!(matches!(
+            RowTemplateTypeDb::try_from(0i16),
+            Ok(RowTemplateTypeDb::String)
+        ));
+        assert!(matches!(
+            RowTemplateTypeDb::try_from(1i16),
+            Ok(RowTemplateTypeDb::Json)
+        ));
+        assert!(RowTemplateTypeDb::try_from(99i16).is_err());
+    }
+
+    #[test]
+    fn test_row_template_type_from_meta() {
+        use config::meta::alerts::alert::RowTemplateType;
+        assert!(matches!(
+            RowTemplateTypeDb::from(RowTemplateType::String),
+            RowTemplateTypeDb::String
+        ));
+        assert!(matches!(
+            RowTemplateTypeDb::from(RowTemplateType::Json),
+            RowTemplateTypeDb::Json
+        ));
+    }
+
+    #[test]
+    fn test_meta_from_row_template_type_db() {
+        use config::meta::alerts::alert::RowTemplateType;
+        assert!(matches!(
+            RowTemplateType::from(RowTemplateTypeDb::String),
+            RowTemplateType::String
+        ));
+        assert!(matches!(
+            RowTemplateType::from(RowTemplateTypeDb::Json),
+            RowTemplateType::Json
+        ));
+    }
+
+    // ── TriggerThresholdOperator → MetaOperator ──────────────────────────────
+
+    #[test]
+    fn test_trigger_threshold_operator_to_meta() {
+        assert!(matches!(
+            MetaOperator::from(TriggerThresholdOperator::EqualTo),
+            MetaOperator::EqualTo
+        ));
+        assert!(matches!(
+            MetaOperator::from(TriggerThresholdOperator::NotEqualTo),
+            MetaOperator::NotEqualTo
+        ));
+        assert!(matches!(
+            MetaOperator::from(TriggerThresholdOperator::GreaterThan),
+            MetaOperator::GreaterThan
+        ));
+        assert!(matches!(
+            MetaOperator::from(TriggerThresholdOperator::GreaterThanEquals),
+            MetaOperator::GreaterThanEquals
+        ));
+        assert!(matches!(
+            MetaOperator::from(TriggerThresholdOperator::LessThan),
+            MetaOperator::LessThan
+        ));
+        assert!(matches!(
+            MetaOperator::from(TriggerThresholdOperator::LessThanEquals),
+            MetaOperator::LessThanEquals
+        ));
+    }
+
+    // ── QueryCondition / MetaCondition ───────────────────────────────────────
+
+    #[test]
+    fn test_query_condition_from_meta() {
+        let meta = MetaCondition {
+            column: "level".to_string(),
+            operator: MetaOperator::EqualTo,
+            value: serde_json::json!("error"),
+            ignore_case: false,
+        };
+        let qc = QueryCondition::from(meta);
+        assert_eq!(qc.column, "level");
+        assert!(matches!(qc.operator, ConditionOperator::EqualTo));
+        assert!(!qc.ignore_case);
+    }
+
+    #[test]
+    fn test_meta_condition_from_query_condition() {
+        let qc = QueryCondition {
+            column: "status".to_string(),
+            operator: ConditionOperator::GreaterThan,
+            value: serde_json::json!(500),
+            ignore_case: true,
+        };
+        let meta = MetaCondition::from(qc);
+        assert_eq!(meta.column, "status");
+        assert!(matches!(meta.operator, MetaOperator::GreaterThan));
+        assert!(meta.ignore_case);
+    }
+
+    // ── QueryAggregation / MetaAggregation ───────────────────────────────────
+
+    #[test]
+    fn test_query_aggregation_from_meta() {
+        let meta = MetaAggregation {
+            warning_value: None,
+            multi_alert: false,
+            group_by: Some(vec!["service".to_string()]),
+            function: MetaAggFunction::Count,
+            having: MetaCondition {
+                column: "count".to_string(),
+                operator: MetaOperator::GreaterThanEquals,
+                value: serde_json::json!(10),
+                ignore_case: false,
+            },
+        };
+        let qa = QueryAggregation::from(meta);
+        assert_eq!(qa.group_by, Some(vec!["service".to_string()]));
+        assert!(matches!(qa.function, AggFunction::Count));
+        assert_eq!(qa.having.column, "count");
+        assert!(matches!(
+            qa.having.operator,
+            ConditionOperator::GreaterThanEquals
+        ));
+    }
+
+    #[test]
+    fn test_meta_aggregation_from_query_aggregation() {
+        let qa = QueryAggregation {
+            warning_value: None,
+            multi_alert: false,
+            group_by: None,
+            function: AggFunction::Avg,
+            having: QueryCondition {
+                column: "value".to_string(),
+                operator: ConditionOperator::LessThan,
+                value: serde_json::json!(100),
+                ignore_case: false,
+            },
+        };
+        let meta = MetaAggregation::from(qa);
+        assert!(meta.group_by.is_none());
+        assert!(matches!(meta.function, MetaAggFunction::Avg));
+        assert_eq!(meta.having.column, "value");
+        assert!(matches!(meta.having.operator, MetaOperator::LessThan));
     }
 }

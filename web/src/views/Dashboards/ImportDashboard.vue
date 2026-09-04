@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,215 +14,141 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div class="q-mx-sm q-pt-xs">
-    <div class="card-container tw:mb-[0.625rem]">
-      <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]">
-      <div class="col">
-        <div class="flex">
-          <q-btn
-            no-caps
-            padding="xs"
-            outline
-            @click="goBack()"
-            icon="arrow_back_ios_new"
-            class="el-border"
-          />
-          <div class="text-h6 q-ml-md">
-            {{ t("dashboard.importDashboard") }}
-          </div>
-        </div>
-      </div>
-      <div class="flex justify-center">
-        <q-btn
-          class="q-mr-md o2-secondary-button"
-          no-caps
-          :label="t('dashboard.communityDashboard')"
-          @click="goToCommunityDashboards"
-          data-test="dashboard-panel-tutorial-btn"
-        ></q-btn>
-        <q-btn
-          v-close-popup
-          class="text-bold q-mr-md o2-secondary-button"
-          :label="t('function.cancel')"
-          no-caps
-          @click="goBack()"
-        />
-        <q-btn
-          :disable="!!isLoading"
-          class="text-bold o2-primary-button"
-          :label="t('dashboard.import')"
-          type="submit"
-          no-caps
-          @click="importDashboard"
-        />
-      </div>
-    </div>
-    </div>
-    <div class="flex">
-
-      <div class="flex">
-        <q-splitter
-          no-scroll
-          v-model="splitterModel"
-          :limits="[40, 80]"
-          style="width: calc(100vw - 100px);"
-        >
+  <OPageLayout
+    class="h-[calc(100vh-var(--navbar-height))]! overflow-hidden"
+    :title="t('dashboard.importDashboard')"
+    :back="{ label: t('dashboard.header'), onClick: goBack }"
+    bleed
+  >
+    <template #actions>
+      <OButton
+        variant="outline"
+        size="sm-action"
+        @click="goToCommunityDashboards"
+        data-test="dashboard-panel-tutorial-btn"
+        >{{ t("dashboard.communityDashboard") }}</OButton
+      >
+      <OButton
+        variant="outline"
+        size="sm-action"
+        v-close-popup
+        data-test="dashboard-import-cancel-btn"
+        @click="goBack()"
+        >{{ t("function.cancel") }}</OButton
+      >
+      <OButton
+        variant="primary"
+        size="sm-action"
+        type="submit"
+        form="import-dashboard-form"
+        :loading="!!isLoading"
+        data-test="dashboard-import-submit-btn"
+        >{{ t("dashboard.import") }}</OButton
+      >
+    </template>
+    <div class="flex min-h-0 w-full flex-1">
+      <div class="flex min-h-0 w-full min-w-0">
+        <OSplitter v-model="splitterModel" class="h-full min-h-0 w-full min-w-0">
           <template #before>
-          <div class="tw:w-full tw:h-full ">
-            <div class="card-container tw:py-[0.625rem] tw:pl-[0.625rem] tw:mb-[0.625rem]">
-              <div class="app-tabs-container tw:h-[36px] tw:w-fit">
-            <app-tabs
-                data-test="dashboard-import-type-tabs"
-                class="tabs-selection-container"
-                :tabs="tabs"
-                v-model:active-tab="activeTab"
-                @update:active-tab="updateActiveTab"
-              />
-              </div>
-              </div>
-            <div
-              v-if="activeTab == 'import_json_url'"
-              class="editor-container-url card-container tw:py-1"
-            >
-              <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit="onSubmit">
-                <div
-                  style="width: calc(100% - 10px)"
-                  class="flex full-width"
-                >
-                  <div
-                    data-test="dashboard-import-url-input"
-                    style="width: 69%"
-                    class="q-pr-sm"
-                  >
-                    <q-input
-                      v-model="url"
-                      :label="t('dashboard.addURL')"
-                       style="padding: 10px;"
-                      stack-label
-                      label-slot
-                      :loading="isLoading == ImportType.URL"
-                     borderless hide-bottom-space/>
-                  </div>
-
-                  <div
-                    style="width: calc(30%);position: relative;"
-                    data-test="dashboard-folder-dropdown"
-                    class="import-folder-dropdown-container"
-                  >
-                    <select-folder-dropdown
-                      @folder-selected="selectedFolder = $event"
-                      :activeFolderId="selectedFolder.value"
+            <OForm id="import-dashboard-form" :form="form" class="flex h-full min-h-0 flex-col">
+              <div class="flex h-full min-h-0 w-full flex-col">
+                <div class="bg-card-glass-bg px-page-edge mb-1 shrink-0 py-2.5">
+                  <div class="app-tabs-container h-9 w-fit">
+                    <AppTabs
+                      data-test="dashboard-import-type-tabs"
+                      class="tabs-selection-container"
+                      :tabs="tabs"
+                      v-model:active-tab="activeTab"
+                      @update:active-tab="updateActiveTab"
                     />
                   </div>
                 </div>
-                <query-editor
-                  data-test="dashboard-import-url-editor"
-                  ref="queryEditorFileRef"
-                  editor-id="dashboards-query-editor-file"
-                  class="monaco-editor tw:mx-2"
-                  :debounceTime="300"
-                  v-model:query="jsonStr"
-                  language="json"
-                  :class="
-                    jsonStr == '' && queryEditorPlaceholderFlag
-                      ? 'empty-query'
-                      : ''
-                  "
-                  @focus="queryEditorPlaceholderFlag = false"
-                  @blur="queryEditorPlaceholderFlag = true"
-                />
-              </q-form>
-            </div>
-            <div
-              v-if="activeTab == 'import_json_file'"
-              class="dashboard-import-json-container card-container tw:py-1"
-            >
-              <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit="onSubmit">
                 <div
-                  style="width: calc(100% - 10px)"
-                  class="flex full-width"
+                  v-if="activeTab == 'import_json_url'"
+                  class="editor-container-url bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
                 >
-                  <div
-                    data-test="dashboard-import-file-input"
-                    style="width: 69%"
-                    class="q-pr-sm"
-                  >
-                    <q-file
-                      v-model="jsonFiles"
-                      bottom-slots
-                      :label="t('dashboard.dropFileMsg')"
-                      accept=".json"
-                      multiple
-                      filled
-                      :disable="!!isLoading"
-                    >
-                      <template v-slot:prepend>
-                        <q-icon name="cloud_upload" @click.stop.prevent />
-                      </template>
-                      <template v-slot:append>
-                        <q-icon
-                          name="close"
-                          @click.stop.prevent="jsonFiles = null"
-                          class="cursor-pointer"
+                  <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
+                    <div class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2">
+                      <div data-test="dashboard-import-url-input" class="w-[69%]">
+                        <OFormInput
+                          data-test="dashboard-import-url-control"
+                          name="url"
+                          :label="t('common.url')"
+                          :placeholder="t('dashboard.addURL')"
                         />
-                      </template>
-                      <template v-slot:hint> .json files only </template>
-                    </q-file>
-                  </div>
-                  <div
-                    style="width: calc(30%);position: relative;"
-                    class="import-folder-dropdown-container"
-                  >
-                    <select-folder-dropdown
-                      @folder-selected="selectedFolder = $event"
-                      :activeFolderId="selectedFolder.value"
+                      </div>
+
+                      <div
+                        data-test="dashboard-folder-dropdown"
+                        class="import-folder-dropdown-container w-[calc(30%)]"
+                      >
+                        <SelectFolderDropdown
+                          @folder-selected="selectedFolder = $event"
+                          :activeFolderId="selectedFolder.value"
+                        />
+                      </div>
+                    </div>
+                    <QueryEditor
+                      data-test="dashboard-import-url-editor"
+                      ref="queryEditorFileRef"
+                      editor-id="dashboards-query-editor-file"
+                      class="border-card-glass-border rounded-default mt-2 min-h-0 flex-1 resize-none overflow-hidden border"
+                      :debounceTime="300"
+                      v-model:query="jsonStr"
+                      language="json"
                     />
                   </div>
-                  <div v-if="filesImportResults.length" class="q-py-sm">
-                    <div v-for="importResult in filesImportResults">
-                      <span
-                        v-if="importResult.status == 'rejected'"
-                        class="text-red"
-                      >
-                        <code style="background-color: #f2f1f1; padding: 3px">{{
-                          importResult?.reason?.file
-                        }}</code>
-                        : {{ importResult?.reason?.error }}
-                      </span>
+                </div>
+                <div
+                  v-if="activeTab == 'import_json_file'"
+                  class="dashboard-import-json-container bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
+                >
+                  <div class="mx-2 mt-1 mb-1 flex min-h-0 flex-1 flex-col">
+                    <div class="flex w-[calc(100%_-_0.625rem)] w-full shrink-0 items-center gap-2">
+                      <div data-test="dashboard-import-file-input" class="w-[69%]">
+                        <OFormFile
+                          data-test="dashboard-import-file-control"
+                          name="jsonFiles"
+                          :label="t('dashboard.selectFile')"
+                          :placeholder="t('dashboard.dropFileMsg')"
+                          accept=".json"
+                          multiple
+                          dropZone
+                          :disabled="!!isLoading"
+                        />
+                      </div>
+                      <div class="import-folder-dropdown-container w-[calc(30%)]">
+                        <SelectFolderDropdown
+                          @folder-selected="selectedFolder = $event"
+                          :activeFolderId="selectedFolder.value"
+                        />
+                      </div>
                     </div>
+                    <QueryEditor
+                      data-test="dashboard-import-json-file-editor"
+                      ref="queryEditorJsonRef"
+                      editor-id="dashboards-query-editor-json"
+                      class="border-card-glass-border rounded-default mt-2 min-h-0 flex-1 resize-none overflow-hidden border"
+                      :debounceTime="300"
+                      v-model:query="jsonStr"
+                      language="json"
+                    />
                   </div>
                 </div>
-                <query-editor
-                  data-test="dashboard-import-json-file-editor"
-                  ref="queryEditorJsonRef"
-                  editor-id="dashboards-query-editor-json"
-                  class="monaco-editor tw:mx-2"
-                  :debounceTime="300"
-                  v-model:query="jsonStr"
-                  language="json"
-                  :class="
-                    jsonStr == '' && queryEditorPlaceholderFlag
-                      ? 'empty-query'
-                      : ''
-                  "
-                  @focus="queryEditorPlaceholderFlag = false"
-                  @blur="queryEditorPlaceholderFlag = true"
-                />
-
-                <div></div>
-              </q-form>
-            </div>
-            </div>
+              </div>
+            </OForm>
           </template>
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              class="card-container tw:mb-[0.625rem] tw:h-[calc(100vh-130px)]"
+              class="bg-card-glass-bg border-border-default flex h-full min-h-0 flex-col border-s"
             >
-              <div  class="text-center text-h6 tw:py-2">Error Validations</div>
-              <q-separator class="q-mt-md" />
+              <div class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
+                {{ t("dashboard.importDashboardPage.errorValidations") }}
+              </div>
+              <OSeparator class="mt-1 shrink-0" />
               <div
-                class="error-section"
+                class="error-section mb-2.5 min-h-0 flex-1 overflow-auto p-2.5"
                 v-if="dashboardErrorsToDisplay.length > 0"
               >
                 <div class="error-reporter-container">
@@ -230,58 +156,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Iterate through each inner array (the individual error message) -->
                   <div
-                    v-for="(
-                      errorMessage, errorIndex
-                    ) in dashboardErrorsToDisplay"
+                    v-for="(errorMessage, errorIndex) in dashboardErrorsToDisplay"
                     :key="errorIndex"
-                    class="error-item"
+                    class="error-item py-1.25 text-sm"
                   >
                     <span
                       v-if="errorMessage.field == 'dashboard_title'"
-                      class="text-red"
+                      class="text-status-negative"
+                      data-test="dashboard-import-error-title-message"
                     >
                       {{ errorMessage.message }}
-                      <div style="width: 300px">
-                        <q-input
+                      <div class="w-75" data-test="dashboard-import-error-title-input">
+                        <OInput
+                          data-test="dashboard-import-error-title-control"
                           v-model="dashboardTitles[errorIndex]"
-                          :label="'Dashboard Title'"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="showLabelOnTop"
-                          stack-label
-                          dense
-                          tabindex="0"
+                          :label="t('dashboard.importDashboardPage.dashboardTitle')"
                           @update:model-value="
                             updateDashboardTitle(
                               dashboardTitles[errorIndex],
                               errorMessage.dashboardIndex,
                             )
                           "
-                         borderless hide-bottom-space/>
+                        />
                       </div>
                     </span>
                     <span
                       v-else-if="errorMessage.field == 'stream_type'"
-                      class="text-red"
+                      class="text-status-negative"
                     >
                       {{ errorMessage.message }}
-                      <div style="width: 300px">
-                        <q-select
+                      <div class="w-75">
+                        <OSelect
                           v-model="streamTypes[errorIndex]"
-                          :options="streamTypeOptions"
-                          :label="'Stream Type'"
-                          :popup-content-style="{
-                            textTransform: 'lowercase',
-                          }"
-                          color="input-border"
-                          bg-color="input-bg"
-                          class="q-py-sm showLabelOnTop no-case"
-                          stack-label
-                          dense
-                          use-input
-                          hide-selected
-                          fill-input
-                          :input-debounce="400"
+                          :options="streamTypeSelectOptions"
+                          :label="t('dashboard.importDashboardPage.streamType')"
                           @update:model-value="
                             updateStreamType(
                               streamTypes[errorIndex],
@@ -291,81 +199,112 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               errorMessage.queryIndex,
                             )
                           "
-                          behavior="menu"
-                         borderless hide-bottom-space/>
+                        />
                       </div>
                     </span>
 
                     <span
                       v-else-if="errorMessage.field == 'dashboard_validation'"
-                      class="text-red"
+                      class="text-status-negative"
+                      data-test="dashboard-import-error-validation-message"
                     >
                       {{ errorMessage.message }}
                     </span>
 
-                    <span v-else>{{
+                    <span v-else data-test="dashboard-import-error-message">{{
                       errorMessage.message || errorMessage
                     }}</span>
                   </div>
                 </div>
               </div>
+
+              <div
+                v-if="filesImportResults.some((r) => r.status === 'rejected')"
+                class="error-section mb-2.5 shrink-0 overflow-auto p-2.5"
+                data-test="dashboard-import-file-results"
+              >
+                <div v-for="(importResult, index) in filesImportResults" :key="'file-' + index">
+                  <div
+                    v-if="importResult.status == 'rejected'"
+                    class="error-item text-status-negative py-1.25 text-sm"
+                    data-test="dashboard-import-file-rejected"
+                  >
+                    <code v-if="importResult?.reason?.file" class="bg-surface-panel p-0.75">{{
+                      importResult.reason.file
+                    }}</code>
+                    <template v-if="importResult?.reason?.file"> : </template
+                    >{{ importResult?.reason?.error }}
+                  </div>
+                </div>
+              </div>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
     </div>
 
     <div></div>
-  </div>
+  </OPageLayout>
 </template>
 <script lang="ts">
 // @ts-nocheck
 import { defineComponent, ref, onMounted, reactive, watch } from "vue";
-import { useI18n } from "vue-i18n";
-import { getAllDashboards, getFoldersList } from "../../utils/commons.js";
+import { useI18nTyped } from "@/types/i18n";
+import { getAllDashboards, getFoldersList, dedupeDashboardIds } from "../../utils/commons.js";
 import { useStore } from "vuex";
 import { useRouter, useRoute } from "vue-router";
 import dashboardService from "../../services/dashboards.js";
 import axios from "axios";
 import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboardSchemaVersion";
-import { validateDashboardJson } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 import SelectFolderDropdown from "@/components/dashboards/SelectFolderDropdown.vue";
 import useNotifications from "@/composables/useNotifications";
 import AppTabs from "@/components/common/AppTabs.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+
+import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormFile from "@/lib/forms/File/OFormFile.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { makeImportDashboardSchema, importDashboardDefaults } from "./ImportDashboard.schema";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
-import stream from "@/services/stream.js";
 export default defineComponent({
   name: "Import Dashboard",
   props: ["dashboardId"],
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const { showPositiveNotification, showErrorNotification } =
-      useNotifications();
+    const { showPositiveNotification, showErrorNotification } = useNotifications();
     const selectedFolder = ref({
       label:
         store.state.organizationData.folders.find(
-          (item: any) => item.folderId === route.query.folder ?? "default",
+          (item: any) => item.folderId === (route.query.folder ?? "default"),
         )?.name ?? "default",
       value: route.query.folder,
     });
 
-    // hold the values of 3 supported import types
-    const jsonFiles = ref<any>();
-    const url = ref("");
+    // Monaco editor content (a non-OForm* code editor, bridged at @submit).
+    // url + jsonFiles are form-owned and read below via form.useStore.
     const jsonStr = ref("");
 
     const tabs = reactive([
       {
-        label: "File Upload / JSON",
+        label: t("dashboard.importDashboardPage.fileUploadJson"),
         value: "import_json_file",
+        icon: "upload",
       },
       {
-        label: "URL Import",
+        label: t("dashboard.importDashboardPage.urlImport"),
         value: "import_json_url",
+        icon: "link",
       },
     ]);
     const activeTab = ref("import_json_file");
@@ -379,6 +318,7 @@ export default defineComponent({
     const dashboardTitles = reactive({});
     const streamTypes = reactive({});
     const streamTypeOptions = ["logs", "metrics", "traces"];
+    const streamTypeSelectOptions = streamTypeOptions.map((t) => ({ label: t, value: t }));
     // import type values
     const ImportType = {
       FILES: "files",
@@ -388,6 +328,22 @@ export default defineComponent({
 
     // store the results of the import (for files)
     const filesImportResults = ref([]);
+
+    // OWNER pattern: the page owns <OForm> (url + jsonFiles) and the
+    // fetch/parse watchers + import logic read those values, so it creates the
+    // form with useOForm and reads it via form.useStore — ONE source, no mirror.
+    // url/jsonFiles are name=-owned; every write goes through setFormField. The
+    // deep JSON validation + recovery inputs + the Monaco editor stay outside the
+    // form (documented no-OForm* exceptions).
+    const form = useOForm({
+      defaultValues: importDashboardDefaults(),
+      schema: makeImportDashboardSchema(t),
+      // forward to importDashboard defined below (avoids a TDZ ref at setup time)
+      onSubmit: () => importDashboard(),
+    });
+    const setFormField = (name: string, val: unknown) => form.setFieldValue(name, val);
+    const url = form.useStore((s: any) => s.values?.url ?? "");
+    const jsonFiles = form.useStore((s: any) => s.values?.jsonFiles);
 
     onMounted(async () => {
       filesImportResults.value = [];
@@ -442,12 +398,12 @@ export default defineComponent({
             jsonStr.value = JSON.stringify(jsonObject, null, 2);
           }
         } catch (error) {
-          showErrorNotification("Invalid JSON format");
+          showErrorNotification(t("dashboard.importDashboardPage.invalidJsonFormat"));
         }
       }
       if (newVal == "") {
-        jsonFiles.value = null;
-        url.value = "";
+        setFormField("jsonFiles", null);
+        setFormField("url", "");
       }
     });
 
@@ -473,23 +429,30 @@ export default defineComponent({
             ) {
               jsonStr.value = JSON.stringify(response.data, null, 2);
             } else {
-              showErrorNotification("Invalid JSON format in the URL");
+              showErrorNotification(t("dashboard.importDashboardPage.invalidJsonFormatUrl"));
             }
           } catch (parseError) {
             // If parsing fails, display an error message
-            showErrorNotification("Invalid JSON format");
+            showErrorNotification(t("dashboard.importDashboardPage.invalidJsonFormat"));
           }
         }
       } catch (error) {
-        showErrorNotification("Error fetching data");
+        showErrorNotification(t("dashboard.importDashboardPage.errorFetchingData"));
       }
     });
 
     //import dashboard from the json
-    const importDashboardFromJSON = async (
-      jsonObj: any,
-      selectedFolder: any,
-    ) => {
+    const migrateSchema = (dashboard: any) => {
+      const converted = convertDashboardSchemaVersion(dashboard);
+      try {
+        dedupeDashboardIds(converted);
+      } catch (e) {
+        console.error("Failed to dedupe dashboard ids on import", e);
+      }
+      return converted;
+    };
+
+    const importDashboardFromJSON = async (jsonObj: any, selectedFolder: any) => {
       const data =
         typeof jsonObj == "string"
           ? JSON.parse(jsonObj)
@@ -518,7 +481,7 @@ export default defineComponent({
     // import multiple files
     const importFiles = async () => {
       if (!jsonStr.value || !jsonStr.value.length) {
-        showErrorNotification("No JSON file(s) selected for import");
+        showErrorNotification(t("dashboard.importDashboardPage.noJsonFilesSelected"));
         isLoading.value = false;
         return;
       }
@@ -528,80 +491,78 @@ export default defineComponent({
       try {
         jsonStr.value = JSON.parse(jsonStr.value);
       } catch (e) {
-        showErrorNotification("Invalid JSON content");
+        showErrorNotification(t("dashboard.importDashboardPage.invalidJsonContent"));
         isLoading.value = false;
         return;
       }
 
       const data = jsonStr.value.map((parsedContent, fileIndex) => {
-        return new Promise(async (resolve, reject) => {
-          const fileName =
-            jsonFiles.value[fileIndex]?.name || `File ${fileIndex + 1}`;
+        return new Promise((resolve, reject) => {
+          (async () => {
+            const fileName =
+              jsonFiles.value[fileIndex]?.name ||
+              t("dashboard.importDashboardPage.fileFallback", { n: fileIndex + 1 });
 
-          try {
-            //this is done because if the user uploads a single dashboard, it will be an object and if the user uploads multiple dashboards, it will be an array of objects
-            //to support both the cases, we are using this condition\
-            //Example: if user uploads a single object file it will be converted to an array and if user uploads a array of objects it is already an array so we dont do anything
-            const dashboards = Array.isArray(parsedContent)
-              ? parsedContent
-              : [parsedContent];
+            try {
+              //this is done because if the user uploads a single dashboard, it will be an object and if the user uploads multiple dashboards, it will be an array of objects
+              //to support both the cases, we are using this condition\
+              //Example: if user uploads a single object file it will be converted to an array and if user uploads a array of objects it is already an array so we dont do anything
+              const dashboards = Array.isArray(parsedContent) ? parsedContent : [parsedContent];
 
-            const results = [];
+              const results = [];
 
-            for (let i = 0; i < dashboards.length; i++) {
-              const dashboard = dashboards[i];
-              //this is the core logic to convert the dashboard schema version
-              //it will convert the dashboard schema version to the latest version
+              for (let i = 0; i < dashboards.length; i++) {
+                const dashboard = dashboards[i];
+                //this is the core logic to convert the dashboard schema version
+                //it will convert the dashboard schema version to the latest version
 
-              try {
-                const convertedSchema =
-                  convertDashboardSchemaVersion(dashboard);
+                try {
+                  const convertedSchema = migrateSchema(dashboard);
 
-                // Validate the converted schema before importing
-                const validationErrors = validateDashboardJson(convertedSchema);
-                if (validationErrors.length > 0) {
-                  const errorMessage = validationErrors.join("; ");
-                  results.push({
-                    index: i + 1,
-                    error: new Error(errorMessage),
-                  });
-                  continue;
+                  // Validate the converted schema before importing
+                  const validationErrors = validateDashboardJson(t, convertedSchema);
+                  if (validationErrors.length > 0) {
+                    const errorMessage = validationErrors.join("; ");
+                    results.push({
+                      index: i + 1,
+                      error: new Error(errorMessage),
+                    });
+                    continue;
+                  }
+
+                  const res = await importDashboardFromJSON(convertedSchema, selectedFolder.value);
+                  results.push({ index: i + 1, result: res });
+                } catch (e) {
+                  results.push({ index: i + 1, error: e });
                 }
-
-                const res = await importDashboardFromJSON(
-                  convertedSchema,
-                  selectedFolder.value,
-                );
-                results.push({ index: i + 1, result: res });
-              } catch (e) {
-                results.push({ index: i + 1, error: e });
               }
-            }
 
-            const failedMessages = results
-              .filter((r) => r.error)
-              .map((r) => `${r.error?.message || r.error}`);
+              const failedMessages = results
+                .filter((r) => r.error)
+                .map((r) => `${r.error?.message || r.error}`);
 
-            if (failedMessages.length) {
+              if (failedMessages.length) {
+                reject({
+                  file: t("dashboard.importDashboardPage.jsonFileLabel", { n: fileIndex + 1 }),
+                  error: failedMessages.join("; "),
+                });
+              } else {
+                resolve({ file: fileName, results });
+              }
+            } catch (e) {
               reject({
-                file: `JSON ${fileIndex + 1}`,
-                error: failedMessages.join("; "),
+                file: fileName,
+                error: t("dashboard.importDashboardPage.errorProcessingFile"),
               });
-            } else {
-              resolve({ file: fileName, results });
             }
-          } catch (e) {
-            reject({ file: fileName, error: "Error processing file" });
-          }
+          })().catch(reject);
         });
       });
 
       Promise.allSettled(data).then(async (results) => {
         filesImportResults.value = results;
 
-        const successfulImports = results.filter(
-          (r) => r.status === "fulfilled",
-        ).length;
+        const successfulImports = results.filter((r) => r.status === "fulfilled").length;
 
         if (results.length === successfulImports) {
           await resetAndRefresh(ImportType.FILES, selectedFolder.value);
@@ -609,13 +570,15 @@ export default defineComponent({
 
         if (successfulImports) {
           showPositiveNotification(
-            `${successfulImports} File(s) Imported Successfully`,
+            t("dashboard.importDashboardPage.filesImportedSuccessfully", { n: successfulImports }),
           );
         }
 
         const failedImports = results.length - successfulImports;
         if (failedImports) {
-          showErrorNotification(`${failedImports} File(s) Failed to Import`);
+          showErrorNotification(
+            t("dashboard.importDashboardPage.filesFailedToImport", { n: failedImports }),
+          );
         }
 
         isLoading.value = false;
@@ -626,12 +589,12 @@ export default defineComponent({
     const resetAndRefresh = async (type, selectedFolder) => {
       switch (type) {
         case ImportType.FILES:
-          jsonFiles.value = null;
+          setFormField("jsonFiles", null);
           jsonStr.value = "";
           isLoading.value = false;
           break;
         case ImportType.URL:
-          url.value = "";
+          setFormField("url", "");
           isLoading.value = false;
           break;
         case ImportType.JSON_STRING:
@@ -658,7 +621,7 @@ export default defineComponent({
         const urlData = url.value.trim();
 
         if (!urlData && !jsonStr.value) {
-          showErrorNotification("Please Enter a URL for import");
+          showErrorNotification(t("dashboard.importDashboardPage.pleaseEnterUrl"));
           return;
         }
 
@@ -670,10 +633,10 @@ export default defineComponent({
 
         const importPromises = dashboards.map((dashboard, index) => {
           try {
-            const converted = convertDashboardSchemaVersion(dashboard);
+            const converted = migrateSchema(dashboard);
 
             // Validate the converted schema before importing
-            const validationErrors = validateDashboardJson(converted);
+            const validationErrors = validateDashboardJson(t, converted);
             if (validationErrors.length > 0) {
               const errorMessage = validationErrors.join("; ");
               return Promise.reject({ index, error: new Error(errorMessage) });
@@ -687,25 +650,25 @@ export default defineComponent({
 
         const results = await Promise.allSettled(importPromises);
 
-        const successCount = results.filter(
-          (r) => r.status === "fulfilled",
-        ).length;
+        const successCount = results.filter((r) => r.status === "fulfilled").length;
         const failedCount = results.length - successCount;
 
         if (successCount > 0) {
           await resetAndRefresh(ImportType.URL, selectedFolder.value);
           showPositiveNotification(
-            `${successCount} Dashboard(s) Imported Successfully`,
+            t("dashboard.importDashboardPage.dashboardsImportedSuccessfully", { n: successCount }),
           );
         }
 
         if (failedCount > 0) {
-          showErrorNotification(`${failedCount} Dashboard(s) Failed to Import`);
+          showErrorNotification(
+            t("dashboard.importDashboardPage.dashboardsFailedToImport", { n: failedCount }),
+          );
         }
 
         filesImportResults.value = results;
       } catch (error) {
-        showErrorNotification("Failed to Import Dashboard");
+        showErrorNotification(t("dashboard.importDashboardPage.failedToImportDashboard"));
       } finally {
         if (jsonStr.value && typeof jsonStr.value !== "string") {
           jsonStr.value = "";
@@ -721,29 +684,29 @@ export default defineComponent({
         // get the dashboard
 
         const oldImportedSchema = JSON.parse(jsonStr.value);
-        const convertedSchema =
-          convertDashboardSchemaVersion(oldImportedSchema);
+        const convertedSchema = migrateSchema(oldImportedSchema);
 
         // Validate the converted schema before importing
-        const validationErrors = validateDashboardJson(convertedSchema);
+        const validationErrors = validateDashboardJson(t, convertedSchema);
         if (validationErrors.length > 0) {
           const errorMessage = validationErrors.join("; ");
-          showErrorNotification(`Validation failed: ${errorMessage}`);
+          showErrorNotification(
+            t("dashboard.importDashboardPage.validationFailed", { error: errorMessage }),
+          );
           return;
         }
 
-        await importDashboardFromJSON(
-          convertedSchema,
-          selectedFolder.value,
-        ).then((res) => {
+        await importDashboardFromJSON(convertedSchema, selectedFolder.value).then((_res) => {
           resetAndRefresh(ImportType.JSON_STRING, selectedFolder.value);
           filesImportResults.value = [];
           jsonStr.value = "";
 
-          showPositiveNotification(`Dashboard Imported Successfully`);
+          showPositiveNotification(
+            t("dashboard.importDashboardPage.dashboardImportedSuccessfully"),
+          );
         });
       } catch (error) {
-        showErrorNotification("Please Enter a JSON object for import");
+        showErrorNotification(t("dashboard.importDashboardPage.pleaseEnterJsonObject"));
       } finally {
         isLoading.value = false;
       }
@@ -751,8 +714,8 @@ export default defineComponent({
 
     // back button to render dashboard List page
     const goBack = () => {
-      jsonFiles.value = [];
-      url.value = "";
+      setFormField("jsonFiles", []);
+      setFormField("url", "");
       jsonStr.value = "";
       filesImportResults.value = [];
       return router.push({
@@ -763,10 +726,11 @@ export default defineComponent({
         },
       });
     };
+
     const updateActiveTab = () => {
       jsonStr.value = "";
-      jsonFiles.value = null;
-      url.value = "";
+      setFormField("jsonFiles", null);
+      setFormField("url", "");
     };
     const importDashboard = () => {
       try {
@@ -775,12 +739,12 @@ export default defineComponent({
         if (Array.isArray(jsonObj)) {
           jsonObj.forEach((input, index) => {
             // migrate to new schema
-            const convertedSchema = convertDashboardSchemaVersion(input);
+            const convertedSchema = migrateSchema(input);
             validateBasicInputs(convertedSchema, index);
           });
         } else {
           // migrate to new schema
-          const convertedSchema = convertDashboardSchemaVersion(jsonObj);
+          const convertedSchema = migrateSchema(jsonObj);
           validateBasicInputs(convertedSchema);
         }
         if (dashboardErrorsToDisplay.value.length > 0) {
@@ -796,25 +760,30 @@ export default defineComponent({
           importFromUrl();
         }
       } catch (e) {
-        showErrorNotification("Failed to Import Dashboard");
+        showErrorNotification(t("dashboard.importDashboardPage.failedToImportDashboard"));
       }
     };
     const validateBasicInputs = (input, index = 0) => {
       // Basic title validation
       if (input.title === "" || typeof input.title !== "string") {
         dashboardErrorsToDisplay.value.push({
-          message: `Title is required for dashboard - ${index ? index + 1 : 1}  and should be a string`,
+          message: t("dashboard.importDashboardPage.titleRequired", {
+            index: index ? index + 1 : 1,
+          }),
           field: "dashboard_title",
           dashboardIndex: index,
         });
       }
 
       // Comprehensive dashboard validation using validateDashboardJson
-      const validationErrors = validateDashboardJson(input);
+      const validationErrors = validateDashboardJson(t, input);
       if (validationErrors.length > 0) {
         validationErrors.forEach((error) => {
           dashboardErrorsToDisplay.value.push({
-            message: `Dashboard ${index ? index + 1 : 1}: ${error}`,
+            message: t("dashboard.importDashboardPage.dashboardValidationError", {
+              index: index ? index + 1 : 1,
+              error,
+            }),
             field: "dashboard_validation",
             dashboardIndex: index,
           });
@@ -847,9 +816,8 @@ export default defineComponent({
           queryIndex
         ].fields.stream_type = selectedStreamType;
       } else {
-        jsonObj.tabs[tabIndex].panels[panelIndex].queries[
-          queryIndex
-        ].fields.stream_type = selectedStreamType;
+        jsonObj.tabs[tabIndex].panels[panelIndex].queries[queryIndex].fields.stream_type =
+          selectedStreamType;
       }
       jsonStr.value = JSON.stringify(jsonObj, null, 2);
     };
@@ -883,151 +851,47 @@ export default defineComponent({
       updateDashboardTitle,
       updateStreamType,
       streamTypeOptions,
+      streamTypeSelectOptions,
       dashboardTitles,
       streamTypes,
+      form,
     };
   },
-  components: { SelectFolderDropdown, AppTabs, QueryEditor },
+  components: {
+    OSeparator,
+    SelectFolderDropdown,
+    AppTabs,
+    OPageLayout,
+    QueryEditor,
+    OButton,
+    OInput,
+    OSelect,
+    OForm,
+    OFormInput,
+    OFormFile,
+    OSplitter,
+  },
 });
 </script>
 
-<style scoped lang="scss">
-.empty-query .monaco-editor-background {
-  background-image: url("../../assets/images/common/query-editor.png");
-  background-repeat: no-repeat;
-  background-size: 115px;
-}
-
-.empty-function .monaco-editor-background {
-  background-image: url("../../assets/images/common/vrl-function.png");
-  background-repeat: no-repeat;
-  background-size: 170px;
-}
-.editor-container {
-  height: calc(80vh - 20px) !important;
-}
-.editor-container-url {
-  .monaco-editor {
-    height: calc(100vh - 310px) !important; /* Total editor height */
-    overflow: auto; /* Allows scrolling if content overflows */
-    resize: none; /* Remove resize behavior */
-  }
-}
-.dashboard-import-json-container {
-  .monaco-editor {
-    height: calc(100vh - 310px) !important; /* Total editor height */
-    overflow: auto; /* Allows scrolling if content overflows */
-    resize: none; /* Remove resize behavior */
-  }
-}
-.monaco-editor {
-  height: calc(81vh - 14px) !important; /* Total editor height */
-  overflow: auto; /* Allows scrolling if content overflows */
-  resize: none; /* Remove resize behavior */
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-}
-.error-report-container {
-  height: calc(100vh - 8px) !important; /* Total editor height */
-  overflow: auto; /* Allows scrolling if content overflows */
+<style scoped>
+/* keep(lib-override:monaco): fixed Monaco editor heights for the import editors
+   plus the folder-dropdown button spacing, reaching Monaco's internal DOM via
+   :deep(). The elements carrying these container classes are this view's own,
+   so scoping matches the exact same DOM the former global rule did. BaseImport.vue
+   carries the matching .editor-container-url rule for its own editor. */
+.editor-container-url :deep(.monaco-editor) {
+  height: calc(100vh - 17.8125rem) !important;
+  overflow: hidden;
   resize: none;
 }
-.error-container {
-  display: flex;
-  overflow-y: auto;
-
-  flex-direction: column;
-  border: 1px solid #ccc;
-  height: calc(100% - 100px) !important; /* Total container height */
+.dashboard-import-json-container :deep(.monaco-editor) {
+  height: calc(100vh - 17.625rem) !important;
+  overflow: hidden;
+  resize: none;
 }
-
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-list {
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
-}
-.dashboard-import-type-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #464646;
-  }
-
-  :deep(.rum-tab) {
-    &:hover {
-      background: #464646;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-.dashboard-import-type-tabs {
-  height: fit-content;
-
-  :deep(.rum-tabs) {
-    border: 1px solid #eaeaea;
-    height: fit-content;
-    border-radius: 4px;
-    overflow: hidden;
-  }
-
-  :deep(.rum-tab) {
-    width: fit-content !important;
-    padding: 4px 12px !important;
-    border: none !important;
-
-    &:hover {
-      background: #eaeaea;
-    }
-
-    &.active {
-      background: #5960b2;
-      color: #ffffff !important;
-    }
-  }
-}
-.dashboard-folder-dropdown {
-  :deep(.q-field--labeled.showLabelOnTop) {
-    padding-top: 12px; /* Example override */
-  }
-}
-.dashboard-folder-dropdown {
-  :deep(
-      .q-field--labeled.showLabelOnTop.q-select
-        .q-field__control-container
-        .q-field__native
-    )
-    > :first-child {
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-}
-.import-folder-dropdown-container {
-  :deep(.q-field) {
-    padding-top: 10px;
-  }
-  :deep(.flex) {
-    align-items: center !important;
-  }
-  :deep(.add-folder-btn) {
-    margin-bottom: 0 !important;
-    margin-top: 12px !important;
-  }
+.import-folder-dropdown-container :deep(.add-folder-btn) {
+  margin-bottom: 0 !important;
+  margin-top: 0.75rem !important;
 }
 </style>

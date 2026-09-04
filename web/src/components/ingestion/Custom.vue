@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,86 +16,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-splitter
-    v-model="splitterModel"
-    unit="px"
-    class="tw:h-[calc(100vh-140px)]"
-  >
-    <template v-slot:before>
-      <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem]">
-        <div class="card-container tw:h-[calc(100vh-140px)]">
-          <q-tabs
-            v-model="tabs"
-            indicator-color="transparent"
-            inline-label
-            vertical
-          >
-            <q-route-tab
-              default
-              name="ingestLogs"
-              :to="{
-                name: 'ingestLogs',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.logsLabel')"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="ingestMetrics"
-              :to="{
-                name: 'ingestMetrics',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.metricsLabel')"
-              content-class="tab_content"
-            />
-            <q-route-tab
-              name="ingestTraces"
-              :to="{
-                name: 'ingestTraces',
-                query: {
-                  org_identifier: store.state.selectedOrganization.identifier,
-                },
-              }"
-              :label="t('ingestion.tracesLabel')"
-              content-class="tab_content"
-            />
-          </q-tabs>
-        </div>
-      </div>
+  <DataSourceSidebarLayout v-model="tabs" :splitter-width="250">
+    <template #tabs>
+      <ORouteTab
+        name="ingestLogs"
+        data-test="ingestion-custom-tab-ingestLogs"
+        :to="{
+          name: 'ingestLogs',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.logsLabel')"
+      />
+      <ORouteTab
+        name="ingestMetrics"
+        data-test="ingestion-custom-tab-ingestMetrics"
+        :to="{
+          name: 'ingestMetrics',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.metricsLabel')"
+      />
+      <ORouteTab
+        name="ingestTraces"
+        data-test="ingestion-custom-tab-ingestTraces"
+        :to="{
+          name: 'ingestTraces',
+          query: {
+            org_identifier: store.state.selectedOrganization.identifier,
+          },
+        }"
+        :label="t('ingestion.tracesLabel')"
+      />
     </template>
 
-    <template v-slot:after>
-      <div class="tw:overflow-hidden tw:h-full tw:pr-[0.625rem]">
-        <router-view
-          :title="tabs"
-          :currOrgIdentifier="currOrgIdentifier"
-          :currUserEmail="currentUserEmail"
-          @copy-to-clipboard-fn="copyToClipboardFn"
-        >
-        </router-view>
-      </div>
-    </template>
-  </q-splitter>
+    <div class="h-full overflow-hidden">
+      <router-view
+        :title="tabs"
+        :currOrgIdentifier="currOrgIdentifier"
+        :currUserEmail="currentUserEmail"
+        @copy-to-clipboard-fn="copyToClipboardFn"
+      >
+      </router-view>
+    </div>
+  </DataSourceSidebarLayout>
 </template>
 
 <script lang="ts">
+import ORouteTab from "@/lib/navigation/Tabs/ORouteTab.vue";
+import DataSourceSidebarLayout from "@/components/ingestion/DataSourceSidebarLayout.vue";
 // @ts-ignore
-import { defineComponent, ref, onBeforeMount, computed, onUpdated } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, onBeforeMount, onUpdated } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
 import config from "@/aws-exports";
 import segment from "@/services/segment_analytics";
 import { getImageURL } from "@/utils/zincutils";
 
 export default defineComponent({
   name: "CustomPage",
+  components: { ORouteTab, DataSourceSidebarLayout },
   props: {
     currOrgIdentifier: {
       type: String,
@@ -103,39 +88,49 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const q = useQuasar();
     const router: any = useRouter();
-    const tabs = ref("");
-    const currentOrgIdentifier: any = ref(
-      store.state.selectedOrganization.identifier
-    );
+    const currentOrgIdentifier: any = ref(store.state.selectedOrganization.identifier);
     const metricRoutes = [
       "prometheus",
+      "vmagent",
+      "nightingale",
+      "categraf",
       "otelCollector",
       "telegraf",
       "cloudwatchMetrics",
     ];
-    const traceRoutes = ["tracesOTLP"];
+    const traceRoutes = ["tracesOTLP", "ingestTracesFromOtel"];
     const rumRoutes = ["frontendMonitoring"];
+    const logRoutes = [
+      "curl",
+      "fluentbit",
+      "fluentd",
+      "kinesisfirehose",
+      "vector",
+      "filebeat",
+      "gcpLogs",
+      "logstash",
+      "syslogNg",
+      "loongcollector",
+      "ingestLogsFromOtel",
+    ];
+    const tabs = ref(
+      logRoutes.includes(router.currentRoute.value.name as string)
+        ? "ingestLogs"
+        : metricRoutes.includes(router.currentRoute.value.name as string)
+          ? "ingestMetrics"
+          : traceRoutes.includes(router.currentRoute.value.name as string)
+            ? "ingestTraces"
+            : "ingestLogs",
+    );
 
     onBeforeMount(() => {
-      const ingestRoutes = [
-        "ingestLogs",
-        "ingestTraces",
-        "ingestMetrics",
-        "rumMonitoring",
-      ];
-      const logRoutes = [
-        "curl",
-        "fluentbit",
-        "fluentd",
-        "kinesisfirehose",
-        "vector",
-        "filebeat",
-        "gcpLogs",
-      ];
+      // Parent container routes: navigating to these redirects to their first child.
+      // Leaf child routes (tracesOTLP, ingestTracesFromOtel, logRoutes members, etc.)
+      // are intentionally excluded here — they just set the active tab below.
+      const ingestRoutes = ["ingestLogs", "ingestTraces", "ingestMetrics", "rumMonitoring"];
 
       if (ingestRoutes.includes(router.currentRoute.value.name)) {
         router.push({
@@ -181,28 +176,20 @@ export default defineComponent({
     });
 
     const copyToClipboardFn = (content: any) => {
-      copyToClipboard(content.innerText)
-        .then(() => {
-          q.notify({
-            type: "positive",
-            message: "Content Copied Successfully!",
-            timeout: 5000,
+      copyToClipboard(content.innerText, t, {
+        successMessage: t("common.contentCopiedSuccessfully"),
+        errorMessage: t("ingestion.copyContentError"),
+        timeout: 5000,
+      }).then((success: boolean) => {
+        if (success) {
+          segment.track("Button Click", {
+            button: "Copy to Clipboard",
+            ingestion: router.currentRoute.value.name,
+            user_org: store.state.selectedOrganization.identifier,
+            user_id: store.state.userInfo.email,
+            page: "Ingestion",
           });
-        })
-        .catch(() => {
-          q.notify({
-            type: "negative",
-            message: "Error while copy content.",
-            timeout: 5000,
-          });
-        });
-
-      segment.track("Button Click", {
-        button: "Copy to Clipboard",
-        ingestion: router.currentRoute.value.name,
-        user_org: store.state.selectedOrganization.identifier,
-        user_id: store.state.userInfo.email,
-        page: "Ingestion",
+        }
       });
     };
 
@@ -211,7 +198,6 @@ export default defineComponent({
       store,
       router,
       config,
-      splitterModel: ref(250),
       currentUserEmail: store.state.userInfo.email,
       currentOrgIdentifier,
       getImageURL,
@@ -224,31 +210,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.ingestionPage {
-  padding: 1.5rem 0 0;
-  .head {
-    padding-bottom: 1rem;
-  }
-  
-}
-</style>
-<style lang="scss">
-.ingestionPage {
-  .q-tab-panel {
-    padding: 0 !important;
-    .tab_content {
-      .q-tab__label {
-        overflow: hidden !important;
-        text-overflow: ellipsis !important;
-        white-space: nowrap !important;
-      }
-    }
-  }
-
-  .q-icon > img {
-    height: auto !important;
-  }
-}
-</style>

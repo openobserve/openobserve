@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,22 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="padding: 5px; height: 100%; width: 100%">
-    <div ref="chartRef" id="chart-map" style="height: 100%; width: 100%"></div>
+  <div class="h-full w-full p-1.25" data-test="dashboard-geomap-renderer">
+    <div class="h-full w-full" ref="chartRef" id="chart-map"></div>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  onMounted,
-  watch,
-  onUnmounted,
-  nextTick,
-  onBeforeMount,
-} from "vue";
-import { useStore } from "vuex";
+import { defineComponent, ref, onMounted, watch, onUnmounted, nextTick } from "vue";
 
 import L from "leaflet";
 import "@/utils/dashboard/leaflet-echarts/index";
@@ -63,50 +54,7 @@ import {
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
-import type {
-  BarSeriesOption,
-  LineSeriesOption,
-  CustomSeriesOption,
-  GaugeSeriesOption,
-  PieSeriesOption,
-  ScatterSeriesOption,
-  HeatmapSeriesOption,
-  SankeySeriesOption,
-  TreeSeriesOption,
-} from "echarts/charts";
-import type { ComposeOption } from "echarts/core";
-import type {
-  TitleComponentOption,
-  TooltipComponentOption,
-  GridComponentOption,
-  ToolboxComponentOption,
-  DatasetComponentOption,
-  LegendComponentOption,
-  PolarComponentOption,
-  VisualMapComponentOption,
-  DataZoomComponentOption,
-} from "echarts/components";
-
-type ECOption = ComposeOption<
-  | BarSeriesOption
-  | LineSeriesOption
-  | CustomSeriesOption
-  | GaugeSeriesOption
-  | PieSeriesOption
-  | ScatterSeriesOption
-  | HeatmapSeriesOption
-  | SankeySeriesOption
-  | TreeSeriesOption
-  | TitleComponentOption
-  | TooltipComponentOption
-  | GridComponentOption
-  | ToolboxComponentOption
-  | DatasetComponentOption
-  | LegendComponentOption
-  | PolarComponentOption
-  | VisualMapComponentOption
-  | DataZoomComponentOption
->;
+import { withChartFont } from "@/utils/fonts";
 
 echarts.use([
   TitleComponent,
@@ -148,11 +96,8 @@ export default defineComponent({
     let chart: any;
     let lmap: any;
     let lmapComponent: any;
-    const lmapOptions = props.data.options?.lmap
-      ? { ...props.data.options.lmap }
-      : {};
+    const lmapOptions = props.data.options?.lmap ? { ...props.data.options.lmap } : {};
 
-    const store = useStore();
     const windowResizeEventCallback = async () => {
       await nextTick();
       await nextTick();
@@ -174,18 +119,18 @@ export default defineComponent({
         ...props.data.options,
         lmap: lmapOptions,
       };
-      chart?.setOption(options || {}, true);
+      chart?.setOption(withChartFont(options || {}), true);
       window.addEventListener("resize", windowResizeEventCallback);
 
       // Get Leaflet extension component
       // getModel and getComponent do not seem to be exported in echarts typescript
       // add the following two comments to circumvent this
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
       // @ts-ignore
       lmapComponent = chart?.getModel()?.getComponent("lmap");
 
       // Get the instance of Leaflet
-      // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
       // @ts-ignore
       lmap = lmapComponent?.getLeaflet();
 
@@ -197,11 +142,8 @@ export default defineComponent({
       }
       if (props.data.options?.lmap?.center) {
         lmap.setView(
-          [
-            props.data.options?.lmap?.center[1],
-            props.data.options?.lmap?.center[0],
-          ],
-          props.data.options?.lmap?.zoom
+          [props.data.options?.lmap?.center[1], props.data.options?.lmap?.center[0]],
+          props.data.options?.lmap?.zoom,
         );
       }
       // L.geoJson(mapData).addTo(lmap);
@@ -218,23 +160,23 @@ export default defineComponent({
 
     watch(
       () => props.data.options,
-      async (newOptions) => {
+      async () => {
         await nextTick();
         chart?.resize();
         const options = {
           ...props.data.options,
           lmap: lmapOptions,
         };
-        chart?.setOption(options || {}, true);
+        chart?.setOption(withChartFont(options || {}), true);
         // Get Leaflet extension component
         // getModel and getComponent do not seem to be exported in echarts typescript
         // add the following two comments to circumvent this
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
         // @ts-ignore
         lmapComponent = chart?.getModel().getComponent("lmap");
 
         // Get the instance of Leaflet
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+
         // @ts-ignore
         lmap = lmapComponent?.getLeaflet();
 
@@ -246,15 +188,12 @@ export default defineComponent({
         }
         if (props.data.options?.lmap?.center) {
           lmap?.setView(
-            [
-              props.data.options?.lmap?.center[1],
-              props.data.options?.lmap?.center[0],
-            ],
-            props.data.options?.lmap?.zoom
+            [props.data.options?.lmap?.center[1], props.data.options?.lmap?.center[0]],
+            props.data.options?.lmap?.zoom,
           );
         }
       },
-      { deep: true }
+      { deep: true },
     );
     return { chartRef };
   },

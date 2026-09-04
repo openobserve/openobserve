@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -18,41 +18,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div
     v-if="visible"
     ref="menuRef"
-    class="traces-metrics-context-menu"
+    class="bg-dropdown-bg border-dropdown-border rounded-default fixed z-9999 min-w-50 border border-solid py-1 shadow-sm dark:shadow-sm"
     :style="menuStyle"
     @click.stop
     data-test="traces-metrics-context-menu"
   >
     <div
-      class="menu-item"
+      class="text-compact text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 transition-colors select-none"
       @click="handleMenuItemClick('gte')"
       @mouseenter="hoveredItem = 'gte'"
       @mouseleave="hoveredItem = null"
-      :class="{ 'hovered': hoveredItem === 'gte' }"
+      :class="{ 'bg-dropdown-item-hover-bg!': hoveredItem === 'gte' }"
       data-test="context-menu-gte"
     >
-      <q-icon name="arrow_upward" size="xs" class="q-mr-sm" />
+      <OIcon name="arrow-upward" size="xs" class="me-2" />
       <span>{{ fieldName }} >= {{ formattedValue }}</span>
     </div>
     <div
-      class="menu-item"
+      class="text-compact text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 transition-colors select-none"
       @click="handleMenuItemClick('lte')"
       @mouseenter="hoveredItem = 'lte'"
       @mouseleave="hoveredItem = null"
-      :class="{ 'hovered': hoveredItem === 'lte' }"
+      :class="{ 'bg-dropdown-item-hover-bg!': hoveredItem === 'lte' }"
       data-test="context-menu-lte"
     >
-      <q-icon name="arrow_downward" size="xs" class="q-mr-sm" />
+      <OIcon name="arrow-downward" size="xs" class="me-2" />
       <span>{{ fieldName }} &lt;= {{ formattedValue }}</span>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, onBeforeUnmount } from 'vue';
+import { defineComponent, ref, computed, watch, onBeforeUnmount } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 export default defineComponent({
-  name: 'TracesMetricsContextMenu',
+  name: "TracesMetricsContextMenu",
+  components: {
+    OIcon,
+  },
   props: {
     visible: {
       type: Boolean,
@@ -72,16 +76,16 @@ export default defineComponent({
     },
     fieldName: {
       type: String,
-      default: 'Value',
+      default: "Value",
     },
   },
-  emits: ['select', 'close'],
+  emits: ["select", "close"],
   setup(props, { emit }) {
     const menuRef = ref<HTMLElement | null>(null);
     const hoveredItem = ref<string | null>(null);
 
     const formattedValue = computed(() => {
-      if (typeof props.value === 'number') {
+      if (typeof props.value === "number") {
         return props.value.toLocaleString(undefined, {
           maximumFractionDigits: 2,
         });
@@ -94,8 +98,8 @@ export default defineComponent({
       top: `${props.y}px`,
     }));
 
-    const handleMenuItemClick = (condition: 'gte' | 'lte') => {
-      emit('select', {
+    const handleMenuItemClick = (condition: "gte" | "lte") => {
+      emit("select", {
         condition,
         value: props.value,
         fieldName: props.fieldName,
@@ -104,13 +108,13 @@ export default defineComponent({
 
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.value && !menuRef.value.contains(event.target as Node)) {
-        emit('close');
+        emit("close");
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        emit('close');
+      if (event.key === "Escape") {
+        emit("close");
       }
     };
 
@@ -119,19 +123,19 @@ export default defineComponent({
       (newVisible) => {
         if (newVisible) {
           setTimeout(() => {
-            document.addEventListener('click', handleClickOutside);
-            document.addEventListener('keydown', handleEscape);
+            document.addEventListener("click", handleClickOutside);
+            document.addEventListener("keydown", handleEscape);
           }, 0);
         } else {
-          document.removeEventListener('click', handleClickOutside);
-          document.removeEventListener('keydown', handleEscape);
+          document.removeEventListener("click", handleClickOutside);
+          document.removeEventListener("keydown", handleEscape);
         }
       },
     );
 
     onBeforeUnmount(() => {
-      document.removeEventListener('click', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
     });
 
     return {
@@ -144,60 +148,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.traces-metrics-context-menu {
-  position: fixed;
-  z-index: 9999;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  min-width: 200px;
-  padding: 4px 0;
-
-  .menu-item {
-    display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    font-size: 13px;
-    color: #333;
-
-    &.hovered,
-    &:hover {
-      background-color: #f5f5f5;
-    }
-
-    &:active {
-      background-color: #e0e0e0;
-    }
-
-    span {
-      user-select: none;
-    }
-  }
-}
-
-body.body--dark {
-  .traces-metrics-context-menu {
-    background: #2c2c2c;
-    border-color: #404040;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-
-    .menu-item {
-      color: #e0e0e0;
-
-      &.hovered,
-      &:hover {
-        background-color: #383838;
-      }
-
-      &:active {
-        background-color: #404040;
-      }
-    }
-  }
-}
-</style>

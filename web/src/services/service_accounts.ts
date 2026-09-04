@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,25 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import http from "./http";
-import config from "../aws-exports";
 
 const service_accounts = {
-  list: (
-    org_identifier: string,
-  ) => {
-    return http().get(
-      `/api/${org_identifier}/service_accounts`
-    );
-  },
-  get_service_token: (
-    org_identifier: string,
-    email_id: string
-  ) => {
-    return http().get(
-      `/api/${org_identifier}/service_accounts/${email_id}`
-    );
+  list: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/service_accounts`);
   },
   create: (data: any, org_identifier: string) => {
     return http().post(`/api/${org_identifier}/service_accounts`, data);
@@ -45,9 +31,8 @@ const service_accounts = {
   bulkDelete: (org_identifier: string, data: any) => {
     return http().delete(`/api/${org_identifier}/service_accounts/bulk`, { data });
   },
-  refresh_token : (org_identifier: string, user_email: string) => {
-    return http().put(`/api/${org_identifier}/service_accounts/${user_email}?rotateToken=true`,{});
-  }
-
+  refresh_token: (org_identifier: string, user_email: string) => {
+    return http().put(`/api/${org_identifier}/service_accounts/${user_email}?rotateToken=true`, {});
+  },
 };
 export default service_accounts;

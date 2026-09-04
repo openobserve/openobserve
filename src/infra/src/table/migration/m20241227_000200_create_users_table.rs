@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -127,31 +127,6 @@ mod tests {
         assert_eq!(
             &create_users_email_idx_stmnt().to_string(PostgresQueryBuilder),
             r#"CREATE UNIQUE INDEX IF NOT EXISTS "users_email_idx" ON "users" ("email")"#
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_users_table_statement().to_string(MysqlQueryBuilder),
-            r#"
-                CREATE TABLE IF NOT EXISTS `users` (
-                `id` char(27) NOT NULL PRIMARY KEY,
-                `email` varchar(100) NOT NULL,
-                `first_name` varchar(100) NOT NULL,
-                `last_name` varchar(100) NOT NULL,
-                `password` varchar(256) NOT NULL,
-                `salt` varchar(256) NOT NULL,
-                `is_root` bool NOT NULL,
-                `password_ext` varchar(256),
-                `user_type` smallint NOT NULL,
-                `created_at` bigint NOT NULL,
-                `updated_at` bigint NOT NULL
-            )"#
-        );
-        assert_eq!(
-            &create_users_email_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `users_email_idx` ON `users` (`email`)"#
         );
     }
 

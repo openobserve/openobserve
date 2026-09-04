@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -32,46 +32,19 @@ impl MigrationTrait for Migration {
         let default_expiry =
             chrono::Utc::now().timestamp_micros() + (default_expiry_hours * 60 * 60 * 1_000_000);
 
-        // MySQL doesn't support IF NOT EXISTS in ALTER TABLE
-        // So we use add_column for MySQL and add_column_if_not_exists for others
-        if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
-            // For MySQL, we need to check if column exists first to make migration idempotent
-            let result = manager
-                .alter_table(
-                    Table::alter()
-                        .table(Sessions::Table)
-                        .add_column(
-                            ColumnDef::new(Sessions::ExpiresAt)
-                                .big_integer()
-                                .not_null()
-                                .default(default_expiry),
-                        )
-                        .to_owned(),
-                )
-                .await;
-
-            // Ignore "Duplicate column" error for idempotency (test retries)
-            if let Err(e) = result {
-                let err_msg = e.to_string();
-                if !err_msg.contains("Duplicate column") {
-                    return Err(e);
-                }
-            }
-        } else {
-            manager
-                .alter_table(
-                    Table::alter()
-                        .table(Sessions::Table)
-                        .add_column_if_not_exists(
-                            ColumnDef::new(Sessions::ExpiresAt)
-                                .big_integer()
-                                .not_null()
-                                .default(default_expiry),
-                        )
-                        .to_owned(),
-                )
-                .await?;
-        }
+        manager
+            .alter_table(
+                Table::alter()
+                    .table(Sessions::Table)
+                    .add_column_if_not_exists(
+                        ColumnDef::new(Sessions::ExpiresAt)
+                            .big_integer()
+                            .not_null()
+                            .default(default_expiry),
+                    )
+                    .to_owned(),
+            )
+            .await?;
 
         // Create index on expires_at for efficient cleanup queries
         // Use if_not_exists for idempotency
@@ -129,4 +102,19 @@ impl MigrationTrait for Migration {
 enum Sessions {
     Table,
     ExpiresAt,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20251218_000001_add_expires_at_to_sessions"
+        );
+    }
 }

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,11 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="query-plan-tree">
+  <div
+    class="query-plan-tree text-compact bg-surface-subtle rounded-default overflow-x-auto p-4 font-mono leading-[1.8]"
+  >
     <div
       v-for="(node, index) in tree.children"
       :key="index"
-      class="tree-node"
+      class="tree-node m-0"
+      data-test="query-plan-tree-node"
     >
       <QueryPlanNode
         :node="node"
@@ -53,25 +56,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.query-plan-tree {
-  font-family: "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro", monospace;
-  font-size: 13px;
-  line-height: 1.8;
-  padding: 16px;
-  background-color: rgba(0, 0, 0, 0.02);
-  border-radius: 4px;
-  overflow-x: auto;
-
-  .tree-node {
-    margin: 0;
-  }
-}
-
-.body--dark {
-  .query-plan-tree {
-    background-color: rgba(255, 255, 255, 0.03);
-  }
-}
-</style>

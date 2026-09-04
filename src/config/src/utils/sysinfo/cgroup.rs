@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -87,5 +87,31 @@ fn read_memory_cgroup_v2() -> usize {
         val.trim_end().parse::<usize>().unwrap_or_default()
     } else {
         0
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_cpu_limit_positive() {
+        let limit = get_cpu_limit();
+        assert!(limit > 0, "cpu limit should be at least 1");
+    }
+
+    #[test]
+    fn test_get_memory_limit_positive() {
+        let limit = get_memory_limit();
+        assert!(limit > 0, "memory limit should be positive");
+    }
+
+    #[test]
+    fn test_get_cpu_limit_less_than_unrealistic_number() {
+        let limit = get_cpu_limit();
+        assert!(
+            limit < 100_000,
+            "cpu limit should be a sane number of cores"
+        );
     }
 }

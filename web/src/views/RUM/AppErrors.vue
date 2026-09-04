@@ -15,132 +15,283 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="sessions_page">
-    <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
-      <div class="card-container">
-        <div class="text-right tw:p-[0.375rem] flex align-center justify-between">
-          <syntax-guide />
-          <div class="flex align-center justify-end metrics-date-time">
-            <date-time
+  <div class="sessions_page flex min-h-0 flex-1 flex-col overflow-hidden">
+    <div>
+      <div class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5">
+        <div class="flex items-start gap-1">
+          <!-- Query editor (flex-grow to fill available space) -->
+          <div class="relative min-w-0 flex-1">
+            <QueryEditor
+              ref="errorQueryEditorRef"
+              editor-id="rum-errors-query-editor"
+              :class="[
+                'border',
+                'solid',
+                'border-card-glass-border',
+                'p-1',
+                'rounded-default',
+                'overflow-y-auto',
+                errorEditorHeight,
+              ]"
+              v-model:query="errorTrackingState.data.editorValue"
+              :debounce-time="300"
+              :keywords="effectiveKeywords"
+              :suggestions="effectiveSuggestions"
+              :field-value-resolver="resolveFieldValues"
+              @focus="onQueryEditorFocus"
+              @blur="onQueryEditorBlur"
+              @update:query="updateAutoComplete"
+            />
+            <div
+              v-if="!errorTrackingState.data.editorValue && !editorFocused"
+              class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start py-0.75 ps-[2.15rem] pe-2 pb-0 select-none"
+            >
+              <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
+            </div>
+          </div>
+
+          <!-- Controls on the right -->
+          <div class="flex shrink-0 items-start gap-1">
+            <SyntaxGuide />
+            <DateTime
               auto-apply
+              menu-align="end"
               :default-type="errorTrackingState.data.datetime?.valueType"
               :default-absolute-time="{
                 startTime: errorTrackingState.data.datetime.startTime,
                 endTime: errorTrackingState.data.datetime.endTime,
               }"
-              :default-relative-time="
-                errorTrackingState.data.datetime.relativeTimePeriod
-              "
+              :default-relative-time="errorTrackingState.data.datetime.relativeTimePeriod"
               data-test="logs-search-bar-date-time-dropdown"
-              class="q-mr-sm"
               @on:date-change="updateDateChange"
             />
-            <q-btn
-              data-test="metrics-explorer-run-query-button"
-              data-cy="metrics-explorer-run-query-button"
-              dense
-              :title="t('metrics.runQuery')"
-              class="q-pa-none tw:mr-none! o2-run-query-button o2-color-primary tw:h-[33px] element-box-shadow"
+            <!-- Run query button (also bound to the refresh shortcut) -->
+            <OButton
+              data-test="errors-run-query-button"
+              variant="primary"
+              size="sm-toolbar"
+              :loading="isLoadingIssues"
               @click="runQuery"
+              class="shrink-0"
             >
               {{ t("metrics.runQuery") }}
-            </q-btn>
+              <OTooltip
+                side="bottom"
+                :content="t('metrics.runQuery')"
+                shortcut-id="rumErrorsRefresh"
+              />
+            </OButton>
+            <OTableColumnToggle
+              :columns="tableColumns"
+              :column-visibility="columnVisibility"
+              @update:column-visibility="setColumnVisibility"
+            />
+            <ShareButton
+              ref="shareButtonRef"
+              data-test="rum-app-errors-share-link-btn"
+              :url="shareUrl"
+              variant="outline"
+              size="icon-toolbar"
+              shortcut-id="rumErrorsCopyUrl"
+              class="shrink-0"
+            />
           </div>
+          <!-- end controls -->
         </div>
-        <div class="tw:pb-[0.375rem] tw:px-[0.375rem]">
-          <query-editor
-            editor-id="rum-errors-query-editor"
-            class="monaco-editor tw:border tw:solid tw:border-[var(--o2-border-color)] tw:p-[0.25rem] tw:rounded-[0.375rem] tw:overflow-hidden tw:h-[4rem]!"
-            v-model:query="errorTrackingState.data.editorValue"
-            :debounce-time="300"
-          />
-        </div>
+        <!-- end flex row -->
       </div>
+      <!-- end bg-card-glass-bg -->
     </div>
-    <q-splitter
-      class="logs-horizontal-splitter tw:pl-[0.625rem]! tw:h-[calc(100%-80px)]!"
+    <!-- end toolbar wrapper -->
+    <OSplitter
+      class="logs-horizontal-splitter min-h-0 flex-1"
       v-model="splitterModel"
       unit="px"
-      vertical
+      :horizontal="false"
     >
       <template #before>
-        <div class="card-container tw:p-[0.325rem] tw:h-full">
-          <FieldList
+        <div class="bg-surface-panel border-border-default h-full overflow-auto border-e py-1">
+          <SearchFieldList
             :fields="streamFields"
             :time-stamp="{
               startTime: dateTime.startTime,
               endTime: dateTime.endTime,
             }"
             :stream-name="errorTrackingState.data.stream.errorStream"
+            stream-type="logs"
+            :enable-grouping="true"
+            :query="errorTrackingState.data.editorValue"
+            :base-filter="fieldListBaseFilter"
             @event-emitted="handleSidebarEvent"
           />
         </div>
       </template>
       <template #after>
-        <div class="tw:pr-[0.625rem] tw:h-full">
-          <div class="card-container tw:h-full">
-            <template v-if="isLoading.length">
-              <div
-                class="q-pb-lg flex items-center justify-center text-center tw:h-[calc(100vh-18.75rem)]"
-              >
-                <div>
-                  <q-spinner-hourglass
-                    color="primary"
-                    size="2.5rem"
-                    class="tw:mx-auto tw:block"
-                  />
-                  <div class="text-center full-width">
-                    {{ t("rum.loadingApplicationErrors") }}
-                  </div>
-                </div>
-              </div>
-            </template>
-            <AppTable
-              :columns="columns"
-              :rows="errorTrackingState.data.errors"
-              class="app-table-container tw:h-full"
-              @event-emitted="handleTableEvent"
+        <div class="flex h-full min-h-0 flex-col">
+          <!-- Errors-over-time chart + KPI summary -->
+          <div class="px-page-edge grid h-44 shrink-0 grid-cols-1 gap-2 pt-1.5 lg:grid-cols-5">
+            <ErrorsOverTimeChart
+              class="lg:col-span-3"
+              :buckets="chartSeries"
+              :deploy="latestDeploy"
+              :spike-factor="deploySpikeFactor"
+              :focus="typeFilter"
+              :loading="isLoadingChart"
+            />
+            <ErrorsKpiCards class="lg:col-span-2" :kpis="kpis" :loading="isLoadingKpis" />
+          </div>
+
+          <!-- Status / type / service filters -->
+          <div class="px-page-edge py-1.5">
+            <ErrorsFilterBar
+              :status="statusFilter"
+              :type="typeFilter"
+              :service="serviceFilter"
+              :services="serviceOptions"
+              :counts="filterCounts"
+              @update:status="onStatusFilterChange"
+              @update:type="onTypeFilterChange"
+              @update:service="onServiceFilterChange"
+            />
+          </div>
+
+          <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
+            <OTable
+              :data="visibleIssues"
+              :columns="tableColumns"
+              :default-columns="false"
+              :column-visibility="columnVisibility"
+              :loading="!!isLoading.length || isLoadingIssues"
+              row-key="_rowKey"
+              pagination="none"
+              virtual-scroll
+              :dense="false"
+              :row-height="60"
+              :show-global-filter="false"
+              class="h-full"
+              data-test="rum-app-errors-table"
+              row-class="cursor-pointer"
+              @row-click="handleRowClick"
             >
-              <template v-slot:error_details="slotProps">
-                <ErrorDetail :column="slotProps.column.row" />
+              <template #empty>
+                <NoData />
               </template>
-            </AppTable>
+              <template #cell-issue="{ row }">
+                <ErrorIssueCell :issue="row" />
+              </template>
+              <template #cell-trend="{ row }">
+                <ErrorTrendCell
+                  :buckets="trendBuckets[issueKey(row)] ?? null"
+                  :status="row.status"
+                  :handling="row.error_handling"
+                  @visible="fetchTrend(row)"
+                />
+              </template>
+              <template #cell-events="{ row }">
+                <div class="flex flex-col items-end">
+                  <span
+                    class="font-semibold tabular-nums"
+                    data-test="rum-app-errors-events-count"
+                    >{{ addCommasToNumber(row.events) }}</span
+                  >
+                  <small>{{ t("rum.eventsUnit") }}</small>
+                </div>
+              </template>
+              <template #cell-users="{ row }">
+                <span class="tabular-nums" data-test="rum-app-errors-users-count">{{
+                  row.users_affected != null ? addCommasToNumber(row.users_affected) : "—"
+                }}</span>
+              </template>
+              <template #cell-seen="{ row }">
+                <div class="flex flex-col">
+                  <span data-test="rum-app-errors-last-seen">{{
+                    formatRelativeTime(row.zo_sql_timestamp)
+                  }}</span>
+                  <small data-test="rum-app-errors-first-seen">{{
+                    t("rum.firstSeenAgo", {
+                      time: formatRelativeTime(row.first_seen),
+                    })
+                  }}</small>
+                </div>
+              </template>
+              <template #cell-status="{ row }">
+                <OTag
+                  :label="row.status === 'new' ? t('rum.statusNew') : t('rum.statusOngoing')"
+                  :variant="row.status === 'new' ? 'error' : 'error-outline'"
+                  size="sm"
+                  :title="row.status === 'new' ? t('rum.statusNewTooltip') : undefined"
+                  data-test="rum-app-errors-status-badge"
+                />
+              </template>
+            </OTable>
           </div>
         </div>
       </template>
-    </q-splitter>
+    </OSplitter>
   </div>
 </template>
 
 <script setup lang="ts">
+// Explicit name so <keep-alive :include> in RealUserMonitoring.vue matches this
+// view. Without it the name is inferred from the FILENAME, so renaming the file
+// would silently drop it from the cache and bring back the refetch-on-return.
+defineOptions({ name: "AppErrors" });
+
 import {
+  computed,
   nextTick,
   onBeforeMount,
   onMounted,
+  onBeforeUnmount,
+  onActivated,
+  onDeactivated,
   ref,
   type Ref,
   defineAsyncComponent,
+  watch,
 } from "vue";
-import AppTable from "@/components/rum/AppTable.vue";
+import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
+import useSqlSuggestions from "@/composables/useSuggestions";
+import { useSqlEditorDiagnostics } from "@/composables/useSqlEditorDiagnostics";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OTableColumnToggle from "@/lib/core/Table/sub-components/OTableColumnToggle.vue";
+import useExternalColumnToggle from "@/composables/useExternalColumnToggle";
+import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 import { b64DecodeUnicode, b64EncodeUnicode } from "@/utils/zincutils";
 import { useRouter } from "vue-router";
-import ErrorDetail from "@/components/rum/ErrorDetail.vue";
+import ErrorIssueCell from "@/components/rum/errorTracking/list/ErrorIssueCell.vue";
+import ErrorTrendCell from "@/components/rum/errorTracking/list/ErrorTrendCell.vue";
+import ErrorsOverTimeChart from "@/components/rum/errorTracking/list/ErrorsOverTimeChart.vue";
+import ErrorsKpiCards from "@/components/rum/errorTracking/list/ErrorsKpiCards.vue";
+import ErrorsFilterBar, {
+  type IssueStatusFilter,
+  type IssueTypeFilter,
+} from "@/components/rum/errorTracking/list/ErrorsFilterBar.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import useErrorTracking from "@/composables/useErrorTracking";
-import useQuery from "@/composables/useQuery";
+import useErrorIssuesData from "@/composables/rum/useErrorIssuesData";
+import { issueKey, formatRelativeTime, escapeSqlString } from "@/utils/rum/errorIssueUtils";
+import { addCommasToNumber } from "@/utils/formatters";
 import { useStore } from "vuex";
-import searchService from "@/services/search";
 import DateTime from "@/components/DateTime.vue";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import { cloneDeep } from "lodash-es";
-import FieldList from "@/components/common/sidebar/FieldList.vue";
-import { useI18n } from "vue-i18n";
+import SearchFieldList from "@/components/common/sidebar/SearchFieldList.vue";
+import { useI18nTyped } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
-import { useQuasar } from "quasar";
+import { applyFilterTerm, removeFieldCondition } from "@/utils/traces/filterUtils";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
+import useRum from "@/composables/rum/useRum";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
+import NoData from "@/components/shared/grid/NoData.vue";
 
-const QueryEditor = defineAsyncComponent(
-  () => import("@/components/CodeQueryEditor.vue"),
-);
-const { t } = useI18n();
+const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+const { t } = useI18nTyped();
 const dateTime = ref({
   startTime: 0,
   endTime: 0,
@@ -149,42 +300,244 @@ const dateTime = ref({
 });
 const streamFields: Ref<any[]> = ref([]);
 const splitterModel = ref(250);
-const { getTimeInterval, buildQueryPayload, parseQuery } = useQuery();
+const editorFocused = ref(false);
+const errorQueryEditorRef = ref<any>(null);
+
+// Server-error highlight ranges, forwarded to the filter editor by the composable.
+const sqlErrorRanges = ref<SqlErrorRange[]>([]);
+
+const {
+  onFocus: _sqlOnFocus,
+  onBlur: _sqlOnBlur,
+  onQueryChange: _sqlOnQueryChange,
+} = useSqlEditorDiagnostics({
+  queryEditorRef: errorQueryEditorRef,
+  sqlMode: computed(() => false),
+  query: computed(() => errorTrackingState.data.editorValue ?? ""),
+  streamName: computed(() => errorTrackingState.data.stream.errorStream),
+  externalErrors: sqlErrorRanges,
+});
+
+const onQueryEditorFocus = () => {
+  editorFocused.value = true;
+  _sqlOnFocus();
+};
+const onQueryEditorBlur = async () => {
+  editorFocused.value = false;
+  await _sqlOnBlur();
+};
+
+// Autosuggestions — field names, operators, filter values
+const {
+  autoCompleteData,
+  effectiveKeywords,
+  effectiveSuggestions,
+  getSuggestions,
+  updateFieldKeywords,
+  resolveFieldValues,
+} = useSqlSuggestions();
+
+const updateAutoComplete = (value: string) => {
+  _sqlOnQueryChange();
+  autoCompleteData.value.query = value;
+  autoCompleteData.value.cursorIndex = errorQueryEditorRef.value?.getCursorIndex?.();
+  autoCompleteData.value.popup.open = errorQueryEditorRef.value?.triggerAutoComplete;
+  autoCompleteData.value.org = store.state.selectedOrganization.identifier;
+  autoCompleteData.value.streamType = "logs";
+  autoCompleteData.value.streamName = errorTrackingState.data.stream.errorStream;
+  getSuggestions();
+};
+
+// Dynamic placeholder based on actual error stream fields
+const _sqlMode = computed(() => false);
+const _noStream = computed(() => !errorTrackingState.data.stream.errorStream);
+const { placeholder: editorPlaceholder } = useQueryPlaceholder(
+  streamFields,
+  computed(() => ({})),
+  _sqlMode,
+  _noStream,
+  t,
+);
 const { errorTrackingState } = useErrorTracking();
+const {
+  issues,
+  trendBuckets,
+  chartSeries,
+  latestDeploy,
+  deploySpikeFactor,
+  kpis,
+  isLoadingIssues,
+  isLoadingChart,
+  isLoadingKpis,
+  fetchAll,
+  cancelAll,
+  fetchTrend,
+  lastQueryError,
+} = useErrorIssuesData(t);
+
+// Turn the last issues-search server error into editor squiggles (filter mode).
+watch(lastQueryError, async (err) => {
+  if (!err) {
+    sqlErrorRanges.value = [];
+    return;
+  }
+  sqlErrorRanges.value = await rangesFromServerError({
+    code: err.code,
+    message: err.message,
+    errorDetail: err.error_detail,
+    sqlMode: false,
+    query: errorTrackingState.data.editorValue,
+    streamName: errorTrackingState.data.stream.errorStream,
+  });
+});
 const store = useStore();
 const isLoading: Ref<true[]> = ref([]);
 const isMounted = ref(false);
-const { getStream } = useStreams();
-const totalErrorsCount = ref(0);
+const { getStream } = useStreams(t);
 const schemaMapping: Ref<{ [key: string]: boolean }> = ref({});
-const columns = ref([
+
+const tableErrors = computed(() =>
+  issues.value.map((issue: any, i: number) => ({
+    _rowKey: issue.latest_error_id || issue.zo_sql_timestamp || `err_${i}`,
+    ...issue,
+  })),
+);
+
+// ── Status / type / service filters ────────────────────────────────
+const statusFilter = ref<IssueStatusFilter>("all");
+const typeFilter = ref<IssueTypeFilter>("all");
+const serviceFilter = ref("");
+// Accumulated across runs so the list survives service-filtered queries.
+const serviceOptions: Ref<string[]> = ref([]);
+
+const filterCounts = computed(() => {
+  const counts = { new: 0, ongoing: 0, unhandled: 0, handled: 0 };
+  for (const issue of issues.value) {
+    counts[issue.status === "new" ? "new" : "ongoing"]++;
+    counts[issue.error_handling === "handled" ? "handled" : "unhandled"]++;
+  }
+  return counts;
+});
+
+// Chips filter client-side over the grouped result set; the chart and KPI
+// cards intentionally keep showing the whole (SQL-filtered) stream.
+const visibleIssues = computed(() =>
+  tableErrors.value.filter((issue: any) => {
+    if (statusFilter.value !== "all" && issue.status !== statusFilter.value) {
+      return false;
+    }
+    if (typeFilter.value !== "all") {
+      const handling = issue.error_handling === "handled" ? "handled" : "unhandled";
+      if (handling !== typeFilter.value) return false;
+    }
+    return true;
+  }),
+);
+
+const collectServiceOptions = () => {
+  const merged = new Set(serviceOptions.value);
+  for (const issue of issues.value) {
+    if (issue.service) merged.add(issue.service);
+  }
+  serviceOptions.value = Array.from(merged).sort();
+};
+
+const onStatusFilterChange = (value: IssueStatusFilter) => {
+  statusFilter.value = value;
+  updateUrlQueryParams();
+};
+
+const onTypeFilterChange = (value: IssueTypeFilter) => {
+  typeFilter.value = value;
+  updateUrlQueryParams();
+};
+
+const onServiceFilterChange = (value: string) => {
+  serviceFilter.value = value;
+  runQuery();
+};
+
+// The sidebar shares `_rumdata` with sessions/views/actions, so without these
+// its value counts are whole-stream counts and dwarf the issue table's. Mirror
+// the non-editable part of the issues query (buildIssuesSql) — `type='error'`
+// plus the service chip. The status/type chips are excluded on purpose: they
+// filter the grouped result set client-side, not the underlying rows.
+const fieldListBaseFilter = computed(() => {
+  const clauses = ["type='error'"];
+  if (serviceFilter.value) {
+    clauses.push(`service='${escapeSqlString(serviceFilter.value)}'`);
+  }
+  return clauses.join(" AND ");
+});
+
+// Dynamic editor height based on content lines
+const errorEditorHeight = computed(() => {
+  const lines = (errorTrackingState.data.editorValue.match(/\n/g) || []).length + 1;
+  if (lines === 1) return "h-8!";
+  if (lines === 2) return "h-14!";
+  return "h-20!"; // 3+ lines, capped at 5rem (approx 3 lines)
+});
+
+const { columnVisibility, setColumnVisibility } =
+  useExternalColumnToggle("rum-error-tracking-list");
+
+const tableColumns = [
   {
-    name: "error",
-    field: (row: any) => row["error"],
-    prop: (row: any) => row["error"],
-    label: t("rum.error"),
-    align: "left",
-    sortable: true,
-    slot: true,
-    slotName: "error_details",
+    id: "issue",
+    header: t("rum.issueColumn"),
+    accessorKey: "error_message",
+    sortable: false,
+    hideable: true,
+    // autoWidth: the issue cell absorbs leftover width and truncates long
+    // messages instead of expanding the table into a horizontal scrollbar.
+    meta: { align: "left", autoWidth: true },
   },
   {
-    name: "events",
-    field: (row: any) => row["events"],
-    prop: (row: any) => row["events"],
-    label: t("rum.events"),
-    align: "left",
-    sortable: true,
+    id: "trend",
+    header: t("rum.trendColumn"),
+    accessorKey: "events",
+    sortable: false,
+    hideable: true,
+    size: 170,
+    meta: { align: "left" },
   },
   {
-    name: "initial_view_name",
-    field: (row: any) => row["view_url"],
-    prop: (row: any) => row["view_url"],
-    label: t("rum.viewURL"),
-    align: "left",
+    id: "events",
+    header: t("rum.events"),
+    accessorKey: "events",
     sortable: true,
+    hideable: true,
+    size: COL.count,
+    meta: { align: "right" },
   },
-]);
+  {
+    id: "users",
+    header: t("rum.usersColumn"),
+    accessorKey: "users_affected",
+    sortable: true,
+    hideable: true,
+    size: COL.count,
+    meta: { align: "right" },
+  },
+  {
+    id: "seen",
+    header: t("rum.seenColumn"),
+    accessorKey: "zo_sql_timestamp",
+    sortable: true,
+    hideable: true,
+    size: 150,
+    meta: { align: "left" },
+  },
+  {
+    id: "status",
+    header: t("rum.statusColumn"),
+    accessorKey: "status",
+    sortable: true,
+    hideable: true,
+    size: COL.status,
+    meta: { align: "left" },
+  },
+] satisfies OTableColumnDef[];
 
 const userDataSet = new Set([
   "user_agent_device_brand",
@@ -236,7 +589,8 @@ const userDataSet = new Set([
 
 const router = useRouter();
 
-const q = useQuasar();
+const { shareUrl } = useRum();
+const shareButtonRef = ref<InstanceType<typeof ShareButton> | null>(null);
 
 onBeforeMount(() => {
   restoreUrlQueryParams();
@@ -248,13 +602,43 @@ onMounted(async () => {
   runQuery();
 });
 
+// Leaving the tab frees the searches it started. Error tracking fans out 5 concurrent
+// searches per load plus a trend fetch per visible row; abandoning them leaves the
+// server's per-user work-group queue full, so the next tab's queries queue behind them
+// and come back cancelled as HTTP 429.
+onBeforeUnmount(() => {
+  cancelAll();
+});
+
+// This view is kept alive, so leaving it DEACTIVATES rather than unmounts —
+// onBeforeUnmount does not fire and its searches would keep holding work-group slots.
+onDeactivated(() => {
+  cancelAll();
+});
+
+// Returning from an error detail page shows the issues already fetched instead of
+// re-running the five-query chain. onActivated also fires on the first mount, where
+// onMounted already owns the initial load, so that first call is skipped.
+let activatedBefore = false;
+onActivated(() => {
+  if (!activatedBefore) {
+    activatedBefore = true;
+    return;
+  }
+  if (!issues.value?.length) runQuery();
+});
+
 const handleSidebarEvent = (event: string, value: any) => {
   if (event === "add-field") {
-    if (errorTrackingState.data.editorValue.length) {
-      errorTrackingState.data.editorValue += " and " + value;
-    } else {
-      errorTrackingState.data.editorValue += value;
-    }
+    errorTrackingState.data.editorValue = applyFilterTerm(
+      value,
+      errorTrackingState.data.editorValue,
+    );
+  } else if (event === "remove-field") {
+    errorTrackingState.data.editorValue = removeFieldCondition(
+      errorTrackingState.data.editorValue,
+      value,
+    );
   }
 };
 
@@ -275,115 +659,15 @@ const getStreamFields = () => {
             });
           }
         });
+
+        // Feed all schema fields (not just userDataSet) into autosuggestion engine
+        updateFieldKeywords(stream.schema);
       })
       .finally(() => {
         resolve(true);
         isLoading.value.pop();
       });
   });
-};
-
-const getErrorLogs = () => {
-  const interval = getTimeInterval(
-    dateTime.value.startTime,
-    dateTime.value.endTime,
-  );
-  const parsedQuery = parseQuery(errorTrackingState.data.editorValue, false);
-  const queryPayload: any = {
-    from: Object.keys(errorTrackingState.data.errors).length,
-    size: errorTrackingState.data.resultGrid.size,
-    timestamp_column: store.state.zoConfig.timestamp_column,
-    timestamps: {
-      startTime: dateTime.value.startTime,
-      endTime: dateTime.value.endTime,
-    },
-    timeInterval: interval.interval,
-    sqlMode: false,
-    currentPage: errorTrackingState.data.resultGrid.currentPage,
-    selectedStream: errorTrackingState.data.stream.errorStream,
-    parsedQuery,
-    streamName: errorTrackingState.data.stream.errorStream,
-  };
-  const req = buildQueryPayload(queryPayload);
-
-  let errorFields = "";
-  let errorWhereClause = "";
-
-  if (schemaMapping.value["error_id"]) {
-    errorFields += "error_id, ";
-    errorWhereClause += "error_id, ";
-  }
-
-  if (schemaMapping.value["error_message"]) {
-    errorFields += "error_message, ";
-    errorWhereClause += "error_message, ";
-  }
-  if (schemaMapping.value["error_handling"]) {
-    errorFields += "error_handling, ";
-    errorWhereClause += "error_handling, ";
-  }
-  schemaMapping.value["error_stack"] = false;
-  schemaMapping.value["error_handling_stack"] = false;
-
-  if (
-    schemaMapping.value["error_handling_stack"] &&
-    schemaMapping.value["error_stack"]
-  ) {
-    errorWhereClause +=
-      "MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack WHEN error_handling_stack IS NOT NULL THEN error_handling_stack ELSE NULL END ) AS error_stack, ";
-    errorFields += "error_stack, ";
-  } else if (schemaMapping.value["error_handling_stack"]) {
-    errorWhereClause +=
-      "MIN(CASE WHEN error_handling_stack IS NOT NULL THEN error_handling_stack ELSE NULL END ) AS error_stack, ";
-    errorFields += "error_stack, ";
-  } else if (schemaMapping.value["error_stack"]) {
-    errorWhereClause +=
-      "MIN(CASE WHEN error_stack IS NOT NULL THEN error_stack ELSE NULL END ) AS error_stack, ";
-    errorFields += "error_stack, ";
-  }
-
-  req.query.sql = `select max(${
-    store.state.zoConfig.timestamp_column
-  }) as zo_sql_timestamp, type, service, COUNT(*) as events, ${errorWhereClause} max(view_url) as view_url, max(session_id) as session_id from "_rumdata" where type='error'${
-    errorTrackingState.data.editorValue.length
-      ? " and " + errorTrackingState.data.editorValue
-      : ""
-  } GROUP BY ${errorFields} type, service order by zo_sql_timestamp DESC`;
-
-  req.query.sql.replaceAll("\n", " ");
-  delete req.aggs;
-  isLoading.value.push(true);
-
-  updateUrlQueryParams();
-
-  searchService
-    .search(
-      {
-        org_identifier: store.state.selectedOrganization.identifier,
-        query: req,
-        page_type: "logs",
-      },
-      "RUM",
-    )
-    .then((res) => {
-      errorTrackingState.data.errors = res.data.hits;
-      totalErrorsCount.value = res.data.hits.reduce(
-        (acc: number, curr: any) => {
-          return acc + curr.events;
-        },
-        0,
-      );
-    })
-    .catch((err) => {
-      q.notify({
-        message:
-          err.response?.data?.message || "Error while fetching error events",
-        position: "bottom",
-        color: "negative",
-        timeout: 4000,
-      });
-    })
-    .finally(() => isLoading.value.pop());
 };
 
 const updateDateChange = (date: any) => {
@@ -402,8 +686,14 @@ const updateDateChange = (date: any) => {
 
 const runQuery = () => {
   errorTrackingState.data.resultGrid.currentPage = 0;
-  errorTrackingState.data.errors = {};
-  getErrorLogs();
+  updateUrlQueryParams();
+  fetchAll({
+    startTime: dateTime.value.startTime,
+    endTime: dateTime.value.endTime,
+    schema: schemaMapping.value,
+    userQuery: errorTrackingState.data.editorValue,
+    service: serviceFilter.value,
+  }).then(collectServiceOptions);
 };
 
 const handleErrorTypeClick = async (payload: any) => {
@@ -411,21 +701,15 @@ const handleErrorTypeClick = async (payload: any) => {
   await nextTick();
   router.push({
     name: "ErrorViewer",
-    params: { id: payload.row.error_id },
+    params: { id: payload.row.latest_error_id },
     query: {
       timestamp: payload.row.zo_sql_timestamp,
     },
   });
 };
 
-const handleTableEvent = (event: string, payload: any) => {
-  const eventsToHandle = ["cell-click"];
-  if (eventsToHandle.indexOf(event) === -1) return;
-
-  const eventMapping: { [key: string]: (payload: any) => Promise<void> } = {
-    "cell-click": handleErrorTypeClick,
-  };
-  eventMapping[event](payload);
+const handleRowClick = (row: any) => {
+  handleErrorTypeClick({ row });
 };
 
 function restoreUrlQueryParams() {
@@ -443,8 +727,17 @@ function restoreUrlQueryParams() {
   }
 
   if (queryParams.query) {
-    errorTrackingState.data.editorValue =
-      b64DecodeUnicode(queryParams.query as string) || "";
+    errorTrackingState.data.editorValue = b64DecodeUnicode(queryParams.query as string) || "";
+  }
+
+  if (queryParams.status === "new" || queryParams.status === "ongoing") {
+    statusFilter.value = queryParams.status;
+  }
+  if (queryParams.type === "unhandled" || queryParams.type === "handled") {
+    typeFilter.value = queryParams.type;
+  }
+  if (typeof queryParams.service === "string" && queryParams.service) {
+    serviceFilter.value = queryParams.service;
   }
 }
 
@@ -463,77 +756,24 @@ function updateUrlQueryParams() {
 
   query["query"] = b64EncodeUnicode(errorTrackingState.data.editorValue);
 
+  if (statusFilter.value !== "all") query["status"] = statusFilter.value;
+  if (typeFilter.value !== "all") query["type"] = typeFilter.value;
+  if (serviceFilter.value) query["service"] = serviceFilter.value;
+
   query["org_identifier"] = store.state.selectedOrganization.identifier;
   router.push({ query });
 }
+
+useShortcuts([
+  {
+    id: "rumErrorsRefresh",
+    handler: () => {
+      if (!isInputFocused()) runQuery();
+    },
+  },
+  {
+    id: "rumErrorsCopyUrl",
+    handler: () => shareButtonRef.value?.handleShareClick(),
+  },
+]);
 </script>
-
-<style scoped lang="scss">
-</style>
-<style lang="scss">
-.sessions_page {
-  .index-menu .field_list .field_overlay .field_label,
-  .q-field__native,
-  .q-field__input,
-  .q-table tbody td {
-    font-size: 0.75rem !important;
-  }
-
-  .q-splitter__after {
-    overflow: hidden;
-  }
-
-  .q-item__label span {
-    /* text-transform: capitalize; */
-  }
-
-  .index-table :hover::-webkit-scrollbar,
-  #tracesSearchGridComponent:hover::-webkit-scrollbar {
-    height: 0.8125rem;
-    width: 0.8125rem;
-  }
-
-  .index-table ::-webkit-scrollbar-track,
-  #tracesSearchGridComponent::-webkit-scrollbar-track {
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.3);
-    border-radius: 0.625rem;
-  }
-
-  .index-table ::-webkit-scrollbar-thumb,
-  #tracesSearchGridComponent::-webkit-scrollbar-thumb {
-    border-radius: 0.625rem;
-    -webkit-box-shadow: inset 0 0 6px rgba(0, 0, 0, 0.5);
-  }
-
-  .q-table__top {
-    padding: 0 !important;
-  }
-
-  .q-table__control {
-    width: 100%;
-  }
-
-  .q-field__control-container {
-    padding-top: 0 !important;
-  }
-
-  .search-button {
-    width: 6rem;
-    line-height: 1.8125rem;
-    font-weight: bold;
-    text-transform: initial;
-    font-size: 0.6875rem;
-    color: white;
-
-    .q-btn__content {
-      background: $secondary;
-      border-radius: 0.1875rem 0.1875rem 0.1875rem 0.1875rem;
-
-      .q-icon {
-        font-size: 0.9375rem;
-        color: #ffffff;
-      }
-    }
-  }
-}
-</style>

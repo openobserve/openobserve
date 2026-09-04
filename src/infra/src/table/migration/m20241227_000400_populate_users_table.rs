@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -409,4 +409,47 @@ mod organization {
     pub enum Relation {}
 
     impl ActiveModelBehavior for ActiveModel {}
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_users_ksuid_from_hash_is_deterministic() {
+        let email = "test@example.com".to_string();
+        let k1 = super::users::ksuid_from_hash(email.clone());
+        let k2 = super::users::ksuid_from_hash(email);
+        assert_eq!(k1.to_string(), k2.to_string());
+    }
+
+    #[test]
+    fn test_users_ksuid_different_emails_yield_different_ksuids() {
+        let k1 = super::users::ksuid_from_hash("alice@example.com".to_string());
+        let k2 = super::users::ksuid_from_hash("bob@example.com".to_string());
+        assert_ne!(k1.to_string(), k2.to_string());
+    }
+
+    #[test]
+    fn test_org_users_ksuid_from_hash_is_deterministic() {
+        let org = "my-org".to_string();
+        let email = "user@example.com".to_string();
+        let k1 = super::org_users::ksuid_from_hash(org.clone(), email.clone());
+        let k2 = super::org_users::ksuid_from_hash(org, email);
+        assert_eq!(k1.to_string(), k2.to_string());
+    }
+
+    #[test]
+    fn test_org_users_ksuid_same_email_different_org_differs() {
+        let email = "shared@example.com".to_string();
+        let k1 = super::org_users::ksuid_from_hash("org-a".to_string(), email.clone());
+        let k2 = super::org_users::ksuid_from_hash("org-b".to_string(), email);
+        assert_ne!(k1.to_string(), k2.to_string());
+    }
+
+    #[test]
+    fn test_org_users_ksuid_same_org_different_email_differs() {
+        let org = "same-org".to_string();
+        let k1 = super::org_users::ksuid_from_hash(org.clone(), "a@example.com".to_string());
+        let k2 = super::org_users::ksuid_from_hash(org, "b@example.com".to_string());
+        assert_ne!(k1.to_string(), k2.to_string());
+    }
 }

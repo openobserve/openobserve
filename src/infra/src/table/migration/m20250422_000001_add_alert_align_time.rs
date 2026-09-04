@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -35,35 +35,19 @@ impl MigrationTrait for Migration {
 
 // Adds the alerts's align_time column.
 async fn add_align_time_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Alerts::Table)
-                    .add_column(
-                        ColumnDef::new(Alerts::AlignTime)
-                            .boolean()
-                            .not_null()
-                            .default(true),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-    } else {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(Alerts::Table)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(Alerts::AlignTime)
-                            .boolean()
-                            .not_null()
-                            .default(true),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-    }
+    manager
+        .alter_table(
+            Table::alter()
+                .table(Alerts::Table)
+                .add_column_if_not_exists(
+                    ColumnDef::new(Alerts::AlignTime)
+                        .boolean()
+                        .not_null()
+                        .default(true),
+                )
+                .to_owned(),
+        )
+        .await?;
 
     Ok(())
 }
@@ -73,4 +57,16 @@ async fn add_align_time_column(manager: &SchemaManager<'_>) -> Result<(), DbErr>
 enum Alerts {
     Table,
     AlignTime,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(Migration.name(), "m20250422_000001_add_alert_align_time");
+    }
 }

@@ -1,91 +1,69 @@
 <template>
-  <q-card
-    class="dashboard-json-editor column full-height"
-    :class="store.state.theme === 'dark' ? 'dark-mode' : 'bg-white'"
+  <ODrawer
+    data-test="dashboard-json-editor-drawer"
+    bleed
+    :open="open"
+    :width="70"
+    persistent
+    :title="t('dashboard.editJson')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('common.save')"
+    :primary-button-loading="saveJsonLoading"
+    @update:open="$emit('update:open', $event)"
+    @click:secondary="$emit('update:open', false)"
+    @click:primary="saveChanges()"
   >
-    <div class="row items-center no-wrap">
-      <div class="col">
-        <div class="q-mx-md q-my-md text-h6">
-          {{ t("dashboard.editJson") }}
-        </div>
-      </div>
-      <div class="col-auto">
-        <q-icon
-          v-close-popup
-          name="cancel"
-          class="cursor-pointer tw:mr-3"
-          size="20px"
-          data-test="json-editor-close"
+    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+    <div
+      data-test="dashboard-json-editor-container"
+      class="bg-surface-base flex h-[calc(100vh-116px)] w-[70vw] flex-col"
+    >
+      <!-- eslint-enable local/no-hardcoded-px -->
+      <!-- Monaco editor fills remaining space; flex-1 + min-h-0 lets it expand without overflow -->
+      <div class="min-h-0 flex-1">
+        <QueryEditor
+          data-test="dashboard-json-editor"
+          ref="queryEditorRef"
+          editor-id="dashboard-json-editor"
+          class="h-full"
+          :debounceTime="300"
+          v-model:query="jsonContent"
+          language="json"
+          @update:query="handleEditorChange"
         />
       </div>
+
+      <!-- Display validation errors -->
+      <div
+        v-if="validationErrors.length > 0"
+        data-test="dashboard-json-editor-validation-errors"
+        class="text-status-error-text max-h-50 overflow-y-auto p-3"
+      >
+        <div class="mb-2 font-bold">{{ t("dashboard.dashboardJsonEditor.pleaseFixIssues") }}</div>
+        <ul class="ms-3">
+          <li v-for="(error, index) in validationErrors" :key="index">
+            {{ error }}
+          </li>
+        </ul>
+      </div>
     </div>
-    <q-separator></q-separator>
-
-    <q-card-section class="col q-pa-none">
-      <query-editor
-        data-test="dashboard-json-editor"
-        ref="queryEditorRef"
-        editor-id="dashboard-json-editor"
-        class="monaco-editor"
-        :debounceTime="300"
-        v-model:query="jsonContent"
-        language="json"
-        @update:query="handleEditorChange"
-      />
-    </q-card-section>
-
-    <!-- Display validation errors -->
-    <q-card-section
-      v-if="validationErrors.length > 0"
-      class="q-pa-md text-negative validation-errors"
-    >
-      <div class="text-bold q-mb-sm">Please fix the following issues:</div>
-      <ul class="q-ml-md">
-        <li v-for="(error, index) in validationErrors" :key="index">
-          {{ error }}
-        </li>
-      </ul>
-    </q-card-section>
-
-    <q-space></q-space>
-
-    <q-card-actions align="right" class="q-pa-md">
-      <q-btn
-        flat
-        :label="t('common.cancel')"
-        color="primary"
-        class="q-ml-sm o2-secondary-button tw:h-[36px]"
-        v-close-popup
-        data-test="json-editor-cancel"
-      />
-      <q-btn
-        class="q-ml-sm o2-primary-button tw:h-[36px]"
-        no-caps
-        :label="t('common.save')"
-        :loading="saveJsonLoading"
-        :disable="
-          !isValidJson || validationErrors.length > 0 || saveJsonLoading
-        "
-        @click="saveChanges"
-        data-test="json-editor-save"
-      />
-    </q-card-actions>
-  </q-card>
+  </ODrawer>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onMounted, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { defineAsyncComponent } from "vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
-import { getImageURL } from "@/utils/zincutils";
-import { validateDashboardJson } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { validateDashboardJson } from "@/utils/dashboard/panelValidation";
 
 export default defineComponent({
   name: "DashboardJsonEditor",
   components: {
     QueryEditor,
+    ODrawer,
   },
   props: {
     dashboardData: {
@@ -96,10 +74,14 @@ export default defineComponent({
       type: Object,
       required: true,
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["close"],
-  setup(props, { emit }) {
-    const { t } = useI18n();
+  emits: ["close", "update:open"],
+  setup(props) {
+    const { t } = useI18nTyped();
     const store = useStore();
     const jsonContent = ref("");
     const isValidJson = ref(true);
@@ -107,9 +89,7 @@ export default defineComponent({
     const queryEditorRef = ref();
 
     // Use the loading state from the parent component
-    const saveJsonLoading = computed(
-      () => props.saveJsonDashboard.isLoading.value,
-    );
+    const saveJsonLoading = computed(() => props.saveJsonDashboard.isLoading.value);
 
     const handleEditorChange = (value: string) => {
       try {
@@ -117,34 +97,27 @@ export default defineComponent({
         isValidJson.value = true;
 
         // Validate the dashboard JSON structure
-        validationErrors.value = validateDashboardJson(parsedJson);
+        validationErrors.value = validateDashboardJson(t, parsedJson);
 
         // Check if dashboardId has been changed
-        if (
-          parsedJson.dashboardId &&
-          parsedJson.dashboardId !== props.dashboardData.dashboardId
-        ) {
-          validationErrors.value.push("Dashboard ID cannot be modified");
+        if (parsedJson.dashboardId && parsedJson.dashboardId !== props.dashboardData.dashboardId) {
+          validationErrors.value.push(
+            t("dashboard.dashboardJsonEditor.dashboardIdCannotBeModified"),
+          );
         }
 
         // Check if owner has been changed
-        if (
-          parsedJson.owner &&
-          parsedJson.owner !== props.dashboardData.owner
-        ) {
-          validationErrors.value.push("Owner cannot be modified");
+        if (parsedJson.owner && parsedJson.owner !== props.dashboardData.owner) {
+          validationErrors.value.push(t("dashboard.dashboardJsonEditor.ownerCannotBeModified"));
         }
 
         // Check if created has been changed
-        if (
-          parsedJson.created &&
-          parsedJson.created !== props.dashboardData.created
-        ) {
-          validationErrors.value.push("Created cannot be modified");
+        if (parsedJson.created && parsedJson.created !== props.dashboardData.created) {
+          validationErrors.value.push(t("dashboard.dashboardJsonEditor.createdCannotBeModified"));
         }
       } catch (error) {
         isValidJson.value = false;
-        validationErrors.value = ["Invalid JSON format"];
+        validationErrors.value = [t("dashboard.dashboardJsonEditor.invalidJsonFormat")];
       }
     };
 
@@ -154,7 +127,7 @@ export default defineComponent({
       try {
         const updatedJson = JSON.parse(jsonContent.value);
         // Validate one more time before saving
-        const errors = validateDashboardJson(updatedJson);
+        const errors = validateDashboardJson(t, updatedJson);
 
         if (errors.length > 0) {
           // Show validation errors
@@ -166,7 +139,12 @@ export default defineComponent({
       } catch (error) {
         console.error("Failed during JSON save:", error);
         validationErrors.value = [
-          `Failed during JSON save: ${error instanceof Error ? error.message : "Unknown error"}`,
+          t("dashboard.dashboardJsonEditor.failedDuringJsonSave", {
+            error:
+              error instanceof Error
+                ? error.message
+                : t("dashboard.dashboardJsonEditor.unknownError"),
+          }),
         ];
       }
     };
@@ -192,38 +170,7 @@ export default defineComponent({
       queryEditorRef,
       handleEditorChange,
       saveChanges,
-      getImageURL,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.dashboard-json-editor {
-  width: 70vw;
-  display: flex;
-  flex-direction: column;
-
-  .dark-mode {
-    background-color: $dark-page;
-  }
-
-  :deep(.monaco-editor) {
-    height: 100%;
-  }
-
-  :deep(.q-card__section) {
-    padding-left: 8px;
-    padding-right: 0;
-  }
-
-  .validation-errors {
-    max-height: 200px;
-    overflow-y: auto;
-  }
-
-  .no-border {
-    border: none !important;
-  }
-}
-</style>

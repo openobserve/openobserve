@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use sea_orm::DbBackend;
 use sea_orm_migration::prelude::*;
 
 const RESOURCE_KEY_OLD: &str = "rkey_idx";
@@ -57,18 +56,9 @@ impl MigrationTrait for Migration {
         }
 
         // Create new unique index with stat_interval_ms included
-        match manager.get_database_backend() {
-            DbBackend::MySql => {
-                manager
-                    .create_index(create_ratelimit_resource_key_idx_stmnt_mysql())
-                    .await?;
-            }
-            _ => {
-                manager
-                    .create_index(create_ratelimit_resource_key_idx_stmnt())
-                    .await?;
-            }
-        }
+        manager
+            .create_index(create_ratelimit_resource_key_idx_stmnt())
+            .await?;
 
         Ok(())
     }
@@ -116,17 +106,6 @@ fn create_ratelimit_resource_key_idx_stmnt() -> IndexCreateStatement {
         .to_owned()
 }
 
-fn create_ratelimit_resource_key_idx_stmnt_mysql() -> IndexCreateStatement {
-    sea_query::Index::create()
-        .name(RESOURCE_KEY_NEW)
-        .table(RateLimitRules::Table)
-        .col(RateLimitRules::Org)
-        .col(RateLimitRules::UserRole)
-        .col(RateLimitRules::UserId)
-        .col(RateLimitRules::StatIntervalMs)
-        .to_owned()
-}
-
 #[derive(DeriveIden)]
 enum RateLimitRules {
     Table,
@@ -136,4 +115,27 @@ enum RateLimitRules {
     ApiGroupName,
     ApiGroupOperation,
     StatIntervalMs,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_new_idx_contains_name() {
+        let sql = create_ratelimit_resource_key_idx_stmnt().build(SqliteQueryBuilder);
+        assert!(sql.contains(RESOURCE_KEY_NEW));
+    }
+
+    #[test]
+    fn test_resource_key_old_constant() {
+        assert_eq!(RESOURCE_KEY_OLD, "rkey_idx");
+    }
+
+    #[test]
+    fn test_resource_key_new_constant() {
+        assert_eq!(RESOURCE_KEY_NEW, "rkey_idx_with_interval");
+    }
 }

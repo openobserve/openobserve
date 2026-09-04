@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -80,19 +80,6 @@ mod tests {
                 "type" varchar(27) NOT NULL PRIMARY KEY,
                 "content" text NOT NULL,
                 "updated_at" bigint NOT NULL DEFAULT 0
-            )"#
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_system_prompts_table_statement().to_string(MysqlQueryBuilder),
-            r#"
-                CREATE TABLE IF NOT EXISTS `system_prompts` (
-                `type` varchar(27) NOT NULL PRIMARY KEY,
-                `content` text NOT NULL,
-                `updated_at` bigint NOT NULL DEFAULT 0
             )"#
         );
     }

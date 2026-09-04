@@ -1,16 +1,16 @@
 import { ref, watch } from "vue";
-import { annotationService } from "../../services/dashboard_annotations";
 import useNotifications from "../useNotifications";
 import { getDashboard } from "@/utils/commons";
 import { useStore } from "vuex";
-import { fromZonedTime } from "date-fns-tz";
-import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/convertDataIntoUnitValue";
+import { getUTCTimestampFromZonedTimestamp } from "@/utils/dashboard/dateTimeUtils";
+import type { TranslateFn } from "@/types/i18n";
 
 export const useAnnotationsData = (
   organization: string,
   dashboardId: string,
   panelId: string,
   folderId: string,
+  t: TranslateFn,
 ) => {
   // show annotation button
   const isAddAnnotationMode = ref(false);
@@ -90,10 +90,7 @@ export const useAnnotationsData = (
   // Watch for annotation mode to show notification
   watch(isAddAnnotationMode, () => {
     if (isAddAnnotationMode.value) {
-      showInfoNotification(
-        "Click on the chart data or select a range to add an annotation",
-        {},
-      );
+      showInfoNotification(t("toastMessages.dashboard.clickOnTheChartDataOr"), {});
     }
   });
 
@@ -116,7 +113,7 @@ export const useAnnotationsData = (
     const allPanels: any[] = [];
 
     dashboardData.tabs.forEach((tab: any) => {
-      const tabName = tab.name?.trim() || "Unnamed Tab";
+      const tabName = tab.name?.trim() || t("dashboard.unnamedTab");
 
       if (tab.panels && Array.isArray(tab.panels)) {
         const tabPanels = tab.panels

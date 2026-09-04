@@ -1,19 +1,59 @@
 
 import logsdata from "../../../test-data/logs_data.json";
+const http = require('http');
+const https = require('https');
+const nodeFetch = require('node-fetch');
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+
+// node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
+// "Premature close" / ECONNRESET flakiness in CI.
+// Pick the agent by protocol so both local (http://localhost) and cloud/alpha
+// (https://) ingestion URLs work — an http.Agent rejects https:// URLs.
+const noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
+const noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
+const selectAgent = (parsedURL) =>
+  parsedURL.protocol === 'https:' ? noKeepAliveHttpsAgent : noKeepAliveHttpAgent;
+
+async function fetchWithRetry(url, options, maxRetries = 3) {
+  const requestOpts = { ...options, compress: false, agent: selectAgent };
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await nodeFetch(url, requestOpts);
+      // Retry transient 5xx (alpha returns 503/502 on ingestion during load spikes) —
+      // a bare fetch treats those as success and the caller throws on the first one.
+      // A persistent 5xx still returns after maxRetries, so nothing is masked.
+      if (response.status >= 500 && attempt < maxRetries) {
+        const backoffMs = 800 * (attempt + 1);
+        testLogger.warn('Transient 5xx from ingestion, retrying', { url, status: response.status, attempt: attempt + 1, maxRetries, backoffMs });
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        continue;
+      }
+      return response;
+    } catch (err) {
+      const message = String(err && err.message ? err.message : err);
+      const isTransient = /premature close|ECONNRESET|socket hang up|network|EPIPE|other side closed/i.test(message);
+      if (!isTransient) {
+        testLogger.warn('Non-transient fetch error (not retrying)', { url, error: message });
+        throw err;
+      }
+      if (attempt === maxRetries) throw err;
+      const backoffMs = 500 * (attempt + 1);
+      testLogger.warn('Transient fetch error, retrying ingestion', { url, attempt: attempt + 1, maxRetries, error: message, backoffMs });
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+  }
+}
+
 export class IngestionPage {
   constructor(page) {
     this.page = page;
   }
   async ingestion() {
-    const orgId = process.env["ORGNAME"];
+    const orgId = getOrgIdentifier();
     const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-    const fetchResponse = await fetch(
+    const headers = getAuthHeaders();
+    const fetchResponse = await fetchWithRetry(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
@@ -38,12 +78,8 @@ export class IngestionPage {
   }
 
   async ingestionJoin() {
-    const orgId = process.env["ORGNAME"];
-    const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
+    const orgId = getOrgIdentifier();
+    const headers = getAuthHeaders();
 
     // Ingest to both default and e2e_automate streams for join queries
     const streams = ["default", "e2e_automate"];
@@ -76,12 +112,8 @@ export class IngestionPage {
 
   async ingestionMultiOrg(orgId) {
     const streamName = "e2e_automate";
-    const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-    const fetchResponse = await fetch(
+    const headers = getAuthHeaders();
+    const fetchResponse = await fetchWithRetry(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
@@ -106,12 +138,8 @@ export class IngestionPage {
   }
 
   async ingestionMultiOrgStream(orgId, streamName) {
-    const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
-    const fetchResponse = await fetch(
+    const headers = getAuthHeaders();
+    const fetchResponse = await fetchWithRetry(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,
       {
         method: "POST",
@@ -142,18 +170,14 @@ export class IngestionPage {
    * @returns {Promise<{streamA: string, streamB: string, results: object}>} Stream names and ingestion results
    */
   async ingestionJoinUnion(testRunId = null) {
-    const orgId = process.env["ORGNAME"];
+    const orgId = getOrgIdentifier();
     const ingestionUrl = process.env["INGESTION_URL"];
-    const email = process.env["ZO_ROOT_USER_EMAIL"];
-    const password = process.env["ZO_ROOT_USER_PASSWORD"];
 
     // Validate environment variables
-    if (!orgId || !ingestionUrl || !email || !password) {
+    if (!orgId || !ingestionUrl) {
       const missing = [];
       if (!orgId) missing.push("ORGNAME");
       if (!ingestionUrl) missing.push("INGESTION_URL");
-      if (!email) missing.push("ZO_ROOT_USER_EMAIL");
-      if (!password) missing.push("ZO_ROOT_USER_PASSWORD");
       throw new Error(`ingestionJoinUnion: Missing required environment variables: ${missing.join(", ")}`);
     }
 
@@ -163,11 +187,7 @@ export class IngestionPage {
     const streamB = `e2e_join_b_${runId}`;
     const streams = [streamA, streamB];
 
-    const basicAuthCredentials = Buffer.from(`${email}:${password}`).toString('base64');
-    const headers = {
-      "Authorization": `Basic ${basicAuthCredentials}`,
-      "Content-Type": "application/json",
-    };
+    const headers = getAuthHeaders();
 
     const results = { success: [], failed: [] };
 
@@ -181,7 +201,7 @@ export class IngestionPage {
       testLogger.debug(`ingestionJoinUnion: Ingesting to stream '${streamName}' at ${url}`);
 
       try {
-        const response = await fetch(url, {
+        const response = await fetchWithRetry(url, {
           method: "POST",
           headers: headers,
           body: JSON.stringify(logsdata),

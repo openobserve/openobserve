@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -22,14 +22,11 @@ use sea_orm::{
 };
 
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{DestinationError, Error},
-    table::{
-        entity::{
-            destinations::{ActiveModel, Column, Entity, Model},
-            templates,
-        },
-        get_lock,
+    table::entity::{
+        destinations::{ActiveModel, Column, Entity, Model},
+        templates,
     },
 };
 
@@ -77,9 +74,7 @@ pub async fn put(
         None
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let (model, template): (Model, Option<String>) =
         match get_model_and_template(client, &destination.org_id, &destination.name).await? {
@@ -144,7 +139,7 @@ pub async fn put(
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<destinations::Destination>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     match get_model_and_template(client, org_id, name).await? {
         Some((model, template)) => Ok(Some(model.try_into(template)?)),
         None => Ok(None),
@@ -155,7 +150,7 @@ pub async fn list(
     org_id: &str,
     module: Option<&str>,
 ) -> Result<Vec<destinations::Destination>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let destinations = list_models(client, Some(org_id), module)
         .await?
         .into_iter()
@@ -165,7 +160,7 @@ pub async fn list(
 }
 
 pub async fn list_all() -> Result<Vec<destinations::Destination>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let destinations = list_models(client, None, None)
         .await?
         .into_iter()
@@ -175,10 +170,7 @@ pub async fn list_all() -> Result<Vec<destinations::Destination>, Error> {
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = get_model_and_template(client, org_id, name).await?;
 
     if let Some((model, ..)) = model {
@@ -222,4 +214,93 @@ async fn list_models(
         .into_iter()
         .map(|(dest, temp)| (dest, temp.map(|t| t.name)))
         .collect())
+}
+
+/// Deletes all destinations belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
+    let client = get_orm_client_rw().await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use svix_ksuid::KsuidLike as _;
+
+    use super::*;
+
+    fn make_model(id: &str, module: &str, type_json: serde_json::Value) -> Model {
+        Model {
+            id: id.to_string(),
+            org: "myorg".to_string(),
+            name: "my-dest".to_string(),
+            module: module.to_string(),
+            template_id: None,
+            r#type: type_json,
+        }
+    }
+
+    #[test]
+    fn test_try_into_alert_http_ok() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let type_json = serde_json::json!({"type": "http", "url": "https://example.com"});
+        let model = make_model(&id, "alert", type_json);
+        let result = model.try_into(None);
+        assert!(result.is_ok());
+        let dest = result.unwrap();
+        assert_eq!(dest.org_id, "myorg");
+        assert_eq!(dest.name, "my-dest");
+        assert!(matches!(dest.module, destinations::Module::Alert { .. }));
+    }
+
+    #[test]
+    fn test_try_into_alert_with_template() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let type_json = serde_json::json!({"type": "http", "url": "https://example.com"});
+        let model = make_model(&id, "alert", type_json);
+        let dest = model.try_into(Some("tmpl".to_string())).unwrap();
+        match dest.module {
+            destinations::Module::Alert { template, .. } => {
+                assert_eq!(template, Some("tmpl".to_string()));
+            }
+            _ => panic!("expected alert module"),
+        }
+    }
+
+    #[test]
+    fn test_try_into_pipeline_ok() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let type_json = serde_json::json!({"url": "https://pipeline.example.com"});
+        let model = make_model(&id, "pipeline", type_json);
+        let result = model.try_into(None);
+        assert!(result.is_ok());
+        assert!(matches!(
+            result.unwrap().module,
+            destinations::Module::Pipeline { .. }
+        ));
+    }
+
+    #[test]
+    fn test_try_into_unknown_module_treated_as_pipeline() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let type_json = serde_json::json!({"url": "https://example.com"});
+        let model = make_model(&id, "UNKNOWN_MODULE", type_json);
+        let result = model.try_into(None);
+        assert!(result.is_ok());
+        assert!(matches!(
+            result.unwrap().module,
+            destinations::Module::Pipeline { .. }
+        ));
+    }
+
+    #[test]
+    fn test_try_into_invalid_ksuid_fails() {
+        let type_json = serde_json::json!({"type": "http", "url": "https://example.com"});
+        let model = make_model("not-a-ksuid", "alert", type_json);
+        let result = model.try_into(None);
+        assert!(result.is_err());
+    }
 }

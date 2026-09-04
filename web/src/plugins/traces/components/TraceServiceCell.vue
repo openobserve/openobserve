@@ -1,0 +1,74 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div class="flex flex-nowrap! items-center" :data-test="dataTest || 'trace-row-service'">
+    <!-- Service type icon -->
+    <img
+      data-test="trace-row-service-icon"
+      :src="serviceIconUrl"
+      class="me-2 h-5 w-5 shrink-0"
+      aria-hidden="true"
+      alt=""
+    />
+
+    <!-- Service name + badge -->
+    <div class="flex min-w-0 flex-nowrap! items-center gap-[0.325rem]">
+      <span data-test="trace-row-service-name" class="text-text-body min-w-0 truncate text-xs">
+        {{ item.service_name }}
+        <OTooltip side="bottom" align="center">
+          <template #content>{{ item.service_name }}</template>
+        </OTooltip>
+      </span>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from "vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import useTraces from "@/composables/useTraces";
+import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
+import useTheme from "@/composables/useTheme";
+
+const props = defineProps<{
+  item: Record<string, any>;
+  dataTest?: string;
+}>();
+
+const { isDark } = useTheme();
+
+const { getOrSetServiceColor } = useTraces();
+
+const rootColor = computed(() => getOrSetServiceColor(props.item.service_name) ?? "#9e9e9e");
+
+const serviceIconUrl = computed(() => {
+  if (props.item.infer_service_system) {
+    return getServiceIconDataUrl(props.item.infer_service_system, isDark.value, rootColor.value);
+  }
+
+  if (props.item.infer_service_type) {
+    return getServiceIconDataUrl(
+      props.item.service_name,
+      isDark.value,
+      rootColor.value,
+      props.item.infer_service_type,
+    );
+  }
+
+  return getServiceIconDataUrl(props.item.service_name, isDark.value, rootColor.value);
+});
+</script>

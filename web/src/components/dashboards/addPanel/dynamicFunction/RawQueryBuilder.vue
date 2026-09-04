@@ -1,35 +1,26 @@
-<template>
-  <div style="width: 100%">
-    <div class="query-section">
-      <div class="query-label">Query</div>
-      <div class="query-label tw:text-xs">
-        Write a SQL query for complex actions.
-      </div>
+<!-- Copyright 2026 OpenObserve Inc. -->
 
-      <textarea
-        style="
-          min-width: 100%;
-          max-width: 100%;
-          resize: vertical;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-          margin-top: 2px;
-          padding: 2px;
-        "
+<template>
+  <div class="w-full" data-test="dashboard-raw-query-builder">
+    <div class="flex flex-col" data-test="dashboard-raw-query-section">
+      <OTextarea
         v-model="fields.rawQuery"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
+        :rows="10"
+        :placeholder="t('dashboard.rawQueryBuilder.instruction')"
         data-test="dashboard-raw-query-textarea"
-        :rows="6"
-      ></textarea>
+        class="w-full"
+      />
     </div>
   </div>
 </template>
 <script lang="ts">
 import { ref, watch } from "vue";
-import { useStore } from "vuex";
+import OTextarea from "@/lib/forms/Input/OTextarea.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 export default {
   name: "RawQueryBuilder",
+  components: { OTextarea },
   props: {
     modelValue: {
       type: Object,
@@ -38,8 +29,7 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
-    const store = useStore();
-
+    const { t } = useI18nTyped();
     const fields = ref(props.modelValue);
 
     watch(
@@ -51,7 +41,7 @@ export default {
     );
 
     return {
-      store,
+      t,
       fields,
     };
   },

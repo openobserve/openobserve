@@ -4,6 +4,7 @@ import geoMapdata from "../../test-data/geo_map.json";
 import dashboardChartJsonData from "../../test-data/dashboard_chart_json.json";
 // Using require() for testLogger as it exports via module.exports (CommonJS)
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
 // Exported function to remove UTF characters
 const removeUTFCharacters = (text) => {
@@ -11,27 +12,21 @@ const removeUTFCharacters = (text) => {
   return text.replace(/[^\x00-\x7F]/g, " ");
 };
 
-// Function to retrieve authentication token (to be implemented securely)
+// Function to retrieve authentication token
 const getAuthToken = async () => {
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString("base64");
-  return `Basic ${basicAuthCredentials}`;
+  const headers = getAuthHeaders();
+  return headers['Authorization'] || headers['authorization'] || '';
 };
 
 // Common ingestion helper - extracts shared logic for all ingestion functions
 const ingestData = async (streamName, data, errorContext = "Ingestion") => {
-  if (!process.env["ORGNAME"] || !process.env["INGESTION_URL"]) {
+  const orgId = getOrgIdentifier();
+  if (!orgId || !process.env["INGESTION_URL"]) {
     throw new Error("Required environment variables are not set");
   }
 
-  const orgId = process.env["ORGNAME"];
-
   try {
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: await getAuthToken(),
-    };
+    const headers = getAuthHeaders();
 
     const fetchResponse = await fetch(
       `${process.env.INGESTION_URL}/api/${orgId}/${streamName}/_json`,

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,19 +24,16 @@ use config::{
 };
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, Order, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Schema, Set, entity::prelude::*,
+    QuerySelect, Schema, Set, entity::prelude::*, sea_query::Func,
 };
 use serde::{Deserialize, Serialize};
 
-use super::{
-    entity::{
-        org_users::{ActiveModel, Column, Entity, Model},
-        organizations, users,
-    },
-    get_lock,
+use super::entity::{
+    org_users::{ActiveModel, Column, Entity, Model},
+    organizations, users,
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
@@ -182,7 +179,7 @@ impl FromQueryResult for OrgUserExpandedRecord {
 }
 
 pub async fn create_table() -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let builder = client.get_database_backend();
 
     let schema = Schema::new(builder);
@@ -243,10 +240,7 @@ pub async fn add_with_flags(
         allow_static_token: Set(allow_static_token),
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     match Entity::insert(record).exec(client).await {
         Ok(_) => Ok(()),
         Err(e) => match e.sql_err() {
@@ -257,13 +251,10 @@ pub async fn add_with_flags(
 }
 
 pub async fn remove(org_id: &str, email: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -272,12 +263,9 @@ pub async fn remove(org_id: &str, email: &str) -> Result<(), errors::Error> {
 }
 
 pub async fn remove_by_user(email: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -292,7 +280,7 @@ pub async fn update(
     token: &str,
     rum_token: Option<String>,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     // There can be only one record with one org_id and email.
     // Hence the below updates only one record.
     Entity::update_many()
@@ -304,7 +292,7 @@ pub async fn update(
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -317,7 +305,7 @@ pub async fn update_rum_token(
     email: &str,
     rum_token: &str,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     // There can be only one record with one org_id and email.
     // Hence the below updates only one record.
     Entity::update_many()
@@ -327,7 +315,7 @@ pub async fn update_rum_token(
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -336,7 +324,7 @@ pub async fn update_rum_token(
 }
 
 pub async fn update_token(org_id: &str, email: &str, token: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     // There can be only one record with one org_id and email.
     // Hence the below updates only one record.
     Entity::update_many()
@@ -346,7 +334,7 @@ pub async fn update_token(org_id: &str, email: &str, token: &str) -> Result<(), 
             Expr::value(chrono::Utc::now().timestamp_micros()),
         )
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .exec(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
@@ -355,10 +343,10 @@ pub async fn update_token(org_id: &str, email: &str, token: &str) -> Result<(), 
 }
 
 pub async fn get(org_id: &str, email: &str) -> Result<OrgUserRecord, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
+        .filter(Expr::expr(Func::lower(Expr::col(Column::Email))).eq(email.to_lowercase()))
         .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
@@ -368,7 +356,7 @@ pub async fn get(org_id: &str, email: &str) -> Result<OrgUserRecord, errors::Err
 }
 
 pub async fn get_admin(org_id: &str) -> Result<OrgUserRecord, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let user = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Role.eq(UserRole::Admin as i16))
@@ -384,10 +372,12 @@ pub async fn get_expanded_user_org(
     org_id: &str,
     email: &str,
 ) -> Result<OrgUserExpandedRecord, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::OrgId.eq(org_id))
-        .filter(Column::Email.eq(email))
+        .filter(
+            Expr::expr(Func::lower(Expr::col((Entity, Column::Email)))).eq(email.to_lowercase()),
+        )
         .inner_join(users::Entity)
         .select_only()
         .column(users::Column::Email)
@@ -420,7 +410,7 @@ pub async fn get_user_by_rum_token(
     org_id: &str,
     rum_token: &str,
 ) -> Result<OrgUserExpandedRecord, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::RumToken.eq(rum_token))
         .filter(Column::OrgId.eq(org_id))
@@ -452,7 +442,7 @@ pub async fn get_user_by_rum_token(
 }
 
 pub async fn list_users_by_org(org_id: &str) -> Result<Vec<OrgUserRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .all(client)
@@ -466,9 +456,11 @@ pub async fn list_users_by_org(org_id: &str) -> Result<Vec<OrgUserRecord>, error
 }
 
 pub async fn list_orgs_by_user(email: &str) -> Result<Vec<UserOrgExpandedRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
-        .filter(Column::Email.eq(email))
+        .filter(
+            Expr::expr(Func::lower(Expr::col((Entity, Column::Email)))).eq(email.to_lowercase()),
+        )
         .order_by(Column::CreatedAt, Order::Desc)
         .inner_join(super::entity::organizations::Entity)
         .select_only()
@@ -490,7 +482,7 @@ pub async fn list_orgs_by_user(email: &str) -> Result<Vec<UserOrgExpandedRecord>
 }
 
 pub async fn list(limit: Option<i64>) -> Result<Vec<OrgUserRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut res = Entity::find().order_by(Column::CreatedAt, Order::Desc);
     if let Some(limit) = limit {
         res = res.limit(limit as u64);
@@ -507,7 +499,7 @@ pub async fn list(limit: Option<i64>) -> Result<Vec<OrgUserRecord>, errors::Erro
 }
 
 pub async fn len() -> usize {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let len = Entity::find().count(client).await;
 
     match len {
@@ -520,10 +512,7 @@ pub async fn len() -> usize {
 }
 
 pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .exec(client)
         .await
@@ -534,4 +523,76 @@ pub async fn clear() -> Result<(), errors::Error> {
 
 pub async fn is_empty() -> bool {
     len().await == 0
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::user::UserRole;
+
+    use super::*;
+
+    #[test]
+    fn test_org_user_record_new_fields() {
+        let r = OrgUserRecord::new(
+            "org-1",
+            "user@example.com",
+            UserRole::Admin,
+            "tok-abc",
+            None,
+        );
+        assert_eq!(r.org_id, "org-1");
+        assert_eq!(r.email, "user@example.com");
+        assert_eq!(r.token, "tok-abc");
+        assert!(r.rum_token.is_none());
+        assert!(r.allow_static_token);
+        assert!(r.created_at > 0);
+    }
+
+    #[test]
+    fn test_org_user_record_new_with_rum_token() {
+        let r = OrgUserRecord::new(
+            "org-2",
+            "admin@example.com",
+            UserRole::Viewer,
+            "tok-xyz",
+            Some("rum-tok".to_string()),
+        );
+        assert_eq!(r.rum_token.as_deref(), Some("rum-tok"));
+    }
+
+    #[test]
+    fn test_org_user_put_fields() {
+        let p = OrgUserPut {
+            email: "e@x.com".to_string(),
+            org_id: "org-3".to_string(),
+            role: UserRole::Editor,
+            token: "t".to_string(),
+            rum_token: None,
+        };
+        assert_eq!(p.org_id, "org-3");
+        assert!(p.rum_token.is_none());
+    }
+
+    #[test]
+    fn test_from_model_to_org_user_record() {
+        use super::super::entity::org_users::Model;
+        let model = Model {
+            id: "ou-1".to_string(),
+            email: "model@example.com".to_string(),
+            org_id: "myorg".to_string(),
+            role: 0, // maps to some UserRole variant
+            token: "tok-xyz".to_string(),
+            rum_token: Some("rum-abc".to_string()),
+            created_at: 1_000_000,
+            updated_at: 2_000_000,
+            allow_static_token: true,
+        };
+        let rec = OrgUserRecord::from(model);
+        assert_eq!(rec.email, "model@example.com");
+        assert_eq!(rec.org_id, "myorg");
+        assert_eq!(rec.token, "tok-xyz");
+        assert_eq!(rec.rum_token.as_deref(), Some("rum-abc"));
+        assert!(rec.allow_static_token);
+        assert_eq!(rec.created_at, 1_000_000);
+    }
 }

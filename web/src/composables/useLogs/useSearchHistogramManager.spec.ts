@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,8 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSearchHistogramManager } from "./useSearchHistogramManager";
-import { searchState } from "./searchState";
+import { gt } from "@/types/i18n";
 import { logsUtils } from "./logsUtils";
-import { useHistogram } from "./useHistogram";
 
 // Create a shared mock state
 const createMockState = () => ({
@@ -50,7 +49,6 @@ let mockState: ReturnType<typeof createMockState>;
 const mockHistogramFunctions = {
   resetHistogramWithError: vi.fn(),
   generateHistogramSkeleton: vi.fn(),
-  setMultiStreamHistogramQuery: vi.fn(() => "mocked SQL"),
   isHistogramEnabled: vi.fn(() => true),
 };
 
@@ -94,9 +92,8 @@ describe("useSearchHistogramManager", () => {
     // Reset mock functions
     mockHistogramFunctions.resetHistogramWithError.mockClear();
     mockHistogramFunctions.generateHistogramSkeleton.mockClear();
-    mockHistogramFunctions.setMultiStreamHistogramQuery.mockClear();
     mockHistogramFunctions.isHistogramEnabled.mockReturnValue(true);
-    histogramManager = useSearchHistogramManager();
+    histogramManager = useSearchHistogramManager(gt);
   });
 
   describe("isHistogramDataMissing", () => {
@@ -139,14 +136,14 @@ describe("useSearchHistogramManager", () => {
       expect(result).toBe(true);
     });
 
-    it("should return true for multi-stream non-SQL mode", () => {
+    it("should return false for multi-stream, which has no histogram", () => {
       // Use mockState directly
       mockState.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
       mockState.searchObj.meta.sqlMode = false;
 
       const parsedSQL = {};
       const result = histogramManager.shouldShowHistogram(parsedSQL);
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
   });
 
@@ -226,7 +223,7 @@ describe("useSearchHistogramManager", () => {
         "trace-123",
         response,
         {},
-        refreshPagination
+        refreshPagination,
       );
 
       expect(mockState.searchObj.loading).toBe(false);
@@ -258,13 +255,7 @@ describe("useSearchHistogramManager", () => {
         },
       };
 
-      histogramManager.handleHistogramResponse(
-        queryReq,
-        "trace-123",
-        response,
-        {},
-        vi.fn()
-      );
+      histogramManager.handleHistogramResponse(queryReq, "trace-123", response, {}, vi.fn());
 
       expect(Array.isArray(mockState.searchObj.data.queryResults.aggs)).toBe(true);
     });
@@ -299,7 +290,7 @@ describe("useSearchHistogramManager", () => {
         "trace-123",
         response,
         { isHistogramOnly: true },
-        refreshPagination
+        refreshPagination,
       );
 
       // The refreshPagination call happens in an async IIFE, so we need to wait
@@ -322,14 +313,14 @@ describe("useSearchHistogramManager", () => {
       await histogramManager.processHistogramRequest(
         queryReq,
         buildWebSocketPayload,
-        initializeSearchConnection
+        initializeSearchConnection,
       );
 
       expect(buildWebSocketPayload).not.toHaveBeenCalled();
       expect(initializeSearchConnection).not.toHaveBeenCalled();
     });
 
-    it("should show error for multi-stream SQL mode", async () => {
+    it("should show the unavailable notice for any multi-stream search", async () => {
       // Use mockState directly
       mockState.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
       mockState.searchObj.meta.sqlMode = true;
@@ -346,12 +337,12 @@ describe("useSearchHistogramManager", () => {
       await histogramManager.processHistogramRequest(
         queryReq,
         buildWebSocketPayload,
-        initializeSearchConnection
+        initializeSearchConnection,
       );
 
       expect(mockHistogramFunctions.resetHistogramWithError).toHaveBeenCalledWith(
-        "Histogram is not available for multi-stream SQL mode search.",
-        0
+        "Histogram unavailable for CTEs, DISTINCT, UNION, JOIN and LIMIT queries.",
+        -1,
       );
     });
 
@@ -387,7 +378,7 @@ describe("useSearchHistogramManager", () => {
         queryReq,
         buildWebSocketPayload,
         initializeSearchConnection,
-        callbacks
+        callbacks,
       );
 
       expect(mockHistogramFunctions.generateHistogramSkeleton).toHaveBeenCalled();
@@ -408,7 +399,7 @@ describe("useSearchHistogramManager", () => {
       await histogramManager.getPageCountThroughSocket(
         queryReq,
         buildWebSocketPayload,
-        initializeSearchConnection
+        initializeSearchConnection,
       );
 
       expect(buildWebSocketPayload).not.toHaveBeenCalled();
@@ -433,7 +424,7 @@ describe("useSearchHistogramManager", () => {
       await histogramManager.getPageCountThroughSocket(
         queryReq,
         buildWebSocketPayload,
-        initializeSearchConnection
+        initializeSearchConnection,
       );
 
       expect(queryReq.query.size).toBe(0);
@@ -471,7 +462,7 @@ describe("useSearchHistogramManager", () => {
       await histogramManager.getPageCountThroughSocket(
         queryReq,
         buildWebSocketPayload,
-        initializeSearchConnection
+        initializeSearchConnection,
       );
 
       expect(queryReq.query.start_time).toBe(1000);

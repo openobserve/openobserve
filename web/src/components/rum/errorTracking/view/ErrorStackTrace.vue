@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,37 +15,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row q-mt-lg q-ml-xs">
-    <div class="col-12">
-      <div class="tags-title text-bold q-mb-xs">{{ t("rum.errorStack") }}</div>
-      <div class="q-mb-sm">{{ error_stack[0] }}</div>
-      <div class="error-stacks">
-        <template v-for="(stack, index) in error_stack" :key="stack">
-          <div
-            v-if="index"
-            class="error_stack q-px-sm"
-            :style="{
-              'border-top': Number(index) === 1 ? '1px solid #e0e0e0' : '',
-              'border-radius':
-                Number(index) === error_stack.length - 1
-                  ? '0 0 4px 4px'
-                  : Number(index) === 1
-                  ? '4px 4px 0 0'
-                  : '',
-            }"
-          >
-            {{ stack }}
+  <div class="ms-1 mt-4 flex">
+    <div class="w-full">
+      <div class="mb-1 text-base font-bold">{{ t("rum.errorStack") }}</div>
+      <div class="mb-2">{{ error_stack[0] }}</div>
+
+      <!-- Tabs for Pretty and Raw views -->
+      <OTabs v-model="activeTab" dense class="text-text-secondary mb-1" align="left">
+        <OTab
+          name="raw"
+          :label="t('rum.stackTraceRaw')"
+          data-test="rum-error-stack-trace-raw-tab"
+        />
+        <OTab
+          name="pretty"
+          :label="t('rum.stackTracePretty')"
+          data-test="rum-error-stack-trace-pretty-tab"
+        />
+      </OTabs>
+
+      <OSeparator class="mb-2" />
+
+      <!-- Tab panels -->
+      <OTabPanels v-model="activeTab" animated>
+        <!-- Raw view -->
+        <OTabPanel name="raw">
+          <div class="error-stacks">
+            <template v-for="(stack, index) in error_stack" :key="stack">
+              <!-- eslint-disable local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom -->
+              <div
+                v-if="index"
+                data-test="error-stack-trace-line"
+                class="border-border-default text-compact border-s border-e border-b border-solid px-2 py-1.5"
+                :class="Number(index) === 1 ? 'border-t' : ''"
+                :style="{
+                  'border-radius':
+                    Number(index) === error_stack.length - 1
+                      ? '0 0 0.25rem 0.25rem'
+                      : Number(index) === 1
+                        ? '0.25rem 0.25rem 0 0'
+                        : '',
+                }"
+              >
+                <!-- eslint-enable local/no-hardcoded-px -->
+                {{ stack }}
+              </div>
+            </template>
           </div>
-        </template>
-      </div>
+        </OTabPanel>
+
+        <!-- Pretty formatted view -->
+        <OTabPanel name="pretty">
+          <PrettyStackTrace
+            v-if="activeTab === 'pretty'"
+            :error_stack="error_stack"
+            :error="error"
+          />
+        </OTabPanel>
+      </OTabPanels>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
-const { t } = useI18n();
-const props = defineProps({
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { useI18nTyped } from "@/types/i18n";
+import { ref } from "vue";
+import PrettyStackTrace from "./PrettyStackTrace.vue";
+
+const { t } = useI18nTyped();
+
+defineProps({
   error_stack: {
     type: Array,
     required: true,
@@ -55,22 +99,6 @@ const props = defineProps({
     required: true,
   },
 });
+
+const activeTab = ref("raw");
 </script>
-
-<style lang="scss">
-.tags-title {
-  font-size: 16px;
-}
-
-.error_stack {
-  border-bottom: 1px solid #e0e0e0;
-  border-left: 1px solid #e0e0e0;
-  border-right: 1px solid #e0e0e0;
-  font-size: 13px;
-  padding: 6px 8px;
-}
-
-.error_stacks:first-child .error_stack {
-  border-top: 1px solid #e0e0e0;
-}
-</style>

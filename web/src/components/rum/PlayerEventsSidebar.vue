@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,128 +15,102 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="events-container relative-position">
-    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="tw:border-b" />
+  <!-- eslint-disable-next-line local/no-hardcoded-px -- 1-device-pixel trim off a 100% width to dodge sub-pixel overflow; a rem inset would open a visible gap -->
+  <div class="relative-position flex h-full w-[calc(100%-1px)] flex-col overflow-hidden">
+    <AppTabs :tabs="tabs" v-model:active-tab="activeTab" class="mx-2! mt-2! px-2 py-1" />
     <template v-if="activeTab === 'tags'">
-      <div
-        data-test="event-metadata"
-        class="row q-pa-sm event-metadata tw:px-[0.375rem]"
-      >
-        <div class="col-12 row">
-          <div class="col-12 q-pb-sm text-caption">
-            <q-icon name="mail" size="1rem" class="q-pr-xs" />
-            {{ sessionDetails.user_email || "Unknown User" }}
+      <div data-test="event-metadata" class="sticky top-0 flex p-2 px-3">
+        <div class="flex w-full flex-col">
+          <div class="w-full pb-2 text-xs">
+            <OIcon name="mail" size="sm" class="pe-1" />
+            {{ sessionDetails.user_email || t("common.unknownUser") }}
           </div>
-          <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
-            <q-icon name="schedule" size="1rem" class="q-pr-xs" />
+          <div class="mb-2 w-full truncate pe-1 text-xs">
+            <OIcon name="schedule" size="sm" class="pe-1" />
             {{ sessionDetails.date }}
           </div>
-          <div class="col-12 q-mb-sm text-caption ellipsis q-pr-xs">
-            <q-icon name="settings" size="1rem" class="q-pr-xs" />
+          <div class="mb-2 w-full truncate pe-1 text-xs">
+            <OIcon name="settings" size="sm" class="pe-1" />
             {{ sessionDetails.browser }}, {{ sessionDetails.os }}
           </div>
-          <div class="col-12 q-mb-sm text-caption ellipsis">
-            <q-icon name="language" size="1rem" class="q-pr-xs" />
+          <div class="mb-2 w-full truncate text-xs">
+            <OIcon name="language" size="sm" class="pe-1" />
             {{ sessionDetails.ip }}
           </div>
-          <div class="col-12 q-mb-sm text-caption ellipsis">
-            <q-icon name="location_on" size="1rem" class="q-pr-xs" />
+          <div class="mb-2 w-full truncate text-xs">
+            <OIcon name="location-on" size="sm" class="pe-1" />
             {{ sessionDetails.city }}, {{ sessionDetails.country }}
           </div>
         </div>
       </div>
     </template>
-    <template v-else>
-      <div
-        class="flex items-center justify-between col-12 q-pt-sm tw:px-[0.375rem]"
-      >
-        <div class="q-pr-xs tw:w-[60%]">
-          <q-input
+    <!-- KeepAlive sits OUTSIDE the tab branch chain so toggling deactivates the
+    traces tab instead of destroying it — a remount used to refire the whole
+    fetch pipeline (rum query + stream resolution + metadata) on every
+    Breadcrumbs↔Traces switch. The sidebar dies with SessionViewer, so nothing
+    leaks across sessions. -->
+    <KeepAlive>
+      <PlayerTracesTab
+        v-if="activeTab === 'traces'"
+        :session-id="sessionId"
+        :current-time="currentTime"
+        :start-time="startTime"
+        :end-time="endTime"
+        @event-emitted="(type, payload) => emit('event-emitted', type, payload)"
+      />
+    </KeepAlive>
+    <template v-if="activeTab !== 'tags' && activeTab !== 'traces'">
+      <div class="flex w-full items-center justify-between px-1.5 pt-2">
+        <div class="w-[60%] pe-1">
+          <OInput
             v-model="searchEvent"
-            size="xs"
-            filled
-            borderless
-            dense
             clearable
-            debounce="1"
             :placeholder="t('rum.searchEvents')"
             @update:model-value="searchEvents"
           />
         </div>
-        <div class="q-pl-xs event-type-selector tw:w-[40%] relative-position">
-          <q-select
+        <div class="event-type-selector relative-position w-[40%] ps-1">
+          <OSelect
             v-model="selectedEventTypes"
             :options="eventOptions"
-            behavior="menu"
             multiple
-            filled
-            borderless
-            dense
-            emit-value
-            size="xs"
+            labelKey="label"
+            valueKey="value"
             data-test="player-events-filter-select"
             @update:model-value="searchEvents(searchEvent)"
-          >
-            <template
-              v-slot:option="{ itemProps, opt, selected, toggleOption }"
-            >
-              <q-item v-bind="itemProps">
-                <q-item-section side class="tw:pr-0!">
-                  <q-checkbox
-                    :model-value="selected"
-                    @update:model-value="toggleOption(opt)"
-                    class="tw:mr-0! tw:pr-0!"
-                    size="xs"
-                  />
-                </q-item-section>
-                <q-item-section class="tw:ml-0! tw-pl-0!">
-                  <q-item-label class="tw:ml-0! tw-pl-0!">{{
-                    opt.label
-                  }}</q-item-label>
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
+          />
         </div>
       </div>
-      <q-separator class="q-mt-sm" />
-      <div class="events-list">
+      <OSeparator class="my-2" />
+      <div class="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-2">
         <template
           v-for="(filteredEvent, index) in filteredEvents"
           :key="filteredEvent.id + '-' + index"
         >
           <div
-            class="q-mt-xs q-px-sm event-container q-py-sm cursor-pointer rounded-borders"
+            class="rounded-default hover:bg-interactive-hover-bg hover:text-text-body mb-1 cursor-pointer px-2 py-2"
             @click="handleEventClick(filteredEvent)"
             :data-test="`player-event-row-${filteredEvent.type}`"
           >
-            <div class="ellipsis">
-              <div class="q-mr-md inline" data-test="event-display-time">
+            <div class="truncate">
+              <div class="me-3 inline" data-test="event-display-time">
                 {{ filteredEvent.displayTime }}
               </div>
-              <div
-                class="q-mr-md inline event-type q-px-xs tw:rounded-[0.25rem]"
-                :class="filteredEvent.type === 'error' ? 'bg-red-3' : ''"
+              <OTag
+                type="rumEventType"
+                :value="filteredEvent.type"
+                class="me-3"
                 data-test="event-type-badge"
-              >
-                {{ filteredEvent.type }}
-              </div>
+              />
               <template
-                v-if="
-                  filteredEvent.frustration_types &&
-                  filteredEvent.frustration_types.length > 0
-                "
+                v-if="filteredEvent.frustration_types && filteredEvent.frustration_types.length > 0"
               >
                 <FrustrationEventBadge
                   :frustration-types="filteredEvent.frustration_types"
-                  class="q-mr-xs inline"
+                  class="me-1 inline"
                 />
               </template>
-              <div
-                class="inline"
-                :title="filteredEvent.name"
-                data-test="event-name"
-              >
+              <div class="inline" :title="filteredEvent.name" data-test="event-name">
                 {{ filteredEvent.name }}
               </div>
             </div>
@@ -149,11 +123,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts" setup>
 import { ref, watch } from "vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import AppTabs from "../common/AppTabs.vue";
-import { useI18n } from "vue-i18n";
-import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 
-const { t } = useI18n();
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import FrustrationEventBadge from "./FrustrationEventBadge.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import PlayerTracesTab from "./PlayerTracesTab.vue";
+
+const { t } = useI18nTyped();
 
 const props = defineProps({
   events: {
@@ -164,13 +145,35 @@ const props = defineProps({
     type: Object,
     required: true,
   },
+  sessionId: {
+    type: String,
+    default: "",
+  },
+  currentTime: {
+    type: Number,
+    default: 0,
+  },
+  startTime: {
+    type: Number,
+    default: 0,
+  },
+  endTime: {
+    type: Number,
+    default: 0,
+  },
 });
 
 const activeTab = ref<string>("breadcrumbs");
-const tabs = [
+const tabs: Array<{
+  label: I18nText;
+  value: string;
+  icon: string;
+  style: Record<string, string>;
+}> = [
   {
     label: t("rum.breadcrumbs"),
     value: "breadcrumbs",
+    icon: "send",
     style: {
       width: "fit-content",
       padding: "0.5rem 0.625rem",
@@ -180,6 +183,13 @@ const tabs = [
   {
     label: t("rum.tags"),
     value: "tags",
+    icon: "tag",
+    style: { width: "fit-content", padding: "0.5rem 0.625rem" },
+  },
+  {
+    label: t("rum.traces"),
+    value: "traces",
+    icon: "timeline",
     style: { width: "fit-content", padding: "0.5rem 0.625rem" },
   },
 ];
@@ -196,19 +206,14 @@ watch(
   { immediate: true, deep: true },
 );
 
-const selectedEventTypes = ref<string[]>([
-  "error",
-  "action",
-  "view",
-  "frustration",
-]);
+const selectedEventTypes = ref<string[]>(["error", "action", "view", "frustration"]);
 const searchEvent = ref<string>("");
 
 const eventOptions = [
-  { label: "Error", value: "error" },
-  { label: "Action", value: "action" },
-  { label: "View", value: "view" },
-  { label: "Frustration", value: "frustration" },
+  { label: t("rum.playerEvents.error"), value: "error" },
+  { label: t("rum.playerEvents.action"), value: "action" },
+  { label: t("rum.playerEvents.view"), value: "view" },
+  { label: t("rum.playerEvents.frustration"), value: "frustration" },
 ];
 
 const searchEvents = (value: string | number | null) => {
@@ -223,16 +228,12 @@ const searchEvents = (value: string | number | null) => {
         ? true
         : (() => {
             // Check if event type is selected
-            const isTypeSelected = selectedEventTypes.value.includes(
-              event.type,
-            );
+            const isTypeSelected = selectedEventTypes.value.includes(event.type);
 
             // Check if frustration filter is active and event has frustrations
-            const hasFrustration =
-              event.frustration_types && event.frustration_types.length > 0;
+            const hasFrustration = event.frustration_types && event.frustration_types.length > 0;
             const showFrustration =
-              selectedEventTypes.value.includes("frustration") &&
-              hasFrustration;
+              selectedEventTypes.value.includes("frustration") && hasFrustration;
 
             // Show event if its type is selected OR if frustration filter is active and event has frustrations
             return isTypeSelected || showFrustration;
@@ -251,58 +252,3 @@ const handleEventClick = (event: any) => {
   emit("event-emitted", "event-click", event);
 };
 </script>
-
-<style scoped lang="scss">
-.inline {
-  display: inline;
-}
-
-.events-container {
-  width: calc(100% - 1px);
-  height: calc(100vh - 3.5625rem);
-  overflow: hidden;
-}
-
-.events-list {
-  height: calc(100vh - 12.9375rem);
-  overflow-x: hidden;
-  overflow-y: auto;
-}
-
-.event-container:hover {
-  background-color: #ededed;
-  color: black;
-}
-
-.frustration-count-badge {
-  position: absolute;
-  top: -0.375rem;
-  right: -0.375rem;
-  font-size: 0.625rem;
-  font-weight: 600;
-  z-index: 1;
-}
-
-.event-type {
-  text-transform: capitalize;
-}
-
-.event-metadata {
-  position: sticky;
-  top: 0;
-}
-</style>
-
-<style lang="scss">
-.event-type-selector {
-  .q-field__control {
-    .q-field__native {
-      span {
-        text-overflow: ellipsis;
-        white-space: nowrap;
-        overflow: hidden;
-      }
-    }
-  }
-}
-</style>

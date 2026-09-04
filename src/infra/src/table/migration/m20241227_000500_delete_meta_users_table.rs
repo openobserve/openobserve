@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -65,4 +65,16 @@ mod meta {
     pub enum Relation {}
 
     impl ActiveModelBehavior for ActiveModel {}
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(Migration.name(), "m20241227_000500_delete_meta_users_table");
+    }
 }

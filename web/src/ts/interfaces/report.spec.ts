@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -245,8 +245,6 @@ describe("Report Interfaces", () => {
       // Type assertions to verify field types
       const reportNumber: number = report["#"];
       const reportName: string = report.name;
-      const reportTab: string | null | undefined = report.tab;
-      const reportTimeRange: string | null | undefined = report.time_range;
       const reportFrequency: string = report.frequency;
       const reportLastTriggered: string = report.last_triggered_at;
       const reportCreated: string = report.created_at;
@@ -295,7 +293,7 @@ describe("Report Interfaces", () => {
       };
 
       expect(new Date(report.last_triggered_at).getTime()).toBeGreaterThan(
-        new Date(report.created_at).getTime()
+        new Date(report.created_at).getTime(),
       );
     });
 

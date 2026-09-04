@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,13 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import TransformService from "@/services/jstransform";
 
 const useFunctions = () => {
   const store = useStore();
-  const $q = useQuasar();
 
   const getAllFunctions = async () => {
     try {
@@ -29,7 +27,7 @@ const useFunctions = () => {
         "name",
         false,
         "",
-        store.state.selectedOrganization.identifier
+        store.state.selectedOrganization.identifier,
       )
         .then((res: any) => {
           store.dispatch("setFunctions", res.data.list);
@@ -39,7 +37,6 @@ const useFunctions = () => {
           throw new Error(e.message);
         });
     } catch (e: any) {
-      console.log(e,'error here')
       throw new Error(e.message);
     }
   };

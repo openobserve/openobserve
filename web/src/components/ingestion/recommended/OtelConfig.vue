@@ -1,24 +1,24 @@
 <template>
   <div>
-    <div class="q-pa-sm">
-      <div class="text-subtitle1 text-bold">OTLP HTTP</div>
-      <ContentCopy class="q-mt-sm" :content="getOtelHttpConfig" />
+    <div class="p-2 pt-1">
+      <div class="text-base font-bold font-medium">{{ t("ingestion.otlpHttp") }}</div>
+      <ContentCopy class="mt-2" :content="raw(getOtelHttpConfig)" />
     </div>
-    <div class="q-pa-md">
-      <div class="text-subtitle1 text-bold">OTLP gRPC</div>
-      <ContentCopy :content="getOtelGrpcConfig" />
+    <div class="p-3" v-if="config.isCloud == 'false'">
+      <div class="text-base font-bold font-medium">{{ t("ingestion.otlpGrpc") }}</div>
+      <ContentCopy :content="raw(getOtelGrpcConfig)" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type Ref } from "vue";
-import type { Endpoint } from "@/ts/interfaces";
+import { computed, ref } from "vue";
 import ContentCopy from "@/components/CopyContent.vue";
-import { useStore } from "vuex";
-import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
+import { getEndPoint, getIngestionURL } from "../../../utils/zincutils";
+import config from "@/aws-exports";
+import { raw, useI18nTyped } from "@/types/i18n";
 
-const store = useStore();
+const { t } = useI18nTyped();
 
 const props = defineProps({
   currOrgIdentifier: {
@@ -40,12 +40,6 @@ const endpoint: any = ref({
 const ingestionURL = getIngestionURL();
 endpoint.value = getEndPoint(ingestionURL);
 
-const accessKey = computed(() => {
-  return b64EncodeStandard(
-    `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`
-  );
-});
-
 const getOtelGrpcConfig = computed(() => {
   return `exporters:
   otlp/openobserve:
@@ -55,7 +49,12 @@ const getOtelGrpcConfig = computed(() => {
         organization: ${props.currOrgIdentifier}
         stream-name: default
       tls:
-        insecure: true`;
+        insecure: true
+
+service:
+  telemetry:
+    logs:
+      level: warn`;
 });
 
 const getOtelHttpConfig = computed(() => {
@@ -64,8 +63,11 @@ const getOtelHttpConfig = computed(() => {
     endpoint: ${endpoint.value.url}/api/${props.currOrgIdentifier}
     headers:
       Authorization: Basic [BASIC_PASSCODE]
-      stream-name: default`;
+      stream-name: default
+
+service:
+  telemetry:
+    logs:
+      level: warn`;
 });
 </script>
-
-<style scoped></style>

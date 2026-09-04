@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { Quasar, date } from "quasar";
 import PipelineHistory from "@/components/pipelines/PipelineHistory.vue";
 import i18n from "@/locales";
 import router from "../../helpers/router";
@@ -32,7 +31,7 @@ vi.mock("@/services/pipelines", () => ({
             { name: "test-pipeline-2", pipeline_id: "pid2" },
           ],
         },
-      })
+      }),
     ),
   },
 }));
@@ -56,7 +55,7 @@ vi.mock("@/services/http", () => ({
           ],
           total: 1,
         },
-      })
+      }),
     ),
     post: vi.fn(() => Promise.resolve({ data: {} })),
     put: vi.fn(() => Promise.resolve({ data: {} })),
@@ -81,18 +80,22 @@ describe("PipelineHistory.vue", () => {
   const mountComponent = (props = {}) => {
     return mount(PipelineHistory, {
       props,
+      attachTo: document.body,
       global: {
-        plugins: [store, router, i18n, Quasar],
+        plugins: [store, router, i18n],
         stubs: {
           DateTime: {
-            template: '<div data-test="datetime-stub"></div>',
+            template: '<div data-test="pipeline-history-date-picker"></div>',
             emits: ["on:date-change"],
           },
-          QTablePagination: {
+          Pagination: {
             template: '<div data-test="pagination-stub"></div>',
           },
           NoData: {
             template: '<div data-test="no-data-stub">No Data</div>',
+          },
+          Teleport: {
+            template: "<div><slot /></div>",
           },
         },
       },
@@ -107,39 +110,32 @@ describe("PipelineHistory.vue", () => {
       expect(wrapper.find('[data-test="pipeline-history-page"]').exists()).toBe(true);
     });
 
-    it("should render back button", () => {
-      const wrapper = mountComponent();
-
-      expect(wrapper.find('[data-test="alert-history-back-btn"]').exists()).toBe(true);
+    it.skip("should render back button", () => {
+      // The component no longer has a back button — navigation is handled by the shell
     });
 
-    it("should render page title with info icon", () => {
-      const wrapper = mountComponent();
-
-      expect(wrapper.find('[data-test="pipeline-history-title"]').exists()).toBe(true);
+    it.skip("should render page title with info icon", () => {
+      // The component no longer renders its own page title — it is provided by the shell breadcrumb
     });
 
-    it("should render date time picker", () => {
+    it("should render date time picker", async () => {
       const wrapper = mountComponent();
+      await flushPromises();
 
-      // DateTime component is present (either stub or actual component)
+      // DateTime is teleported to #o2-page-actions; with Teleport stubbed it renders inline
       expect(wrapper.find('[data-test="pipeline-history-date-picker"]').exists()).toBe(true);
     });
 
-    it("should render pipeline search select", () => {
+    it("should render pipeline search select", async () => {
       const wrapper = mountComponent();
+      await flushPromises();
 
       expect(wrapper.find('[data-test="pipeline-history-search-select"]').exists()).toBe(true);
     });
 
-    it("should render manual search button", () => {
+    it("should render refresh button", async () => {
       const wrapper = mountComponent();
-
-      expect(wrapper.find('[data-test="pipeline-history-manual-search-btn"]').exists()).toBe(true);
-    });
-
-    it("should render refresh button", () => {
-      const wrapper = mountComponent();
+      await flushPromises();
 
       expect(wrapper.find('[data-test="pipeline-history-refresh-btn"]').exists()).toBe(true);
     });
@@ -152,19 +148,8 @@ describe("PipelineHistory.vue", () => {
   });
 
   describe("back button", () => {
-    it("should navigate back to pipelines page when clicked", async () => {
-      const wrapper = mountComponent();
-      const pushSpy = vi.spyOn(router, "push");
-
-      const backBtn = wrapper.find('[data-test="alert-history-back-btn"]');
-      await backBtn.trigger("click");
-
-      expect(pushSpy).toHaveBeenCalledWith({
-        name: "pipelines",
-        query: {
-          org_identifier: "test-org",
-        },
-      });
+    it.skip("should navigate back to pipelines page when clicked", () => {
+      // The component no longer has a back button — navigation is handled by the shell
     });
   });
 
@@ -243,48 +228,6 @@ describe("PipelineHistory.vue", () => {
     });
   });
 
-  describe("getStatusColor helper", () => {
-    it("should return positive color for success status", () => {
-      const wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-
-      expect(vm.getStatusColor("success")).toBe("positive");
-      expect(vm.getStatusColor("ok")).toBe("positive");
-      expect(vm.getStatusColor("completed")).toBe("positive");
-    });
-
-    it("should return negative color for error status", () => {
-      const wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-
-      expect(vm.getStatusColor("error")).toBe("negative");
-      expect(vm.getStatusColor("failed")).toBe("negative");
-    });
-
-    it("should return warning color for warning status", () => {
-      const wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-
-      expect(vm.getStatusColor("warning")).toBe("warning");
-    });
-
-    it("should return info color for pending/running status", () => {
-      const wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-
-      expect(vm.getStatusColor("pending")).toBe("info");
-      expect(vm.getStatusColor("running")).toBe("info");
-    });
-
-    it("should return theme-based color for unknown status", () => {
-      const wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-
-      const color = vm.getStatusColor("unknown");
-      expect(["white", "black"]).toContain(color);
-    });
-  });
-
   describe("table columns", () => {
     it("should have correct column definitions", () => {
       const wrapper = mountComponent();
@@ -293,11 +236,11 @@ describe("PipelineHistory.vue", () => {
       expect(vm.columns).toBeDefined();
       expect(Array.isArray(vm.columns)).toBe(true);
 
-      const columnNames = vm.columns.map((col: any) => col.name);
-      expect(columnNames).toContain("pipeline_name");
-      expect(columnNames).toContain("timestamp");
-      expect(columnNames).toContain("status");
-      expect(columnNames).toContain("duration");
+      const columnIds = vm.columns.map((col: any) => col.id);
+      expect(columnIds).toContain("pipeline_name");
+      expect(columnIds).toContain("timestamp");
+      expect(columnIds).toContain("status");
+      expect(columnIds).toContain("duration");
     });
   });
 
@@ -316,25 +259,27 @@ describe("PipelineHistory.vue", () => {
       const wrapper = mountComponent();
       const vm = wrapper.vm as any;
 
-      expect(vm.rowsPerPageOptions).toBeDefined();
-      expect(Array.isArray(vm.rowsPerPageOptions)).toBe(true);
-      expect(vm.rowsPerPageOptions.length).toBeGreaterThan(0);
+      expect(vm.pageSizeOptions).toBeDefined();
+      expect(Array.isArray(vm.pageSizeOptions)).toBe(true);
+      expect(vm.pageSizeOptions.length).toBeGreaterThan(0);
     });
   });
 
   describe("pipeline search", () => {
-    it("should have clearable search select", () => {
+    it("should have clearable search select", async () => {
       const wrapper = mountComponent();
+      await flushPromises();
 
       const searchSelect = wrapper.find('[data-test="pipeline-history-search-select"]');
-      // Just verify the select exists
       expect(searchSelect.exists()).toBe(true);
     });
 
-    it("should have search icon prepend", () => {
+    it("should have searchable select for pipeline search", async () => {
       const wrapper = mountComponent();
+      await flushPromises();
 
-      expect(wrapper.find(".o2-search-input-icon").exists()).toBe(true);
+      const searchSelect = wrapper.find('[data-test="pipeline-history-search-select"]');
+      expect(searchSelect.exists()).toBe(true);
     });
   });
 
@@ -343,36 +288,20 @@ describe("PipelineHistory.vue", () => {
       const wrapper = mountComponent();
       await flushPromises();
 
-      // Verify DateTime component is rendered with the data-test attribute
+      // DateTime is teleported to #o2-page-actions; with Teleport stubbed it renders inline
       const dateTimeElement = wrapper.find('[data-test="pipeline-history-date-picker"]');
       expect(dateTimeElement.exists()).toBe(true);
     });
   });
 
   describe("loading state", () => {
-    it("should show loading indicator when fetching data", async () => {
+    it("should track loading state reactively", async () => {
       const wrapper = mountComponent();
+      await flushPromises();
+
       const vm = wrapper.vm as any;
-
-      vm.loading = true;
-      await wrapper.vm.$nextTick();
-
-      const refreshBtn = wrapper.find('[data-test="pipeline-history-refresh-btn"]');
-      // Check for Quasar loading state
-      const hasLoading = refreshBtn.attributes("loading") !== undefined ||
-                        refreshBtn.classes().includes("q-btn--loading");
-      expect(hasLoading || vm.loading).toBe(true);
-    });
-
-    it("should disable manual search button when loading", async () => {
-      const wrapper = mountComponent();
-      const vm = wrapper.vm as any;
-
-      vm.loading = true;
-      await wrapper.vm.$nextTick();
-
-      const searchBtn = wrapper.find('[data-test="pipeline-history-manual-search-btn"]');
-      expect(searchBtn.attributes("aria-disabled")).toBe("true");
+      // Verify loading is false after data is fetched
+      expect(vm.loading).toBe(false);
     });
   });
 });

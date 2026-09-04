@@ -4,9 +4,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+# Both crates are used directly from build.rs; cargo-machete does not inspect build scripts.
+[package.metadata.cargo-machete]
+ignored = ["cargo_metadata", "tonic-prost-build"]
+
 [dependencies]
-async-trait.workspace = true
-datafusion.workspace = true
 datafusion-proto.workspace = true
 prost.workspace = true
 prost-wkt-types.workspace = true
@@ -14,8 +16,7 @@ serde.workspace = true
 serde_json.workspace = true
 tonic.workspace = true
 tonic-prost.workspace = true
-tokio.workspace = true
 
 [build-dependencies]
-prost-build = { version = "0.14.1" }
+cargo_metadata = "0.19"
 tonic-prost-build = { version = "0.14.1" }

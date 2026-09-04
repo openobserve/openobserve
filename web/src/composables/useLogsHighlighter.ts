@@ -1,23 +1,37 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
 /**
  * Logs Highlighting Composable
  * ============================
  *
- * Extracted from LogsHighlighting.vue for reusability and performance optimization.
  * Provides the core highlighting logic that can be used with caching.
  */
 
+import type { TranslateFn } from "@/types/i18n";
 import { useTextHighlighter } from "@/composables/useTextHighlighter";
 import { getThemeColors } from "@/utils/logs/keyValueParser";
-import { computed, ref, watch, onBeforeUnmount } from "vue";
-import { useStore } from "vuex";
-import { searchState } from "@/composables/useLogs/searchState";
+import { escapeHtml } from "@/utils/html";
+import { ref, watch, onBeforeUnmount, getCurrentInstance } from "vue";
+import { useTheme } from "@/composables/useTheme";
 
-export function useLogsHighlighter() {
-  const processedResults = ref({});
+export function useLogsHighlighter(t: TranslateFn) {
+  const processedResults = ref<Record<string, string>>({});
 
-  const store = useStore();
-  const currentColors = ref(getThemeColors(store.state.theme === "dark"));
-  const { searchObj } = searchState();
+  const { isDark } = useTheme();
+  const currentColors = ref(getThemeColors(isDark.value));
 
   // Track active processing to prevent memory leaks
   let abortController: AbortController | null = null;
@@ -36,31 +50,22 @@ export function useLogsHighlighter() {
     }
   };
 
-  // Cleanup on component unmount (if used in a component context)
-  // Note: This only works if called within a component setup
-  try {
+  // Cleanup on component unmount (only register when in a component context)
+  if (getCurrentInstance()) {
     onBeforeUnmount(() => {
       cleanup();
     });
-  } catch (e) {
-    // onBeforeUnmount not available (not in component context)
-    // This is fine - cleanup will still happen on abort
   }
 
   watch(
-    () => store.state.theme,
+    () => isDark.value,
     (newTheme) => {
-      currentColors.value = getThemeColors(newTheme === "dark");
+      currentColors.value = getThemeColors(newTheme);
     },
   );
 
-  const {
-    processTextWithHighlights,
-    extractKeywords,
-    splitTextByKeywords,
-    escapeHtml,
-    isFTSColumn,
-  } = useTextHighlighter();
+  const { processTextWithHighlights, extractKeywords, splitTextByKeywords, isFTSColumn } =
+    useTextHighlighter();
 
   /**
    * Process hits array in chunks to avoid blocking the main thread
@@ -129,9 +134,7 @@ export function useLogsHighlighter() {
               columns[columnIndex].id === "source" ||
               isFTSColumn(
                 columns[columnIndex].id,
-                columns[columnIndex].id === "source"
-                  ? hit
-                  : hit[columns[columnIndex].id],
+                columns[columnIndex].id === "source" ? hit : hit[columns[columnIndex].id],
                 selectedStreamFtsKeys,
               )
             ),
@@ -201,7 +204,6 @@ export function useLogsHighlighter() {
   };
 
   /**
-   * Legacy function - kept for backward compatibility
    * @deprecated Use processHitsInChunks instead
    */
   const processHitsHighlighting = (data: any): Promise<any> => {
@@ -289,7 +291,7 @@ export function useLogsHighlighter() {
   const truncateLargeContent = (data: any, maxSize: number = 50000): string => {
     if (typeof data === "string") {
       if (data.length > maxSize) {
-        return data.substring(0, maxSize) + `... [truncated, original size: ${data.length} chars]`;
+        return data.substring(0, maxSize) + t("search.contentTruncated", { size: data.length });
       }
       return data;
     }
@@ -298,11 +300,13 @@ export function useLogsHighlighter() {
       try {
         const jsonStr = JSON.stringify(data);
         if (jsonStr.length > maxSize) {
-          return jsonStr.substring(0, maxSize) + `... [truncated, original size: ${jsonStr.length} chars]`;
+          return (
+            jsonStr.substring(0, maxSize) + t("search.contentTruncated", { size: jsonStr.length })
+          );
         }
         return jsonStr;
       } catch (error) {
-        return "[Object too large to display]";
+        return t("search.objectTooLargeToDisplay");
       }
     }
 
@@ -352,12 +356,7 @@ export function useLogsHighlighter() {
 
     // Handle single string values with semantic colorization and highlighting
     if (typeof data === "string") {
-      return processTextWithHighlights(
-        data,
-        effectiveQueryString,
-        currentColors.value,
-        showQuotes,
-      );
+      return processTextWithHighlights(data, effectiveQueryString, currentColors.value, showQuotes);
     }
 
     // Handle primitive data types
@@ -408,12 +407,7 @@ export function useLogsHighlighter() {
     // Handle complex objects with full JSON colorization
     //this is for objects and arrays if any
     try {
-      return colorizeObjectWithClasses(
-        data,
-        showBraces,
-        showQuotes,
-        effectiveQueryString,
-      );
+      return colorizeObjectWithClasses(data, showBraces, showQuotes, effectiveQueryString);
     } catch (error) {
       return escapeHtml(JSON.stringify(data));
     }
@@ -458,8 +452,7 @@ export function useLogsHighlighter() {
     if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "email";
 
     // HTTP methods
-    if (/^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)$/i.test(trimmed))
-      return "http-method";
+    if (/^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)$/i.test(trimmed)) return "http-method";
 
     // HTTP Status codes - only match valid status codes
     // 1xx: Informational (100-103)
@@ -475,11 +468,7 @@ export function useLogsHighlighter() {
       return "status-code";
 
     // UUIDs
-    if (
-      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-        trimmed,
-      )
-    )
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(trimmed))
       return "uuid";
 
     // File paths
@@ -536,7 +525,6 @@ export function useLogsHighlighter() {
   }
 
   /**
-   * Legacy function - kept for backward compatibility
    * @deprecated Use createStyledSpanWithClasses instead
    */
   function createStyledSpan(
@@ -546,12 +534,7 @@ export function useLogsHighlighter() {
     showQuotes: boolean = false,
   ): string {
     const semanticType = detectSemanticType(text);
-    return createStyledSpanWithClasses(
-      text,
-      semanticType,
-      queryString,
-      showQuotes,
-    );
+    return createStyledSpanWithClasses(text, semanticType, queryString, showQuotes);
   }
 
   /**
@@ -611,28 +594,12 @@ export function useLogsHighlighter() {
 
       // VALUES: Colored based on type + highlighted if matches search
       if (value === null) {
-        parts.push(
-          createStyledSpanWithClasses("null", "null", queryString, false),
-        );
+        parts.push(createStyledSpanWithClasses("null", "null", queryString, false));
       } else if (typeof value === "boolean") {
-        parts.push(
-          createStyledSpanWithClasses(
-            String(value),
-            "boolean",
-            queryString,
-            false,
-          ),
-        );
+        parts.push(createStyledSpanWithClasses(String(value), "boolean", queryString, false));
       } else if (typeof value === "number") {
         const numType = String(value).length >= 13 ? "timestamp" : "number";
-        parts.push(
-          createStyledSpanWithClasses(
-            String(value),
-            numType,
-            queryString,
-            false,
-          ),
-        );
+        parts.push(createStyledSpanWithClasses(String(value), numType, queryString, false));
       } else if (typeof value === "string") {
         // STRING VALUES: Detect semantic type and use appropriate class
         if (isLogLineWithMixedContent(value)) {
@@ -647,36 +614,17 @@ export function useLogsHighlighter() {
         } else {
           // Regular string processing with semantic detection
           parts.push(
-            processTextWithHighlights(
-              value,
-              queryString,
-              currentColors.value,
-              showQuotes,
-            ),
+            processTextWithHighlights(value, queryString, currentColors.value, showQuotes),
           );
         }
       } else if (typeof value === "object") {
         // NESTED OBJECTS/ARRAYS: Convert to JSON string and treat as object value
         const objStr = JSON.stringify(value);
-        parts.push(
-          createStyledSpanWithClasses(
-            objStr,
-            "object-value",
-            queryString,
-            showQuotes,
-          ),
-        );
+        parts.push(createStyledSpanWithClasses(objStr, "object-value", queryString, showQuotes));
       } else {
         // FALLBACK: Any other type (functions, symbols, etc.)
         const strValue = String(value);
-        parts.push(
-          createStyledSpanWithClasses(
-            strValue,
-            "default",
-            queryString,
-            showQuotes,
-          ),
-        );
+        parts.push(createStyledSpanWithClasses(strValue, "default", queryString, showQuotes));
       }
 
       // Add comma separator (except for last item): ","
@@ -693,7 +641,6 @@ export function useLogsHighlighter() {
   }
 
   /**
-   * Legacy function - kept for backward compatibility
    * @deprecated Use colorizeObjectWithClasses instead
    */
   function colorizeObject(
@@ -708,7 +655,6 @@ export function useLogsHighlighter() {
 
   /**
    * Main colorization logic with integrated highlighting
-   * This is the core function extracted from LogsHighlighting.vue
    */
   function colorizeJson(
     data: any,
@@ -745,12 +691,7 @@ export function useLogsHighlighter() {
 
     // Handle single string values with semantic colorization and highlighting
     if (typeof data === "string") {
-      return processTextWithHighlights(
-        data,
-        queryString,
-        currentColors,
-        showQuotes,
-      );
+      return processTextWithHighlights(data, queryString, currentColors, showQuotes);
     }
 
     // Handle primitive data types
@@ -760,53 +701,22 @@ export function useLogsHighlighter() {
       if (typeof data === "number") {
         // Detect timestamp-like numbers
         if (dataStr.length >= 13) {
-          return createStyledSpan(
-            dataStr,
-            currentColors.timestamp,
-            queryString,
-            false,
-          );
+          return createStyledSpan(dataStr, currentColors.timestamp, queryString, false);
         } else {
-          return createStyledSpan(
-            dataStr,
-            currentColors.numberValue,
-            queryString,
-            false,
-          );
+          return createStyledSpan(dataStr, currentColors.numberValue, queryString, false);
         }
       } else if (typeof data === "boolean") {
-        return createStyledSpan(
-          String(data),
-          currentColors.booleanValue,
-          queryString,
-          false,
-        );
+        return createStyledSpan(String(data), currentColors.booleanValue, queryString, false);
       } else if (data === null) {
-        return createStyledSpan(
-          "null",
-          currentColors.nullValue,
-          queryString,
-          false,
-        );
+        return createStyledSpan("null", currentColors.nullValue, queryString, false);
       } else {
-        return processTextWithHighlights(
-          dataStr,
-          queryString,
-          currentColors,
-          showQuotes,
-        );
+        return processTextWithHighlights(dataStr, queryString, currentColors, showQuotes);
       }
     }
 
     // Handle complex objects with full JSON colorization
     try {
-      return colorizeObject(
-        data,
-        currentColors,
-        showBraces,
-        showQuotes,
-        queryString,
-      );
+      return colorizeObject(data, currentColors, showBraces, showQuotes, queryString);
     } catch (error) {
       return escapeHtml(JSON.stringify(data));
     }
@@ -848,21 +758,31 @@ export function useLogsHighlighter() {
         const value = data[key];
 
         // Add key
-        chunkHtml += `<span style="color: ${currentColors.key}">${showQuotes ? '"' : ''}${escapeHtml(key)}${showQuotes ? '"' : ''}</span>: `;
+        chunkHtml += `<span style="color: ${currentColors.key}">${showQuotes ? '"' : ""}${escapeHtml(key)}${showQuotes ? '"' : ""}</span>: `;
 
         // Add value (truncate individual fields if >100KB)
         let processedValue = value;
         if (typeof value === "string" && value.length > 100000) {
-          processedValue = value.substring(0, 100000) + `... [field truncated, ${value.length} chars]`;
+          processedValue =
+            value.substring(0, 100000) + t("search.fieldTruncated", { size: value.length });
         } else if (typeof value === "object" && value !== null) {
           const valueStr = JSON.stringify(value);
           if (valueStr.length > 100000) {
-            processedValue = valueStr.substring(0, 100000) + `... [field truncated, ${valueStr.length} chars]`;
+            processedValue =
+              valueStr.substring(0, 100000) + t("search.fieldTruncated", { size: valueStr.length });
           }
         }
 
         // Colorize the value (without highlighting for performance)
-        const colorizedValue = colorizeJson(processedValue, isDarkTheme, showBraces, showQuotes, "", false, true);
+        const colorizedValue = colorizeJson(
+          processedValue,
+          isDarkTheme,
+          showBraces,
+          showQuotes,
+          "",
+          false,
+          true,
+        );
         chunkHtml += colorizedValue;
 
         // Add comma if not last
@@ -880,7 +800,7 @@ export function useLogsHighlighter() {
 
       // Yield to event loop every chunk
       if (i + chunkSize < keys.length) {
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
       }
     }
 
@@ -890,7 +810,7 @@ export function useLogsHighlighter() {
 
   return {
     colorizeJson,
-    colorizeJsonProgressive, // New progressive rendering function
+    colorizeJsonProgressive, // Progressive rendering function
     simpleHighlight,
     createStyledSpan,
     createStyledSpanWithClasses,

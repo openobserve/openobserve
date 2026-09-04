@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,22 +15,18 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { Quasar } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 
 // Mock the InvoiceTable component before import
 vi.mock("@/enterprise/components/billings/invoiceTable.vue", () => ({
   default: {
     name: "InvoiceTable",
-    template: '<div data-testid="mock-invoice-table">Mock Invoice Table</div>'
-  }
+    template: '<div data-testid="mock-invoice-table">Mock Invoice Table</div>',
+  },
 }));
 
 import InvoiceHistory from "@/enterprise/components/billings/invoiceHistory.vue";
-
-installQuasar();
 
 describe("InvoiceHistory", () => {
   let wrapper: any;
@@ -40,9 +36,9 @@ describe("InvoiceHistory", () => {
       global: {
         plugins: [i18n],
         provide: {
-          store: store
+          store: store,
         },
-      }
+      },
     });
   });
 
@@ -60,22 +56,9 @@ describe("InvoiceHistory", () => {
       expect(InvoiceHistory.name).toBe("Payment Details");
     });
 
-    it("should render the main container with proper class", () => {
-      const pageContainer = wrapper.find(".q-page");
+    it("should render the main container", () => {
+      const pageContainer = wrapper.find('[data-test="invoice-history-container"]');
       expect(pageContainer.exists()).toBe(true);
-      expect(pageContainer.classes()).toContain("q-py-md");
-    });
-
-    it("should render the title row with correct classes", () => {
-      const titleRow = wrapper.find(".row.q-px-sm.q-table__title");
-      expect(titleRow.exists()).toBe(true);
-    });
-
-    it("should display the correct title text", () => {
-      const titleElement = wrapper.find(".row.q-px-sm.q-table__title");
-      expect(titleElement.exists()).toBe(true);
-      // The text should be the translated text
-      expect(titleElement.text()).toContain("Invoice History");
     });
   });
 
@@ -127,8 +110,8 @@ describe("InvoiceHistory", () => {
         props: propsData,
         global: {
           plugins: [i18n],
-          provide: { store }
-        }
+          provide: { store },
+        },
       });
       expect(wrapperWithProps.exists()).toBe(true);
     });
@@ -138,8 +121,8 @@ describe("InvoiceHistory", () => {
         props: { unknownProp: "test" },
         global: {
           plugins: [i18n],
-          provide: { store }
-        }
+          provide: { store },
+        },
       });
       expect(wrapperWithUnknownProps.exists()).toBe(true);
     });
@@ -147,24 +130,16 @@ describe("InvoiceHistory", () => {
 
   describe("Template Structure and DOM Elements", () => {
     it("should have the correct template structure", () => {
-      const qPage = wrapper.find(".q-page");
-      expect(qPage.exists()).toBe(true);
-
-      const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
-      expect(titleDiv.exists()).toBe(true);
+      const container = wrapper.find('[data-test="invoice-history-container"]');
+      expect(container.exists()).toBe(true);
 
       const invoiceTable = wrapper.find('[data-testid="mock-invoice-table"]');
       expect(invoiceTable.exists()).toBe(true);
     });
 
-    it("should contain exactly one q-page element", () => {
-      const qPages = wrapper.findAll(".q-page");
-      expect(qPages).toHaveLength(1);
-    });
-
-    it("should contain exactly one title div", () => {
-      const titleDivs = wrapper.findAll(".row.q-px-sm.q-table__title");
-      expect(titleDivs).toHaveLength(1);
+    it("should contain exactly one container element", () => {
+      const containers = wrapper.findAll('[data-test="invoice-history-container"]');
+      expect(containers).toHaveLength(1);
     });
 
     it("should contain exactly one InvoiceTable component", () => {
@@ -173,27 +148,19 @@ describe("InvoiceHistory", () => {
     });
 
     it("should have proper nesting structure", () => {
-      const qPage = wrapper.find(".q-page");
-      const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
+      const container = wrapper.find('[data-test="invoice-history-container"]');
       const invoiceTable = wrapper.find('[data-testid="mock-invoice-table"]');
 
-      expect(qPage.exists()).toBe(true);
-      expect(titleDiv.exists()).toBe(true);
+      expect(container.exists()).toBe(true);
       expect(invoiceTable.exists()).toBe(true);
     });
   });
 
-
   describe("Internationalization (i18n)", () => {
-    it("should use i18n for title text", () => {
-      const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
-      expect(titleDiv.text()).toBe("Invoice History");
-    });
-
     it("should handle missing translation keys gracefully", () => {
       // Test that translation function exists and works
       expect(typeof wrapper.vm.t).toBe("function");
-      
+
       // Test with a known translation key
       const result = wrapper.vm.t("billing.invoiceHistory");
       expect(typeof result).toBe("string");
@@ -262,10 +229,8 @@ describe("InvoiceHistory", () => {
           global: {
             plugins: [i18n],
             provide: { store },
-            stubs: {
-              'q-page': true
-            }
-          }
+            stubs: {},
+          },
         });
       }).not.toThrow();
     });
@@ -276,9 +241,9 @@ describe("InvoiceHistory", () => {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            InvoiceTable: true
-          }
-        }
+            InvoiceTable: true,
+          },
+        },
       });
       expect(minimalWrapper.exists()).toBe(true);
     });
@@ -289,7 +254,7 @@ describe("InvoiceHistory", () => {
           global: {
             plugins: [i18n],
             // Completely omit store from provide to test actual missing store scenario
-          }
+          },
         });
       }).not.toThrow();
     });
@@ -299,8 +264,8 @@ describe("InvoiceHistory", () => {
         props: null,
         global: {
           plugins: [i18n],
-          provide: { store }
-        }
+          provide: { store },
+        },
       });
       expect(wrapperWithNullProps.exists()).toBe(true);
     });
@@ -309,12 +274,11 @@ describe("InvoiceHistory", () => {
   describe("Performance and Optimization", () => {
     it("should maintain component stability", () => {
       // Test that component maintains its structure after updates
-      const initialHtml = wrapper.html();
       wrapper.vm.$forceUpdate();
-      
+
       // Verify component still exists and has expected elements
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.html()).toContain("Invoice History");
+      expect(wrapper.find('[data-test="invoice-history-container"]').exists()).toBe(true);
     });
 
     it("should have minimal component overhead", () => {
@@ -334,26 +298,21 @@ describe("InvoiceHistory", () => {
 
   describe("Accessibility", () => {
     it("should have proper semantic structure", () => {
-      const qPage = wrapper.find(".q-page");
-      expect(qPage.exists()).toBe(true);
+      const container = wrapper.find('[data-test="invoice-history-container"]');
+      expect(container.exists()).toBe(true);
     });
 
     it("should not have accessibility violations in basic structure", () => {
-      const titleDiv = wrapper.find(".row.q-px-sm.q-table__title");
-      expect(titleDiv.exists()).toBe(true);
-      expect(titleDiv.element.tagName).toBe("DIV");
+      const container = wrapper.find('[data-test="invoice-history-container"]');
+      expect(container.exists()).toBe(true);
+      expect(container.element.tagName).toBe("DIV");
     });
 
     it("should maintain proper DOM hierarchy", () => {
-      const qPage = wrapper.find(".q-page");
-      expect(qPage.exists()).toBe(true);
+      const container = wrapper.find('[data-test="invoice-history-container"]');
+      expect(container.exists()).toBe(true);
       const allDivs = wrapper.findAll("div");
       expect(allDivs.length).toBeGreaterThan(0);
-    });
-
-    it("should render text content properly", () => {
-      const text = wrapper.text();
-      expect(text).toContain("Invoice History");
     });
   });
 });

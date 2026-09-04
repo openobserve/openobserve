@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,10 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fmt, hash::Hasher, sync::Arc, time::Duration};
+use std::{
+    fmt,
+    hash::Hasher,
+    sync::{Arc, LazyLock as Lazy},
+    time::Duration,
+};
 
 use hashbrown::HashSet;
-use once_cell::sync::Lazy;
 use regex::Regex;
 use serde::{
     Deserialize, Serialize,
@@ -416,6 +420,16 @@ impl EvalContext {
         self.start == self.end
     }
 
+    /// More than one evaluation window, overlapping by a positive duration.
+    /// Reset detection compares adjacent sample pairs, and a pair repeats
+    /// across windows only when two windows share at least two samples.
+    pub fn windows_overlap(&self, range_micros: i64) -> bool {
+        !self.is_instant()
+            && self.step > 0
+            && self.end - self.start >= self.step
+            && self.step < range_micros
+    }
+
     /// Get all evaluation timestamps
     pub fn timestamps(&self) -> Vec<i64> {
         if self.is_instant() {
@@ -480,26 +494,29 @@ impl Serialize for RangeValue {
     where
         S: Serializer,
     {
-        if self.exemplars.is_none() {
-            let mut seq = serializer.serialize_struct("range_value", 2)?;
-            let labels_map = self
-                .labels
-                .iter()
-                .map(|l| (l.name.as_str(), l.value.as_str()))
-                .collect::<FxIndexMap<_, _>>();
-            seq.serialize_field("metric", &labels_map)?;
-            seq.serialize_field("values", &self.samples)?;
-            seq.end()
-        } else {
-            let mut seq = serializer.serialize_struct("range_value", 2)?;
-            let labels_map = self
-                .labels
-                .iter()
-                .map(|l| (l.name.as_str(), l.value.as_str()))
-                .collect::<FxIndexMap<_, _>>();
-            seq.serialize_field("seriesLabels", &labels_map)?;
-            seq.serialize_field("exemplars", &self.exemplars.as_ref().unwrap())?;
-            seq.end()
+        match &self.exemplars {
+            Some(exemplars) => {
+                let mut seq = serializer.serialize_struct("range_value", 2)?;
+                let labels_map = self
+                    .labels
+                    .iter()
+                    .map(|l| (l.name.as_str(), l.value.as_str()))
+                    .collect::<FxIndexMap<_, _>>();
+                seq.serialize_field("seriesLabels", &labels_map)?;
+                seq.serialize_field("exemplars", &exemplars)?;
+                seq.end()
+            }
+            None => {
+                let mut seq = serializer.serialize_struct("range_value", 2)?;
+                let labels_map = self
+                    .labels
+                    .iter()
+                    .map(|l| (l.name.as_str(), l.value.as_str()))
+                    .collect::<FxIndexMap<_, _>>();
+                seq.serialize_field("metric", &labels_map)?;
+                seq.serialize_field("values", &self.samples)?;
+                seq.end()
+            }
         }
     }
 }
@@ -589,7 +606,7 @@ impl RangeValue {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum ExtrapolationKind {
     /// Calculate the per-second average rate of increase of the time series.
     /// Adjust for breaks in monotonicity (counter resets).
@@ -611,6 +628,13 @@ pub enum ExtrapolationKind {
     Delta,
 }
 
+impl ExtrapolationKind {
+    /// Counter kinds correct for resets and extrapolate the counter zero point.
+    pub fn is_counter(self) -> bool {
+        matches!(self, Self::Rate | Self::Increase)
+    }
+}
+
 /// `extrapolated_rate` is a utility function for rate/increase/delta.
 ///
 /// Calculates the rate (allowing for counter resets if `kind` is Rate or
@@ -627,6 +651,120 @@ pub enum ExtrapolationKind {
 // cf. https://github.com/prometheus/prometheus/blob/80b7f73d267a812b3689321554aec637b75f468d/promql/functions.go#L67
 pub fn extrapolated_rate(
     samples: &[Sample],
+    eval_ts: i64,
+    range: Duration,
+    offset: Duration,
+    kind: ExtrapolationKind,
+) -> Option<f64> {
+    if samples.len() < 2 {
+        // Not enough samples.
+        return None;
+    }
+
+    let first = &samples[0];
+    let last = &samples.last().unwrap();
+    let mut delta = last.value - first.value;
+
+    if kind.is_counter() {
+        // Handle counter resets.
+        let mut prev_value = first.value;
+        for sample in &samples[1..] {
+            if sample.value < prev_value {
+                delta += prev_value;
+            }
+            prev_value = sample.value;
+        }
+    }
+
+    extrapolate_from_delta(samples, delta, eval_ts, range, offset, kind)
+}
+
+/// Per-series counter state for reset-corrected extrapolation across sliding
+/// windows: resets are located once, then each window sums only its own
+/// corrections in scan order, so results are bit-identical to
+/// [`extrapolated_rate`].
+pub struct CounterSeries<'a> {
+    samples: &'a [Sample],
+    // (sample index, value dropped by the reset ending at that index)
+    resets: Vec<(usize, f64)>,
+    kind: ExtrapolationKind,
+}
+
+impl<'a> CounterSeries<'a> {
+    /// Builds the per-series reset state when `kind` is a counter function
+    /// and the one-pass scan can amortize over overlapping windows; `None`
+    /// keeps the caller on the per-window scan.
+    pub fn try_new(
+        samples: &'a [Sample],
+        kind: Option<ExtrapolationKind>,
+        eval_ctx: &EvalContext,
+        range_micros: i64,
+    ) -> Option<Self> {
+        let kind = kind?;
+        eval_ctx
+            .windows_overlap(range_micros)
+            .then(|| Self::new(samples, kind))
+    }
+
+    /// # Panics
+    ///
+    /// Panics if `kind` is not a counter kind.
+    fn new(samples: &'a [Sample], kind: ExtrapolationKind) -> Self {
+        assert!(kind.is_counter(), "CounterSeries requires a counter kind");
+        let mut resets = Vec::new();
+        for i in 1..samples.len() {
+            if samples[i].value < samples[i - 1].value {
+                resets.push((i, samples[i - 1].value));
+            }
+        }
+        Self {
+            samples,
+            resets,
+            kind,
+        }
+    }
+
+    /// [`extrapolated_rate`] for the window `samples[start..end]`.
+    ///
+    /// Returns `None` for windows with fewer than two samples.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `start..end` is out of bounds or the window is not in range.
+    pub fn extrapolate(
+        &self,
+        start: usize,
+        end: usize,
+        eval_ts: i64,
+        range: Duration,
+    ) -> Option<f64> {
+        let window = &self.samples[start..end];
+        if window.len() < 2 {
+            return None;
+        }
+        let mut delta = window[window.len() - 1].value - window[0].value;
+        // Resets strictly inside the window, added in scan order.
+        let from = self.resets.partition_point(|&(index, _)| index <= start);
+        for &(index, correction) in &self.resets[from..] {
+            if index >= end {
+                break;
+            }
+            delta += correction;
+        }
+        extrapolate_from_delta(window, delta, eval_ts, range, Duration::ZERO, self.kind)
+    }
+}
+
+/// Applies Prometheus boundary extrapolation to a counter-corrected delta.
+///
+/// See the diagrams at <https://promlabs.com/blog/2021/01/29/how-exactly-does-promql-calculate-rates/#extrapolation-of-data>
+///
+/// # Panics
+///
+/// Panics if the samples are not in the range.
+fn extrapolate_from_delta(
+    samples: &[Sample],
+    delta: f64,
     eval_ts: i64,
     range: Duration,
     offset: Duration,
@@ -668,19 +806,8 @@ pub fn extrapolated_rate(
     assert!(first.timestamp >= start);
     assert!(last.timestamp <= end);
 
-    let mut result = last.value - first.value;
-
-    let is_counter = matches!(kind, ExtrapolationKind::Rate | ExtrapolationKind::Increase);
-    if is_counter {
-        // Handle counter resets.
-        let mut prev_value = first.value;
-        for sample in &samples[1..] {
-            if sample.value < prev_value {
-                result += prev_value;
-            }
-            prev_value = sample.value;
-        }
-    }
+    let mut result = delta;
+    let is_counter = kind.is_counter();
 
     // Duration between first/last samples and boundary of range.
     let mut duration_to_start = (first.timestamp - start) as f64 / 1_000.0;
@@ -995,6 +1122,220 @@ mod tests {
     }
 
     #[test]
+    fn test_counter_series_reset_locations() {
+        let samples = [
+            Sample::new(1, 90.0),
+            Sample::new(2, 100.0),
+            Sample::new(3, 5.0),
+            Sample::new(4, 15.0),
+        ];
+        let counter = CounterSeries::new(&samples, ExtrapolationKind::Rate);
+        assert_eq!(counter.resets, vec![(2, 100.0)]);
+        assert!(
+            CounterSeries::new(&[], ExtrapolationKind::Rate)
+                .resets
+                .is_empty()
+        );
+    }
+
+    #[test]
+    fn test_counter_series_preserves_small_resets_next_to_huge_ones() {
+        const MICROS: i64 = 1_000_000;
+        // A 1e16 reset before the window must not absorb the small reset
+        // inside it: a shared running prefix would round the +1 away.
+        let values = [1e16, 0.0, 0.0, 1.0, 0.0, 2.0];
+        let samples = values
+            .iter()
+            .enumerate()
+            .map(|(i, &value)| Sample::new((20 + 15 * i as i64) * MICROS, value))
+            .collect::<Vec<_>>();
+        let range = Duration::from_secs(60);
+        let eval_ts = 100 * MICROS;
+
+        for kind in [ExtrapolationKind::Rate, ExtrapolationKind::Increase] {
+            let legacy =
+                extrapolated_rate(&samples[2..6], eval_ts, range, Duration::ZERO, kind).unwrap();
+            let counter = CounterSeries::new(&samples, kind);
+            let windowed = counter.extrapolate(2, 6, eval_ts, range).unwrap();
+            assert_eq!(legacy.to_bits(), windowed.to_bits());
+            assert!(legacy.is_finite());
+        }
+    }
+
+    #[test]
+    fn test_counter_series_infinite_reset_outside_window() {
+        const MICROS: i64 = 1_000_000;
+        // The +Inf -> 2.0 reset sits before the window; a shared prefix would
+        // produce inf - inf = NaN where the legacy scan stays finite.
+        let values = [f64::INFINITY, 2.0, 5.0, 9.0];
+        let samples = values
+            .iter()
+            .enumerate()
+            .map(|(i, &value)| Sample::new((20 + 15 * i as i64) * MICROS, value))
+            .collect::<Vec<_>>();
+        let range = Duration::from_secs(60);
+        let eval_ts = 80 * MICROS;
+
+        let legacy = extrapolated_rate(
+            &samples[1..4],
+            eval_ts,
+            range,
+            Duration::ZERO,
+            ExtrapolationKind::Rate,
+        )
+        .unwrap();
+        let counter = CounterSeries::new(&samples, ExtrapolationKind::Rate);
+        let windowed = counter.extrapolate(1, 4, eval_ts, range).unwrap();
+        assert!(legacy.is_finite());
+        assert_eq!(legacy.to_bits(), windowed.to_bits());
+    }
+
+    #[test]
+    fn test_eval_context_windows_overlap() {
+        const MINUTE: i64 = 60 * 1_000_000;
+        let ctx = |end, step| EvalContext::new(MINUTE, MINUTE + end, step, "test".into());
+        // Overlapping windows: 15s step inside a 5m range.
+        assert!(ctx(180 * MINUTE, MINUTE / 4).windows_overlap(5 * MINUTE));
+        // Adjacent windows share at most one sample, so no pair repeats.
+        assert!(!ctx(5 * MINUTE, 5 * MINUTE).windows_overlap(5 * MINUTE));
+        // Disjoint windows (1h step, 5m range) or a single window cannot.
+        assert!(!ctx(7 * 24 * 60 * MINUTE, 60 * MINUTE).windows_overlap(5 * MINUTE));
+        assert!(!ctx(0, MINUTE / 4).windows_overlap(5 * MINUTE));
+        assert!(!ctx(0, 0).windows_overlap(5 * MINUTE));
+        assert!(!ctx(MINUTE, 0).windows_overlap(5 * MINUTE));
+    }
+
+    #[test]
+    #[should_panic(expected = "counter kind")]
+    fn test_counter_series_rejects_non_counter_kind() {
+        CounterSeries::new(&[], ExtrapolationKind::Delta);
+    }
+
+    #[test]
+    fn test_counter_series_window_boundaries() {
+        const MICROS: i64 = 1_000_000;
+        // A reset sits between samples 1 and 2. Windows that include it must
+        // count it; windows starting after it must not.
+        let samples = [
+            Sample::new(23 * MICROS, 90.0),
+            Sample::new(38 * MICROS, 100.0),
+            Sample::new(53 * MICROS, 5.0),
+            Sample::new(68 * MICROS, 15.0),
+        ];
+        let range = Duration::from_secs(60);
+
+        for kind in [ExtrapolationKind::Rate, ExtrapolationKind::Increase] {
+            let counter = CounterSeries::new(&samples, kind);
+
+            // Full window: reset included.
+            let legacy =
+                extrapolated_rate(&samples, 75 * MICROS, range, Duration::ZERO, kind).unwrap();
+            let prefixed = counter.extrapolate(0, 4, 75 * MICROS, range).unwrap();
+            assert_eq!(legacy.to_bits(), prefixed.to_bits());
+
+            // Window starting after the reset: prefix difference must exclude it.
+            let legacy =
+                extrapolated_rate(&samples[2..], 110 * MICROS, range, Duration::ZERO, kind)
+                    .unwrap();
+            let prefixed = counter.extrapolate(2, 4, 110 * MICROS, range).unwrap();
+            assert_eq!(legacy.to_bits(), prefixed.to_bits());
+        }
+
+        // Fewer than two samples yields no result.
+        let counter = CounterSeries::new(&samples, ExtrapolationKind::Rate);
+        assert!(counter.extrapolate(1, 2, 75 * MICROS, range).is_none());
+        assert!(counter.extrapolate(2, 2, 75 * MICROS, range).is_none());
+    }
+
+    #[test]
+    fn test_counter_series_matches_windowed_scan() {
+        const MICROS: i64 = 1_000_000;
+        const BASE: i64 = 1_000_000 * MICROS;
+        let range = Duration::from_secs(300);
+        let range_micros = 300 * MICROS;
+
+        let mut state: u64 = 0x9E3779B97F4A7C15;
+        let mut next = move || {
+            state = state
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            state >> 11
+        };
+
+        for series in 0..20 {
+            // Counter series with growth, resets, timestamp jitter, and gaps;
+            // half the series use huge values to stress float cancellation.
+            let scale = if series % 2 == 0 { 1.0 } else { 1.0e12 };
+            let mut value = (next() % 1000) as f64 * scale;
+            let mut timestamp = BASE;
+            let samples = (0..120)
+                .map(|_| {
+                    let r = next();
+                    timestamp += 15 * MICROS + ((r % 7) as i64 - 3) * MICROS;
+                    if r % 11 == 0 {
+                        timestamp += 60 * MICROS;
+                    }
+                    if r % 29 == 0 {
+                        value += 1.0e16;
+                    }
+                    if r % 13 == 0 {
+                        value = (r % 5) as f64 * scale;
+                    }
+                    value += (r % 97) as f64 * 0.25 * scale;
+                    Sample::new(timestamp, value)
+                })
+                .collect::<Vec<_>>();
+            let mut start_index = 0;
+            let mut end_index = 0;
+            let mut eval_ts = samples[0].timestamp + range_micros;
+            let stop = samples.last().unwrap().timestamp + range_micros;
+            while eval_ts <= stop {
+                while start_index < samples.len()
+                    && samples[start_index].timestamp < eval_ts - range_micros
+                {
+                    start_index += 1;
+                }
+                if end_index < start_index {
+                    end_index = start_index;
+                }
+                while end_index < samples.len() && samples[end_index].timestamp <= eval_ts {
+                    end_index += 1;
+                }
+
+                for kind in [ExtrapolationKind::Rate, ExtrapolationKind::Increase] {
+                    let legacy = extrapolated_rate(
+                        &samples[start_index..end_index],
+                        eval_ts,
+                        range,
+                        Duration::ZERO,
+                        kind,
+                    );
+                    let prefixed = CounterSeries::new(&samples, kind).extrapolate(
+                        start_index,
+                        end_index,
+                        eval_ts,
+                        range,
+                    );
+                    match (legacy, prefixed) {
+                        (None, None) => {}
+                        (Some(legacy), Some(prefixed)) => {
+                            assert_eq!(
+                                legacy.to_bits(),
+                                prefixed.to_bits(),
+                                "series {series} eval_ts {eval_ts} {kind:?}: {legacy} vs {prefixed}",
+                            );
+                        }
+                        (legacy, prefixed) => {
+                            panic!("presence diverged: {legacy:?} vs {prefixed:?}")
+                        }
+                    }
+                }
+                eval_ts += 15 * MICROS;
+            }
+        }
+    }
+
+    #[test]
     fn test_invalid_label_name() {
         assert!(!Label::is_valid_label_name("~invalid-label-name"));
     }
@@ -1023,7 +1364,7 @@ mod tests {
 
         use std::iter::zip;
         for (expect, got) in zip(expected, output.clone()) {
-            assert_eq!(expect.name, got.name, "{:?}", &output);
+            assert_eq!(expect.name, got.name, "{:?}", output);
         }
     }
 
@@ -1040,7 +1381,7 @@ mod tests {
 
         use std::iter::zip;
         for (expect, got) in zip(expected, output.clone()) {
-            assert_eq!(expect.name, got.name, "{:?}", &output);
+            assert_eq!(expect.name, got.name, "{:?}", output);
         }
     }
 
@@ -1055,10 +1396,10 @@ mod tests {
 
         use std::iter::zip;
         for (expect, got) in zip(expected.clone(), output_deleted.clone()) {
-            assert_eq!(expect.name, got.name, "{:?}", &output_deleted);
+            assert_eq!(expect.name, got.name, "{:?}", output_deleted);
         }
         for (expect, got) in zip(expected, output_kept.clone()) {
-            assert_eq!(expect.name, got.name, "{:?}", &output_kept);
+            assert_eq!(expect.name, got.name, "{:?}", output_kept);
         }
     }
 
@@ -1470,5 +1811,193 @@ mod tests {
             ExtrapolationKind::Rate,
         );
         assert!(result.is_none());
+    }
+
+    #[test]
+    fn test_sample_is_nan() {
+        let normal = Sample::new(1000, 42.0);
+        assert!(!normal.is_nan());
+
+        let nan_sample = Sample::new(1000, f64::NAN);
+        assert!(nan_sample.is_nan());
+
+        let inf_sample = Sample::new(1000, f64::INFINITY);
+        assert!(!inf_sample.is_nan());
+    }
+
+    #[test]
+    fn test_range_value_new() {
+        let labels: Labels = vec![
+            Arc::new(Label::new("__name__", "cpu")),
+            Arc::new(Label::new("job", "node")),
+        ];
+        let samples = vec![Sample::new(1000, 1.0), Sample::new(2000, 2.0)];
+        let rv = RangeValue::new(labels.clone(), samples);
+        assert_eq!(rv.samples.len(), 2);
+        assert_eq!(rv.samples[0].value, 1.0);
+        assert!(rv.exemplars.is_none());
+        assert!(rv.time_window.is_none());
+    }
+
+    #[test]
+    fn test_value_get_ref_matrix_values() {
+        let rv = RangeValue::new(vec![], vec![Sample::new(1000, 1.0)]);
+        let val = Value::Matrix(vec![rv]);
+        assert!(val.get_ref_matrix_values().is_some());
+        assert_eq!(val.get_ref_matrix_values().unwrap().len(), 1);
+
+        let val_none = Value::Float(1.0);
+        assert!(val_none.get_ref_matrix_values().is_none());
+    }
+
+    #[test]
+    fn test_value_get_range_values() {
+        let rv = RangeValue::new(vec![], vec![Sample::new(1000, 1.0)]);
+        let val = Value::Matrix(vec![rv]);
+        let result = val.get_range_values();
+        assert!(result.is_some());
+        assert_eq!(result.unwrap().len(), 1);
+
+        assert!(Value::Float(1.0).get_range_values().is_none());
+    }
+
+    #[test]
+    fn test_value_get_vector() {
+        let iv = InstantValue {
+            labels: vec![],
+            sample: Sample::new(1000, 5.0),
+        };
+        let val = Value::Vector(vec![iv]);
+        assert!(val.get_vector().is_some());
+        assert_eq!(val.get_vector().unwrap().len(), 1);
+
+        assert!(Value::Float(1.0).get_vector().is_none());
+    }
+
+    #[test]
+    fn test_value_get_string() {
+        let val = Value::String("hello".to_string());
+        assert_eq!(val.get_string(), Some("hello".to_string()));
+
+        assert!(Value::Float(1.0).get_string().is_none());
+        assert!(Value::None.get_string().is_none());
+    }
+
+    #[test]
+    fn test_value_get_float() {
+        let val = Value::Float(3.25);
+        assert_eq!(val.get_float(), Some(3.25));
+
+        assert!(Value::String("x".to_string()).get_float().is_none());
+        assert!(Value::None.get_float().is_none());
+    }
+
+    #[test]
+    fn test_labels_without_label() {
+        let labels: Labels = vec![
+            Arc::new(Label::new("__name__", "cpu")),
+            Arc::new(Label::new("job", "node")),
+            Arc::new(Label::new("instance", "host1")),
+        ];
+        let filtered = labels.without_label("job");
+        assert_eq!(filtered.len(), 2);
+        assert!(filtered.iter().all(|l| l.name != "job"));
+    }
+
+    #[test]
+    fn test_labels_without_metric_name() {
+        let labels: Labels = vec![
+            Arc::new(Label::new("__name__", "cpu")),
+            Arc::new(Label::new("job", "node")),
+        ];
+        let filtered = labels.without_metric_name();
+        assert_eq!(filtered.len(), 1);
+        assert!(filtered.iter().all(|l| l.name != "__name__"));
+    }
+
+    #[test]
+    fn test_eval_context_is_instant_true() {
+        let ctx = EvalContext::new(1000, 1000, 0, "trace-1".to_string());
+        assert!(ctx.is_instant());
+        let ts = ctx.timestamps();
+        assert_eq!(ts, vec![1000]);
+    }
+
+    #[test]
+    fn test_eval_context_is_instant_false_timestamps() {
+        let ctx = EvalContext::new(0, 200, 100, "trace-2".to_string());
+        assert!(!ctx.is_instant());
+        let ts = ctx.timestamps();
+        assert_eq!(ts, vec![0, 100, 200]);
+    }
+
+    #[test]
+    fn test_contains_same_label_set_vector_three_unique() {
+        let label_a = vec![Arc::new(Label::new("n", "a"))];
+        let label_b = vec![Arc::new(Label::new("n", "b"))];
+        let label_c = vec![Arc::new(Label::new("n", "c"))];
+        let v = Value::Vector(vec![
+            InstantValue {
+                labels: label_a,
+                sample: Sample::new(1, 1.0),
+            },
+            InstantValue {
+                labels: label_b,
+                sample: Sample::new(2, 2.0),
+            },
+            InstantValue {
+                labels: label_c,
+                sample: Sample::new(3, 3.0),
+            },
+        ]);
+        assert!(!v.contains_same_label_set());
+    }
+
+    #[test]
+    fn test_contains_same_label_set_vector_three_with_duplicate() {
+        let label_a = vec![Arc::new(Label::new("n", "a"))];
+        let label_b = vec![Arc::new(Label::new("n", "b"))];
+        let label_a2 = vec![Arc::new(Label::new("n", "a"))]; // dup
+        let v = Value::Vector(vec![
+            InstantValue {
+                labels: label_a,
+                sample: Sample::new(1, 1.0),
+            },
+            InstantValue {
+                labels: label_b,
+                sample: Sample::new(2, 2.0),
+            },
+            InstantValue {
+                labels: label_a2,
+                sample: Sample::new(3, 3.0),
+            },
+        ]);
+        assert!(v.contains_same_label_set());
+    }
+
+    #[test]
+    fn test_contains_same_label_set_matrix_three_unique() {
+        let la = vec![Arc::new(Label::new("n", "a"))];
+        let lb = vec![Arc::new(Label::new("n", "b"))];
+        let lc = vec![Arc::new(Label::new("n", "c"))];
+        let m = Value::Matrix(vec![
+            RangeValue::new(la, vec![]),
+            RangeValue::new(lb, vec![]),
+            RangeValue::new(lc, vec![]),
+        ]);
+        assert!(!m.contains_same_label_set());
+    }
+
+    #[test]
+    fn test_contains_same_label_set_matrix_three_with_duplicate() {
+        let la = vec![Arc::new(Label::new("n", "a"))];
+        let lb = vec![Arc::new(Label::new("n", "b"))];
+        let la2 = vec![Arc::new(Label::new("n", "a"))]; // dup
+        let m = Value::Matrix(vec![
+            RangeValue::new(la, vec![]),
+            RangeValue::new(lb, vec![]),
+            RangeValue::new(la2, vec![]),
+        ]);
+        assert!(m.contains_same_label_set());
     }
 }

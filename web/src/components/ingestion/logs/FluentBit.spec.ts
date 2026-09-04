@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,14 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import { createStore } from "vuex";
 import FluentBit from "@/components/ingestion/logs/FluentBit.vue";
 
 // Mock dependencies
 vi.mock("../../../aws-exports", () => ({
   default: {
-    isCloud: "false"
-  }
+    isCloud: "false",
+  },
 }));
 
 vi.mock("../../../utils/zincutils", () => ({
@@ -36,11 +35,9 @@ vi.mock("@/components/CopyContent.vue", () => ({
   default: {
     name: "CopyContent",
     props: ["content"],
-    template: "<div>{{ content }}</div>"
-  }
+    template: "<div>{{ content }}</div>",
+  },
 }));
-
-installQuasar();
 
 describe("FluentBit Component", () => {
   let wrapper: any;
@@ -63,7 +60,7 @@ describe("FluentBit Component", () => {
       host: "localhost",
       port: "5080",
       protocol: "http:",
-      tls: "off"
+      tls: "off",
     });
     mockGetImageURL.mockReturnValue("/test-image.png");
 
@@ -73,15 +70,15 @@ describe("FluentBit Component", () => {
         API_ENDPOINT: "http://localhost:5080",
         selectedOrganization: {
           identifier: "test_org",
-          name: "Test Organization"
+          name: "Test Organization",
         },
         zoConfig: {
-          timestamp_column: "_timestamp"
-        }
+          timestamp_column: "_timestamp",
+        },
       },
       getters: {},
       mutations: {},
-      actions: {}
+      actions: {},
     });
 
     wrapper = mount(FluentBit, {
@@ -261,12 +258,12 @@ describe("FluentBit Component", () => {
     const customStore = createStore({
       state: {
         selectedOrganization: {
-          identifier: "custom_org"
+          identifier: "custom_org",
         },
         zoConfig: {
-          timestamp_column: "@timestamp"
-        }
-      }
+          timestamp_column: "@timestamp",
+        },
+      },
     });
 
     const customWrapper = mount(FluentBit, {
@@ -283,7 +280,7 @@ describe("FluentBit Component", () => {
 
     expect(customWrapper.vm.content).toContain("URI /api/custom_org/default/_json");
     expect(customWrapper.vm.content).toContain("Json_date_key    @timestamp");
-    
+
     customWrapper.unmount();
   });
 
@@ -294,7 +291,7 @@ describe("FluentBit Component", () => {
       host: "example.com",
       port: "443",
       protocol: "https:",
-      tls: "on"
+      tls: "on",
     });
 
     const httpsWrapper = mount(FluentBit, {
@@ -315,7 +312,7 @@ describe("FluentBit Component", () => {
     expect(httpsWrapper.vm.content).toContain("Host example.com");
     expect(httpsWrapper.vm.content).toContain("Port 443");
     expect(httpsWrapper.vm.content).toContain("tls on");
-    
+
     httpsWrapper.unmount();
   });
 
@@ -323,7 +320,7 @@ describe("FluentBit Component", () => {
   it("should have reactive endpoint ref", () => {
     const initialHost = wrapper.vm.endpoint.host;
     expect(initialHost).toBe("localhost");
-    
+
     // Modify endpoint
     wrapper.vm.endpoint.host = "newhost.com";
     expect(wrapper.vm.endpoint.host).toBe("newhost.com");
@@ -332,7 +329,7 @@ describe("FluentBit Component", () => {
   // Test 32: Content template interpolation
   it("should correctly interpolate template variables in content", () => {
     const content = wrapper.vm.content;
-    
+
     // Verify all template variables are replaced
     expect(content).not.toContain("${store.state.selectedOrganization.identifier}");
     expect(content).not.toContain("${endpoint.value.host}");
@@ -362,12 +359,12 @@ describe("FluentBit Component", () => {
     const emptyStore = createStore({
       state: {
         selectedOrganization: {
-          identifier: ""
+          identifier: "",
         },
         zoConfig: {
-          timestamp_column: "_timestamp"
-        }
-      }
+          timestamp_column: "_timestamp",
+        },
+      },
     });
 
     const emptyWrapper = mount(FluentBit, {
@@ -381,9 +378,9 @@ describe("FluentBit Component", () => {
     });
 
     await flushPromises();
-    
+
     expect(emptyWrapper.vm.content).toContain("URI /api//default/_json");
-    
+
     emptyWrapper.unmount();
   });
 

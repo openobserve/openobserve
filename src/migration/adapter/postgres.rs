@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -109,7 +109,7 @@ impl DbAdapter for PostgresAdapter {
 
     async fn list_tables(&self) -> Result<Vec<String>, anyhow::Error> {
         let rows: Vec<(String,)> =
-            sqlx::query_as("SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
+            sqlx::query_as("SELECT tablename FROM pg_tables WHERE schemaname = current_schema()")
                 .fetch_all(&self.pool)
                 .await?;
 
@@ -120,7 +120,7 @@ impl DbAdapter for PostgresAdapter {
         let rows: Vec<(String, String, String)> = sqlx::query_as(
             "SELECT column_name, data_type, is_nullable
              FROM information_schema.columns
-             WHERE table_schema = 'public' AND table_name = $1
+             WHERE table_schema = current_schema() AND table_name = $1
              ORDER BY ordinal_position",
         )
         .bind(table)
@@ -162,7 +162,7 @@ impl DbAdapter for PostgresAdapter {
                 ON ccu.constraint_name = tc.constraint_name
                 AND ccu.table_schema = tc.table_schema
              WHERE tc.constraint_type = 'FOREIGN KEY'
-                AND tc.table_schema = 'public'",
+                AND tc.table_schema = current_schema()",
         )
         .fetch_all(&self.pool)
         .await?;
@@ -377,6 +377,35 @@ impl DbAdapter for PostgresAdapter {
         sqlx::query(&format!("TRUNCATE TABLE \"{}\" CASCADE", table))
             .execute(&self.pool)
             .await?;
+        Ok(())
+    }
+
+    async fn sync_sequences(&self, table: &str) -> Result<(), anyhow::Error> {
+        // Find all columns that have a sequence (SERIAL / GENERATED AS IDENTITY)
+        let seq_cols: Vec<(String,)> = sqlx::query_as(
+            "SELECT column_name
+             FROM information_schema.columns
+             WHERE table_schema = current_schema()
+               AND table_name   = $1
+               AND (column_default LIKE 'nextval(%'
+                    OR identity_generation IS NOT NULL)",
+        )
+        .bind(table)
+        .fetch_all(&self.pool)
+        .await?;
+
+        for (col,) in seq_cols {
+            // setval to max(col); if the table is empty keep sequence at 1
+            let sql = format!(
+                "SELECT setval(\
+                    pg_get_serial_sequence('\"{}\"', '{}'), \
+                    COALESCE(MAX(\"{}\"), 1)\
+                 ) FROM \"{}\"",
+                table, col, col, table
+            );
+            sqlx::query(&sql).execute(&self.pool).await?;
+        }
+
         Ok(())
     }
 

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,20 +13,40 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::utils::time::now_micros;
+use config::{
+    meta::stream::{EnrichmentTableMetaStreamStats, StreamType},
+    utils::time::{BASE_TIME, now_micros},
+};
 use sea_orm::{
     ColumnTrait, EntityTrait, FromQueryResult, Order, QueryFilter, QueryOrder, QuerySelect, Set,
     entity::prelude::*,
 };
 use serde::{Deserialize, Serialize};
 
-use super::get_lock;
 // Re-export the entity for convenience
 pub use crate::table::entity::enrichment_tables::{ActiveModel, Column, Entity, Model, Relation};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_db, get_orm_client_ro, get_orm_client_rw},
     errors,
 };
+
+pub const ENRICHMENT_TABLE_META_STREAM_STATS_KEY: &str = "/enrichment_table_meta_stream_stats";
+
+/// Get the earliest searchable timestamp for an enrichment table.
+pub async fn get_start_time(org_id: &str, name: &str) -> i64 {
+    match get_meta_stats(org_id, name).await {
+        Some(meta_stats) => meta_stats.start_time,
+        None => {
+            let stats =
+                crate::cache::stats::get_stream_stats(org_id, name, StreamType::EnrichmentTables);
+            if stats.doc_time_min > 0 {
+                stats.doc_time_min
+            } else {
+                BASE_TIME.timestamp_micros()
+            }
+        }
+    }
+}
 
 #[derive(FromQueryResult, Debug, Serialize, Deserialize)]
 pub struct EnrichmentTableRecord {
@@ -77,10 +97,7 @@ pub async fn add(
         ..Default::default()
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::insert(record).exec(client).await?;
 
     Ok(())
@@ -95,10 +112,7 @@ pub async fn add(
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn delete(org: &str, table_name: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(table_name))
@@ -120,7 +134,7 @@ pub async fn get_by_org_and_name(
     org: &str,
     table_name: &str,
 ) -> Result<Vec<EnrichmentTableRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -157,7 +171,7 @@ pub async fn get_by_org_and_name_with_end_time(
     table_name: &str,
     end_time_exclusive: Option<i64>,
 ) -> Result<Vec<EnrichmentTableRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut query = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -182,6 +196,47 @@ pub async fn get_by_org_and_name_with_end_time(
     Ok(records)
 }
 
+/// Read and flatten the JSON arrays stored for an enrichment table.
+pub async fn get_data_by_org_and_name(
+    org: &str,
+    table_name: &str,
+    end_time_exclusive: Option<i64>,
+) -> Result<(Vec<serde_json::Value>, i64, i64), errors::Error> {
+    let records = if end_time_exclusive.is_some() {
+        get_by_org_and_name_with_end_time(org, table_name, end_time_exclusive).await?
+    } else {
+        get_by_org_and_name(org, table_name).await?
+    };
+
+    let mut values = Vec::new();
+    let mut min_ts = 0;
+    let mut max_ts = 0;
+    for record in records {
+        if min_ts == 0 || record.created_at < min_ts {
+            min_ts = record.created_at;
+        }
+        if max_ts == 0 || record.created_at > max_ts {
+            max_ts = record.created_at;
+        }
+        match serde_json::from_slice::<serde_json::Value>(&record.data) {
+            Ok(serde_json::Value::Array(items)) => values.extend(items),
+            Ok(data) => log::error!("Invalid enrichment data: {data}"),
+            Err(err) => log::error!("Failed to parse enrichment data: {err}"),
+        }
+    }
+
+    Ok((values, min_ts, max_ts))
+}
+
+/// Read the last successfully written meta-stream statistics for an enrichment table.
+pub async fn get_meta_stats(org: &str, table_name: &str) -> Option<EnrichmentTableMetaStreamStats> {
+    let key = format!("{ENRICHMENT_TABLE_META_STREAM_STATS_KEY}/{org}/{table_name}");
+    let value = get_db().await.get(&key).await.ok()?;
+    serde_json::from_slice(&value)
+        .inspect_err(|err| log::error!("Failed to parse meta stream stats: {err}"))
+        .ok()
+}
+
 /// Get all enrichment table records for a specific organization
 ///
 /// # Arguments
@@ -190,7 +245,7 @@ pub async fn get_by_org_and_name_with_end_time(
 /// # Returns
 /// * `Result<Vec<EnrichmentTableRecord>, errors::Error>` - List of records or error
 pub async fn get_by_org(org: &str) -> Result<Vec<EnrichmentTableRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -215,7 +270,7 @@ pub async fn get_by_org(org: &str) -> Result<Vec<EnrichmentTableRecord>, errors:
 /// # Returns
 /// * `Result<bool, errors::Error>` - True if records exist, false otherwise
 pub async fn contains(org: &str, table_name: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(table_name))
@@ -235,7 +290,7 @@ pub async fn contains(org: &str, table_name: &str) -> Result<bool, errors::Error
 /// # Returns
 /// * `Result<usize, errors::Error>` - Count of records
 pub async fn count_by_org_and_name(org: &str, table_name: &str) -> Result<usize, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let count = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(table_name))
@@ -250,7 +305,7 @@ pub async fn count_by_org_and_name(org: &str, table_name: &str) -> Result<usize,
 /// # Returns
 /// * `Result<usize, errors::Error>` - Total count of records
 pub async fn count() -> Result<usize, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let count = Entity::find().count(client).await?;
 
     Ok(count as usize)
@@ -261,10 +316,7 @@ pub async fn count() -> Result<usize, errors::Error> {
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn clear() -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::delete_many().exec(client).await?;
 
     Ok(())
@@ -284,7 +336,7 @@ pub async fn is_empty() -> Result<bool, errors::Error> {
 /// # Returns
 /// * `Result<Vec<(String, String)>, errors::Error>` - List of (org_id, table_name) pairs
 pub async fn list() -> Result<Vec<(String, String)>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -297,4 +349,46 @@ pub async fn list() -> Result<Vec<(String, String)>, errors::Error> {
         .iter()
         .map(|r| (r.org.clone(), r.name.clone()))
         .collect())
+}
+
+/// Deletes all enrichment table entries belonging to the given org.
+pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_enrichment_table_record_new_sets_org_and_name() {
+        let record = EnrichmentTableRecord::new("myorg", "my-table", vec![1, 2, 3]);
+        assert_eq!(record.org, "myorg");
+        assert_eq!(record.name, "my-table");
+        assert_eq!(record.data, vec![1, 2, 3]);
+    }
+
+    #[test]
+    fn test_enrichment_table_record_new_timestamp_is_positive() {
+        let record = EnrichmentTableRecord::new("org", "table", vec![]);
+        assert!(record.created_at > 0);
+    }
+
+    #[test]
+    fn test_enrichment_table_record_new_empty_data() {
+        let record = EnrichmentTableRecord::new("org", "table", vec![]);
+        assert!(record.data.is_empty());
+    }
+
+    #[test]
+    fn test_enrichment_table_record_new_large_data() {
+        let data: Vec<u8> = (0u8..=255).collect();
+        let record = EnrichmentTableRecord::new("org", "table", data.clone());
+        assert_eq!(record.data, data);
+    }
 }

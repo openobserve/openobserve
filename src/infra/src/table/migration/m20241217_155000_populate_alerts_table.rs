@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -145,9 +145,8 @@ impl OrgWithAlert {
         let select_statement = Self::statement();
         let backend = db.get_database_backend();
         let (sql, values) = match backend {
-            sea_orm::DatabaseBackend::MySql => select_statement.build(MysqlQueryBuilder),
             sea_orm::DatabaseBackend::Postgres => select_statement.build(PostgresQueryBuilder),
-            sea_orm::DatabaseBackend::Sqlite => select_statement.build(SqliteQueryBuilder),
+            _ => select_statement.build(SqliteQueryBuilder),
         };
         let statement = Statement::from_sql_and_values(backend, sql, values);
         Self::find_by_statement(statement).paginate(db, page_size)
@@ -203,9 +202,8 @@ impl MetaAlertWithFolder {
         let select_statement = Self::statement();
         let backend = db.get_database_backend();
         let (sql, values) = match backend {
-            sea_orm::DatabaseBackend::MySql => select_statement.build(MysqlQueryBuilder),
             sea_orm::DatabaseBackend::Postgres => select_statement.build(PostgresQueryBuilder),
-            sea_orm::DatabaseBackend::Sqlite => select_statement.build(SqliteQueryBuilder),
+            _ => select_statement.build(SqliteQueryBuilder),
         };
         let statement = Statement::from_sql_and_values(backend, sql, values);
         Self::find_by_statement(statement).paginate(db, page_size)
@@ -1013,15 +1011,6 @@ mod tests {
     }
 
     #[test]
-    fn org_with_alert_mysql() {
-        let stmnt = OrgWithAlert::statement();
-        assert_eq!(
-            &stmnt.to_string(MysqlQueryBuilder),
-            r#"SELECT `key1` FROM `meta` WHERE `module` = 'alerts' GROUP BY `key1` ORDER BY `key1` ASC"#
-        );
-    }
-
-    #[test]
     fn org_with_alert_sqlite() {
         let stmnt = OrgWithAlert::statement();
         assert_eq!(
@@ -1046,26 +1035,6 @@ mod tests {
                 AND "folders"."type" = 1 
                 AND "folders"."folder_id" = 'default'
                 ORDER BY "meta"."id" ASC
-            "#
-        );
-    }
-
-    #[test]
-    fn meta_with_folder_mysql() {
-        let stmnt = MetaAlertWithFolder::statement();
-        collapsed_eq!(
-            &stmnt.to_string(MysqlQueryBuilder),
-            r#"
-                SELECT 
-                `meta`.`value`, 
-                `folders`.`id` 
-                FROM `meta` 
-                LEFT JOIN `folders` 
-                ON `folders`.`org` = `meta`.`key1` 
-                WHERE `meta`.`module` = 'alerts' 
-                AND `folders`.`type` = 1 
-                AND `folders`.`folder_id` = 'default'
-                ORDER BY `meta`.`id` ASC
             "#
         );
     }
@@ -1426,7 +1395,7 @@ mod tests {
 
         let ser_condition: alerts_table_ser::Condition = meta_condition.into();
         assert_eq!(ser_condition.column, "status");
-        assert_eq!(ser_condition.ignore_case, true);
+        assert!(ser_condition.ignore_case);
 
         let value_str = ser_condition.value.as_str().unwrap();
         assert_eq!(value_str, "active");
@@ -1450,7 +1419,7 @@ mod tests {
         let ser_agg: alerts_table_ser::Aggregation = meta_agg.into();
         assert_eq!(ser_agg.group_by.as_ref().unwrap().len(), 2);
         assert_eq!(ser_agg.having.column, "count");
-        assert_eq!(ser_agg.having.ignore_case, false);
+        assert!(!ser_agg.having.ignore_case);
     }
 
     #[test]

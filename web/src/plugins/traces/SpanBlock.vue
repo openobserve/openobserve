@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,37 +16,44 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="flex wrap justify-start items-center"
-    :class="[
-      defocusSpan ? 'defocus' : '',
-      store.state.theme === 'dark' ? 'bg-dark' : 'bg-white',
-    ]"
+    class="wrap bg-surface-base flex items-center justify-start"
+    :class="defocusSpan ? 'opacity-30' : ''"
     :style="{
       zIndex: 2,
     }"
     :id="span.spanId"
     data-test="span-block-container"
   >
+    <!-- The row owns the horizontal clip. It used to live on the bar row below,
+         which worked only because that row was unpositioned: an absolutely
+         positioned box escapes an `overflow` ancestor that is not in its
+         containing-block chain, so the duration label and the markers were never
+         actually clipped there. Making the bar row `relative` puts them inside
+         its clip, and it is only as tall as the bar — the label would lose half
+         its line box. Clipping at the row keeps the same left and right edges,
+         since both boxes are the same width. -->
     <div
-      class="flex justify-between items-end cursor-pointer span-block relative-position"
-      :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white']"
+      class="span-block relative-position bg-surface-base flex w-full cursor-pointer items-end justify-between overflow-hidden pb-1.5"
       :style="{
         height: spanDimensions.height + 'px',
-        width: '100%',
-        paddingBottom: '6px',
       }"
       ref="spanBlock"
       @click="selectSpan(span.spanId)"
       @mouseover="onSpanHover"
       data-test="span-block"
     >
+      <!-- `relative` is load-bearing: it makes this box — which is exactly as
+           tall as the bar — the containing block for the event markers and the
+           duration label. It carried a dead Quasar `position-relative` class (no
+           such rule exists in this codebase), so it was a static box and both
+           escaped up to the waterfall row wrapper, where `top-1/2` centred the
+           markers on the 30px row instead of on the 8px bar. It stays `w-full`
+           so marker `left` percentages keep resolving against the trace window,
+           which is the space they are computed in. Do not move `relative` onto
+           the bar itself — that would rebase them onto the span. -->
       <div
-        :style="{
-          width: '100%',
-          overflow: 'hidden',
-        }"
-        class="cursor-pointer flex items-center no-wrap position-relative"
-        :class="defocusSpan ? 'defocus' : ''"
+        class="relative flex w-full cursor-pointer flex-nowrap items-center"
+        :class="defocusSpan ? 'opacity-30' : ''"
         @click="selectSpan(span.spanId)"
         data-test="span-block-select-trigger"
       >
@@ -55,57 +62,133 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             height: spanDimensions.barHeight + 'px',
             width: spanWidth + '%',
             left: leftPosition + '%',
-            position: 'relative',
           }"
-          class="flex justify-start items-center no-wrap"
+          class="relative flex flex-nowrap items-center justify-start"
           ref="spanMarkerRef"
           data-test="span-marker"
         >
           <div
+            class="rounded-default h-full w-full"
             :style="{
-              width: 'calc(100% - 6px)',
-              height: '100%',
-              borderRadius: '2px',
-              backgroundColor: span.style?.color || '#58508d',
+              backgroundColor: span.style?.color || DEFAULT_SPAN_COLOR,
             }"
           />
         </div>
+        <button
+          v-for="cluster in eventClusters"
+          :key="cluster.key"
+          type="button"
+          class="absolute top-1/2 h-3 w-0.75 -translate-x-1/2 -translate-y-1/2 p-0 before:absolute before:top-1/2 before:left-1/2 before:h-4 before:w-2.5 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
+          :class="SEVERITY_MARKER_CLASS[cluster.severity]"
+          :style="{
+            left: cluster.left + '%',
+            zIndex: 3,
+          }"
+          :title="clusterLabel(cluster)"
+          :aria-label="clusterAriaLabel(cluster)"
+          :data-event-severity="cluster.severity"
+          :data-event-count="cluster.events.length"
+          data-test="span-event-marker"
+          @click.stop="selectSpanEvent(cluster)"
+        />
         <div
           :style="{
-            position: 'absolute',
             ...durationStyle,
-            transition: 'all 0.5s ease',
             zIndex: 1,
           }"
-          class="text-caption flex items-center"
+          class="absolute flex items-center text-xs transition-all duration-500 ease-[ease]"
+          :data-label-above-bar="labelAboveBar"
           data-test="span-block-duration"
         >
           <div>
             {{ formatTimeWithSuffix(span.durationUs) }}
           </div>
         </div>
-        <q-resize-observer debounce="300" @resize="onResize" />
       </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  computed,
-  ref,
-  onMounted,
-  nextTick,
-  watch,
-  onActivated,
-} from "vue";
+import { defineComponent, computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import useTraces from "@/composables/useTraces";
 import { getImageURL, formatTimeWithSuffix } from "@/utils/zincutils";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
-import { b64EncodeStandard } from "@/utils/zincutils";
-import { useRouter } from "vue-router";
+import { useI18nTyped } from "@/types/i18n";
+import {
+  useSpanEventMarkers,
+  clusterSpanEventMarkers,
+  truncateEventName,
+  SEVERITY_MARKER_CLASS,
+  type SpanEventMarker,
+  type SpanEventCluster,
+} from "@/composables/traces/useSpanEvents";
+
+// TODO(design-tokens): fallback bar colour for a span the trace colour allocator
+// never assigned. No semantic token fits — it is a categorical "unassigned span"
+// slate-purple, not a status/surface/accent role. Needs e.g.
+// --color-trace-span-unassigned; this const is then the only site to change.
+const DEFAULT_SPAN_COLOR = "#58508d";
+
+/**
+ * Gap, in pixels, between the bar's right edge and its duration label.
+ *
+ * This used to be subtracted from the bar fill's own width
+ * (`calc(100% - 6px)`) — originally `21px`, reserving room for an inline
+ * expand chevron that was removed in Oct 2024. Subtracting it from the fill
+ * made every bar render 6px shorter than the span it represents and clamped
+ * sub-6px spans to zero width. It belongs to the label, not the bar.
+ */
+const BAR_LABEL_GUTTER_PX = 6;
+
+/**
+ * Vertical offset that centres the duration label on the span bar.
+ *
+ * The label's containing block is the bar row, which is `barHeight` tall (8px —
+ * see TraceDetails' spanDimensions), so `top: 0` aligns the label's top edge
+ * with the bar's top edge. The label is one `text-xs` line box: 0.75rem at a
+ * 4/3 line-height, i.e. 1rem = 16px. Centring 16px on 8px needs
+ * (8 - 16) / 2 = -4px = -0.25rem.
+ *
+ * Applies to both positions beside the bar. The one case that does not use it
+ * is the fallback above the bar — see BAR_LABEL_ABOVE_REM.
+ */
+const BAR_LABEL_TOP_REM = "-0.25rem";
+
+/**
+ * Vertical offset that lifts the duration label into the band above the bar.
+ *
+ * Used only when neither side of the bar has room. The label's containing block
+ * is the 8px bar row, which sits at the bottom of the 30px span row (the row is
+ * `items-end` with `pb-1.5`), so the 16px above it is empty. A 16px line box at
+ * -1rem fills exactly that band and is not clipped by the row's `overflow-hidden`.
+ *
+ * The event-marker ticks reach 2px above the bar, so they and the label's line
+ * box share 2px. That overlap lands in the line box's descender space, below the
+ * glyphs of a duration string, which has no descenders.
+ */
+const BAR_LABEL_ABOVE_REM = "-1rem";
+
+/*
+ * Tick height is `h-3` (12px) in the markup above — 1.5x this surface's 8px span
+ * bar, so every tick overhangs it by 2px above and below.
+ *
+ * Overhang is the whole point. A stroke that crosses the bar reads as an
+ * annotation on it; one enclosed inside it competes with the bar for the same
+ * few pixels, and at 8px an enclosed tick looked like it was replacing the span
+ * rather than marking it. Overhang also puts part of every tick on the row
+ * background — a known luminance — which is what lets markers carry no outline
+ * at all (see SEVERITY_MARKER_CLASS): the mark is never wholly at the mercy of
+ * whatever service colour the bar happens to have.
+ *
+ * Height is not part of the shared vocabulary, because it cannot transfer: the
+ * sidebar mini-timeline draws into a 20px track and the flame graph into a 24px
+ * block, so each surface sizes against its own geometry. Colour transfers, and
+ * so does the *fact* of overhanging — the flame graph overhangs its block by 1px,
+ * the width its inter-row gutter affords. The sidebar is the one surface that
+ * does not, because its track is a known neutral rather than a service colour,
+ * so it has nothing to escape onto.
+ */
 
 export default defineComponent({
   name: "SpanBlock",
@@ -143,12 +226,14 @@ export default defineComponent({
       default: () => ({}),
     },
   },
-  emits: ["toggleCollapse", "selectSpan", "hover", "view-logs"],
+  emits: ["toggleCollapse", "selectSpan", "hover", "view-logs", "selectSpanEvent"],
   setup(props, { emit }) {
     const store = useStore();
     const { searchObj } = useTraces();
     const spanBlock: any = ref(null);
     const spanBlockWidth = ref(0);
+    let _resizeObserver: ResizeObserver | null = null;
+    let _debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const onePixelPercent = ref(0);
     const defocusSpan = computed(() => {
       if (!searchObj.data.traceDetails.selectedSpanId) return false;
@@ -156,8 +241,13 @@ export default defineComponent({
     });
 
     const durationStyle = ref({});
-    const router = useRouter();
-    const { t } = useI18n();
+
+    /**
+     * True when the duration label had to be lifted above the bar, because the
+     * span is wide enough that neither side of it has room.
+     */
+    const labelAboveBar = ref(false);
+    const { t } = useI18nTyped();
 
     const leftPosition = ref(0);
 
@@ -167,40 +257,95 @@ export default defineComponent({
       emit("selectSpan", spanId);
     };
 
+    /**
+     * Selecting a span hides the waterfall timeline entirely — only the
+     * operation-name tree remains — so a marker click destroys the view the
+     * marker lived in. Carry the event index along so the sidebar can
+     * re-establish the same picture on its own mini-timeline.
+     */
+    const selectSpanEvent = (cluster: SpanEventCluster) => {
+      emit("selectSpan", props.span.spanId);
+      emit("selectSpanEvent", {
+        spanId: props.span.spanId,
+        eventIndex: cluster.events[0].index,
+      });
+    };
+
+    // Span events are plotted against the whole trace, matching the coordinate
+    // space the span bar and duration label already use.
+    const eventMarkers = useSpanEventMarkers(
+      () => props.spanData?.events,
+      () => ({
+        startUs: props.baseTracePosition?.startTimeUs,
+        durationUs: props.baseTracePosition?.durationUs,
+      }),
+      () => store.state.zoConfig?.timestamp_column,
+    );
+
+    const eventMarkerLabel = (marker: SpanEventMarker) =>
+      marker.severity === "error"
+        ? t("traces.exceptionMarkerTooltip", { type: truncateEventName(marker.exceptionType) })
+        : t("traces.eventMarkerTooltip", {
+            name: truncateEventName(marker.name) || t("traces.spanEventFallback"),
+          });
+
+    // Clusters re-derive whenever the row is resized, so the bucket width
+    // tracks the timeline the user is actually looking at.
+    const eventClusters = computed(() =>
+      clusterSpanEventMarkers(eventMarkers.value, spanBlockWidth.value),
+    );
+
+    const clusterLabel = (cluster: SpanEventCluster) =>
+      cluster.events.length > 1
+        ? t("traces.eventClusterTooltip", { count: cluster.events.length })
+        : eventMarkerLabel(cluster.events[0]);
+
+    const clusterAriaLabel = (cluster: SpanEventCluster) => {
+      if (cluster.events.length === 1) return eventMarkerLabel(cluster.events[0]);
+      const errors = cluster.events.filter((event) => event.severity === "error").length;
+      const count = cluster.events.length;
+      return errors === 1
+        ? t("traces.eventClusterAriaLabel", { count, errors })
+        : t("traces.eventClusterAriaLabelPlural", { count, errors });
+    };
+
     const spanMarkerRef = ref(null);
 
     const getLeftPosition = () => {
-      const left =
-        props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
+      const left = props.span.startTimeUs - props.baseTracePosition["startTimeUs"];
 
       return (left / props.baseTracePosition?.durationUs) * 100;
     };
 
     const getSpanWidth = () => {
       return Number(
-        (
-          (props.span?.durationUs / props.baseTracePosition?.durationUs) *
-          100
-        ).toFixed(2),
+        ((props.span?.durationUs / props.baseTracePosition?.durationUs) * 100).toFixed(2),
       );
     };
 
     onMounted(async () => {
       durationStyle.value = getDurationStyle();
-      const params = router.currentRoute.value.query;
-      const spanId = Array.isArray(params.span_id)
-        ? params.span_id[0]
-        : params.span_id; // Ensure it's a single string
 
-      if (spanId) {
-        const element = document.getElementById(spanId);
-        if (element) {
-          element.scrollIntoView({
-            behavior: "smooth", // Smooth scrolling
-            block: "center", // Attempt to align the element at the center of the screen
-            inline: "nearest", // Keep horizontal alignment as close as possible
-          });
-        }
+      // NOTE: do NOT scroll the pre-selected span into view here. Rows are
+      // virtualized, so a SpanBlock remounts every time it scrolls into the
+      // viewport — doing scrollIntoView on each mount snapped the view back to
+      // the URL's span_id and fought the user's scroll. Centering the
+      // pre-selected span is owned by TraceTree (virtualizer scrollToIndex).
+
+      if (spanBlock.value) {
+        // Measure once, synchronously. The observer's callback is debounced by
+        // 300ms, so without this the row spends a third of a second at
+        // `spanBlockWidth === 0`, where the cluster threshold is 0 and every
+        // event renders as its own overlapping tick. Rows are virtualized and
+        // remount on scroll, so that burst would repeat for every row that
+        // scrolls into view.
+        onResize();
+
+        _resizeObserver = new ResizeObserver(() => {
+          if (_debounceTimer) clearTimeout(_debounceTimer);
+          _debounceTimer = setTimeout(() => onResize(), 300);
+        });
+        _resizeObserver.observe(spanBlock.value);
       }
     });
 
@@ -237,43 +382,89 @@ export default defineComponent({
 
     watch(
       () => spanBlockWidth.value + leftPosition.value + spanWidth.value,
-      (val) => {
+      () => {
         durationStyle.value = getDurationStyle();
       },
     );
 
+    /**
+     * Places the duration label: after the bar when it fits there, above the bar
+     * when it does not.
+     *
+     * The rule is "is there room after the bar", not "where does the bar start".
+     * The original version pinned the label to `right: 0` whenever it would not
+     * fit after the bar — but a bar that does not leave room after itself is a
+     * bar that reaches the container's right edge, so `right: 0` printed the
+     * label *on top of the bar*, in row-background text colour over an arbitrary
+     * service colour. Every long span rendered an unreadable duration.
+     *
+     * Deliberately only two positions. Squeezing the label into the space to the
+     * left of a long bar also works geometrically, but it splits long spans
+     * between two different treatments on a margin of a pixel or two, so
+     * neighbouring rows of similar length disagree about where their label
+     * belongs. One fallback keeps every long bar's label in the same place
+     * relative to its bar.
+     */
     const getDurationStyle = () => {
       const style: any = {
-        top: "10px",
+        top: BAR_LABEL_TOP_REM,
       };
+
+      // Reset first: this is recomputed on resize and on window changes, and a
+      // latched flag would keep the label above the bar after it shrank enough
+      // to sit beside it again.
+      labelAboveBar.value = false;
 
       const onePercent = Number((spanBlockWidth.value / 100).toFixed(2));
       const labelWidth = 60;
-      if (
-        (leftPosition.value + spanWidth.value) * onePercent + labelWidth >
-        spanBlockWidth.value
-      ) {
-        style.right = 0;
-        style.top = "-0.3125rem";
-      } else if (leftPosition.value > 50) {
-        style.left = leftPosition.value * onePercent - labelWidth + "px";
-      } else {
-        const left =
-          leftPosition.value +
-          (Math.floor(spanWidth.value) ? spanWidth.value : 1);
+      const barStartPx = leftPosition.value * onePercent;
+      const barEndPx = (leftPosition.value + spanWidth.value) * onePercent;
 
-        style.left =
-          (left * onePercent - leftPosition.value * onePercent < 19
-            ? leftPosition.value * onePercent + 19
-            : left * onePercent) + "px";
+      // A hairline bar still needs the label clear of it, so the label tracks a
+      // fixed offset from the bar's start rather than its (barely different)
+      // end. The gutter is added because the fill is now the bar's true width —
+      // it used to be drawn 6px short, which supplied this clearance for free.
+      const afterBarPx =
+        barEndPx - barStartPx < 19
+          ? barStartPx + 19 + BAR_LABEL_GUTTER_PX
+          : barEndPx + BAR_LABEL_GUTTER_PX;
+
+      // The fallback below is a room comparison, and there is no room to compare
+      // against until the container has been measured. Unmeasured, it fails and
+      // would lift every label above its bar at a negative offset — off-screen —
+      // so take the ordinary after-the-bar position and let the resize observer
+      // place it properly once a width exists.
+      if (!(spanBlockWidth.value > 0) || afterBarPx + labelWidth <= spanBlockWidth.value) {
+        style.left = afterBarPx + "px";
+        return style;
       }
 
+      // No room after the bar, so stop looking sideways and go up. The 16px band
+      // above the bar is empty — the bar row sits at the bottom of the 30px row
+      // — so the label lands on the row background at full contrast and hides
+      // none of the bar it describes.
+      //
+      // Right-aligned to the bar's own end rather than to the container, so it
+      // still reads as belonging to this bar when the bar stops short of the
+      // edge. Clamped so it can neither run off the left nor past the right.
+      style.top = BAR_LABEL_ABOVE_REM;
+      style.left =
+        Math.min(
+          Math.max(barEndPx - labelWidth, 0),
+          Math.max(spanBlockWidth.value - labelWidth, 0),
+        ) + "px";
+      labelAboveBar.value = true;
       return style;
     };
 
     const onResize = () => {
       spanBlockWidth.value = spanBlock.value.clientWidth;
     };
+
+    onBeforeUnmount(() => {
+      if (_debounceTimer) clearTimeout(_debounceTimer);
+      _resizeObserver?.disconnect();
+    });
 
     const onSpanHover = () => {
       emit("hover");
@@ -283,6 +474,7 @@ export default defineComponent({
       t,
       formatTimeWithSuffix,
       selectSpan,
+      selectSpanEvent,
       getImageURL,
       leftPosition,
       spanWidth,
@@ -295,38 +487,14 @@ export default defineComponent({
       store,
       onSpanHover,
       durationStyle,
+      labelAboveBar,
       searchObj,
+      DEFAULT_SPAN_COLOR,
+      eventClusters,
+      clusterLabel,
+      clusterAriaLabel,
+      SEVERITY_MARKER_CLASS,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-.defocus {
-  opacity: 0.3;
-}
-
-.collapse-btn {
-  opacity: 0.6;
-}
-
-.collapse-container {
-  border: 1px solid #ececec;
-}
-
-.light-grey {
-  background-color: #ececec;
-}
-
-.view-span-logs {
-  visibility: hidden;
-}
-
-.span-block-overlay {
-  &:hover {
-    .view-span-logs {
-      visibility: visible;
-    }
-  }
-}
-</style>

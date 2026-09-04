@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,7 +16,7 @@
 use std::{
     path::PathBuf,
     sync::{
-        Arc,
+        Arc, LazyLock as Lazy,
         atomic::{AtomicU64, Ordering},
     },
 };
@@ -24,12 +24,12 @@ use std::{
 use arrow_schema::Schema;
 use config::{metrics, stats::MemorySize, utils::time::now_micros};
 use hashbrown::HashMap;
-use once_cell::sync::Lazy;
 
 use crate::{
     ReadRecordBatchEntry,
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::Result,
+    pack::PackWriter,
     stream::Stream,
 };
 
@@ -101,6 +101,7 @@ impl MemTable {
         idx: usize,
         org_id: &str,
         stream_type: &str,
+        mut pack: Option<&mut PackWriter>,
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let mut schema_size = 0;
         let mut paths = Vec::with_capacity(self.streams.len());
@@ -112,7 +113,14 @@ impl MemTable {
                 (org_id, stream_name.as_ref())
             };
             let (part_schema_size, partitions) = stream
-                .persist(id, idx, org_id, stream_type, stream_name)
+                .persist(
+                    id,
+                    idx,
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    pack.as_deref_mut(),
+                )
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);
@@ -132,5 +140,29 @@ impl MemTable {
 impl MemorySize for MemTable {
     fn mem_size(&self) -> usize {
         std::mem::size_of::<MemTable>() + self.streams.mem_size()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_memtable_new_has_unique_id() {
+        let m1 = MemTable::new();
+        let m2 = MemTable::new();
+        assert_ne!(m1.id(), m2.id());
+    }
+
+    #[test]
+    fn test_memtable_new_empty_streams() {
+        let m = MemTable::new();
+        assert!(m.streams.is_empty());
+    }
+
+    #[test]
+    fn test_memtable_mem_size_at_least_struct_size() {
+        let m = MemTable::new();
+        assert!(m.mem_size() >= std::mem::size_of::<MemTable>());
     }
 }

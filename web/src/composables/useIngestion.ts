@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,7 @@ import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
 
 const useIngestion = () => {
   const store = useStore();
-  
+
   const endpoint: any = ref({
     url: "",
     host: "",
@@ -128,6 +128,10 @@ Access Key: [BASIC_PASSCODE]`;
     heroku: "https://short.openobserve.ai/heroku",
   };
 
+  const aiContent = `OPENOBSERVE_URL=${endpoint.value.url}
+OPENOBSERVE_ORG=${store.state.selectedOrganization.identifier}
+OPENOBSERVE_AUTH_TOKEN=Basic [BASIC_PASSCODE]`;
+
   return {
     endpoint,
     databaseContent,
@@ -146,6 +150,7 @@ Access Key: [BASIC_PASSCODE]`;
     languagesDocURLs,
     othersContent,
     othersDocURLs,
+    aiContent,
   };
 };
 

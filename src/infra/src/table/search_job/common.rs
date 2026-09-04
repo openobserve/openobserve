@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -37,4 +37,41 @@ pub enum OperatorType {
     NotEqual,    // curently not used
     GreaterThan, // curently not used
     LessThan,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_value_string_constructor() {
+        let v = Value::string("hello");
+        assert!(matches!(v, Value::String(s) if s == "hello"));
+    }
+
+    #[test]
+    fn test_value_i64_constructor() {
+        let v = Value::i64(42);
+        assert!(matches!(v, Value::I64(n) if n == 42));
+    }
+
+    #[test]
+    fn test_value_string_empty() {
+        let v = Value::string("");
+        assert!(matches!(v, Value::String(s) if s.is_empty()));
+    }
+
+    #[test]
+    fn test_value_i64_negative() {
+        let v = Value::i64(-100);
+        assert!(matches!(v, Value::I64(n) if n == -100));
+    }
+
+    #[test]
+    fn test_value_roundtrip_json() {
+        let v = Value::string("test");
+        let json = serde_json::to_string(&v).unwrap();
+        let back: Value = serde_json::from_str(&json).unwrap();
+        assert!(matches!(back, Value::String(s) if s == "test"));
+    }
 }

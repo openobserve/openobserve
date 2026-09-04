@@ -8,8 +8,8 @@ RUN NODE_OPTIONS="--max-old-space-size=8192" npm run build
 
 FROM public.ecr.aws/zinclabs/rust:trixie-sccache AS builder
 
-# RUN rustup toolchain install nightly-2025-11-11
-# RUN rustup default nightly-2025-11-11
+# RUN rustup toolchain install nightly-2026-05-20
+# RUN rustup default nightly-2026-05-20
 # RUN rustup target add x86_64-unknown-linux-gnu
 # RUN diff -u <(rustc --print cfg) <(rustc -C target-cpu=native --print cfg)
 RUN rustc --version && sccache --version
@@ -22,9 +22,11 @@ RUN cargo build --release
 
 # FROM gcr.io/distroless/cc as runtime
 FROM public.ecr.aws/debian/debian:trixie-slim AS runtime
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates
-RUN apt-get install -y curl htop iftop sysstat procps lsof net-tools
-RUN update-ca-certificates
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+      ca-certificates curl htop iftop sysstat procps lsof net-tools && \
+    update-ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
 COPY --from=builder /openobserve/target/release/openobserve /
 RUN ["/openobserve", "init-dir", "-p", "/data/"]
 CMD ["/openobserve"]

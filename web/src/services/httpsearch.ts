@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,9 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import store from "../stores";
-import router from "../router";
 import axios from "axios";
-import { Notify } from "quasar";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { gt } from "@/types/i18n";
 
 const http = () => {
   const instance = axios.create({
@@ -33,27 +33,15 @@ const http = () => {
       if (error && error.response && error.response.status) {
         switch (error.response.status) {
           case 400:
-            Notify.create({
-              position: "bottom-right",
-              progress: true,
-              multiLine: true,
-              color: "red-5",
-              textColor: "white",
-              icon: "warning",
-              message: JSON.stringify(
-                error.response.data["error"] || "Bad Request"
-              ),
+            toast({
+              message: error.response.data["error"] || gt("common.badRequest"),
+              variant: "error",
             });
             break;
           case 401:
-            Notify.create({
-              position: "bottom-right",
-              progress: true,
-              multiLine: true,
-              color: "red-5",
-              textColor: "white",
-              icon: "warning",
-              message: error.response.data["error"] || "Invalid credentials",
+            toast({
+              message: error.response.data["error"] || gt("common.invalidCredentials"),
+              variant: "error",
             });
             store.dispatch("logout");
             localStorage.clear();
@@ -61,27 +49,15 @@ const http = () => {
             window.location.reload();
             break;
           case 404:
-            Notify.create({
-              position: "bottom-right",
-              progress: true,
-              multiLine: true,
-              color: "red-5",
-              textColor: "white",
-              icon: "warning",
-              message: error.response.data["error"] || "Not Found",
+            toast({
+              message: error.response.data["error"] || gt("common.notFound"),
+              variant: "error",
             });
             break;
           case 500:
-            Notify.create({
-              position: "bottom-right",
-              progress: true,
-              multiLine: true,
-              color: "red-5",
-              textColor: "white",
-              icon: "warning",
-              message: JSON.stringify(
-                error.response.data["error"] || "Internal ServerError"
-              ),
+            toast({
+              message: error.response.data["error"] || gt("common.internalServerError"),
+              variant: "error",
             });
             break;
           default:
@@ -89,7 +65,7 @@ const http = () => {
         }
       }
       return Promise.reject(error);
-    }
+    },
   );
 
   return instance;

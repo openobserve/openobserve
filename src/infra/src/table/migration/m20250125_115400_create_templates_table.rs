@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -99,14 +99,6 @@ mod tests {
         collapsed_eq!(
             &create_templates_table_statement().to_string(PostgresQueryBuilder),
             r#"CREATE TABLE IF NOT EXISTS "templates" ( "id" char(27) NOT NULL PRIMARY KEY, "org" varchar(100) NOT NULL, "name" varchar(256) NOT NULL, "is_default" bool NOT NULL, "type" varchar(10) NOT NULL, "body" text NOT NULL, "title" text NULL )"#
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_templates_table_statement().to_string(MysqlQueryBuilder),
-            r#"CREATE TABLE IF NOT EXISTS `templates` ( `id` char(27) NOT NULL PRIMARY KEY, `org` varchar(100) NOT NULL, `name` varchar(256) NOT NULL, `is_default` bool NOT NULL, `type` varchar(10) NOT NULL, `body` text NOT NULL, `title` text NULL )"#
         );
     }
 

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -197,7 +197,7 @@ mod tests {
         // Test with base64 that decodes to invalid UTF-8
         // This is tricky to create, but we can test the error path
         let invalid_utf8 = [0xFF, 0xFE, 0xFD];
-        let encoded = base64::engine::general_purpose::STANDARD.encode(&invalid_utf8);
+        let encoded = base64::engine::general_purpose::STANDARD.encode(invalid_utf8);
 
         // This should fail when trying to convert to String
         assert!(decode(&encoded).is_err());

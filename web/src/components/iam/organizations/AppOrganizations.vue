@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <component v-if="loadComponent" :is="componentName" />
-  </div>
+  <component v-if="loadComponent" :is="componentName" />
 </template>
 
 <script lang="ts">
 import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import OrganizationsEnterprise from "@/components/iam/organizations/ListOrganizations.vue";
 
 import config from "@/aws-exports";
@@ -36,7 +34,7 @@ export default defineComponent({
   },
   setup() {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const componentName = ref("OrganizationsEnterprise");
 
@@ -45,11 +43,7 @@ export default defineComponent({
     watch(
       () => store.state.zoConfig,
       (zoConfig) => {
-        if (
-          zoConfig.sso_enabled ||
-          config.isEnterprise == "true" ||
-          config.isCloud == "true"
-        ) {
+        if (zoConfig.sso_enabled || config.isEnterprise == "true" || config.isCloud == "true") {
           componentName.value = "OrganizationsEnterprise";
         }
 

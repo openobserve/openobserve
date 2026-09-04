@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,30 +15,25 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pa-sm">
-    <CopyContent class="copy-content-container-cls" :content="content" />
-  </div>
-  <div>
-    <a
+  <IngestionContent>
+    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
+    <IngestionDocLink
       href="https://openobserve.ai/blog/how-to-send-kubernetes-logs-using-fluent-bit"
-      class="q-ml-lg text-bold"
-      style="padding-right: 2px"
-      target="_blank"
-      title="Harnessing the Power of FluentBit to Stream Kubernetes Logs to OpenObserve!"
     >
-      Click here</a
+      {{ t("ingestion.fluentBitDocLinkText") }}</IngestionDocLink
     >
-    to explore the process of sending logs from Kubernetes to OpenObserve using
-    FluentBit.
-  </div>
+  </IngestionContent>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
+import IngestionContent from "@/components/ingestion/IngestionContent.vue";
+import IngestionDocLink from "@/components/ingestion/IngestionDocLink.vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 export default defineComponent({
   name: "fluentbit-mechanism",
   props: {
@@ -49,8 +44,9 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent },
+  components: { CopyContent, IngestionContent, IngestionDocLink },
   setup() {
+    const { t } = useI18nTyped();
     const store = useStore();
     const endpoint: any = ref({
       url: "",
@@ -76,6 +72,8 @@ export default defineComponent({
   HTTP_Passwd [PASSCODE]
   compress gzip`;
     return {
+      raw,
+      t,
       store,
       config,
       endpoint,

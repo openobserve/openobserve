@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,27 +13,29 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { raw, type TranslateFn } from "@/types/i18n";
 import type { DimensionAnalysis, LatencyInsightsConfig } from "./useLatencyInsightsAnalysis";
+
+/** Colors shared between the dashboard chart series and the UI chips */
+export const COMPARISON_COLORS = {
+  light: { baseline: "#2775ea", selected: "#12adc2" },
+  dark: { baseline: "#2c7de0", selected: "#1cb8d0" },
+} as const;
 
 /**
  * Composable for generating dashboard JSON for Latency Insights
  * Transforms DimensionAnalysis results into OpenObserve dashboard schema
  */
-export function useLatencyInsightsDashboard() {
+export function useLatencyInsightsDashboard(t: TranslateFn) {
   /**
    * Build comparison query using UNION to combine baseline and selected results
    * Supports both latency analysis (duration-based) and volume analysis (rate-based)
    */
-  const buildComparisonQuery = (
-    dimensionName: string,
-    config: LatencyInsightsConfig
-  ) => {
-    const baseFilters = config.baseFilter?.trim().length
-      ? config.baseFilter.trim()
-      : "";
+  const buildComparisonQuery = (dimensionName: string, config: LatencyInsightsConfig) => {
+    const baseFilters = config.baseFilter?.trim().length ? config.baseFilter.trim() : "";
 
     // Check if baseFilter is a custom SQL query (starts with SELECT)
-    const isCustomSQL = baseFilters.trim().toUpperCase().startsWith('SELECT');
+    const isCustomSQL = baseFilters.trim().toUpperCase().startsWith("SELECT");
     const isVolumeAnalysis = config.analysisType === "volume";
 
     // For custom SQL queries, wrap them in a subquery and GROUP BY the dimension
@@ -69,7 +71,10 @@ export function useLatencyInsightsDashboard() {
         // Check if SQL already has timestamp filter
         if (timestampPattern.test(sql)) {
           // Replace existing timestamp filter
-          return sql.replace(timestampPattern, `_timestamp >= ${startTime} AND _timestamp <= ${endTime}`);
+          return sql.replace(
+            timestampPattern,
+            `_timestamp >= ${startTime} AND _timestamp <= ${endTime}`,
+          );
         }
 
         // No timestamp filter found, need to inject it
@@ -77,7 +82,10 @@ export function useLatencyInsightsDashboard() {
         const wherePattern = /\bWHERE\b/i;
         if (wherePattern.test(sql)) {
           // Has WHERE clause, add timestamp filter with AND
-          return sql.replace(wherePattern, `WHERE _timestamp >= ${startTime} AND _timestamp <= ${endTime} AND`);
+          return sql.replace(
+            wherePattern,
+            `WHERE _timestamp >= ${startTime} AND _timestamp <= ${endTime} AND`,
+          );
         } else {
           // No WHERE clause, need to add one before GROUP BY, ORDER BY, or LIMIT
           // Find the position to insert WHERE clause
@@ -87,7 +95,11 @@ export function useLatencyInsightsDashboard() {
           if (match) {
             // Insert WHERE before GROUP BY/ORDER BY/LIMIT
             const insertPos = match.index!;
-            return sql.slice(0, insertPos) + `WHERE _timestamp >= ${startTime} AND _timestamp <= ${endTime} ` + sql.slice(insertPos);
+            return (
+              sql.slice(0, insertPos) +
+              `WHERE _timestamp >= ${startTime} AND _timestamp <= ${endTime} ` +
+              sql.slice(insertPos)
+            );
           } else {
             // No GROUP BY/ORDER BY/LIMIT, add WHERE at the end
             return sql.trim() + ` WHERE _timestamp >= ${startTime} AND _timestamp <= ${endTime}`;
@@ -96,14 +108,16 @@ export function useLatencyInsightsDashboard() {
       };
 
       // Calculate durations for normalization
-      const baselineDurationSeconds = (config.baselineTimeRange.endTime - config.baselineTimeRange.startTime) / 1000000;
-      const selectedDurationSeconds = (config.selectedTimeRange.endTime - config.selectedTimeRange.startTime) / 1000000;
+      const baselineDurationSeconds =
+        (config.baselineTimeRange.endTime - config.baselineTimeRange.startTime) / 1000000;
+      const selectedDurationSeconds =
+        (config.selectedTimeRange.endTime - config.selectedTimeRange.startTime) / 1000000;
 
       // Create baseline query with baseline time range
       const baselineSQL = addOrReplaceTimestampFilter(
         baseFilters,
         config.baselineTimeRange.startTime,
-        config.baselineTimeRange.endTime
+        config.baselineTimeRange.endTime,
       );
 
       // For custom SQL, the user's query might already have aggregations
@@ -125,7 +139,7 @@ export function useLatencyInsightsDashboard() {
       const selectedSQL = addOrReplaceTimestampFilter(
         baseFilters,
         config.selectedTimeRange.startTime,
-        config.selectedTimeRange.endTime
+        config.selectedTimeRange.endTime,
       );
 
       const selectedQuery = `
@@ -149,8 +163,10 @@ export function useLatencyInsightsDashboard() {
     const selectedTimeFilter = `_timestamp >= ${config.selectedTimeRange.startTime} AND _timestamp <= ${config.selectedTimeRange.endTime}`;
 
     // Build baseline WHERE clause with time filtering
-    const baselineFiltersArray = [baselineTimeFilter, baseFilters].filter(f => f);
-    const baselineWhere = baselineFiltersArray.length ? `WHERE ${baselineFiltersArray.join(' AND ')}` : "";
+    const baselineFiltersArray = [baselineTimeFilter, baseFilters].filter((f) => f);
+    const baselineWhere = baselineFiltersArray.length
+      ? `WHERE ${baselineFiltersArray.join(" AND ")}`
+      : "";
 
     // Build selected WHERE clause with appropriate filter
     let filterClause = "";
@@ -163,8 +179,10 @@ export function useLatencyInsightsDashboard() {
       filterClause = `duration >= ${config.durationFilter.start} AND duration <= ${config.durationFilter.end}`;
     }
 
-    const selectedFiltersArray = [selectedTimeFilter, filterClause, baseFilters].filter(f => f);
-    const selectedWhere = selectedFiltersArray.length ? `WHERE ${selectedFiltersArray.join(' AND ')}` : "";
+    const selectedFiltersArray = [selectedTimeFilter, filterClause, baseFilters].filter((f) => f);
+    const selectedWhere = selectedFiltersArray.length
+      ? `WHERE ${selectedFiltersArray.join(" AND ")}`
+      : "";
 
     if (isVolumeAnalysis) {
       // Volume Analysis: Normalize both baseline and selected to the selected time window
@@ -172,21 +190,23 @@ export function useLatencyInsightsDashboard() {
       // Makes comparison intuitive: spike shows MORE records in same time window
 
       // Calculate durations in seconds
-      const baselineDurationSeconds = (config.baselineTimeRange.endTime - config.baselineTimeRange.startTime) / 1000000;
-      const selectedDurationSeconds = (config.selectedTimeRange.endTime - config.selectedTimeRange.startTime) / 1000000;
+      const baselineDurationSeconds =
+        (config.baselineTimeRange.endTime - config.baselineTimeRange.startTime) / 1000000;
+      const selectedDurationSeconds =
+        (config.selectedTimeRange.endTime - config.selectedTimeRange.startTime) / 1000000;
 
       // Use count(_timestamp) for logs, approx_distinct(trace_id) for traces
-      const countExpression = config.streamType === "traces"
-        ? "approx_distinct(trace_id)"
-        : "count(_timestamp)";
+      const countExpression =
+        config.streamType === "traces" ? "approx_distinct(trace_id)" : "count(_timestamp)";
 
       // Check if we should use single query or comparison query
-      // For TRACES: Check if filters have time-based selection (timeStart/timeEnd)
+      // For TRACES: Only check the rateFilter (volume-specific) — a brush on the
+      // duration or error chart must not trigger comparison mode for volume panels.
       // For LOGS: Check if time ranges are the same (no brush selection)
       const hasTimeBasedFilter =
-        (config.durationFilter !== undefined && config.durationFilter.timeStart !== undefined && config.durationFilter.timeEnd !== undefined) ||
-        (config.rateFilter !== undefined && config.rateFilter.timeStart !== undefined && config.rateFilter.timeEnd !== undefined) ||
-        (config.errorFilter !== undefined && config.errorFilter.timeStart !== undefined && config.errorFilter.timeEnd !== undefined);
+        config.rateFilter !== undefined &&
+        config.rateFilter.timeStart !== undefined &&
+        config.rateFilter.timeEnd !== undefined;
 
       const isSameTimeRange =
         config.streamType === "logs" &&
@@ -196,7 +216,8 @@ export function useLatencyInsightsDashboard() {
       // Use single query (baseline-only) when:
       // - TRACES: No time-based filter exists
       // - LOGS: Time ranges are the same (no brush selection)
-      const useBaselineOnly = config.streamType === "traces" ? !hasTimeBasedFilter : isSameTimeRange;
+      const useBaselineOnly =
+        config.streamType === "traces" ? !hasTimeBasedFilter : isSameTimeRange;
 
       if (useBaselineOnly) {
         const singleQuery = `
@@ -209,8 +230,6 @@ export function useLatencyInsightsDashboard() {
           ORDER BY trace_count DESC
           LIMIT 5
         `.trim();
-
-  
 
         return singleQuery;
       }
@@ -240,19 +259,19 @@ export function useLatencyInsightsDashboard() {
 
       const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY trace_count DESC LIMIT 5`;
 
-      
       return unionQuery;
     } else if (config.analysisType === "error") {
       // Error Analysis: Compare error percentages by dimension
       // Error % = (error_traces / total_traces) * 100
 
       // Check if we should use single query (baseline-only mode)
-      // For TRACES: Check if filters have time-based selection (timeStart/timeEnd)
+      // For TRACES: Only check the errorFilter (error-specific) — a brush on the
+      // duration or rate chart must not trigger comparison mode for error panels.
       // For LOGS: Check if time ranges are the same (no brush selection)
       const hasTimeBasedFilter =
-        (config.durationFilter !== undefined && config.durationFilter.timeStart !== undefined && config.durationFilter.timeEnd !== undefined) ||
-        (config.rateFilter !== undefined && config.rateFilter.timeStart !== undefined && config.rateFilter.timeEnd !== undefined) ||
-        (config.errorFilter !== undefined && config.errorFilter.timeStart !== undefined && config.errorFilter.timeEnd !== undefined);
+        config.errorFilter !== undefined &&
+        config.errorFilter.timeStart !== undefined &&
+        config.errorFilter.timeEnd !== undefined;
 
       const isSameTimeRange =
         config.streamType === "logs" &&
@@ -262,7 +281,8 @@ export function useLatencyInsightsDashboard() {
       // Use single query (baseline-only) when:
       // - TRACES: No time-based filter exists
       // - LOGS: Time ranges are the same (no brush selection)
-      const useBaselineOnly = config.streamType === "traces" ? !hasTimeBasedFilter : isSameTimeRange;
+      const useBaselineOnly =
+        config.streamType === "traces" ? !hasTimeBasedFilter : isSameTimeRange;
 
       if (useBaselineOnly) {
         // Baseline-only mode: single query without comparison
@@ -306,18 +326,18 @@ export function useLatencyInsightsDashboard() {
 
       const unionQuery = `${baselineQuery} UNION ${selectedQuery} ORDER BY error_percentage DESC LIMIT 5`;
 
-
       return unionQuery;
     } else {
       // Latency Analysis: Compare percentile latencies by dimension
 
       // Check if we should use single query (baseline-only mode)
-      // For TRACES: Check if filters have time-based selection (timeStart/timeEnd)
+      // For TRACES: Only check the durationFilter (latency-specific) — a brush on the
+      // rate or error chart must not trigger comparison mode for latency panels.
       // For LOGS: Check if time ranges are the same (no brush selection)
       const hasTimeBasedFilter =
-        (config.durationFilter !== undefined && config.durationFilter.timeStart !== undefined && config.durationFilter.timeEnd !== undefined) ||
-        (config.rateFilter !== undefined && config.rateFilter.timeStart !== undefined && config.rateFilter.timeEnd !== undefined) ||
-        (config.errorFilter !== undefined && config.errorFilter.timeStart !== undefined && config.errorFilter.timeEnd !== undefined);
+        config.durationFilter !== undefined &&
+        config.durationFilter.timeStart !== undefined &&
+        config.durationFilter.timeEnd !== undefined;
 
       const isSameTimeRange =
         config.streamType === "logs" &&
@@ -327,7 +347,8 @@ export function useLatencyInsightsDashboard() {
       // Use single query (baseline-only) when:
       // - TRACES: No time-based filter exists
       // - LOGS: Time ranges are the same (no brush selection)
-      const useBaselineOnly = config.streamType === "traces" ? !hasTimeBasedFilter : isSameTimeRange;
+      const useBaselineOnly =
+        config.streamType === "traces" ? !hasTimeBasedFilter : isSameTimeRange;
 
       if (useBaselineOnly) {
         // Baseline-only mode: single query without comparison
@@ -375,49 +396,55 @@ export function useLatencyInsightsDashboard() {
    */
   const generateDashboard = (
     analyses: DimensionAnalysis[],
-    config: LatencyInsightsConfig
+    config: LatencyInsightsConfig,
+    theme: "dark" | "light" = "dark",
   ) => {
     const isVolumeAnalysis = config.analysisType === "volume";
     const isErrorAnalysis = config.analysisType === "error";
 
     // Check if we're using comparison mode (baseline vs selected) or single query mode
-    // Comparison mode is enabled when:
-    // 1. Any filter with time-based selection exists (filter object + timeStart/timeEnd), OR
-    // 2. For logs: time ranges differ (brush selection made)
-    //
-    // A filter is active only if:
-    // - The filter object exists (not undefined), AND
-    // - It has both timeStart and timeEnd set (indicating a brush selection was made)
-    const hasTimeBasedFilter =
-      (config.durationFilter !== undefined && config.durationFilter.timeStart !== undefined && config.durationFilter.timeEnd !== undefined) ||
-      (config.rateFilter !== undefined && config.rateFilter.timeStart !== undefined && config.rateFilter.timeEnd !== undefined) ||
-      (config.errorFilter !== undefined && config.errorFilter.timeStart !== undefined && config.errorFilter.timeEnd !== undefined);
+    // Only check the filter that corresponds to the current analysis type —
+    // a brush on the duration chart must not trigger comparison mode for volume/error panels.
+    const hasTimeBasedFilter = isVolumeAnalysis
+      ? config.rateFilter?.timeStart !== undefined && config.rateFilter?.timeEnd !== undefined
+      : isErrorAnalysis
+        ? config.errorFilter?.timeStart !== undefined && config.errorFilter?.timeEnd !== undefined
+        : config.durationFilter?.timeStart !== undefined &&
+          config.durationFilter?.timeEnd !== undefined;
     const isSameTimeRange =
-      config.streamType === "logs" &&
+      config.streamType &&
       config.baselineTimeRange.startTime === config.selectedTimeRange.startTime &&
       config.baselineTimeRange.endTime === config.selectedTimeRange.endTime;
-    const isComparisonMode = hasTimeBasedFilter || !isSameTimeRange;
+    const isComparisonMode = hasTimeBasedFilter && !isSameTimeRange;
 
- 
     const panels = analyses.map((analysis, index) => {
       // Build panel description based on analysis type
+      // Panel descriptions surface in the panel info tooltip (PanelContainer
+      // renders them because this dashboard is mounted with viewOnly=false).
       let description = "";
       if (isVolumeAnalysis) {
         if (isComparisonMode) {
-          description = `Trace count comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value appears more frequently in high-volume periods.`;
+          description = t("latencyInsights.panelDescVolumeComparison", {
+            dimension: analysis.dimensionName,
+          });
         } else {
-          description = `Top values by count for dimension: ${analysis.dimensionName}.`;
+          description = t("latencyInsights.panelDescVolumeTopValues", {
+            dimension: analysis.dimensionName,
+          });
         }
       } else if (isErrorAnalysis) {
-        description = `Error percentage comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value has more errors in the error spike period.`;
+        description = t("latencyInsights.panelDescErrorComparison", {
+          dimension: analysis.dimensionName,
+        });
       } else {
-        description = `Percentile latency comparison for dimension: ${analysis.dimensionName}. Higher Selected bars indicate this dimension value correlates with slower traces.`;
+        description = t("latencyInsights.panelDescLatencyComparison", {
+          dimension: analysis.dimensionName,
+        });
       }
 
       // Generate SQL query for this dimension
       const sqlQuery = buildComparisonQuery(analysis.dimensionName, config);
 
-  
       // Determine panel ID prefix
       let panelPrefix = "LatencyInsights";
       if (isVolumeAnalysis) panelPrefix = "VolumeInsights";
@@ -442,7 +469,7 @@ export function useLatencyInsightsDashboard() {
       }
 
       // Generate unique panel ID using dimension name to ensure stability
-      const dimensionHash = analysis.dimensionName.replace(/[^a-zA-Z0-9]/g, '_');
+      const dimensionHash = analysis.dimensionName.replace(/[^a-zA-Z0-9]/g, "_");
 
       return {
         id: `Panel_${panelPrefix}_${dimensionHash}_${index}`,
@@ -460,20 +487,26 @@ export function useLatencyInsightsDashboard() {
           },
           axis_label_rotate: 30,
           axis_label_truncate_width: 80,
-          color: isComparisonMode ? {
-            mode: "palette-classic-by-series",
-            fixedColor: ["#ffc107", "#1976d2"],
-            seriesBy: "last",
-            colorBySeries: [
-              { name: "Selected", color: "#ffc107" },
-              { name: "Baseline", color: "#1976d2" },
-            ],
-          } : {
-            mode: "palette-classic-by-series",
-            fixedColor: ["#5960b2"],
-            seriesBy: "last",
-            colorBySeries: [],
-          },
+          color: isComparisonMode
+            ? {
+                mode: "palette-classic-by-series",
+                seriesBy: "last",
+                colorBySeries: [
+                  {
+                    value: "Baseline",
+                    color: COMPARISON_COLORS[theme].baseline,
+                  },
+                  {
+                    value: "Selected",
+                    color: COMPARISON_COLORS[theme].selected,
+                  },
+                ],
+              }
+            : {
+                mode: "shades",
+                fixedColor: [COMPARISON_COLORS[theme].baseline],
+                seriesBy: "last",
+              },
           top_results_others: false,
           line_thickness: 1.5,
           step_value: "0",
@@ -539,8 +572,16 @@ export function useLatencyInsightsDashboard() {
               y: [
                 {
                   label: "",
-                  alias: isVolumeAnalysis ? "trace_count" : (isErrorAnalysis ? "error_percentage" : "percentile_latency"),
-                  column: isVolumeAnalysis ? "trace_count" : (isErrorAnalysis ? "error_percentage" : "percentile_latency"),
+                  alias: isVolumeAnalysis
+                    ? "trace_count"
+                    : isErrorAnalysis
+                      ? "error_percentage"
+                      : "percentile_latency",
+                  column: isVolumeAnalysis
+                    ? "trace_count"
+                    : isErrorAnalysis
+                      ? "error_percentage"
+                      : "percentile_latency",
                   color: null,
                   isDerived: false,
                   havingConditions: [],
@@ -548,17 +589,19 @@ export function useLatencyInsightsDashboard() {
                 },
               ],
               z: [],
-              breakdown: isComparisonMode ? [
-                {
-                  label: "",
-                  alias: "series",
-                  column: "series",
-                  color: null,
-                  isDerived: false,
-                  havingConditions: [],
-                  treatAsNonTimestamp: true,
-                },
-              ] : [],
+              breakdown: isComparisonMode
+                ? [
+                    {
+                      label: "",
+                      alias: "series",
+                      column: "series",
+                      color: null,
+                      isDerived: false,
+                      havingConditions: [],
+                      treatAsNonTimestamp: true,
+                    },
+                  ]
+                : [],
               filter: {
                 filterType: "group",
                 logicalOperator: "AND",
@@ -589,43 +632,71 @@ export function useLatencyInsightsDashboard() {
       };
     });
 
-    let title = "Latency Insights";
-    if (isVolumeAnalysis) title = "Volume Insights";
-    if (isErrorAnalysis) title = "Error Insights";
+    let title = t("latencyInsights.dashboardTitleLatency");
+    if (isVolumeAnalysis) title = t("latencyInsights.dashboardTitleVolume");
+    if (isErrorAnalysis) title = t("latencyInsights.dashboardTitleError");
 
     let description = "";
     if (isVolumeAnalysis) {
-      description = `Comparing trace count distribution ${config.rateFilter ? `of selected periods (rate ${config.rateFilter.start}-${config.rateFilter.end} traces)` : ''} vs baseline across dimensions`;
+      // Two whole sentences rather than one with an optional clause spliced in:
+      // the clause carries its own parenthetical, and the old empty-string arm
+      // left a double space mid-sentence.
+      description = config.rateFilter
+        ? t("latencyInsights.dashboardDescVolumeRate", {
+            start: config.rateFilter.start,
+            end: config.rateFilter.end,
+          })
+        : t("latencyInsights.dashboardDescVolume");
     } else if (isErrorAnalysis) {
-      description = `Comparing error percentage of traces during error spike period vs baseline across dimensions`;
+      description = t("latencyInsights.dashboardDescError");
     } else {
-      description = `Comparing percentile latency of selected traces (duration ${config.durationFilter?.start}-${config.durationFilter?.end}µs) vs baseline across dimensions`;
+      description = t("latencyInsights.dashboardDescLatency", {
+        start: config.durationFilter?.start,
+        end: config.durationFilter?.end,
+      });
     }
 
     // Only include percentile variable for latency analysis
     const percentileValue = config.percentile || "0.95";
-    const variables = (isVolumeAnalysis || isErrorAnalysis)
-      ? { list: [], showDynamicFilters: false }
-      : {
-          list: [
-            {
-              type: "custom",
-              name: "percentile",
-              label: "Latency Percentile",
-              value: percentileValue,
-              multiSelect: false,
-              isLoading: false,
-              isVariableLoading: false,
-              options: [
-                { label: "P50 (Median)", value: "0.50", selected: percentileValue === "0.50" },
-                { label: "P75", value: "0.75", selected: percentileValue === "0.75" },
-                { label: "P95", value: "0.95", selected: percentileValue === "0.95" },
-                { label: "P99", value: "0.99", selected: percentileValue === "0.99" },
-              ],
-            },
-          ],
-          showDynamicFilters: false,
-        };
+    const variables =
+      isVolumeAnalysis || isErrorAnalysis
+        ? { list: [], showDynamicFilters: false }
+        : {
+            list: [
+              {
+                type: "custom",
+                name: "percentile",
+                label: t("traces.latencyPercentile"),
+                value: percentileValue,
+                multiSelect: false,
+                isLoading: false,
+                isVariableLoading: false,
+                options: [
+                  {
+                    label: t("traces.p50Median"),
+                    value: "0.50",
+                    selected: percentileValue === "0.50",
+                  },
+                  {
+                    label: raw("P75"),
+                    value: "0.75",
+                    selected: percentileValue === "0.75",
+                  },
+                  {
+                    label: raw("P95"),
+                    value: "0.95",
+                    selected: percentileValue === "0.95",
+                  },
+                  {
+                    label: raw("P99"),
+                    value: "0.99",
+                    selected: percentileValue === "0.99",
+                  },
+                ],
+              },
+            ],
+            showDynamicFilters: false,
+          };
 
     const dashboard = {
       version: 5,

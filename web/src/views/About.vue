@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,305 +15,495 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem] aboutPage q-pt-xs">
-    <div class="card-container tw:h-[calc(100vh-50px)] tw:overflow-auto">
-      <div class="q-px-sm q-py-sm tw:h-full">
-        <!-- Hero Section -->
-        <div class="hero-section">
-          <div class="tw:flex tw:flex-col tw:flex-row tw:items-center tw:justify-between tw:gap-8">
-            <div class="tw:flex-1">
-              <img
-                :src="
-                  store.state.theme == 'dark'
-                    ? getImageURL('images/common/openobserve_latest_dark_2.svg')
-                    : getImageURL('images/common/openobserve_latest_light_2.svg')
-                "
-                class="logo"
-                width="220"
-              />
-              <p class="tagline tw:mt-4">{{ t("about.logoMsg") }}</p>
-              <div class="tw:flex tw:gap-3 tw:mt-6">
-                <div class="version-badge" :class="store.state.theme === 'dark' ? 'version-badge-dark' : 'version-badge-light'">
-                  <span>{{ store.state.zoConfig.version }}</span>
-                </div>
-                <div class="build-badge tw:capitalize" :class="store.state.theme === 'dark' ? 'build-badge-dark' : 'build-badge-light'">
-                  <q-icon name="workspaces" size="20px" />
-                  <span>{{ store.state.zoConfig.build_type }}</span>
-                </div>
-              </div>
-            </div>
-            <div class="stats-grid">
-              <div class="stat-card stat-card-commit" :class="store.state.theme === 'dark' ? 'stat-card-commit-dark' : 'stat-card-commit-light'">
-                <q-icon name="code" size="32px" class="stat-icon" />
-                <div class="stat-label">{{ t("about.commit_lbl") }}</div>
-                <div class="stat-value tw:font-mono">{{ store.state.zoConfig.commit_hash }}</div>
-              </div>
-              <div class="stat-card stat-card-built" :class="store.state.theme === 'dark' ? 'stat-card-built-dark' : 'stat-card-built-light'">
-                <q-icon name="event" size="32px" class="stat-icon" />
-                <div class="stat-label">{{ t("about.build_lbl") }}</div>
-                <div class="stat-value">{{ formatDate(store.state.zoConfig.build_date) }}</div>
-              </div>
+  <div class="rounded-default px-page-edge h-full w-full pt-2.5 pb-2.5">
+    <div class="h-full overflow-auto">
+      <div class="flex flex-col gap-4">
+        <!-- ── Hero Banner ─────────────────────────────────────────── -->
+        <div class="bg-card-glass-bg rounded-default relative overflow-hidden p-4">
+          <div class="relative z-1">
+            <img
+              :src="
+                isDark
+                  ? getImageURL('images/common/openobserve_latest_dark_2.svg')
+                  : getImageURL('images/common/openobserve_latest_light_2.svg')
+              "
+              class="block max-w-55"
+              width="220"
+            />
+            <OText variant="body" class="mt-1 mb-0">
+              {{ t("about.logoMsg") }}
+            </OText>
+
+            <!-- One-line meta bar -->
+            <div class="mt-5 inline-flex flex-wrap items-center gap-2">
+              <!-- version -->
+              <span
+                class="rounded-default text-status-positive border-status-positive/28 bg-card-glass-tint-positive inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-semibold whitespace-nowrap"
+              >
+                <OIcon name="check-circle" size="sm" class="text-status-positive shrink-0" />
+                {{ store.state.zoConfig.version }}
+              </span>
+              <!-- build type -->
+              <span
+                class="rounded-default text-accent border-accent/28 bg-card-glass-tint-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-semibold whitespace-nowrap capitalize"
+              >
+                <OIcon name="workspaces" size="sm" class="text-accent shrink-0" />
+                {{ store.state.zoConfig.build_type }}
+              </span>
+              <!-- commit -->
+              <span
+                class="text-text-body rounded-default border-info/28 bg-card-glass-tint-info-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm whitespace-nowrap"
+              >
+                <OIcon name="code" size="sm" class="text-info shrink-0" />
+                <span class="text-info text-xs font-semibold tracking-wide uppercase">{{
+                  t("about.commit_lbl")
+                }}</span>
+                <OText variant="mono">{{ store.state.zoConfig.commit_hash }}</OText>
+                <button
+                  @click="copyToClipboard(store.state.zoConfig.commit_hash)"
+                  class="rounded-default text-text-muted hover:text-info inline-flex cursor-pointer items-center justify-center border-none bg-transparent p-0.5 transition-colors duration-150"
+                  :title="t('about.copyCommitHash')"
+                >
+                  <OIcon name="content-copy" size="sm" />
+                </button>
+              </span>
+              <!-- built date -->
+              <span
+                class="text-text-body rounded-default border-warning/28 bg-card-glass-tint-warning inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm whitespace-nowrap"
+              >
+                <OIcon name="event" size="sm" class="text-warning shrink-0" />
+                <span class="text-warning text-xs font-semibold tracking-wide uppercase">{{
+                  t("about.build_lbl")
+                }}</span>
+                {{
+                  store.state.zoConfig.build_date ? formatDate(store.state.zoConfig.build_date) : ""
+                }}
+              </span>
             </div>
           </div>
         </div>
 
-        <!-- Features Grid -->
-        <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4">
+        <!-- ── Info Cards Grid ─────────────────────────────────────── -->
+        <div class="grid grid-cols-1 gap-4">
           <!-- Open Source Libraries -->
-          <div class=" feature-card">
-            <div class="tw:mb-4">
-              <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
-                <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <q-icon name="code" size="24px" />
-                </div>
-                <h3 class="feature-title">{{ t("about.os_libraries") }}</h3>
+          <div class="bg-card-glass-bg rounded-default flex flex-col gap-y-2 p-4">
+            <div class="flex items-center gap-3">
+              <div
+                class="rounded-default text-accent bg-card-glass-tint-medium flex h-12 w-12 shrink-0 items-center justify-center"
+              >
+                <OIcon name="code" size="md" />
               </div>
-              <p class="feature-text">
-                {{ t("about.os_libraries_msg") }}
-              </p>
+              <OText variant="page-title" as="h2" class="text-xl font-medium">{{
+                t("about.os_libraries")
+              }}</OText>
             </div>
-            <div class="tw:flex tw:flex-wrap tw:gap-2">
+            <div class="text-text-secondary text-sm">{{ t("about.os_libraries_msg") }}</div>
+            <div class="grid grid-cols-4 gap-2.5">
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/Cargo.toml"
                 target="_blank"
-                class="link-badge"
+                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
               >
-                <q-icon name="settings" size="16px" class="tw:mr-1" />
-                Cargo.toml
+                <OIcon name="settings" size="md" class="text-accent shrink-0" />
+                <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span
+                    class="text-text-heading overflow-hidden font-mono text-sm font-semibold text-ellipsis whitespace-nowrap"
+                    >{{ t("about.cargoToml") }}</span
+                  >
+                  <span class="text-text-secondary text-xs">{{ t("about.rustCrates") }}</span>
+                </div>
+                <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
               <a
                 href="https://github.com/openobserve/openobserve/blob/main/web/package.json"
                 target="_blank"
-                class="link-badge"
+                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
               >
-              <q-icon name="backpack" class="tw:mr-1" />
-                package.json
+                <OIcon name="backpack" size="md" class="text-accent shrink-0" />
+                <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span
+                    class="text-text-heading overflow-hidden font-mono text-sm font-semibold text-ellipsis whitespace-nowrap"
+                    >{{ t("about.packageJson") }}</span
+                  >
+                  <span class="text-text-secondary text-xs">{{ t("about.nodePackages") }}</span>
+                </div>
+                <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
-              <a href="https://npmjs.com" target="_blank" class="link-badge">
-                <q-icon name="javascript" size="16px" class="tw:mr-1" />
-                npmjs.com
+              <a
+                href="https://npmjs.com"
+                target="_blank"
+                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
+              >
+                <OIcon name="javascript" size="md" class="text-accent shrink-0" />
+                <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span
+                    class="text-text-heading overflow-hidden font-mono text-sm font-semibold text-ellipsis whitespace-nowrap"
+                    >{{ t("about.npmjsCom") }}</span
+                  >
+                  <span class="text-text-secondary text-xs">{{ t("about.jsRegistry") }}</span>
+                </div>
+                <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
-              <a href="https://crates.io" target="_blank" class="link-badge">
-                <q-icon name="inventory_2" size="16px" class="tw:mr-1" />
-                crates.io
+              <a
+                href="https://crates.io"
+                target="_blank"
+                class="border-card-glass-border rounded-default bg-card-glass-bg hover:border-accent/35 flex items-center gap-3 border px-3.5 py-3 no-underline transition-all duration-200"
+              >
+                <OIcon name="inventory-2" size="md" class="text-accent shrink-0" />
+                <div class="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span
+                    class="text-text-heading overflow-hidden font-mono text-sm font-semibold text-ellipsis whitespace-nowrap"
+                    >{{ t("about.cratesIo") }}</span
+                  >
+                  <span class="text-text-secondary text-xs">{{ t("about.rustRegistry") }}</span>
+                </div>
+                <OIcon name="open-in-new" size="sm" class="text-text-muted shrink-0" />
               </a>
             </div>
           </div>
 
-          <!-- License Info -->
+          <!-- License Info (opensource or enterprise on-prem) -->
           <div
-            v-if="store.state.zoConfig.build_type == 'opensource' || (store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false')"
-            class=" feature-card license-feature"
+            v-if="
+              store.state.zoConfig.build_type == 'opensource' ||
+              (store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false')
+            "
+            class="bg-card-glass-bg rounded-default p-4"
           >
-            <div class="tw:mb-4">
-              <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
-                <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <q-icon name="shield" size="24px" />
-                </div>
-                <h3 class="feature-title">{{ t("about.license_info") }}</h3>
+            <div class="mb-3 flex items-center gap-3">
+              <div
+                class="rounded-default text-info bg-card-glass-tint-info flex h-12 w-12 shrink-0 items-center justify-center"
+              >
+                <OIcon name="shield" size="md" />
               </div>
-              <p v-if="store.state.zoConfig.build_type == 'opensource'" class="feature-text">
-                {{ t("about.license_info_os_msg") }} <a
-                  href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
-                  target="_blank"
-                  class="inline-link"
-                >GNU Affero General Public License (AGPL)</a>.
-              </p>
-              <p v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'" class="feature-text">
-                {{ t("about.license_info_msg") }}
-              </p>
+              <OText variant="page-title" as="h2" class="m-0 text-xl font-medium">{{
+                t("about.license_info")
+              }}</OText>
             </div>
-            <div class="tw:mt-4 tw:p-3 tw:rounded tw:bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw:bg-blue-400' : 'tw:bg-blue-500'">
-              <p class="tw:text-sm tw:mb-0">
-                <q-icon name="info" size="16px" class="tw:mr-1" />
-                {{ t("about.license_info_note") }}
-              </p>
-            </div>
+            <OText
+              v-if="store.state.zoConfig.build_type == 'opensource'"
+              variant="body"
+              as="div"
+              class="m-0 mb-4 leading-relaxed"
+            >
+              {{ t("about.license_info_os_msg") }}
+              <a
+                href="https://github.com/openobserve/openobserve/blob/main/LICENSE"
+                target="_blank"
+                class="text-text-link hover:border-text-link border-text-link/35 border-b font-medium no-underline transition-colors duration-200"
+                >{{ t("about.agplFullName") }}</a
+              >.
+            </OText>
+            <OText
+              v-if="store.state.zoConfig.build_type == 'enterprise' && config.isCloud == 'false'"
+              variant="body"
+              as="div"
+              class="leading-relaxed"
+            >
+              {{ t("about.license_info_msg") }}
+            </OText>
+            <OBanner variant="info" icon="info" class="mt-2">
+              {{ t("about.license_info_note") }}
+            </OBanner>
           </div>
 
-          <!-- Community Card (if no license card) -->
-          <div
-            v-else
-            class=" feature-card"
-          >
-            <div class="tw:mb-4" style="min-height: 120px;">
-              <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
-                <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <q-icon name="groups" size="24px" />
-                </div>
-                <h3 class="feature-title">{{ t("about.community_lbl") }}</h3>
+          <!-- Community Card (fallback for cloud) -->
+          <div v-else class="bg-card-glass-bg rounded-default p-4">
+            <div class="mb-3 flex items-center gap-3">
+              <div
+                class="rounded-default text-accent bg-card-glass-tint-medium flex h-12 w-12 shrink-0 items-center justify-center"
+              >
+                <OIcon name="groups" size="md" />
               </div>
-              <p class="feature-text">
-                {{ t("about.community_msg") }}
-              </p>
+              <OText variant="page-title" as="h3" class="m-0 text-lg leading-6 font-medium">{{
+                t("about.community_lbl")
+              }}</OText>
             </div>
-            <div class="tw:flex tw:flex-wrap tw:gap-2">
-              <a href="https://github.com/openobserve/openobserve" target="_blank" class="link-badge">
-                <q-icon name="code" size="16px" class="tw:mr-1" />
-                GitHub
+            <OText variant="body" class="m-0 mb-4 leading-relaxed">{{
+              t("about.community_msg")
+            }}</OText>
+            <div class="flex flex-wrap gap-2">
+              <a
+                href="https://github.com/openobserve/openobserve"
+                target="_blank"
+                class="rounded-default text-accent border-accent/18 bg-card-glass-tint-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-medium no-underline transition-all duration-200"
+              >
+                <OIcon name="code" size="sm" />
+                {{ t("about.github") }}
               </a>
-              <a href="https://openobserve.ai" target="_blank" class="link-badge">
-                <q-icon name="language" size="16px" class="tw:mr-1" />
-                Website
+              <a
+                href="https://openobserve.ai"
+                target="_blank"
+                class="rounded-default text-accent border-accent/18 bg-card-glass-tint-soft inline-flex items-center gap-1.5 border px-3.5 py-2 text-sm font-medium no-underline transition-all duration-200"
+              >
+                <OIcon name="language" size="sm" />
+                {{ t("about.website") }}
               </a>
             </div>
           </div>
         </div>
 
-        <!-- Enterprise License Details Section -->
-        <div v-if="config.isEnterprise == 'true' && config.isCloud === 'false'" class="tw:mt-4">
-          <div class="feature-card">
-            <div class="tw:flex tw:items-center tw:justify-between tw:mb-4">
-              <div class="tw:flex tw:items-center tw:gap-3">
-                <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-                  <q-icon name="workspace_premium" size="24px" />
-                </div>
-                <h3 class="feature-title">{{ t("about.ent_lincese_detail_lbl") }}</h3>
+        <!-- ── Enterprise License Details ──────────────────────────── -->
+        <div
+          v-if="config.isEnterprise == 'true' && config.isCloud === 'false'"
+          class="bg-card-glass-bg rounded-default p-4"
+        >
+          <!-- Header: eyebrow + title + manage button -->
+          <div class="mb-2 flex items-start justify-between">
+            <div class="flex items-start gap-3">
+              <div
+                class="rounded-default text-info bg-card-glass-tint-info flex h-12 w-12 shrink-0 items-center justify-center"
+              >
+                <OIcon name="workspace-premium" size="md" />
               </div>
-              <q-btn
-                no-caps
-                :label="t('about.manage_license')"
-                @click="navigateToLicense"
-                size="sm"
-                class="o2-primary-button"
-              />
-            </div>
-
-            <div v-if="loadingLicense" class="tw:text-center tw:py-8">
-              <q-spinner size="40px" color="primary" />
-              <div class="tw:mt-3 tw:text-sm tw:opacity-70">{{ t("about.loading_license_info") }}</div>
-            </div>
-
-            <div v-else-if="!licenseData || !licenseData.license" class="tw:py-4">
-              <div class="tw:flex tw:items-start tw:gap-3 tw:p-4 tw:rounded tw:bg-opacity-10" :class="store.state.theme === 'dark' ? 'tw:bg-yellow-400' : 'tw:bg-yellow-500'">
-                <q-icon name="warning" size="24px" class="tw:text-yellow-500" />
-                <div>
-                  <div class="tw:font-semibold tw:mb-1">{{ t("about.no_license_installed_lbl") }}</div>
-                  <p class="tw:text-sm tw:mb-2 tw:opacity-80">
-                    {{ t("about.no_license_installed_msg") }}
-                  </p>
-                  <div v-if="licenseData && licenseData.installation_id" class="tw:text-xs tw:opacity-70 tw:mb-2">
-                    {{ t("about.installation_id_lbl") }}: <code class="tw:px-2 tw:py-1 tw:rounded tw:bg-black tw:bg-opacity-10">{{ licenseData.installation_id }}</code>
-                  </div>
-                </div>
+              <div>
+                <OText variant="label" class="text-accent m-0 mb-1 tracking-widest uppercase">{{
+                  t("about.licenseAndUsage")
+                }}</OText>
+                <h2 class="text-text-heading m-0 text-xl font-semibold">
+                  {{ t("about.ent_lincese_detail_lbl") }}
+                </h2>
               </div>
             </div>
+            <OButton variant="primary" size="sm" @click="navigateToLicense">
+              {{ t("about.manage_license") }}
+            </OButton>
+          </div>
+          <OText variant="body" class="m-0 mb-5 leading-relaxed">{{
+            t("about.license_info_msg")
+          }}</OText>
 
-            <div v-else>
-              <div class="tw:grid tw:grid-cols-1 md:tw:grid-cols-2 tw:gap-4">
-                <div>
-                  <q-markup-table flat bordered dense class="compact-table">
-                    <tbody>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.lincese_id_lbl") }}</td>
-                        <td>{{ licenseData.license.license_id }}</td>
-                      </tr>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.status_lbl") }}</td>
-                        <td>
-                          <q-badge :color="licenseData?.expired ? 'red' : 'green'">
-                            {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
-                          </q-badge>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.create_at_lbl") }}</td>
-                        <td>{{ formatLicenseDate(licenseData.license.created_at) }}</td>
-                      </tr>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.expires_at_lbl") }}</td>
-                        <td>
-                          <div class="tw:flex tw:items-center tw:justify-start tw:gap-4">
-                            <span>{{ formatLicenseDate(licenseData.license.expires_at) }}</span>
-                          </div>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </q-markup-table>
-                </div>
+          <div v-if="loadingLicense" class="py-8 text-center">
+            <OSpinner size="md" />
+            <div class="text-text-muted mt-3 text-sm">{{ t("about.loading_license_info") }}</div>
+          </div>
 
-                <div>
-                  <q-markup-table flat bordered dense class="compact-table">
-                    <thead>
-                      <tr>
-                        <th colspan="2" class="tw:text-center tw:font-semibold">{{ t("about.usage_limits") }}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.ingestion_type") }}</td>
-                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.typ ? licenseData.license.limits.Ingestion.typ : 'PerDayCount' }}</td>
-                      </tr>
-                      <tr>
-                        <td class="tw:font-semibold">{{ t("about.ingestion_limit") }}</td>
-                        <td>{{ !licenseData?.expired && licenseData.license.limits?.Ingestion?.value ? `${licenseData.license.limits.Ingestion.value} GB / day` : '50 GB / day' }}</td>
-                      </tr>
-                      <tr v-if="licenseData.ingestion_used !== undefined">
-                        <td class="tw:font-semibold">{{ t("about.today_usage") }}</td>
-                        <td>
-                          <span :class="licenseData.ingestion_used > 90 ? 'tw:text-red-500 tw:font-bold' : licenseData.ingestion_used > 70 ? 'tw:text-orange-500' : ''">
-                            {{ licenseData.ingestion_used.toFixed(2) }}%
-                          </span>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </q-markup-table>
+          <div v-else-if="!licenseData || !licenseData.license" class="py-2">
+            <OBanner variant="warning" icon="warning">
+              <div class="mb-1 font-semibold">{{ t("about.no_license_installed_lbl") }}</div>
+              <p class="mb-2 text-sm">{{ t("about.no_license_installed_msg") }}</p>
+              <div
+                v-if="licenseData && licenseData.installation_id"
+                class="flex flex-wrap items-center gap-1 text-xs"
+              >
+                {{ t("about.installation_id_lbl") }}:
+                <code
+                  class="rounded-default border-card-glass-border bg-code-bg border border-solid px-2 py-0.5 font-mono select-all"
+                >
+                  {{ licenseData.installation_id }}
+                </code>
+              </div>
+            </OBanner>
+          </div>
+
+          <div v-else class="grid grid-cols-2 gap-4">
+            <!-- License details table -->
+            <div class="border-card-glass-border rounded-default overflow-hidden border">
+              <table class="w-full border-collapse">
+                <tbody>
+                  <tr class="border-table-row-divider border-b last:border-b-0">
+                    <td
+                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                    >
+                      {{ t("about.lincese_id_lbl") }}
+                    </td>
+                    <td class="text-text-body px-3.5 py-2.5 font-mono text-sm">
+                      <div class="flex items-center gap-1.5">
+                        <span>{{ licenseData.license.license_id }}</span>
+                        <button
+                          @click="copyToClipboard(licenseData.license.license_id)"
+                          class="rounded-default text-text-muted hover:text-accent inline-flex cursor-pointer items-center justify-center border-none bg-transparent p-0.5 transition-colors duration-150"
+                          :title="t('about.copyLicenseId')"
+                        >
+                          <OIcon name="content-copy" size="sm" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  <tr class="border-table-row-divider border-b last:border-b-0">
+                    <td
+                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                    >
+                      {{ t("about.status_lbl") }}
+                    </td>
+                    <td class="text-text-body px-3.5 py-2.5 text-sm">
+                      <span
+                        class="me-1.5 inline-block h-2 w-2 rounded-full align-middle"
+                        :class="licenseData?.expired ? 'bg-status-negative' : 'bg-status-positive'"
+                      />
+                      <span
+                        :class="
+                          licenseData?.expired ? 'text-status-error-text' : 'text-status-positive'
+                        "
+                      >
+                        {{ licenseData?.expired ? t("about.expired_lbl") : t("about.active_lbl") }}
+                      </span>
+                    </td>
+                  </tr>
+                  <tr class="border-table-row-divider border-b last:border-b-0">
+                    <td
+                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                    >
+                      {{ t("about.editionLbl") }}
+                    </td>
+                    <td class="text-text-body px-3.5 py-2.5 text-sm">
+                      {{ t("about.value_license_enterprise") }}
+                    </td>
+                  </tr>
+                  <tr class="border-table-row-divider border-b last:border-b-0">
+                    <td
+                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                    >
+                      {{ t("about.create_at_lbl") }}
+                    </td>
+                    <td class="text-text-body px-3.5 py-2.5 text-sm">
+                      {{ formatLicenseDate(licenseData.license.created_at) }}
+                    </td>
+                  </tr>
+                  <tr class="border-table-row-divider border-b last:border-b-0">
+                    <td
+                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                    >
+                      {{ t("about.expires_at_lbl") }}
+                    </td>
+                    <td class="text-text-body px-3.5 py-2.5 text-sm">
+                      {{ formatLicenseDate(licenseData.license.expires_at) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- Ingestion usage panel -->
+            <div
+              class="border-card-glass-border rounded-default bg-card-glass-tint-faint border p-5"
+            >
+              <p class="text-text-heading m-0 mb-1 text-sm font-semibold">
+                {{ t("about.usage_limits") }}
+              </p>
+              <p class="text-text-muted m-0 mb-4 text-xs">
+                {{ licenseData.license.limits?.Ingestion?.typ || raw("PerDayCount") }}
+                {{ t("about.limitPrefix") }}
+                {{ licenseData.license.limits?.Ingestion?.value || 50 }} {{ t("about.gbPerDay") }}
+              </p>
+              <div v-if="licenseData.ingestion_used !== undefined">
+                <div class="mb-3 flex items-baseline gap-2">
+                  <span
+                    class="text-text-body text-4xl leading-none font-bold"
+                    :class="
+                      licenseData.ingestion_used > 90
+                        ? 'text-status-error-text'
+                        : licenseData.ingestion_used > 70
+                          ? 'text-status-warning-text'
+                          : ''
+                    "
+                    >{{ licenseData.ingestion_used.toFixed(2) }}%</span
+                  >
+                  <span class="text-text-secondary text-xs">{{
+                    t("about.ofDailyLimitUsedToday")
+                  }}</span>
                 </div>
+                <div class="bg-card-glass-border mb-1.5 h-1.5 overflow-hidden rounded-full">
+                  <div
+                    class="h-full min-w-1 rounded-full transition-[width] duration-[400ms]"
+                    :class="
+                      licenseData.ingestion_used > 90
+                        ? 'bg-status-negative'
+                        : licenseData.ingestion_used > 70
+                          ? 'bg-warning'
+                          : 'bg-accent'
+                    "
+                    :style="{ width: Math.min(licenseData.ingestion_used, 100) + '%' }"
+                  />
+                </div>
+                <div class="text-text-muted mb-3.5 flex justify-between text-xs">
+                  <span
+                    >{{
+                      (
+                        (licenseData.ingestion_used / 100) *
+                        (licenseData.license.limits?.Ingestion?.value || 50)
+                      ).toFixed(0)
+                    }}
+                    {{ t("about.gbToday") }}</span
+                  >
+                  <span
+                    >{{ licenseData.license.limits?.Ingestion?.value || 50 }}
+                    {{ t("about.gbPerDay") }}</span
+                  >
+                </div>
+              </div>
+              <div
+                class="text-status-positive rounded-default border-status-positive/22 bg-card-glass-tint-positive flex items-start gap-1.5 border px-3 py-2 text-xs"
+              >
+                <OIcon name="check-circle" size="sm" class="mt-0.5 shrink-0" />
+                {{ t("about.feature_comparision_plan_detail") }}
               </div>
             </div>
           </div>
         </div>
-        <!-- Feature Comparison Table -->
-        <div class="tw:mt-6 tw:mb-[20px]" v-if="config.isCloud === 'false'">
+
+        <!-- ── Feature Comparison ──────────────────────────────────── -->
+        <div v-if="config.isCloud === 'false'" class="bg-card-glass-bg rounded-default mb-5 p-4">
           <FeatureComparisonTable />
         </div>
       </div>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onMounted } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { getImageURL } from "../utils/zincutils";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
 import FeatureComparisonTable from "@/components/about/FeatureComparisonTable.vue";
-import { useQuasar } from "quasar";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
+import OText from "@/lib/core/Typography/OText.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "PageAbout",
   components: {
     FeatureComparisonTable,
+    OButton,
+    OIcon,
+    OSpinner,
+    OBanner,
+    OText,
   },
   setup() {
     const store = useStore();
+    const { isDark } = useTheme();
     const router = useRouter();
     const pageData = ref("Page Data");
-    const { t } = useI18n();
-    const $q = useQuasar();
+    const { t } = useI18nTyped();
     const licenseData = ref<any>(null);
     const loadingLicense = ref(false);
 
     const formatDate = (dateString: string) => {
       const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
+      return date.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
       });
     };
 
     const formatLicenseDate = (timestamp: number) => {
-      return new Date(timestamp / 1000).toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
+      return new Date(timestamp / 1000).toLocaleString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
       });
     };
 
@@ -331,23 +521,24 @@ export default defineComponent({
     };
 
     onMounted(() => {
-      //  We don't need to make license data call for cloud
-      if(config.isCloud == 'false' && config.isEnterprise == 'true'){
+      if (config.isCloud == "false" && config.isEnterprise == "true") {
         loadLicenseData();
       }
     });
 
-    const navigateToLicense = () => {
-      // Get meta org identifier
-      const metaOrgIdentifier = store.state.zoConfig.meta_org;
+    const copyToClipboard = (text: string) => {
+      navigator.clipboard.writeText(text).then(() => {
+        toast({ message: t("toastMessages.views.copiedToClipboard"), variant: "success" });
+      });
+    };
 
-      // Find the meta org from the organizations list
+    const navigateToLicense = () => {
+      const metaOrgIdentifier = store.state.zoConfig.meta_org;
       const metaOrg = store.state.organizations?.find(
-        (org: any) => org.identifier === metaOrgIdentifier
+        (org: any) => org.identifier === metaOrgIdentifier,
       );
 
       if (metaOrg) {
-        // Create the org option object so that it will be used to switch to meta org
         const metaOrgOption = {
           label: metaOrg.name,
           id: metaOrg.id,
@@ -356,32 +547,23 @@ export default defineComponent({
           ingest_threshold: metaOrg.ingest_threshold,
           search_threshold: metaOrg.search_threshold,
         };
-
-        // Set the selected organization using dispatch
         store.dispatch("setSelectedOrganization", metaOrgOption);
-
-        // Navigate to license page with the meta org identifier
         router.push({
-          name: 'license',
-          query: { org_identifier: metaOrgIdentifier }
+          name: "license",
+          query: { org_identifier: metaOrgIdentifier },
         });
       } else {
-        // Show error notification when user doesn't have access to meta org
-          $q.notify({
-            message: "You are not authorized to manage the license.",
-            color: 'negative',
-            timeout: 5000,
-          })
-        // router.push({
-        //   name: 'license',
-        //   query: { org_identifier: metaOrgIdentifier }
-        // });
+        toast({
+          message: t("toastMessages.views.youAreNotAuthorizedToManage"),
+          variant: "error",
+        });
       }
     };
 
-
     return {
+      isDark,
       t,
+      raw,
       store,
       config,
       pageData,
@@ -391,272 +573,8 @@ export default defineComponent({
       loadingLicense,
       formatLicenseDate,
       navigateToLicense,
+      copyToClipboard,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.aboutPage {
-  // Hero Section
-  .hero-section {
-    padding: 0.1rem;
-    margin-bottom: 1rem;
-
-    .logo {
-      display: block;
-    }
-
-    .tagline {
-      font-size: 1.25rem;
-      font-weight: 500;
-      opacity: 0.85;
-      margin: 0;
-      line-height: 1.6;
-    }
-
-    .version-badge,
-    .build-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.5rem;
-      padding: 0.625rem 1.25rem;
-      border-radius: 0.375rem;
-      font-weight: 600;
-      font-size: 0.9375rem;
-      transition: all 0.3s ease;
-
-      &:hover {
-        transform: translateY(-2px);
-      }
-    }
-
-    .version-badge-dark {
-      background: rgba(76, 175, 80, 0.2);
-      color: #81C784;
-      border: 1px solid rgba(76, 175, 80, 0.3);
-    }
-
-    .version-badge-light {
-      background: rgba(76, 175, 80, 0.12);
-      color: #2E7D32;
-      border: 1px solid rgba(76, 175, 80, 0.25);
-    }
-
-    .build-badge-dark {
-      background: rgba(33, 150, 243, 0.2);
-      color: #64B5F6;
-      border: 1px solid rgba(33, 150, 243, 0.3);
-    }
-
-    .build-badge-light {
-      background: rgba(33, 150, 243, 0.12);
-      color: #1565C0;
-      border: 1px solid rgba(33, 150, 243, 0.25);
-    }
-
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1rem;
-
-      .stat-card {
-        padding: 1.75rem;
-        text-align: center;
-        transition: all 0.3s ease;
-        position: relative;
-        overflow: hidden;
-        border-radius: 0.375rem;
-        border: 1.5px solid;
-
-        &:hover {
-          transform: translateY(-4px);
-        }
-
-        .stat-icon {
-          margin-bottom: 1rem;
-        }
-
-        .stat-label {
-          font-size: 0.6875rem;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          font-weight: 700;
-          margin-bottom: 0.5rem;
-          opacity: 0.9;
-        }
-
-        .stat-value {
-          font-size: 1.125rem;
-          font-weight: 600;
-          letter-spacing: -0.01em;
-        }
-      }
-
-      .stat-card-commit-dark {
-        background: linear-gradient(135deg, rgba(156, 39, 176, 0.15) 0%, rgba(123, 31, 162, 0.1) 100%);
-        border-color: rgba(156, 39, 176, 0.3);
-        color: #CE93D8;
-
-        .stat-icon {
-          color: #BA68C8;
-        }
-      }
-
-      .stat-card-commit-light {
-        background: linear-gradient(135deg, rgba(156, 39, 176, 0.08) 0%, rgba(123, 31, 162, 0.05) 100%);
-        border-color: rgba(156, 39, 176, 0.25);
-        color: #6A1B9A;
-
-        .stat-icon {
-          color: #8E24AA;
-        }
-      }
-
-      .stat-card-built-dark {
-        background: linear-gradient(135deg, rgba(255, 152, 0, 0.15) 0%, rgba(251, 140, 0, 0.1) 100%);
-        border-color: rgba(255, 152, 0, 0.3);
-        color: #FFB74D;
-
-        .stat-icon {
-          color: #FFA726;
-        }
-      }
-
-      .stat-card-built-light {
-        background: linear-gradient(135deg, rgba(255, 152, 0, 0.08) 0%, rgba(251, 140, 0, 0.05) 100%);
-        border-color: rgba(255, 152, 0, 0.25);
-        color: #E65100;
-
-        .stat-icon {
-          color: #F57C00;
-        }
-      }
-    }
-  }
-
-  // Feature Cards
-  .feature-card1 {
-    padding: 2rem;
-    transition: all 0.3s ease;
-    position: relative;
-    border: 1px solid;
-    border-radius: 0.375rem;
-
-    &:hover {
-      transform: translateY(-3px);
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.12);
-    }
-    border: 0.0625rem solid var(--o2-border-color);
-  }
-
-
-  .feature-card {
-    .icon-wrapper {
-      width: 56px;
-      height: 56px;
-      border-radius: 0.375rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-    }
-
-    .icon-wrapper-dark {
-      background: rgba(33, 150, 243, 0.18);
-      color: #64B5F6;
-    }
-
-    .icon-wrapper-light {
-      background: rgba(33, 150, 243, 0.12);
-      color: #1565C0;
-    }
-
-    .feature-title {
-      font-size: 1.375rem;
-      font-weight: 600;
-      margin: 0;
-      letter-spacing: -0.02em;
-    }
-
-    .feature-text {
-      font-size: 0.9375rem;
-      line-height: 1.8;
-      opacity: 0.8;
-      margin-bottom: 0;
-    }
-
-    .link-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 0.625rem 1.125rem;
-      border-radius: 0.375rem;
-      background: rgba(33, 150, 243, 0.08);
-      color: var(--q-primary);
-      text-decoration: none;
-      font-size: 0.875rem;
-      font-weight: 600;
-      transition: all 0.25s ease;
-      border: 1.5px solid rgba(33, 150, 243, 0.2);
-
-      &:hover {
-        background: rgba(33, 150, 243, 0.15);
-        border-color: rgba(33, 150, 243, 0.35);
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(33, 150, 243, 0.15);
-      }
-    }
-
-    .external-link {
-      display: inline-flex;
-      align-items: center;
-      color: var(--q-primary);
-      text-decoration: none;
-      font-size: 0.875rem;
-      opacity: 0.8;
-      transition: all 0.2s ease;
-
-      &:hover {
-        opacity: 1;
-        text-decoration: underline;
-      }
-    }
-
-    .inline-link {
-      color: var(--q-primary);
-      text-decoration: none;
-      font-weight: 600;
-      border-bottom: 1px solid transparent;
-      transition: all 0.2s ease;
-
-      &:hover {
-        border-bottom-color: var(--q-primary);
-      }
-    }
-  }
-
-  // Compact table styles
-  .compact-table {
-    td, th {
-      padding: 8px 12px !important;
-      line-height: 1.2;
-    }
-  }
-
-  // Responsive
-  @media (max-width: 768px) {
-    .hero-section {
-      padding: 1.5rem;
-
-      .stats-grid {
-        grid-template-columns: 1fr;
-        width: 100%;
-      }
-    }
-
-    .feature-card {
-      padding: 1.5rem;
-    }
-  }
-}
-</style>

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,20 +15,18 @@
 
 import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import MenuLink from "@/components/MenuLink.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
-
-installQuasar();
 
 const mockRouter = createRouter({
   history: createWebHistory(),
   routes: [
     { path: "/", component: { template: "<div>Home</div>" } },
-    { path: "/logs", component: { template: "<div>Logs</div>" } }
-  ]
+    { path: "/logs", component: { template: "<div>Logs</div>" } },
+  ],
 });
 
 // Set current route for the router
@@ -41,7 +39,7 @@ mockRouter.currentRoute.value = {
   fullPath: "/logs",
   matched: [],
   meta: {},
-  redirectedFrom: undefined
+  redirectedFrom: undefined,
 };
 
 describe("MenuLink", async () => {
@@ -93,7 +91,7 @@ describe("MenuLink", async () => {
 
   it("should render icon when icon prop is provided", async () => {
     await wrapper.setProps({ icon: "home" });
-    expect(wrapper.find(".q-icon").exists()).toBe(true);
+    expect(wrapper.findComponent(OIcon).exists()).toBe(true);
   });
 
   it("should render with iconComponent when provided", async () => {

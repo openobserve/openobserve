@@ -1,0 +1,272 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div class="divide-border-strong/8 divide-y">
+    <!-- Field type -->
+    <div class="px-3 py-2">
+      <div
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
+      >
+        {{ t("dashboard.sectionFieldType") }}
+      </div>
+      <OToggleGroup class="cf-seg h-8" type="single" v-model="colModel.fieldType">
+        <OToggleGroupItem
+          v-for="ft in fieldTypeOptions"
+          :key="ft.value"
+          :value="ft.value"
+          size="sm"
+          :data-test="`o2-format-field-type-${ft.value}-${col.field}`"
+        >
+          {{ ft.label }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+    </div>
+
+    <!-- Value formatting (numeric only) -->
+    <div v-if="isNumeric" class="px-3 py-2">
+      <div
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
+      >
+        {{ t("dashboard.sectionValueFormatting") }}
+      </div>
+      <OSelect
+        v-model="colModel.unit"
+        :options="unitOptions"
+        class="w-full max-w-[22.5rem]"
+        :data-test="`o2-format-unit-${col.field}`"
+      />
+      <OInput
+        v-if="col.unit === 'custom'"
+        :model-value="colModel.customUnit ?? ''"
+        @update:model-value="colModel.customUnit = String($event)"
+        :label="t('dashboard.customunitLabel')"
+        class="mt-2 w-full max-w-[22.5rem]"
+        :data-test="`o2-format-custom-unit-${col.field}`"
+      />
+    </div>
+
+    <!-- Alignment -->
+    <div class="px-3 py-2">
+      <div
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
+      >
+        {{ t("dashboard.sectionAlignment") }}
+      </div>
+      <OToggleGroup class="cf-seg h-8" type="single" v-model="alignmentModel">
+        <OToggleGroupItem v-for="a in alignOptions" :key="a.value" :value="a.value" size="sm">
+          {{ a.label }}
+        </OToggleGroupItem>
+      </OToggleGroup>
+    </div>
+
+    <!-- Styling -->
+    <div class="px-3 py-2">
+      <div
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
+      >
+        {{ t("dashboard.sectionStyling") }}
+      </div>
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        <span
+          class="o-input-label text-compact text-input-label-text w-24 shrink-0 leading-tight font-medium"
+          >{{ t("dashboard.textColor") }}</span
+        >
+        <ColorSwatchPicker
+          v-model="colModel.textColor"
+          :swatches="TEXT_SWATCHES"
+          :data-test="`o2-format-text-color-${col.field}`"
+        />
+      </div>
+      <div class="mt-2 flex flex-wrap items-center gap-2">
+        <span
+          class="o-input-label text-compact text-input-label-text w-24 shrink-0 leading-tight font-medium"
+          >{{ t("dashboard.bgColor") }}</span
+        >
+        <ColorSwatchPicker
+          v-model="colModel.bgColor"
+          :swatches="BG_SWATCHES"
+          :data-test="`o2-format-bg-color-${col.field}`"
+        />
+      </div>
+      <button
+        type="button"
+        class="rounded-default hover:border-accent mt-3 inline-flex cursor-pointer items-center gap-2 border px-2.5 py-1.5 text-left transition-colors"
+        :class="
+          col.autoColor ? 'border-accent bg-accent/7' : 'border-border-strong/28 bg-transparent'
+        "
+        :data-test="`o2-format-unique-color-${col.field}`"
+        @click="colModel.autoColor = !colModel.autoColor"
+      >
+        <OCheckbox :model-value="col.autoColor" size="sm" class="pointer-events-none" />
+        <span
+          class="o-input-label text-compact text-input-label-text cursor-pointer leading-tight font-medium"
+          >{{ t("dashboard.overrideConfigUniqueValueColor") }}</span
+        >
+      </button>
+    </div>
+
+    <!-- Conditional (numeric only) -->
+    <div v-if="isNumeric" class="px-3 py-2">
+      <div
+        class="o-input-label text-compact text-input-label-text mb-1.5 block leading-tight font-medium"
+      >
+        {{ t("dashboard.sectionConditionalStyling") }}
+      </div>
+      <div v-if="!col.conditions.length" class="text-compact text-text-secondary mb-1.5">
+        {{ t("dashboard.conditionNoRules") }}
+      </div>
+      <div
+        v-for="(rule, ruleIdx) in col.conditions"
+        :key="ruleIdx"
+        class="rounded-default border-border-strong/10 bg-border-strong/4 mb-1.5 flex flex-col gap-2 border px-2.5 py-2"
+      >
+        <div class="flex flex-wrap items-center gap-2">
+          <span
+            class="o-input-label text-compact text-input-label-text w-28 shrink-0 leading-tight font-medium"
+            >{{ t("dashboard.conditionIfValue") }}</span
+          >
+          <div class="w-52 shrink-0">
+            <OSelect v-model="rule.operator" :options="conditionOperators" class="w-full" />
+          </div>
+          <div class="w-28 shrink-0">
+            <OInput
+              v-model="rule.threshold"
+              type="number"
+              :placeholder="t('dashboard.conditionThreshold')"
+              class="w-full"
+              :data-test="`o2-format-cond-threshold-${col.field}-${ruleIdx}`"
+            />
+          </div>
+          <OButton
+            variant="ghost"
+            size="icon-xs"
+            icon-left="close"
+            :title="t('common.remove')"
+            class="ms-auto shrink-0"
+            @click="colModel.conditions.splice(ruleIdx, 1)"
+          />
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span
+            class="o-input-label text-compact text-input-label-text w-28 shrink-0 leading-tight font-medium"
+            >{{ t("dashboard.conditionThenText") }}</span
+          >
+          <ColorSwatchPicker
+            v-model="rule.textColor"
+            :swatches="TEXT_SWATCHES"
+            :data-test="`o2-format-cond-text-${col.field}-${ruleIdx}`"
+          />
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <span
+            class="o-input-label text-compact text-input-label-text w-28 shrink-0 leading-tight font-medium"
+            >{{ t("dashboard.conditionAndBg") }}</span
+          >
+          <ColorSwatchPicker
+            v-model="rule.bgColor"
+            :swatches="BG_SWATCHES"
+            :data-test="`o2-format-cond-bg-${col.field}-${ruleIdx}`"
+          />
+        </div>
+      </div>
+      <OButton
+        variant="outline"
+        size="sm"
+        class="mt-1"
+        :data-test="`o2-format-add-rule-${col.field}`"
+        @click="colModel.conditions.push(emptyConditionalRule())"
+      >
+        {{ t("dashboard.conditionAddRule") }}
+      </OButton>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+import { computed, defineComponent, PropType } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ColorSwatchPicker from "./ColorSwatchPicker.vue";
+import {
+  type ColumnOverrideUI,
+  emptyConditionalRule,
+  useColumnFormattingOptions,
+  TEXT_SWATCHES,
+  BG_SWATCHES,
+} from "@/composables/dashboard/useColumnFormatting";
+
+export default defineComponent({
+  name: "ColumnFormatControls",
+  components: {
+    OButton,
+    OSelect,
+    OInput,
+    OCheckbox,
+    OToggleGroup,
+    OToggleGroupItem,
+    ColorSwatchPicker,
+  },
+  props: {
+    col: { type: Object as PropType<ColumnOverrideUI>, required: true },
+    isNumeric: { type: Boolean, default: false },
+  },
+  setup(props) {
+    const { t } = useI18nTyped();
+    const { unitOptions, fieldTypeOptions, alignOptions, conditionOperators } =
+      useColumnFormattingOptions();
+
+    // Alias preserves the same prop reference for in-place mutation via v-model.
+    const colModel = computed(() => props.col);
+
+    // Explicit "Auto" replaces tap-to-clear: null ⇄ the "auto" sentinel item.
+    const alignmentModel = computed({
+      get: () => props.col.alignment ?? "auto",
+      set: (v: string) => {
+        colModel.value.alignment = v === "auto" ? null : v;
+      },
+    });
+
+    return {
+      t,
+      colModel,
+      unitOptions,
+      fieldTypeOptions,
+      alignOptions,
+      alignmentModel,
+      conditionOperators,
+      TEXT_SWATCHES,
+      BG_SWATCHES,
+      emptyConditionalRule,
+    };
+  },
+});
+</script>
+
+<style scoped>
+/* keep(lib-override:o2-toggle-group): OToggleGroup renders its own <button>
+   children, so their intrinsic min-height can only be reset from the parent via
+   :deep() — no utility on this component can reach that generated element. */
+.cf-seg :deep(button) {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+</style>

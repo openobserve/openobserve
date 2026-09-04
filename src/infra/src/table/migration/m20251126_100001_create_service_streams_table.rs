@@ -142,3 +142,28 @@ enum ServiceStreams {
     LastSeen,
     Metadata,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_service_streams_table_contains_table_name() {
+        let sql = create_service_streams_table_statement().build(SqliteQueryBuilder);
+        assert!(sql.contains("service_streams"));
+    }
+
+    #[test]
+    fn test_org_service_key_idx_name() {
+        let sql = create_service_streams_org_service_key_idx_stmnt().build(SqliteQueryBuilder);
+        assert!(sql.contains(SERVICE_STREAMS_ORG_SERVICE_KEY_IDX));
+    }
+
+    #[test]
+    fn test_org_service_name_idx_name() {
+        let sql = create_service_streams_org_service_name_idx_stmnt().build(SqliteQueryBuilder);
+        assert!(sql.contains(SERVICE_STREAMS_ORG_SERVICE_NAME_IDX));
+    }
+}

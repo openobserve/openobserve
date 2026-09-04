@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,171 +15,158 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-[calc(100vh-172px)] tw:px-2 org-dedup-settings tw:flex tw:flex-col">
+  <!-- Inline form: OForm renders the <form>, so the footer Save uses
+       type="submit" (Enter submits natively — no form-id needed). The component
+       OWNS the form (it reads `enabled`/`alert_dedup_enabled` to drive the
+       conditional sections) → Rule ③ owner pattern: useOForm + form.useStore +
+       <OForm :form>. -->
+  <OForm
+    id="organization-deduplication-settings-form"
+    :form="form"
+    v-slot="{ isSubmitting }"
+    class="bg-card-glass-bg flex h-full w-full flex-col"
+  >
     <!-- Scrollable content area -->
-    <div class="tw:flex-1 tw:overflow-y-auto tw:pr-2">
-      <div class="tw:mb-6">
-        <GroupHeader :title="t('alerts.correlation.title')" :showIcon="false" class="tw:mb-2" />
-        <div class="text-body2 text-grey-7">
-          {{ t('alerts.correlation.description') }}
+    <div class="flex-1 overflow-y-auto pe-2 pt-4">
+      <div class="mb-4">
+        <div class="text-text-heading text-sm leading-tight font-semibold">
+          {{ t("alerts.correlation.title") }}
         </div>
-        <div class="text-body2 text-grey-6 tw:mt-2 tw:italic">
-          {{ t('alerts.correlation.semanticFieldNote') }}
+        <div class="text-text-secondary mt-1 text-xs">
+          {{ t("alerts.correlation.description") }}
         </div>
-        <q-btn
-          data-test="dedup-settings-refresh-btn"
-          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          flat
-          dense
-          color="primary"
-          :label="t('common.refresh')"
-          @click="loadConfig"
-        />
+        <div class="text-text-secondary mt-1 text-xs italic">
+          {{ t("alerts.correlation.semanticFieldNote") }}
+        </div>
       </div>
 
-      <q-separator class="tw:mb-6" />
+      <OButton
+        data-test="dedup-settings-refresh-btn"
+        variant="outline"
+        size="sm"
+        class="mb-6"
+        @click="loadConfig"
+        >{{ t("common.refresh") }}</OButton
+      >
 
       <!-- Enable Deduplication -->
-      <div class="tw:mb-6">
-        <q-checkbox
+      <div class="mb-6">
+        <OFormCheckbox
+          name="enabled"
           data-test="organization-deduplication-enable-checkbox"
-          v-model="localConfig.enabled"
           :label="t('alerts.correlation.enableOrgLevel')"
-          dense
-          @update:model-value="emitUpdate"
         >
-          <q-tooltip>
-            {{ t('alerts.correlation.enableOrgLevelTooltip') }}
-          </q-tooltip>
-        </q-checkbox>
+          <OTooltip :content="t('alerts.correlation.enableOrgLevelTooltip')" />
+        </OFormCheckbox>
       </div>
 
       <!-- Cross-Alert Deduplication -->
-      <div class="tw:mb-6" v-if="localConfig.enabled">
-        <q-checkbox
+      <div class="mb-6" v-if="enabled">
+        <OFormCheckbox
+          name="alert_dedup_enabled"
           data-test="organizationdeduplication-enable-cross-alert-checkbox"
-          v-model="localConfig.alert_dedup_enabled"
           :label="t('alerts.correlation.enableCrossAlert')"
-          dense
-          @update:model-value="emitUpdate"
         >
-          <q-tooltip>
-            {{ t('alerts.correlation.enableCrossAlertTooltip') }}
-          </q-tooltip>
-        </q-checkbox>
+          <OTooltip :content="t('alerts.correlation.enableCrossAlertTooltip')" />
+        </OFormCheckbox>
       </div>
 
       <!-- Cross-Alert Fingerprint Groups -->
-      <div class="tw:mb-6" v-if="localConfig.alert_dedup_enabled">
-        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
-          {{ t('alerts.correlation.fingerprintGroups') }} <span class="tw:text-red-500 tw:ml-1">*</span>
-          <q-icon
-            :name="outlinedInfo"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              style="font-size: 12px"
-            >
-              {{ t('alerts.correlation.fingerprintGroupsTooltip') }}
-            </q-tooltip>
-          </q-icon>
+      <div class="mb-6" v-if="enabled && alertDedupEnabled">
+        <div class="flex items-center pb-2 font-semibold">
+          {{ t("alerts.correlation.fingerprintGroups") }}
+          <span class="text-status-error-text ms-1">*</span>
+          <OIcon name="info" size="sm" class="ms-1 cursor-pointer" :class="'text-text-secondary'">
+            <OTooltip
+              side="right"
+              align="center"
+              :content="t('alerts.correlation.fingerprintGroupsTooltip')"
+            />
+          </OIcon>
         </div>
-        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
-          {{ t('alerts.correlation.fingerprintGroupsHint') }}
+        <div class="text-text-secondary mb-2 text-sm">
+          {{ t("alerts.correlation.fingerprintGroupsHint") }}
         </div>
-        <div class="tw:flex tw:flex-col tw:gap-2">
-          <q-checkbox
+        <!-- The selected group ids ARE the form's alert_fingerprint_groups
+             array. Each per-group OCheckbox is a group member (value = id); the
+             group's superRefine "at least one required" error renders below. -->
+        <OFormCheckboxGroup name="alert_fingerprint_groups">
+          <OCheckbox
             v-for="group in localSemanticGroups"
             :data-test="'organizationdeduplication-fingerprint-' + group.id + '-checkbox'"
             :key="group.id"
-            :model-value="localConfig.alert_fingerprint_groups?.includes(group.id)"
-            @update:model-value="(val) => toggleFingerprintGroup(group.id, val)"
-            :label="`${group.display} (${group.id})`"
-            dense
+            :value="group.id"
+            :label="raw(`${group.display} (${group.id})`)"
           />
-          <div
-            v-if="!localConfig.alert_fingerprint_groups || localConfig.alert_fingerprint_groups.length === 0"
-            class="tw:text-red-500 tw:text-sm tw:mt-1"
-          >
-            {{ t('alerts.correlation.fingerprintGroupsRequired') }}
-          </div>
-        </div>
+        </OFormCheckboxGroup>
       </div>
 
       <!-- Time Window -->
-      <div class="tw:mb-6">
-        <div class="tw:font-semibold tw:pb-2 tw:flex tw:items-center">
-          {{ t('alerts.correlation.defaultWindow') }}
-          <q-icon
-            :name="outlinedInfo"
-            size="17px"
-            class="q-ml-xs cursor-pointer"
-            :class="store.state.theme === 'dark' ? 'text-grey-5' : 'text-grey-7'"
-          >
-            <q-tooltip
-              anchor="center right"
-              self="center left"
-              max-width="300px"
-              style="font-size: 12px"
-            >
-              {{ t('alerts.correlation.defaultWindowTooltip') }}
-            </q-tooltip>
-          </q-icon>
+      <div class="mb-6">
+        <div class="flex items-center pb-2 font-semibold">
+          {{ t("alerts.correlation.defaultWindow") }}
+          <OIcon name="info" size="sm" class="ms-1 cursor-pointer" :class="'text-text-secondary'" />
+          <OTooltip
+            side="right"
+            align="center"
+            :content="t('alerts.correlation.defaultWindowTooltip')"
+          />
         </div>
-        <div class="tw:text-sm tw:text-gray-600 dark:tw:text-gray-400 tw:mb-2">
-          {{ t('alerts.correlation.defaultWindowDescription') }}
+        <div class="text-text-secondary mb-2 text-sm">
+          {{ t("alerts.correlation.defaultWindowDescription") }}
         </div>
-        <q-input
+        <OFormInput
+          name="time_window_minutes"
           data-test="organizationdeduplication-default-window-input"
-          v-model.number="localConfig.time_window_minutes"
           type="number"
-          dense
-          borderless
           min="1"
+          width="md"
           :placeholder="t('alerts.correlation.defaultWindowPlaceholder')"
-          :class="
-            store.state.theme === 'dark'
-              ? 'input-box-bg-dark input-border-dark'
-              : 'input-box-bg-light input-border-light'
-          "
-          @update:model-value="emitUpdate"
         />
       </div>
     </div>
 
     <!-- Sticky footer with buttons -->
-    <div class="tw:flex tw:justify-end tw:gap-3 tw:pt-4 tw:pb-2 tw:border-t tw:border-gray-200 dark:tw:border-gray-700 tw:bg-inherit tw:sticky tw:bottom-0">
-      <q-btn :label="t('alerts.correlation.cancelButton')" @click="$emit('cancel')" class="o2-secondary-button" />
-      <q-btn
-        :label="t('alerts.correlation.saveButton')"
-        @click="saveSettings"
-        :loading="saving"
-        class="o2-primary-button"
-      />
+    <div
+      class="border-border-default sticky bottom-0 flex justify-end gap-3 border-t bg-inherit pt-4 pb-2"
+    >
+      <OButton
+        variant="outline"
+        size="sm-action"
+        :disabled="isSubmitting"
+        @click="$emit('cancel')"
+        >{{ t("alerts.correlation.cancelButton") }}</OButton
+      >
+      <OButton variant="primary" size="sm-action" type="submit" :loading="isSubmitting">{{
+        t("alerts.correlation.saveButton")
+      }}</OButton>
     </div>
-  </div>
+  </OForm>
 </template>
 
 <script setup lang="ts">
 import { ref, watch } from "vue";
-import { useStore } from "vuex";
-import { useQuasar } from "quasar";
-import { useI18n } from "vue-i18n";
-import { outlinedInfo } from "@quasar/extras/material-icons-outlined";
+import { raw, useI18nTyped } from "@/types/i18n";
 import alertsService from "@/services/alerts";
-import GroupHeader from "@/components/common/GroupHeader.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormCheckbox from "@/lib/forms/Checkbox/OFormCheckbox.vue";
+import OFormCheckboxGroup from "@/lib/forms/Checkbox/OFormCheckboxGroup.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import {
+  makeOrgDedupSettingsSchema,
+  orgDedupSettingsDefaults,
+  type OrgDedupSettingsForm,
+} from "./OrganizationDeduplicationSettings.schema";
 
-const store = useStore();
-const $q = useQuasar();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
-interface SemanticFieldGroup {
+interface FieldAlias {
   id: string;
   display: string;
   group?: string;
@@ -190,11 +177,9 @@ interface SemanticFieldGroup {
 
 interface OrganizationDeduplicationConfig {
   enabled: boolean;
-  semantic_field_groups?: SemanticFieldGroup[];
   alert_dedup_enabled?: boolean;
   alert_fingerprint_groups?: string[];
-  time_window_minutes?: number;
-  fqn_priority_dimensions?: string[];
+  time_window_minutes?: number | null;
 }
 
 interface Props {
@@ -211,117 +196,80 @@ const emit = defineEmits<{
   (e: "cancel"): void;
 }>();
 
-const saving = ref(false);
-
-const localConfig = ref<OrganizationDeduplicationConfig>({
-  enabled: true,
-  alert_dedup_enabled: props.config?.alert_dedup_enabled ?? false,
-  alert_fingerprint_groups: props.config?.alert_fingerprint_groups ?? [],
-  time_window_minutes: props.config?.time_window_minutes ?? undefined,
-  semantic_field_groups: props.config?.semantic_field_groups ?? [],
-  fqn_priority_dimensions: props.config?.fqn_priority_dimensions,
+// Owner pattern (Rule ③): create the ONE form here so the template can read it
+// reactively (form.useStore) to drive the conditional sections. Loading is
+// form-driven (isSubmitting) — no manual `saving` ref.
+const orgDedupSettingsSchema = makeOrgDedupSettingsSchema(t);
+const form = useOForm<OrgDedupSettingsForm>({
+  defaultValues: orgDedupSettingsDefaults(props.config),
+  schema: orgDedupSettingsSchema,
+  // Forward to saveSettings (defined below) — arrow avoids a setup-time TDZ ref.
+  onSubmit: (value) => saveSettings(value),
 });
 
-const localSemanticGroups = ref<SemanticFieldGroup[]>(
-  props.config?.semantic_field_groups ?? [],
-);
+// Reactive reads for the parent-side v-if sections (single source of truth).
+const enabled = form.useStore((s: any) => s.values.enabled);
+const alertDedupEnabled = form.useStore((s: any) => s.values.alert_dedup_enabled);
 
-const toggleFingerprintGroup = (groupId: string, checked: boolean) => {
-  if (!localConfig.value.alert_fingerprint_groups) {
-    localConfig.value.alert_fingerprint_groups = [];
-  }
+// Available semantic groups (the option list rendered as checkboxes) — NOT form
+// data, so it stays a plain local ref.
+const localSemanticGroups = ref<FieldAlias[]>([]);
 
-  if (checked) {
-    if (!localConfig.value.alert_fingerprint_groups.includes(groupId)) {
-      localConfig.value.alert_fingerprint_groups.push(groupId);
-    }
-  } else {
-    localConfig.value.alert_fingerprint_groups =
-      localConfig.value.alert_fingerprint_groups.filter((id) => id !== groupId);
-  }
-};
-
-const emitUpdate = () => {
-  // Just update local state, don't auto-save
-};
-
-const saveSettings = async () => {
-  // Validate cross-alert dedup requires fingerprint groups
-  if (localConfig.value.alert_dedup_enabled) {
-    if (!localConfig.value.alert_fingerprint_groups ||
-        localConfig.value.alert_fingerprint_groups.length === 0) {
-      $q.notify({
-        type: "negative",
-        message: "Please select at least one semantic group for cross-alert deduplication",
-        timeout: 3000,
-      });
-      return;
-    }
-  }
-
-  saving.value = true;
+const saveSettings = async (value: OrgDedupSettingsForm) => {
+  // @submit fires only when the schema passes, so the cross-alert fingerprint
+  // guard is already enforced (superRefine) — no imperative toast-guard here.
   try {
-    await alertsService.setOrganizationDeduplicationConfig(
-      props.orgId,
-      localConfig.value,
-    );
+    // Payload parity: build with explicit keys (no {...value} leak) and coerce
+    // time_window_minutes exactly like the pre-migration form (empty/NaN → null,
+    // else a number).
+    const rawWindow = value.time_window_minutes as unknown;
+    const payload = {
+      enabled: value.enabled,
+      alert_dedup_enabled: value.alert_dedup_enabled,
+      alert_fingerprint_groups: value.alert_fingerprint_groups,
+      time_window_minutes:
+        rawWindow == null || rawWindow === "" || isNaN(Number(rawWindow))
+          ? null
+          : Number(rawWindow),
+    };
+    await alertsService.setOrganizationDeduplicationConfig(props.orgId, payload);
 
-    $q.notify({
-      type: "positive",
-      message:
-        "Organization deduplication settings saved successfully",
-      timeout: 2000,
+    toast({
+      variant: "success",
+      message: t("alerts.correlation.settingsSaved"),
     });
 
     emit("saved");
   } catch (error: any) {
     console.error("Error saving deduplication settings:", error);
-    $q.notify({
-      type: "negative",
-      message: error?.message || "Failed to save settings",
-      timeout: 3000,
+    toast({
+      variant: "error",
+      message: error?.message || t("alerts.correlation.settingsSaveError"),
     });
-  } finally {
-    saving.value = false;
   }
 };
 
-// Fetch config on mount if not provided
+// Fetch config on mount if not provided. Async data arrives → form.reset() (not
+// a setFieldValue loop / local mirror). Also wired to the refresh button (its
+// exact behavior is preserved; being type="button" it never submits/validates).
 const loadConfig = async () => {
   if (!props.config) {
     try {
-      // Try to get existing config
+      // Load dedup config (does NOT contain semantic groups)
       const response = await alertsService.getOrganizationDeduplicationConfig(props.orgId);
-      const config = response.data;
-      localConfig.value = {
-        enabled: config.enabled ?? true,
-        alert_dedup_enabled: config.alert_dedup_enabled ?? false,
-        alert_fingerprint_groups: config.alert_fingerprint_groups ?? [],
-        time_window_minutes: config.time_window_minutes ?? undefined,
-        semantic_field_groups: config.semantic_field_groups ?? [],
-        fqn_priority_dimensions: config.fqn_priority_dimensions,
-      };
-      localSemanticGroups.value = config.semantic_field_groups ?? [];
+      form.reset(orgDedupSettingsDefaults(response.data));
     } catch (error) {
-      // Load default semantic groups from backend
-      try {
-        const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
-        const defaultGroups = semanticGroupsResponse.data;
+      // No dedup config exists yet — use defaults
+      form.reset(orgDedupSettingsDefaults(null));
+    }
 
-        localConfig.value = {
-          enabled: true,
-          alert_dedup_enabled: false,
-          alert_fingerprint_groups: [],
-          time_window_minutes: undefined,
-          semantic_field_groups: defaultGroups,
-          fqn_priority_dimensions: undefined,
-        };
-        localSemanticGroups.value = defaultGroups;
-      } catch (semanticError) {
-        console.error("Failed to load default semantic groups:", semanticError);
-        // Fallback to empty
-        localSemanticGroups.value = [];
-      }
+    // Always load semantic groups from system_settings (single source of truth)
+    try {
+      const semanticGroupsResponse = await alertsService.getSemanticGroups(props.orgId);
+      localSemanticGroups.value = semanticGroupsResponse.data;
+    } catch (semanticError) {
+      console.error("Failed to load semantic groups:", semanticError);
+      localSemanticGroups.value = [];
     }
   }
 };
@@ -329,29 +277,16 @@ const loadConfig = async () => {
 // Load config on mount
 loadConfig();
 
-// Watch for external changes
+// Watch for external changes — reset the form from the EXTERNAL source (props),
+// not a local mirror. Initial values are already seeded via useOForm's
+// defaultValues, so this only handles subsequent prop changes.
 watch(
   () => props.config,
   (newVal) => {
     if (newVal) {
-      localConfig.value = {
-        enabled: newVal.enabled ?? true,
-        alert_dedup_enabled: newVal.alert_dedup_enabled ?? false,
-        alert_fingerprint_groups: newVal.alert_fingerprint_groups ?? [],
-        time_window_minutes: newVal.time_window_minutes ?? undefined,
-        semantic_field_groups: newVal.semantic_field_groups ?? [],
-        fqn_priority_dimensions: newVal.fqn_priority_dimensions,
-      };
-      localSemanticGroups.value = newVal.semantic_field_groups ?? [];
+      form.reset(orgDedupSettingsDefaults(newVal));
     }
   },
-  { deep: true, immediate: true },
+  { deep: true },
 );
 </script>
-
-<style scoped lang="scss">
-.org-dedup-settings {
-  // Match parent card-container background
-  background: var(--o2-card-bg);
-}
-</style>

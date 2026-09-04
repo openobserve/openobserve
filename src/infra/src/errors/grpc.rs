@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,52 +17,65 @@ use datafusion::{common::SchemaError, error::DataFusionError};
 
 use super::{Error, ErrorCodes};
 
-fn get_key_from_error(err: &str, pos: usize) -> Option<String> {
-    for punctuation in ['\'', '"'] {
-        let pos_start = err[pos..].find(punctuation);
-        if pos_start.is_none() {
-            continue;
-        }
-        let pos_start = pos_start.unwrap();
-        let pos_end = err[pos + pos_start + 1..].find(punctuation);
-        if pos_end.is_none() {
-            continue;
-        }
-        let pos_end = pos_end.unwrap();
-        return Some(err[pos + pos_start + 1..pos + pos_start + 1 + pos_end].to_string());
+/// Carries an `ErrorCodes` through DataFusion so the HTTP status survives the round trip.
+#[derive(Debug)]
+struct DataFusionErrorCode(ErrorCodes);
+
+impl std::fmt::Display for DataFusionErrorCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
-    None
+}
+
+impl std::error::Error for DataFusionErrorCode {}
+
+impl From<ErrorCodes> for DataFusionError {
+    fn from(code: ErrorCodes) -> Self {
+        Self::External(Box::new(DataFusionErrorCode(code)))
+    }
 }
 
 impl From<DataFusionError> for Error {
     fn from(err: DataFusionError) -> Self {
+        let err = match err {
+            DataFusionError::External(external) => match external.downcast::<DataFusionErrorCode>()
+            {
+                Ok(code) => return Error::ErrorCode(code.0),
+                Err(external) => DataFusionError::External(external),
+            },
+            err => err,
+        };
         if let DataFusionError::SchemaError(schema_err, _) = &err
             && let SchemaError::FieldNotFound {
                 field,
-                valid_fields: _,
+                valid_fields,
             } = schema_err.as_ref()
         {
-            return Error::ErrorCode(ErrorCodes::SearchFieldNotFound(field.name.clone()));
+            // Keep the same textual shape DataFusion's Display uses so the
+            // HTTP layer can parse candidates out of either origin and offer
+            // did-you-mean suggestions.
+            let valid = valid_fields
+                .iter()
+                .map(|f| f.flat_name())
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Error::ErrorCode(ErrorCodes::SearchFieldNotFound(if valid.is_empty() {
+                format!("No field named {}.", field.name)
+            } else {
+                format!("No field named {}. Valid fields are {}.", field.name, valid)
+            }));
         }
 
         let err = err.to_string();
         if err.contains("Schema error: No field named") {
-            let pos = err.find("Schema error: No field named").unwrap();
-            return match get_key_from_error(&err, pos) {
-                Some(key) => Error::ErrorCode(ErrorCodes::SearchFieldNotFound(key)),
-                None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
-            };
+            return Error::ErrorCode(ErrorCodes::SearchFieldNotFound(err));
         }
         if err.contains("parquet not found") || err.contains("parquet file not found") {
             log::error!("[Datafusion] Parquet file not found: {err}");
             return Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound);
         }
         if err.contains("Invalid function ") {
-            let pos = err.find("Invalid function ").unwrap();
-            return match get_key_from_error(&err, pos) {
-                Some(key) => Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(key)),
-                None => Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err)),
-            };
+            return Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(err));
         }
         if err.contains("Incompatible data types") {
             let pos = err.find("for field").unwrap();
@@ -72,5 +85,87 @@ impl From<DataFusionError> for Error {
             return Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType(field));
         }
         Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(err))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use datafusion::error::DataFusionError;
+
+    use super::*;
+
+    #[test]
+    fn test_from_datafusion_schema_no_field_named() {
+        let df_err =
+            DataFusionError::Plan("Schema error: No field named `missing_col`".to_string());
+        let err = Error::from(df_err);
+        assert!(matches!(
+            err,
+            Error::ErrorCode(ErrorCodes::SearchFieldNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn test_from_datafusion_parquet_not_found() {
+        let df_err = DataFusionError::Plan("parquet not found on disk".to_string());
+        let err = Error::from(df_err);
+        assert!(matches!(
+            err,
+            Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound)
+        ));
+    }
+
+    #[test]
+    fn test_from_datafusion_parquet_file_not_found() {
+        let df_err = DataFusionError::Plan("parquet file not found".to_string());
+        let err = Error::from(df_err);
+        assert!(matches!(
+            err,
+            Error::ErrorCode(ErrorCodes::SearchParquetFileNotFound)
+        ));
+    }
+
+    #[test]
+    fn test_from_datafusion_invalid_function() {
+        let df_err = DataFusionError::Plan("Invalid function my_udf".to_string());
+        let err = Error::from(df_err);
+        assert!(matches!(
+            err,
+            Error::ErrorCode(ErrorCodes::SearchFunctionNotDefined(_))
+        ));
+    }
+
+    #[test]
+    fn test_from_datafusion_generic_error_falls_through_to_sql_execute() {
+        let df_err = DataFusionError::Plan("some unrecognized error".to_string());
+        let err = Error::from(df_err);
+        assert!(matches!(
+            err,
+            Error::ErrorCode(ErrorCodes::SearchSQLExecuteError(_))
+        ));
+    }
+
+    #[test]
+    fn test_from_datafusion_error_code_round_trips() {
+        let df_err: DataFusionError = ErrorCodes::SearchCancelQuery("canceled".to_string()).into();
+        assert!(matches!(
+            Error::from(df_err),
+            Error::ErrorCode(ErrorCodes::SearchCancelQuery(message)) if message == "canceled"
+        ));
+    }
+
+    #[test]
+    fn test_from_datafusion_incompatible_data_types_extracts_field_name() {
+        let df_err = DataFusionError::Plan(
+            "Incompatible data types for field myField. Expected Int64 but got Utf8".to_string(),
+        );
+        let err = Error::from(df_err);
+        match err {
+            Error::ErrorCode(ErrorCodes::SearchFieldHasNoCompatibleDataType(field)) => {
+                // The parsing extracts the substring after the first space in "for field <name>."
+                assert_eq!(field, "field myField");
+            }
+            _ => panic!("expected SearchFieldHasNoCompatibleDataType"),
+        }
     }
 }

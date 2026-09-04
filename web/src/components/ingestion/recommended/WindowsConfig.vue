@@ -1,62 +1,35 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!--
+  Windows host agent setup page. Content lives in setupCard/content/windows.ts
+  and renders through the shared DataSourceSetupCard.
+
+  Also mounted inside AWSIntegrationTile's EC2 dialog (see awsIntegrations.ts
+  componentOptions), so it must stay self-contained.
+-->
 <template>
-  <div class="q-pa-md">
-    <div class="text-subtitle1 q-pl-xs q-mt-md">
-      Run the powershell terminal as administrator and execute the following
-      command:
-    </div>
-    <ContentCopy class="q-mt-sm" :content="getCommand" />
-    <br />
-    <hr />
-    <div>
-      <div class="text-subtitle1 q-pl-xs q-mt-md">
-        Once you have installed the OpenObserve collector, it will:
-        <ul class="tw:list-disc tw:ml-5">
-          <li>Collect logs from Windows event log</li>
-          <li>Collect metrics from Windows performance counters</li>
-        </ul>
-      </div>
-    </div>
-  </div>
+  <DataSourceSetupCard slug="windows" />
 </template>
 
 <script setup lang="ts">
-import { computed, ref, type Ref } from "vue";
-import type { Endpoint } from "@/ts/interfaces";
-import ContentCopy from "@/components/CopyContent.vue";
-import { useStore } from "vuex";
-import { b64EncodeStandard, getEndPoint, getIngestionURL } from "../../../utils/zincutils";
+import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 
-const store = useStore();
-
-const props = defineProps({
-  currOrgIdentifier: {
-    type: String,
-  },
-  currUserEmail: {
-    type: String,
-  },
-});
-
-const endpoint: any = ref({
-  url: "",
-  host: "",
-  port: "",
-  protocol: "",
-  tls: "",
-});
-
-const ingestionURL = getIngestionURL();
-endpoint.value = getEndPoint(ingestionURL);
-
-const accessKey = computed(() => {
-  return b64EncodeStandard(
-    `${props.currUserEmail}:${store.state.organizationData.organizationPasscode}`,
-  );
-});
-
-const getCommand = computed(() => {
-  return `Invoke-WebRequest -Uri https://raw.githubusercontent.com/openobserve/agents/main/windows/install.ps1 -OutFile install.ps1 ; .\\install.ps1 -URL ${endpoint.value.url}/api/${props.currOrgIdentifier}/ -AUTH_KEY [BASIC_PASSCODE]`;
-});
+defineProps<{
+  currOrgIdentifier?: string;
+  currUserEmail?: string;
+}>();
 </script>
-
-<style scoped></style>

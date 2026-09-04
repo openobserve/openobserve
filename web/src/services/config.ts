@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,13 @@
 import http from "./http";
 
 const zo_config = {
+  // Unauthenticated bootstrap: only the fields the login page needs.
   get_config: () => {
     return http().get(`/config`);
+  },
+  // Authenticated full configuration, fetched once an org is known.
+  get_config_full: (orgIdentifier: string) => {
+    return http().get(`/api/${orgIdentifier}/config`);
   },
 };
 

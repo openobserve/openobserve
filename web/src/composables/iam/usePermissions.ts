@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@ const groups = {
 };
 
 const roles = {
-  roles: [],
+  roles: [] as any[],
 };
 
 const permissions = {
@@ -34,7 +34,7 @@ const permissions = {
 
 const users = {
   users: [] as any[],
-  getOrgUsers: (org_identifier: string, queryParams?: { list_all?: boolean } ) => {
+  getOrgUsers: (org_identifier: string, _queryParams?: { list_all?: boolean }) => {
     return new Promise((resolve, reject) => {
       usersService
         .orgUsers(org_identifier)

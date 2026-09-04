@@ -1,99 +1,77 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
+
 <template>
-  <div class="row">
-    <q-select
-      v-model="fields.functionName"
-      label="Select Function"
-      :options="filteredFunctions"
-      data-test="dashboard-function-dropdown"
-      input-debounce="0"
-      behavior="menu"
-      use-input
-      borderless
-      dense
-      hide-selected
-      fill-input
-      @filter="filterFunctionsOptions"
-      option-label="label"
-      option-value="value"
-      emit-value
-      map-options
-      class="tw:w-72 o2-custom-select-dashboard"
-    >
-    </q-select>
-    <div class="tw:w-full tw:p-3 tw:flex tw:gap-2">
-      <!-- Loop through the args for the first n-1 arguments -->
-      <div class="tw:w-full">
+  <div class="flex flex-col">
+    <!-- Function selector -->
+    <div class="w-60 flex-none">
+      <OSelect
+        v-model="fields.functionName"
+        :options="filteredFunctions"
+        data-test="dashboard-function-dropdown"
+        class="w-full"
+        @search="onFunctionSearch"
+      >
+        <template #icon-left>
+          <OIcon name="function" size="sm" />
+        </template>
+      </OSelect>
+    </div>
+
+    <!-- Argument tree -->
+    <div class="mt-2 w-full">
+      <div class="w-full">
         <div
-          v-for="(arg, argIndex) in fields.args"
+          v-for="(arg, argIndex) in argRows"
           :key="argIndex + '-' + arg.type"
-          class="tw:w-full tw:flex tw:flex-col"
+          class="flex w-full flex-col"
         >
-          <div
-            class="tw:flex"
-            :style="{
-              marginLeft: isChild ? '-60px' : '0px',
-            }"
-          >
-            <div class="tw:mr-2 tw:relative" style="min-height: 50px">
+          <div class="flex" :style="{ marginLeft: isChild ? '-3rem' : '0' }">
+            <div class="relative me-1.5 min-h-12.5 w-2.5">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
-                class="tw:absolute tw:top-0 tw:w-[1px] tw:bg-[#001495] tw:opacity-50"
+                class="bg-accent absolute top-0 w-px opacity-50"
                 :style="{
-                  bottom:
-                    argIndex === fields.args.length - 1
-                      ? 'calc(100% - 32px)'
-                      : '0',
-                  left: '0px',
+                  bottom: argIndex === fields.args.length - 1 ? 'calc(100% - 2rem)' : '0',
+                  left: '0.3125rem',
                 }"
               ></div>
 
               <!-- SubTask Arrow -->
-              <div class="tw:absolute" style="top: 30px; left: -1px">
+              <div class="text-text-secondary absolute top-7.5 left-1">
                 <SubTaskArrow />
               </div>
             </div>
 
-            <div>
-              <div class="tw:flex tw:items-center tw:gap-x-2">
+            <div class="flex min-w-0 flex-1 flex-col">
+              <div class="flex items-center gap-x-2">
                 <label :for="'arg-' + argIndex">{{
                   getParameterLabel(fields.functionName, argIndex)
                 }}</label>
               </div>
-              <div class="tw:flex">
-                <!-- type selector -->
-                <q-select
+              <div class="flex items-start gap-1">
+                <!-- Argument type switcher -->
+                <OSelect
+                  v-if="hasArgTypeChoice(fields.functionName, argIndex)"
                   v-model="fields.args[argIndex].type"
                   @update:model-value="onArgTypeChange(fields.args[argIndex])"
                   :options="
-                    getSupportedTypeBasedOnFunctionNameAndIndex(
-                      fields.functionName,
-                      argIndex,
-                    )
+                    getSupportedTypeBasedOnFunctionNameAndIndex(fields.functionName, argIndex)
                   "
-                  option-label="label"
-                  option-value="value"
-                  behavior="menu"
-                  map-options
-                  emit-value
-                  dense
-                  filled
-                  :display-value="''"
-                  class="o2-custom-select-dashboard arg-type-select tw:mr-0.5"
+                  icon-key="icon"
+                  label-position="inside"
+                  class="o2-custom-select-dashboard arg-type-select me-0.5 w-fit! flex-none!"
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >
-                  <template v-slot:prepend>
-                    <q-icon
-                      :name="getIconBasedOnArgType(fields.args[argIndex].type)"
-                      padding="sm"
-                    />
+                  <template #icon-left>
+                    <OIcon :name="getIconBasedOnArgType(fields.args[argIndex].type)" size="sm" />
                   </template>
-                </q-select>
-                <!-- Left field selector using StreamFieldSelect -->
-                <div
-                  class="tw:w-52"
-                  v-if="fields.args[argIndex]?.type === 'field'"
-                >
+                  <!-- empty slot keeps the trigger icon-only -->
+                  <template #trigger><span class="sr-only"></span></template>
+                </OSelect>
+
+                <!-- Field selector -->
+                <div class="w-52 flex-none" v-if="fields.args[argIndex]?.type === 'field'">
                   <StreamFieldSelect
                     :streams="getAllSelectedStreams()"
                     v-model="fields.args[argIndex].value"
@@ -101,28 +79,55 @@
                   />
                 </div>
 
-                <q-input
-                  v-if="fields.args[argIndex]?.type === 'string'"
-                  type="text"
-                  v-model="fields.args[argIndex].value"
-                  placeholder="Enter string"
-                  :required="isRequired(fields.functionName, argIndex)"
-                  class="tw:w-52"
-                  dense
-                  :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
-                />
+                <div v-if="fields.args[argIndex]?.type === 'string'" class="w-52 flex-none">
+                  <OInput
+                    type="text"
+                    v-model="fields.args[argIndex].value"
+                    :placeholder="t('dashboard.selectFunction.enterString')"
+                    class="w-full"
+                    :data-test="`dashboard-function-dropdown-arg-string-input-${argIndex}`"
+                  />
+                </div>
 
-                <q-input
+                <OInput
                   v-if="fields.args[argIndex]?.type === 'number'"
                   type="number"
                   v-model.number="fields.args[argIndex].value"
-                  placeholder="Enter number"
-                  :required="isRequired(fields.functionName, argIndex)"
-                  class="tw:w-52"
-                  dense
+                  :placeholder="t('dashboard.selectFunction.enterNumber')"
+                  class="w-52 flex-none"
                   :data-test="`dashboard-function-dropdown-arg-number-input-${argIndex}`"
                 />
 
+                <!-- Cast target type -->
+                <div v-if="fields.args[argIndex]?.type === 'castType'" class="w-52 flex-none">
+                  <OSelect
+                    v-model="fields.args[argIndex].value"
+                    :options="castTypeOptions"
+                    :label="t('dashboard.selectFunction.selectCastType')"
+                    label-position="inside"
+                    class="o2-custom-select-dashboard"
+                    :data-test="`dashboard-function-dropdown-arg-cast-type-select-${argIndex}`"
+                  />
+                </div>
+
+                <!-- histogram interval for sql queries -->
+                <div
+                  v-if="fields.args[argIndex]?.type === 'histogramInterval'"
+                  class="w-52 flex-none"
+                >
+                  <HistogramIntervalDropDown
+                    :model-value="fields.args[argIndex].value"
+                    @update:modelValue="
+                      (newValue: any) => {
+                        fields.args[argIndex].value = newValue;
+                      }
+                    "
+                    class="w-full"
+                    :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
+                  />
+                </div>
+
+                <!-- Nested function inline with type selector -->
                 <SelectFunction
                   v-if="fields.args[argIndex]?.type === 'function'"
                   v-model="fields.args[argIndex].value"
@@ -131,70 +136,116 @@
                   :data-test="`dashboard-function-dropdown-arg-function-input-${argIndex}`"
                 />
 
-                <!-- histogram interval for sql queries -->
-                <HistogramIntervalDropDown
-                  v-if="fields.args[argIndex]?.type === 'histogramInterval'"
-                  :model-value="fields.args[argIndex].value"
-                  @update:modelValue="
-                    (newValue: any) => {
-                      fields.args[argIndex].value = newValue.value;
-                    }
-                  "
-                  class="tw:w-52"
-                  :data-test="`dashboard-function-dropdown-arg-histogram-interval-input-${argIndex}`"
-                />
-
                 <!-- Remove argument button -->
-                <q-btn
+                <OButton
                   v-if="canRemoveArgument(fields.functionName, argIndex)"
-                  icon="close"
-                  dense
-                  flat
-                  round
+                  variant="ghost"
+                  size="icon"
+                  class="shrink-0"
                   @click="removeArgument(argIndex)"
-                  class="tw:h-10 tw:w-10"
                   :data-test="`dashboard-function-dropdown-arg-remove-button-${argIndex}`"
-                />
+                  icon-left="close"
+                >
+                </OButton>
               </div>
+
+              <OBanner
+                v-if="castSuggestions[argIndex]"
+                variant="warning"
+                icon="warning"
+                dense
+                class="mt-2"
+                :data-test="`dashboard-function-dropdown-arg-cast-suggestion-${argIndex}`"
+              >
+                <span class="text-xs">{{ castSuggestions[argIndex].message }}</span>
+                <template #actions>
+                  <div class="flex items-center gap-2">
+                    <OButton
+                      variant="outline"
+                      size="sm"
+                      @click="applyCast(argIndex, suggestedCastType)"
+                      :data-test="`dashboard-function-dropdown-arg-cast-apply-${argIndex}`"
+                    >
+                      {{
+                        t("dashboard.selectFunction.castSuggestion.castTo", {
+                          type: castTypeLabels[suggestedCastType],
+                        })
+                      }}
+                    </OButton>
+                    <OButton
+                      variant="ghost"
+                      size="sm"
+                      @click="dismissCastSuggestion(argIndex)"
+                      :data-test="`dashboard-function-dropdown-arg-cast-dismiss-${argIndex}`"
+                    >
+                      {{ t("dashboard.selectFunction.castSuggestion.dismiss") }}
+                    </OButton>
+                  </div>
+                </template>
+              </OBanner>
             </div>
           </div>
         </div>
-
-        <!-- Add more arguments if allowed -->
       </div>
     </div>
-    <q-btn
+
+    <!-- Add more arguments if allowed -->
+    <OButton
       v-if="canAddArgument(fields.functionName)"
+      variant="outline"
+      size="sm"
       @click="addArgument()"
-      color="primary"
-      label="+ Add"
-      padding="5px 14px"
-      class="tw:mt-3"
-      no-caps
-      dense
+      class="mt-3 w-fit border-dashed"
+      icon-left="add"
       :data-test="`dashboard-function-dropdown-add-argument-button`"
-    />
+    >
+      {{ t("dashboard.selectFunction.add") }}
+    </OButton>
   </div>
 </template>
 
 <script lang="ts">
-import { ref, watch, toRef, computed, inject } from "vue";
+import { ref, watch, computed, inject } from "vue";
+import { useI18nTyped, raw } from "@/types/i18n";
+import type { I18nText } from "@/types/i18n";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import HistogramIntervalDropDown from "../HistogramIntervalDropDown.vue";
 import { addMissingArgs } from "@/utils/dashboard/dashboardAutoQueryBuilder";
 import StreamFieldSelect from "@/components/dashboards/addPanel/StreamFieldSelect.vue";
 import SubTaskArrow from "@/components/icons/SubTaskArrow.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import {
-  symOutlinedFunction,
-  symOutlinedTitle,
-  symOutlined123,
-  symOutlinedList,
-} from "@quasar/extras/material-symbols-outlined";
+  CAST_TARGET_TYPES,
+  DEFAULT_CAST_TARGET_TYPE,
+  getCastSeverity,
+  resolveFieldType,
+  wrapArgInCast,
+  type CastTargetType,
+} from "@/utils/dashboard/castSuggestion";
+
+/** SQL type names shown to the user; not copy, so never translated. */
+const CAST_TYPE_LABELS: Record<CastTargetType, string> = {
+  DOUBLE: "Double",
+  BIGINT: "Bigint",
+};
 
 export default {
   name: "SelectFunction",
-  components: { HistogramIntervalDropDown, StreamFieldSelect, SubTaskArrow },
+  components: {
+    HistogramIntervalDropDown,
+    StreamFieldSelect,
+    SubTaskArrow,
+    OButton,
+    OSelect,
+    OInput,
+    OIcon,
+    OBanner,
+  },
   props: {
     modelValue: {
       type: Object,
@@ -213,15 +264,23 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props: any, { emit }) {
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { getAllSelectedStreams } = useDashboardPanelData(
+    interface FunctionArg {
+      type: string;
+      value: unknown;
+    }
+
+    const { t } = useI18nTyped();
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { getAllSelectedStreams, dashboardPanelData } = useDashboardPanelData(
       dashboardPanelDataPageKey,
+      t,
     );
 
     const fields = ref(addMissingArgs(props.modelValue));
+
+    // Typed view of the args used only for template iteration, so the v-for
+    // index resolves to `number` (v-model still writes through `fields`).
+    const argRows = computed<FunctionArg[]>(() => fields.value.args ?? []);
 
     watch(
       () => fields.value,
@@ -234,15 +293,19 @@ export default {
     );
 
     const filteredFunctions: any = ref([]);
+    const dismissedSuggestions = ref<string[]>([]);
+
+    const castTypeOptions = CAST_TARGET_TYPES.map((castType) => ({
+      label: raw(CAST_TYPE_LABELS[castType]),
+      value: castType,
+    }));
 
     // Initialize filteredFunctions with all available options
     const initializeFunctions = () => {
       let filteredFunctionsValidation = functionValidation;
       // if allowAggregation is false, filter out aggregation functions
       if (props.allowAggregation === false) {
-        filteredFunctionsValidation = filteredFunctionsValidation.filter(
-          (v) => !v.isAggregation,
-        );
+        filteredFunctionsValidation = filteredFunctionsValidation.filter((v) => !v.isAggregation);
       }
 
       // None is already included in functionValidation.json, just map all functions
@@ -260,9 +323,7 @@ export default {
         let filteredFunctionsValidation = functionValidation;
         // if allowAggregation is false, filter out aggregation functions
         if (props.allowAggregation === false) {
-          filteredFunctionsValidation = filteredFunctionsValidation.filter(
-            (v) => !v.isAggregation,
-          );
+          filteredFunctionsValidation = filteredFunctionsValidation.filter((v) => !v.isAggregation);
         }
 
         const searchVal = val?.toLowerCase();
@@ -277,14 +338,22 @@ export default {
       });
     };
 
-    // const availableFunctions = ref(["arrzip", "concat", "count", "sum"]);
+    const onFunctionSearch = (val: string) => {
+      let filteredFunctionsValidation = functionValidation;
+      if (props.allowAggregation === false) {
+        filteredFunctionsValidation = filteredFunctionsValidation.filter((v) => !v.isAggregation);
+      }
+      const searchVal = val?.toLowerCase() ?? "";
+      filteredFunctions.value = filteredFunctionsValidation
+        .map((v) => ({
+          label: v.functionLabel,
+          value: v.functionName,
+        }))
+        .filter((v) => v.label.toLowerCase().indexOf(searchVal) > -1);
+    };
 
     const getValidationForFunction = (functionName: string) => {
-      return (
-        functionValidation.find(
-          (v) => v.functionName === (functionName ?? null),
-        ) ?? {}
-      );
+      return functionValidation.find((v) => v.functionName === (functionName ?? null)) ?? {};
     };
 
     const canAddArgument = (functionName: string) => {
@@ -302,11 +371,7 @@ export default {
       const allowAddArgAt = funcValidation?.allowAddArgAt;
 
       // Determine the actual index based on allowAddArgAt
-      const adjustedIndex = getAdjustedIndex(
-        argsValidation,
-        argIndex,
-        allowAddArgAt,
-      );
+      const adjustedIndex = getAdjustedIndex(argsValidation, argIndex, allowAddArgAt);
 
       const minArg = argsValidation[adjustedIndex]?.min ?? 0;
       const functionTotalArgs = argsValidation.length;
@@ -316,9 +381,7 @@ export default {
     };
 
     const addArgument = () => {
-      const funcValidation: any = getValidationForFunction(
-        fields.value.functionName,
-      );
+      const funcValidation: any = getValidationForFunction(fields.value.functionName);
 
       const adjustedIndex = getAdjustedIndex(
         funcValidation?.args || [],
@@ -364,11 +427,7 @@ export default {
     };
 
     // Helper function to adjust the index based on allowAddArgAt
-    const getAdjustedIndex = (
-      argsValidation: any,
-      argIndex: number,
-      allowAddArgAt: any,
-    ) => {
+    const getAdjustedIndex = (argsValidation: any, argIndex: number, allowAddArgAt: any) => {
       const totalArgs = argsValidation.length;
 
       // Handle different cases for allowAddArgAt
@@ -407,27 +466,26 @@ export default {
       const allowAddArgAt = funcValidation?.allowAddArgAt;
 
       // Determine the actual index based on allowAddArgAt
-      const adjustedIndex = getAdjustedIndex(
-        argsValidation,
-        argIndex,
-        allowAddArgAt,
-      );
+      const adjustedIndex = getAdjustedIndex(argsValidation, argIndex, allowAddArgAt);
 
       // Return the type for the adjusted index, or an empty array if the index is out of bounds
-      return argsValidation[adjustedIndex]?.type || [];
+      const types = argsValidation[adjustedIndex]?.type || [];
+      // Inject icon name for each option so the switcher buttons show icons
+      return types.map((t: any) => ({
+        ...t,
+        icon: getIconBasedOnArgType(t.value),
+      }));
     };
 
     // watcher on functionName
     watch(
       () => fields.value.functionName,
-      (newVal) => {
+      () => {
         // Save the old args
         const oldArgs = [...fields.value.args];
 
         // get the validation for the selected function
-        const funcValidation: any = getValidationForFunction(
-          fields.value.functionName,
-        );
+        const funcValidation: any = getValidationForFunction(fields.value.functionName);
 
         // rebuild fields.value.args based on funcValidation.args
         if (funcValidation) {
@@ -440,10 +498,19 @@ export default {
             })),
           );
 
-          // Preserve field values where both old and new types are "field"
+          // Allowed types per new arg slot, in the same order as newArgs.
+          const allowedTypes = (funcValidation?.args ?? []).flatMap((arg: any) =>
+            Array.from({ length: arg.min ?? 1 }).map(() =>
+              (arg.type ?? []).map((argType: any) => argType.value),
+            ),
+          );
+
+          // Carry the old argument over whenever the new slot accepts its type.
+          // Preserving only field→field discarded any nested expression — most
+          // visibly a cast, which changing sum to avg would silently undo.
           for (let i = 0; i < newArgs.length && i < oldArgs.length; i++) {
-            if (newArgs[i].type === "field" && oldArgs[i].type === "field") {
-              newArgs[i].value = oldArgs[i].value;
+            if (allowedTypes[i]?.includes(oldArgs[i].type)) {
+              newArgs[i] = { type: oldArgs[i].type, value: oldArgs[i].value };
             }
           }
 
@@ -472,18 +539,75 @@ export default {
       }
     };
 
+    const setArgType = (argIndex: number, type: string) => {
+      const arg = fields.value.args[argIndex];
+      if (!arg || arg.type === type) return;
+      arg.type = type;
+      onArgTypeChange(arg);
+    };
+
+    // Keyed by field as well as index so changing the field re-offers the cast.
+    const suggestionKey = (argIndex: number) => {
+      const fieldRef = fields.value.args?.[argIndex]?.value as { field?: string } | undefined;
+      return `${fields.value.functionName}:${argIndex}:${fieldRef?.field ?? ""}`;
+    };
+
+    const castSuggestions = computed(() => {
+      const groupedFields = dashboardPanelData.meta?.streamFields?.groupedFields;
+      const functionName = fields.value.functionName;
+      const funcValidation: any = getValidationForFunction(functionName);
+      const result: Record<number, { message: I18nText }> = {};
+
+      (fields.value.args ?? []).forEach((arg: FunctionArg, argIndex: number) => {
+        if (arg?.type !== "field") return;
+
+        const fieldRef = arg.value as { field?: string; streamAlias?: string } | undefined;
+        const fieldType = resolveFieldType(groupedFields, fieldRef);
+
+        if (!getCastSeverity(functionName, fieldType)) return;
+        if (dismissedSuggestions.value.includes(suggestionKey(argIndex))) return;
+
+        result[argIndex] = {
+          message: t("dashboard.selectFunction.castSuggestion.error", {
+            fn: funcValidation?.functionLabel ?? functionName,
+            field: fieldRef?.field ?? "",
+            type: fieldType ?? "",
+          }),
+        };
+      });
+
+      return result;
+    });
+
+    const applyCast = (argIndex: number, targetType: CastTargetType) => {
+      const arg = fields.value.args?.[argIndex];
+      if (!arg) return;
+      fields.value.args[argIndex] = wrapArgInCast(arg, targetType);
+    };
+
+    const dismissCastSuggestion = (argIndex: number) => {
+      dismissedSuggestions.value.push(suggestionKey(argIndex));
+    };
+
+    const hasArgTypeChoice = (functionName: string, argIndex: number) =>
+      getSupportedTypeBasedOnFunctionNameAndIndex(functionName, argIndex).length > 1;
+
     const getIconBasedOnArgType = (type: string) => {
       switch (type) {
         case "field":
-          return symOutlinedList;
+          return "list";
         case "function":
-          return symOutlinedFunction;
+          return "function";
         case "string":
-          return symOutlinedTitle;
+          return "title";
         case "number":
-          return symOutlined123;
+          return "123";
         case "histogramInterval":
-          return "bar_chart";
+          return "bar-chart";
+        case "castType":
+          return "transform";
+        default:
+          return undefined;
       }
     };
 
@@ -491,28 +615,26 @@ export default {
       const funcValidation: any = getValidationForFunction(functionName);
 
       if (!funcValidation) {
-        return `Parameter ${argIndex + 1}`;
+        return t("dashboard.selectFunction.parameter", { n: argIndex + 1 });
       }
 
       const argsValidation = funcValidation?.args || [];
       const allowAddArgAt = funcValidation?.allowAddArgAt;
 
       // Determine the actual index based on allowAddArgAt
-      const adjustedIndex = getAdjustedIndex(
-        argsValidation,
-        argIndex,
-        allowAddArgAt,
-      );
+      const adjustedIndex = getAdjustedIndex(argsValidation, argIndex, allowAddArgAt);
 
       // Return the label from validation, or fallback to default
       return (
-        argsValidation[adjustedIndex]?.label || `Parameter ${argIndex + 1}`
+        argsValidation[adjustedIndex]?.label ||
+        t("dashboard.selectFunction.parameter", { n: argIndex + 1 })
       );
     };
 
     return {
+      t,
       fields,
-      // availableFunctions,
+      argRows,
       getValidationForFunction,
       canAddArgument,
       canRemoveArgument,
@@ -524,51 +646,21 @@ export default {
       getSupportedTypeBasedOnFunctionNameAndIndex,
       filteredFunctions,
       filterFunctionsOptions,
+      onFunctionSearch,
       initializeFunctions,
       onArgTypeChange,
+      setArgType,
       getAllSelectedStreams,
       getIconBasedOnArgType,
       getParameterLabel,
+      castSuggestions,
+      castTypeOptions,
+      suggestedCastType: DEFAULT_CAST_TARGET_TYPE,
+      castTypeLabels: CAST_TYPE_LABELS,
+      applyCast,
+      dismissCastSuggestion,
+      hasArgTypeChoice,
     };
   },
 };
 </script>
-
-<style lang="scss" scoped>
-.arg-type-select {
-  :deep(.q-field__control) {
-    background-color: transparent !important;
-    border: 1px solid var(--o2-border-color) !important;
-    border-radius: 4px !important;
-    align-items: center !important;
-  }
-
-  :deep(.q-field__control):before,
-  :deep(.q-field__control):after {
-    display: none !important;
-  }
-
-  :deep(.q-field):before,
-  :deep(.q-field):after {
-    display: none !important;
-  }
-
-  :deep(.q-field__append) {
-    align-items: center !important;
-  }
-
-  :deep(.q-field__prepend) {
-    align-items: center !important;
-  }
-
-  :deep(.q-field__append .q-icon) {
-    color: var(--o2-primary-btn-bg) !important;
-    font-size: 18px !important;
-  }
-
-  :deep(.q-field__prepend .q-icon) {
-    color: var(--o2-primary-btn-bg) !important;
-    font-size: 18px !important;
-  }
-}
-</style>

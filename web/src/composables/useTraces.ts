@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,21 +13,24 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { reactive, computed } from "vue";
-import {
-  b64EncodeStandard,
-  b64EncodeUnicode,
-  useLocalTraceFilterField,
-} from "@/utils/zincutils";
+import { reactive, computed, nextTick, shallowRef } from "vue";
+import { b64EncodeStandard, b64EncodeUnicode, useLocalTraceFilterField } from "@/utils/zincutils";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { copyToClipboard, useQuasar } from "quasar";
-
+import { copyToClipboard } from "@/utils/clipboard";
+import type { TranslateFn } from "@/types/i18n";
+import { getOrSetServiceColor as registryGetOrSetServiceColor } from "@/utils/traces/serviceColorRegistry";
+import { quoteSqlIdentifierIfNeeded } from "@/utils/query/sqlIdentifiers";
+import { buildFieldToGroupIdMap, quoteSqlLiteral } from "@/utils/telemetryCorrelation";
+import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import { DEFAULT_TRACE_SEARCH_MODE } from "@/ts/interfaces/traces/trace.types";
 const defaultObject = {
   organizationIdentifier: "",
   runQuery: false,
   loading: false,
   loadingStream: false,
+  searchApplied: false,
 
   config: {
     splitterModel: 20,
@@ -68,6 +71,9 @@ const defaultObject = {
       wrapCells: false,
       manualRemoveFields: false,
       rowsPerPage: 25,
+      showPagination: false,
+      sortBy: "start_time" as string,
+      sortOrder: "desc" as "asc" | "desc",
       chartInterval: "1 second",
       chartKeyFormat: "HH:mm:ss",
       navigation: {
@@ -78,12 +84,14 @@ const defaultObject = {
     serviceColors: {} as any,
     redirectedFromLogs: false,
     searchApplied: false,
-    metricsRangeFilters: new Map<
-      string,
-      { panelTitle: string; start: number; end: number }
-    >(),
-    showErrorOnly: false,
+    lastRunAt: undefined as number | undefined,
+    metricsRangeFilters: new Map<string, { panelTitle: string; start: number; end: number }>(),
     queryEditorPlaceholderFlag: true,
+    liveMode: localStorage.getItem("oo_toggle_auto_run") === "true",
+    searchMode: DEFAULT_TRACE_SEARCH_MODE,
+    serviceGraphVisualizationType:
+      (localStorage.getItem("serviceGraph_visualizationType") as "tree" | "graph") || "tree",
+    serviceGraphLayoutType: localStorage.getItem("serviceGraph_layoutType") || "horizontal",
   },
   data: {
     query: "",
@@ -91,6 +99,15 @@ const defaultObject = {
     parsedQuery: {},
     errorMsg: "",
     errorCode: 0,
+    errorDetail: "",
+    // Server-error highlight ranges forwarded to the query editor (mirrors Logs).
+    sqlSyntaxErrorRanges: [] as Array<{
+      startLine: number;
+      endLine: number;
+      column?: number;
+      endColumn?: number;
+      error: string;
+    }>,
     additionalErrorMsg: "",
     stream: {
       streamLists: [],
@@ -99,8 +116,10 @@ const defaultObject = {
       selectedFields: <string[]>[],
       filterField: "",
       addToFilter: "",
+      removeFilterField: "",
       functions: [],
       filters: [] as any[],
+      userDefinedSchema: [] as string[],
       fieldValues: {} as {
         [key: string | number]: {
           isLoading: boolean;
@@ -140,29 +159,64 @@ const defaultObject = {
         trace_id: string;
         trace_start_time: number;
         trace_end_time: number;
+        // Stamped on at runtime by TraceDetails' updateServiceColors: the
+        // per-service span counts derived from the span list.
+        service_name?: { service_name: string; count: number }[];
+        services?: Record<string, number>;
       } | null,
       traceId: "",
       spanList: [],
       isLoadingTraceMeta: false,
       isLoadingTraceDetails: false,
-      selectedSpanId: "" as String | null,
+      selectedSpanId: "" as string | null,
       expandedSpans: [] as String[],
       showSpanDetails: false,
-      selectedLogStreams: [] as String[],
+      selectedLogStreams: [] as string[],
+      correlationProps: null as any,
     },
   },
 };
 
 const searchObj = reactive(Object.assign({}, defaultObject));
 
+/** Default ordered column ID lists used when no localStorage entry exists. */
+export const DEFAULT_TRACE_COLUMNS: Record<"traces" | "spans", string[]> = {
+  spans: ["service_name", "operation_name", "duration", "span_status"],
+  traces: ["service_name", "operation_name", "duration", "spans", "status", "service_latency"],
+};
+
+// Shared SQL parser singleton — loaded once by Index.vue in onBeforeMount,
+// then reused across all child components (SearchBar, IndexList, TracesMetricsDashboard).
+// This avoids redundant WASM loads and prevents timing issues where a component's
+// onMounted calls loadDashboard before its own parser finishes loading.
+const tracesParser = shallowRef<any>(null);
+let _loadTracesParserPromise: Promise<void> | null = null;
+
+const loadTracesParser = async (): Promise<void> => {
+  if (tracesParser.value) return;
+  if (_loadTracesParserPromise) {
+    await _loadTracesParserPromise;
+    return;
+  }
+  _loadTracesParserPromise = (async () => {
+    const useSqlParser: any = await import("@/composables/useParser");
+    const { sqlParser }: any = useSqlParser.default();
+    tracesParser.value = await sqlParser();
+  })();
+  await _loadTracesParserPromise;
+};
+
 const useTraces = () => {
   const store = useStore();
   const router = useRouter();
-  const $q = useQuasar();
+
+  const { loadSemanticGroups } = useServiceCorrelation();
 
   const resetSearchObj = () => {
     // delete searchObj.data;
     searchObj.data.errorMsg = "";
+    searchObj.data.errorDetail = "";
+    searchObj.data.sqlSyntaxErrorRanges = [];
     searchObj.data.stream.streamLists = [];
     searchObj.data.stream.selectedStream = { label: "", value: "" };
     searchObj.data.stream.selectedStreamFields = [];
@@ -185,16 +239,38 @@ const useTraces = () => {
     searchObj.data.traceDetails.isLoadingTraceMeta = false;
   };
 
-  const updatedLocalLogFilterField = (): void => {
+  /**
+   * Persist the current selectedFields for the given mode.
+   * Stored as traceFilterField[orgId_stream][mode] = string[].
+   */
+  const updatedLocalLogFilterField = (searchMode: "traces" | "spans" = "traces"): void => {
     const identifier: string = searchObj.organizationIdentifier || "default";
-    const selectedFields: any =
-      useLocalTraceFilterField()?.value != null
-        ? useLocalTraceFilterField()?.value
-        : {};
-    selectedFields[
-      `${identifier}_${searchObj.data.stream.selectedStream.value}`
-    ] = searchObj.data.stream.selectedFields;
-    useLocalTraceFilterField(selectedFields);
+    const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
+    const all: any = useLocalTraceFilterField()?.value ?? {};
+    all[key] = {
+      ...(all[key] ?? {}),
+      [searchMode]: searchObj.data.stream.selectedFields,
+    };
+    useLocalTraceFilterField(all);
+  };
+
+  /**
+   * Restore selectedFields for the given mode from localStorage.
+   * Falls back to the default ordered column list when no saved value exists.
+   */
+  const loadLocalLogFilterField = (searchMode: "traces" | "spans" = "traces"): void => {
+    const identifier: string = searchObj.organizationIdentifier || "default";
+    const key = `${identifier}_${searchObj.data.stream.selectedStream.value}`;
+    // storage ref .value is typed {} at this boundary; narrow to the stored map shape
+    const stored = useLocalTraceFilterField()?.value as
+      Record<string, Record<string, string[]>> | undefined;
+    const saved: Record<string, string[]> | undefined = stored?.[key];
+
+    const fields: string[] = saved?.[searchMode]?.length
+      ? saved?.[searchMode]
+      : [...DEFAULT_TRACE_COLUMNS[searchMode]];
+
+    searchObj.data.stream.selectedFields = fields;
   };
 
   function getUrlQueryParams(getShareLink: boolean = false) {
@@ -216,6 +292,8 @@ const useTraces = () => {
 
     query["trace_id"] = router.currentRoute.value.query.trace_id;
 
+    query["tab"] = searchObj.meta.searchMode;
+
     if (router.currentRoute.value.query.span_id)
       query["span_id"] = router.currentRoute.value.query.span_id;
 
@@ -223,6 +301,7 @@ const useTraces = () => {
   }
 
   const copyTracesUrl = (
+    t: TranslateFn,
     customTimeRange: { from: string; to: string } | null = null,
   ) => {
     const queryParams = getUrlQueryParams(true);
@@ -234,7 +313,7 @@ const useTraces = () => {
 
     const searchParams = new URLSearchParams();
     for (const [key, value] of Object.entries(queryParams)) {
-      searchParams.append(key, value);
+      searchParams.append(key, value as string);
     }
     const queryString = searchParams.toString();
 
@@ -244,43 +323,39 @@ const useTraces = () => {
       shareURL += "?" + queryString;
     }
 
-    copyToClipboard(shareURL)
-      .then(() => {
-        $q.notify({
-          type: "positive",
-          message: "Link Copied Successfully!",
-          timeout: 5000,
-        });
-      })
-      .catch(() => {
-        $q.notify({
-          type: "negative",
-          message: "Error while copy link.",
-          timeout: 5000,
-        });
-      });
+    copyToClipboard(shareURL, t, {
+      successMessage: t("search.linkCopiedSuccessfully"),
+      errorMessage: t("toastMessages.views.errorWhileCopyLink"),
+      timeout: 5000,
+    });
   };
+
+  // The columns carrying span/trace ids are org-configurable. Both log
+  // navigations — the plain one and the correlated one — resolve them here so
+  // they cannot drift apart. Defaults mirror stores/index.ts.
+  const getSpanIdField = () =>
+    store.state.organizationData?.organizationSettings?.span_id_field_name || "span_id";
+  const getTraceIdField = () =>
+    store.state.organizationData?.organizationSettings?.trace_id_field_name || "trace_id";
 
   // Function to build query details for navigation
   const buildQueryDetails = (span: any, isSpan: boolean = true) => {
-    const spanIdField =
-      store.state.organizationData?.organizationSettings?.span_id_field_name;
-    const traceIdField =
-      store.state.organizationData?.organizationSettings?.trace_id_field_name;
+    const spanIdField = getSpanIdField();
+    const traceIdField = getTraceIdField();
     const traceId = searchObj.data.traceDetails.selectedTrace?.trace_id;
 
     let query: string = isSpan
-      ? `${spanIdField}='${span.spanId || span.span_id}' ${
-          traceId ? `AND ${traceIdField}='${traceId}'` : ""
+      ? `${quoteSqlIdentifierIfNeeded(spanIdField)}='${span.spanId || span.span_id}' ${
+          traceId ? `AND ${quoteSqlIdentifierIfNeeded(traceIdField)}='${traceId}'` : ""
         }`
-      : `${traceIdField}='${traceId}'`;
+      : `${quoteSqlIdentifierIfNeeded(traceIdField)}='${traceId}'`;
 
     if (query) query = b64EncodeStandard(query) as string;
 
     return {
       stream: searchObj.data.traceDetails.selectedLogStreams.join(","),
-      from: span.startTimeMs * 1000 - 60000000,
-      to: span.endTimeMs * 1000 + 60000000,
+      from: Math.floor(span.start_time / 1000) - 60000000,
+      to: Math.ceil(span.end_time / 1000) + 60000000,
       refresh: 0,
       query,
       orgIdentifier: store.state.selectedOrganization.identifier,
@@ -288,7 +363,9 @@ const useTraces = () => {
   };
 
   // Function to navigate to logs with the provided query details
-  const navigateToLogs = (queryDetails: any) => {
+  const navigateToLogs = async (queryDetails: any) => {
+    store.dispatch("logs/setIsInitialized", false);
+    await nextTick();
     router.push({
       path: "/logs",
       query: {
@@ -329,37 +406,39 @@ const useTraces = () => {
     return shareURL;
   });
 
-  // Color palette for service visualization
-  const colorPalette = [
-    "#b7885e",
-    "#1ab8be",
-    "#ffcb99",
-    "#f89570",
-    "#839ae2",
-  ];
-
   /**
-   * Generate a new color in HSL format
-   * Used when the color palette is exhausted
+   * Assign service colors for raw hits from either traces or spans mode.
+   * - Traces mode: service_name is an array of strings or objects with a service_name property.
+   * - Spans mode: service_name is a plain string.
    */
-  const generateNewColor = (currentColorCount: number): string => {
-    const hue = currentColorCount * (360 / 50);
-    const lightness = 50 + (currentColorCount % 2) * 15;
-    return `hsl(${hue}, 100%, ${lightness}%)`;
+  const setServiceColors = (hits: any[]): void => {
+    hits.forEach((hit: any) => {
+      const serviceNames = Array.isArray(hit.service_name)
+        ? hit.service_name
+        : hit.service_name
+          ? [hit.service_name]
+          : [];
+      serviceNames.forEach((service: any) => {
+        const serviceName = typeof service === "string" ? service : service.service_name;
+        if (serviceName && !searchObj.meta.serviceColors[serviceName]) {
+          searchObj.meta.serviceColors[serviceName] = registryGetOrSetServiceColor(serviceName);
+        }
+      });
+    });
   };
 
-  /**
-   * Format raw trace hits from API into structured trace metadata
-   * Assigns service colors and formats timestamps
-   * @param traces - Raw trace hits from the API
-   * @returns Formatted trace metadata array
-   */
+  const getOrSetServiceColor = (serviceName: string): string => {
+    const color = registryGetOrSetServiceColor(serviceName);
+    if (serviceName && !searchObj.meta.serviceColors[serviceName]) {
+      searchObj.meta.serviceColors[serviceName] = color;
+    }
+    return searchObj.meta.serviceColors[serviceName] ?? color;
+  };
+
   const formatTracesMetaData = (traces: any[]): any[] => {
     if (!traces.length) return [];
 
-    // Track color palette locally if not using shared colors
-    const localColors = [...colorPalette];
-    let colorIndex = Object.keys(searchObj.meta.serviceColors).length;
+    setServiceColors(traces);
 
     return traces.map((trace) => {
       const _trace = {
@@ -371,35 +450,25 @@ const useTraces = () => {
         spans: trace.spans?.[0] || 0,
         errors: trace.spans?.[1] || 0,
         duration: trace.duration || 0,
-        services: {} as Record<string, number>,
+        services: {} as Record<string, { count: number; duration: number }>,
         zo_sql_timestamp: new Date(trace.start_time / 1000).getTime(),
-        _o2_llm_usage_details_input: trace._o2_llm_usage_details_input,
-        _o2_llm_usage_details_output: trace._o2_llm_usage_details_output,
-        _o2_llm_usage_details_total: trace._o2_llm_usage_details_total,
-        _o2_llm_cost_details_total: trace._o2_llm_cost_details_total,
-        _o2_llm_input: trace._o2_llm_input || {},
+        gen_ai_usage_input_tokens: trace.gen_ai_usage_input_tokens,
+        gen_ai_usage_output_tokens: trace.gen_ai_usage_output_tokens,
+        gen_ai_usage_total_tokens: trace.gen_ai_usage_total_tokens,
+        gen_ai_usage_cost: trace.gen_ai_usage_cost,
+        gen_ai_input_messages: trace.gen_ai_input_messages,
       };
 
-      // Assign colors to services
+      // Build per-trace service span count and duration map
       if (trace.service_name && Array.isArray(trace.service_name)) {
         trace.service_name.forEach((service: any) => {
-          const serviceName =
-            typeof service === "string" ? service : service.service_name;
-
-          if (!searchObj.meta.serviceColors[serviceName]) {
-            // Generate new color if palette is exhausted
-            if (colorIndex >= localColors.length) {
-              localColors.push(generateNewColor(localColors.length));
-            }
-
-            searchObj.meta.serviceColors[serviceName] = localColors[colorIndex];
-            colorIndex++;
-          }
-
-          // Track service span count
-          const serviceCount =
-            typeof service === "string" ? 1 : service.count || 1;
-          _trace.services[serviceName] = serviceCount;
+          const serviceName = typeof service === "string" ? service : service.service_name;
+          const serviceCount = typeof service === "string" ? 1 : service.count || 1;
+          const serviceDuration = typeof service === "string" ? 0 : service.duration || 0;
+          _trace.services[serviceName] = {
+            count: serviceCount,
+            duration: serviceDuration,
+          };
         });
       }
 
@@ -407,16 +476,86 @@ const useTraces = () => {
     });
   };
 
+  const navigateToCorrelatedLogs = async (correlationProps: any) => {
+    // Conditions are keyed by semantic group, not by field name, so that two
+    // streams aliasing one dimension (k8s_namespace_name vs
+    // service_k8s_namespace_name) collapse into a single condition.
+    const conditions = new Map<string, string>();
+
+    const semanticGroups = await loadSemanticGroups();
+    const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups);
+
+    const groupIdFor = (field: string) => fieldToGroupId.get(field.toLowerCase()) ?? field;
+    const setCondition = (field: string, value: string) =>
+      conditions.set(
+        groupIdFor(field),
+        `${quoteSqlIdentifierIfNeeded(field)} = ${quoteSqlLiteral(value)}`,
+      );
+
+    for (const streamInfo of correlationProps.logStreams) {
+      const filters = streamInfo.filters ?? {};
+      for (const [field, value] of Object.entries(filters)) {
+        if (!value || value === SELECT_ALL_VALUE || field.startsWith("_")) continue;
+        // First stream to claim a group wins.
+        if (conditions.has(groupIdFor(field))) continue;
+        setCondition(field, String(value));
+      }
+    }
+
+    // Narrow the correlated logs down to the span the user clicked "View Logs"
+    // on. Field names come from org settings and values from the current
+    // selection, same as buildQueryDetails(). These deliberately overwrite a
+    // stream filter on the same group — an exact id is the more specific match.
+    const idFilters: Array<[string, string | null | undefined]> = [
+      [getSpanIdField(), searchObj.data.traceDetails.selectedSpanId],
+      [getTraceIdField(), searchObj.data.traceDetails.selectedTrace?.trace_id],
+    ];
+
+    for (const [field, value] of idFilters) {
+      if (!value) continue;
+      setCondition(field, value);
+    }
+
+    const queryString = Array.from(conditions.values()).join(" and ");
+    const encodedQuery = b64EncodeUnicode(queryString);
+    const streamNames = correlationProps.logStreams.map((s: any) => s.stream_name).join(",");
+
+    store.dispatch("logs/setIsInitialized", false);
+    await nextTick();
+
+    router.push({
+      path: "/logs",
+      query: {
+        stream: streamNames,
+        sql_mode: "false",
+        query: encodedQuery,
+        from: String(correlationProps.timeRange.startTime),
+        to: String(correlationProps.timeRange.endTime),
+        stream_type: "logs",
+        org_identifier: store.state.selectedOrganization.identifier,
+        type: "trace_explorer",
+        quick_mode: "false",
+        show_histogram: "true",
+      },
+    });
+  };
+
   return {
     searchObj,
     resetSearchObj,
     updatedLocalLogFilterField,
+    loadLocalLogFilterField,
     getUrlQueryParams,
     copyTracesUrl,
     buildQueryDetails,
     navigateToLogs,
+    navigateToCorrelatedLogs,
     tracesShareURL,
     formatTracesMetaData,
+    setServiceColors,
+    getOrSetServiceColor,
+    tracesParser,
+    loadTracesParser,
   };
 };
 

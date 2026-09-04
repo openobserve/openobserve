@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,104 +15,89 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="col-12 q-py-sm variables-input "
-  :class="{
-    'flex tw:gap-2 items-center tw:w-full': variables.length == 0,
-  }"
+  <!-- ── FORM MODE (opt-in via `name-prefix` inside a parent <OForm>) ────────
+       Rows are FORM-OWNED: rendered as OFormInput fields with indexed names
+       (`${namePrefix}[i].key/value`), added/removed through the injected form
+       (pushFieldValue/removeFieldValue). No v-model, no local mirrors — the
+       consuming form's schema owns validation (Rule ②). -->
+  <div
+    class="variables-input w-full py-2"
+    :class="{
+      'flex w-full items-center gap-2': formRows.length == 0,
+    }"
   >
-    <div class="q-pb-xs custom-input-label text-bold">
+    <div class="custom-input-label pb-1 font-bold">
       <span>
-        Variable
+        {{ t("alerts.variables.label") }}
       </span>
-          <q-btn
-          style="color: #A0A0A0;"
-              no-caps
-              padding="xs"
-              class=""
-              size="sm"
-              flat
-              icon="info_outline"
-            >
-              <q-tooltip>
-              Variables are used to pass data from the alert to the destination.
-            </q-tooltip>
-          </q-btn>
-        </div>
-    <template v-if="!variables.length">
-      <div class="flex justify-between items-center tw:ml-auto">
-
-        <q-btn
+      <OButton variant="ghost-muted" size="icon-sm">
+        <OIcon name="info-outline" size="sm" />
+        <OTooltip :content="t('alerts.advanced.variablesTooltip')" />
+      </OButton>
+    </div>
+    <template v-if="!formRows.length">
+      <div class="flex items-center justify-between">
+        <OButton
           data-test="alert-variables-add-btn"
           size="sm"
-          class="text-bold no-border o2-secondary-button tw:h-[36px]"
-          flat
-          no-caps
-          @click="addVariable"
+          variant="outline"
+          @click="addFormRow"
         >
-        <q-icon name="add" />
-        <span>Add Variable</span>
-      </q-btn>
+          <OIcon name="add" size="sm" />
+          <span>{{ t("alerts.advanced.addVariable") }}</span>
+        </OButton>
       </div>
     </template>
     <template v-else>
+      <!-- 🔑 :key MUST be the array INDEX (Rule ①): the fields bind by
+           index-based `name` and form.Field resolves its name at CREATION, so
+           a stable-id key would leave surviving rows bound to their OLD index
+           after a mid-list delete (inputs shifted/blank). -->
       <div
-        v-for="(variable, index) in variables as any"
-        :key="variable.uuid"
-        class="q-col-gutter-sm q-pb-sm flex items-center"
+        v-for="(row, index) in formRows"
+        :key="index"
+        class="flex items-center gap-2 pb-2"
         :data-test="`alert-variables-${index + 1}`"
       >
-        <div class="q-ml-none">
-          <q-input
+        <div class="ms-0">
+          <OFormInput
             data-test="alert-variables-key-input"
-            v-model="variable.key"
-            stack-label
-            borderless
+            :name="`${namePrefix}[${index}].key`"
             :placeholder="t('common.name')"
-            dense
             tabindex="0"
           />
         </div>
-        <div class="q-ml-none">
-          <q-input
+        <div class="ms-0">
+          <OFormInput
             data-test="alert-variables-value-input"
-            v-model="variable.value"
+            :name="`${namePrefix}[${index}].value`"
             :placeholder="t('common.value')"
-            stack-label
-            borderless
-            dense
-            isUpdatingDestination
             tabindex="0"
-            style="min-width: 250px"
+            style="min-width: 15.625rem"
           />
         </div>
-        <div class="col-2 q-ml-none">
-          <q-btn
+        <div class="ms-0 w-1/6">
+          <OButton
             data-test="alert-variables-delete-variable-btn"
-            :icon="outlinedDelete"
-            class="q-ml-xs iconHoverBtn"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
+            class="ms-1"
+            variant="ghost"
+            size="icon-circle-sm"
             :title="t('alert_templates.edit')"
-            @click="removeVariable(variable)"
-          />
-          <q-btn
+            @click="removeFormRow(index)"
+          >
+            <OIcon name="delete" size="sm" />
+          </OButton>
+          <OButton
             data-test="alert-variables-add-variable-btn"
-            v-if="index === variables.length - 1"
-            icon="add"
-            class="q-ml-xs iconHoverBtn"
-            :class="store.state?.theme === 'dark' ? 'icon-dark' : ''"
-            padding="sm"
-            unelevated
-            size="sm"
-            round
-            flat
+            v-if="index === formRows.length - 1"
+            class="ms-1"
+            variant="ghost"
+            size="icon-circle-sm"
             :title="t('alert_templates.edit')"
-            @click="addVariable"
-          />
+            @click="addFormRow"
+          >
+            <OIcon name="add" size="sm" />
+          </OButton>
         </div>
       </div>
     </template>
@@ -120,52 +105,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { useI18n } from "vue-i18n";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
-import { useStore } from "vuex";
+import { inject, ref } from "vue";
+import type { Ref } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
+
+interface VariableRow {
+  key: string;
+  value: string;
+}
 
 const props = defineProps({
-  variables: {
-    type: Array,
-    required: true,
+  /**
+   * Path of the rows array inside the parent <OForm>'s values (e.g. "variables"
+   * / "context_attributes"). Rows render as OFormInput fields with indexed names
+   * (`${namePrefix}[i].key|value`), owned by the form. This component is
+   * form-mode only.
+   */
+  namePrefix: {
+    type: String,
+    default: "",
+    required: false,
   },
 });
 
-const emits = defineEmits(["add:variable", "remove:variable"]);
+const { t } = useI18nTyped();
 
-const store = useStore();
+// The injected OForm — rows are name-bound to it; add/remove go through its
+// field-array API below.
+const injectedForm = inject(FORM_CONTEXT_KEY, null);
 
-const { t } = useI18n();
+/** Resolve a dotted/indexed path ("a.b[2].c") inside the form values. */
+const resolvePath = (obj: any, path: string): any =>
+  path
+    .replace(/\[(\d+)\]/g, ".$1")
+    .split(".")
+    .filter(Boolean)
+    .reduce((acc: any, key: string) => (acc == null ? undefined : acc[key]), obj);
 
-const removeVariable = (variable: any) => {
-  emits("remove:variable", variable);
-};
+// ⚠️ MUST be form.useStore (reactive) — NOT form.state.values (a snapshot a
+// computed won't track; playbook §2).
+const formRows: Ref<VariableRow[]> = injectedForm
+  ? injectedForm.useStore((s: any) =>
+      props.namePrefix ? (resolvePath(s.values, props.namePrefix) ?? []) : [],
+    )
+  : ref<VariableRow[]>([]);
 
-const addVariable = () => {
-  emits("add:variable");
-};
+const makeVariableRow = (): VariableRow => ({ key: "", value: "" });
+
+const addFormRow = () => injectedForm?.pushFieldValue(props.namePrefix, makeVariableRow());
+
+const removeFormRow = (index: number) => injectedForm?.removeFieldValue(props.namePrefix, index);
 </script>
-
-<style lang="scss">
-.add-variable {
-  .q-icon {
-    margin-right: 4px !important;
-    font-size: 15px !important;
-  }
-}
-
-.variables-input {
-  .q-btn {
-    &.icon-dark {
-      filter: none !important;
-    }
-  }
-}
-
-.input-bg-dark .q-field__control{
-  background-color: #181a1b !important;
-}
-.input-bg-light .q-field__control{
-  background-color: #ffffff !important;
-}
-</style>

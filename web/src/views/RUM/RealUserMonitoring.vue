@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,104 +15,142 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:h-[calc(100vh-2.5625rem)] tw:overflow-hidden tw:mt-[0.325rem]">
+  <div class="flex h-full flex-col overflow-hidden">
     <template v-if="isLoading.length">
-      <div
-        class="q-pb-lg flex items-center justify-center text-center q-pt-xs tw:h-[calc(100vh-11.875rem)]"
-      >
+      <div class="flex h-[calc(100vh-11.875rem)] items-center justify-center pt-1 pb-4 text-center">
         <div>
-          <q-spinner-hourglass
-            color="primary"
-            size="2.5rem"
-            class="tw:mx-auto tw:block"
-          />
-          <div class="text-center full-width">
+          <OSpinner size="md" class="mx-auto block" data-test="rum-loading-indicator" />
+          <div class="w-full text-center">
             {{ t("rum.loadingMsg") }}
           </div>
         </div>
       </div>
     </template>
     <template v-else-if="isRumEnabled || isSessionReplayEnabled">
-      <div v-if="showTabs" class="tw:pb-[0.625rem] tw:px-[0.625rem]">
-        <AppTabs
-          :show="showTabs"
-          :tabs="tabs"
-          class="card-container"
-          v-model:active-tab="activeTab"
-          @update:active-tab="changeTab"
-        />
-      </div>
+      <OPageHeader
+        v-if="showTabs"
+        :title="t('rum.title')"
+        :subtitle="t('rum.subtitle')"
+        icon="devices"
+        tabs-below
+        class="shrink-0"
+      >
+        <template #tabs>
+          <OTabs v-model="activeTab" align="left" @change="changeTab">
+            <OTab v-for="tab in tabs" :key="tab.value" :name="tab.value" :label="tab.label" />
+          </OTabs>
+        </template>
+      </OPageHeader>
       <router-view v-slot="{ Component }">
-        <template v-if="$route.meta.keepAlive">
-          <keep-alive
-            :class="showTabs ? 'tw:h-[calc(100%-53px)]' : 'tw:h-full'"
-          >
+        <!--
+          ONE keep-alive, always rendered. It must NOT sit inside a v-if on
+          $route.meta.keepAlive: <keep-alive> holds its cache in its OWN instance, so
+          toggling the element destroys the cache along with it. Navigating
+          Sessions -> SessionViewer (meta.keepAlive false) tore the whole thing down,
+          and coming back built a fresh, empty one — which is why returning from a
+          session detail page re-ran every query instead of showing the list already
+          fetched. `include` decides what is retained; the element itself stays put.
+        -->
+        <div class="flex min-h-0 flex-1 flex-col">
+          <keep-alive :include="CACHED_RUM_VIEWS">
             <component
               :is="Component"
               :isRumEnabled="isRumEnabled"
               :isSessionReplayEnabled="isSessionReplayEnabled"
             />
           </keep-alive>
-        </template>
-        <template v-else>
-          <div :class="showTabs ? 'tw:h-[calc(100%-53px)]' : 'tw:h-full'">
-            <component
-              :is="Component"
-              :isRumEnabled="isRumEnabled"
-              :isSessionReplayEnabled="isSessionReplayEnabled"
-            />
-          </div>
-        </template>
+        </div>
       </router-view>
     </template>
     <template v-else>
-      <div class="">
-        <div
-          class="card-container q-pa-lg tw:mx-[0.625rem] tw:max-w-full tw:max-h-full tw:h-[calc(100vh - 3.125rem)]"
-        >
-          <div class="q-pb-lg">
-            <div class="text-left text-h6 text-bold q-pb-md">
-              {{ t("rum.aboutRUMTitle") }}
-            </div>
-            <div class="text-subtitle1">
-              {{ t("rum.aboutRUMMessage") }}
-            </div>
-            <div>
-              <div></div>
-            </div>
-          </div>
-          <q-btn
-            class="o2-primary-button tw:h-[36px]"
-            flat
-            no-caps
-            :title="t('rum.getStartedTitle')"
+      <OEmptyState illustration="radar" size="hero" :hide-action="true">
+        <template #title>{{ t("rum.emptyState.title") }}</template>
+        <template #description>{{ t("rum.emptyState.description") }}</template>
+
+        <template #actions>
+          <!-- Instrument a web app -->
+          <EmptyStateIngestionCard
+            icon="devices"
+            :label="t('rum.emptyState.webApp')"
+            :sublabel="t('rum.emptyState.webAppDesc', { product: raw('JavaScript') })"
+            icon-variant="blue"
+            data-test="rum-empty-web-card"
             @click="getStarted"
-          >
-            {{ t("rum.getStartedLabel") }}
-            <q-icon name="arrow_forward" size="1.25rem"
-  class="q-ml-xs" />
-          </q-btn>
-        </div>
-      </div>
+          />
+
+          <!-- Session Replay -->
+          <EmptyStateIngestionCard
+            icon="play-circle"
+            :label="t('rum.emptyState.sessionReplay')"
+            :sublabel="t('rum.emptyState.sessionReplayDesc')"
+            icon-variant="purple"
+            data-test="rum-empty-session-card"
+            @click="getStarted"
+          />
+        </template>
+
+        <template #extra>
+          <div class="flex flex-wrap items-center justify-center gap-2">
+            <span class="text-text-secondary me-1 text-sm font-semibold">
+              {{ t("rum.emptyState.learnMore") }}
+            </span>
+            <EmptyStateIngestionChip
+              icon="bolt"
+              href="https://openobserve.ai/frontend-monitoring/#quick-implementation"
+              data-test="rum-empty-quickstart-btn"
+              >{{ t("rum.emptyState.quickImpl") }}</EmptyStateIngestionChip
+            >
+            <EmptyStateIngestionChip
+              icon="menu-book"
+              href="https://openobserve.ai/blog/frontend-monitoring-basics/"
+              data-test="rum-empty-blog-btn"
+              >{{ t("rum.emptyState.blogPost") }}</EmptyStateIngestionChip
+            >
+          </div>
+        </template>
+      </OEmptyState>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, onActivated, onMounted, ref, watch, onUpdated } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import useSession from "@/composables/useSessionReplay";
 import useErrorTracking from "@/composables/useErrorTracking";
 import usePerformance from "@/composables/rum/usePerformance";
 
 import { b64EncodeUnicode } from "@/utils/zincutils";
-import { useI18n } from "vue-i18n";
-import useRum from "@/composables/rum/useRum";
+import { raw, useI18nTyped } from "@/types/i18n";
 import useStreams from "@/composables/useStreams";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import EmptyStateIngestionCard from "@/lib/core/EmptyState/EmptyStateIngestionCard.vue";
+import EmptyStateIngestionChip from "@/lib/core/EmptyState/EmptyStateIngestionChip.vue";
 
-const route = useRoute();
+/**
+ * COMPONENT names (not route names) that <keep-alive> retains — the RUM views whose
+ * route sets `meta.keepAlive: true`. Keep the two in sync.
+ *
+ * Deliberately NOT derived from `$route.meta.keepAlive` at render time: that flag
+ * describes the route being entered, and using it to conditionally render the
+ * <keep-alive> element is what destroyed the cache on every visit to a detail page.
+ *
+ * SessionViewer and UploadSourceMaps are absent on purpose — both are keyed by a route
+ * param, so a cached instance would be reused for a different id.
+ */
+const CACHED_RUM_VIEWS = [
+  "AppSessions",
+  "AppErrors",
+  "ErrorViewer",
+  "SourceMaps",
+  "AppPerformance",
+];
+
 const router = useRouter();
 const store = useStore();
 const showTabs = computed(() => {
@@ -124,17 +162,17 @@ const showTabs = computed(() => {
     "rumPerformanceWebVitals",
     "rumPerformanceErrors",
     "rumPerformanceApis",
+    "SourceMaps",
   ];
   return routes.includes(router.currentRoute.value.name?.toString() || "");
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const isLoading = ref<boolean[]>([]);
 const { sessionState } = useSession();
 const { errorTrackingState } = useErrorTracking();
 const { performanceState } = usePerformance();
-const { rumState } = useRum();
-const { getStream, getStreams } = useStreams();
+const { getStream } = useStreams(t);
 
 const activeTab = ref<string>("performance");
 const tabs = [
@@ -149,6 +187,10 @@ const tabs = [
   {
     label: t("rum.errorTracking"),
     value: "error_tracking",
+  },
+  {
+    label: t("rum.sourceMaps"),
+    value: "source_maps",
   },
 ];
 
@@ -175,23 +217,20 @@ onMounted(async () => {
     ErrorViewer: "error_tracking",
     Sessions: "sessions",
     rumPerformanceSummary: "performance",
+    SourceMaps: "source_maps",
   };
 
   if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
-    activeTab.value =
-      routeNameMapping[
-        router.currentRoute.value.name?.toString() || "placeholder"
-      ];
+    activeTab.value = routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
   } else {
     activeTab.value = "performance";
   }
 
   // This is temporary fix, as we have kept sessionViewer keep-alive as false.
   // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-  const ignoreRoutes = ["SessionViewer", "ErrorViewer"];
+  const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
 
-  if (!ignoreRoutes.includes(routeName.value as string))
-    changeTab(activeTab.value);
+  if (!ignoreRoutes.includes(routeName.value as string)) changeTab(activeTab.value);
 });
 
 onUpdated(async () => {
@@ -203,23 +242,21 @@ onUpdated(async () => {
       ErrorViewer: "error_tracking",
       Sessions: "sessions",
       rumPerformanceSummary: "performance",
+      SourceMaps: "source_maps",
     };
 
     if (routeNameMapping[routeName.value?.toString() || "placeholder"]) {
       activeTab.value =
-        routeNameMapping[
-          router.currentRoute.value.name?.toString() || "placeholder"
-        ];
+        routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
     } else {
       activeTab.value = "performance";
     }
 
     // This is temporary fix, as we have kept sessionViewer keep-alive as false.
     // So on routing to sessionViewer, this hook is called triggered and it routes to Session page again
-    const ignoreRoutes = ["SessionViewer", "ErrorViewer"];
+    const ignoreRoutes = ["SessionViewer", "ErrorViewer", "UploadSourceMaps"];
 
-    if (!ignoreRoutes.includes(routeName.value as string))
-      changeTab(activeTab.value);
+    if (!ignoreRoutes.includes(routeName.value as string)) changeTab(activeTab.value);
   }
 });
 
@@ -242,11 +279,9 @@ const updateTabOnRouteChange = () => {
     rumPerformanceWebVitals: "performance",
     rumPerformanceErrors: "performance",
     rumPerformanceApis: "performance",
+    SourceMaps: "source_maps",
   };
-  const tab =
-    routeNameMapping[
-      router.currentRoute.value.name?.toString() || "placeholder"
-    ];
+  const tab = routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
   if (tab !== activeTab.value && tab !== undefined) {
     activeTab.value = tab;
   }
@@ -254,21 +289,29 @@ const updateTabOnRouteChange = () => {
 
 const checkIfRumEnabled = async () => {
   await nextTick();
-  return new Promise(async (resolve) => {
+  return new Promise((resolve) => {
     getStream("_rumdata", "logs", false)
       .then((response: any) => {
-        if (response) isRumEnabled.value = true;
+        if (response?.name === "_rumdata") isRumEnabled.value = true;
+        else isRumEnabled.value = false;
       })
       .finally(() => {
         resolve(true);
+      })
+      .catch(() => {
+        isRumEnabled.value = false;
       });
 
     getStream("_sessionreplay", "logs", false)
       .then((response: any) => {
-        if (response) isSessionReplayEnabled.value = true;
+        if (response?.name === "_sessionreplay") isSessionReplayEnabled.value = true;
+        else isSessionReplayEnabled.value = false;
       })
       .finally(() => {
         resolve(true);
+      })
+      .catch(() => {
+        isSessionReplayEnabled.value = false;
       });
   });
 };
@@ -289,7 +332,7 @@ const getQueryParams = (dateTime: any, editorValue: string) => {
   return query;
 };
 
-const changeTab = (tab: string) => {
+const changeTab = (tab: string | number) => {
   if (tab === "performance") {
     router.push({
       name: "rumPerformanceSummary",
@@ -304,10 +347,7 @@ const changeTab = (tab: string) => {
   if (tab === "error_tracking") {
     router.push({
       name: "ErrorTracking",
-      query: getQueryParams(
-        performanceState.data.datetime,
-        errorTrackingState.data.editorValue,
-      ),
+      query: getQueryParams(performanceState.data.datetime, errorTrackingState.data.editorValue),
     });
     return;
   }
@@ -315,10 +355,17 @@ const changeTab = (tab: string) => {
   if (tab === "sessions") {
     router.push({
       name: "Sessions",
-      query: getQueryParams(
-        performanceState.data.datetime,
-        sessionState.data.editorValue,
-      ),
+      query: getQueryParams(performanceState.data.datetime, sessionState.data.editorValue),
+    });
+    return;
+  }
+
+  if (tab === "source_maps") {
+    router.push({
+      name: "SourceMaps",
+      query: {
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
     });
     return;
   }
@@ -351,9 +398,7 @@ const getSessionReplayFields = () => {
           name: "_sessionreplay",
         };
         stream.schema.forEach((field: any) => {
-          performanceState.data.streams["_sessionreplay"]["schema"][
-            field.name
-          ] = field;
+          performanceState.data.streams["_sessionreplay"]["schema"][field.name] = field;
         });
       })
       .finally(() => {
@@ -373,8 +418,7 @@ const getRumDataFields = () => {
           name: "_rumdata",
         };
         stream.schema.forEach((field: any) => {
-          performanceState.data.streams["_rumdata"]["schema"][field.name] =
-            field;
+          performanceState.data.streams["_rumdata"]["schema"][field.name] = field;
         });
       })
       .finally(() => {

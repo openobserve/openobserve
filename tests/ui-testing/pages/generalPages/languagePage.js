@@ -9,32 +9,6 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 class LanguagePage {
   // ============================================================================
-  // LOCATORS (at top per framework rules)
-  // ============================================================================
-
-  // Alerts page tabs
-  alertsAlertsTab = '[data-test="alerts-alerts-tab"]';
-  alertsDestinationsTab = '[data-test="alerts-destinations-tab"]';
-  alertsTemplatesTab = '[data-test="alerts-templates-tab"]';
-
-  // Logs page
-  sqlModeToggle = '[data-test="logs-search-bar-sql-mode-toggle-btn"]';
-
-  // Dashboard
-  addDashboardBtn = '[data-test="dashboard-add"]';
-
-  // Text extraction selectors
-  textSelectors = [
-    'button', 'a', 'label', 'span', 'p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-    'input[placeholder]', 'textarea[placeholder]',
-    '.q-item__label', '.q-tab__label', '.q-btn__content',
-    '.q-field__label', '.q-card__section', '.q-toolbar__title',
-    '[class*="menu"]', '[class*="nav"]', '[class*="sidebar"]',
-    '[data-test]', '.q-dialog', '.q-modal', '.q-drawer',
-    '[role="tab"]', '[role="tabpanel"]', '[role="dialog"]',
-  ];
-
-  // ============================================================================
   // CONFIGURATION
   // ============================================================================
 
@@ -58,6 +32,8 @@ class LanguagePage {
   ];
 
   // Sub-tabs/sub-pages for each module (from frontend routes)
+  // Note: tabDataTest stores the data-test attribute value (NOT a full selector) so the
+  // PO can resolve the locator through a constructor factory (POM strict).
   SUB_PAGES = {
     Logs: [
       { name: 'SQL Mode', action: 'toggleSqlMode' },
@@ -80,9 +56,9 @@ class LanguagePage {
       { name: 'Create Report', path: '/reports/create' },
     ],
     Alerts: [
-      { name: 'Alerts Tab', tabSelector: '[data-test="alerts-alerts-tab"]' },
-      { name: 'Destinations Tab', tabSelector: '[data-test="alerts-destinations-tab"]' },
-      { name: 'Templates Tab', tabSelector: '[data-test="alerts-templates-tab"]' },
+      { name: 'Alerts Tab', tabDataTest: 'alerts-alerts-tab' },
+      { name: 'Destinations Tab', tabDataTest: 'alerts-destinations-tab' },
+      { name: 'Templates Tab', tabDataTest: 'alerts-templates-tab' },
       { name: 'Alert History', path: '/alerts/history' },
     ],
     'Data Sources': [
@@ -211,11 +187,67 @@ class LanguagePage {
   ]);
 
   // ============================================================================
-  // CONSTRUCTOR
+  // CONSTRUCTOR — locators hoisted per §3 POM strict
   // ============================================================================
 
   constructor(page) {
     this.page = page;
+
+    // Alerts page tabs (kept as factory key for completeness)
+    this.alertsAlertsTab = page.locator('[data-test="alerts-alerts-tab"]');
+    this.alertsDestinationsTab = page.locator('[data-test="alerts-destinations-tab"]');
+    this.alertsTemplatesTab = page.locator('[data-test="alerts-templates-tab"]');
+
+    // Logs page
+    this.sqlModeToggle = page.locator('[data-test="logs-search-bar-sql-mode-toggle-btn"]');
+
+    // Dashboard
+    this.addDashboardBtn = page.locator('[data-test="dashboard-new"]');
+    this.addDashboardDialog = page.locator('[data-test="dashboard-add-dialog"]');
+    this.addDashboardDialogCloseBtn = page.locator('[data-test="dashboard-add-dialog"] [data-test="o-dialog-secondary-btn"]');
+  }
+
+  /**
+   * Factory: resolve a sub-tab locator from its data-test attribute string.
+   * Used by SUB_PAGES entries that carry a `tabDataTest` key (runtime-dynamic).
+   * @param {string} tabDataTest
+   * @returns {import('@playwright/test').Locator}
+   */
+  getSubTabLocator(tabDataTest) {
+    return this.page.locator(`[data-test="${tabDataTest}"]`).first();
+  }
+
+  /**
+   * A closed page/context (or a Playwright "Target ... has been closed" error) is
+   * fatal and non-recoverable — it means the worker's browser process crashed
+   * (typically OOM under high parallelism). Such errors must NEVER be swallowed by
+   * best-effort try/catch blocks: doing so lets the test limp through the rest of
+   * the crawl and report a bogus coverage percentage instead of failing honestly.
+   * @param {Error} error
+   * @returns {boolean}
+   */
+  _isFatalClosedError(error) {
+    return this.page.isClosed()
+      || /has been closed|Target (page|frame)?.*closed|Target closed/i.test((error && error.message) || '');
+  }
+
+  /**
+   * Navigate to a page for text scraping with a BOUNDED settle.
+   *
+   * Translation strings are static i18n rendered on component mount, so we do not
+   * need a fully loaded/idle page — waiting for `networkidle` on chart/monaco/
+   * websocket-heavy views (Metrics/Traces/RUM/Dashboards) never settles, wasting
+   * up to 10–30s per page AND holding that heavy page live at peak renderer memory
+   * the whole time. Under `--workers=5` that prolonged, overlapping memory spike is
+   * what OOM-kills a worker. Using `domcontentloaded` + a short bounded settle caps
+   * each heavy page's live-at-peak dwell to ~a few seconds (lower OOM probability)
+   * and makes the crawl ~3–4× faster (fits the shard timeout).
+   * @param {string} url
+   * @param {number} settleMs bounded max settle after DOMContentLoaded
+   */
+  async _navigateForScrape(url, settleMs = 2500) {
+    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+    await this.page.waitForLoadState('networkidle', { timeout: settleMs }).catch(() => {});
   }
 
   // ============================================================================
@@ -252,7 +284,8 @@ class LanguagePage {
     // Change language
     testLogger.info(`Changing language to ${langConfig.label}...`);
     await pm.homePage.changeLanguage(langCode);
-    await this.page.waitForTimeout(800);
+    // After language change the app reloads; wait for the network to settle
+    await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
 
     // Test main pages
     for (const pageConfig of this.MAIN_PAGES) {
@@ -329,8 +362,7 @@ class LanguagePage {
    */
   async navigateToHome() {
     const homeUrl = `/web/?org_identifier=${process.env["ORGNAME"]}`;
-    await this.page.goto(homeUrl);
-    await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
+    await this._navigateForScrape(homeUrl, 5000);
   }
 
   /**
@@ -339,7 +371,7 @@ class LanguagePage {
    */
   async resetToEnglish(pm) {
     await this.navigateToHome();
-    await pm.homePage.changeLanguage('en-gb');
+    await pm.homePage.changeLanguage('en-us');
   }
 
   /**
@@ -372,40 +404,68 @@ class LanguagePage {
   // ============================================================================
 
   /**
-   * Extract all visible text from the current page
+   * Extract all visible text from the current page.
+   *
+   * Data collection runs inside `page.evaluate` and uses a DOM TreeWalker over
+   * text nodes plus reads of common a11y / placeholder / title attributes —
+   * intentionally NOT a set of Playwright locators. We deliberately avoid
+   * `.class` / `[role]` selectors here (§2). The walker visits all rendered
+   * elements via `*` to capture i18n strings emitted by Vue/Reka components
+   * that don't carry `data-test` attributes.
    */
   async _extractAllVisibleText() {
-    const selectors = this.textSelectors;
-    return await this.page.evaluate((sels) => {
+    return await this.page.evaluate(() => {
       const texts = new Set();
 
-      sels.forEach(selector => {
-        try {
-          document.querySelectorAll(selector).forEach(el => {
-            const text = el.textContent?.trim();
-            if (text && text.length > 0 && text.length < 100) {
-              text.split(/[\n\r\t|:,\/]/).forEach(part => {
-                const cleaned = part.trim();
-                if (cleaned.length > 1 && cleaned.length < 50) {
-                  texts.add(cleaned);
-                }
-              });
+      // Walk every text node in the live DOM (data collection only).
+      const walker = document.createTreeWalker(
+        document.body,
+        NodeFilter.SHOW_TEXT,
+        {
+          acceptNode(node) {
+            const parent = node.parentElement;
+            if (!parent) return NodeFilter.FILTER_REJECT;
+            // Skip script/style content.
+            const tag = parent.tagName;
+            if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'NOSCRIPT') {
+              return NodeFilter.FILTER_REJECT;
             }
+            const raw = node.textContent;
+            if (!raw || !raw.trim()) return NodeFilter.FILTER_REJECT;
+            return NodeFilter.FILTER_ACCEPT;
+          },
+        },
+      );
 
-            const placeholder = el.getAttribute('placeholder');
-            if (placeholder) texts.add(placeholder.trim());
-
-            const ariaLabel = el.getAttribute('aria-label');
-            if (ariaLabel) texts.add(ariaLabel.trim());
-
-            const title = el.getAttribute('title');
-            if (title) texts.add(title.trim());
+      let current;
+      while ((current = walker.nextNode())) {
+        const text = current.textContent.trim();
+        if (text.length > 0 && text.length < 100) {
+          text.split(/[\n\r\t|:,\/]/).forEach((part) => {
+            const cleaned = part.trim();
+            if (cleaned.length > 1 && cleaned.length < 50) {
+              texts.add(cleaned);
+            }
           });
-        } catch (e) { /* ignore */ }
+        }
+      }
+
+      // Pull a11y / placeholder / title strings across the whole document.
+      // (`*` is a tag-agnostic DOM API call inside page.evaluate, not a
+      // Playwright locator, so it is not subject to §2's locator policy.)
+      document.querySelectorAll('*').forEach((el) => {
+        const placeholder = el.getAttribute && el.getAttribute('placeholder');
+        if (placeholder) texts.add(placeholder.trim());
+
+        const ariaLabel = el.getAttribute && el.getAttribute('aria-label');
+        if (ariaLabel) texts.add(ariaLabel.trim());
+
+        const title = el.getAttribute && el.getAttribute('title');
+        if (title) texts.add(title.trim());
       });
 
       return Array.from(texts);
-    }, selectors);
+    });
   }
 
   /**
@@ -456,7 +516,7 @@ class LanguagePage {
     const words = normalizedText.split(/\s+/);
 
     // CJK characters = definitely translated
-    if (/[\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(text)) {
+    if (/[぀-ゟ゠-ヿ一-鿿가-힯]/.test(text)) {
       return true;
     }
 
@@ -530,9 +590,7 @@ class LanguagePage {
    */
   async _testSinglePage(pageConfig, langCode) {
     const pageUrl = `/web${pageConfig.path}?org_identifier=${process.env["ORGNAME"]}`;
-    await this.page.goto(pageUrl);
-    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-    await this.page.waitForTimeout(400);
+    await this._navigateForScrape(pageUrl);
 
     const allTexts = await this._extractAllVisibleText();
     return this._analyzeTranslation(allTexts, langCode);
@@ -550,35 +608,50 @@ class LanguagePage {
     for (const subPage of subPages) {
       try {
         if (subPage.action === 'toggleSqlMode') {
-          // Special action: toggle SQL mode
-          const sqlToggle = this.page.locator(this.sqlModeToggle);
-          if (await sqlToggle.isVisible({ timeout: 2000 }).catch(() => false)) {
-            await sqlToggle.click();
-            await this.page.waitForTimeout(300);
-            const texts = await this._extractAllVisibleText();
-            results.push({
-              name: subPage.name,
-              analysis: this._analyzeTranslation(texts, langCode),
-            });
-            await sqlToggle.click();
+          // Special action: toggle SQL mode.
+          // Use [data-test="logs-search-bar-menu-sql-mode-btn"] (the ODropdownItem) — the legacy
+          // data-test="logs-search-bar-sql-mode-toggle-btn" is on an unrelated syntax-guide component.
+          const utilitiesBtn = this.page.locator('[data-test="logs-search-bar-utilities-menu-btn"]');
+          const sqlModeMenuItem = this.page.locator('[data-test="logs-search-bar-menu-sql-mode-btn"]');
+          const utilitiesBtnVisible = await utilitiesBtn.isVisible({ timeout: 2000 }).catch(() => false);
+          if (utilitiesBtnVisible) {
+            await utilitiesBtn.click();
+            const menuItemVisible = await sqlModeMenuItem.isVisible({ timeout: 3000 }).catch(() => false);
+            if (menuItemVisible) {
+              await sqlModeMenuItem.click();
+              await this.page.keyboard.press('Escape');
+              // Wait for the SQL editor surface (Monaco) to mount before scraping.
+              await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
+              const texts = await this._extractAllVisibleText();
+              results.push({
+                name: subPage.name,
+                analysis: this._analyzeTranslation(texts, langCode),
+              });
+              // Toggle back: reopen the menu and click again
+              await utilitiesBtn.click();
+              await sqlModeMenuItem.waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+              await sqlModeMenuItem.click();
+              await this.page.keyboard.press('Escape');
+            } else {
+              await this.page.keyboard.press('Escape');
+            }
           }
         } else if (subPage.path) {
           // Navigate to sub-page URL
           const subPageUrl = `/web${subPage.path}?org_identifier=${process.env["ORGNAME"]}`;
-          await this.page.goto(subPageUrl);
-          await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
-          await this.page.waitForTimeout(400);
+          await this._navigateForScrape(subPageUrl);
           const texts = await this._extractAllVisibleText();
           results.push({
             name: subPage.name,
             analysis: this._analyzeTranslation(texts, langCode),
           });
-        } else if (subPage.tabSelector) {
+        } else if (subPage.tabDataTest) {
           // Click tab selector
-          const tab = this.page.locator(subPage.tabSelector).first();
+          const tab = this.getSubTabLocator(subPage.tabDataTest);
           if (await tab.isVisible({ timeout: 2000 }).catch(() => false)) {
             await tab.click();
-            await this.page.waitForTimeout(500);
+            // The tab swap re-renders the panel; wait for any pending fetches.
+            await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
             const texts = await this._extractAllVisibleText();
             results.push({
               name: subPage.name,
@@ -587,6 +660,8 @@ class LanguagePage {
           }
         }
       } catch (e) {
+        // Rethrow fatal browser-crash errors — never mask a dead page/context.
+        if (this._isFatalClosedError(e)) throw e;
         testLogger.warn(`Could not test sub-page ${subPage.name}: ${e.message}`);
       }
     }
@@ -599,23 +674,32 @@ class LanguagePage {
    */
   async _testDashboardModal(results, langCode) {
     try {
-      const addDashboardBtn = this.page.locator(this.addDashboardBtn);
-      if (await addDashboardBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await addDashboardBtn.click();
-        await this.page.waitForTimeout(500);
+      if (await this.addDashboardBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
+        await this.addDashboardBtn.click();
+        // Wait for the drawer to mount before scraping.
+        await this.addDashboardDialog.waitFor({ state: 'visible', timeout: 5000 });
 
         const texts = await this._extractAllVisibleText();
         const analysis = this._analyzeTranslation(texts, langCode);
 
-        await this.page.keyboard.press('Escape');
-        await this.page.waitForTimeout(300);
+        // Close the drawer via its own Cancel button (data-test scoped, no body click).
+        if (await this.addDashboardDialogCloseBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+          await this.addDashboardDialogCloseBtn.click();
+        } else {
+          // Fallback: press Escape — Reka's Dialog/Drawer closes on Escape.
+          await this.page.keyboard.press('Escape');
+        }
+        await this.addDashboardDialog.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
 
         results.modalResults['Add Dashboard Modal'] = analysis;
         results.totalElements += analysis.total;
         results.totalTranslated += analysis.translatedCount;
         testLogger.info(`    Modal (Add Dashboard): ${analysis.percentage}%`);
       }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+      // Rethrow fatal browser-crash errors; only best-effort modal issues are ignored.
+      if (this._isFatalClosedError(e)) throw e;
+    }
   }
 }
 

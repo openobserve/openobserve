@@ -73,14 +73,12 @@ where
         let start = Instant::now();
         let start_time = crate::utils::time::now_micros();
 
-        // Extract request info before moving req
+        // Real IP was resolved up-chain by the `extract_real_ip` middleware.
         let remote_addr = req
-            .headers()
-            .get("X-Forwarded-For")
-            .or_else(|| req.headers().get("Forwarded"))
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or("-")
-            .to_string();
+            .extensions()
+            .get::<super::RealIp>()
+            .map(|ip| ip.0.to_string())
+            .unwrap_or_else(|| "-".to_string());
 
         let path = req
             .uri()
@@ -170,5 +168,29 @@ where
             }
             Poll::Pending => Poll::Pending,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_slow_log_layer_new_stores_threshold() {
+        let layer = SlowLogLayer::new(30);
+        assert_eq!(layer.threshold_secs, 30);
+    }
+
+    #[test]
+    fn test_slow_log_layer_new_zero_threshold() {
+        let layer = SlowLogLayer::new(0);
+        assert_eq!(layer.threshold_secs, 0);
+    }
+
+    #[test]
+    fn test_slow_log_layer_clone() {
+        let layer = SlowLogLayer::new(60);
+        let cloned = layer.clone();
+        assert_eq!(cloned.threshold_secs, 60);
     }
 }

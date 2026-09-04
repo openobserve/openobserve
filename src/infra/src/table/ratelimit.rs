@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -26,7 +26,7 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     orm_err,
     table::{
         entity::rate_limit_rules::{ActiveModel, Column, Entity},
@@ -57,7 +57,7 @@ pub async fn fetch_rules(
     org_id: Option<String>,
     user_role: Option<String>,
 ) -> Result<Vec<RatelimitRule>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut res = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -90,7 +90,7 @@ pub async fn fetch_rules(
 }
 
 pub async fn fetch_rules_by_id(rule_id: &str) -> Result<Option<RatelimitRule>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -124,7 +124,7 @@ async fn add_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Collect all rule IDs and validate
     let rule_ids: Vec<String> = rules
@@ -208,7 +208,7 @@ async fn add_upsert_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error
         return Ok(());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let current_time = config::utils::time::now_micros();
 
     // Start transaction
@@ -316,7 +316,7 @@ async fn add_single(rule: RatelimitRule) -> Result<(), anyhow::Error> {
     let rule_id = rule.rule_id.clone();
     match fetch_rules_by_id(rule_id.unwrap().as_str()).await {
         Ok(None) => {
-            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let client = get_orm_client_rw().await;
             let active_rule = ActiveModel {
                 org: Set(rule.org),
                 rule_id: Set(rule.rule_id.unwrap()),
@@ -365,7 +365,7 @@ async fn update_single(rule: RatelimitRule) -> Result<(), anyhow::Error> {
 
     match fetch_rules_by_id(rule_id.as_str()).await {
         Ok(Some(_)) => {
-            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let client = get_orm_client_rw().await;
             match Entity::update_many()
                 .col_expr(Column::Org, Expr::value(&rule.org))
                 .col_expr(
@@ -411,7 +411,7 @@ async fn update_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
         return Ok(());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let txn = client
         .begin()
         .await
@@ -501,7 +501,7 @@ async fn update_batch(rules: Vec<RatelimitRule>) -> Result<(), anyhow::Error> {
 pub async fn delete(rule_id: String) -> Result<(), anyhow::Error> {
     match fetch_rules_by_id(rule_id.as_str()).await {
         Ok(Some(_)) => {
-            let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+            let client = get_orm_client_rw().await;
             match Entity::delete_many()
                 .filter(Column::RuleId.eq(rule_id))
                 .exec(client)
@@ -526,7 +526,7 @@ pub async fn list(
     api: Option<&str>,
     user_id: Option<&str>,
 ) -> Result<Vec<RatelimitRule>, anyhow::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let mut query = Entity::find()
         .select_only()
         .column(Column::Org)
@@ -601,7 +601,6 @@ mod tests {
             .append_query_results(vec![vec![create_test_model()]])
             .into_connection();
 
-        // Override the ORM_CLIENT for testing
         let rules = Entity::find()
             .select_only()
             .column(Column::Org)
@@ -682,10 +681,10 @@ mod tests {
         // Test update
         let result = Entity::update_many()
             .col_expr(Column::Org, Expr::value(&rule.org))
-            .col_expr(Column::RuleType, Expr::value(&rule.rule_type.unwrap()))
-            .col_expr(Column::UserRole, Expr::value(&rule.user_role.unwrap()))
+            .col_expr(Column::RuleType, Expr::value(rule.rule_type.unwrap()))
+            .col_expr(Column::UserRole, Expr::value(rule.user_role.unwrap()))
             .col_expr(Column::Threshold, Expr::value(rule.threshold))
-            .filter(Column::RuleId.eq(&rule.rule_id.unwrap()))
+            .filter(Column::RuleId.eq(rule.rule_id.unwrap()))
             .exec(&db)
             .await;
 
@@ -736,15 +735,15 @@ mod tests {
     #[test]
     fn test_ratelimit_rule_type() {
         assert!(matches!(
-            RatelimitRuleType::try_from("exact"),
-            Ok(RatelimitRuleType::Exact)
+            RatelimitRuleType::from("exact"),
+            RatelimitRuleType::Exact
         ));
         assert!(matches!(
-            RatelimitRuleType::try_from("regex"),
-            Ok(RatelimitRuleType::Regex)
+            RatelimitRuleType::from("regex"),
+            RatelimitRuleType::Regex
         ));
         assert_eq!(
-            RatelimitRuleType::try_from("invalid").unwrap().to_string(),
+            RatelimitRuleType::from("invalid").to_string(),
             RatelimitRuleType::Exact.to_string()
         );
         assert_eq!(RatelimitRuleType::Exact.to_string(), "exact");
@@ -755,10 +754,10 @@ mod tests {
 
     async fn setup_test_db(mock_db: sea_orm::DatabaseConnection) {
         INIT.call_once(|| {
-            // Initialize ORM_CLIENT only once
-            ORM_CLIENT
-                .set(mock_db)
-                .expect("Failed to set mock database");
+            // Another test in the shared process may already have initialized
+            // the write client; the validation paths under test never reach a
+            // query, so losing the race is fine.
+            let _ = crate::db::ORM_CLIENT_RW.set(mock_db);
         });
     }
 
@@ -790,5 +789,254 @@ mod tests {
                 .to_string()
                 .contains("Rule ID is required")
         );
+    }
+
+    // ── RuleEntry::TryFrom<&Bytes> ────────────────────────────────────────────
+
+    #[test]
+    fn test_rule_entry_try_from_bytes_single_rule() {
+        // RuleEntry is an enum serialised as tagged: {"Single": {...}} / {"Batch": [...]} / etc.
+        let json = serde_json::json!({
+            "Single": {
+                "org": "my_org",
+                "rule_id": "r1",
+                "threshold": 50
+            }
+        });
+        let bytes = Bytes::from(json.to_string());
+        let entry = RuleEntry::try_from(&bytes);
+        assert!(entry.is_ok(), "expected Ok, got {:?}", entry);
+        match entry.unwrap() {
+            RuleEntry::Single(rule) => {
+                assert_eq!(rule.org, "my_org");
+                assert_eq!(rule.rule_id, Some("r1".to_string()));
+                assert_eq!(rule.threshold, 50);
+            }
+            other => panic!("expected Single variant, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_rule_entry_try_from_bytes_batch() {
+        let json = serde_json::json!([
+            {"org": "org1", "rule_id": "r1", "threshold": 10},
+            {"org": "org2", "rule_id": "r2", "threshold": 20}
+        ]);
+        // Wrap in Batch variant
+        let wrapper = serde_json::json!({"Batch": json});
+        let bytes = Bytes::from(wrapper.to_string());
+        let entry = RuleEntry::try_from(&bytes);
+        assert!(entry.is_ok());
+        match entry.unwrap() {
+            RuleEntry::Batch(rules) => {
+                assert_eq!(rules.len(), 2);
+                assert_eq!(rules[0].org, "org1");
+                assert_eq!(rules[1].threshold, 20);
+            }
+            other => panic!("expected Batch variant, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_rule_entry_try_from_bytes_upsert_batch() {
+        let json = serde_json::json!([
+            {"org": "org_u", "rule_id": "ru1", "threshold": 100}
+        ]);
+        let wrapper = serde_json::json!({"UpsertBatch": json});
+        let bytes = Bytes::from(wrapper.to_string());
+        let entry = RuleEntry::try_from(&bytes);
+        assert!(entry.is_ok());
+        match entry.unwrap() {
+            RuleEntry::UpsertBatch(rules) => {
+                assert_eq!(rules.len(), 1);
+                assert_eq!(rules[0].rule_id, Some("ru1".to_string()));
+            }
+            other => panic!("expected UpsertBatch variant, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_rule_entry_try_from_bytes_invalid_json() {
+        let bytes = Bytes::from("not json at all {{}}");
+        let result = RuleEntry::try_from(&bytes);
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Failed to deserialize")
+        );
+    }
+
+    #[test]
+    fn test_rule_entry_try_from_bytes_empty_bytes() {
+        let bytes = Bytes::from("");
+        let result = RuleEntry::try_from(&bytes);
+        assert!(result.is_err());
+    }
+
+    // ── RULE_EXISTS / RULE_NOT_FOUND constants ────────────────────────────────
+
+    #[test]
+    fn test_constants_have_expected_values() {
+        assert_eq!(RULE_EXISTS, "Rule already exists");
+        assert_eq!(RULE_NOT_FOUND, "Rule not found");
+    }
+
+    // ── RatelimitRule default / partial fields ────────────────────────────────
+
+    #[test]
+    fn test_ratelimit_rule_default() {
+        let rule = RatelimitRule::default();
+        assert_eq!(rule.org, "");
+        assert_eq!(rule.threshold, 0);
+        assert!(rule.rule_id.is_none());
+        assert!(rule.user_role.is_none());
+    }
+
+    #[test]
+    fn test_ratelimit_rule_serialization_skips_none_fields() {
+        let rule = RatelimitRule {
+            org: "acme".to_string(),
+            threshold: 42,
+            ..Default::default()
+        };
+        let json = serde_json::to_string(&rule).unwrap();
+        // Optional None fields must be omitted (skip_serializing_if)
+        assert!(!json.contains("rule_id"));
+        assert!(!json.contains("user_role"));
+        assert!(!json.contains("api_group_name"));
+        assert!(json.contains("acme"));
+        assert!(json.contains("42"));
+    }
+
+    #[test]
+    fn test_ratelimit_rule_serialization_includes_present_fields() {
+        let rule = RatelimitRule {
+            org: "org1".to_string(),
+            rule_type: Some("exact".to_string()),
+            rule_id: Some("abc-123".to_string()),
+            user_role: Some("admin".to_string()),
+            user_id: Some("user42".to_string()),
+            api_group_name: Some("search".to_string()),
+            api_group_operation: Some("read".to_string()),
+            threshold: 200,
+            stat_interval_ms: Some(1000),
+        };
+        let json = serde_json::to_string(&rule).unwrap();
+        assert!(json.contains("abc-123"));
+        assert!(json.contains("admin"));
+        assert!(json.contains("search"));
+        assert!(json.contains("200"));
+    }
+
+    #[test]
+    fn test_ratelimit_rule_round_trip_deserialization() {
+        let original = RatelimitRule {
+            org: "round_trip_org".to_string(),
+            rule_id: Some("rt-001".to_string()),
+            rule_type: Some("regex".to_string()),
+            user_role: Some("viewer".to_string()),
+            user_id: None,
+            api_group_name: Some("ingest".to_string()),
+            api_group_operation: Some("write".to_string()),
+            threshold: 999,
+            stat_interval_ms: Some(5000),
+        };
+        let serialized = serde_json::to_string(&original).unwrap();
+        let deserialized: RatelimitRule = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(deserialized.org, original.org);
+        assert_eq!(deserialized.rule_id, original.rule_id);
+        assert_eq!(deserialized.threshold, original.threshold);
+        assert_eq!(deserialized.stat_interval_ms, original.stat_interval_ms);
+    }
+
+    #[test]
+    fn test_ratelimit_rule_missing_required_field_fails() {
+        // `threshold` is required (no default in JSON, no Option wrapper)
+        let json = r#"{"org":"test_org"}"#;
+        let result: Result<RatelimitRule, _> = serde_json::from_str(json);
+        assert!(result.is_err(), "should fail without threshold");
+    }
+
+    // ── RatelimitRuleType enum ────────────────────────────────────────────────
+
+    #[test]
+    fn test_ratelimit_rule_type_from_str_exact() {
+        let rt = RatelimitRuleType::from("exact");
+        assert_eq!(rt.to_string(), "exact");
+    }
+
+    #[test]
+    fn test_ratelimit_rule_type_from_str_regex() {
+        let rt = RatelimitRuleType::from("regex");
+        assert_eq!(rt.to_string(), "regex");
+    }
+
+    #[test]
+    fn test_ratelimit_rule_type_from_str_unknown_defaults_to_exact() {
+        let rt = RatelimitRuleType::from("unknown_type");
+        assert_eq!(rt.to_string(), "exact");
+    }
+
+    #[test]
+    fn test_ratelimit_rule_type_from_str_empty_defaults_to_exact() {
+        let rt = RatelimitRuleType::from("");
+        assert_eq!(rt.to_string(), "exact");
+    }
+
+    #[test]
+    fn test_ratelimit_rule_type_case_sensitive() {
+        // "Exact" (capitalised) is NOT a valid variant, should fall through to default
+        let rt = RatelimitRuleType::from("Exact");
+        assert_eq!(rt.to_string(), "exact");
+    }
+
+    // ── RuleEntry variant matching ────────────────────────────────────────────
+
+    #[test]
+    fn test_rule_entry_clone_and_debug() {
+        let rule = create_test_rule();
+        let entry = RuleEntry::Single(rule.clone());
+        // Clone must succeed
+        let cloned = entry.clone();
+        match cloned {
+            RuleEntry::Single(r) => assert_eq!(r.org, rule.org),
+            _ => panic!("unexpected variant"),
+        }
+        // Debug must not panic
+        let _ = format!("{:?}", entry);
+    }
+
+    #[test]
+    fn test_rule_entry_batch_clone_and_debug() {
+        let rules = vec![create_test_rule()];
+        let entry = RuleEntry::Batch(rules);
+        let cloned = entry.clone();
+        match cloned {
+            RuleEntry::Batch(rs) => assert_eq!(rs.len(), 1),
+            _ => panic!("unexpected variant"),
+        }
+        let _ = format!("{:?}", entry);
+    }
+
+    #[test]
+    fn test_rule_entry_upsert_batch_clone_and_debug() {
+        let rules = vec![create_test_rule()];
+        let entry = RuleEntry::UpsertBatch(rules);
+        let cloned = entry.clone();
+        match cloned {
+            RuleEntry::UpsertBatch(rs) => assert_eq!(rs.len(), 1),
+            _ => panic!("unexpected variant"),
+        }
+        let _ = format!("{:?}", entry);
+    }
+
+    // ── add_upsert_batch empty early return ───────────────────────────────────
+
+    #[tokio::test]
+    async fn test_add_upsert_batch_empty() {
+        let result = add_upsert_batch(vec![]).await;
+        assert!(result.is_ok());
     }
 }

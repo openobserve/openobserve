@@ -18,3 +18,23 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: 42,
+            work_group: "global".to_string(),
+            org_id: "org".to_string(),
+            user_id: "user".to_string(),
+            trace_id: "trace-1".to_string(),
+            created_at: 1000,
+        };
+        assert_eq!(m.id, 42);
+        assert_eq!(m.work_group, "global");
+        assert_eq!(m.org_id, "org");
+    }
+}

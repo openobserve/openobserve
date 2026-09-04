@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,15 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="scroll"
-    style="width: 100%; height: 100%; overflow: auto; padding: 1%"
-  >
+  <div class="scroll h-full w-full overflow-auto" data-test="markdown-renderer-scroll-container">
     <div
-      :class="[
-        'tw:prose tw:prose-sm tw:max-w-none',
-        store.state?.theme === 'dark' && 'tw:prose-invert',
-      ]"
+      :class="['prose prose-sm max-w-none px-2 py-1', isDark && 'prose-invert']"
       v-html="DOMPurify.sanitize(marked(processedContent))"
       data-test="markdown-renderer"
     ></div>
@@ -32,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { computed, defineComponent } from "vue";
-import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { processVariableContent } from "@/utils/dashboard/variables/variablesUtils";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
@@ -58,7 +52,7 @@ export default defineComponent({
     },
   },
   setup(props): any {
-    const store = useStore();
+    const { isDark } = useTheme();
 
     const processedContent = computed(() => {
       const context = {
@@ -71,7 +65,7 @@ export default defineComponent({
     return {
       DOMPurify,
       marked,
-      store,
+      isDark,
       processedContent,
     };
   },

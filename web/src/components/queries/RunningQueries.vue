@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,190 +15,169 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="running-queries-page q-pt-md q-px-md" v-if="isMetaOrg" style="min-height: 95vh;">
-    <div class="flex justify-between items-center full-width">
-      <div class="text-h6 q-my-xs" data-test="log-stream-title-text">
-        {{ t("queries.runningQueries") }}
-      </div>
-      <q-space />
-      <div class="flex items-start">
-        <div
-          data-test="running-queries-filter-container"
-          class="flex items-center"
+  <OPageLayout
+    v-if="isMetaOrg"
+    :title="t('queries.runningQueries')"
+    icon="query-stats"
+    :subtitle="t('settings.queryManagementDesc')"
+    bleed
+  >
+    <!-- Filters live in the sub-nav band directly above the table. -->
+    <template #subnav>
+      <div
+        data-test="running-queries-filter-container"
+        class="px-page-edge flex items-center justify-start gap-3 py-2"
+      >
+        <OToggleGroup
+          :model-value="selectedQueryTypeTab"
+          @update:model-value="onChangeQueryTab($event as 'summary' | 'all')"
+          data-test="running-queries-query-type-tabs"
         >
-          <div
-            style="border: 1px solid #cacaca; padding: 2px; border-radius: 4px"
-            class="q-mr-sm query-management-tabs"
-            data-test="running-queries-query-type-tabs"
+          <OToggleGroupItem
+            v-for="visual in runningQueryTypes"
+            :key="visual.value"
+            :value="visual.value"
+            size="sm"
           >
-            <template v-for="visual in runningQueryTypes" :key="visual.value">
-              <q-btn
-                :color="visual.value === selectedQueryTypeTab ? 'primary' : ''"
-                :flat="visual.value === selectedQueryTypeTab ? false : true"
-                dense
-                emit-value
-                no-caps
-                class="query-management-query-tab-selection-btn"
-                style="height: 30px; margin: 0 0px; padding: 4px 12px"
-                @click="onChangeQueryTab(visual.value as 'summary' | 'all')"
-              >
-                {{ visual.label }}</q-btn
-              >
-            </template>
-          </div>
-          <div class=" o2-select-input o2-input">
-          <q-select
+            {{ visual.label }}
+          </OToggleGroupItem>
+        </OToggleGroup>
+        <div class="o2-select-input o2-input">
+          <OSelect
             v-model="selectedSearchField"
-            dense
-            map-options
-            emit-value
-            filled
             :options="searchFieldOptions"
-            class="q-pa-none tw:w-[140px] q-mr-sm"
+            labelKey="label"
+            valueKey="value"
+            class="w-35 p-0"
             data-test="running-queries-search-fields-select"
             @update:model-value="filterQuery = ''"
-          ></q-select>
-          </div>
- 
-          <q-input
-            v-if="selectedSearchField == 'all'"
+          />
+        </div>
+        <OSearchInput
+          v-if="selectedSearchField == 'all'"
+          v-model="filterQuery"
+          class="no-border o2-search-input"
+          :placeholder="t('queries.search')"
+          data-test="running-queries-search-input"
+        />
+        <div v-else class="o2-select-input o2-input w-62.5">
+          <OSelect
             v-model="filterQuery"
-            dense
-            borderless
-            class="no-border search-input q-pa-none search-running-query o2-search-input tw:h-[36px]"
-            :class="store.state.theme == 'dark' ? 'o2-search-input-dark' : 'o2-search-input-light'"
-            :placeholder="t('queries.search')"
-            data-test="running-queries-search-input"
-          >
-            <template #prepend>
-              <q-icon name="search" class="o2-search-input-icon" :class="store.state.theme == 'dark' ? 'o2-search-input-icon-dark' : 'o2-search-input-icon-light'" />
-            </template>
-          </q-input>
-          <div v-else class=" o2-select-input o2-input ">
-            <q-select
-            v-model="filterQuery"
-            borderless
-            map-options
-            emit-value
-            filled
-            dense
-
-            :label="filterQuery ? '' : 'Select option'"
+            :placeholder="t('queries.selectOption')"
             :options="otherFieldOptions"
-            class="no-border search-input"
-            :placeholder="t('queries.search')"
+            labelKey="label"
+            valueKey="value"
+            class="no-border search-input w-62.5"
             data-test="running-queries-search-input"
-          ></q-select>
-          </div>
-          <q-btn
-            data-test="running-queries-refresh-btn"
-            class="q-ml-sm text-bold no-border o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme == 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            no-caps
-            :label="t(`queries.refreshQuery`)"
-            @click="refreshData"
           />
         </div>
       </div>
-    </div>
-    <div class="label-container tw:flex tw:justify-end q-py-sm tw:h-[54px]">
-      <div v-if="selectedQueryTypeTab === 'all'">
-        <div
-          style="border: 1px solid #cacaca; padding: 2px; border-radius: 4px"
-          class="q-mr-md query-management-tabs q-mr-lg"
-          data-test="running-queries-search-type-tabs"
-        >
-          <template v-for="visual in searchTypes" :key="visual">
-            <q-btn
-              :color="visual === selectedSearchType ? 'primary' : ''"
-              :flat="visual === selectedSearchType ? false : true"
-              dense
-              no-caps
-              class="query-management-query-tab-selection-btn"
-              style="height: 30px; margin: 0 0px; padding: 4px 12px"
-              @click="onChangeSearchType(visual)"
-            >
-              {{ visual }}</q-btn
-            >
-          </template>
+    </template>
+
+    <div class="min-h-0 flex-1">
+      <div class="h-full w-full">
+        <div class="bg-card-glass-bg h-full">
+          <div
+            v-show="selectedQueryTypeTab === 'all'"
+            class="h-full"
+            data-test="running-queries-all-queries-list"
+          >
+            <RunningQueriesList
+              :rows="rowsQuery"
+              :filtered="!!filterQuery"
+              :last-refreshed="lastRefreshed"
+              :search-type="selectedSearchType"
+              :search-types="searchTypes"
+              :search-type-labels="searchTypeLabels"
+              @update:search-type="onChangeSearchType"
+              v-model:selectedRows="selectedRow['all']"
+              @delete:query="confirmDeleteAction"
+              @delete:queries="handleMultiQueryCancel"
+              @show:schema="listSchema"
+              @clear:filters="filterQuery = ''"
+              @refresh="refreshData"
+            />
+          </div>
+          <div
+            v-show="selectedQueryTypeTab === 'summary'"
+            class="h-full"
+            data-test="running-queries-summary-list"
+          >
+            <SummaryList
+              :rows="summaryRows"
+              :filtered="!!filterQuery"
+              :last-refreshed="lastRefreshed"
+              v-model:selectedRows="selectedRow['summary']"
+              @filter:queries="filterUserQueries"
+              @delete:queries="handleMultiQueryCancel"
+              @clear:filters="filterQuery = ''"
+              @refresh="refreshData"
+            />
+          </div>
         </div>
       </div>
-      <label class="q-my-sm text-bold"
-        >Last Data Refresh Time: {{ lastRefreshed }}</label
-      >
     </div>
 
-    <div
-      v-show="selectedQueryTypeTab === 'all'"
-      data-test="running-queries-all-queries-list"
-    >
-      <RunningQueriesList
-        :rows="rowsQuery"
-        v-model:selectedRows="selectedRow['all']"
-        @delete:query="confirmDeleteAction"
-        @delete:queries="handleMultiQueryCancel"
-        @show:schema="listSchema"
-      />
-    </div>
-    <div
-      v-show="selectedQueryTypeTab === 'summary'"
-      data-test="running-queries-summary-list"
-    >
-      <SummaryList
-        :rows="summaryRows"
-        v-model:selectedRows="selectedRow['summary']"
-        @filter:queries="filterUserQueries"
-        @delete:queries="handleMultiQueryCancel"
-      />
-    </div>
-
-    <confirm-dialog
+    <ConfirmDialog
       v-model="deleteDialog.show"
       :title="deleteDialog.title"
       :message="deleteDialog.message"
       @update:ok="deleteQuery"
       @update:cancel="deleteDialog.show = false"
     />
-    <q-dialog
-      v-model="showListSchemaDialog"
-      position="right"
-      full-height
-      maximized
+    <ODrawer
+      bleed
+      v-model:open="showListSchemaDialog"
+      size="xl"
+      :show-close="false"
       data-test="list-schema-dialog"
+      @close="showListSchemaDialog = false"
     >
-      <QueryList :schemaData="schemaData" />
-    </q-dialog>
-  </div>
+      <QueryList :schemaData="schemaData" @close="showListSchemaDialog = false" />
+    </ODrawer>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import SearchService from "@/services/search";
-import {
-  onBeforeMount,
-  ref,
-  type Ref,
-  defineComponent,
-  computed,
-  toRaw,
-  watch,
-} from "vue";
-import { useQuasar, type QTableProps, QTable } from "quasar";
-import { useI18n } from "vue-i18n";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
+import { onBeforeMount, ref, defineComponent, computed, toRaw, watch } from "vue";
+
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
 import QueryList from "@/components/queries/QueryList.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import { durationFormatter } from "@/utils/zincutils";
 import RunningQueriesList from "./RunningQueriesList.vue";
 import SummaryList from "./SummaryList.vue";
 import { getDuration } from "@/utils/zincutils";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 
 export default defineComponent({
   name: "RunningQueries",
-  components: { QueryList, ConfirmDialog, RunningQueriesList, SummaryList },
+  components: {
+    OPageLayout,
+    QueryList,
+    ConfirmDialog,
+    RunningQueriesList,
+    SummaryList,
+    OToggleGroup,
+    OToggleGroupItem,
+    ODrawer,
+    OSelect,
+    OSearchInput,
+  },
   setup() {
+    // Declared first: the option lists below resolve their labels through `t`.
+    const { t } = useI18nTyped();
     const store = useStore();
     const schemaData = ref({});
     const lastRefreshed = ref("");
@@ -213,19 +192,24 @@ export default defineComponent({
     });
 
     const searchFieldOptions = ref([
-      { label: "All Fields", value: "all" },
-      { label: "Exec. Duration", value: "exec_duration" },
-      { label: "Query Range", value: "query_range" },
+      { label: t("search.allFieldsLabel"), value: "all" },
+      { label: t("queries.duration"), value: "exec_duration" },
+      { label: t("queries.queryRange"), value: "query_range" },
     ]);
 
     const selectedQueryTypeTab = ref<"summary" | "all">("summary");
 
     const selectedSearchType = ref("dashboards");
     const searchTypes = ["dashboards", "ui", "Others"]; // UI, Dashboards, Reports, Alerts, Values, Other, RUM, DerivedStream,
+    const searchTypeLabels: Record<string, I18nText> = {
+      dashboards: t("queries.searchTypeDashboards"),
+      ui: t("queries.searchTypeUi"),
+      Others: t("queries.searchTypeOthers"),
+    };
 
     const runningQueryTypes = [
-      { label: "User Summary", value: "summary" },
-      { label: "All Queries", value: "all" },
+      { label: t("queries.userSummary"), value: "summary" },
+      { label: t("queries.allQueries"), value: "all" },
     ];
     const selectedSearchField = ref(searchFieldOptions.value[0].value);
 
@@ -239,67 +223,60 @@ export default defineComponent({
      */
     const getRunningQueriesSummary = () => {
       try {
-        const result = queries.value.reduce(
-          (acc: { [key: string]: any }, query: any) => {
-            const {
-              trace_id,
-              user_id,
+        const result = queries.value.reduce((acc: { [key: string]: any }, query: any) => {
+          const {
+            trace_id,
+            user_id,
+            search_type,
+            search_type_label,
+            created_at,
+            query: { start_time, end_time },
+          } = query;
+
+          const key = `${user_id}-${search_type_label}`;
+
+          if (!acc[key]) {
+            acc[key] = {
+              row_id: key,
+              user_id: user_id,
+              numOfQueries: 0,
+              duration: 0,
+              queryRange: 0,
               search_type,
-              search_type_label,
+              search_type_label: search_type_label,
+              trace_ids: [],
               created_at,
-              query: { start_time, end_time },
-            } = query;
+              query: { end_time, start_time },
+            };
+          }
 
-            const key = `${user_id}-${search_type_label}`;
+          if (acc[key].created_at > created_at) {
+            acc[key].created_at = created_at;
+          }
 
-            if (!acc[key]) {
-              acc[key] = {
-                row_id: key,
-                user_id: user_id,
-                numOfQueries: 0,
-                duration: 0,
-                queryRange: 0,
-                search_type,
-                search_type_label: search_type_label,
-                trace_ids: [],
-                created_at,
-                query: { end_time, start_time },
-              };
-            }
+          if (acc[key].query.start_time > start_time) {
+            acc[key].query.start_time = start_time;
+          }
 
-            if (acc[key].created_at > created_at) {
-              acc[key].created_at = created_at;
-            }
+          if (acc[key].query.end_time < end_time) {
+            acc[key].query.end_time = end_time;
+          }
 
-            if (acc[key].query.start_time > start_time) {
-              acc[key].query.start_time = start_time;
-            }
+          acc[key].trace_ids.push(trace_id);
 
-            if (acc[key].query.end_time < end_time) {
-              acc[key].query.end_time = end_time;
-            }
+          acc[key].numOfQueries += 1;
 
-            acc[key].trace_ids.push(trace_id);
+          if (created_at) {
+            acc[key].duration += getDuration(created_at).durationInSeconds;
+          }
 
-            acc[key].numOfQueries += 1;
+          acc[key].queryRange += queryRange(start_time, end_time).queryRangeInSeconds;
 
-            if (created_at) {
-              acc[key].duration += getDuration(created_at).durationInSeconds;
-            }
+          return acc;
+        }, {});
 
-            acc[key].queryRange += queryRange(
-              start_time,
-              end_time,
-            ).queryRangeInSeconds;
-
-            return acc;
-          },
-          {},
-        );
-
-        return Object.values(result).map((user: any, index: number) => ({
+        return Object.values(result).map((user: any) => ({
           ...user,
-          "#": index + 1,
           duration: user.duration,
           queryRange: user.queryRange,
         }));
@@ -329,13 +306,11 @@ export default defineComponent({
 
     const deleteDialog = ref({
       show: false,
-      title: "Delete Running Query",
-      message: "Are you sure you want to delete this running query?",
+      title: t("queries.deleteRunningQueryTitle"),
+      message: t("queries.deleteRunningQueryMessage"),
       data: null as any,
     });
 
-    const qTable: Ref<InstanceType<typeof QTable> | null> = ref(null);
-    const { t } = useI18n();
     const showListSchemaDialog = ref(false);
 
     const listSchema = (row: any) => {
@@ -346,25 +321,22 @@ export default defineComponent({
     };
 
     const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
+      { label: raw("5"), value: 5 },
+      { label: raw("10"), value: 10 },
+      { label: raw("20"), value: 20 },
+      { label: raw("50"), value: 50 },
+      { label: raw("100"), value: 100 },
     ];
     const selectedPerPage = ref(20);
     const pagination: any = ref({
       rowsPerPage: 20,
     });
 
-    const changePagination = (val: { label: string; value: any }) => {
+    const changePagination = (val: { label: I18nText; value: any }) => {
       selectedPerPage.value = val.value;
       pagination.value.rowsPerPage = val.value;
-      qTable.value?.setPagination(pagination.value);
     };
     const filterQuery = ref("");
-
-    const q = useQuasar();
 
     const localTimeToMicroseconds = () => {
       // Create a Date object representing the current local time
@@ -401,13 +373,9 @@ export default defineComponent({
       return durationFormatter(averageDuration); // You can also return the total if needed
     };
 
-    const getGroupedQueryRange = (
-      queries: Array<{ startTime: number; endTime: number }>,
-    ) => {
+    const getGroupedQueryRange = (queries: Array<{ startTime: number; endTime: number }>) => {
       const totalQueryDuration = queries.reduce((acc, query) => {
-        const queryDuration = Math.floor(
-          (query.endTime - query.startTime) / 1000000,
-        );
+        const queryDuration = Math.floor((query.endTime - query.startTime) / 1000000);
         return acc + queryDuration;
       }, 0);
 
@@ -416,13 +384,9 @@ export default defineComponent({
       return durationFormatter(averageQueryDuration); // You can also return the total if needed
     };
 
-    const columns = ref<QTableProps["columns"]>([
-      {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-      },
+    const columns = ref<
+      { name: string; label: string; field: string; align?: string; sortable?: boolean }[]
+    >([
       {
         name: "user_id",
         field: "user_id",
@@ -491,16 +455,13 @@ export default defineComponent({
     const runningQueriesSummary = ref<any[]>([]);
 
     const baseFilteredQueries = computed(() =>
-      selectedQueryTypeTab.value === "all"
-        ? queries.value
-        : runningQueriesSummary.value,
+      selectedQueryTypeTab.value === "all" ? queries.value : runningQueriesSummary.value,
     );
 
     const searchTypeFiltered = computed(() =>
       baseFilteredQueries.value.filter(
         (query) =>
-          (selectedQueryTypeTab.value === "all" &&
-            filterQueryBySearchTypeTab(query)) ||
+          (selectedQueryTypeTab.value === "all" && filterQueryBySearchTypeTab(query)) ||
           selectedQueryTypeTab.value === "summary",
       ),
     );
@@ -508,9 +469,7 @@ export default defineComponent({
     const fieldFiltered = computed(() => {
       if (!filterQuery.value) return searchTypeFiltered.value;
       return searchTypeFiltered.value.filter((query) =>
-        Object.values(filterQueryCriteria).some((criteria) =>
-          criteria(query, filterQuery.value),
-        ),
+        Object.values(filterQueryCriteria).some((criteria) => criteria(query, filterQuery.value)),
       );
     });
 
@@ -557,12 +516,8 @@ export default defineComponent({
 
     const filterQueryBySearchTypeTab = (query: any) => {
       return (
-        query?.search_type
-          ?.toLowerCase()
-          .includes(selectedSearchType.value.toLowerCase()) ||
-        query?.search_type_label
-          ?.toLowerCase()
-          .includes(selectedSearchType.value.toLowerCase())
+        query?.search_type?.toLowerCase().includes(selectedSearchType.value.toLowerCase()) ||
+        query?.search_type_label?.toLowerCase().includes(selectedSearchType.value.toLowerCase())
       );
     };
 
@@ -595,23 +550,23 @@ export default defineComponent({
     const otherFieldOptions = computed(() => {
       if (selectedSearchField.value === "exec_duration") {
         return [
-          { label: "> 1 second", value: "gt_1s" },
-          { label: "> 5 seconds", value: "gt_5s" },
-          { label: "> 15 seconds", value: "gt_15s" },
-          { label: "> 30 seconds", value: "gt_30s" },
-          { label: "> 1 minute", value: "gt_1m" },
-          { label: "> 5 minutes", value: "gt_5m" },
-          { label: "> 10 minutes", value: "gt_10m" },
+          { label: t("queries.durationOptions.gt1s"), value: "gt_1s" },
+          { label: t("queries.durationOptions.gt5s"), value: "gt_5s" },
+          { label: t("queries.durationOptions.gt15s"), value: "gt_15s" },
+          { label: t("queries.durationOptions.gt30s"), value: "gt_30s" },
+          { label: t("queries.durationOptions.gt1m"), value: "gt_1m" },
+          { label: t("queries.durationOptions.gt5m"), value: "gt_5m" },
+          { label: t("queries.durationOptions.gt10m"), value: "gt_10m" },
         ];
       } else if (selectedSearchField.value === "query_range") {
         return [
-          { label: "> 5 minutes", value: "gt_5m" },
-          { label: "> 10 minutes", value: "gt_10m" },
-          { label: "> 15 minutes", value: "gt_15m" },
-          { label: "> 1 hour", value: "gt_1h" },
-          { label: "> 1 day", value: "gt_1d" },
-          { label: "> 1 week", value: "gt_1w" },
-          { label: "> 1 Month", value: "gt_1M" },
+          { label: t("queries.durationOptions.gt5m"), value: "gt_5m" },
+          { label: t("queries.durationOptions.gt10m"), value: "gt_10m" },
+          { label: t("queries.durationOptions.gt15m"), value: "gt_15m" },
+          { label: t("queries.durationOptions.gt1h"), value: "gt_1h" },
+          { label: t("queries.durationOptions.gt1d"), value: "gt_1d" },
+          { label: t("queries.durationOptions.gt1w"), value: "gt_1w" },
+          { label: t("queries.durationOptions.gt1Month"), value: "gt_1M" },
         ];
       }
 
@@ -625,11 +580,10 @@ export default defineComponent({
     });
 
     const getRunningQueries = () => {
-      const dismiss = q.notify({
-        message: "Fetching running queries...",
-        color: "primary",
-        position: "bottom",
-        spinner: true,
+      const dismiss = toast({
+        message: t("toastMessages.queries.fetchingRunningQueries"),
+        variant: "loading",
+        timeout: 0,
       });
       SearchService.get_running_queries(store.state.zoConfig.meta_org)
         .then((response: any) => {
@@ -650,13 +604,9 @@ export default defineComponent({
           runningQueriesSummary.value = getRunningQueriesSummary();
         })
         .catch((error: any) => {
-          q.notify({
-            message:
-              error.response?.data?.message ||
-              "Failed to fetch running queries",
-            color: "negative",
-            position: "bottom",
-            timeout: 2500,
+          toast({
+            message: error.response?.data?.message || t("queries.fetchRunningQueriesFailed"),
+            variant: "error",
           });
         })
         .finally(() => {
@@ -665,28 +615,21 @@ export default defineComponent({
     };
 
     const deleteQuery = () => {
-      SearchService.delete_running_queries(
-        store.state.zoConfig.meta_org,
-        deleteDialog.value.data,
-      )
+      SearchService.delete_running_queries(store.state.zoConfig.meta_org, deleteDialog.value.data)
         .then(() => {
           selectedRow.value[selectedQueryTypeTab.value] = [];
 
           getRunningQueries();
 
-          q.notify({
-            message: "Query cancelled",
-            color: "positive",
-            position: "bottom",
-            timeout: 1500,
+          toast({
+            message: t("toastMessages.queries.queryCancelled"),
+            variant: "info",
           });
         })
         .catch((error: any) => {
-          q.notify({
-            message: error.response?.data?.message || "Failed to cancel query",
-            color: "negative",
-            position: "bottom",
-            timeout: 1500,
+          toast({
+            message: error.response?.data?.message || t("queries.cancelQueryFailed"),
+            variant: "error",
           });
         })
         .finally(() => {
@@ -702,17 +645,18 @@ export default defineComponent({
 
     const handleMultiQueryCancel = (traceIds: string[] | null = null) => {
       if (!traceIds) {
-        deleteDialog.value.data = selectedRow.value[
-          selectedQueryTypeTab.value
-        ].reduce((acc: any, row: any) => {
-          if (row.trace_id) {
-            acc.push(row.trace_id);
-          } else {
-            // If query tab is "Summary", then add all trace_ids ( we store trace_id of all queries in trace_ids key )
-            acc.push(...row.trace_ids);
-          }
-          return acc;
-        }, []);
+        deleteDialog.value.data = selectedRow.value[selectedQueryTypeTab.value].reduce(
+          (acc: any, row: any) => {
+            if (row.trace_id) {
+              acc.push(row.trace_id);
+            } else {
+              // If query tab is "Summary", then add all trace_ids ( we store trace_id of all queries in trace_ids key )
+              acc.push(...row.trace_ids);
+            }
+            return acc;
+          },
+          [],
+        );
       } else {
         deleteDialog.value.data = traceIds;
       }
@@ -725,10 +669,9 @@ export default defineComponent({
 
       rows.sort((a: any, b: any) => b.created_at - a.created_at);
 
-      return rows.map((row, index) => {
+      return rows.map((row: any) => {
         return {
           ...row,
-          "#": index < 9 ? `0${index + 1}` : index + 1,
         };
       });
     });
@@ -738,18 +681,24 @@ export default defineComponent({
 
       rows.sort((a: any, b: any) => b.created_at - a.created_at);
 
-      return rows.map((row: any, index) => {
+      return rows.map((row: any) => {
         const search_type = row?.search_type;
         var query_source = "-unknown-";
 
-        if(search_type === "dashboards") {
-          query_source = row?.search_event_context?.folder_name + "/" + row?.search_event_context?.dashboard_name;
-        } else if(search_type == "alerts"){
-          query_source = row?.search_event_context?.alert_name + "(" + row?.search_event_context?.alert_key + ")";
+        if (search_type === "dashboards") {
+          query_source =
+            row?.search_event_context?.folder_name +
+            "/" +
+            row?.search_event_context?.dashboard_name;
+        } else if (search_type == "alerts") {
+          query_source =
+            row?.search_event_context?.alert_name +
+            "(" +
+            row?.search_event_context?.alert_key +
+            ")";
         }
 
         return {
-          "#": index < 9 ? `0${index + 1}` : index + 1,
           user_id: row?.user_id,
           org_id: row?.org_id,
           duration: getDuration(row.created_at).durationInSeconds,
@@ -790,6 +739,22 @@ export default defineComponent({
       filterQuery.value = row.user_id;
     };
 
+    // ── Keyboard shortcuts ────────────────────────────────────────────────
+    useShortcuts([
+      {
+        id: "runningQueriesRefresh",
+        handler: () => {
+          if (!isInputFocused()) refreshData();
+        },
+      },
+      {
+        id: "runningQueriesFocusSearch",
+        handler: () => {
+          focusSearchInput("running-queries-search-input");
+        },
+      },
+    ]);
+
     return {
       t,
       store,
@@ -804,7 +769,7 @@ export default defineComponent({
       showListSchemaDialog,
       filterQuery,
       changePagination,
-      outlinedCancel,
+      cancel: "cancel",
       schemaData,
       loadingState,
       refreshData,
@@ -812,7 +777,6 @@ export default defineComponent({
       isMetaOrg,
       resultTotal,
       selectedPerPage,
-      qTable,
       rowsQuery,
       filteredQueries,
       selectedRow,
@@ -827,6 +791,7 @@ export default defineComponent({
       runningQueriesSummary,
       onChangeSearchType,
       searchTypes,
+      searchTypeLabels,
       selectedSearchType,
       filterUserQueries,
       summaryRows,
@@ -848,40 +813,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.running-queries-page {
-  :deep(.q-table th),
-  :deep(.q-table td) {
-    padding: 0px 16px;
-    height: 32px;
-  }
-}
-.query-management-tabs {
-  :deep(.q-btn:before) {
-    border: none !important;
-  }
-}
-
-.label-container {
-  display: flex;
-  width: 100%;
-}
-</style>
-
-<style lang="scss">
-.running-queries-page {
-  .search-input {
-    width: 250px;
-  }
-}
-
-.search-field-select {
-  .q-field__control {
-    padding-left: 12px;
-    top: -1px;
-    position: relative;
-  }
-}
-
-</style>

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -208,7 +208,7 @@ describe("PromQL Types", () => {
   describe("PromQLChartConverter", () => {
     it("should implement converter interface", () => {
       const mockConverter: PromQLChartConverter = {
-        convert: (processedData, panelSchema, store, extras, chartPanelRef) => {
+        convert: () => {
           return {
             series: [],
             xAxis: {},

@@ -50,3 +50,26 @@ impl Related<super::users::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "id-1".to_string(),
+            email: "user@example.com".to_string(),
+            org_id: "org-1".to_string(),
+            role: 1,
+            token: "tok-abc".to_string(),
+            rum_token: Some("rum-tok".to_string()),
+            created_at: 1000,
+            updated_at: 2000,
+            allow_static_token: true,
+        };
+        assert_eq!(m.email, "user@example.com");
+        assert_eq!(m.role, 1);
+        assert!(m.allow_static_token);
+    }
+}

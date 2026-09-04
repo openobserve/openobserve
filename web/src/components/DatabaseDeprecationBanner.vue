@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,32 +16,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="feature-card q-mb-md"
-    :class="store.state.theme === 'dark' ? 'dark-stream-container' : 'light-stream-container'"
+    class="feature-card mb-3"
     v-if="showDeprecationWarning"
     role="region"
-    aria-label="MySQL deprecation warning"
+    :aria-label="t('components.databaseDeprecationBanner.ariaLabel')"
+    data-test="database-deprecation-banner-message"
   >
-    <div class="row items-center">
-      <div class="col">
-        <span class="deprecation-message">
-          ⚠️ MySQL support is DEPRECATED and will be removed in future.
+    <div class="flex items-center">
+      <div class="flex flex-col">
+        <span
+          class="text-text-heading text-base leading-6 font-semibold"
+          data-test="database-deprecation-banner-title"
+        >
+          {{ t("components.databaseDeprecationBanner.title") }}
         </span>
         <br />
-        <span class="deprecation-subtitle">
-          Please migrate to PostgreSQL to ensure continued support.
+        <span
+          class="text-text-secondary text-sm leading-5 font-normal"
+          data-test="database-deprecation-banner-subtitle"
+        >
+          {{ t("components.databaseDeprecationBanner.description") }}
         </span>
       </div>
-      <div class="col-auto q-ml-sm">
-        <q-btn
-          @click="dismissWarning"
-          flat
-          round
-          dense
-          icon="close"
-          size="sm"
-          class="text-grey-7"
-        />
+      <div class="col-auto ms-2">
+        <OButton variant="ghost" size="icon-sm" icon-left="close" @click="dismissWarning" />
       </div>
     </div>
   </div>
@@ -49,14 +47,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, onMounted } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const DISMISS_KEY = "mysql_deprecation_dismissed";
 const DISMISS_DURATION_DAYS = 7;
 
 export default defineComponent({
   name: "DatabaseDeprecationBanner",
+  components: { OButton },
   setup() {
+    const { t } = useI18nTyped();
     const store = useStore();
     const showDeprecationWarning = ref(false);
 
@@ -75,7 +77,7 @@ export default defineComponent({
           const dismissedDate = new Date(timestamp);
           const currentDate = new Date();
           const daysSinceDismissal = Math.floor(
-            (currentDate.getTime() - dismissedDate.getTime()) / (1000 * 60 * 60 * 24)
+            (currentDate.getTime() - dismissedDate.getTime()) / (1000 * 60 * 60 * 24),
           );
 
           // Show again if more than DISMISS_DURATION_DAYS have passed
@@ -104,6 +106,7 @@ export default defineComponent({
     });
 
     return {
+      t,
       store,
       showDeprecationWarning,
       dismissWarning,
@@ -111,19 +114,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-.deprecation-message {
-  font-size: 16px;
-  font-weight: 600;
-  line-height: 24px;
-  color: var(--o2-text-primary);
-}
-
-.deprecation-subtitle {
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 20px;
-  color: var(--o2-text-secondary);
-}
-</style>

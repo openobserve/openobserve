@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,133 +15,116 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="q-pa-none tw:w-[300px]!"
-    :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-    style="min-height: inherit"
+  <ODialog
+    data-test="panel-layout-settings-drawer"
+    :open="open"
+    size="sm"
+    :title="t('panel.layout')"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('dashboard.save')"
+    form-id="panel-layout-settings-form"
+    @update:open="$emit('update:open', $event)"
+    @click:secondary="$emit('update:open', false)"
   >
-    <div class="row items-center no-wrap">
-      <div class="col">
-        <div class="q-mx-md q-my-md text-h6">
-          {{ t("panel.layout") }}
+    <div data-test="panel-layout-settings-content" class="[min-height:inherit] p-0">
+      <div>
+        <div data-test="panel-layout-settings-height" class="o2-input">
+          <OForm id="panel-layout-settings-form" :form="form">
+            <OFormInput
+              class="min-w-55"
+              name="h"
+              :label="t('dashboard.panelHeight')"
+              required
+              type="number"
+              data-test="panel-layout-settings-height-input"
+            />
+          </OForm>
+
+          <div class="mt-1 flex items-center gap-1 text-xs">
+            <span class="whitespace-nowrap"
+              >{{ t("dashboard.approximately") }} <strong>{{ getRowCount }}</strong>
+              {{ t("dashboard.tableRowsWillBeDisplayed") }}</span
+            >
+            <OIcon name="info-outline" class="shrink-0 cursor-pointer" size="xs" />
+            <!-- Prose, not a style: the grid unit is a fixed unitless 30 below, so it never
+                 scales with font-size — px is the truthful unit in this copy. -->
+            <OTooltip :content="t('dashboard.unitPixelHint')" />
+          </div>
         </div>
-      </div>
-      <div class="col-auto">
-        <q-btn
-          v-close-popup="true"
-          round
-          flat
-          :icon="'img:' + getImageURL('images/common/close_icon.svg')"
-        />
       </div>
     </div>
-    <q-separator></q-separator>
-    <q-form @submit="savePanelLayout">
-      <div class="q-mx-md">
-        <div
-          data-test="panel-layout-settings-height"
-          class="o2-input tw:relative"
-          style="padding-top: 12px"
-        >
-          <q-input
-            v-model.number="updatedLayout.h"
-            :label="t('dashboard.panelHeight') + ' *'"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            borderless hide-bottom-space
-            dense
-            type="number"
-            :rules="[
-              (val: any) => {
-                if (val === null || val === undefined || val === '') {
-                  return t('common.required'); // If value is empty or null
-                }
-                return val > 0 ? true : t('common.valueMustBeGreaterThanZero'); // Ensure value is greater than 0
-              },
-            ]"
-            style="min-width: 220px"
-            data-test="panel-layout-settings-height-input"
-          />
-
-          <div class="tw:text-[12px]">
-            Approximately
-            <span class="tw:font-bold">{{ getRowCount }}</span> table rows will
-            be displayed
-          </div>
-
-          <q-icon
-            name="info_outline"
-            class="cursor-pointer q-ml-sm tw:absolute tw:top-[14px] tw:left-[94px]"
-            size="16px"
-          >
-            <q-tooltip
-              anchor="center end"
-              self="center left"
-              class="tw:text-[12px]"
-            >
-              1 unit = 30px
-            </q-tooltip>
-          </q-icon>
-        </div>
-      </div>
-      <div class="flex justify-center q-mt-lg">
-        <q-btn
-          ref="closeBtn"
-          v-close-popup="true"
-          class="o2-secondary-button tw:h-[36px]"
-          :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          flat
-          :label="t('dashboard.cancel')"
-          data-test="panel-layout-settings-cancel"
-        />
-        <q-btn
-          :label="t('dashboard.save')"
-          class="o2-primary-button tw:h-[36px] q-ml-md"
-          :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          padding="sm xl"
-          type="submit"
-          no-caps
-          data-test="panel-layout-settings-save"
-        />
-      </div>
-    </q-form>
-  </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
-import { computed, defineComponent, ref } from "vue";
+import { computed, defineComponent, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "../../utils/zincutils";
-
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import {
+  makePanelLayoutSettingsSchema,
+  type PanelLayoutSettingsForm,
+} from "./PanelLayoutSettings.schema";
 export default defineComponent({
   name: "PanelLayoutSettings",
-  components: {},
+  components: { ODialog, OForm, OFormInput, OTooltip, OIcon },
   props: {
     layout: {
       type: Object,
       required: true,
     },
+    open: {
+      type: Boolean,
+      default: false,
+    },
   },
-  emits: ["save:layout"],
+  emits: ["save:layout", "close", "update:open"],
   setup(props, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
 
-    const updatedLayout = ref({ ...props.layout });
+    const panelLayoutSettingsSchema = makePanelLayoutSettingsSchema(t);
 
-    const savePanelLayout = () => {
-      emit("save:layout", { ...updatedLayout.value });
-    };
+    // OWNER pattern (rule ③): this component renders <OForm> and needs the live
+    // height to compute the row-count preview, so it creates the form with
+    // useOForm and reads it via form.useStore — ONE source of truth, no mirror.
+    // Only `h` is editable; w/x/y/i are carried over from props.layout at submit.
+    // @submit (baked in) fires only after the schema passes (required + > 0).
+    const form = useOForm<PanelLayoutSettingsForm>({
+      defaultValues: { h: props.layout?.h },
+      schema: panelLayoutSettingsSchema,
+      onSubmit: (value) => {
+        emit("save:layout", { ...props.layout, h: Number(value.h) });
+      },
+    });
+
+    // The form is owned here and the component persists across opens (the parent
+    // toggles `:open`; its `v-if` is on the panel data, not cleared on close), so
+    // reset on BOTH transitions: re-seed `h` on open, and clear submit-state +
+    // errors on close so a failed submit's error doesn't linger on reopen.
+    watch(
+      () => props.open,
+      () => {
+        form.reset({ h: props.layout?.h });
+      },
+    );
+
+    // "Approximately N table rows" preview tracks the typed height — read it
+    // reactively from the form (rule ③: form.useStore, NOT a local copy).
+    const liveHeight = form.useStore((s: any) => Number(s.values?.h ?? 0));
 
     const getRowCount = computed(() => {
       // 24 is the height of toolbar
-      // 28.5 is the height of each row
-      const count = Number(Math.ceil((updatedLayout.value.h * 30 - 24) / 28.5));
+      // 28.5 is the height of each "row"
+      const count = Number(Math.ceil((liveHeight.value * 30 - 24) / 28.5));
 
       if (count < 0) return 0;
 
@@ -153,16 +136,9 @@ export default defineComponent({
       store,
       router,
       getImageURL,
-      savePanelLayout,
+      form,
       getRowCount,
-      updatedLayout,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-.dark-mode {
-  background-color: $dark-page;
-}
-</style>

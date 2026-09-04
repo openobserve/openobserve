@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,12 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import router from "src/router";
 import * as acorn from "acorn";
 import * as walk from "acorn-walk";
-import { ref } from 'vue';
+import { ref } from "vue";
 
-// Add at the top of the file
+import { gt } from "@/types/i18n";
+
 export const panelIdToBeRefreshed = ref<string | null>(null);
 
 /**
@@ -29,7 +29,6 @@ export const panelIdToBeRefreshed = ref<string | null>(null);
  * @param {any} store - the store object
  * @return {Object} - the options object for rendering the chart
  */
-
 
 export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
   return new Promise((resolve, reject) => {
@@ -55,13 +54,22 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     // **Validation before execution**
     const validationError = validateUserCode(userCode);
     if (validationError) {
-      reject(new Error(`Unsafe code detected: ${validationError}`));
+      reject(new Error(gt("dashboard.utils.unsafeCodeDetected", { error: validationError })));
       document.body.removeChild(iframe);
       return;
     }
 
     // Generate a nonce
     const nonce = Math.random().toString(36).substring(2);
+
+    // The sandbox iframe has no access to the app's i18n instance, so the messages it
+    // posts back are translated here and injected as a frozen JSON literal.
+    const sandboxMessages = JSON.stringify({
+      cspViolationPrefix: gt("dashboard.utils.cspViolationPrefix"),
+      executionTimeout: gt("dashboard.utils.executionTimeout"),
+      executionErrorPrefix: gt("dashboard.utils.executionErrorPrefix"),
+      cspViolationBlocked: gt("dashboard.utils.cspViolationBlocked"),
+    });
 
     const scriptContent = `
   <meta http-equiv="Content-Security-Policy" content="
@@ -75,6 +83,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
   <script src="${staticEchartsRef}" nonce="${nonce}"></script>
   <script src="${staticPurifierRef}" nonce="${nonce}"></script>
   <script nonce="${nonce}">
+    const i18nMessages = ${sandboxMessages};
     let securityPolicyError = false;
     let cspViolationDetected = false;
 
@@ -88,7 +97,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
       cspViolationDetected = true;
       parent.postMessage({ 
         type: 'error', 
-        message: 'CSP Violation: ' + event.violatedDirective + ' blocked ' + event.blockedURI 
+        message: i18nMessages.cspViolationPrefix + event.violatedDirective + ' blocked ' + event.blockedURI
       }, '*');
     });
 
@@ -120,14 +129,14 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
 
           // Execution timeout to prevent infinite loops
           const timeout = setTimeout(() => {
-            parent.postMessage({ type: 'error', message: 'Execution Timeout: Script took too long to run' }, '*');
+            parent.postMessage({ type: 'error', message: i18nMessages.executionTimeout }, '*');
           }, 2000);
 
           (function(data, echarts) {
             try {
               ${userCode};
             } catch (err) {
-              parent.postMessage({ type: 'error', message: 'Execution Error: ' + err.message }, '*');
+              parent.postMessage({ type: 'error', message: i18nMessages.executionErrorPrefix + err.message }, '*');
               return;
             }
 
@@ -137,7 +146,7 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
             setTimeout(() => {
               
               if (securityPolicyError || cspViolationDetected) {
-                parent.postMessage({ type: 'error', message: 'CSP Violation Detected. Execution blocked.' }, '*');
+                parent.postMessage({ type: 'error', message: i18nMessages.cspViolationBlocked }, '*');
               } else {
                 parent.postMessage({ type: 'success', result: JSON.stringify(convertFunctionsToString(option)) }, '*');
               }
@@ -152,8 +161,6 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
     });
   </script>
     `;
-
-
 
     iframe.srcdoc = scriptContent;
 
@@ -188,18 +195,16 @@ export const runJavaScriptCode = (panelSchema: any, searchQueryData: any) => {
       iframe?.contentWindow?.postMessage(
         {
           type: "execute",
-          code: userCode, 
+          code: userCode,
           data: JSON.stringify(searchQueryData),
         },
-        "*"
+        "*",
       );
     };
   });
 };
 
-
-
-const validateUserCode = (code: string): string | null => {
+export const validateUserCode = (code: string): string | null => {
   try {
     // Parse the code using Acorn
     const ast = acorn.parse(code, { ecmaVersion: 2020 }) as acorn.Node;
@@ -230,18 +235,12 @@ const validateUserCode = (code: string): string | null => {
     walk.simple(ast, {
       CallExpression(node: acorn.Node & { callee: any; arguments: any[] }) {
         // **Direct function call check (eval(), fetch(), etc.)**
-        if (
-          node.callee.type === "Identifier" &&
-          forbiddenFunctions.includes(node.callee.name)
-        ) {
-          errorMessage = `Use of '${node.callee.name}()' is not allowed.`;
+        if (node.callee.type === "Identifier" && forbiddenFunctions.includes(node.callee.name)) {
+          errorMessage = gt("dashboard.utils.forbiddenFunctionCall", { name: node.callee.name });
         }
 
         // **Detect setTimeout() misuse**
-        if (
-          node.callee.type === "Identifier" &&
-          node.callee.name === "setTimeout"
-        ) {
+        if (node.callee.type === "Identifier" && node.callee.name === "setTimeout") {
           if (
             node.arguments.length > 1 &&
             node.arguments[1].type === "Literal" &&
@@ -249,10 +248,10 @@ const validateUserCode = (code: string): string | null => {
           ) {
             const delay = node.arguments[1].value;
             if (delay < 100) {
-              errorMessage = "Use of 'setTimeout()' with delay < 100ms is not allowed.";
+              errorMessage = gt("dashboard.utils.unsafeSetTimeoutDelay");
             }
           } else {
-            errorMessage = "Invalid usage of 'setTimeout()'.";
+            errorMessage = gt("dashboard.utils.invalidSetTimeoutUsage");
           }
 
           // Block setTimeout(() => eval(...))
@@ -260,9 +259,12 @@ const validateUserCode = (code: string): string | null => {
             node.arguments.length > 0 &&
             node.arguments[0].type === "CallExpression" &&
             node.arguments[0].callee.type === "Identifier" &&
-           ( node.arguments[0].callee.name === "eval" || node.arguments[0].callee.name === "Function")
+            (node.arguments[0].callee.name === "eval" ||
+              node.arguments[0].callee.name === "Function")
           ) {
-            errorMessage = `Use of ${node.arguments[0].callee.name} inside 'setTimeout()' is not allowed.`;
+            errorMessage = gt("dashboard.utils.forbiddenInsideSetTimeout", {
+              name: node.arguments[0].callee.name,
+            });
           }
         }
 
@@ -275,17 +277,16 @@ const validateUserCode = (code: string): string | null => {
           node.arguments[0].type === "Literal" &&
           node.arguments[0].value === ""
         ) {
-          errorMessage = "Obfuscated function call detected.";
+          errorMessage = gt("dashboard.utils.obfuscatedFunctionCall");
         }
       },
 
       MemberExpression(node: acorn.Node & { object: any; property: any }) {
         // **Detect direct access to forbidden objects (e.g., document.cookie, localStorage.setItem)**
-        if (
-          node.object.type === "Identifier" &&
-          forbiddenIdentifiers.includes(node.object.name)
-        ) {
-          errorMessage = `Access to '${node.object.name}' is not allowed.`;
+        if (node.object.type === "Identifier" && forbiddenIdentifiers.includes(node.object.name)) {
+          errorMessage = gt("dashboard.utils.forbiddenIdentifierAccess", {
+            name: node.object.name,
+          });
         }
 
         // **Detect obfuscated method calls like this[x] where x is created using .join("")**
@@ -294,32 +295,32 @@ const validateUserCode = (code: string): string | null => {
           node.property.callee.type === "MemberExpression" &&
           node.property.callee.property.name === "join"
         ) {
-          errorMessage = "Obfuscated method/property access detected.";
+          errorMessage = gt("dashboard.utils.obfuscatedAccessDetected");
         }
       },
 
       WhileStatement(node: acorn.Node & { test: any }) {
         // **Detect `while (true)`**
         if (node.test.type === "Literal" && node.test.value === true) {
-          errorMessage = "Infinite loop using 'while(true)' is not allowed.";
+          errorMessage = gt("dashboard.utils.infiniteWhileLoop");
         }
       },
 
       ForStatement(node: acorn.Node & acorn.ForStatement) {
         // **Detect `for(;;)` which means infinite loop**
         if (!node.test) {
-          errorMessage = "Infinite loop using 'for(;;)' is not allowed.";
+          errorMessage = gt("dashboard.utils.infiniteForLoop");
         }
       },
       NewExpression(node: acorn.Node & { callee: any }) {
         if (node.callee.type === "Identifier" && node.callee.name === "Function") {
-          errorMessage = "Use of 'new Function()' is not allowed.";
+          errorMessage = gt("dashboard.utils.newFunctionNotAllowed");
         }
       },
     });
 
     return errorMessage;
   } catch (error) {
-    return "Invalid JavaScript syntax.";
+    return gt("dashboard.utils.invalidJavaScriptSyntax");
   }
-};
+};

@@ -1,0 +1,229 @@
+// Copyright 2026 OpenObserve Inc.
+
+import type { I18nText } from "@/types/i18n";
+
+import type { InjectionKey } from "vue";
+import type { FieldWidth } from "../Input/OInput.types";
+
+export type SelectValue = string | number | boolean | null;
+export type SelectModelValue = SelectValue | SelectValue[] | undefined;
+
+/** Injection key for the value map that preserves original value types across OSelect → OSelectItem */
+export const SELECT_VALUE_MAP_KEY: InjectionKey<Map<string, SelectValue>> =
+  Symbol("SelectValueMap");
+
+/**
+ * Injection key forwarding the parent OSelect's `data-test` attribute down to
+ * OSelectItem instances. Used to auto-derive `<parent>-option` data-test
+ * values for non-listbox-mode select option rows. Provided as a ComputedRef
+ * so consumers reactively pick up data-test updates.
+ */
+import type { ComputedRef } from "vue";
+export const SELECT_PARENT_DATA_TEST_KEY: InjectionKey<ComputedRef<string | undefined>> =
+  Symbol("SelectParentDataTest");
+
+/**
+ * Internal sentinel string that represents a `null` value.
+ * Reka UI primitives require string values; this lets us round-trip `null`
+ * through the component without corrupting the emitted model value.
+ */
+export const NULL_VALUE_SENTINEL = "__o2__null__";
+
+export type SelectSize = "sm" | "md";
+
+/**
+ * Trigger chrome.
+ *
+ * - `"field"` (default) — the standard bordered control with a fixed height.
+ * - `"inline"` — the trigger reads as a WORD INSIDE RUNNING TEXT: no border, no
+ *   background, no fixed height, sized to its own content and contributing
+ *   nothing to the surrounding line box. For a value that belongs to a sentence
+ *   rather than to a form row — e.g. the folder in a page header's description
+ *   line ("Add Alert in KTX"). Everything else (search, keyboard, options list,
+ *   `#after-options`) is identical to `"field"`.
+ *
+ * Single-select only; `multiple` renders chips that need the field chrome.
+ */
+export type SelectAppearance = "field" | "inline";
+
+// ── Option shape ──────────────────────────────────────────────────────────
+
+export interface SelectOption {
+  label: I18nText;
+  value?: SelectValue;
+  disabled?: boolean;
+  /** When true, renders the item as a non-selectable group header */
+  header?: boolean;
+  [key: string]: unknown;
+}
+
+/**
+ * Anything accepted by the `options` prop. Primitive entries (strings,
+ * numbers, …) are normalized at runtime into `{ label, value }` pairs by
+ * OSelect's normalizeOption().
+ */
+export type SelectOptionInput = SelectOption | SelectValue;
+
+// ── Root ──────────────────────────────────────────────────────────────────
+
+export interface SelectProps {
+  /** Currently selected value */
+  modelValue?: SelectModelValue;
+  /**
+   * Flat list of options. When provided, OSelectItem nodes are rendered
+   * automatically. For grouped or custom-rendered options, use the `default`
+   * slot instead.
+   */
+  options?: readonly SelectOptionInput[];
+  /** Allows selecting multiple options */
+  multiple?: boolean;
+  /**
+   * Maximum number of selection chips rendered in the trigger before the
+   * rest collapse into a "+N more" indicator. Defaults to 3.
+   * Only meaningful when `multiple` is true.
+   */
+  maxVisibleChips?: number;
+  /** Enables local text filtering / combobox mode */
+  searchable?: boolean;
+  /** Debounce (ms) before emitting search events */
+  searchDebounce?: number;
+  /** Hides already selected options in multiple mode */
+  hideSelected?: boolean;
+  /**
+   * Makes group headers (options with `header: true`) clickable to collapse /
+   * expand their items — an accordion inside the dropdown. Default off, so
+   * existing selects are unaffected. Ignored while a search term is active
+   * (search always spans every group).
+   */
+  collapsibleGroups?: boolean;
+  /**
+   * Renders a "Select All" master row at the top of the dropdown (multi-select
+   * listbox mode only). Shows an indeterminate dash when only some options are
+   * selected, a check when all are, and toggles the entire selection on click.
+   */
+  selectAll?: boolean;
+  /** Allows creating new values by typing — emits @create event */
+  creatable?: boolean;
+  /** Optional dropdown content style passthrough */
+  dropdownStyle?: string | Record<string, string | number>;
+  /** Placeholder text shown in the internal search input */
+  searchPlaceholder?: I18nText;
+  /** Key to read label from each option object */
+  labelKey?: string;
+  /** Key to read value from each option object */
+  valueKey?: string;
+  /** Key to read a OIcon name from each option object — when set, renders an icon before the label in the dropdown list */
+  iconKey?: string;
+  /** Floating label rendered above the trigger */
+  label?: I18nText;
+  /** Marks the field required — renders a `*` after the label (no manual ` *`). */
+  required?: boolean;
+  /** Placeholder text shown when no value is selected */
+  placeholder?: I18nText;
+  /** Error message — when truthy the field shows error styling */
+  errorMessage?: I18nText;
+  /** Marks the field in error state without a message */
+  error?: boolean;
+  /** Shows a ✕ button to clear the selection */
+  clearable?: boolean;
+  /** Prevents value changes */
+  disabled?: boolean;
+  /** Control size */
+  size?: SelectSize;
+  /** Trigger chrome — `field` (default) or the running-text `inline`. */
+  appearance?: SelectAppearance;
+  /** HTML id */
+  id?: string;
+  /** HTML name */
+  name?: string;
+  /** Helper text displayed below the field */
+  helpText?: I18nText;
+  /**
+   * Semantic field width — controls how wide the component renders.
+   * Defaults to "full" (fills the container).
+   * @see FieldWidth
+   */
+  width?: FieldWidth;
+  /**
+   * Controls where the label is rendered.
+   * - `"outside"` (default): label sits above the trigger as a separate element.
+   * - `"inside"`: label is rendered as a compact inline prefix inside the trigger,
+   *   saving vertical space when the label is short (e.g. in config panels).
+   */
+  labelPosition?: "inside" | "outside";
+  /** When true, replaces the chevron with a spinner to indicate async loading */
+  loading?: boolean;
+  /**
+   * In multi-select mode, controls what a row click does vs a checkbox click.
+   * - `false` (default): clicking anywhere on a row toggles that item (standard multi-select).
+   * - `true`: clicking the row label/text single-selects that item (replaces the whole selection
+   *   and closes the dropdown), while clicking the checkbox still toggles it.
+   */
+  rowClickSingleSelect?: boolean;
+  /** When true, shows the full option label as a native tooltip on hover (useful when labels are truncated). */
+  optionTooltip?: boolean;
+}
+
+export interface SelectEmits {
+  (_e: "update:modelValue", _value: SelectModelValue): void;
+  (_e: "clear"): void;
+  /** Fired when the user types into the search input */
+  (_e: "search", _value: string): void;
+  /** Fired when a new value is created (requires creatable) */
+  (_e: "create", _value: string): void;
+  /** Fired when the dropdown opens */
+  (_e: "open"): void;
+  /** Fired when the dropdown closes */
+  (_e: "close"): void;
+  (_e: "blur", _event: FocusEvent): void;
+  (_e: "change", _value: SelectModelValue): void;
+  (_e: "keydown", _event: KeyboardEvent): void;
+}
+
+export interface SelectSlots {
+  /** Custom options — render OSelectItem / OSelectGroup nodes here */
+  default?: () => unknown;
+  /** Custom trigger content — overrides the default value display */
+  trigger?: (_scope: { value: SelectModelValue }) => unknown;
+  /** Custom chip content for each selected item (multiple mode) */
+  chip?: (_scope: { label: string; value: SelectValue }) => unknown;
+  /** Empty state — shown when no options match the search */
+  empty?: () => unknown;
+  /** Content before the options list */
+  "before-options"?: () => unknown;
+  /** Content after the options list */
+  "after-options"?: () => unknown;
+  /** Icon content inside the trigger on the left — matches OButton's `#icon-left` pattern */
+  "icon-left"?: () => unknown;
+  /**
+   * Tooltip content rendered inside an info icon in the label area.
+   * Provide a tooltip element as the slot content.
+   */
+  tooltip?: () => unknown;
+}
+
+// ── Item ─────────────────────────────────────────────────────────────────
+
+export interface SelectItemProps {
+  /** The value emitted when this item is selected */
+  value: SelectValue;
+  /** Display label */
+  label?: I18nText;
+  /** Prevents selection */
+  disabled?: boolean;
+}
+
+export interface SelectItemSlots {
+  default?: () => unknown;
+}
+
+// ── Group ─────────────────────────────────────────────────────────────────
+
+export interface SelectGroupProps {
+  /** Visible heading above the group */
+  label?: I18nText;
+}
+
+export interface SelectGroupSlots {
+  default?: () => unknown;
+}

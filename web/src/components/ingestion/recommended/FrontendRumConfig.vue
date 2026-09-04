@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,203 +14,181 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!--
+  FrontendRumConfig — the Data Sources > RUM setup page.
+
+  Hosts one card per platform, chosen with the Browser / React Native switch:
+  setupCard/content/rum (browser: NPM / CDN) and
+  setupCard/content/rumReactNative (React Native: npm / Yarn + session replay).
+  They are separate cards rather than variants of one because the runtime,
+  troubleshooting and endpoint shape all differ.
+
+  Both authenticate with the org's RUM token — generated from this page's header
+  (see Ingestion.vue) — so the card only appears once that token exists.
+-->
+<script setup lang="ts">
+import { computed, ref } from "vue";
+import { useStore } from "vuex";
+import { useI18nTyped } from "@/types/i18n";
+import { getIngestionURL, maskText } from "@/utils/zincutils";
+import SetupCardRenderer from "@/components/ingestion/setupCard/SetupCardRenderer.vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import BetaBadge from "@/components/common/BetaBadge.vue";
+import type { IconName } from "@/lib/core/Icon/OIcon.icons";
+import type { CardSubstitutions, RichCardContent } from "@/components/ingestion/setupCard/types";
+import rumCard from "@/components/ingestion/setupCard/content/rum";
+import rumReactNativeCard from "@/components/ingestion/setupCard/content/rumReactNative";
+import rumAndroidCard from "@/components/ingestion/setupCard/content/rumAndroid";
+import rumIOSCard from "@/components/ingestion/setupCard/content/rumIOS";
+import type { I18nKey } from "@/types/i18n";
+
+defineProps<{
+  currOrgIdentifier?: string;
+  currUserEmail?: string;
+}>();
+
+const store = useStore();
+const { t } = useI18nTyped();
+
+const rumToken = computed<string>(() => store.state.organizationData?.rumToken?.rum_token ?? "");
+
+// Full origin (preconnect/CSP hints) and the protocol-less `site` SDK option.
+const endpoint = computed(() => (getIngestionURL() as string).replace(/\/$/, ""));
+const site = computed(() => endpoint.value.replace(/^https?:\/\//, ""));
+const insecureHTTP = computed(() => !String(store.state.API_ENDPOINT ?? "").startsWith("https://"));
+
+const org = computed(() => store.state.selectedOrganization?.identifier ?? "");
+
+/**
+ * One entry per SDK we ship a guide for. Adding iOS / Android / Flutter later is
+ * a new entry here plus its card builder — the template never changes.
+ * `label` is an i18n key; `build` returns that platform's whole card.
+ */
+const PLATFORMS: {
+  id: string;
+  labelKey: I18nKey;
+  icon: IconName;
+  /** Mobile SDKs are still in beta — the switch tags them so it shows up wherever the guide is picked. */
+  beta?: boolean;
+  build: () => RichCardContent;
+}[] = [
+  {
+    id: "browser",
+    labelKey: "ingestion.rumPlatformBrowser",
+    icon: "web",
+    build: () =>
+      rumCard(
+        {
+          site: site.value,
+          endpoint: endpoint.value,
+          org: org.value,
+          rumToken: rumToken.value,
+          rumTokenMasked: maskText(rumToken.value),
+          insecureHTTP: insecureHTTP.value,
+        },
+        t,
+      ),
+  },
+  {
+    id: "react-native",
+    labelKey: "ingestion.rumPlatformReactNative",
+    icon: "smartphone",
+    beta: true,
+    build: () =>
+      rumReactNativeCard(
+        {
+          endpoint: endpoint.value,
+          org: org.value,
+          rumToken: rumToken.value,
+          rumTokenMasked: maskText(rumToken.value),
+          insecureHTTP: insecureHTTP.value,
+        },
+        t,
+      ),
+  },
+  {
+    id: "android",
+    labelKey: "ingestion.rumPlatformAndroid",
+    icon: "android",
+    beta: true,
+    build: () =>
+      rumAndroidCard({
+        endpoint: endpoint.value,
+        org: org.value,
+        rumToken: rumToken.value,
+        rumTokenMasked: maskText(rumToken.value),
+        insecureHTTP: insecureHTTP.value,
+      }),
+  },
+  {
+    id: "ios",
+    labelKey: "ingestion.rumPlatformIOS",
+    icon: "phone-iphone",
+    beta: true,
+    build: () =>
+      rumIOSCard({
+        endpoint: endpoint.value,
+        org: org.value,
+        rumToken: rumToken.value,
+        rumTokenMasked: maskText(rumToken.value),
+        insecureHTTP: insecureHTTP.value,
+      }),
+  },
+];
+
+/** Which platform's setup guide is shown. */
+const platform = ref<string>(PLATFORMS[0].id);
+
+const content = computed<RichCardContent>(() =>
+  (PLATFORMS.find((p) => p.id === platform.value) ?? PLATFORMS[0]).build(),
+);
+
+// The renderer's subs drive detection (org) — RUM never exposes the Basic-auth
+// ingestion token, so `token` stays empty (no .env download on this card).
+const subs = computed<CardSubstitutions>(() => ({
+  url: endpoint.value,
+  org: org.value,
+  token: "",
+}));
+</script>
+
 <template>
-  <div class="q-ma-md" :key="rumToken">
-    <div v-if="rumToken">
-      <div class="text-h6 q-mt-xs" data-test="rumweb-title-text">
-        {{ t("ingestion.npmStepTitle") }}
-      </div>
-      <q-separator class="q-my-sm"></q-separator>
-
-      <SanitizedHtmlRenderer
-        class="text-subtitle1 q-mt-xs"
-        :htmlContent="npmStep1"
-      />
-
-      <copy-content
-        content="npm i @openobserve/browser-rum @openobserve/browser-logs"
-      ></copy-content>
-
-      <br />
-      <SanitizedHtmlRenderer
-        class="text-subtitle1 q-mt-xs"
-        :htmlContent="npmStep2"
-      />
-      <CopyContent
-        :key="displayConfiguration"
-        :content="initConfiguration"
-        :displayContent="displayConfiguration"
-      ></CopyContent>
-    </div>
-    <div v-else class="q-mt-xs">
+  <div class="p-2">
+    <SetupCardRenderer
+      v-if="rumToken"
+      :key="platform"
+      :content="content"
+      :subs="subs"
+      data-test="rum-web-setup-card"
+    >
+      <!-- Platform switch sits on its own row directly under the card title,
+           ahead of the tagline and meta chips it selects the guide for. -->
+      <template #hero-under-title>
+        <OToggleGroup
+          :model-value="platform"
+          type="single"
+          :aria-label="t('ingestion.rumPlatform')"
+          data-test="rum-setup-platform-group"
+          @update:model-value="(v: any) => v && (platform = v as string)"
+        >
+          <OToggleGroupItem
+            v-for="p in PLATFORMS"
+            :key="p.id"
+            :value="p.id"
+            size="sm"
+            :data-test="`rum-setup-platform-${p.id}`"
+          >
+            <OIcon :name="p.icon" size="xs" class="me-1" />
+            {{ t(p.labelKey) }}
+            <BetaBadge v-if="p.beta" size="xs" class="ms-1.5" />
+          </OToggleGroupItem>
+        </OToggleGroup>
+      </template>
+    </SetupCardRenderer>
+    <p v-else class="mt-1" data-test="rum-web-no-token-message">
       {{ t("ingestion.generateRUMTokenMessage") }}
-    </div>
+    </p>
   </div>
 </template>
-
-<script lang="ts">
-import { defineComponent, ref, onMounted, onUpdated, onActivated } from "vue";
-import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
-import { getImageURL, getIngestionURL, maskText } from "../../../utils/zincutils";
-import CopyContent from "../../CopyContent.vue";
-import SanitizedHtmlRenderer from "@/components/SanitizedHtmlRenderer.vue";
-
-export default defineComponent({
-  name: "rum-web-page",
-  components: {
-    CopyContent,
-    SanitizedHtmlRenderer,
-  },
-  props: {
-    currOrgIdentifier: {
-      type: String,
-    },
-    currUserEmail: {
-      type: String,
-    },
-  },
-  setup(props) {
-    const store = useStore();
-    const { t } = useI18n();
-
-    const npmStep1 = ref(
-      "<b>Step1: </b>Add <a href='https://www.npmjs.com/package/&#64;openobserve/browser-rum' style='color:darkorange' target='_blank'>&#64;openobserve/browser-rum</a> and <a href='https://www.npmjs.com/package/&#64;openobserve/browser-logs' style='color:darkorange' target='_blank'>&#64;openobserve/browser-logs</a> to your package.json file, or run the following command:"
-    );
-    const npmStep2 = ref(
-      "<b>Step2: </b>Initialize the OpenObserve RUM and Logs SDKs in your application entry point (e.g. index.js or main.js)."
-    );
-    const rumToken = ref("");
-    const defaultConfig = `
-import { openobserveRum } from '@openobserve/browser-rum';
-import { openobserveLogs } from '@openobserve/browser-logs';
-
-const options = {
-  clientToken: '<OPENOBSERVE_CLIENT_TOKEN>',
-  applicationId: 'web-application-id',
-  site: '<OPENOBSERVE_SITE>',
-  service: 'my-web-application',
-  env: 'production',
-  version: '0.0.1',
-  organizationIdentifier: '<OPENOBSERVE_ORGANIZATION_IDENTIFIER>',
-  insecureHTTP: <INSECUREHTTP>,
-  apiVersion: 'v1',
-};
-
-openobserveRum.init({
-  applicationId: options.applicationId, // required, any string identifying your application
-  clientToken: options.clientToken,
-  site: options.site,
-  organizationIdentifier: options.organizationIdentifier,
-  service: options.service,
-  env: options.env,
-  version: options.version,
-  trackResources: true,
-  trackLongTasks: true,
-  trackUserInteractions: true,
-  apiVersion: options.apiVersion,
-  insecureHTTP: options.insecureHTTP,
-  defaultPrivacyLevel: 'allow' // 'allow' or 'mask-user-input' or 'mask'. Use one of the 3 values.
-});
-
-openobserveLogs.init({
-  clientToken: options.clientToken,
-  site: options.site,
-  organizationIdentifier: options.organizationIdentifier,
-  service: options.service,
-  env: options.env,
-  version: options.version,
-  forwardErrorsToLogs: true,
-  insecureHTTP: options.insecureHTTP,
-  apiVersion: options.apiVersion,
-});
-
-// You can set a user context
-openobserveRum.setUser({
-  id: "1",
-  name: "Captain Hook",
-  email: "captainhook@example.com",
-});
-
-openobserveRum.startSessionReplayRecording();`;
-    const initConfiguration = ref(defaultConfig);
-    const displayConfiguration = ref(defaultConfig);
-
-    onMounted(() => {
-      if (store.state.organizationData.rumToken) {
-        rumToken.value = store.state.organizationData.rumToken.rum_token;
-      }
-    });
-
-    onUpdated(() => {
-      if (store.state.organizationData.rumToken) {
-        replaceStaticValues();
-      }
-    });
-
-    onActivated(() => {
-      replaceStaticValues();
-    });
-
-    const replaceStaticValues = () => {
-      rumToken.value = store.state.organizationData.rumToken.rum_token;
-      let configData = defaultConfig;
-
-      const ingestionURL = getIngestionURL();
-
-      configData = configData.replace(
-        /<OPENOBSERVE_SITE>/g,
-        ingestionURL
-          .replace("https://", "")
-          .replace("http://", "")
-          .replace(/\/$/, "")
-      );
-
-      configData = configData.replace(
-        /<OPENOBSERVE_ORGANIZATION_IDENTIFIER>/g,
-        store.state.selectedOrganization.identifier
-      );
-
-      if (store.state.API_ENDPOINT.indexOf("https://") > -1) {
-        configData = configData.replace(/<INSECUREHTTP>/g, "false");
-      } else {
-        configData = configData.replace(/<INSECUREHTTP>/g, "true");
-      }
-
-      initConfiguration.value = configData.replace(
-        /<OPENOBSERVE_CLIENT_TOKEN>/g,
-        rumToken.value
-      );
-
-      displayConfiguration.value = configData.replace(
-        /<OPENOBSERVE_CLIENT_TOKEN>/g,
-        maskText(rumToken.value)
-      );
-    };
-
-    return {
-      t,
-      store,
-      getImageURL,
-      rumToken,
-      npmStep1,
-      npmStep2,
-      initConfiguration,
-      displayConfiguration,
-      replaceStaticValues,
-      defaultConfig,
-    };
-  },
-  computed: {
-    checkRUMToken() {
-      return this.store.state.organizationData.rumToken;
-    },
-  },
-  watch: {
-    checkRUMToken() {
-      this.rumToken = this.store.state.organizationData.rumToken.key;
-      this.replaceStaticValues();
-    },
-  },
-});
-</script>

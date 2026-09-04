@@ -1,157 +1,158 @@
 <template>
   <div>
-    <div class="q-px-md q-pt-md q-pb-md">
-      <div class="text-body1 text-bold">
+    <!-- Section header is provided full-width by the Settings shell. The page
+         gutter is owned by ConstrainedPage; this page adds none of its own. -->
+    <div class="pb-3">
+      <div class="text-base font-bold">
         {{ t("settings.logDetails") }}
       </div>
     </div>
 
-    <div class="q-mx-md q-mb-md">
-    <div
-      data-test="add-role-rolename-input-btn"
-      class="trace-id-field-name o2-input q-mb-sm"
+    <OForm
+      id="organization-settings-form"
+      class="mb-3"
+      :schema="organizationSettingsSchema"
+      :default-values="organizationSettingsDefaults"
+      @submit="saveOrgSettings"
+      v-slot="{ isSubmitting }"
     >
-      <q-input
-        v-model.trim="traceIdFieldName"
-        :label="t('settings.traceIdFieldName') + ' *'"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-md showLabelOnTop"
-        stack-label
-        borderless
-        dense
-        :rules="[
-          (val: string) =>
-            !!val
-              ? isValidTraceField ||
-                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-              : t('common.nameRequired'),
-        ]"
-      >
-        <template v-slot:hint>
-          Use alphanumeric and '+=,.@-_' characters only, without spaces.
-        </template>
-      </q-input>
-    </div>
+      <div data-test="add-role-rolename-input-btn" class="trace-id-field-name o2-input mb-2 w-100">
+        <OFormInput
+          data-test="settings-org-trace-id-input"
+          name="traceIdFieldName"
+          :label="t('settings.traceIdFieldName')"
+          required
+          class="showLabelOnTop py-3"
+          :help-text="t('settings.organizationSettings.fieldNameHelp')"
+        />
+      </div>
 
-    <div
-      data-test="add-role-rolename-input-btn"
-      class="span-id-field-name o2-input"
-    >
-      <q-input
-        v-model.trim="spanIdFieldName"
-        :label="t('settings.spanIdFieldName') + ' *'"
-        color="input-border"
-        bg-color="input-bg"
-        class="q-py-md showLabelOnTop"
-        stack-label
-        borderless
-        dense
-        :rules="[
-          (val: string) =>
-            !!val
-              ? isValidSpanField ||
-                `Use alphanumeric and '+=,.@-_' characters only, without spaces.`
-              : t('common.nameRequired'),
-        ]"
-        @update:model-value="updateFieldName('span')"
-      >
-        <template v-slot:hint>
-          Use alphanumeric and '+=,.@-_' characters only, without spaces.
-        </template>
-      </q-input>
-    </div>
+      <div data-test="add-role-rolename-input-btn" class="span-id-field-name o2-input w-100">
+        <OFormInput
+          data-test="settings-org-span-id-input"
+          name="spanIdFieldName"
+          :label="t('settings.spanIdFieldName')"
+          required
+          class="showLabelOnTop py-3"
+          :help-text="t('settings.organizationSettings.fieldNameHelp')"
+        />
+      </div>
 
-    <div data-test="add-toggle-ingestion" class="span-id-field-name o2-input">
-      <q-toggle
-        data-test="add-toggle-ingestion-btn"
-        v-model="toggleIngestionLogs"
-        :label="t('settings.toggleIngestionLogsLabel')"
-        stack-label
-        class="q-mt-sm o2-toggle-button-lg tw:mr-3 -tw:ml-4"
-        size="lg"
+      <div
+        v-if="config.isCloud !== 'true'"
+        data-test="add-toggle-ingestion"
+        class="span-id-field-name o2-input w-100"
       >
-      </q-toggle>
-    </div>
+        <OFormSwitch
+          data-test="add-toggle-ingestion-btn"
+          name="toggleIngestionLogs"
+          :label="t('settings.toggleIngestionLogsLabel')"
+          class="mt-2"
+        />
+      </div>
 
-    <div class="flex justify-start q-mt-md">
-      <q-btn
+      <div data-test="add-toggle-usage-stream" class="o2-input">
+        <OFormSwitch
+          data-test="add-toggle-usage-stream-btn"
+          name="usageStreamEnabled"
+          :label="t('settings.usageStreamEnabledLabel')"
+          class="mt-2"
+        />
+      </div>
+
+      <!-- Cross-Linking Configuration -->
+      <template v-if="store.state.zoConfig?.enable_cross_linking">
+        <OSeparator class="mt-6 mb-4" />
+        <CrossLinkManager
+          v-model="crossLinks"
+          :title="t('crossLinks.orgConfigTitle')"
+          :subtitle="t('crossLinks.orgConfigSubtitle')"
+          @change="formDirty = true"
+        />
+      </template>
+
+      <div class="mt-3 flex gap-2">
+        <!-- <OButton
         data-test="add-alert-cancel-btn"
-        v-close-popup="true"
-        class="q-mr-md o2-secondary-button tw:h-[36px]"
-        :label="t('alerts.cancel')"
-        no-caps
-        flat
+        variant="outline"
+        size="sm-action"
         @click="$emit('cancel:hideform')"
-      />
-      <q-btn
-        data-test="add-alert-submit-btn"
-        :label="t('alerts.save')"
-        class="o2-primary-button no-border tw:h-[36px]"
-        type="submit"
-        no-caps
-        flat
-        @click="saveOrgSettings"
-      />
-    </div>
-    </div>
+      >{{ t('alerts.cancel') }}</OButton> -->
+        <OButton
+          data-test="add-alert-submit-btn"
+          variant="primary"
+          size="sm-action"
+          type="submit"
+          :loading="isSubmitting"
+          >{{ t("alerts.save") }}</OButton
+        >
+      </div>
+    </OForm>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, onMounted } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, ref, watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import organizations from "@/services/organizations";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import CrossLinkManager from "@/components/cross-linking/CrossLinkManager.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import config from "@/aws-exports";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeOrganizationSettingsSchema,
+  type OrganizationSettingsForm,
+} from "./OrganizationSettings.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 
-const traceIdFieldName = ref(
-  store.state?.organizationData?.organizationSettings?.trace_id_field_name,
-);
+// Schema-driven validation replaces the hand-rolled validate()/error refs.
+const organizationSettingsSchema = makeOrganizationSettingsSchema(t);
 
-const spanIdFieldName = ref(
-  store.state?.organizationData?.organizationSettings?.span_id_field_name,
-);
+// CrossLinkManager has no OForm* equivalent (composite) — kept as local state
+// and merged at submit (the documented exception).
+const crossLinks = ref(store.state?.organizationData?.organizationSettings?.cross_links || []);
+const formDirty = ref(false);
 
-const q = useQuasar();
-
-const isValidSpanField = ref(true);
-const isValidTraceField = ref(true);
-const toggleIngestionLogs = ref(
-  store.state?.organizationData?.organizationSettings?.toggle_ingestion_logs ||
-    false,
-);
-
-const isValidRoleName = computed(() => {
-  const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
-  // Check if the role name is valid
-  return roleNameRegex.test(traceIdFieldName.value);
+// Dynamic defaults (edit-prefill from the store) → a typed computed. The trace/
+// span/toggle values are form-owned (OFormInput / OFormSwitch).
+const organizationSettingsDefaults = computed((): OrganizationSettingsForm => {
+  const s = store.state?.organizationData?.organizationSettings;
+  return {
+    traceIdFieldName: s?.trace_id_field_name ?? "",
+    spanIdFieldName: s?.span_id_field_name ?? "",
+    toggleIngestionLogs: s?.toggle_ingestion_logs ?? false,
+    usageStreamEnabled: s?.usage_stream_enabled ?? false,
+  };
 });
 
-const validateFieldName = (value: string) => {
-  const roleNameRegex = /^[a-zA-Z0-9+=,.@_-]+$/;
-  // Check if the role name is valid
-  return roleNameRegex.test(value);
-};
+watch(
+  () => store.state?.organizationData?.organizationSettings?.cross_links,
+  (newVal) => {
+    if (!formDirty.value) {
+      crossLinks.value = newVal || [];
+    }
+  },
+);
 
-const updateFieldName = (fieldName: string) => {
-  if (fieldName === "span")
-    isValidSpanField.value = validateFieldName(spanIdFieldName.value);
-
-  if (fieldName === "trace")
-    isValidTraceField.value = validateFieldName(traceIdFieldName.value);
-};
-
-const saveOrgSettings = async () => {
+// @submit fires only once the schema passes (both field names required + regex),
+// so the old validateOrgSettings()/error refs are gone. Awaited by OForm so the
+// inline Save button's spinner spans the POST.
+const saveOrgSettings = async (value: OrganizationSettingsForm) => {
   try {
     const payload: any = {
-      trace_id_field_name: traceIdFieldName.value,
-      span_id_field_name: spanIdFieldName.value,
-      toggle_ingestion_logs: toggleIngestionLogs.value,
+      trace_id_field_name: value.traceIdFieldName,
+      span_id_field_name: value.spanIdFieldName,
+      toggle_ingestion_logs: value.toggleIngestionLogs,
+      cross_links: crossLinks.value,
+      usage_stream_enabled: value.usageStreamEnabled,
     };
 
     await organizations.post_organization_settings(
@@ -161,33 +162,35 @@ const saveOrgSettings = async () => {
 
     const updatedSettings: any = {
       ...store.state?.organizationData?.organizationSettings,
-      trace_id_field_name: traceIdFieldName.value,
-      span_id_field_name: spanIdFieldName.value,
-      toggle_ingestion_logs: toggleIngestionLogs.value,
+      trace_id_field_name: value.traceIdFieldName,
+      span_id_field_name: value.spanIdFieldName,
+      toggle_ingestion_logs: value.toggleIngestionLogs,
+      cross_links: crossLinks.value,
+      usage_stream_enabled: value.usageStreamEnabled,
     };
 
     store.dispatch("setOrganizationSettings", updatedSettings);
 
-    q.notify({
-      message: "Organization settings updated successfully",
-      color: "positive",
-      position: "bottom",
-      timeout: 3000,
+    formDirty.value = false;
+
+    toast({
+      message: t("settings.organizationSettings.settingsUpdated"),
+      variant: "success",
     });
   } catch (e: any) {
-    q.notify({
-      message: e?.message || "Error saving organization settings",
-      color: "negative",
-      position: "bottom",
-      timeout: 3000,
+    toast({
+      message: e?.message || t("settings.organizationSettings.settingsSaveError"),
+      variant: "error",
     });
   }
 };
-</script>
 
-<style scoped lang="scss">
-.trace-id-field-name,
-.span-id-field-name {
-  width: 400px;
-}
-</style>
+// Exposed for unit tests that exercise the submit handler directly.
+defineExpose({
+  crossLinks,
+  formDirty,
+  saveOrgSettings,
+  organizationSettingsSchema,
+  organizationSettingsDefaults,
+});
+</script>

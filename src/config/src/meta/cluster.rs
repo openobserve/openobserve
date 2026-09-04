@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -95,7 +95,7 @@ impl Node {
     }
 
     pub fn is_single_node(&self) -> bool {
-        self.role.len() == 1 && self.role.contains(&Role::All)
+        get_config().common.local_mode
     }
     pub fn is_single_role(&self) -> bool {
         self.role.len() == 1
@@ -123,17 +123,8 @@ impl Node {
     pub fn is_flatten_compactor(&self) -> bool {
         self.role.contains(&Role::FlattenCompactor)
     }
-    pub fn is_alert_manager(&self) -> bool {
-        self.role.contains(&Role::AlertManager) || self.role.contains(&Role::All)
-    }
-    pub fn is_action_server(&self) -> bool {
-        self.role.contains(&Role::ActionServer) || self.role.contains(&Role::All)
-    }
-    pub fn is_standalone(&self) -> bool {
-        // standalone implies there is no external dependency required
-        // for this node. All role will always have DB dep.
-        // currently only action server has no external dep
-        !self.role.contains(&Role::All) && self.role.contains(&Role::ActionServer)
+    pub fn is_scheduler(&self) -> bool {
+        self.role.contains(&Role::Scheduler) || self.role.contains(&Role::All)
     }
 }
 
@@ -204,9 +195,9 @@ pub enum Role {
     Querier,
     Compactor,
     Router,
-    AlertManager,
+    #[serde(alias = "AlertManager")]
+    Scheduler,
     FlattenCompactor,
-    ActionServer,
 }
 
 impl FromStr for Role {
@@ -219,11 +210,8 @@ impl FromStr for Role {
             "querier" => Ok(Role::Querier),
             "compactor" => Ok(Role::Compactor),
             "router" => Ok(Role::Router),
-            "alertmanager" | "alert_manager" => Ok(Role::AlertManager),
+            "scheduler" | "alertmanager" | "alert_manager" => Ok(Role::Scheduler),
             "flatten_compactor" => Ok(Role::FlattenCompactor),
-            "action_server" | "actionserver" | "script_server" | "scriptserver" => {
-                Ok(Role::ActionServer)
-            }
             _ => Err(format!("Invalid cluster role: {s}")),
         }
     }
@@ -237,9 +225,8 @@ impl std::fmt::Display for Role {
             Role::Querier => write!(f, "querier"),
             Role::Compactor => write!(f, "compactor"),
             Role::Router => write!(f, "router"),
-            Role::AlertManager => write!(f, "alert_manager"),
+            Role::Scheduler => write!(f, "scheduler"),
             Role::FlattenCompactor => write!(f, "flatten_compactor"),
-            Role::ActionServer => write!(f, "action_server"),
         }
     }
 }
@@ -321,10 +308,12 @@ mod tests {
 
     #[test]
     fn test_node_is_ingester() {
-        let mut node = Node::default();
+        let mut node = Node {
+            role: vec![Role::All],
+            ..Default::default()
+        };
 
         // Test with All role
-        node.role = vec![Role::All];
         assert!(node.is_ingester());
 
         // Test with Ingester role
@@ -338,10 +327,12 @@ mod tests {
 
     #[test]
     fn test_node_is_querier() {
-        let mut node = Node::default();
+        let mut node = Node {
+            role: vec![Role::All],
+            ..Default::default()
+        };
 
         // Test with All role
-        node.role = vec![Role::All];
         assert!(node.is_querier());
 
         // Test with Querier role
@@ -355,10 +346,12 @@ mod tests {
 
     #[test]
     fn test_node_role_checks() {
-        let mut node = Node::default();
+        let mut node = Node {
+            role: vec![Role::Router],
+            ..Default::default()
+        };
 
         // Test router
-        node.role = vec![Role::Router];
         assert!(node.is_router());
         assert!(!node.is_compactor());
 
@@ -367,16 +360,236 @@ mod tests {
         assert!(node.is_compactor());
         assert!(!node.is_router());
 
-        // Test alert manager
-        node.role = vec![Role::AlertManager];
-        assert!(node.is_alert_manager());
-
-        // Test action server
-        node.role = vec![Role::ActionServer];
-        assert!(node.is_action_server());
+        // Test scheduler
+        node.role = vec![Role::Scheduler];
+        assert!(node.is_scheduler());
 
         // Test flatten compactor
         node.role = vec![Role::FlattenCompactor];
         assert!(node.is_flatten_compactor());
+    }
+
+    #[test]
+    fn test_node_is_single_node() {
+        let node = Node::default();
+        // is_single_node is driven by config.common.local_mode, not by the node role.
+        let expected = get_config().common.local_mode;
+        assert_eq!(node.is_single_node(), expected);
+    }
+
+    #[test]
+    fn test_node_is_single_role() {
+        let mut node = Node {
+            role: vec![Role::Ingester],
+            ..Default::default()
+        };
+
+        assert!(node.is_single_role());
+
+        node.role = vec![Role::All];
+        assert!(node.is_single_role());
+
+        node.role = vec![Role::Ingester, Role::Querier];
+        assert!(!node.is_single_role());
+
+        node.role = vec![];
+        assert!(!node.is_single_role());
+    }
+
+    #[test]
+    fn test_node_is_interactive_querier() {
+        let mut node = Node {
+            role: vec![Role::Querier],
+            role_group: RoleGroup::None,
+            ..Default::default()
+        };
+
+        // querier + no role group → interactive
+        assert!(node.is_interactive_querier());
+
+        // querier + Interactive → interactive
+        node.role_group = RoleGroup::Interactive;
+        assert!(node.is_interactive_querier());
+
+        // querier + Background → NOT interactive
+        node.role_group = RoleGroup::Background;
+        assert!(!node.is_interactive_querier());
+
+        // non-querier → never interactive querier
+        node.role = vec![Role::Ingester];
+        node.role_group = RoleGroup::None;
+        assert!(!node.is_interactive_querier());
+    }
+
+    #[test]
+    fn test_node_is_background_querier() {
+        let mut node = Node {
+            role: vec![Role::Querier],
+            role_group: RoleGroup::None,
+            ..Default::default()
+        };
+
+        // querier + no role group → background
+        assert!(node.is_background_querier());
+
+        // querier + Background → background
+        node.role_group = RoleGroup::Background;
+        assert!(node.is_background_querier());
+
+        // querier + Interactive → NOT background
+        node.role_group = RoleGroup::Interactive;
+        assert!(!node.is_background_querier());
+
+        // non-querier → never background querier
+        node.role = vec![Role::Compactor];
+        node.role_group = RoleGroup::None;
+        assert!(!node.is_background_querier());
+    }
+
+    #[test]
+    fn test_node_is_same() {
+        let a = Node {
+            id: 1,
+            uuid: "uuid-1".to_string(),
+            name: "node-1".to_string(),
+            http_addr: "http://localhost:5080".to_string(),
+            grpc_addr: "localhost:5081".to_string(),
+            role: vec![Role::Ingester],
+            role_group: RoleGroup::None,
+            scheduled: true,
+            broadcasted: false,
+            status: NodeStatus::Online,
+            ..Default::default()
+        };
+
+        let b = a.clone();
+        assert!(a.is_same(&b));
+
+        let mut c = b.clone();
+        c.status = NodeStatus::Offline;
+        assert!(!a.is_same(&c));
+
+        let mut d = b.clone();
+        d.role = vec![Role::Querier];
+        assert!(!a.is_same(&d));
+    }
+
+    #[test]
+    fn test_role_from_str() {
+        assert_eq!("all".parse::<Role>().unwrap(), Role::All);
+        assert_eq!("ingester".parse::<Role>().unwrap(), Role::Ingester);
+        assert_eq!("querier".parse::<Role>().unwrap(), Role::Querier);
+        assert_eq!("compactor".parse::<Role>().unwrap(), Role::Compactor);
+        assert_eq!("router".parse::<Role>().unwrap(), Role::Router);
+        assert_eq!("scheduler".parse::<Role>().unwrap(), Role::Scheduler);
+        assert_eq!("alertmanager".parse::<Role>().unwrap(), Role::Scheduler);
+        assert_eq!("alert_manager".parse::<Role>().unwrap(), Role::Scheduler);
+        assert_eq!(
+            "flatten_compactor".parse::<Role>().unwrap(),
+            Role::FlattenCompactor
+        );
+        // unknown → Err
+        assert!("unknown_role".parse::<Role>().is_err());
+    }
+
+    #[test]
+    fn test_role_display() {
+        assert_eq!(Role::All.to_string(), "all");
+        assert_eq!(Role::Ingester.to_string(), "ingester");
+        assert_eq!(Role::Querier.to_string(), "querier");
+        assert_eq!(Role::Compactor.to_string(), "compactor");
+        assert_eq!(Role::Router.to_string(), "router");
+        assert_eq!(Role::Scheduler.to_string(), "scheduler");
+        assert_eq!(Role::FlattenCompactor.to_string(), "flatten_compactor");
+    }
+
+    #[test]
+    fn test_role_deserializes_legacy_alert_manager() {
+        assert_eq!(
+            serde_json::from_str::<Role>(r#""AlertManager""#).unwrap(),
+            Role::Scheduler
+        );
+        assert_eq!(
+            serde_json::to_string(&Role::Scheduler).unwrap(),
+            r#""Scheduler""#
+        );
+    }
+
+    #[test]
+    fn test_role_group_from_str() {
+        assert_eq!(RoleGroup::from("background"), RoleGroup::Background);
+        assert_eq!(RoleGroup::from("BACKGROUND"), RoleGroup::Background);
+        assert_eq!(RoleGroup::from("interactive"), RoleGroup::Interactive);
+        assert_eq!(RoleGroup::from("Interactive"), RoleGroup::Interactive);
+        assert_eq!(RoleGroup::from("other"), RoleGroup::None);
+        assert_eq!(RoleGroup::from(""), RoleGroup::None);
+    }
+
+    #[test]
+    fn test_role_group_display() {
+        assert_eq!(RoleGroup::None.to_string(), "");
+        assert_eq!(RoleGroup::Interactive.to_string(), "interactive");
+        assert_eq!(RoleGroup::Background.to_string(), "background");
+    }
+
+    #[test]
+    fn test_node_status_from_i32() {
+        assert_eq!(NodeStatus::from(1), NodeStatus::Prepare);
+        assert_eq!(NodeStatus::from(2), NodeStatus::Online);
+        assert_eq!(NodeStatus::from(3), NodeStatus::Offline);
+        // unknown → Prepare
+        assert_eq!(NodeStatus::from(99), NodeStatus::Prepare);
+        assert_eq!(NodeStatus::from(-1), NodeStatus::Prepare);
+    }
+
+    #[test]
+    fn test_role_group_from_search_event_type_background() {
+        // Reports, Alerts, DerivedStream, SearchJob → Background
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Reports),
+            RoleGroup::Background
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Alerts),
+            RoleGroup::Background
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::DerivedStream),
+            RoleGroup::Background
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::SearchJob),
+            RoleGroup::Background
+        );
+    }
+
+    #[test]
+    fn test_role_group_from_search_event_type_interactive() {
+        // All other SearchEventType variants → Interactive
+        assert_eq!(RoleGroup::from(SearchEventType::UI), RoleGroup::Interactive);
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Dashboards),
+            RoleGroup::Interactive
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Values),
+            RoleGroup::Interactive
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Other),
+            RoleGroup::Interactive
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::RUM),
+            RoleGroup::Interactive
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Download),
+            RoleGroup::Interactive
+        );
+        assert_eq!(
+            RoleGroup::from(SearchEventType::Insights),
+            RoleGroup::Interactive
+        );
     }
 }

@@ -108,3 +108,16 @@ enum SearchJobs {
     ErrorMessage,
     PartitionNum,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_create_table_contains_search_jobs() {
+        let sql = create_table_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains("search_jobs"));
+    }
+}

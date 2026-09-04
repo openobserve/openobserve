@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -47,7 +47,7 @@ async fn read_files_in_directory(c: Cli, dir_path: &str) -> Result<bool, anyhow:
                 ingestion_type: Some(proto::cluster_rpc::IngestionType::Json.into()),
                 metadata: None,
             };
-            if let Err(e) = crate::service::ingestion::ingestion_service::ingest(req).await {
+            if let Err(e) = openobserve_core::ingestion::ingestion_service::ingest(req).await {
                 eprintln!("insert data fail {path:?}: {e:?}");
                 return Ok(false);
             } else {

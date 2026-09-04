@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,79 +15,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div v-if="show" class="flex items-center o2-tabs">
-    <div
-      :key="tab.value + tab.disabled"
-      v-for="tab in tabs as Tab[]"
-      class="cursor-pointer"
+  <OToggleGroup v-if="show" :model-value="activeTab" @update:model-value="onSelect">
+    <OToggleGroupItem
+      v-for="tab in visibleTabs"
+      :key="tab.value"
+      :value="tab.value"
+      :disabled="tab.disabled ?? false"
+      :size="size"
+      :title="tab.title ?? tab.label"
+      :style="tab.style"
+      :data-test="`tab-${tab.value}`"
     >
-      <div
-        :data-test="`tab-${tab.value}`"
-        class="q-px-lg q-py-sm o2-tab text-center"
-        :style="tab.style"
-        :title="tab.title || tab.label"
-        :class="[
-          activeTab === tab.value ? 'active text-primary' : '',
-          tab.disabled && 'disabled',
-          tab.hide && 'hidden',
-          activeTab !== tab.value ? 'inactive' : ''
-        ]"
-        @click="changeTab(tab)"
-      >
-        {{ tab.label }}
-        <q-tooltip v-if="tab.tooltipLabel">
-          {{ tab.tooltipLabel }}
-        </q-tooltip>
-      </div>
-    </div>
-  </div>
+      <template v-if="tab.icon" #icon-left>
+        <OIcon v-if="typeof tab.icon === 'string'" :name="tab.icon as any" size="sm" />
+        <component v-else :is="tab.icon" class="size-3.5 shrink-0" />
+      </template>
+      {{ tab.label }}
+      <span
+        v-if="tab.dirty"
+        class="bg-button-primary ms-1.5 h-2 w-2 shrink-0 rounded-full"
+        :title="dirtyTitle"
+        :data-test="`tab-${tab.value}-dirty-dot`"
+        aria-hidden="true"
+      />
+      <OTooltip v-if="tab.tooltipLabel" :content="raw(tab.tooltipLabel)" />
+    </OToggleGroupItem>
+  </OToggleGroup>
 </template>
 
 <script setup lang="ts">
+import { raw, type I18nText } from "@/types/i18n";
+import { computed } from "vue";
+import type { Component } from "vue";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import type { ToggleGroupItemSize } from "@/lib/core/ToggleGroup/OToggleGroupItem.types";
+
 interface Tab {
-  label: string;
+  label: I18nText;
   value: string;
   style?: Record<string, string>;
   disabled?: boolean;
-  title?: string;
+  title?: I18nText;
   tooltipLabel?: string;
   hide?: boolean;
+  icon?: Component | string;
+  // When true, renders a small unsaved-changes dot to the right of the label.
+  // Optional and defaults to undefined, so existing callers are unaffected.
+  dirty?: boolean;
 }
 
 const emit = defineEmits(["update:activeTab"]);
-const props = defineProps({
-  show: {
-    type: Boolean,
-    default: true,
-  },
-  tabs: {
-    type: Array,
-    required: true,
-  },
-  activeTab: {
-    type: String,
-    required: true,
-  },
-});
 
-const changeTab = (tab: Tab) => {
-  if (tab.disabled || tab.hide) return;
-  emit("update:activeTab", tab.value);
+const props = withDefaults(
+  defineProps<{
+    show?: boolean;
+    tabs: Tab[];
+    activeTab: string;
+    size?: ToggleGroupItemSize;
+    // Tooltip shown when hovering an unsaved-changes dot (optional).
+    dirtyTitle?: I18nText;
+  }>(),
+  {
+    show: true,
+    size: "sm",
+    dirtyTitle: raw(""),
+  },
+);
+
+const visibleTabs = computed(() => (props.tabs as Tab[]).filter((t) => !t.hide));
+
+const onSelect = (value: unknown) => {
+  if (!value) return;
+  emit("update:activeTab", value);
 };
 </script>
-
-<style lang="scss" scoped>
-.o2-tabs {
-  .o2-tab {
-    border-bottom: 2px solid transparent;
-    width: auto;
-    min-width: 80px;
-    white-space: nowrap;
-  }
-  .active {
-    border-bottom: 2px solid var(--o2-primary-btn-bg);
-    background-color: color-mix(in srgb, var(--o2-primary-btn-bg) 20%, white 10%);
-    color: var(--o2-card-text) !important;
-  }
-}
-</style>

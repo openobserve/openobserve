@@ -1,388 +1,250 @@
 <template>
   <div>
-    <div class="q-pb-xs flex justify-start q-px-md copy-log-btn">
-      <app-tabs
+    <div class="copy-log-btn flex justify-start px-3 pb-1">
+      <AppTabs
         v-if="filteredTabs.length"
-        class="tw:mb-[0.375rem] logs-json-preview-tabs q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:rounded-[0.25rem] tw:text-[]"
+        class="border-card-glass-border rounded-default me-2 mb-1.5 h-fit overflow-hidden border-s border-e border-t border-solid"
         data-test="logs-json-preview-tabs"
         :tabs="filteredTabs"
         v-model:active-tab="activeTab"
         @update:active-tab="handleTabChange"
       />
 
-      <q-btn
+      <OButton
         :label="t('common.copyToClipboard')"
-        dense
-        size="sm"
-        no-caps
-        class="tw:mb-[0.375rem] q-px-sm copy-log-btn q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
-        icon="content_copy"
+        size="xs"
+        variant="outline"
+        class="me-2 mb-1.5"
         @click="copyLogToClipboard"
-      />
-      <q-btn
+        ><OIcon name="content-copy" size="xs" class="me-1" />{{
+          t("common.copyToClipboard")
+        }}</OButton
+      >
+      <OButton
         v-if="showViewRelatedBtn"
-        :label="t('search.viewRelated')"
-        dense
-        size="sm"
-        no-caps
-        class="log-preview-btn q-px-sm q-mr-sm"
-        icon="link"
-        color="secondary"
-        outline
+        size="xs"
+        variant="outline"
+        class="me-2 mb-1.5"
         @click="openCorrelation"
         data-test="log-correlation-btn"
       >
-        <q-tooltip>
-          {{ t('search.viewRelatedTooltip') }}
-        </q-tooltip>
-      </q-btn>
+        <OIcon name="link" size="xs" class="me-1" />{{ t("search.viewRelated") }}
+        <OTooltip :content="t('search.viewRelatedTooltip')" />
+      </OButton>
+      <!-- Stream picker and its action read as one control, sized to sit level
+           with the toolbar buttons above rather than towering over them. -->
       <div
         v-if="
-          showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
+          !hideViewTrace && showViewTraceBtn && (tracesStreams.length || isTracesStreamsLoading)
         "
-        class="o2-input flex items-center logs-trace-selector"
+        class="mb-1.5 flex items-center gap-2"
       >
-        <q-select
+        <OSelect
           data-test="log-search-index-list-select-stream"
           v-model="searchObj.meta.selectedTraceStream"
-          :options="filteredTracesStreamOptions"
-          input-debounce="0"
-          filled
-          size="xs"
-          borderless
-          dense
-          fill-input
-          behavior="menu"
-          :title="searchObj.meta.selectedTraceStream"
+          :options="tracesStreams"
+          class="w-auto shrink-0"
           :loading="isTracesStreamsLoading"
-        >
-          <template #no-option>
-            <div class="o2-input log-stream-search-input">
-              <q-input
-                data-test="alert-list-search-input"
-                v-model="streamSearchValue"
-                borderless
-                filled
-                debounce="500"
-                autofocus
-                dense
-                size="xs"
-                @update:model-value="filterStreamFn"
-                class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                :placeholder="t('search.searchStream')"
-              >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer" />
-                </template>
-              </q-input>
-            </div>
-            <q-item>
-              <q-item-section> {{ t("search.noResult") }}</q-item-section>
-            </q-item>
-          </template>
-          <template #before-options>
-            <div class="o2-input log-stream-search-input">
-              <q-input
-                data-test="alert-list-search-input"
-                v-model="streamSearchValue"
-                borderless
-                debounce="500"
-                filled
-                dense
-                size="xs"
-                autofocus
-                @update:model-value="filterStreamFn"
-                class="q-ml-auto q-mb-xs no-border q-pa-xs"
-                :placeholder="t('search.searchStream')"
-              >
-                <template #prepend>
-                  <q-icon name="search" class="cursor-pointer" />
-                </template>
-              </q-input>
-            </div>
-          </template>
-        </q-select>
-        <q-btn
-          data-test="trace-view-logs-btn"
-          v-close-popup="true"
-          class="text-bold traces-view-logs-btn q-px-sm view-trace-btn"
-          :label="t('search.viewTrace')"
-          padding="sm sm"
-          size="xs"
-          no-caps
-          dense
-          :icon="outlinedAccountTree"
-          @click="redirectToTraces"
+          :disabled="isTracesStreamsLoading"
+          size="sm"
         />
+        <OButton
+          data-test="trace-view-logs-btn"
+          size="xs"
+          variant="outline"
+          icon-left="account-tree"
+          @click="redirectToTraces"
+          >{{ t("search.viewTrace") }}</OButton
+        >
       </div>
     </div>
-    <div v-show="activeTab === 'unflattened'" class="q-pl-md">
-      <q-spinner-hourglass v-if="loading"
-size="lg" color="primary" />
+    <div v-show="activeTab === 'unflattened'" class="ps-3">
+      <OSpinner size="md" />
       <div v-if="!loading">
-        <code-query-editor
+        <!-- Editor sizing is inlined (not scoped CSS) so it doesn't leak onto
+             every .monaco-editor app-wide. The focus-border is left off so this
+             editor stays borderless like the others. -->
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+        <CodeQueryEditor
           v-model:query="unflattendData"
           ref="queryEditorRef"
           :editor-id="`logs-json-preview-unflattened-json-editor-${previewId}`"
-          class="monaco-editor"
-          :class="mode"
+          class="w-[calc(100%-1rem)]!"
+          :class="[mode, mode === 'expanded' ? 'h-75! max-w-256!' : 'h-[calc(100vh-250px)]!']"
           language="json"
         />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
-    <div v-show="activeTab !== 'unflattened'" class="q-pl-md">
+    <div v-show="activeTab !== 'unflattened'" class="ps-3">
       {
       <div
-        class="log_json_content"
+        class="log_json_content flex font-mono text-xs whitespace-pre-wrap"
         v-for="(key, index) in Object.keys(value)"
         :key="key"
+        :data-test="`log-detail-row-${key}`"
       >
-        <q-btn-dropdown
-          data-test="log-details-include-exclude-field-btn"
-          size="0.5rem"
-          flat
-          outlined
-          filled
-          dense
-          class="q-ml-sm pointer"
-          :name="'img:' + getImageURL('images/common/add_icon.svg')"
-          aria-label="Add icon"
+        <ODropdown
+          v-if="!hideFieldOptions"
+          v-model:open="dropdownOpenMap[key]"
+          side="bottom"
+          align="start"
         >
-          <q-list class="logs-table-list">
-            <q-item
-              clickable
-              v-close-popup
-              v-if="
-                searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                  item.name === key ? item.isSchemaField : '',
-                ) && multiStreamFields.includes(key)
-              "
-              @click.stop="addSearchTerm(key, value[key], 'include')"
-              data-test="log-details-include-field-btn"
+          <template #trigger>
+            <OButton
+              data-test="log-details-include-exclude-field-btn"
+              size="xs"
+              variant="ghost"
+              class="ms-2 h-5! min-h-5! w-5! min-w-5! p-0! align-middle"
+              :aria-label="t('logs.jsonPreview.addIcon')"
             >
-              <q-item-section>
-                <q-item-label
-                  ><q-btn
-                    title="Add to search query"
-                    size="6px"
-                    round
-                    class="q-mr-sm pointer"
-                  >
-                    <q-icon color="currentColor">
-                      <EqualIcon></EqualIcon>
-                    </q-icon> </q-btn
-                  >{{ t("common.includeSearchTerm") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
+              <OIcon :name="dropdownOpenMap[key] ? 'arrow-drop-up' : 'arrow-drop-down'" size="sm" />
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-if="
+              !hideSearchTermActions &&
+              searchObj.data.stream.selectedStreamFields.some((item: any) =>
+                item.name === key ? item.isSchemaField : '',
+              ) &&
+              multiStreamFields.includes(key)
+            "
+            data-test="log-details-include-field-btn"
+            @select.stop="addSearchTerm(key, value[key], 'include')"
+          >
+            <template #icon-left><EqualIcon class="size-2.5" /></template>
+            {{ t("common.includeSearchTerm") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="
+              !hideSearchTermActions &&
+              searchObj.data.stream.selectedStreamFields.some((item: any) =>
+                item.name === key ? item.isSchemaField : '',
+              ) &&
+              multiStreamFields.includes(key)
+            "
+            data-test="log-details-exclude-field-btn"
+            @select.stop="addSearchTerm(key, value[key], 'exclude')"
+          >
+            <template #icon-left><NotEqualIcon class="size-2.5" /></template>
+            {{ t("common.excludeSearchTerm") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="key !== store.state.zoConfig.timestamp_column"
+            data-test="log-details-add-field-btn"
+            @select.stop="addFieldToTable(key)"
+            icon-left="visibility"
+          >
+            {{ addOrRemoveLabel(key) }}
+          </ODropdownItem>
+          <!-- Cross-link options -->
+          <template v-if="getCrossLinksForField(key).length > 0">
+            <ODropdownSeparator />
+            <ODropdownItem
+              v-for="crossLink in getCrossLinksForField(key)"
+              :key="crossLink.name"
+              :data-test="`log-details-cross-link-${crossLink.name}`"
+              @select.stop="openCrossLink(crossLink.resolvedUrl)"
+              icon-left="open-in-new"
+            >
+              {{ crossLink.name }}
+            </ODropdownItem>
+          </template>
+          <ODropdownItem
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            data-test="send-to-ai-chat-btn"
+            @select.stop="sendToAiChat(JSON.stringify({ [key]: value[key] }))"
+          >
+            <template #icon-left>
+              <img :src="getBtnLogo" width="14" height="14" alt="" />
+            </template>
+            {{ t("logs.jsonPreview.sendToAiChat") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled"
+            data-test="redirect-to-regex-pattern-btn"
+            @select.stop="createRegexPatternFromLogs(key, value[key])"
+          >
+            <template #icon-left>
+              <img :src="regexIcon" width="14" height="14" alt="" />
+            </template>
+            {{ t("regex_patterns.create_regex_pattern_field") }}
+          </ODropdownItem>
+        </ODropdown>
 
-            <q-item
-              clickable
-              v-close-popup
-              v-if="
-                searchObj.data.stream.selectedStreamFields.some((item: any) =>
-                  item.name === key ? item.isSchemaField : '',
-                ) && multiStreamFields.includes(key)
-              "
-              @click.stop="addSearchTerm(key, value[key], 'exclude')"
-              data-test="log-details-exclude-field-btn"
-            >
-              <q-item-section>
-                <q-item-label
-                  ><q-btn
-                    title="Add to search query"
-                    size="6px"
-                    round
-                    class="q-mr-sm pointer"
-                  >
-                    <q-icon color="currentColor">
-                      <NotEqualIcon></NotEqualIcon>
-                    </q-icon> </q-btn
-                  >{{ t("common.excludeSearchTerm") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-close-popup
-              @click.stop="addFieldToTable(key)"
-              data-test="log-details-add-field-btn"
-            >
-              <q-item-section>
-                <q-item-label
-                  ><q-btn
-                    title="Add field to table"
-                    icon="visibility"
-                    size="6px"
-                    round
-                    class="q-mr-sm pointer"
-                  ></q-btn
-                  >{{ addOrRemoveLabel(key) }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              v-if="
-                config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
-              "
-              clickable
-              v-close-popup
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="send-to-ai-chat-btn"
-                  @click.stop="
-                    sendToAiChat(
-                      JSON.stringify({
-                        [key]: value[key],
-                      }),
-                    )
-                  "
-                  v-close-popup
-                  ><q-btn
-                    title="Send to AI Chat"
-                    size="6px"
-                    round
-                    class="q-mr-sm pointer"
-                  >
-                    <q-img
-                      height="14px"
-                      width="14px"
-                      :src="getBtnLogo"
-                    /> </q-btn
-                  >Send to AI Chat</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              v-if="
-                config.isEnterprise == 'true' && store.state.zoConfig.ai_enabled
-              "
-              clickable
-              v-close-popup
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="redirect-to-regex-pattern-btn"
-                  @click.stop="createRegexPatternFromLogs(key, value[key])"
-                  v-close-popup
-                  ><q-btn
-                    title="Add field to table"
-                    size="6px"
-                    round
-                    class="q-mr-sm pointer"
-                  >
-                    <q-img
-                      height="14px"
-                      width="14px"
-                      :src="regexIcon"
-                    /> </q-btn
-                  >{{
-                    t("regex_patterns.create_regex_pattern_field")
-                  }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-btn-dropdown>
-
-        <span
-          class="q-pl-xs"
-          :data-test="`log-expand-detail-key-${key}`"
-          :class="store.state.theme === 'dark' ? 'dark' : ''"
-        >
-          <LogsHighLighting
-            :data="{ [key]: value[key] }"
-            :show-braces="false"
-            :query-string="highlightQuery"
-          /><span v-if="index < Object.keys(value).length - 1">,</span>
+        <span class="ps-1" :data-test="`log-expand-detail-key-${key}`">
+          <span class="log-key">{{ key }}</span
+          ><span class="log-separator">: </span
+          ><span
+            ><ChunkedContent
+              v-if="getContentSize(value[key]) > 50000"
+              :data="value[key]"
+              :field-key="`json_preview_${key}`"
+              :query-string="highlightQuery"
+              :simple-mode="false" /><LogsHighLighting
+              v-else
+              :data="getDisplayValue(key, value[key])"
+              :show-braces="false"
+              :query-string="highlightQuery" /></span
+          ><span v-if="index < Object.keys(value).length - 1">,</span>
         </span>
       </div>
       }
       <div
         v-if="showMenu"
-        class="context-menu shadow-lg rounded-sm"
+        class="context-menu rounded-default [font-size: var(--text-compact)] bg-surface-overlay border-border-default text-text-body min-w-50 border py-1 shadow-lg"
         :style="{
           position: 'fixed',
           top: `${menuY}px`,
           left: `${menuX}px`,
           zIndex: 9999,
         }"
-        :class="
-          store.state.theme === 'dark'
-            ? 'context-menu-dark'
-            : 'context-menu-light'
-        "
       >
-        <div class="context-menu-item" @click="copySelectedText">
-          <q-icon name="content_copy"
-size="xs" class="q-mr-sm" />
-          Copy
+        <div
+          class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
+          @click="copySelectedText"
+        >
+          <OIcon name="content-copy" size="sm" class="me-2" />
+          {{ t("logs.jsonPreview.copy") }}
         </div>
-        <div class="context-menu-item" @click="handleCreateRegex">
-          <q-img
+        <div
+          class="hover:bg-dropdown-item-hover-bg flex cursor-pointer items-center px-3 py-1.5 [transition:background-color_0.2s]"
+          @click="handleCreateRegex"
+        >
+          <img
             :src="regexIconForContextMenu"
-            class="q-mr-sm"
-            style="width: 14px; height: 14px"
+            class="me-2"
+            style="width: 0.875rem; height: 0.875rem"
+            alt=""
           />
-          Create regex pattern
+          {{ t("logs.jsonPreview.createRegexPattern") }}
         </div>
       </div>
     </div>
-    <q-dialog v-if="config.isEnterprise == 'true'" v-model="typeOfRegexPattern">
-      <q-card style="width: 700px; max-width: 80vw">
-        <q-card-section>
-          <div class="text-h6">
-            What is the type of regex pattern you want to create?
-          </div>
-        </q-card-section>
-
-        <q-card-section class="q-pt-none">
-          <div>
-            <q-input
-              type="text"
-              data-test="regex-pattern-type-input"
-              v-model="regexPatternType"
-              color="input-border"
-              label="Type of regex pattern (e.g. email, phone number, etc.)"
-              bg-color="input-bg"
-              class="showLabelOnTop"
-              stack-label
-              outlined
-              filled
-              dense
-            />
-          </div>
-        </q-card-section>
-
-        <q-card-actions align="right">
-          <q-btn
-            data-test="search-scheduler-max-records-cancel-btn"
-            unelevated
-            no-caps
-            class="q-mr-sm text-bold"
-            :label="t('confirmDialog.cancel')"
-            v-close-popup
-          />
-          <q-btn
-            data-test="search-scheduler-max-records-submit-btn"
-            unelevated
-            no-caps
-            :label="t('confirmDialog.ok')"
-            color="secondary"
-            class="text-bold"
-            @click="confirmRegexPatternType"
-            v-close-popup
-          />
-        </q-card-actions>
-      </q-card>
-    </q-dialog>
+    <ODialog
+      data-test="json-preview-regex-pattern-dialog"
+      v-if="config.isEnterprise == 'true'"
+      v-model:open="typeOfRegexPattern"
+      size="lg"
+      :title="t('logs.jsonPreview.regexPatternTypeTitle')"
+      :secondary-button-label="t('confirmDialog.cancel')"
+      :primary-button-label="t('confirmDialog.ok')"
+      @click:secondary="typeOfRegexPattern = false"
+      @click:primary="confirmRegexPatternType"
+    >
+      <OInput
+        data-test="regex-pattern-type-input"
+        v-model="regexPatternType"
+        :label="t('logs.jsonPreview.regexPatternTypeLabel')"
+      />
+    </ODialog>
   </div>
 </template>
 
 <script lang="ts">
 import {
   ref,
+  reactive,
   onBeforeMount,
   computed,
   nextTick,
@@ -392,21 +254,35 @@ import {
 } from "vue";
 import { getImageURL, getUUID } from "@/utils/zincutils";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import EqualIcon from "@/components/icons/EqualIcon.vue";
 import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
-import { useI18n } from "vue-i18n";
-import { outlinedAccountTree } from "@quasar/extras/material-icons-outlined";
+import { raw, useI18nTyped } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useRouter } from "vue-router";
-import useStreams from "@/composables/useStreams";
 import AppTabs from "@/components/common/AppTabs.vue";
 import searchService from "@/services/search";
 import { generateTraceContext } from "@/utils/zincutils";
 import { defineAsyncComponent } from "vue";
-import { useQuasar } from "quasar";
 import config from "@/aws-exports";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
+import ChunkedContent from "@/components/logs/ChunkedContent.vue";
 import { searchState } from "@/composables/useLogs/searchState";
+import useViewTraceAction from "@/composables/useLogs/useViewTraceAction";
 import { useServiceCorrelation } from "@/composables/useServiceCorrelation";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import ODropdownSeparator from "@/lib/overlay/Dropdown/ODropdownSeparator.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { copyToClipboard } from "@/utils/clipboard";
+import { timestampToTimezoneDate } from "@/utils/timezone";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { isSafeNavigableUrl } from "@/utils/safeUrl";
 
 export default {
   name: "JsonPreview",
@@ -438,15 +314,38 @@ export default {
       type: Boolean,
       default: false,
     },
+    // Set by DetailTable's drawer, which renders the View Trace action in its
+    // own header row instead so it stays reachable from every tab.
+    hideViewTrace: {
+      type: Boolean,
+      default: false,
+    },
+    hideSearchTermActions: {
+      type: Boolean,
+      default: false,
+    },
+    hideFieldOptions: {
+      type: Boolean,
+      default: false,
+    },
   },
   components: {
     NotEqualIcon,
     EqualIcon,
     AppTabs,
     LogsHighLighting,
-    CodeQueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    ChunkedContent,
+    OButton,
+    ODialog,
+    OIcon,
+    ODropdown,
+    ODropdownItem,
+    ODropdownSeparator,
+    CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
+    OSpinner,
+    OTooltip,
+    OInput,
+    OSelect,
   },
   emits: [
     "copy",
@@ -458,31 +357,24 @@ export default {
     "show-correlation",
   ],
   setup(props: any, { emit }: any) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
+    const { isDark } = useTheme();
     const activeTab = ref("flattened");
 
     const streamSearchValue = ref<string>("");
 
-    const { getStreams } = useStreams();
-
-    const filteredTracesStreamOptions = ref([]);
-
     const router = useRouter();
 
-    const tracesStreams = ref([]);
-
     const queryEditorRef = ref<any>();
-
-    const isTracesStreamsLoading = ref(false);
 
     const typeOfRegexPattern = ref(false);
     const regexPatternType = ref("");
 
     const previewId = ref("");
     const schemaToBeSearch = ref({});
+    const dropdownOpenMap = reactive<Record<string, boolean>>({});
 
-    const $q = useQuasar();
     const unflattendData: any = ref("");
     const loading = ref(false);
 
@@ -495,19 +387,19 @@ export default {
       {
         value: "flattened",
         label: t("search.flattened"),
+        icon: "align-left",
       },
       {
         value: "unflattened",
         label: t("search.original"),
+        icon: "description",
       },
     ];
 
     const copyLogToClipboard = () => {
       emit(
         "copy",
-        activeTab.value === "unflattened"
-          ? JSON.parse(unflattendData.value)
-          : props.value,
+        activeTab.value === "unflattened" ? JSON.parse(unflattendData.value) : props.value,
       );
     };
     const addSearchTerm = (
@@ -521,9 +413,105 @@ export default {
       emit("addFieldToTable", value);
     };
     const { searchObj, searchAggData } = searchState();
+
+    // Shared with DetailTable's drawer header so both renderings of the
+    // View Trace action apply the same rules. See useViewTraceAction.
+    const {
+      tracesStreams,
+      filteredTracesStreamOptions,
+      isTracesStreamsLoading,
+      showViewTraceBtn,
+      getTracesStreams,
+      setViewTraceBtn: setViewTraceBtnFor,
+      filterStreamFn,
+    } = useViewTraceAction(t, searchObj);
+
+    const setViewTraceBtn = () => setViewTraceBtnFor(props.value);
+
+    // Cross-linking: get all matching cross-links for a field using result_schema data
+    const getCrossLinksForField = (
+      fieldName: string,
+    ): Array<{ name: string; resolvedUrl: string }> => {
+      if (!store.state.zoConfig?.enable_cross_linking) return [];
+
+      const crossLinks = searchObj.data.crossLinks;
+      if (!crossLinks) return [];
+
+      const { stream_links = [], org_links = [] } = crossLinks;
+
+      // Build alias→original map
+      const aliasToOriginal: Record<string, string> = {};
+      for (const link of [...stream_links, ...org_links]) {
+        for (const f of link.fields || []) {
+          if (f.alias) aliasToOriginal[f.alias] = f.name;
+        }
+      }
+
+      const originalFieldName = aliasToOriginal[fieldName] || fieldName;
+      const fieldValue = props.value?.[fieldName];
+
+      const streamCoveredFields = new Set<string>();
+      for (const link of stream_links) {
+        for (const f of link.fields || []) {
+          if (f.alias) streamCoveredFields.add(f.name);
+        }
+      }
+
+      const results: Array<{ name: string; resolvedUrl: string }> = [];
+
+      for (const link of stream_links) {
+        if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
+          const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
+          results.push({ name: link.name, resolvedUrl: resolved });
+        }
+      }
+
+      if (!streamCoveredFields.has(originalFieldName)) {
+        for (const link of org_links) {
+          if (link.fields?.some((f: any) => f.name === originalFieldName && f.alias)) {
+            const resolved = resolveCrossLinkUrl(link.url, originalFieldName, fieldValue);
+            results.push({ name: link.name, resolvedUrl: resolved });
+          }
+        }
+      }
+
+      return results;
+    };
+
+    const resolveCrossLinkUrl = (
+      urlTemplate: string,
+      fieldName: string,
+      fieldValue: any,
+    ): string => {
+      const startTime = searchObj.data.datetime?.startTime || 0;
+      const endTime = searchObj.data.datetime?.endTime || 0;
+      const query = searchObj.data.crossLinkQuery || searchObj.data.query || "";
+
+      return urlTemplate
+        .replace(/\$\{field\.__name\}/g, encodeURIComponent(String(fieldName)))
+        .replace(/\$\{field\.__value\}/g, encodeURIComponent(String(fieldValue ?? "")))
+        .replace(/\$\{start_time\}/g, String(startTime))
+        .replace(/\$\{end_time\}/g, String(endTime))
+        .replace(/\$\{query\}/g, encodeURIComponent(query))
+        .replace(/\$\{query_encoded\}/g, btoa(query));
+    };
+
+    // Dropdown state for multi-link fields
+    const crossLinkDropdownVisible = ref(false);
+
+    const openCrossLink = (url: string) => {
+      // Guard the RESOLVED url, not just the saved template: links stored
+      // before save-time validation existed are still in the DB, and a field
+      // VALUE substituted into the template can carry a hostile scheme too.
+      if (!isSafeNavigableUrl(url)) {
+        crossLinkDropdownVisible.value = false;
+        return;
+      }
+      window.open(url, "_blank", "noopener,noreferrer");
+      crossLinkDropdownVisible.value = false;
+    };
     let multiStreamFields: any = ref([]);
 
-    const showViewTraceBtn = ref(false);
     const showViewRelatedBtn = ref(false);
 
     // Initialize service correlation composable
@@ -535,67 +523,40 @@ export default {
       try {
         // Gate correlation feature behind enterprise check to avoid 403 errors
         if (config.isEnterprise !== "true") {
-          console.log("[JsonPreview] Correlation feature requires enterprise license");
           showViewRelatedBtn.value = false;
           return;
         }
-
-        const available = await isCorrelationAvailable();
-        console.log("[JsonPreview] Correlation feature available:", available, "Mode:", props.mode);
 
         // Show button if correlation is available AND we're in detail view (sidebar or expanded)
         // AND service_streams is enabled in config
         // AND hideViewRelated prop is not set (used by DetailTable drawer to hide the button)
         // Mode can be 'sidebar' (when opened from sidebar) or 'expanded' (when log row is expanded in table)
-        const isDetailView = props.mode === 'sidebar' || props.mode === 'expanded';
+        const isDetailView = props.mode === "sidebar" || props.mode === "expanded";
         const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false; // Default to true if not set
-        showViewRelatedBtn.value = available && isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
 
-        console.log("[JsonPreview] showViewRelatedBtn set to:", showViewRelatedBtn.value, "isDetailView:", isDetailView, "serviceStreamsEnabled:", serviceStreamsEnabled, "hideViewRelated:", props.hideViewRelated);
+        if (isDetailView && serviceStreamsEnabled) {
+          const available = await isCorrelationAvailable();
+          showViewRelatedBtn.value =
+            available && isDetailView && serviceStreamsEnabled && !props.hideViewRelated;
+        }
       } catch (err) {
         console.error("[JsonPreview] Error checking correlation availability:", err);
         showViewRelatedBtn.value = false;
       }
     });
 
-    const getTracesStreams = async () => {
-      isTracesStreamsLoading.value = true;
-      try {
-        getStreams("traces", false)
-          .then((res: any) => {
-            tracesStreams.value = res.list.map((option: any) => option.name);
-            filteredTracesStreamOptions.value = JSON.parse(
-              JSON.stringify(tracesStreams.value),
-            );
-
-            if (!searchObj.meta.selectedTraceStream.length)
-              searchObj.meta.selectedTraceStream = tracesStreams.value[0];
-          })
-          .catch(() => Promise.reject())
-          .finally(() => {
-            isTracesStreamsLoading.value = false;
-          });
-      } catch (err: any) {
-        isTracesStreamsLoading.value = false;
-        console.error("Failed to get traces streams", err);
-      }
-    };
-
-    const setViewTraceBtn = () => {
-      // Hide view traces button when service_streams_enabled is true
-      const serviceStreamsEnabled = store.state.zoConfig.service_streams_enabled !== false;
-
-      showViewTraceBtn.value =
-        !store.state.hiddenMenus.has("traces") && // Check if traces menu is hidden
-        !serviceStreamsEnabled && // Hide when service streams is enabled
-        props.value[
-          store.state.organizationData?.organizationSettings
-            ?.trace_id_field_name
-        ];
-
-      if (showViewTraceBtn.value && !filteredTracesStreamOptions.value.length)
-        getTracesStreams();
-    };
+    // `value` can arrive after this component mounts: DetailTable fills its
+    // `rowData` in an async created() hook, so the row-detail drawer's preview
+    // mounts with `{}`. The onBeforeMount check below then ran against an empty
+    // record, left `showViewTraceBtn` false and never fetched the traces
+    // streams, so the drawer's View Trace button stayed hidden for good.
+    // Re-evaluate whenever the previewed record changes.
+    watch(
+      () => props.value,
+      () => {
+        setViewTraceBtn();
+      },
+    );
 
     onBeforeMount(() => {
       setViewTraceBtn();
@@ -607,7 +568,8 @@ export default {
       // Handler for closing menu on outside click
       //because when user clicks on the log content with right click, the context menu is shown and when user clicks outside the log content, the context menu is closed
       const handleOutsideClick = (e: MouseEvent) => {
-        if (!(e.target as HTMLElement).closest(".q-btn")) {
+        // Guard on the menu itself: its items close it via their own handlers.
+        if (!(e.target as HTMLElement).closest(".context-menu")) {
           showMenu.value = false;
         }
       };
@@ -631,9 +593,7 @@ export default {
           const wouldOverflow = e.clientX + menuWidth > windowWidth;
 
           // Position menu to the left if it would overflow, otherwise to the right
-          menuX.value = wouldOverflow
-            ? e.clientX - menuWidth - 5
-            : e.clientX + 15;
+          menuX.value = wouldOverflow ? e.clientX - menuWidth - 5 : e.clientX + 15;
           menuY.value = e.clientY + 15;
 
           showMenu.value = true;
@@ -677,15 +637,15 @@ export default {
       loading.value = true;
 
       try {
-        const { traceparent, traceId } = generateTraceContext();
+        const { traceparent } = generateTraceContext();
 
         const res = await searchService.search(
           {
             org_identifier: searchObj.organizationIdentifier,
             query: {
               query: {
-                start_time: props.value._timestamp - 10 * 60 * 1000,
                 sql: `SELECT _original FROM "${props.streamName ? props.streamName : searchObj.data.stream.selectedStream}" where _o2_id = ${props.value._o2_id} and _timestamp = ${props.value._timestamp}`,
+                start_time: props.value._timestamp - 10 * 60 * 1000,
                 end_time: props.value._timestamp + 10 * 60 * 1000,
                 size: 1,
                 from: 0,
@@ -697,22 +657,15 @@ export default {
           },
           "ui",
         );
-        const formattedData = JSON.stringify(
-          JSON.parse(res.data.hits[0]._original),
-          null,
-          2,
-        );
+        const formattedData = JSON.stringify(JSON.parse(res.data.hits[0]._original), null, 2);
         unflattendData.value = formattedData;
         //store the data in cache of searchObj
         searchObj.data.originalDataCache[cacheKey] = formattedData;
       } catch (err: any) {
         loading.value = false;
-        $q.notify({
-          message:
-            err.response?.data?.message || "Failed to get the Original data",
-          color: "negative",
-          position: "bottom",
-          timeout: 1500,
+        toast({
+          message: err.response?.data?.message || t("logs.jsonPreview.failedToGetOriginalData"),
+          variant: "error",
         });
       } finally {
         loading.value = false;
@@ -721,13 +674,11 @@ export default {
 
     const updateMultiStreamFields = () => {
       searchObj.data.stream.selectedStreamFields.forEach((item: any) => {
-        if (
-          item.streams?.length == searchObj.data.stream.selectedStream.length
-        ) {
+        if (item.streams?.length == searchObj.data.stream.selectedStream.length) {
           multiStreamFields.value.push(item.name);
         }
       });
-    }
+    };
 
     watch(activeTab, async () => {
       if (activeTab.value === "unflattened") {
@@ -746,23 +697,15 @@ export default {
       },
     );
 
-    const filterStreamFn = (val: any = "") => {
-      filteredTracesStreamOptions.value = tracesStreams.value.filter(
-        (stream: any) => {
-          return stream.toLowerCase().indexOf(val.toLowerCase()) > -1;
-        },
-      );
-    };
-
+    // The previewed log rides along with the event: a listener bound by
+    // reference (`@view-trace="handler"`) otherwise receives `undefined` and
+    // throws on `log[timestamp_column]` (issue #13708). Same contract as
+    // `show-correlation` below.
     const redirectToTraces = () => {
-      emit("view-trace");
+      emit("view-trace", props.value);
     };
 
     const openCorrelation = () => {
-      console.log(
-        "[JsonPreview] openCorrelation clicked, emitting show-correlation event with value:",
-        props.value,
-      );
       emit("show-correlation", props.value);
     };
 
@@ -776,7 +719,7 @@ export default {
     };
 
     const filteredTabs = computed(() => {
-      return tabs.filter((tab) => {
+      return tabs.filter(() => {
         if (
           props.value._o2_id == undefined ||
           searchAggData.hasAggregation ||
@@ -800,20 +743,20 @@ export default {
     };
 
     const getBtnLogo = computed(() => {
-      return store.state.theme === "dark"
+      return isDark.value
         ? getImageURL("images/common/ai_icon_dark.svg")
-        : getImageURL("images/common/ai_icon.svg");
+        : getImageURL("images/common/ai_icon_gradient.svg");
     });
     const regexIcon = computed(() => {
       return getImageURL(
-        store.state.theme == "dark"
+        isDark.value
           ? "images/regex_pattern/regex_icon_dark.svg"
           : "images/regex_pattern/regex_icon_light.svg",
       );
     });
     const regexIconForContextMenu = computed(() => {
       return getImageURL(
-        store.state.theme == "dark"
+        isDark.value
           ? "images/regex_pattern/regex_icon_dark.svg"
           : "images/regex_pattern/regex_icon_light.svg",
       );
@@ -821,7 +764,10 @@ export default {
 
     const createRegexPatternFromLogs = (key: string, value: string) => {
       emit("closeTable");
-      const promptToBeAdded = `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`;
+      // Prompt text handed to the assistant — model input, deliberately English.
+      const promptToBeAdded = raw(
+        `Create a regex pattern for ${key} field that contains the following value: "${value}" from the ${searchObj.data.stream.selectedStream[0]} stream`,
+      );
 
       router.push({
         path: "/settings/regex_patterns",
@@ -845,7 +791,9 @@ export default {
       emit("closeTable");
       // inputMessage.value = `Create a regex pattern for ${store.state.organizationData.customRegexPatternFromLogs.key} field that contains the following value: "${store.state.organizationData.customRegexPatternFromLogs.value}" which should be a type of ${store.state.organizationData.customRegexPatternFromLogs.type} from the ${store.state.organizationData.customRegexPatternFromLogs.stream} stream`;
 
-      const PromptToBeAdded = `Create a regex pattern for the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`;
+      const PromptToBeAdded = raw(
+        `Create a regex pattern for the following value: "${selectedText.value}" which should be a type of ${regexPatternType.value} from the ${searchObj.data.stream.selectedStream[0]} stream`,
+      );
 
       store.state.organizationData.regexPatternPrompt = PromptToBeAdded;
       store.state.organizationData.regexPatternTestValue = selectedText.value;
@@ -861,26 +809,50 @@ export default {
 
     const copySelectedText = () => {
       if (selectedText.value) {
-        navigator.clipboard
-          .writeText(selectedText.value)
-          .then(() => {
+        copyToClipboard(selectedText.value, t, {
+          successMessage: t("logs.jsonPreview.textCopiedToClipboard"),
+          errorMessage: t("logs.jsonPreview.failedToCopyText"),
+          timeout: 1500,
+        }).then((success) => {
+          if (success) {
             showMenu.value = false;
-            $q.notify({
-              message: "Text copied to clipboard",
-              color: "positive",
-              position: "bottom",
-              timeout: 1500,
-            });
-          })
-          .catch(() => {
-            $q.notify({
-              message: "Failed to copy text",
-              color: "negative",
-              position: "bottom",
-              timeout: 1500,
-            });
-          });
+          }
+        });
       }
+    };
+
+    const getContentSize = (data: any): number => {
+      if (data === null || data === undefined) return 0;
+      if (typeof data === "string") return data.length;
+      if (typeof data === "object") {
+        try {
+          return JSON.stringify(data).length;
+        } catch {
+          return 0;
+        }
+      }
+      return String(data).length;
+    };
+
+    // Display-only: render the timestamp column in a human-readable format in
+    // the user-selected timezone (same representation as the traces detail
+    // sidebar). The raw value is kept intact for include/exclude search terms
+    // and all other field actions.
+    const getDisplayValue = (key: string, val: any): any => {
+      if (
+        key === store.state.zoConfig.timestamp_column &&
+        val !== null &&
+        val !== undefined &&
+        val !== "" &&
+        !isNaN(Number(val))
+      ) {
+        return timestampToTimezoneDate(
+          Number(val) / 1000,
+          store.state.timezone,
+          "MMM dd, yyyy HH:mm:ss.SSS ZZZ",
+        );
+      }
+      return val;
     };
 
     return {
@@ -889,7 +861,7 @@ export default {
       getImageURL,
       addSearchTerm,
       addFieldToTable,
-      outlinedAccountTree,
+      dropdownOpenMap,
       store,
       searchObj,
       multiStreamFields,
@@ -929,11 +901,11 @@ export default {
       typeOfRegexPattern,
       regexPatternType,
       confirmRegexPatternType,
+      getContentSize,
+      getDisplayValue,
+      getCrossLinksForField,
+      openCrossLink,
     };
   },
 };
 </script>
-
-<style lang="scss" scoped>
-@import "@/styles/logs/json-preview.scss";
-</style>

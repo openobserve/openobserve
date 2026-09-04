@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,12 +15,8 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSearchResponseHandler } from "./useSearchResponseHandler";
-import { searchState } from "./searchState";
 import { logsUtils } from "./logsUtils";
-import { useHistogram } from "./useHistogram";
 import useNotifications from "@/composables/useNotifications";
-import useSearchPagination from "@/composables/useLogs/useSearchPagination";
-import useStreamFields from "@/composables/useLogs/useStreamFields";
 
 // Create a shared mock state
 const createMockState = () => ({
@@ -82,23 +78,28 @@ const createMockState = () => ({
 let mockState: ReturnType<typeof createMockState>;
 
 // Create a separate shared searchPartitionMap that persists across the composable and tests
-const mockSearchPartitionMap: Record<string, { partition: number; chunks: Record<number, number> }> = {};
+const mockSearchPartitionMap: Record<
+  string,
+  { partition: number; chunks: Record<number, number> }
+> = {};
 
 // Create shared mock functions
 const mockNotifications = {
   showErrorNotification: vi.fn(),
-  showCancelSearchNotification: vi.fn(),
 };
 
+// showCancelSearchNotification is provided by logsUtils, not useNotifications.
 const mockLogsUtils = {
   fnParsedSQL: vi.fn(() => ({})),
   hasAggregation: vi.fn(() => false),
   removeTraceId: vi.fn(),
   updateUrlQueryParams: vi.fn(),
+  showCancelSearchNotification: vi.fn(),
 };
 
 const mockHistogram = {
   getHistogramTitle: vi.fn(() => "Histogram"),
+  getHistogramTitleParts: vi.fn(() => null),
   generateHistogramData: vi.fn(),
   resetHistogramWithError: vi.fn(),
 };
@@ -122,7 +123,7 @@ const mockLogsHighlighter = {
 // Mock dependencies
 vi.mock("vuex", () => ({
   useStore: vi.fn(() => ({
-    state: { timezone: "UTC" },
+    state: { timezone: "UTC", zoConfig: { timestamp_column: "_timestamp" } },
   })),
 }));
 
@@ -185,13 +186,13 @@ describe("useSearchResponseHandler", () => {
     mockState = createMockState();
 
     // Clear the shared searchPartitionMap
-    Object.keys(mockSearchPartitionMap).forEach(key => delete mockSearchPartitionMap[key]);
+    Object.keys(mockSearchPartitionMap).forEach((key) => delete mockSearchPartitionMap[key]);
 
     vi.clearAllMocks();
 
     // Reset all shared mock functions
     mockNotifications.showErrorNotification.mockClear();
-    mockNotifications.showCancelSearchNotification.mockClear();
+    mockLogsUtils.showCancelSearchNotification.mockClear();
     mockLogsUtils.fnParsedSQL.mockReturnValue({});
     mockLogsUtils.hasAggregation.mockReturnValue(false);
     mockLogsUtils.removeTraceId.mockClear();
@@ -277,7 +278,7 @@ describe("useSearchResponseHandler", () => {
       responseHandler.setCancelSearchError();
 
       expect(mockState.searchObj.data.histogram.errorMsg).toBe(
-        "Histogram search query was cancelled"
+        "search.histogramSearchQueryCancelled",
       );
     });
   });
@@ -285,7 +286,7 @@ describe("useSearchResponseHandler", () => {
   describe("handleSearchError", () => {
     it("should handle generic search error", () => {
       // Use mockState directly
-      const notifications = useNotifications();
+      useNotifications();
 
       const request = { type: "search" };
       const error = {
@@ -305,9 +306,24 @@ describe("useSearchResponseHandler", () => {
       expect(mockState.searchObj.data.errorMsg).toContain("Search failed");
     });
 
+    it("should reset streaming progress to 0 on error", () => {
+      mockState.searchObj.loadingProgressPercentage = 80;
+      mockState.searchObj.loadingHistogramProgressPercentage = 60;
+
+      const request = { type: "search" };
+      const error = {
+        content: { message: "boom", trace_id: "t", code: 500 },
+      };
+
+      responseHandler.handleSearchError(request, error as any);
+
+      expect(mockState.searchObj.loadingProgressPercentage).toBe(0);
+      expect(mockState.searchObj.loadingHistogramProgressPercentage).toBe(0);
+    });
+
     it("should handle cancelled search error", () => {
       // Use mockState directly
-      const notifications = useNotifications();
+      useNotifications();
 
       const request = { type: "search" };
       const error = {
@@ -320,7 +336,7 @@ describe("useSearchResponseHandler", () => {
 
       responseHandler.handleSearchError(request, error as any);
 
-      expect(notifications.showCancelSearchNotification).toHaveBeenCalled();
+      expect(mockLogsUtils.showCancelSearchNotification).toHaveBeenCalled();
     });
 
     it("should handle rate limit error", () => {
@@ -353,7 +369,8 @@ describe("useSearchResponseHandler", () => {
       responseHandler.handleSearchError(request, error as any);
 
       expect(mockState.searchObj.data.countErrorMsg).toContain(
-        "Error while retrieving total events"
+        // `t` is mocked to echo its key, so assert the key the code now resolves
+        "search.errorWhileRetrievingTotalEvents",
       );
       expect(mockState.searchObj.data.countErrorMsg).toContain("TraceID: trace-pc");
     });
@@ -372,9 +389,7 @@ describe("useSearchResponseHandler", () => {
 
       responseHandler.handleSearchError(request, error as any);
 
-      expect(mockState.searchObj.data.histogram.errorMsg).toContain(
-        "Histogram failed"
-      );
+      expect(mockState.searchObj.data.histogram.errorMsg).toContain("Histogram failed");
       expect(mockState.searchObj.data.histogram.errorCode).toBe(404);
       expect(mockState.searchObj.data.histogram.errorDetail).toBe("Data not found");
     });
@@ -429,6 +444,49 @@ describe("useSearchResponseHandler", () => {
       expect(mockSearchPartitionMap["trace-1"].chunks[1]).toBe(1);
     });
 
+    it("should set results progress on event_progress for a search payload", () => {
+      const payload = { type: "search", traceId: "trace-progress" };
+      const response = { type: "event_progress", content: { percent: 42 } };
+
+      responseHandler.handleSearchResponse(payload as any, response as any);
+
+      expect(mockState.searchObj.loadingProgressPercentage).toBe(42);
+    });
+
+    it("should route event_progress to the histogram field for a histogram payload", () => {
+      mockState.searchObj.loadingProgressPercentage = 0;
+      const payload = { type: "histogram", traceId: "trace-hist" };
+      const response = { type: "event_progress", content: { percent: 73 } };
+
+      responseHandler.handleSearchResponse(payload as any, response as any);
+
+      // Histogram progress is tracked separately; results progress is untouched.
+      expect(mockState.searchObj.loadingHistogramProgressPercentage).toBe(73);
+      expect(mockState.searchObj.loadingProgressPercentage).toBe(0);
+    });
+
+    it("should default event_progress percent to 0 when missing", () => {
+      const payload = { type: "search", traceId: "trace-progress-2" };
+      const response = { type: "event_progress", content: {} };
+
+      responseHandler.handleSearchResponse(payload as any, response as any);
+
+      expect(mockState.searchObj.loadingProgressPercentage).toBe(0);
+    });
+
+    it("should reset streaming progress to 0 on cancel_response", () => {
+      mockState.searchObj.loadingProgressPercentage = 80;
+      mockState.searchObj.loadingHistogramProgressPercentage = 45;
+
+      const payload = { type: "search", traceId: "trace-cancel" };
+      const response = { type: "cancel_response", content: {} };
+
+      responseHandler.handleSearchResponse(payload as any, response as any);
+
+      expect(mockState.searchObj.loadingProgressPercentage).toBe(0);
+      expect(mockState.searchObj.loadingHistogramProgressPercentage).toBe(0);
+    });
+
     it("should handle search_response_metadata", () => {
       // Use mockState directly
 
@@ -468,9 +526,7 @@ describe("useSearchResponseHandler", () => {
         type: "search_response_hits",
         content: {
           results: {
-            hits: [
-              { zo_sql_key: "2024-01-01T00:00:00", zo_sql_num: 100 },
-            ],
+            hits: [{ zo_sql_key: "2024-01-01T00:00:00", zo_sql_num: 100 }],
           },
         },
       };
@@ -483,7 +539,7 @@ describe("useSearchResponseHandler", () => {
 
     it("should handle cancel_response", () => {
       // Use mockState directly
-      const notifications = useNotifications();
+      useNotifications();
       mockState.searchObj.loading = true;
       mockState.searchObj.loadingHistogram = true;
 
@@ -500,7 +556,7 @@ describe("useSearchResponseHandler", () => {
 
       expect(mockState.searchObj.loading).toBe(false);
       expect(mockState.searchObj.loadingHistogram).toBe(false);
-      expect(notifications.showCancelSearchNotification).toHaveBeenCalled();
+      expect(mockLogsUtils.showCancelSearchNotification).toHaveBeenCalled();
     });
   });
 
@@ -634,11 +690,7 @@ describe("useSearchResponseHandler", () => {
   describe("trimPageCountExtraHit", () => {
     it("should trim last hit when at page boundary", () => {
       // Use mockState directly
-      mockState.searchObj.data.queryResults.hits = [
-        { id: 1 },
-        { id: 2 },
-        { id: 3 },
-      ];
+      mockState.searchObj.data.queryResults.hits = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
       const queryReq = { query: { size: 3, from: 0 } };
 

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,10 +16,9 @@
 use sea_orm::{ActiveModelTrait, ColumnTrait, EntityTrait, QueryFilter, Set};
 use serde::{Deserialize, Serialize};
 
-use super::get_lock;
 pub use crate::table::entity::backfill_jobs::{ActiveModel, Column, Entity, Model, Relation};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors, orm_err,
 };
 
@@ -55,7 +54,7 @@ impl From<Model> for BackfillJob {
 }
 
 pub async fn get(org: &str, job_id: &str) -> Result<BackfillJob, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Id.eq(job_id))
@@ -69,7 +68,7 @@ pub async fn get(org: &str, job_id: &str) -> Result<BackfillJob, errors::Error> 
 }
 
 pub async fn list_by_org(org: &str) -> Result<Vec<BackfillJob>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = Entity::find().filter(Column::Org.eq(org)).all(client).await;
     match res {
         Ok(models) => Ok(models.into_iter().map(|model| model.into()).collect()),
@@ -81,7 +80,7 @@ pub async fn list_by_pipeline(
     org: &str,
     pipeline_id: &str,
 ) -> Result<Vec<BackfillJob>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::PipelineId.eq(pipeline_id))
@@ -107,9 +106,7 @@ pub async fn add(job: BackfillJob) -> Result<(), errors::Error> {
         enabled: Set(job.enabled),
     };
 
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let res = active.insert(client).await;
     match res {
         Ok(_) => Ok(()),
@@ -118,9 +115,7 @@ pub async fn add(job: BackfillJob) -> Result<(), errors::Error> {
 }
 
 pub async fn delete(org: &str, job_id: &str) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let res = Entity::delete_many()
         .filter(Column::Org.eq(org))
         .filter(Column::Id.eq(job_id))
@@ -132,10 +127,18 @@ pub async fn delete(org: &str, job_id: &str) -> Result<(), errors::Error> {
     }
 }
 
-pub async fn update(job: &BackfillJob) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
+/// Deletes all backfill jobs belonging to the given org.
+pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .exec(client)
+        .await?;
+    Ok(())
+}
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+pub async fn update(job: &BackfillJob) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
 
     // Find existing model
     let existing = Entity::find()
@@ -166,9 +169,7 @@ pub async fn update(job: &BackfillJob) -> Result<(), errors::Error> {
 }
 
 pub async fn update_enabled(org: &str, job_id: &str, enabled: bool) -> Result<(), errors::Error> {
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     // Find existing model
     let existing = Entity::find()
@@ -190,5 +191,52 @@ pub async fn update_enabled(org: &str, job_id: &str, enabled: bool) -> Result<()
         }
         Ok(None) => orm_err!("backfill job not found"),
         Err(e) => orm_err!(format!("find backfill job error: {e}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_model() -> Model {
+        Model {
+            id: "job-1".to_string(),
+            org: "myorg".to_string(),
+            pipeline_id: "pipe-1".to_string(),
+            start_time: 1000,
+            end_time: 2000,
+            chunk_period_minutes: Some(30),
+            delay_between_chunks_secs: Some(5),
+            delete_before_backfill: true,
+            created_at: 1000,
+            enabled: true,
+        }
+    }
+
+    #[test]
+    fn test_backfill_job_from_model() {
+        let model = make_model();
+        let job = BackfillJob::from(model);
+        assert_eq!(job.id, "job-1");
+        assert_eq!(job.org, "myorg");
+        assert_eq!(job.pipeline_id, "pipe-1");
+        assert_eq!(job.start_time, 1000);
+        assert_eq!(job.end_time, 2000);
+        assert_eq!(job.chunk_period_minutes, Some(30));
+        assert_eq!(job.delay_between_chunks_secs, Some(5));
+        assert!(job.delete_before_backfill);
+        assert!(job.enabled);
+    }
+
+    #[test]
+    fn test_backfill_job_from_model_optional_fields() {
+        let mut model = make_model();
+        model.chunk_period_minutes = None;
+        model.delay_between_chunks_secs = None;
+        model.delete_before_backfill = false;
+        let job = BackfillJob::from(model);
+        assert!(job.chunk_period_minutes.is_none());
+        assert!(job.delay_between_chunks_secs.is_none());
+        assert!(!job.delete_before_backfill);
     }
 }

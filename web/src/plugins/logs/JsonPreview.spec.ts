@@ -1,26 +1,73 @@
-import { mount } from "@vue/test-utils";
+import { flushPromises, mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import JsonPreview from "@/plugins/logs/JsonPreview.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
 
-installQuasar();
+// Stub ODialog so tests are deterministic (no Portal/Reka teleport)
+// and so we can drive primary/secondary actions via emits.
+const ODialogStub = {
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryButtonVariant",
+    "secondaryButtonVariant",
+    "neutralButtonVariant",
+    "primaryButtonDisabled",
+    "secondaryButtonDisabled",
+    "neutralButtonDisabled",
+    "primaryButtonLoading",
+    "secondaryButtonLoading",
+    "neutralButtonLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div
+      data-test="o-dialog-stub"
+      :data-open="String(open)"
+      :data-size="size"
+      :data-title="title"
+      :data-primary-label="primaryButtonLabel"
+      :data-secondary-label="secondaryButtonLabel"
+    >
+      <slot name="header" />
+      <slot />
+      <slot name="footer" />
+      <button
+        data-test="o-dialog-stub-primary"
+        @click="$emit('click:primary')"
+      >{{ primaryButtonLabel }}</button>
+      <button
+        data-test="o-dialog-stub-secondary"
+        @click="$emit('click:secondary')"
+      >{{ secondaryButtonLabel }}</button>
+    </div>
+  `,
+};
 
 // Mock services
 vi.mock("@/services/search", () => ({
   default: {
-    search: vi.fn()
-  }
+    search: vi.fn(),
+  },
 }));
 
 vi.mock("@/utils/zincutils", () => ({
   getImageURL: vi.fn(() => "mock-image-url"),
   getUUID: vi.fn(() => "mock-uuid-123"),
-  generateTraceContext: vi.fn(() => ({ 
+  generateTraceContext: vi.fn(() => ({
     traceparent: "mock-traceparent",
-    traceId: "mock-trace-id"
+    traceId: "mock-trace-id",
   })),
   useLocalWrapContent: vi.fn(() => false),
 }));
@@ -28,8 +75,8 @@ vi.mock("@/utils/zincutils", () => ({
 vi.mock("@/aws-exports", () => ({
   default: {
     isEnterprise: "true",
-    API_ENDPOINT: "http://localhost:5080"
-  }
+    API_ENDPOINT: "http://localhost:5080",
+  },
 }));
 
 vi.mock("@/composables/useLogs/searchState", () => ({
@@ -41,36 +88,33 @@ vi.mock("@/composables/useLogs/searchState", () => ({
           selectedStreamFields: [
             { name: "field1", isSchemaField: true, streams: ["stream1"] },
             { name: "field2", isSchemaField: true, streams: ["stream1"] },
-            { name: "field3", isSchemaField: false, streams: ["stream1", "stream2"] }
+            { name: "field3", isSchemaField: false, streams: ["stream1", "stream2"] },
           ],
           selectedStream: ["stream1"],
           selectedFields: ["field1", "field2"],
-          streamType: "logs"
+          streamType: "logs",
         },
         originalDataCache: {},
-        queryType: "logs"
+        queryType: "logs",
       },
       meta: {
-        selectedTraceStream: ""
-      }
+        selectedTraceStream: "",
+      },
     },
     searchAggData: {
-      hasAggregation: false
-    }
-  })
+      hasAggregation: false,
+    },
+  }),
 }));
 
 const mockGetStreams = vi.fn().mockResolvedValue({
-  list: [
-    { name: "trace-stream1" },
-    { name: "trace-stream2" }
-  ]
+  list: [{ name: "trace-stream1" }, { name: "trace-stream2" }],
 });
 
 vi.mock("@/composables/useStreams", () => ({
   default: () => ({
-    getStreams: mockGetStreams
-  })
+    getStreams: mockGetStreams,
+  }),
 }));
 
 // Mock router
@@ -79,42 +123,37 @@ const mockRouter = {
   currentRoute: {
     value: {
       name: "logs",
-      query: {}
-    }
-  }
+      query: {},
+    },
+  },
 };
 
 vi.mock("vue-router", () => ({
-  useRouter: () => mockRouter
+  useRouter: () => mockRouter,
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn()
-};
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar
-  };
-});
+// Mock Toast
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(),
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
 
 // Mock window methods
 Object.assign(window, {
   getSelection: vi.fn(() => ({
-    toString: vi.fn(() => "selected text")
+    toString: vi.fn(() => "selected text"),
   })),
   addEventListener: vi.fn(),
-  removeEventListener: vi.fn()
+  removeEventListener: vi.fn(),
 });
 
 // Mock navigator clipboard
 Object.assign(navigator, {
   clipboard: {
-    writeText: vi.fn()
-  }
+    writeText: vi.fn(),
+  },
 });
 
 describe("JsonPreview Component", () => {
@@ -123,38 +162,36 @@ describe("JsonPreview Component", () => {
     _o2_id: "test-id-123",
     _timestamp: 1680246906650420,
     field1: "value1",
-    field2: "value2", 
+    field2: "value2",
     field3: 123,
     nested: {
-      key: "nested value"
-    }
+      key: "nested value",
+    },
   };
-
-  const mockTracesStreams = ["trace-stream1", "trace-stream2"];
 
   beforeEach(() => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Reset mock functions
     mockGetStreams.mockClear();
     mockGetStreams.mockResolvedValue({
-      list: []
+      list: [],
     });
-    
+
     // Mock store state
     store.state.theme = "dark";
     store.state.hiddenMenus = new Set();
     store.state.organizationData = {
       organizationSettings: {
-        trace_id_field_name: "trace_id"
-      }
+        trace_id_field_name: "trace_id",
+      },
     };
     store.state.selectedOrganization = {
-      identifier: "test-org"
+      identifier: "test-org",
     };
     store.state.zoConfig = {
-      ai_enabled: true
+      ai_enabled: true,
     };
 
     wrapper = mount(JsonPreview, {
@@ -162,7 +199,7 @@ describe("JsonPreview Component", () => {
         value: mockValue,
         showCopyButton: true,
         mode: "sidebar",
-        streamName: "test-stream"
+        streamName: "test-stream",
       },
       global: {
         plugins: [i18n],
@@ -170,35 +207,32 @@ describe("JsonPreview Component", () => {
           store,
         },
         stubs: {
-          'app-tabs': {
-            template: '<div><slot></slot></div>',
-            props: ['tabs', 'activeTab'],
-            emits: ['update:activeTab']
+          AppTabs: {
+            template: "<div><slot></slot></div>",
+            props: ["tabs", "activeTab"],
+            emits: ["update:activeTab"],
           },
-          'code-query-editor': {
+          CodeQueryEditor: {
             template: '<div class="mock-code-editor"></div>',
             methods: {
-              formatDocument: vi.fn()
-            }
+              formatDocument: vi.fn(),
+            },
           },
-          'q-btn': true,
-          'q-btn-dropdown': true,
-          'q-list': true,
-          'q-item': true,
-          'q-item-section': true,
-          'q-item-label': true,
-          'q-select': true,
-          'q-icon': true,
-          'q-img': true,
-          'q-input': true,
-          'q-dialog': true,
-          'q-card': true,
-          'q-card-section': true,
-          'q-card-actions': true,
-          'q-spinner-hourglass': true,
-          'EqualIcon': true,
-          'NotEqualIcon': true
-        }
+          ODialog: ODialogStub,
+          OButton: true,
+          ODropdown: true,
+          ODropdownItem: true,
+          ODropdownSeparator: true,
+          OSelect: true,
+          OIcon: true,
+          OInput: true,
+          OSpinner: true,
+          OTooltip: true,
+          LogsHighLighting: true,
+          ChunkedContent: true,
+          EqualIcon: true,
+          NotEqualIcon: true,
+        },
       },
     });
   });
@@ -219,47 +253,44 @@ describe("JsonPreview Component", () => {
     });
 
     it("should initialize with correct props", () => {
-      expect(wrapper.props('value')).toEqual(mockValue);
-      expect(wrapper.props('showCopyButton')).toBe(true);
-      expect(wrapper.props('mode')).toBe("sidebar");
-      expect(wrapper.props('streamName')).toBe("test-stream");
+      expect(wrapper.props("value")).toEqual(mockValue);
+      expect(wrapper.props("showCopyButton")).toBe(true);
+      expect(wrapper.props("mode")).toBe("sidebar");
+      expect(wrapper.props("streamName")).toBe("test-stream");
     });
 
     it("should have default prop values", () => {
       const testWrapper = mount(JsonPreview, {
         props: {
-          value: {}
+          value: {},
         },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'app-tabs': true,
-            'code-query-editor': true,
-            'q-btn': true,
-            'q-btn-dropdown': true,
-            'q-list': true,
-            'q-item': true,
-            'q-item-section': true,
-            'q-item-label': true,
-            'q-select': true,
-            'q-icon': true,
-            'q-img': true,
-            'q-input': true,
-            'q-dialog': true,
-            'q-card': true,
-            'q-card-section': true,
-            'q-card-actions': true,
-            'q-spinner-hourglass': true,
-            'EqualIcon': true,
-            'NotEqualIcon': true
-          }
+            AppTabs: true,
+            CodeQueryEditor: true,
+            ODialog: ODialogStub,
+            OButton: true,
+            ODropdown: true,
+            ODropdownItem: true,
+            ODropdownSeparator: true,
+            OSelect: true,
+            OIcon: true,
+            OInput: true,
+            OSpinner: true,
+            OTooltip: true,
+            LogsHighLighting: true,
+            ChunkedContent: true,
+            EqualIcon: true,
+            NotEqualIcon: true,
+          },
         },
       });
-      
-      expect(testWrapper.props('showCopyButton')).toBe(true);
-      expect(testWrapper.props('mode')).toBe("sidebar");
-      expect(testWrapper.props('streamName')).toBe("");
+
+      expect(testWrapper.props("showCopyButton")).toBe(true);
+      expect(testWrapper.props("mode")).toBe("sidebar");
+      expect(testWrapper.props("streamName")).toBe("");
       testWrapper.unmount();
     });
 
@@ -287,7 +318,7 @@ describe("JsonPreview Component", () => {
 
     it("should return empty filteredTabs when _o2_id is undefined", async () => {
       await wrapper.setProps({
-        value: { field1: "value1" }
+        value: { field1: "value1" },
       });
       expect(wrapper.vm.filteredTabs).toHaveLength(0);
     });
@@ -330,40 +361,46 @@ describe("JsonPreview Component", () => {
   describe("Event Emitters", () => {
     it("should emit copy event with flattened data", () => {
       wrapper.vm.copyLogToClipboard();
-      expect(wrapper.emitted('copy')).toBeTruthy();
-      expect(wrapper.emitted('copy')[0]).toEqual([mockValue]);
+      expect(wrapper.emitted("copy")).toBeTruthy();
+      expect(wrapper.emitted("copy")[0]).toEqual([mockValue]);
     });
 
     it("should emit copy event with unflattened data", async () => {
       wrapper.vm.activeTab = "unflattened";
       wrapper.vm.unflattendData = '{"test": "data"}';
       wrapper.vm.copyLogToClipboard();
-      expect(wrapper.emitted('copy')).toBeTruthy();
-      expect(wrapper.emitted('copy')[0]).toEqual([{"test": "data"}]);
+      expect(wrapper.emitted("copy")).toBeTruthy();
+      expect(wrapper.emitted("copy")[0]).toEqual([{ test: "data" }]);
     });
 
     it("should emit addSearchTerm event", () => {
       wrapper.vm.addSearchTerm("field1", "value1", "include");
-      expect(wrapper.emitted('addSearchTerm')).toBeTruthy();
-      expect(wrapper.emitted('addSearchTerm')[0]).toEqual(["field1", "value1", "include"]);
+      expect(wrapper.emitted("addSearchTerm")).toBeTruthy();
+      expect(wrapper.emitted("addSearchTerm")[0]).toEqual(["field1", "value1", "include"]);
     });
 
     it("should emit addFieldToTable event", () => {
       wrapper.vm.addFieldToTable("field1");
-      expect(wrapper.emitted('addFieldToTable')).toBeTruthy();
-      expect(wrapper.emitted('addFieldToTable')[0]).toEqual(["field1"]);
+      expect(wrapper.emitted("addFieldToTable")).toBeTruthy();
+      expect(wrapper.emitted("addFieldToTable")[0]).toEqual(["field1"]);
     });
 
-    it("should emit view-trace event", () => {
+    // Regression — issue #13708: the event used to be emitted with no payload,
+    // so listeners bound by reference (`@view-trace="redirectToTraces"`) got
+    // `undefined` and threw "Cannot read properties of undefined (reading
+    // '_timestamp')". The log being previewed must ride along, exactly like
+    // the sibling `show-correlation` emit does.
+    it("should emit view-trace event with the previewed log", () => {
       wrapper.vm.redirectToTraces();
-      expect(wrapper.emitted('view-trace')).toBeTruthy();
+      expect(wrapper.emitted("view-trace")).toBeTruthy();
+      expect(wrapper.emitted("view-trace")[0]).toEqual([mockValue]);
     });
 
     it("should emit sendToAiChat event", () => {
       wrapper.vm.sendToAiChat("test data");
-      expect(wrapper.emitted('sendToAiChat')).toBeTruthy();
-      expect(wrapper.emitted('sendToAiChat')[0]).toEqual(["test data", true]); // includes append parameter
-      expect(wrapper.emitted('closeTable')).toBeTruthy();
+      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
+      expect(wrapper.emitted("sendToAiChat")[0]).toEqual(["test data", true]); // includes append parameter
+      expect(wrapper.emitted("closeTable")).toBeTruthy();
     });
   });
 
@@ -372,26 +409,28 @@ describe("JsonPreview Component", () => {
       const mockSearch = await import("@/services/search");
       vi.mocked(mockSearch.default.search).mockResolvedValue({
         data: {
-          hits: [{
-            _original: '{"original": "data"}'
-          }]
-        }
+          hits: [
+            {
+              _original: '{"original": "data"}',
+            },
+          ],
+        },
       });
 
       wrapper.vm.activeTab = "unflattened";
       await nextTick();
-      
+
       // After triggering the tab change, the data should be fetched and formatted
       expect(typeof wrapper.vm.unflattendData).toBe("string");
     });
 
     it("should format document after tab change to unflattened", async () => {
       wrapper.vm.queryEditorRef = {
-        formatDocument: vi.fn()
+        formatDocument: vi.fn(),
       };
-      
+
       await wrapper.vm.handleTabChange();
-      
+
       if (wrapper.vm.activeTab === "unflattened" && !wrapper.vm.loading) {
         expect(wrapper.vm.queryEditorRef.formatDocument).toHaveBeenCalled();
       }
@@ -400,9 +439,9 @@ describe("JsonPreview Component", () => {
     it("should not format document when loading", async () => {
       wrapper.vm.activeTab = "flattened"; // Set to flattened so handleTabChange doesn't trigger format
       wrapper.vm.loading = true;
-      
+
       await wrapper.vm.handleTabChange();
-      
+
       // When tab is not unflattened, handleTabChange should complete without error
       expect(wrapper.vm.activeTab).toBe("flattened");
     });
@@ -411,14 +450,14 @@ describe("JsonPreview Component", () => {
   describe("Original Data Fetching", () => {
     it("should not fetch original data when _o2_id is missing", async () => {
       await wrapper.setProps({
-        value: { field1: "value1" }
+        value: { field1: "value1" },
       });
-      
+
       const mockSearch = await import("@/services/search");
       const searchSpy = vi.mocked(mockSearch.default.search);
-      
+
       await wrapper.vm.getOriginalData();
-      
+
       expect(searchSpy).not.toHaveBeenCalled();
     });
 
@@ -429,12 +468,12 @@ describe("JsonPreview Component", () => {
 
     it("should not fetch original data when multiple streams selected", async () => {
       wrapper.vm.searchObj.data.stream.selectedStream = ["stream1", "stream2"];
-      
+
       const mockSearch = await import("@/services/search");
       const searchSpy = vi.mocked(mockSearch.default.search);
-      
+
       await wrapper.vm.getOriginalData();
-      
+
       expect(searchSpy).not.toHaveBeenCalled();
     });
 
@@ -442,9 +481,9 @@ describe("JsonPreview Component", () => {
       const cacheKey = `${mockValue._o2_id}_${mockValue._timestamp}`;
       const cachedData = '{"cached": "data"}';
       wrapper.vm.searchObj.data.originalDataCache[cacheKey] = cachedData;
-      
+
       await wrapper.vm.getOriginalData();
-      
+
       expect(wrapper.vm.unflattendData).toBe(cachedData);
     });
 
@@ -452,15 +491,17 @@ describe("JsonPreview Component", () => {
       const mockSearch = await import("@/services/search");
       const mockResponse = {
         data: {
-          hits: [{
-            _original: '{"original": "data"}'
-          }]
-        }
+          hits: [
+            {
+              _original: '{"original": "data"}',
+            },
+          ],
+        },
       };
       vi.mocked(mockSearch.default.search).mockResolvedValue(mockResponse);
-      
+
       await wrapper.vm.getOriginalData();
-      
+
       expect(wrapper.vm.loading).toBe(false);
       expect(wrapper.vm.unflattendData).toContain('"original": "data"');
     });
@@ -469,15 +510,13 @@ describe("JsonPreview Component", () => {
       const mockSearch = await import("@/services/search");
       const error = new Error("Fetch failed");
       vi.mocked(mockSearch.default.search).mockRejectedValue(error);
-      
+
       await wrapper.vm.getOriginalData();
-      
+
       expect(wrapper.vm.loading).toBe(false);
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Failed to get the Original data",
-        color: "negative",
-        position: "bottom",
-        timeout: 1500,
+        variant: "error",
       });
     });
 
@@ -486,19 +525,17 @@ describe("JsonPreview Component", () => {
       const error = {
         response: {
           data: {
-            message: "Custom error message"
-          }
-        }
+            message: "Custom error message",
+          },
+        },
       };
       vi.mocked(mockSearch.default.search).mockRejectedValue(error);
-      
+
       await wrapper.vm.getOriginalData();
-      
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
+
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Custom error message",
-        color: "negative",
-        position: "bottom",
-        timeout: 1500,
+        variant: "error",
       });
     });
   });
@@ -506,10 +543,7 @@ describe("JsonPreview Component", () => {
   describe("Traces Functionality", () => {
     it("should get traces streams successfully", async () => {
       mockGetStreams.mockResolvedValue({
-        list: [
-          { name: "trace-stream1" },
-          { name: "trace-stream2" }
-        ]
+        list: [{ name: "trace-stream1" }, { name: "trace-stream2" }],
       });
 
       await wrapper.vm.getTracesStreams();
@@ -532,7 +566,7 @@ describe("JsonPreview Component", () => {
 
     it("should set default trace stream when none selected", async () => {
       mockGetStreams.mockResolvedValue({
-        list: [{ name: "default-stream" }]
+        list: [{ name: "default-stream" }],
       });
 
       wrapper.vm.searchObj.meta.selectedTraceStream = "";
@@ -543,25 +577,25 @@ describe("JsonPreview Component", () => {
 
     it("should filter traces stream options", () => {
       wrapper.vm.tracesStreams = ["trace-stream1", "trace-stream2", "other-stream"];
-      
+
       wrapper.vm.filterStreamFn("trace");
-      
+
       expect(wrapper.vm.filteredTracesStreamOptions).toEqual(["trace-stream1", "trace-stream2"]);
     });
 
     it("should filter traces stream options case insensitive", () => {
       wrapper.vm.tracesStreams = ["Trace-Stream1", "trace-stream2", "Other-Stream"];
-      
+
       wrapper.vm.filterStreamFn("TRACE");
-      
+
       expect(wrapper.vm.filteredTracesStreamOptions).toEqual(["Trace-Stream1", "trace-stream2"]);
     });
 
     it("should handle empty filter", () => {
       wrapper.vm.tracesStreams = ["stream1", "stream2"];
-      
+
       wrapper.vm.filterStreamFn("");
-      
+
       expect(wrapper.vm.filteredTracesStreamOptions).toEqual(["stream1", "stream2"]);
     });
   });
@@ -570,7 +604,7 @@ describe("JsonPreview Component", () => {
     it("should show view trace button when conditions are met", () => {
       store.state.hiddenMenus = new Set();
       wrapper.vm.setViewTraceBtn();
-      
+
       // setViewTraceBtn function should execute without errors
       expect(typeof wrapper.vm.setViewTraceBtn).toBe("function");
     });
@@ -578,23 +612,23 @@ describe("JsonPreview Component", () => {
     it("should hide view trace button when traces menu is hidden", () => {
       store.state.hiddenMenus = new Set(["traces"]);
       wrapper.vm.setViewTraceBtn();
-      
+
       expect(wrapper.vm.showViewTraceBtn).toBe(false);
     });
 
     it("should show view trace button with trace_id field", async () => {
       const valueWithTraceId = {
         ...mockValue,
-        trace_id: "test-trace-id"
+        trace_id: "test-trace-id",
       };
-      
+
       await wrapper.setProps({
-        value: valueWithTraceId
+        value: valueWithTraceId,
       });
-      
+
       store.state.hiddenMenus = new Set();
       wrapper.vm.setViewTraceBtn();
-      
+
       // showViewTraceBtn should be defined after calling setViewTraceBtn
       expect(wrapper.vm.showViewTraceBtn).toBeDefined();
     });
@@ -603,17 +637,17 @@ describe("JsonPreview Component", () => {
   describe("Field Operations", () => {
     it("should return correct label for adding field to table", () => {
       wrapper.vm.searchObj.data.stream.selectedFields = ["field1"];
-      
+
       const label = wrapper.vm.addOrRemoveLabel("field2");
-      
+
       expect(label).toContain("Add field");
     });
 
     it("should return correct label for removing field from table", () => {
       wrapper.vm.searchObj.data.stream.selectedFields = ["field1", "field2"];
-      
+
       const label = wrapper.vm.addOrRemoveLabel("field1");
-      
+
       expect(label).toContain("Remove field");
     });
   });
@@ -622,41 +656,35 @@ describe("JsonPreview Component", () => {
     it("should copy selected text successfully", async () => {
       wrapper.vm.selectedText = "test text";
       vi.mocked(navigator.clipboard.writeText).mockResolvedValue(undefined);
-      
+
       await wrapper.vm.copySelectedText();
-      
+
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test text");
       expect(wrapper.vm.showMenu).toBe(false);
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        message: "Text copied to clipboard",
-        color: "positive",
-        position: "bottom",
-        timeout: 1500,
-      });
     });
 
     it("should handle copy text failure", async () => {
       wrapper.vm.selectedText = "test text";
       const writeTextMock = vi.mocked(navigator.clipboard.writeText);
       writeTextMock.mockRejectedValue(new Error("Copy failed"));
-      
+
       await wrapper.vm.copySelectedText();
-      
+
       // The component should handle the error - check that writeText was called
       expect(writeTextMock).toHaveBeenCalledWith("test text");
     });
 
     it("should not copy when no text selected", async () => {
       wrapper.vm.selectedText = "";
-      
+
       await wrapper.vm.copySelectedText();
-      
+
       expect(navigator.clipboard.writeText).not.toHaveBeenCalled();
     });
 
     it("should handle create regex from context menu", () => {
       wrapper.vm.handleCreateRegex();
-      
+
       expect(wrapper.vm.showMenu).toBe(false);
       expect(wrapper.vm.typeOfRegexPattern).toBe(true);
     });
@@ -666,11 +694,11 @@ describe("JsonPreview Component", () => {
     it("should create regex pattern from logs", () => {
       const field = "email";
       const value = "test@example.com";
-      
+
       wrapper.vm.createRegexPatternFromLogs(field, value);
-      
-      expect(wrapper.emitted('closeTable')).toBeTruthy();
-      expect(wrapper.emitted('sendToAiChat')).toBeTruthy();
+
+      expect(wrapper.emitted("closeTable")).toBeTruthy();
+      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: "/settings/regex_patterns",
         query: {
@@ -683,12 +711,12 @@ describe("JsonPreview Component", () => {
     it("should confirm regex pattern type", () => {
       wrapper.vm.selectedText = "test@email.com";
       wrapper.vm.regexPatternType = "email";
-      
+
       wrapper.vm.confirmRegexPatternType();
-      
+
       expect(wrapper.vm.typeOfRegexPattern).toBe(false);
-      expect(wrapper.emitted('closeTable')).toBeTruthy();
-      expect(wrapper.emitted('sendToAiChat')).toBeTruthy();
+      expect(wrapper.emitted("closeTable")).toBeTruthy();
+      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: "/settings/regex_patterns",
         query: {
@@ -707,37 +735,33 @@ describe("JsonPreview Component", () => {
 
     it("should not add event listeners when enterprise disabled", () => {
       vi.clearAllMocks();
-      const config = { isEnterprise: "false" };
-      
+
       mount(JsonPreview, {
         props: { value: mockValue },
         global: {
           plugins: [i18n],
           provide: { store },
           stubs: {
-            'app-tabs': true,
-            'code-query-editor': true,
-            'q-btn': true,
-            'q-btn-dropdown': true,
-            'q-list': true,
-            'q-item': true,
-            'q-item-section': true,
-            'q-item-label': true,
-            'q-select': true,
-            'q-icon': true,
-            'q-img': true,
-            'q-input': true,
-            'q-dialog': true,
-            'q-card': true,
-            'q-card-section': true,
-            'q-card-actions': true,
-            'q-spinner-hourglass': true,
-            'EqualIcon': true,
-            'NotEqualIcon': true
-          }
+            AppTabs: true,
+            CodeQueryEditor: true,
+            ODialog: ODialogStub,
+            OButton: true,
+            ODropdown: true,
+            ODropdownItem: true,
+            ODropdownSeparator: true,
+            OSelect: true,
+            OIcon: true,
+            OInput: true,
+            OSpinner: true,
+            OTooltip: true,
+            LogsHighLighting: true,
+            ChunkedContent: true,
+            EqualIcon: true,
+            NotEqualIcon: true,
+          },
         },
       });
-      
+
       // Event listeners should not be called for non-enterprise
     });
   });
@@ -763,26 +787,26 @@ describe("JsonPreview Component", () => {
     it("should handle different value types", async () => {
       const objectValue = { test: "string" };
       await wrapper.setProps({
-        value: objectValue
+        value: objectValue,
       });
-      
-      expect(wrapper.props('value')).toEqual(objectValue);
+
+      expect(wrapper.props("value")).toEqual(objectValue);
     });
 
     it("should handle boolean props", async () => {
       await wrapper.setProps({
-        showCopyButton: false
+        showCopyButton: false,
       });
-      
-      expect(wrapper.props('showCopyButton')).toBe(false);
+
+      expect(wrapper.props("showCopyButton")).toBe(false);
     });
 
     it("should handle different modes", async () => {
       await wrapper.setProps({
-        mode: "expanded"
+        mode: "expanded",
       });
-      
-      expect(wrapper.props('mode')).toBe("expanded");
+
+      expect(wrapper.props("mode")).toBe("expanded");
     });
   });
 
@@ -790,7 +814,7 @@ describe("JsonPreview Component", () => {
     it("should handle missing trace field gracefully", () => {
       store.state.organizationData.organizationSettings = {};
       wrapper.vm.setViewTraceBtn();
-      
+
       // Function should execute without throwing errors
       expect(typeof wrapper.vm.setViewTraceBtn).toBe("function");
     });
@@ -798,14 +822,14 @@ describe("JsonPreview Component", () => {
     it("should handle empty streams gracefully", () => {
       wrapper.vm.tracesStreams = [];
       wrapper.vm.filterStreamFn("test");
-      
+
       expect(wrapper.vm.filteredTracesStreamOptions).toEqual([]);
     });
 
     it("should handle missing selectedText in regex creation", () => {
       wrapper.vm.selectedText = "";
       wrapper.vm.regexPatternType = "email";
-      
+
       expect(() => wrapper.vm.confirmRegexPatternType()).not.toThrow();
     });
   });
@@ -836,30 +860,30 @@ describe("JsonPreview Component", () => {
         _timestamp: 1680246906650420,
         level1: {
           level2: {
-            level3: "deep value"
-          }
-        }
+            level3: "deep value",
+          },
+        },
       };
-      
+
       await wrapper.setProps({
-        value: complexValue
+        value: complexValue,
       });
-      
-      expect(wrapper.props('value')).toEqual(complexValue);
+
+      expect(wrapper.props("value")).toEqual(complexValue);
     });
 
     it("should handle array values", async () => {
       const arrayValue = {
         _o2_id: "array-id",
         _timestamp: 1680246906650420,
-        items: [1, 2, 3, 4, 5]
+        items: [1, 2, 3, 4, 5],
       };
-      
+
       await wrapper.setProps({
-        value: arrayValue
+        value: arrayValue,
       });
-      
-      expect(wrapper.props('value')).toEqual(arrayValue);
+
+      expect(wrapper.props("value")).toEqual(arrayValue);
     });
 
     it("should handle null and undefined values", async () => {
@@ -867,22 +891,22 @@ describe("JsonPreview Component", () => {
         _o2_id: "null-id",
         _timestamp: 1680246906650420,
         nullField: null,
-        undefinedField: undefined
+        undefinedField: undefined,
       };
-      
+
       await wrapper.setProps({
-        value: nullValue
+        value: nullValue,
       });
-      
-      expect(wrapper.props('value')).toEqual(nullValue);
+
+      expect(wrapper.props("value")).toEqual(nullValue);
     });
 
     it("should handle empty objects", async () => {
       await wrapper.setProps({
-        value: {}
+        value: {},
       });
-      
-      expect(wrapper.props('value')).toEqual({});
+
+      expect(wrapper.props("value")).toEqual({});
     });
   });
 
@@ -894,7 +918,7 @@ describe("JsonPreview Component", () => {
 
     it("should handle missing organization settings", () => {
       store.state.organizationData.organizationSettings = undefined;
-      
+
       expect(() => wrapper.vm.setViewTraceBtn()).not.toThrow();
     });
 
@@ -904,7 +928,6 @@ describe("JsonPreview Component", () => {
   });
 
   describe("Performance Considerations", () => {
-
     it("should handle rapid tab changes", async () => {
       wrapper.vm.activeTab = "unflattened";
       await nextTick();
@@ -912,8 +935,485 @@ describe("JsonPreview Component", () => {
       await nextTick();
       wrapper.vm.activeTab = "unflattened";
       await nextTick();
-      
+
       expect(wrapper.vm.activeTab).toBe("unflattened");
+    });
+  });
+
+  describe("Regex Pattern ODialog", () => {
+    it("renders ODialog when enterprise is enabled", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.exists()).toBe(true);
+    });
+
+    it("forwards size 'lg' to ODialog", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("size")).toBe("lg");
+    });
+
+    it("forwards the title prop to ODialog", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("title")).toBe("What is the type of regex pattern you want to create?");
+    });
+
+    it("forwards localized primary and secondary button labels to ODialog", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("primaryButtonLabel")).toBeTruthy();
+      expect(dialog.props("secondaryButtonLabel")).toBeTruthy();
+    });
+
+    it("forwards typeOfRegexPattern false to the open prop initially", () => {
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(false);
+    });
+
+    it("forwards typeOfRegexPattern true to the open prop after toggle", async () => {
+      wrapper.vm.typeOfRegexPattern = true;
+      await nextTick();
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(true);
+    });
+
+    it("closes the dialog on click:secondary", async () => {
+      wrapper.vm.typeOfRegexPattern = true;
+      await nextTick();
+
+      const dialog = wrapper.findComponent(ODialogStub);
+      await dialog.vm.$emit("click:secondary");
+      await nextTick();
+
+      expect(wrapper.vm.typeOfRegexPattern).toBe(false);
+    });
+
+    it("invokes confirmRegexPatternType on click:primary", async () => {
+      wrapper.vm.typeOfRegexPattern = true;
+      wrapper.vm.selectedText = "user@example.com";
+      wrapper.vm.regexPatternType = "email";
+      await nextTick();
+
+      const dialog = wrapper.findComponent(ODialogStub);
+      await dialog.vm.$emit("click:primary");
+      await nextTick();
+
+      expect(wrapper.vm.typeOfRegexPattern).toBe(false);
+      expect(wrapper.emitted("closeTable")).toBeTruthy();
+      expect(wrapper.emitted("sendToAiChat")).toBeTruthy();
+      expect(mockRouter.push).toHaveBeenCalledWith({
+        path: "/settings/regex_patterns",
+        query: {
+          org_identifier: "test-org",
+          from: "logs",
+        },
+      });
+    });
+
+    it("opens the regex dialog after handleCreateRegex via context menu", async () => {
+      wrapper.vm.handleCreateRegex();
+      await nextTick();
+
+      const dialog = wrapper.findComponent(ODialogStub);
+      expect(dialog.props("open")).toBe(true);
+      expect(wrapper.vm.showMenu).toBe(false);
+    });
+  });
+
+  describe("Cross-Linking Functionality", () => {
+    const mockCrossLinks = {
+      stream_links: [
+        {
+          name: "View Trace",
+          url: "https://traces.example.com/${field.__value}",
+          fields: [{ name: "trace_id", alias: "field1" }],
+        },
+      ],
+      org_links: [
+        {
+          name: "View Dashboard",
+          url: "https://dashboard.example.com/${field.__value}",
+          fields: [{ name: "host", alias: "field2" }],
+        },
+      ],
+    };
+
+    it("should return empty array when enable_cross_linking is false", () => {
+      store.state.zoConfig.enable_cross_linking = false;
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toEqual([]);
+    });
+
+    it("should return empty array when crossLinks is undefined", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = undefined;
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toEqual([]);
+    });
+
+    it("should return empty array when crossLinks is null", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = null;
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toEqual([]);
+    });
+
+    it("should return matching stream links with resolved URLs", async () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = mockCrossLinks;
+
+      await wrapper.setProps({
+        value: {
+          ...mockValue,
+          field1: "trace-abc-123",
+          field2: "host-xyz",
+        },
+      });
+
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("View Trace");
+      expect(result[0].resolvedUrl).toBe("https://traces.example.com/trace-abc-123");
+    });
+
+    it("should fall back to org links when stream does not cover the field", async () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = mockCrossLinks;
+
+      await wrapper.setProps({
+        value: {
+          ...mockValue,
+          field1: "trace-abc-123",
+          field2: "host-xyz",
+        },
+      });
+
+      const result = wrapper.vm.getCrossLinksForField("field2");
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("View Dashboard");
+      expect(result[0].resolvedUrl).toBe("https://dashboard.example.com/host-xyz");
+    });
+
+    it("should prioritize stream links over org links for same field", async () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = {
+        stream_links: [
+          {
+            name: "Stream Link",
+            url: "https://stream.example.com/${field.__value}",
+            fields: [{ name: "trace_id", alias: "field1" }],
+          },
+        ],
+        org_links: [
+          {
+            name: "Org Link",
+            url: "https://org.example.com/${field.__value}",
+            fields: [{ name: "trace_id", alias: "field1" }],
+          },
+        ],
+      };
+
+      await wrapper.setProps({
+        value: { ...mockValue, field1: "val123" },
+      });
+
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toHaveLength(1);
+      expect(result[0].name).toBe("Stream Link");
+    });
+
+    it("should return empty when field has no matching links", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = mockCrossLinks;
+      const result = wrapper.vm.getCrossLinksForField("nonexistent_field");
+      expect(result).toEqual([]);
+    });
+
+    it("should call window.open when openCrossLink is called", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      wrapper.vm.openCrossLink("https://example.com/trace/123");
+
+      // `noopener,noreferrer` stops the opened tab reaching back via
+      // window.opener and strips the referrer.
+      expect(openSpy).toHaveBeenCalledWith(
+        "https://example.com/trace/123",
+        "_blank",
+        "noopener,noreferrer",
+      );
+      openSpy.mockRestore();
+    });
+
+    // See the DetailTable twin: the RESOLVED url is guarded, because links
+    // saved before validation existed are still in the DB and a substituted
+    // field VALUE can carry a hostile scheme.
+    it("does not open a cross-link whose resolved url is unsafe", () => {
+      const openSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+      for (const hostile of [
+        "javascript:alert(document.cookie)",
+        "data:text/html,<script>alert(1)</script>",
+        "file:///etc/passwd",
+        "http://",
+        "not a url",
+      ]) {
+        wrapper.vm.openCrossLink(hostile);
+      }
+
+      expect(openSpy).not.toHaveBeenCalled();
+      openSpy.mockRestore();
+    });
+
+    it("should encode URI components in resolved URLs", async () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = {
+        stream_links: [
+          {
+            name: "Encoded",
+            url: "https://example.com/search?q=${field.__value}",
+            fields: [{ name: "trace_id", alias: "field1" }],
+          },
+        ],
+        org_links: [],
+      };
+
+      await wrapper.setProps({
+        value: { ...mockValue, field1: "hello world&foo=bar" },
+      });
+
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toHaveLength(1);
+      expect(result[0].resolvedUrl).toBe("https://example.com/search?q=hello%20world%26foo%3Dbar");
+    });
+
+    it("should resolve all 6 fixed variables in URL template", async () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = {
+        stream_links: [
+          {
+            name: "Full Template",
+            url: "https://example.com/${field.__name}/${field.__value}?from=${start_time}&to=${end_time}",
+            fields: [{ name: "trace_id", alias: "field1" }],
+          },
+        ],
+        org_links: [],
+      };
+
+      await wrapper.setProps({
+        value: { ...mockValue, field1: "val123" },
+      });
+
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toHaveLength(1);
+      // field.__name = originalFieldName = "trace_id", field.__value = "val123"
+      expect(result[0].resolvedUrl).toContain("trace_id");
+      expect(result[0].resolvedUrl).toContain("val123");
+    });
+
+    it("should handle empty crossLinks object", () => {
+      store.state.zoConfig.enable_cross_linking = true;
+      wrapper.vm.searchObj.data.crossLinks = {
+        stream_links: [],
+        org_links: [],
+      };
+
+      const result = wrapper.vm.getCrossLinksForField("field1");
+      expect(result).toEqual([]);
+    });
+  });
+
+  // The View Trace action is shared with DetailTable's row-detail drawer, which
+  // renders its own copy in the drawer header (hence `hideViewTrace`) and fills
+  // the previewed record in an async created() hook, so the preview mounts with
+  // an empty `value` and only receives the record later (hence the watcher).
+  describe("View Trace action visibility", () => {
+    const streamSelectSelector = '[data-test="log-search-index-list-select-stream"]';
+    const viewTraceBtnSelector = '[data-test="trace-view-logs-btn"]';
+    const recordWithTraceId = { ...mockValue, trace_id: "test-trace-id" };
+
+    let traceWrapper: any = null;
+
+    const mountPreview = (props: Record<string, any> = {}) =>
+      mount(JsonPreview, {
+        props: { value: recordWithTraceId, mode: "sidebar", ...props },
+        global: {
+          plugins: [i18n],
+          provide: { store },
+          stubs: {
+            AppTabs: true,
+            CodeQueryEditor: true,
+            ODialog: ODialogStub,
+            OButton: true,
+            ODropdown: true,
+            ODropdownItem: true,
+            ODropdownSeparator: true,
+            OSelect: true,
+            OIcon: true,
+            OInput: true,
+            OSpinner: true,
+            OTooltip: true,
+            LogsHighLighting: true,
+            ChunkedContent: true,
+            EqualIcon: true,
+            NotEqualIcon: true,
+          },
+        },
+      });
+
+    beforeEach(() => {
+      // Everything the gate needs: traces menu visible, service streams off,
+      // and traces streams available for the picker.
+      store.state.hiddenMenus = new Set();
+      store.state.zoConfig.service_streams_enabled = false;
+      mockGetStreams.mockResolvedValue({
+        list: [{ name: "trace-stream1" }, { name: "trace-stream2" }],
+      });
+    });
+
+    afterEach(() => {
+      traceWrapper?.unmount();
+      traceWrapper = null;
+    });
+
+    describe("hideViewTrace prop", () => {
+      it("should default hideViewTrace to false", () => {
+        traceWrapper = mountPreview();
+
+        expect(traceWrapper.props("hideViewTrace")).toBe(false);
+      });
+
+      it("should render the stream picker and the button when the gate passes", async () => {
+        traceWrapper = mountPreview();
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
+        expect(traceWrapper.vm.tracesStreams).toEqual(["trace-stream1", "trace-stream2"]);
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+      });
+
+      it("should hide the stream picker and the button when hideViewTrace is true", async () => {
+        traceWrapper = mountPreview({ hideViewTrace: true });
+        await flushPromises();
+
+        // The gate itself still passes — only the prop hides the action.
+        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
+        expect(traceWrapper.vm.tracesStreams.length).toBeGreaterThan(0);
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+
+      it("should stay hidden with hideViewTrace even when value arrives late", async () => {
+        traceWrapper = mountPreview({ value: {}, hideViewTrace: true });
+        await flushPromises();
+
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+    });
+
+    describe("value watcher", () => {
+      it("should hide the action while value is still empty", async () => {
+        traceWrapper = mountPreview({ value: {} });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeFalsy();
+        expect(mockGetStreams).not.toHaveBeenCalled();
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+
+      it("should show the action once value is populated after mount", async () => {
+        traceWrapper = mountPreview({ value: {} });
+        await flushPromises();
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeTruthy();
+        expect(mockGetStreams).toHaveBeenCalledWith("traces", false);
+        expect(traceWrapper.vm.tracesStreams).toEqual(["trace-stream1", "trace-stream2"]);
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+      });
+
+      it("should render the action while the traces streams are still loading", async () => {
+        let resolveStreams: (value: any) => void = () => {};
+        mockGetStreams.mockImplementation(
+          () =>
+            new Promise((resolve) => {
+              resolveStreams = resolve;
+            }),
+        );
+
+        traceWrapper = mountPreview({ value: {} });
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await nextTick();
+
+        // No streams have arrived yet: the loading flag alone keeps it rendered.
+        expect(traceWrapper.vm.tracesStreams).toEqual([]);
+        expect(traceWrapper.vm.isTracesStreamsLoading).toBe(true);
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(true);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+
+        resolveStreams({ list: [{ name: "trace-stream1" }] });
+        await flushPromises();
+
+        expect(traceWrapper.vm.isTracesStreamsLoading).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+      });
+
+      it("should hide the action again when value is emptied", async () => {
+        traceWrapper = mountPreview();
+        await flushPromises();
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+
+        await traceWrapper.setProps({ value: {} });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeFalsy();
+        expect(traceWrapper.find(streamSelectSelector).exists()).toBe(false);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+
+      it("should hide the action when the new value carries no trace id", async () => {
+        traceWrapper = mountPreview();
+        await flushPromises();
+
+        await traceWrapper.setProps({ value: { ...mockValue } });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBeFalsy();
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
+
+      it("should not refetch the traces streams on every value change", async () => {
+        traceWrapper = mountPreview({ value: {} });
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await flushPromises();
+        expect(mockGetStreams).toHaveBeenCalledTimes(1);
+
+        await traceWrapper.setProps({
+          value: { ...recordWithTraceId, trace_id: "another-trace-id" },
+        });
+        await flushPromises();
+
+        expect(mockGetStreams).toHaveBeenCalledTimes(1);
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(true);
+      });
+
+      it("should keep the action hidden when the traces menu is hidden", async () => {
+        store.state.hiddenMenus = new Set(["traces"]);
+        traceWrapper = mountPreview({ value: {} });
+
+        await traceWrapper.setProps({ value: recordWithTraceId });
+        await flushPromises();
+
+        expect(traceWrapper.vm.showViewTraceBtn).toBe(false);
+        expect(mockGetStreams).not.toHaveBeenCalled();
+        expect(traceWrapper.find(viewTraceBtnSelector).exists()).toBe(false);
+      });
     });
   });
 });

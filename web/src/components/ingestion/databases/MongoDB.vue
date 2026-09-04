@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,24 +14,15 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<script setup lang="ts">
-import { useStore } from "vuex";
-import CopyContent from "@/components/CopyContent.vue";
-import useIngestion from "@/composables/useIngestion";
-const name = "mongoDB";
-const store = useStore();
-const { endpoint, databaseContent, databaseDocURLs } = useIngestion();
-const content = databaseContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
-const docURL = databaseDocURLs[name];
-</script>
-
 <template>
-  <div class="q-pa-sm">
-    <div class="tw:text-[16px]">
-      <CopyContent :content="content" />
-      <div class="tw:font-bold tw:pt-6 tw:pb-2">
-        Click <a :href="docURL" target="_blank" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">here</a> to check further documentation.
-      </div>
-    </div>
-  </div>
+  <DataSourceSetupCard slug="mongoDB" />
 </template>
+
+<script setup lang="ts">
+import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
+
+defineProps<{
+  currOrgIdentifier?: string;
+  currUserEmail?: string;
+}>();
+</script>

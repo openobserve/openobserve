@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,12 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { toZonedTime } from "date-fns-tz";
-import {
-  PromQLResponse,
-  ProcessedPromQLData,
-  AggregationFunction,
-} from "./types";
-import { getPromqlLegendName } from "./legendBuilder";
+import { PromQLResponse, ProcessedPromQLData, AggregationFunction } from "./types";
+import { buildPromqlSeriesNames } from "./legendBuilder";
+import { getCachedSemanticGroups } from "@/utils/semanticGroupsCache";
 
 /**
  * Preprocess PromQL responses into a common format for chart converters
@@ -40,14 +37,25 @@ export async function processPromQLData(
   const seriesLimit = panelSchema.config?.promql_series_limit || 100;
   const limitedData = applySeriesLimit(searchQueryData, seriesLimit);
 
+  // Named through the same builder the line/bar path uses, so a panel flipped
+  // from Line to Stacked keeps its legend, its tooltip and its per-series colour
+  // keys instead of reverting to the raw label set.
+  const seriesNames = buildPromqlSeriesNames(
+    limitedData.map((queryData: any, index: number) => ({
+      metrics: ((queryData?.data?.result || queryData?.result) ?? [])
+        .map((metric: any) => metric?.metric)
+        .filter(Boolean),
+      template: panelSchema.queries?.[index]?.config?.promql_legend,
+      fallback: panelSchema.queries?.[index]?.config?.promql_legend_fallback,
+    })),
+    getCachedSemanticGroups(store?.state?.selectedOrganization?.identifier ?? "") ?? [],
+  );
+
   // Collect all unique timestamps across all queries
   const allTimestamps = collectAllTimestamps(limitedData);
 
   // Format timestamps with timezone
-  const formattedTimestamps = formatTimestamps(
-    allTimestamps,
-    store.state.timezone,
-  );
+  const formattedTimestamps = formatTimestamps(allTimestamps, store.state.timezone);
 
   // Process each query
   limitedData.forEach((queryData, index) => {
@@ -59,11 +67,7 @@ export async function processPromQLData(
     }
 
     const series = resultData.map((metric: any) => {
-      // Generate series name using legend template
-      const seriesName = getPromqlLegendName(
-        metric.metric,
-        panelSchema.queries[index]?.config?.promql_legend,
-      );
+      const seriesName = seriesNames.get(metric.metric) ?? "";
 
       // Extract values (matrix has values[], vector has value)
       const values = metric.values || (metric.value ? [metric.value] : []);
@@ -148,10 +152,7 @@ function formatTimestamps(
  * @param limit - Maximum number of series to keep per query
  * @returns Limited data array
  */
-function applySeriesLimit(
-  data: PromQLResponse[],
-  limit: number,
-): PromQLResponse[] {
+function applySeriesLimit(data: PromQLResponse[], limit: number): PromQLResponse[] {
   return data.map((queryData) => {
     // Handle both standard PromQL format and OpenObserve format
     if (queryData?.data?.result) {
@@ -199,10 +200,7 @@ export function fillMissingTimestamps(
   dataObj: Record<number, string>,
   timestamps: Array<[number, Date | string]>,
 ): Array<[Date | string, string | null]> {
-  return timestamps.map(([ts, formattedTs]) => [
-    formattedTs,
-    dataObj[ts] ?? null,
-  ]);
+  return timestamps.map(([ts, formattedTs]) => [formattedTs, dataObj[ts] ?? null]);
 }
 
 /**
@@ -212,9 +210,10 @@ export function fillMissingTimestamps(
  * @param aggregation - Aggregation function to apply
  * @returns Aggregated single value
  */
+// Unknown aggregation strings from panel config fall through to the `last` default case
 export function applyAggregation(
   values: Array<[number, string]>,
-  aggregation: AggregationFunction = "last",
+  aggregation: AggregationFunction | (string & {}) = "last",
 ): number {
   if (!values || values.length === 0) return 0;
 

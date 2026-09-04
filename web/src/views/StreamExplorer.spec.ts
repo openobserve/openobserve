@@ -1,27 +1,21 @@
-// Simplified test file for StreamExplorer.vue
+// Copyright 2026 OpenObserve Inc.
+
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import { createI18n } from "vue-i18n";
 import StreamExplorer from "./StreamExplorer.vue";
 import stream from "@/services/stream";
 import search from "@/services/search";
 
-// Create i18n instance
 const i18n = createI18n({
   legacy: false,
   locale: "en",
   messages: { en: {} },
 });
 
-installQuasar({ plugins: [Notify] });
-
-// Mock services
 vi.mock("@/services/stream");
 vi.mock("@/services/search");
 
-// Mock router
 vi.mock("vue-router", () => ({
   useRouter: () => ({
     currentRoute: {
@@ -35,7 +29,6 @@ vi.mock("vue-router", () => ({
   }),
 }));
 
-// Mock vuex store
 vi.mock("vuex", () => ({
   useStore: () => ({
     state: {
@@ -45,7 +38,6 @@ vi.mock("vuex", () => ({
   }),
 }));
 
-// Mock child components
 vi.mock("@/components/logstream/explore/SearchBar.vue", () => ({
   default: {
     name: "SearchBar",
@@ -54,10 +46,17 @@ vi.mock("@/components/logstream/explore/SearchBar.vue", () => ({
   },
 }));
 
-vi.mock("@/components/logstream/explore/StreamDataTable.vue", () => ({
+vi.mock("@/lib/core/Table/OTable.vue", () => ({
   default: {
-    name: "StreamDataTable",
-    template: "<div>StreamDataTable</div>",
+    name: "OTable",
+    template: "<div>OTable</div>",
+  },
+}));
+
+vi.mock("@/components/shared/grid/NoData.vue", () => ({
+  default: {
+    name: "NoData",
+    template: "<div>NoData</div>",
   },
 }));
 
@@ -76,6 +75,7 @@ describe("StreamExplorer", () => {
     data: {
       from: 0,
       hits: [{ _timestamp: 1609459200000, log: "test log" }],
+      total: 1,
       scan_size: 1000,
       took: 50,
     },
@@ -91,7 +91,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { OTable: true },
       },
     });
 
@@ -103,7 +103,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { OTable: true },
       },
     });
 
@@ -117,14 +117,14 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { OTable: true },
       },
     });
 
     await flushPromises();
 
-    expect(wrapper.vm.tableData.columns).toHaveLength(2);
-    expect(wrapper.vm.tableData.columns[0].name).toBe("_timestamp");
+    expect(wrapper.vm.tableColumns).toHaveLength(2);
+    expect(wrapper.vm.tableColumns[0].id).toBe("_timestamp");
     wrapper.unmount();
   });
 
@@ -132,14 +132,14 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { OTable: true },
       },
     });
 
     await flushPromises();
 
     expect(search.search).toHaveBeenCalled();
-    expect(wrapper.vm.tableData.rows).toHaveLength(1);
+    expect(wrapper.vm.rows).toHaveLength(1);
     wrapper.unmount();
   });
 
@@ -147,7 +147,7 @@ describe("StreamExplorer", () => {
     const wrapper = mount(StreamExplorer, {
       global: {
         plugins: [i18n],
-        stubs: { QPage: true, SearchBar: true, StreamDataTable: true, QSpinnerHourglass: true },
+        stubs: { OTable: true },
       },
     });
 
@@ -155,6 +155,44 @@ describe("StreamExplorer", () => {
     wrapper.vm.updateQuery(newQuery);
 
     expect(wrapper.vm.queryData.query).toBe(newQuery);
+    wrapper.unmount();
+  });
+
+  it("should update currentPage on pagination change", async () => {
+    const wrapper = mount(StreamExplorer, {
+      global: {
+        plugins: [i18n],
+        stubs: { OTable: true },
+      },
+    });
+
+    wrapper.vm.onPaginationChange({ page: 3, size: 100 });
+
+    expect(wrapper.vm.currentPage).toBe(3);
+    expect(wrapper.vm.pageSize).toBe(100);
+    wrapper.unmount();
+  });
+
+  it("should reset to page 1 when time range changes", async () => {
+    const wrapper = mount(StreamExplorer, {
+      global: {
+        plugins: [i18n],
+        stubs: { OTable: true },
+      },
+    });
+
+    await flushPromises();
+
+    wrapper.vm.currentPage = 5;
+    wrapper.vm.updateDateTime({
+      startTime: 1000,
+      endTime: 2000,
+      relativeTimePeriod: "1h",
+      type: "relative",
+      valueType: "relative",
+    });
+
+    expect(wrapper.vm.currentPage).toBe(1);
     wrapper.unmount();
   });
 });

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -31,7 +31,7 @@ const apiKeys = {
   createRUMToken: (org_id: string) => {
     return http().post(`/api/${org_id}/rumtoken`);
   },
-  updateRUMToken: (org_id: string, id: string) => {
+  updateRUMToken: (org_id: string, _id: string) => {
     return http().put(`/api/${org_id}/rumtoken`);
   },
   deleteUserAPIKey: (id: string) => {

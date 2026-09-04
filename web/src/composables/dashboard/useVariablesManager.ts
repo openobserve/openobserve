@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,18 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import type { I18nText, TranslateFn } from "@/types/i18n";
+
 import { ref, computed, reactive } from "vue";
 import {
   buildScopedDependencyGraph,
   detectCyclesInScopedGraph,
-  extractVariableNames,
   type ScopedDependencyGraph,
 } from "@/utils/dashboard/variables/variablesDependencyUtils";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
 export interface VariableConfig {
   name: string;
-  label?: string;
+  label?: I18nText;
   type: "query_values" | "custom" | "constant" | "textbox" | "dynamic_filters";
   scope: "global" | "tabs" | "panels";
   tabs?: string[];
@@ -44,7 +45,7 @@ export interface VariableConfig {
     }>;
   };
   options?: Array<{
-    label: string;
+    label: I18nText;
     value: string;
     selected?: boolean;
   }>;
@@ -80,9 +81,7 @@ export const getVariableKey = (
 };
 
 // Helper to expand variables for scopes
-const expandVariablesForScopes = (
-  variables: VariableConfig[],
-): VariableRuntimeState[] => {
+const expandVariablesForScopes = (variables: VariableConfig[]): VariableRuntimeState[] => {
   const expanded: VariableRuntimeState[] = [];
 
   // Helper to get initial value for a variable
@@ -106,13 +105,20 @@ const expandVariablesForScopes = (
       }
     }
 
-    // For custom type variables, select first option as default
+    // For custom type variables, honor the per-option default (the "Default"
+    // checkbox in variable settings, stored as `option.selected`); fall back to
+    // the first option only when none is marked as default.
     if (variable.type === "custom") {
       const options = (variable as any).options;
       if (options && options.length > 0) {
-        return variable.multiSelect
-          ? [options[0].value]
-          : options[0].value;
+        const defaultOptionValues = options
+          .filter((option: any) => option.selected)
+          .map((option: any) => option.value);
+
+        if (variable.multiSelect) {
+          return defaultOptionValues.length > 0 ? defaultOptionValues : [options[0].value];
+        }
+        return defaultOptionValues.length > 0 ? defaultOptionValues[0] : options[0].value;
       }
     }
 
@@ -153,11 +159,7 @@ const expandVariablesForScopes = (
           isVariablePartialLoaded: variable.type !== "query_values" || hasCustomOrAllDefault,
         });
       });
-    } else if (
-      scope === "panels" &&
-      variable.panels &&
-      variable.panels.length > 0
-    ) {
+    } else if (scope === "panels" && variable.panels && variable.panels.length > 0) {
       variable.panels.forEach((panelId) => {
         expanded.push({
           ...variable,
@@ -175,7 +177,7 @@ const expandVariablesForScopes = (
   return expanded;
 };
 
-export const useVariablesManager = () => {
+export const useVariablesManager = (t: TranslateFn) => {
   // ========== STATE ==========
   // TWO-TIER STATE ARCHITECTURE (like __global mechanism)
 
@@ -216,9 +218,7 @@ export const useVariablesManager = () => {
     // Helper to determine if a specific variable is still in its initial loading phase
     const isVarLoading = (v: VariableRuntimeState) => {
       if (v.type !== "query_values") return false;
-      return (
-        v.isLoading || v.isVariableLoadingPending || !v.isVariablePartialLoaded
-      );
+      return v.isLoading || v.isVariableLoadingPending || !v.isVariablePartialLoaded;
     };
 
     // Global variables are always relevant
@@ -231,8 +231,7 @@ export const useVariablesManager = () => {
 
     // Only check variables in visible panels
     const hasLoadingPanels = Object.entries(variablesData.panels).some(
-      ([panelId, vars]) =>
-        panelsVisibility.value[panelId] && vars.some(isVarLoading),
+      ([panelId, vars]) => panelsVisibility.value[panelId] && vars.some(isVarLoading),
     );
 
     return hasLoadingGlobal || hasLoadingTabs || hasLoadingPanels;
@@ -342,12 +341,7 @@ export const useVariablesManager = () => {
   };
 
   const canVariableLoad = (variable: VariableRuntimeState): boolean => {
-    const key = getVariableKey(
-      variable.name,
-      variable.scope,
-      variable.tabId,
-      variable.panelId,
-    );
+    const key = getVariableKey(variable.name, variable.scope, variable.tabId, variable.panelId);
 
     // Check 1: Is visible?
     if (!isVariableVisible(variable)) {
@@ -426,7 +420,7 @@ export const useVariablesManager = () => {
       migratedConfig.push({
         name: "Dynamic filters",
         type: "dynamic_filters",
-        label: "Dynamic filters",
+        label: t("dashboard.dynamicFilters"),
         scope: "global",
         value: [],
         options: [],
@@ -458,14 +452,7 @@ export const useVariablesManager = () => {
     });
 
     // Step 3: Build dependency graph
-    try {
-      dependencyGraph.value = buildScopedDependencyGraph(
-        expandedVars,
-        panelTabMapping.value,
-      );
-    } catch (error: any) {
-      throw error;
-    }
+    dependencyGraph.value = buildScopedDependencyGraph(expandedVars, panelTabMapping.value);
 
     // Step 4: Detect cycles
     const cycle = detectCyclesInScopedGraph(dependencyGraph.value);
@@ -483,12 +470,15 @@ export const useVariablesManager = () => {
     });
 
     independentGlobalVars.forEach((v) => {
-      // Mark as pending so selector will fire API
-      // Skip custom and "all" variables during initial load - they don't need API calls
-      if (v.type === "query_values") {
+      // Mark as pending so selector will load them
+      // Non-API types (custom, constant, textbox) need to load to notify manager
+      // query_values types without custom/all need API calls
+      if (v.type === "custom" || v.type === "constant" || v.type === "textbox") {
+        // Non-API types still need to load to set values and notify manager
+        v.isVariableLoadingPending = true;
+      } else if (v.type === "query_values") {
         const hasCustomOrAllDefault =
-          v.selectAllValueForMultiSelect === "custom" ||
-          v.selectAllValueForMultiSelect === "all";
+          v.selectAllValueForMultiSelect === "custom" || v.selectAllValueForMultiSelect === "all";
 
         if (!hasCustomOrAllDefault) {
           v.isVariableLoadingPending = true;
@@ -509,8 +499,11 @@ export const useVariablesManager = () => {
         const key = getVariableKey(v.name, v.scope);
         const parentKeys = dependencyGraph.value[key]?.parents || [];
 
-        // Check if all parents are custom/all variables (and thus already loaded)
-        const allParentsAreCustomOrAll = parentKeys.every((parentKey) => {
+        // Check if all parents are non-API types (don't require API calls to load)
+        // These variables are treated the same: they load synchronously without API calls
+        // 1. Custom type variables: custom, constant, textbox, dynamic_filters
+        // 2. Query_values with custom/all defaults (values set from config, not API)
+        const allParentsAreNonAPITypes = parentKeys.every((parentKey) => {
           const parentVar = globalVars.find((gv) => {
             const gvKey = getVariableKey(gv.name, gv.scope);
             return gvKey === parentKey;
@@ -518,16 +511,23 @@ export const useVariablesManager = () => {
 
           if (!parentVar) return false;
 
-          const parentIsCustomOrAll =
-            parentVar.type === "query_values" &&
-            (parentVar.selectAllValueForMultiSelect === "custom" ||
-              parentVar.selectAllValueForMultiSelect === "all");
+          // Parent is non-API type if:
+          // - It's a custom type variable (custom, constant, textbox, dynamic_filters)
+          // - OR it's a query_values with custom/all default (no API call needed)
+          const parentIsNonAPIType =
+            parentVar.type === "custom" ||
+            parentVar.type === "constant" ||
+            parentVar.type === "textbox" ||
+            parentVar.type === "dynamic_filters" ||
+            (parentVar.type === "query_values" &&
+              (parentVar.selectAllValueForMultiSelect === "custom" ||
+                parentVar.selectAllValueForMultiSelect === "all"));
 
-          return parentIsCustomOrAll;
+          return parentIsNonAPIType;
         });
 
-        // If all parents are custom/all, mark this child as pending to load
-        if (allParentsAreCustomOrAll && parentKeys.length > 0) {
+        // If all parents are non-API types, mark this child as pending to load
+        if (allParentsAreNonAPITypes && parentKeys.length > 0) {
           v.isVariableLoadingPending = true;
         }
       }
@@ -542,7 +542,7 @@ export const useVariablesManager = () => {
     variablesData.isInitialized = true;
   };
 
-  // ========== COMMIT MECHANISM (like __global in main branch) ==========
+  // ========== COMMIT MECHANISM ==========
   /**
    * Commits all live variable changes to committed state
    * This is triggered when user clicks the Dashboard Refresh button
@@ -580,12 +580,10 @@ export const useVariablesManager = () => {
   const commitScope = (scope: "panels", id: string) => {
     if (scope === "panels") {
       if (variablesData.panels[id]) {
-        committedVariablesData.panels[id] = variablesData.panels[id].map(
-          (v) => ({
-            ...v,
-            value: Array.isArray(v.value) ? [...v.value] : v.value,
-          }),
-        );
+        committedVariablesData.panels[id] = variablesData.panels[id].map((v) => ({
+          ...v,
+          value: Array.isArray(v.value) ? [...v.value] : v.value,
+        }));
       }
     }
   };
@@ -722,7 +720,7 @@ export const useVariablesManager = () => {
     const immediateChildrenKeys = dependencyGraph.value[variableKey]?.children || [];
     const allVars = getAllVariablesFlat();
 
-    immediateChildrenKeys.forEach(childKey => {
+    immediateChildrenKeys.forEach((childKey) => {
       const childVar = findVariableByKey(childKey, allVars);
       if (!childVar) {
         return;
@@ -749,8 +747,7 @@ export const useVariablesManager = () => {
         if (v.type === "query_values" && !v.isVariablePartialLoaded) {
           // Skip custom and "all" variables - they don't need API calls on visibility change
           const hasCustomOrAllDefault =
-            v.selectAllValueForMultiSelect === "custom" ||
-            v.selectAllValueForMultiSelect === "all";
+            v.selectAllValueForMultiSelect === "custom" || v.selectAllValueForMultiSelect === "all";
 
           if (canVariableLoad(v) && !hasCustomOrAllDefault) {
             v.isVariableLoadingPending = true;
@@ -772,8 +769,7 @@ export const useVariablesManager = () => {
         if (v.type === "query_values" && !v.isVariablePartialLoaded) {
           // Skip custom and "all" variables - they don't need API calls on visibility change
           const hasCustomOrAllDefault =
-            v.selectAllValueForMultiSelect === "custom" ||
-            v.selectAllValueForMultiSelect === "all";
+            v.selectAllValueForMultiSelect === "custom" || v.selectAllValueForMultiSelect === "all";
 
           if (canVariableLoad(v) && !hasCustomOrAllDefault) {
             v.isVariableLoadingPending = true;
@@ -800,10 +796,7 @@ export const useVariablesManager = () => {
     return undefined;
   };
 
-  const getVariablesForPanel = (
-    panelId: string,
-    tabId: string,
-  ): VariableRuntimeState[] => {
+  const getVariablesForPanel = (panelId: string, tabId: string): VariableRuntimeState[] => {
     // Merge: global + tab + panel (LIVE state)
     const merged = [
       ...variablesData.global,
@@ -816,7 +809,6 @@ export const useVariablesManager = () => {
 
   /**
    * Get COMMITTED variables for a panel (used by panels for queries)
-   * This is similar to how panels use currentVariablesDataRef.__global in main branch
    */
   const getCommittedVariablesForPanel = (
     panelId: string,
@@ -824,9 +816,7 @@ export const useVariablesManager = () => {
   ): VariableRuntimeState[] => {
     const merged = [
       ...committedVariablesData.global,
-      ...(tabId && committedVariablesData.tabs[tabId]
-        ? committedVariablesData.tabs[tabId]
-        : []),
+      ...(tabId && committedVariablesData.tabs[tabId] ? committedVariablesData.tabs[tabId] : []),
       ...(committedVariablesData.panels[panelId] || []),
     ];
 
@@ -837,10 +827,7 @@ export const useVariablesManager = () => {
     return [...variablesData.global, ...(variablesData.tabs[tabId] || [])];
   };
 
-  const getAllVisibleVariables = (
-    tabId?: string,
-    panelId?: string,
-  ): VariableRuntimeState[] => {
+  const getAllVisibleVariables = (tabId?: string, panelId?: string): VariableRuntimeState[] => {
     if (panelId) {
       return getVariablesForPanel(panelId, tabId || "");
     } else if (tabId) {
@@ -910,12 +897,7 @@ export const useVariablesManager = () => {
         });
       } else {
         // Scoped variable in URL - apply to that specific instance
-        const variable = getVariable(
-          parsed.name,
-          parsed.scope,
-          parsed.tabId,
-          parsed.panelId,
-        );
+        const variable = getVariable(parsed.name, parsed.scope, parsed.tabId, parsed.panelId);
         if (variable) {
           const parsedValue = parseValue(value, variable.type, variable.multiSelect);
           variable.value = parsedValue;
@@ -998,9 +980,10 @@ export const useVariablesManager = () => {
     // Helper to check if value is valid for URL
     const hasValidValue = (value: any): boolean => {
       if (value === null || value === undefined) return false;
-      if (value === "null") return false;
+      if (value === "" || value === "null") return false;
       if (Array.isArray(value) && value.length === 0) return false;
-      if (Array.isArray(value) && value.every((v) => v === null || v === undefined || v === "")) return false;
+      if (Array.isArray(value) && value.every((v) => v === null || v === undefined || v === ""))
+        return false;
       return true;
     };
 

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { useSearchPagination } from "./useSearchPagination";
-import { searchState } from "./searchState";
+import { gt } from "@/types/i18n";
 
 // Create a shared mock state
 const createMockState = () => ({
@@ -55,7 +55,7 @@ describe("useSearchPagination", () => {
   beforeEach(() => {
     mockState = createMockState();
     vi.clearAllMocks();
-    pagination = useSearchPagination();
+    pagination = useSearchPagination(gt);
   });
 
   describe("getAggsTotal", () => {
@@ -90,9 +90,7 @@ describe("useSearchPagination", () => {
       // Use mockState directly
       mockState.searchObj.meta.resultGrid.rowsPerPage = 100;
       mockState.searchObj.data.resultGrid.currentPage = 1;
-      mockState.searchObj.data.queryResults.aggs = [
-        { zo_sql_key: "key1", zo_sql_num: 250 },
-      ];
+      mockState.searchObj.data.queryResults.aggs = [{ zo_sql_key: "key1", zo_sql_num: 250 }];
 
       pagination.refreshPagination();
 
@@ -112,9 +110,7 @@ describe("useSearchPagination", () => {
       // Use mockState directly
       mockState.searchObj.meta.resultGrid.rowsPerPage = 100;
       mockState.searchObj.data.resultGrid.currentPage = 1;
-      mockState.searchObj.data.queryResults.aggs = [
-        { zo_sql_key: "key1", zo_sql_num: 100 },
-      ];
+      mockState.searchObj.data.queryResults.aggs = [{ zo_sql_key: "key1", zo_sql_num: 100 }];
       mockState.searchObj.data.queryResults.pageCountTotal = 500;
 
       pagination.refreshPagination();
@@ -126,9 +122,7 @@ describe("useSearchPagination", () => {
       // Use mockState directly
       mockState.searchObj.meta.resultGrid.rowsPerPage = 10;
       mockState.searchObj.data.resultGrid.currentPage = 5;
-      mockState.searchObj.data.queryResults.aggs = [
-        { zo_sql_key: "key1", zo_sql_num: 1000 },
-      ];
+      mockState.searchObj.data.queryResults.aggs = [{ zo_sql_key: "key1", zo_sql_num: 1000 }];
 
       pagination.refreshPagination();
 
@@ -160,7 +154,7 @@ describe("useSearchPagination", () => {
 
       expect(result).toBe(false);
       expect(mockState.notificationMsg.value).toContain(
-        "Error while refreshing partition pagination"
+        "Error while refreshing partition pagination",
       );
     });
   });
@@ -324,11 +318,7 @@ describe("useSearchPagination", () => {
   describe("trimPageCountExtraHit", () => {
     it("should trim last hit when at page boundary", () => {
       // Use mockState directly
-      mockState.searchObj.data.queryResults.hits = [
-        { id: 1 },
-        { id: 2 },
-        { id: 3 },
-      ];
+      mockState.searchObj.data.queryResults.hits = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
       const queryReq = {
         query: { size: 3, sql: "SELECT * FROM stream" },
@@ -355,11 +345,7 @@ describe("useSearchPagination", () => {
 
     it("should not trim for queries with LIMIT", () => {
       // Use mockState directly
-      mockState.searchObj.data.queryResults.hits = [
-        { id: 1 },
-        { id: 2 },
-        { id: 3 },
-      ];
+      mockState.searchObj.data.queryResults.hits = [{ id: 1 }, { id: 2 }, { id: 3 }];
 
       const queryReq = {
         query: { size: 3, sql: "SELECT * FROM stream LIMIT 100" },

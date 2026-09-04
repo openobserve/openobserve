@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,18 +23,17 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 
 use super::{
-    super::{
-        entity::{
-            search_job_partitions::{Column as PartitionJobColumn, Entity as PartitionJobEntity},
-            search_job_results::{ActiveModel as JobResultModel, Entity as JobResultEntity},
-            search_jobs::*,
+    super::entity::{
+        search_job_partitions::{Column as PartitionJobColumn, Entity as PartitionJobEntity},
+        search_job_results::{
+            ActiveModel as JobResultModel, Column as JobResultColumn, Entity as JobResultEntity,
         },
-        get_lock,
+        search_jobs::*,
     },
     common::{OperatorType, Value},
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors, orm_err,
 };
 
@@ -165,10 +164,7 @@ pub struct SetOperator {
 
 #[allow(clippy::too_many_arguments)]
 pub async fn submit(job: ActiveModel) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let _res = match Entity::insert(job).exec(client).await {
         Ok(res) => res,
         Err(e) => return orm_err!(format!("submit search job error: {e}")),
@@ -179,10 +175,7 @@ pub async fn submit(job: ActiveModel) -> Result<(), errors::Error> {
 
 // get the job and update status
 pub async fn get_job(updated_at: i64) -> Result<Option<Model>, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let tx = match client.begin().await {
         Ok(tx) => tx,
@@ -232,10 +225,7 @@ pub async fn get_job(updated_at: i64) -> Result<Option<Model>, errors::Error> {
 }
 
 pub async fn cancel_job(job_id: &str, update_at: i64) -> Result<i64, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let tx = match client.begin().await {
         Ok(tx) => tx,
@@ -296,10 +286,7 @@ pub async fn cancel_job(job_id: &str, update_at: i64) -> Result<i64, errors::Err
 }
 
 pub async fn set(operator: SetOperator) -> Result<UpdateResult, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let mut query = Entity::update_many();
 
@@ -331,10 +318,7 @@ pub async fn set(operator: SetOperator) -> Result<UpdateResult, errors::Error> {
 }
 
 pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let res = Entity::delete_many()
         .filter(Column::Id.eq(job_id))
@@ -343,6 +327,60 @@ pub async fn clean_deleted_job(job_id: &str) -> Result<(), errors::Error> {
 
     if let Err(e) = res {
         return orm_err!(format!("clean deleted jobs error: {e}"));
+    }
+
+    Ok(())
+}
+
+/// Delete all search jobs (and their partitions and results) for the given org.
+/// Child rows are deleted explicitly because SQLite does not enforce FK cascades
+/// unless `PRAGMA foreign_keys = ON` is set.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+
+    // Collect job IDs for this org
+    let job_ids: Vec<String> = Entity::find()
+        .filter(Column::OrgId.eq(org_id))
+        .select_only()
+        .column(Column::Id)
+        .into_tuple()
+        .all(client)
+        .await
+        .map_err(|e| {
+            errors::Error::DbError(errors::DbError::SeaORMError(format!(
+                "delete_by_org list jobs error: {e}"
+            )))
+        })?;
+
+    if job_ids.is_empty() {
+        return Ok(());
+    }
+
+    // Delete partitions
+    let res = PartitionJobEntity::delete_many()
+        .filter(PartitionJobColumn::JobId.is_in(job_ids.clone()))
+        .exec(client)
+        .await;
+    if let Err(e) = res {
+        return orm_err!(format!("delete_by_org partitions error: {e}"));
+    }
+
+    // Delete results
+    let res = JobResultEntity::delete_many()
+        .filter(JobResultColumn::JobId.is_in(job_ids.clone()))
+        .exec(client)
+        .await;
+    if let Err(e) = res {
+        return orm_err!(format!("delete_by_org results error: {e}"));
+    }
+
+    // Delete the jobs themselves
+    let res = Entity::delete_many()
+        .filter(Column::OrgId.eq(org_id))
+        .exec(client)
+        .await;
+    if let Err(e) = res {
+        return orm_err!(format!("delete_by_org jobs error: {e}"));
     }
 
     Ok(())
@@ -363,10 +401,7 @@ pub async fn retry_search_job(
     new_trace_id: &str,
     updated_at: i64,
 ) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let tx = match client.begin().await {
         Ok(tx) => tx,
@@ -464,7 +499,7 @@ pub async fn retry_search_job(
 }
 
 pub async fn get(job_id: &str, org_id: &str) -> Result<Model, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = Entity::find()
         .filter(Column::Id.eq(job_id))
         .filter(Column::OrgId.eq(org_id))
@@ -479,7 +514,7 @@ pub async fn get(job_id: &str, org_id: &str) -> Result<Model, errors::Error> {
 }
 
 pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = Entity::find()
         .filter(Column::OrgId.eq(org_id))
         .filter(Column::Status.ne(4))
@@ -496,7 +531,7 @@ pub async fn list_status_by_org_id(org_id: &str) -> Result<Vec<Model>, errors::E
 }
 
 pub async fn get_deleted_jobs() -> Result<Vec<Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let res = Entity::find()
         .filter(Column::Status.eq(4))
@@ -542,7 +577,7 @@ pub async fn set_job_start(
     node: &str,
     updated_at: i64,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let res = Entity::update_many()
         .col_expr(Column::Status, Expr::value(1))
@@ -557,5 +592,50 @@ pub async fn set_job_start(
     match res {
         Ok(_) => Ok(()),
         Err(e) => orm_err!(format!("set job start error: {e}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Filter, MetaColumn};
+    use crate::table::search_job::common::{OperatorType, Value};
+
+    #[test]
+    fn test_filter_new_with_string_value() {
+        let f = Filter::new(MetaColumn::Id, OperatorType::Equal, Value::string("id-1"));
+        assert!(matches!(f.left, MetaColumn::Id));
+        assert!(matches!(f.operator, OperatorType::Equal));
+        assert!(matches!(&f.right, Value::String(s) if s == "id-1"));
+    }
+
+    #[test]
+    fn test_filter_new_with_i64_gt() {
+        let f = Filter::new(
+            MetaColumn::StartTime,
+            OperatorType::GreaterThan,
+            Value::i64(100),
+        );
+        assert!(matches!(f.left, MetaColumn::StartTime));
+        assert!(matches!(f.operator, OperatorType::GreaterThan));
+        assert!(matches!(f.right, Value::I64(v) if v == 100));
+    }
+
+    #[test]
+    fn test_filter_new_with_lt() {
+        let f = Filter::new(MetaColumn::EndTime, OperatorType::LessThan, Value::i64(500));
+        assert!(matches!(f.left, MetaColumn::EndTime));
+        assert!(matches!(f.operator, OperatorType::LessThan));
+    }
+
+    #[test]
+    fn test_filter_clone() {
+        let f = Filter::new(
+            MetaColumn::Status,
+            OperatorType::Equal,
+            Value::string("done"),
+        );
+        let c = f.clone();
+        assert!(matches!(c.left, MetaColumn::Status));
+        assert!(matches!(&c.right, Value::String(s) if s == "done"));
     }
 }

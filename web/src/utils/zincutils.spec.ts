@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,12 +17,14 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import {
   b64EncodeUnicode,
   b64DecodeUnicode,
+  smartDecodeVrlFunction,
   b64EncodeStandard,
   b64DecodeStandard,
   validateEmail,
   getLocalTime,
   getBasicAuth,
   convertToTitleCase,
+  truncateText,
   convertTimeFromMicroToMilli,
   formatLargeNumber,
   formatSizeFromMB,
@@ -30,8 +32,6 @@ import {
   formatTimeWithSuffix,
   formatDuration,
   timestampToTimezoneDate,
-  histogramDateTimezone,
-  convertToUtcTimestamp,
   mergeDeep,
   getUUID,
   getUUIDv7,
@@ -39,6 +39,7 @@ import {
   queryIndexSplit,
   convertToCamelCase,
   getFunctionErrorMessage,
+  processQueryMetadataErrors,
   generateTraceContext,
   durationFormatter,
   getTimezoneOffset,
@@ -50,30 +51,18 @@ import {
   arraysMatch,
   deepCopy,
   getWebSocketUrl,
-  isWebSocketEnabled,
-  isStreamingEnabled,
   maxLengthCharValidation,
   validateUrl,
-  convertUnixToQuasarFormat,
+  convertUnixToDateFormat,
   getCronIntervalDifferenceInSeconds,
   isAboveMinRefreshInterval,
   getDueDays,
   checkCallBackValues,
-  getIngestionURL,
   getEndPoint,
   getUserInfo,
   getDecodedAccessToken,
   useLocalOrganization,
   useLocalCurrentUser,
-  useLocalLogsObj,
-  useLocalLogFilterField,
-  useLocalTraceFilterField,
-  useLocalInterestingFields,
-  useLocalSavedView,
-  useLocalUserInfo,
-  useLocalTimezone,
-  useLocalWrapContent,
-  getDecodedUserInfo,
   getTimezonesByOffset,
 } from "./zincutils";
 
@@ -96,12 +85,8 @@ const sessionStorageMock = {
 global.sessionStorage = sessionStorageMock as any;
 
 // Mock window.btoa and window.atob
-global.btoa = vi.fn((str: string) =>
-  Buffer.from(str, "binary").toString("base64"),
-);
-global.atob = vi.fn((str: string) =>
-  Buffer.from(str, "base64").toString("binary"),
-);
+global.btoa = vi.fn((str: string) => Buffer.from(str, "binary").toString("base64"));
+global.atob = vi.fn((str: string) => Buffer.from(str, "base64").toString("binary"));
 
 // Mock console methods
 vi.spyOn(console, "log").mockImplementation(() => {});
@@ -148,6 +133,219 @@ describe("zincutils", () => {
       it("should handle invalid base64", () => {
         const result = b64DecodeUnicode("invalid-base64");
         expect(result).toBeUndefined();
+      });
+    });
+
+    describe("smartDecodeVrlFunction", () => {
+      // Test data setup
+      const plainTextVrl = '.field1 = "value1"\n.field2 = "value2"';
+      const singleEncodedVrl = b64EncodeUnicode(plainTextVrl);
+      const doubleEncodedVrl = b64EncodeUnicode(singleEncodedVrl as string);
+
+      describe("Normal Case: Single-Encoded VRL", () => {
+        it("should decode single-encoded VRL correctly", () => {
+          const result = smartDecodeVrlFunction(singleEncodedVrl);
+          expect(result).toBe(plainTextVrl);
+        });
+
+        it("should handle single-encoded VRL with special characters", () => {
+          const specialVrl = '.message = "Hello @user! Cost: $50.00"';
+          const encoded = b64EncodeUnicode(specialVrl);
+          const result = smartDecodeVrlFunction(encoded);
+          expect(result).toBe(specialVrl);
+        });
+
+        it("should handle single-encoded VRL with newlines", () => {
+          const multilineVrl = '.field1 = "line1"\n.field2 = "line2"\n.field3 = "line3"';
+          const encoded = b64EncodeUnicode(multilineVrl);
+          const result = smartDecodeVrlFunction(encoded);
+          expect(result).toBe(multilineVrl);
+        });
+
+        it("should handle single-encoded VRL with unicode characters", () => {
+          const unicodeVrl = '.message = "Hello 世界! 🌍"';
+          const encoded = b64EncodeUnicode(unicodeVrl);
+          const result = smartDecodeVrlFunction(encoded);
+          expect(result).toBe(unicodeVrl);
+        });
+      });
+
+      describe("Legacy v0.40 Case: Double-Encoded VRL", () => {
+        it("should detect and decode double-encoded VRL", () => {
+          const result = smartDecodeVrlFunction(doubleEncodedVrl);
+          expect(result).toBe(plainTextVrl);
+        });
+
+        it("should handle double-encoded VRL with special characters", () => {
+          const specialVrl = '.msg = "Test @#$%^&*()"';
+          const doubleEncoded = b64EncodeUnicode(b64EncodeUnicode(specialVrl) as string);
+          const result = smartDecodeVrlFunction(doubleEncoded);
+          expect(result).toBe(specialVrl);
+        });
+
+        it("should handle real-world double-encoded VRL scenario", () => {
+          // Simulate v0.40 bug: VRL gets encoded in QueryEditorDialog, then encoded again in getAlertPayload
+          const originalVrl = '.severity = "error"\n.status_code = 500';
+          const firstEncode = b64EncodeUnicode(originalVrl); // QueryEditorDialog encoding
+          const secondEncode = b64EncodeUnicode(firstEncode as string); // getAlertPayload encoding
+
+          const result = smartDecodeVrlFunction(secondEncode);
+          expect(result).toBe(originalVrl);
+        });
+      });
+
+      describe("Edge Cases", () => {
+        it("should return empty string for null input", () => {
+          const result = smartDecodeVrlFunction(null);
+          expect(result).toBe("");
+        });
+
+        it("should return empty string for undefined input", () => {
+          const result = smartDecodeVrlFunction(undefined);
+          expect(result).toBe("");
+        });
+
+        it("should return empty string for empty string input", () => {
+          const result = smartDecodeVrlFunction("");
+          expect(result).toBe("");
+        });
+
+        it("should handle plain text VRL (not encoded) gracefully", () => {
+          // If someone manually enters plain VRL in JSON editor
+          const plainVrl = '.field = "value"';
+          const result = smartDecodeVrlFunction(plainVrl);
+          // Should attempt to decode and fail gracefully, returning original
+          expect(result).toBe(plainVrl);
+        });
+
+        it("should handle invalid base64 gracefully", () => {
+          const invalidBase64 = "!!!invalid!!!";
+          const result = smartDecodeVrlFunction(invalidBase64);
+          expect(result).toBe(invalidBase64);
+        });
+
+        it("should handle partially encoded text", () => {
+          const partiallyEncoded = "plain text with some SGVsbG8= base64";
+          const result = smartDecodeVrlFunction(partiallyEncoded);
+          // Should return original since it's not fully base64 encoded
+          expect(result).toBe(partiallyEncoded);
+        });
+      });
+
+      describe("Backwards Compatibility", () => {
+        it("should handle alerts from v0.40 with double-encoded VRL", () => {
+          // Simulate: Backend returns double-encoded VRL from legacy v0.40 alert
+          const originalVrl = ".parse_json(.message)";
+          const legacyDoubleEncoded = b64EncodeUnicode(b64EncodeUnicode(originalVrl) as string);
+
+          // Smart decoder should detect and fix
+          const result = smartDecodeVrlFunction(legacyDoubleEncoded);
+          expect(result).toBe(originalVrl);
+        });
+
+        it("should handle alerts saved correctly (single-encoded)", () => {
+          // Simulate: Backend returns properly single-encoded VRL from new alerts
+          const originalVrl = ".parse_json(.message)";
+          const properlyEncoded = b64EncodeUnicode(originalVrl);
+
+          // Should decode once
+          const result = smartDecodeVrlFunction(properlyEncoded);
+          expect(result).toBe(originalVrl);
+        });
+
+        it("should handle migration scenario: fixing double-encoded on save", () => {
+          // Simulate: User loads old double-encoded alert, edits, saves
+          const originalVrl = ".status = 200";
+          const oldDoubleEncoded = b64EncodeUnicode(b64EncodeUnicode(originalVrl) as string);
+
+          // Load: Smart decoder fixes it
+          const decoded = smartDecodeVrlFunction(oldDoubleEncoded);
+          expect(decoded).toBe(originalVrl);
+
+          // Save: Re-encode (should be single-encoded now)
+          const reEncoded = b64EncodeUnicode(decoded);
+
+          // Load again: Should still decode correctly
+          const finalDecoded = smartDecodeVrlFunction(reEncoded);
+          expect(finalDecoded).toBe(originalVrl);
+        });
+      });
+
+      describe("Complex VRL Examples", () => {
+        it("should handle complex VRL with nested functions", () => {
+          const complexVrl = `
+.parsed = parse_json!(.message)
+.severity = .parsed.level
+if .severity == "error" {
+  .alert = true
+}
+.timestamp = to_timestamp!(.time)
+`;
+          const encoded = b64EncodeUnicode(complexVrl);
+          const result = smartDecodeVrlFunction(encoded);
+          expect(result).toBe(complexVrl);
+        });
+
+        it("should handle VRL with arrays and objects", () => {
+          const vrlWithArrays = '.tags = ["production", "api", "critical"]';
+          const encoded = b64EncodeUnicode(vrlWithArrays);
+          const result = smartDecodeVrlFunction(encoded);
+          expect(result).toBe(vrlWithArrays);
+        });
+
+        it("should handle VRL with regex patterns", () => {
+          const vrlWithRegex = '.is_error = match!(.message, r"error|fail|exception")';
+          const encoded = b64EncodeUnicode(vrlWithRegex);
+          const result = smartDecodeVrlFunction(encoded);
+          expect(result).toBe(vrlWithRegex);
+        });
+      });
+
+      describe("Performance and Safety", () => {
+        it("should handle very long VRL functions", () => {
+          const longVrl = '.field = "' + "a".repeat(10000) + '"';
+          const encoded = b64EncodeUnicode(longVrl);
+          const result = smartDecodeVrlFunction(encoded);
+          expect(result).toBe(longVrl);
+        });
+
+        it("should not throw errors for any input", () => {
+          const testInputs = [
+            null,
+            undefined,
+            "",
+            "plain text",
+            "123456",
+            "SGVsbG8=",
+            "!!!",
+            b64EncodeUnicode("test"),
+            b64EncodeUnicode(b64EncodeUnicode("test") as string),
+          ];
+
+          testInputs.forEach((input) => {
+            expect(() => smartDecodeVrlFunction(input as any)).not.toThrow();
+          });
+        });
+
+        it("should handle concurrent decode operations", () => {
+          const vrl1 = '.field1 = "value1"';
+          const vrl2 = '.field2 = "value2"';
+          const vrl3 = '.field3 = "value3"';
+
+          const encoded1 = b64EncodeUnicode(vrl1);
+          const encoded2 = b64EncodeUnicode(vrl2);
+          const encoded3 = b64EncodeUnicode(vrl3);
+
+          const results = [
+            smartDecodeVrlFunction(encoded1),
+            smartDecodeVrlFunction(encoded2),
+            smartDecodeVrlFunction(encoded3),
+          ];
+
+          expect(results[0]).toBe(vrl1);
+          expect(results[1]).toBe(vrl2);
+          expect(results[2]).toBe(vrl3);
+        });
       });
     });
 
@@ -269,6 +467,14 @@ describe("zincutils", () => {
       it("should format smaller numbers as is", () => {
         expect(formatLargeNumber(500)).toBe("500");
       });
+
+      it("should return empty string for undefined", () => {
+        expect(formatLargeNumber(undefined as any)).toBe("");
+      });
+
+      it("should return empty string for null", () => {
+        expect(formatLargeNumber(null as any)).toBe("");
+      });
     });
 
     describe("formatSizeFromMB", () => {
@@ -309,6 +515,22 @@ describe("zincutils", () => {
       });
     });
 
+    describe("truncateText", () => {
+      it("should truncate text exceeding maxLength and append ellipsis", () => {
+        expect(truncateText("oteldemo.RecommendationService", 24)).toBe("oteldemo.Recommendation…");
+        expect(truncateText("oteldemo.RecommendationService", 24).length).toBe(24);
+      });
+
+      it("should return text unchanged when within maxLength", () => {
+        expect(truncateText("frontend", 24)).toBe("frontend");
+        expect(truncateText("exactly-24-characters-ok", 24)).toBe("exactly-24-characters-ok");
+      });
+
+      it("should handle empty string", () => {
+        expect(truncateText("", 24)).toBe("");
+      });
+    });
+
     describe("convertToCamelCase", () => {
       it("should convert string to camel case", () => {
         expect(convertToCamelCase("hello")).toBe("Hello");
@@ -330,18 +552,12 @@ describe("zincutils", () => {
 
     describe("queryIndexSplit", () => {
       it("should split query at specified word", () => {
-        const result = queryIndexSplit(
-          "SELECT * FROM table WHERE id = 1",
-          "WHERE",
-        );
+        const result = queryIndexSplit("SELECT * FROM table WHERE id = 1", "WHERE");
         expect(result).toEqual(["SELECT * FROM table ", " id = 1"]);
       });
 
       it("should handle case insensitive split", () => {
-        const result = queryIndexSplit(
-          "select * from table where id = 1",
-          "WHERE",
-        );
+        const result = queryIndexSplit("select * from table where id = 1", "WHERE");
         expect(result).toEqual(["select * from table ", " id = 1"]);
       });
 
@@ -354,9 +570,7 @@ describe("zincutils", () => {
     describe("escapeSingleQuotes", () => {
       it("should escape single quotes", () => {
         expect(escapeSingleQuotes("It's a test")).toBe("It''s a test");
-        expect(escapeSingleQuotes("Multiple 'quotes' here")).toBe(
-          "Multiple ''quotes'' here",
-        );
+        expect(escapeSingleQuotes("Multiple 'quotes' here")).toBe("Multiple ''quotes'' here");
       });
 
       it("should handle strings without quotes", () => {
@@ -523,9 +737,7 @@ describe("zincutils", () => {
         expect(context).toHaveProperty("traceparent");
         expect(context).toHaveProperty("traceId");
         expect(context).toHaveProperty("spanId");
-        expect(context.traceparent).toMatch(
-          /^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/,
-        );
+        expect(context.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
       });
 
       it("should use UUID v7 for trace ID", () => {
@@ -613,6 +825,7 @@ describe("zincutils", () => {
         expect(isValidResourceName("invalid#name")).toBe(false);
         expect(isValidResourceName("invalid name")).toBe(false);
         expect(isValidResourceName("invalid?name")).toBe(false);
+        expect(isValidResourceName("invalid/name")).toBe(false);
       });
     });
 
@@ -660,11 +873,7 @@ describe("zincutils", () => {
           writable: true,
         });
 
-        const url = getWebSocketUrl(
-          "request123",
-          "org1",
-          "https://api.example.com",
-        );
+        const url = getWebSocketUrl("request123", "org1", "https://api.example.com");
         expect(url).toBe("wss://api.example.com/api/org1/ws/v2/request123");
       });
 
@@ -676,28 +885,24 @@ describe("zincutils", () => {
           writable: true,
         });
 
-        const url = getWebSocketUrl(
-          "request123",
-          "org1",
-          "http://api.example.com",
-        );
+        const url = getWebSocketUrl("request123", "org1", "http://api.example.com");
         expect(url).toBe("ws://api.example.com/api/org1/ws/v2/request123");
       });
     });
   });
 
   describe("Date and Time Utilities", () => {
-    describe("convertUnixToQuasarFormat", () => {
-      it("should convert unix microseconds to Quasar format", () => {
+    describe("convertUnixToDateFormat", () => {
+      it("should convert unix microseconds to date format", () => {
         const unixMicros = 1640995200000000; // 2022-01-01 00:00:00 UTC in microseconds
-        const result = convertUnixToQuasarFormat(unixMicros);
+        const result = convertUnixToDateFormat(unixMicros);
         expect(result).toContain("2022-01-01");
         expect(result).toContain("T");
       });
 
       it("should return empty string for falsy input", () => {
-        expect(convertUnixToQuasarFormat(0)).toBe("");
-        expect(convertUnixToQuasarFormat(null)).toBe("");
+        expect(convertUnixToDateFormat(0)).toBe("");
+        expect(convertUnixToDateFormat(null)).toBe("");
       });
     });
 
@@ -801,18 +1006,132 @@ describe("zincutils", () => {
   });
 
   describe("Error Message Utilities", () => {
+    describe("processQueryMetadataErrors", () => {
+      // Timestamps in microseconds (2026-04-09)
+      const t1 = 1744194599000000; // query 1 new_start_time
+      const t2 = 1744201799000000; // query 1 new_end_time  (t1 + 2h)
+      const t3 = 1744194199000000; // query 2 new_start_time
+      const t4 = 1744201799000000; // query 2 new_end_time  (t3 + 3h)
+
+      it("two queries both restricted ΓÇö both warnings appear", () => {
+        const metadata = [
+          [
+            {
+              function_error:
+                "Query duration is modified due to query range restriction of 2 hours",
+              new_start_time: t1,
+              new_end_time: t2,
+            },
+          ],
+          [
+            {
+              function_error:
+                "Query duration is modified due to query range restriction of 3 hours",
+              new_start_time: t3,
+              new_end_time: t4,
+            },
+          ],
+        ];
+
+        const result = processQueryMetadataErrors(metadata, "UTC");
+
+        expect(result).toContain(
+          "Query duration is modified due to query range restriction of 2 hours",
+        );
+        expect(result).toContain(
+          "Query duration is modified due to query range restriction of 3 hours",
+        );
+        // Both messages are in the same string, separated by newline
+        expect(result.split("\n").length).toBeGreaterThanOrEqual(2);
+      });
+
+      it("two queries only second restricted ΓÇö only second warning appears", () => {
+        const metadata = [
+          [{}], // Query 1 ΓÇö no error
+          [
+            {
+              function_error:
+                "Query duration is modified due to query range restriction of 3 hours",
+              new_start_time: t3,
+              new_end_time: t4,
+            },
+          ],
+        ];
+
+        const result = processQueryMetadataErrors(metadata, "UTC");
+
+        expect(result).toContain(
+          "Query duration is modified due to query range restriction of 3 hours",
+        );
+        expect(result).not.toContain("2 hours");
+      });
+
+      it("two queries neither restricted ΓÇö empty string", () => {
+        const metadata = [[{}], [{}]];
+        const result = processQueryMetadataErrors(metadata, "UTC");
+        expect(result).toBe("");
+      });
+
+      it("single query backward compat ΓÇö still works", () => {
+        const metadata = [
+          {
+            function_error: "Query duration is modified due to query range restriction of 2 hours",
+            new_start_time: t1,
+            new_end_time: t2,
+          },
+        ];
+
+        const result = processQueryMetadataErrors(metadata, "UTC");
+
+        expect(result).toContain(
+          "Query duration is modified due to query range restriction of 2 hours",
+        );
+        expect(result).toContain("Data returned for:");
+      });
+
+      it("duplicate messages across two queries are deduplicated", () => {
+        const metadata = [
+          [
+            {
+              function_error:
+                "Query duration is modified due to query range restriction of 2 hours",
+              new_start_time: t1,
+              new_end_time: t2,
+            },
+          ],
+          [
+            {
+              function_error:
+                "Query duration is modified due to query range restriction of 2 hours",
+              new_start_time: t1,
+              new_end_time: t2,
+            },
+          ],
+        ];
+
+        const result = processQueryMetadataErrors(metadata, "UTC");
+        const messages = result.split("\n");
+
+        // Message should appear exactly once
+        expect(messages.length).toBe(1);
+        expect(result).toContain(
+          "Query duration is modified due to query range restriction of 2 hours",
+        );
+      });
+
+      it("returns empty string for null or empty metadata", () => {
+        expect(processQueryMetadataErrors(null)).toBe("");
+        expect(processQueryMetadataErrors([])).toBe("");
+      });
+    });
+
     describe("getFunctionErrorMessage", () => {
       it("should format error message with timestamps", () => {
         const message = "Query limit exceeded";
         const startTime = 1640995200000000; // microseconds
         const endTime = 1641008400000000; // microseconds
 
-        const result = getFunctionErrorMessage(
-          message,
-          startTime,
-          endTime,
-          "UTC",
-        );
+        const result = getFunctionErrorMessage(message, startTime, endTime, "UTC");
         expect(result).toContain(message);
         expect(result).toContain("Data returned for:");
       });
@@ -821,11 +1140,7 @@ describe("zincutils", () => {
         const message = "Query limit exceeded";
         // The function doesn't actually handle errors the way we expected
         // It still tries to format even with invalid inputs
-        const result = getFunctionErrorMessage(
-          message,
-          "invalid" as any,
-          "invalid" as any,
-        );
+        const result = getFunctionErrorMessage(message, "invalid" as any, "invalid" as any);
         expect(result).toContain(message);
       });
     });
@@ -836,11 +1151,8 @@ describe("zincutils", () => {
       it("should handle user data storage", () => {
         const userData = { id: 1, name: "John" };
         const userDataString = JSON.stringify(userData);
-        const result = useLocalCurrentUser(userDataString);
-        expect(localStorageMock.setItem).toHaveBeenCalledWith(
-          "currentuser",
-          expect.any(String),
-        );
+        useLocalCurrentUser(userDataString);
+        expect(localStorageMock.setItem).toHaveBeenCalledWith("currentuser", expect.any(String));
       });
     });
 

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,16 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock as Lazy;
+
 use async_trait::async_trait;
-use config::meta::{
-    meta_store::MetaStore,
-    triggers::{Trigger, TriggerId, TriggerModule, TriggerStatus},
+use config::{
+    meta::{
+        meta_store::MetaStore,
+        triggers::{Trigger, TriggerModule, TriggerStatus},
+    },
+    utils::json,
 };
-use once_cell::sync::Lazy;
+use sea_orm::{ConnectionTrait, DatabaseBackend, Statement};
 
 use crate::errors::Result;
 
-pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
@@ -31,7 +35,6 @@ pub const TRIGGERS_KEY: &str = "/triggers/";
 
 pub fn connect() -> Box<dyn Scheduler> {
     match config::get_config().common.meta_store.as_str().into() {
-        MetaStore::MySQL => Box::<mysql::MySqlScheduler>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresScheduler>::default(),
         _ => Box::<sqlite::SqliteScheduler>::default(),
     }
@@ -66,11 +69,21 @@ pub trait Scheduler: Sync + Send + 'static {
         )>,
     ) -> Result<()>;
     async fn keep_alive(&self, ids: &[i64], alert_timeout: i64, report_timeout: i64) -> Result<()>;
+    /// Renew one physical claim only while its epoch still owns the row.
+    async fn keep_alive_claim(
+        &self,
+        claim: &Trigger,
+        alert_timeout: i64,
+        report_timeout: i64,
+    ) -> Result<bool>;
+    /// Persist completion/reschedule fields only for the captured claim epoch.
+    async fn complete_claim(&self, trigger: Trigger) -> Result<bool>;
     async fn pull(
         &self,
         concurrency: i64,
         alert_timeout: i64,
         report_timeout: i64,
+        module: Option<TriggerModule>,
     ) -> Result<Vec<Trigger>>;
     async fn get(&self, org: &str, module: TriggerModule, key: &str) -> Result<Trigger>;
     async fn list(&self, module: Option<TriggerModule>) -> Result<Vec<Trigger>>;
@@ -155,6 +168,63 @@ pub async fn keep_alive(ids: &[i64], alert_timeout: i64, report_timeout: i64) ->
     CLIENT.keep_alive(ids, alert_timeout, report_timeout).await
 }
 
+#[inline]
+pub async fn keep_alive_claim(
+    claim: &Trigger,
+    alert_timeout: i64,
+    report_timeout: i64,
+) -> Result<bool> {
+    CLIENT
+        .keep_alive_claim(claim, alert_timeout, report_timeout)
+        .await
+}
+
+#[inline]
+pub async fn complete_claim(trigger: Trigger) -> Result<bool> {
+    CLIENT.complete_claim(trigger).await
+}
+
+/// Acquire the scheduler row's write lock, verify the physical claim, and
+/// renew its lease through a caller-owned SeaORM transaction. The evaluator
+/// calls this before state/transition writes so claim validation and durable
+/// alert state commit atomically. `UPDATE` is used instead of a portable
+/// `SELECT FOR UPDATE`: it locks on PostgreSQL and acquires SQLite's writer
+/// lock while remaining valid on both supported metadata stores.
+pub async fn renew_claim_in_transaction<C: ConnectionTrait>(
+    conn: &C,
+    job_id: i64,
+    claim_epoch: i64,
+    end_time: i64,
+) -> std::result::Result<bool, sea_orm::DbErr> {
+    let backend = conn.get_database_backend();
+    let sql = match backend {
+        DatabaseBackend::Postgres => {
+            "UPDATE scheduled_jobs SET end_time = $1 WHERE id = $2 AND claim_epoch = $3 AND status = $4"
+        }
+        DatabaseBackend::Sqlite => {
+            "UPDATE scheduled_jobs SET end_time = ? WHERE id = ? AND claim_epoch = ? AND status = ?"
+        }
+        _ => {
+            return Err(sea_orm::DbErr::Custom(
+                "unsupported metadata store for scheduler claim fencing".to_string(),
+            ));
+        }
+    };
+    let result = conn
+        .execute(Statement::from_sql_and_values(
+            backend,
+            sql,
+            [
+                end_time.into(),
+                job_id.into(),
+                claim_epoch.into(),
+                (TriggerStatus::Processing as i32).into(),
+            ],
+        ))
+        .await?;
+    Ok(result.rows_affected() == 1)
+}
+
 /// Scheduler pulls only those triggers that match the conditions-
 /// - trigger.next_run_at <= now
 /// - !(trigger.is_realtime && !trigger.is_silenced)
@@ -163,14 +233,19 @@ pub async fn keep_alive(ids: &[i64], alert_timeout: i64, report_timeout: i64) ->
 /// `concurrency` - Defines the maximum number of jobs to pull at a time.
 /// `timeout` - Used to set the maximum time duration the job execution can take.
 ///     This is used to calculate the `end_time` of the trigger.
+/// `module` - When `Some(m)`, pull only jobs for that module (per-module pullers, A3); the
+///     postgres backend also takes a per-module advisory lock so modules don't serialize
+///     against each other. When `None`, pull across all modules under a single global lock
+///     (legacy behavior).
 #[inline]
 pub async fn pull(
     concurrency: i64,
     alert_timeout: i64,
     report_timeout: i64,
+    module: Option<TriggerModule>,
 ) -> Result<Vec<Trigger>> {
     CLIENT
-        .pull(concurrency, alert_timeout, report_timeout)
+        .pull(concurrency, alert_timeout, report_timeout, module)
         .await
 }
 
@@ -236,4 +311,106 @@ pub async fn clear() -> Result<()> {
 pub fn get_scheduler_max_retries() -> (bool, i32) {
     let max_retries = config::get_config().limit.scheduler_max_retries;
     (max_retries > 0, max_retries.unsigned_abs() as i32)
+}
+
+/// Realtime alert triggers are cached on every node; the trigger rides in the
+/// event body so watchers can update their cache without a db read.
+async fn emit_realtime_trigger_event(trigger: &Trigger) -> Result<()> {
+    if trigger.module != TriggerModule::Alert || !trigger.is_realtime {
+        return Ok(());
+    }
+    let key = format!(
+        "{TRIGGERS_KEY}{}/{}/{}",
+        trigger.module, trigger.org, trigger.module_key
+    );
+    let cluster_coordinator = crate::db::get_coordinator().await;
+    cluster_coordinator
+        .put(&key, json::to_vec(trigger).unwrap().into(), true, None)
+        .await
+}
+
+#[cfg(test)]
+mod tests {
+    use std::future::Future;
+
+    use sea_orm::{ConnectionTrait, Database, TransactionTrait};
+
+    use super::*;
+
+    fn assert_bool_result_future<F>(_: F)
+    where
+        F: Future<Output = Result<bool>>,
+    {
+    }
+
+    #[test]
+    fn test_triggers_key_value() {
+        assert_eq!(TRIGGERS_KEY, "/triggers/");
+    }
+
+    #[test]
+    fn test_triggers_key_starts_with_slash() {
+        assert!(TRIGGERS_KEY.starts_with('/'));
+    }
+
+    #[test]
+    fn scheduler_trait_exposes_claim_scoped_keep_alive_and_completion() {
+        let scheduler = sqlite::SqliteScheduler::new();
+        let claim = Trigger {
+            id: 17,
+            claim_epoch: 3,
+            module: TriggerModule::CompositeAlert,
+            status: TriggerStatus::Processing,
+            ..Default::default()
+        };
+
+        assert_bool_result_future(scheduler.keep_alive_claim(&claim, 60, 300));
+        assert_bool_result_future(scheduler.complete_claim(claim));
+    }
+
+    #[tokio::test]
+    async fn transactional_claim_renewal_rejects_a_reclaimed_epoch() {
+        let db = Database::connect("sqlite::memory:").await.unwrap();
+        db.execute_unprepared(
+            "CREATE TABLE scheduled_jobs (\
+             id BIGINT PRIMARY KEY, claim_epoch BIGINT NOT NULL, \
+             status INT NOT NULL, end_time BIGINT)",
+        )
+        .await
+        .unwrap();
+        db.execute_unprepared(
+            "INSERT INTO scheduled_jobs (id, claim_epoch, status, end_time) VALUES (17, 4, 1, 10)",
+        )
+        .await
+        .unwrap();
+
+        let txn = db.begin().await.unwrap();
+        assert!(renew_claim_in_transaction(&txn, 17, 4, 20).await.unwrap());
+        txn.commit().await.unwrap();
+
+        let stale_txn = db.begin().await.unwrap();
+        assert!(
+            !renew_claim_in_transaction(&stale_txn, 17, 3, 30)
+                .await
+                .unwrap()
+        );
+        stale_txn.commit().await.unwrap();
+        let row = db
+            .query_one(sea_orm::Statement::from_string(
+                sea_orm::DatabaseBackend::Sqlite,
+                "SELECT end_time FROM scheduled_jobs WHERE id = 17".to_string(),
+            ))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(row.try_get::<i64>("", "end_time").unwrap(), 20);
+    }
+
+    #[test]
+    fn test_get_scheduler_max_retries_returns_tuple() {
+        let (has_max, _max) = get_scheduler_max_retries();
+        // when config is default (0), should return false and abs(0) = 0
+        let max_retries = config::get_config().limit.scheduler_max_retries;
+        assert_eq!(has_max, max_retries > 0);
+    }
 }

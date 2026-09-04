@@ -15,12 +15,23 @@ classifiers = [
 dependencies = [
     "pytest>=7.0",
     "pytest-order>=1.1.1",
-    "pytest-sugar>=0.9.7",
+    "pytest-sugar>=1.0.1",
     "pytest-pretty>=1.2.0",
+    # pytest-xdist enables `-n <N>` parallel execution. Used by the ENT
+    # RBAC shard to halve wall time on its ~280-test serial run. Requires
+    # tests to use unique resource names (uuid4 suffixes, not just
+    # int(time.time())) — the rbac helper was updated accordingly.
+    "pytest-xdist>=3.0",
     "requests>=2.31.0",
     "ruff>=0.1.8",
     "tink>=1.10.0",
     "protobuf",
+    # query-agent oracle: regenerates queries/*.json via DuckDB before CI runs
+    "duckdb>=1.0",
+    # Phase 5: schemathesis runs OpenAPI-spec-driven fuzz tests in its own
+    # CI job (api_fuzz_tests). Looks for 5xx panics across the 150 endpoints
+    # OO exposes at /api-doc/openapi.json.
+    "schemathesis>=3.27",
 ]
 
 [build-system]
@@ -44,6 +55,35 @@ packages = ["src/main"]
 "Bug Tracker" = "https://github.com/openobserve/openobserve/issues"
 
 [tool.pytest.ini_options]
+pythonpath = ["."]
 markers = [
-    "order: mark test to run in a specific order"
+    "order: mark test to run in a specific order",
+    "framework: self-tests for the support/ framework (Phase 2)",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# Phase 2 baseline: prevent the patterns the rework set out to kill.
+# We are intentionally aggressive only in NEW code paths (support/, new tests/).
+# Legacy tests still violate these — enforce on changed files in CI, not all-at-once.
+select = [
+    "E", "F", "W",      # pyflakes + pycodestyle baseline
+    "T20",              # T201: no `print()`; T203: no `pprint`
+    "PT",               # pytest-style
+    "B",                # bugbear (common bug patterns)
+    "UP",               # pyupgrade (modern syntax)
+]
+ignore = [
+    "E501",             # line length handled by formatter
+    "E402",             # module-level imports not at top (some test files structure their code this way)
+    "B008",             # function-call-in-default-argument (some factories use it intentionally)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# helpers/workflow/ is legacy code waiting for Phase 4 rewrite — keep ruff quiet there.
+"helpers/workflow/**/*.py" = ["T201", "F401", "F841", "E712", "B"]
+# Existing tests are noisy with print(); Phase 3 will sweep. Until then, only WARN.
+"tests/test_*.py" = ["T201"]

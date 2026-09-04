@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -55,7 +55,7 @@ export function getStatusDisplayLabel(status: string): string {
  * Generate SQL CASE statement to map backend statuses to UI labels
  * Usage: SELECT ${getStatusMappingSQL('status')} as display_status FROM triggers
  */
-export function getStatusMappingSQL(columnName: string = 'status'): string {
+export function getStatusMappingSQL(columnName: string = "status"): string {
   return `CASE
     WHEN ${columnName} = '${TriggerDataStatus.Completed}' THEN '${TriggerStatusLabel.Firing}'
     WHEN ${columnName} = '${TriggerDataStatus.Failed}' THEN '${TriggerStatusLabel.Errored}'

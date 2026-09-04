@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -525,5 +525,49 @@ mod tests {
         let deserialized: DashboardVersion =
             serde_json::from_str(&json).expect("Failed to deserialize");
         assert_eq!(deserialized.version, 3);
+    }
+
+    #[test]
+    fn test_created_at_deprecated_version1() {
+        let v1: v1::Dashboard = serde_json::from_value(serde_json::json!({
+            "title": "t", "description": "d"
+        }))
+        .unwrap();
+        let dash: Dashboard = v1.into();
+        assert!(dash.created_at_deprecated().is_some());
+    }
+
+    #[test]
+    fn test_created_at_deprecated_version2() {
+        let v2: v2::Dashboard = serde_json::from_value(serde_json::json!({
+            "version": 2, "title": "t", "description": "d"
+        }))
+        .unwrap();
+        let dash: Dashboard = v2.into();
+        assert!(dash.created_at_deprecated().is_some());
+    }
+
+    #[test]
+    fn test_created_at_deprecated_unknown_version_returns_none() {
+        let dash = Dashboard {
+            v1: None,
+            v2: None,
+            v3: None,
+            v4: None,
+            v5: None,
+            v6: None,
+            v7: None,
+            v8: None,
+            version: 99,
+            hash: String::new(),
+            updated_at: 0,
+        };
+        assert!(dash.created_at_deprecated().is_none());
+    }
+
+    #[test]
+    fn test_datetime_now_is_utc_offset_zero() {
+        let now = datetime_now();
+        assert_eq!(now.offset().local_minus_utc(), 0);
     }
 }

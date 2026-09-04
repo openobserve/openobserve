@@ -1,154 +1,169 @@
+<!-- Copyright 2026 OpenObserve Inc. -->
+
 <template>
-  <div class="tw:flex tw:gap-2">
-    <div style="width: 134px; padding-right: 12px; padding-top: 12px">
-      <div class="text-label-bold tw:pb-3">Property</div>
-      <div style="display: flex; flex-direction: column; gap: 14px">
-        <div>
-          <div class="text-label-normal tw:text-sm">Label</div>
-          <input
+  <div data-test="dynamic-function-popup-root" class="flex flex-col">
+    <!-- Body -->
+    <div :class="fullMode ? 'flex min-h-0' : 'flex flex-col'">
+      <!-- Property pane -->
+      <div
+        class="flex w-52 shrink-0 flex-col gap-3.5 p-3"
+        :class="fullMode ? 'border-border-default border-e' : ''"
+      >
+        <div class="text-compact font-semibold" data-test="dynamic-function-popup-property-label">
+          {{ t("dashboard.dynamicFunctionPopUp.property") }}
+        </div>
+
+        <div class="flex flex-col gap-1">
+          <div
+            class="text-2xs text-text-secondary font-semibold"
+            data-test="dynamic-function-popup-label-text"
+          >
+            {{ t("dashboard.dynamicFunctionPopUp.label") }}
+          </div>
+          <OInput
             v-model="fields.label"
-            :class="[
-              store.state.theme === 'dark' ? 'bg-grey-10' : '',
-              'edit-input',
-            ]"
+            size="sm"
+            class="w-full"
             data-test="dynamic-function-popup-label-input"
           />
         </div>
-        <div>
-          <div class="text-label-normal tw:text-sm">Alias</div>
-          <input
+
+        <div class="flex flex-col gap-1">
+          <div class="text-2xs text-text-secondary font-semibold">
+            {{ t("dashboard.dynamicFunctionPopUp.alias") }}
+          </div>
+          <OInput
             v-model="fields.alias"
+            size="sm"
             disabled
-            :class="[
-              store.state.theme === 'dark' ? 'bg-grey-10' : '',
-              'edit-input',
-            ]"
+            class="w-full"
             data-test="dynamic-function-popup-alias-input"
-          />
+          >
+            <template #icon-right>
+              <OIcon name="lock" size="xs" class="text-text-secondary" />
+            </template>
+          </OInput>
         </div>
-        <div v-if="!customQuery && !fields.isDerived">
+
+        <div v-if="fullMode" class="flex flex-col gap-1">
+          <div class="text-compact font-semibold" data-test="dynamic-function-popup-sort-by-label">
+            {{ t("dashboard.dynamicFunctionPopUp.sortBy") }}
+          </div>
           <SortByBtnGrp :fieldObj="fields" />
         </div>
       </div>
-    </div>
 
-    <div
-      v-if="!customQuery && !fields.isDerived"
-      style="width: calc(100% - 134px)"
-    >
-      <q-tabs
-        v-model="fields.type"
-        @update:modelValue="onFieldTypeChange"
-        dense
-        data-test="dynamic-function-popup-tabs"
-        :align="'left'"
-      >
-        <q-tab
-          name="build"
-          label="Build"
-          data-test="dynamic-function-popup-tab-build"
-          class="tab-item-bold"
-        />
-        <q-tab
-          name="raw"
-          label="Raw"
-          data-test="dynamic-function-popup-tab-raw"
-          class="tab-item-bold"
-        />
-      </q-tabs>
+      <!-- Configuration pane. Rendered in fullMode, and also for table charts so
+           the non-timestamp / JSON toggles stay reachable in custom-query/derived mode. -->
+      <div v-if="fullMode || chartType === 'table'" class="flex min-w-0 flex-1 flex-col p-3">
+        <template v-if="fullMode">
+          <div class="mb-3 flex items-center justify-between gap-2">
+            <div class="text-compact font-semibold">
+              {{
+                fields.type === "build"
+                  ? t("dashboard.dynamicFunctionPopUp.configuration")
+                  : t("dashboard.rawQueryBuilder.query")
+              }}
+            </div>
+            <OButtonGroup data-test="dynamic-function-popup-tabs" class="ms-auto shrink-0">
+              <OButton
+                :active="fields.type === 'build'"
+                variant="outline"
+                size="sm"
+                data-test="dynamic-function-popup-tab-build"
+                @click="setFieldType('build')"
+              >
+                {{ t("dashboard.dynamicFunctionPopUp.build") }}
+              </OButton>
+              <OButton
+                :active="fields.type === 'raw'"
+                variant="outline"
+                size="sm"
+                data-test="dynamic-function-popup-tab-raw"
+                @click="setFieldType('raw')"
+              >
+                {{ t("dashboard.dynamicFunctionPopUp.raw") }}
+              </OButton>
+            </OButtonGroup>
+          </div>
 
-      <q-separator />
+          <!-- -m-1 p-1: padding so focus rings aren't clipped, margin keeps alignment -->
+          <div class="-m-1 max-h-105 min-h-0 overflow-auto p-1">
+            <SelectFunction
+              v-if="fields.type === 'build'"
+              v-model="fields"
+              data-test="dynamic-function-popup-select-function"
+              :allowAggregation="allowAggregation"
+            />
+            <RawQueryBuilder
+              v-else
+              v-model="fields"
+              data-test="dynamic-function-popup-raw-query-builder"
+            />
+          </div>
 
-      <q-tab-panels v-model="fields.type" animated>
-        <q-tab-panel name="build" style="padding: 0px; padding-top: 8px">
-          <div style="display: flex">
-            <div style="width: calc(100% - 134px)">
-              <div class="text-label-bold tw:pb-3">Configuration</div>
-              <SelectFunction
-                v-model="fields"
-                data-test="dynamic-function-popup-select-function"
-                :allowAggregation="allowAggregation"
-              />
+          <div v-if="allowAggregation" class="border-border-default mt-3 border-t pt-3">
+            <div class="mb-2 flex items-baseline gap-2">
+              <span class="text-compact font-semibold">{{
+                t("dashboard.dynamicFunctionPopUp.having")
+              }}</span>
+              <span class="text-text-secondary text-xs">{{
+                t("dashboard.dynamicFunctionPopUp.havingHint")
+              }}</span>
+
+              <OButton
+                v-if="!isHavingFilterVisible()"
+                variant="outline"
+                size="sm"
+                class="ms-auto"
+                data-test="dynamic-function-popup-having-add-btn"
+                icon-left="add"
+                @click="toggleHavingFilter"
+              >
+                {{ t("dashboard.dynamicFunctionPopUp.add") }}
+              </OButton>
+            </div>
+
+            <div v-if="isHavingFilterVisible()" class="flex items-center gap-2">
+              <div class="w-24 shrink-0">
+                <OSelect
+                  v-model="getHavingCondition().operator"
+                  :options="havingOperators"
+                  data-test="dynamic-function-popup-having-operator"
+                />
+              </div>
+
+              <div class="min-w-0 flex-1">
+                <OInput
+                  v-model.number="getHavingCondition().value"
+                  type="number"
+                  :placeholder="t('dashboard.dynamicFunctionPopUp.value')"
+                  data-test="dynamic-function-popup-having-value"
+                />
+              </div>
+
+              <OButton
+                variant="outline"
+                size="icon"
+                class="shrink-0"
+                data-test="dynamic-function-popup-having-cancel-btn"
+                icon-left="close"
+                @click="cancelHavingFilter"
+              >
+              </OButton>
             </div>
           </div>
-        </q-tab-panel>
-        <q-tab-panel name="raw" style="padding: 0px; padding-top: 8px">
-          <div style="display: flex; width: 100%">
-            <div style="width: 100%; padding-right: 12px">
-              <RawQueryBuilder
-                v-model="fields"
-                data-test="dynamic-function-popup-raw-query-builder"
-              />
-            </div>
-          </div>
-        </q-tab-panel>
-      </q-tab-panels>
+        </template>
 
-      <div class="tw:pt-2 tw:pr-3" v-if="allowAggregation">
-        <div class="tw:flex tw:items-center tw:gap-2 tw:mb-2">
-          <span class="tw:font-bold">Having</span>
-
-          <q-btn
-            dense
-            outline
-            icon="add"
-            label="Add"
-            padding="xs sm"
-            class="el-border"
-            no-caps
-            @click="toggleHavingFilter"
-            v-if="!isHavingFilterVisible()"
-            data-test="dynamic-function-popup-having-add-btn"
-          />
-        </div>
-
-        <div
-          class="tw:flex tw:space-x-2 tw:items-center"
-          v-if="isHavingFilterVisible()"
-        >
-          <q-select
-            dense
-            filled
-            v-model="getHavingCondition().operator"
-            :options="havingOperators"
-            borderless
-            style="width: 60px"
-            data-test="dynamic-function-popup-having-operator"
-          />
-
-          <q-input
-            dense
-            filled
-            v-model.number="getHavingCondition().value"
-            style="width: 50%"
-            type="number"
-            placeholder="Value"
-            data-test="dynamic-function-popup-having-value"
-          />
-
-          <q-btn
-            dense
-            flat
-            icon="close"
-            @click="cancelHavingFilter"
-            data-test="dynamic-function-popup-having-cancel-btn"
-          />
-        </div>
-      </div>
-      <div v-if="chartType === 'table'" class="q-mt-sm q-mb-sm">
-        <div>
-          <q-checkbox
+        <div v-if="chartType === 'table'" class="mt-3 flex flex-col gap-1">
+          <OCheckbox
             v-model="fields.treatAsNonTimestamp"
-            :label="'Mark this field as non-timestamp'"
-            dense
+            :label="t('dashboard.dynamicFunctionPopUp.markAsNonTimestamp')"
             data-test="dynamic-function-popup-treat-as-non-timestamp"
           />
-        </div>
-        <div class="q-mt-xs">
-          <q-checkbox
+          <OCheckbox
             v-model="fields.showFieldAsJson"
-            :label="'Render Data as JSON / Array'"
-            dense
+            :label="t('dashboard.dynamicFunctionPopUp.renderDataAsJson')"
             data-test="dynamic-function-popup-show-field-as-json"
           />
         </div>
@@ -158,15 +173,32 @@
 </template>
 
 <script lang="ts">
-import { ref, watch, nextTick } from "vue";
+import { ref, computed, watch, nextTick } from "vue";
 import RawQueryBuilder from "./RawQueryBuilder.vue";
 import SelectFunction from "./SelectFunction.vue";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+
 export default {
   name: "DynamicFunctionPopUp",
-  components: { RawQueryBuilder, SelectFunction, SortByBtnGrp },
+  components: {
+    RawQueryBuilder,
+    SelectFunction,
+    SortByBtnGrp,
+    OButton,
+    OButtonGroup,
+    OSelect,
+    OInput,
+    OIcon,
+    OCheckbox,
+  },
   props: {
     modelValue: {
       type: Object,
@@ -190,16 +222,18 @@ export default {
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const fields = ref(props.modelValue);
 
     // if functionName property is missing for build type, selected function Name will be None -> null
     // Ensure functionName property exists for build type fields
-    if (fields.value && fields.value.type === 'build' && !('functionName' in fields.value)) {
+    if (fields.value && fields.value.type === "build" && !("functionName" in fields.value)) {
       fields.value.functionName = null;
     }
 
     const store = useStore();
+
+    const fullMode = computed(() => !props.customQuery && !fields.value?.isDerived);
 
     watch(
       () => fields.value,
@@ -224,6 +258,12 @@ export default {
       }
     };
 
+    const setFieldType = (type: string) => {
+      if (fields.value.type === type) return;
+      fields.value.type = type;
+      onFieldTypeChange();
+    };
+
     const havingOperators = ["=", "<>", ">=", "<=", ">", "<"];
 
     const isHavingFilterVisible = () => {
@@ -237,7 +277,7 @@ export default {
       }
 
       if (!fields.value.havingConditions.length) {
-        fields.value.havingConditions.push({ operator: null, value: null });
+        fields.value.havingConditions.push({ operator: "=", value: null });
       }
 
       await nextTick();
@@ -250,16 +290,15 @@ export default {
     };
 
     const getHavingCondition = () => {
-      return (
-        fields.value.havingConditions?.[0] || { operator: null, value: null }
-      );
+      return fields.value.havingConditions?.[0] || { operator: null, value: null };
     };
 
     return {
       store,
       t,
       fields,
-      onFieldTypeChange,
+      fullMode,
+      setFieldType,
       havingOperators,
       isHavingFilterVisible,
       toggleHavingFilter,
@@ -269,40 +308,3 @@ export default {
   },
 };
 </script>
-<style scoped>
-.tab-item {
-  flex: 0 1 auto !important;
-  padding: 10px 16px !important;
-}
-
-.text-label-bold {
-  font-family: "Nunito Sans";
-  font-size: 13px;
-  font-style: normal;
-  font-weight: 600;
-}
-
-.text-label-normal {
-  font-family: "Nunito Sans";
-  font-size: 13px;
-  font-style: normal;
-  font-weight: 400;
-  line-height: 70%;
-  padding-bottom: 3px;
-}
-
-.edit-input {
-  flex: 1;
-  border: 1px solid #e0e0e0;
-  line-height: 0px;
-  border-radius: 4px;
-  padding: 2px;
-  outline: none;
-  min-width: 0;
-  width: 100%;
-
-  &:focus {
-    border-color: var(--q-primary);
-  }
-}
-</style>

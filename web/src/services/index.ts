@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,10 +24,7 @@ var index = {
     }
 
     if (schema) {
-      url +=
-        url.indexOf("?") > 0
-          ? "&fetchSchema=" + schema
-          : "?fetchSchema=" + schema;
+      url += url.indexOf("?") > 0 ? "&fetchSchema=" + schema : "?fetchSchema=" + schema;
     }
     return http().get(url);
   },
@@ -39,12 +36,7 @@ var index = {
     }
     return http().get(url);
   },
-  updateSettings: (
-    org_identifier: string,
-    stream_name: string,
-    type: string,
-    data: any
-  ) => {
+  updateSettings: (org_identifier: string, stream_name: string, type: string, data: any) => {
     let url = `/api/${org_identifier}/streams/${stream_name}/settings`;
 
     if (type != "") {

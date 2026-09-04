@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -44,6 +44,12 @@ pub struct StreamInfo {
     /// Example: {"namespace": "production", "cluster": "us-east-1"}
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub filters: HashMap<String, String>,
+
+    /// Identity dimensions that could not be resolved to a queryable field on
+    /// this stream's schema and were therefore omitted from `filters`.
+    /// Consumers should warn: queries on this stream are wider than the chips imply.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dropped_dimensions: Vec<String>,
 }
 
 impl std::hash::Hash for StreamInfo {
@@ -67,6 +73,7 @@ impl StreamInfo {
             stream_name,
             stream_type: StreamType::default(),
             filters: HashMap::new(),
+            dropped_dimensions: Vec::new(),
         }
     }
 
@@ -76,6 +83,7 @@ impl StreamInfo {
             stream_name,
             stream_type,
             filters: HashMap::new(),
+            dropped_dimensions: Vec::new(),
         }
     }
 
@@ -85,6 +93,7 @@ impl StreamInfo {
             stream_name,
             stream_type: StreamType::default(),
             filters,
+            dropped_dimensions: Vec::new(),
         }
     }
 
@@ -98,6 +107,7 @@ impl StreamInfo {
             stream_name,
             stream_type,
             filters,
+            dropped_dimensions: Vec::new(),
         }
     }
 
@@ -128,6 +138,17 @@ pub struct CorrelationResponse {
     /// 3. Pass streams between components (type info is preserved)
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub all_streams: Vec<StreamInfo>,
+    /// The identity set that was selected for this correlation (by best-coverage resolution).
+    /// `None` if the feature is not enabled or the set was not determined.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matched_set_id: Option<String>,
+    /// Echo of the request's source stream, so consumers never have to re-derive
+    /// which stream the correlation started from (F27).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_stream: Option<String>,
+    /// Echo of the request's source stream type (logs/traces/metrics) (F27).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_type: Option<String>,
 }
 
 impl CorrelationResponse {
@@ -175,6 +196,9 @@ impl CorrelationResponse {
             additional_dimensions,
             related_streams,
             all_streams: Vec::new(),
+            matched_set_id: None,
+            source_stream: None,
+            source_type: None,
         };
         response.build_all_streams();
         response
@@ -205,11 +229,57 @@ pub struct DimensionAnalyticsSummary {
     /// (sorted by cardinality, lowest first)
     pub recommended_priority_dimensions: Vec<String>,
 
-    /// All dimension analytics
+    /// All dimension analytics (dimensions with ingested data)
     pub dimensions: Vec<DimensionAnalytics>,
+
+    /// All alias groups found in the org's stream schemas
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub available_groups: Vec<FoundGroup>,
+
+    /// Field name sources for the "service" semantic group, ranked by hit count.
+    /// Shows which actual field names in each stream type contributed a service name.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub service_field_sources: Vec<ServiceFieldSource>,
 
     /// When this summary was generated
     pub generated_at: i64,
+}
+
+/// Describes a raw field name that was used to populate a semantic group,
+/// along with which stream types it appeared in and how many services used it.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct ServiceFieldSource {
+    /// The raw field name in the stream, e.g. "kubernetes_labels_app"
+    pub field_name: String,
+    /// Stream types where this field was used, e.g. ["logs", "traces"]
+    pub stream_types: Vec<String>,
+    /// Number of services where this field provided the semantic group value
+    pub hit_count: usize,
+}
+
+/// A semantic alias group found in the org's stream schemas.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct FoundGroup {
+    /// Semantic group ID, e.g., "k8s-cluster"
+    pub group_id: String,
+    /// Human-readable display name, e.g., "K8s Cluster"
+    pub display: String,
+    /// Which stream types contain a field from this group (e.g., ["logs", "traces"])
+    pub stream_types: Vec<String>,
+    /// Actual field name found per stream type, e.g., {"logs": "k8s_cluster_name"}
+    pub aliases: HashMap<String, String>,
+    /// True if this group appears in 2+ stream types AND has acceptable cardinality
+    /// (Deprecated: logic moving to UI)
+    pub recommended: bool,
+    /// Number of unique values seen in actual data (None if no data collected yet)
+    pub unique_values: Option<usize>,
+    /// Cardinality class derived from unique_values (None if no data yet)
+    pub cardinality_class: Option<CardinalityClass>,
+    /// Category this group belongs to (e.g., "AWS", "Kubernetes", "Azure", "GCP", "Common").
+    /// Sourced from the underlying `FieldAlias.group`. When `None`, the frontend falls
+    /// back to inferring the category from `group_id` prefix.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group: Option<String>,
 }
 
 /// Dimension analytics tracking
@@ -233,9 +303,21 @@ pub struct DimensionAnalytics {
     /// When this dimension was last updated
     pub last_updated: i64,
 
-    /// Sample values (limited to 10 for inspection)
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub sample_values: Vec<String>,
+    /// Sample values mapped by stream type, then stream name (limited to 10 for inspection)
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub sample_values: HashMap<String, HashMap<String, Vec<String>>>,
+
+    /// For each unique value of this dimension, the co-occurring values of other dimensions.
+    /// Example: { "common-dev": { "k8s-namespace": ["introspection", "ziox", "dev"] } }
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub value_children: HashMap<String, HashMap<String, Vec<String>>>,
+
+    /// Number of services that carry each specific value of this dimension.
+    /// Example: { "staging": 42, "prod-us-east": 18, "prod-us-west": 11 }
+    /// Used for per-value coverage: value_counts[v] / service_count = fraction of
+    /// env services in that specific group value.
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub value_counts: HashMap<String, usize>,
 }
 
 impl DimensionAnalytics {
@@ -249,19 +331,42 @@ impl DimensionAnalytics {
             service_count: 0,
             first_seen: now,
             last_updated: now,
-            sample_values: Vec::new(),
+            sample_values: HashMap::new(),
+            value_children: HashMap::new(),
+            value_counts: HashMap::new(),
         }
     }
 
     /// Update analytics with new data
-    pub fn update(&mut self, cardinality: usize, service_count: usize, sample_values: Vec<String>) {
+    pub fn update(
+        &mut self,
+        cardinality: usize,
+        service_count: usize,
+        sample_values: HashMap<String, HashMap<String, Vec<String>>>,
+        value_children: HashMap<String, HashMap<String, Vec<String>>>,
+        value_counts: HashMap<String, usize>,
+    ) {
         self.cardinality = cardinality;
         self.cardinality_class = CardinalityClass::from_cardinality(cardinality);
         self.service_count = service_count;
         self.last_updated = chrono::Utc::now().timestamp_micros();
 
-        // Keep only first 10 sample values
-        self.sample_values = sample_values.into_iter().take(10).collect();
+        // Keep only first 10 sample values per stream within each stream type
+        self.sample_values = sample_values
+            .into_iter()
+            .map(|(stream_type, streams)| {
+                (
+                    stream_type,
+                    streams
+                        .into_iter()
+                        .map(|(k, v)| (k, v.into_iter().take(10).collect()))
+                        .collect(),
+                )
+            })
+            .collect();
+
+        self.value_children = value_children;
+        self.value_counts = value_counts;
     }
 
     /// Check if this dimension is suitable for correlation
@@ -297,49 +402,6 @@ pub enum CardinalityClass {
     VeryHigh,
 }
 
-/// Response for grouped services API
-/// Groups services by their FQN (Fully Qualified Name) for correlation visualization
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct GroupedServicesResponse {
-    /// Services grouped by FQN
-    pub groups: Vec<ServiceFqnGroup>,
-
-    /// Total number of unique FQNs
-    pub total_fqns: usize,
-
-    /// Total number of services (across all FQNs)
-    pub total_services: usize,
-}
-
-/// A group of services sharing the same FQN
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ServiceFqnGroup {
-    /// The Fully Qualified Name (e.g., "o2-openobserve-querier")
-    pub fqn: String,
-
-    /// Services that share this FQN
-    pub services: Vec<ServiceInGroup>,
-
-    /// Summary of streams in this group
-    pub stream_summary: StreamSummary,
-}
-
-/// A service within an FQN group
-#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
-pub struct ServiceInGroup {
-    /// Service name (e.g., "openobserve", "querier")
-    pub service_name: String,
-
-    /// How the FQN was derived (e.g., "k8s-statefulset", "k8s-deployment", "service")
-    pub derived_from: String,
-
-    /// Streams by type
-    pub streams: ServiceStreams,
-
-    /// Key dimensions for this service
-    pub dimensions: HashMap<String, String>,
-}
-
 /// Streams organized by type
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 pub struct ServiceStreams {
@@ -356,7 +418,6 @@ pub struct ServiceStreams {
     pub metrics: Vec<String>,
 }
 
-/// Summary of streams in an FQN group
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema, Default)]
 pub struct StreamSummary {
     /// Number of log streams
@@ -409,6 +470,24 @@ impl CardinalityClass {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_stream_info_dropped_dimensions_serde() {
+        // Old payloads without the field must deserialize (default = empty)
+        let old: StreamInfo =
+            serde_json::from_str(r#"{"stream_name":"s1","stream_type":"logs"}"#).unwrap();
+        assert!(old.dropped_dimensions.is_empty());
+
+        // Empty vec must be skipped on serialization (backward-compatible wire format)
+        let ser = serde_json::to_string(&old).unwrap();
+        assert!(!ser.contains("dropped_dimensions"));
+
+        // Populated vec round-trips
+        let mut s = StreamInfo::new("s2".to_string());
+        s.dropped_dimensions = vec!["k8s-cluster".to_string()];
+        let round: StreamInfo = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
+        assert_eq!(round.dropped_dimensions, vec!["k8s-cluster".to_string()]);
+    }
 
     #[test]
     fn test_stream_info_with_type() {
@@ -521,5 +600,245 @@ mod tests {
             CardinalityClass::from_cardinality(50000),
             CardinalityClass::VeryHigh
         );
+    }
+
+    #[test]
+    fn test_stream_info_new() {
+        let s = StreamInfo::new("my_stream".to_string());
+        assert_eq!(s.stream_name, "my_stream");
+        assert_eq!(s.stream_type, StreamType::default());
+        assert!(s.filters.is_empty());
+    }
+
+    #[test]
+    fn test_stream_info_with_filters() {
+        let mut filters = HashMap::new();
+        filters.insert("env".to_string(), "prod".to_string());
+        let s = StreamInfo::with_filters("s".to_string(), filters.clone());
+        assert_eq!(s.filters, filters);
+        assert_eq!(s.stream_type, StreamType::default());
+    }
+
+    #[test]
+    fn test_stream_info_set_stream_type() {
+        let s = StreamInfo::new("s".to_string()).set_stream_type(StreamType::Metrics);
+        assert_eq!(s.stream_type, StreamType::Metrics);
+    }
+
+    #[test]
+    fn test_cardinality_class_is_suitable_for_correlation() {
+        assert!(CardinalityClass::VeryLow.is_suitable_for_correlation());
+        assert!(CardinalityClass::Low.is_suitable_for_correlation());
+        assert!(CardinalityClass::Medium.is_suitable_for_correlation());
+        assert!(!CardinalityClass::High.is_suitable_for_correlation());
+        assert!(!CardinalityClass::VeryHigh.is_suitable_for_correlation());
+    }
+
+    #[test]
+    fn test_cardinality_class_priority_score() {
+        assert_eq!(CardinalityClass::VeryLow.priority_score(), 1);
+        assert_eq!(CardinalityClass::Low.priority_score(), 2);
+        assert_eq!(CardinalityClass::Medium.priority_score(), 3);
+        assert_eq!(CardinalityClass::High.priority_score(), 4);
+        assert_eq!(CardinalityClass::VeryHigh.priority_score(), 5);
+    }
+
+    #[test]
+    fn test_dimension_analytics_new() {
+        let d = DimensionAnalytics::new("namespace".to_string());
+        assert_eq!(d.dimension_name, "namespace");
+        assert_eq!(d.cardinality, 0);
+        assert_eq!(d.service_count, 0);
+        assert_eq!(d.cardinality_class, CardinalityClass::VeryLow);
+        assert!(d.sample_values.is_empty());
+    }
+
+    #[test]
+    fn test_dimension_analytics_update() {
+        let mut d = DimensionAnalytics::new("env".to_string());
+        let mut sample = HashMap::new();
+        sample.insert("logs".to_string(), HashMap::new());
+        d.update(5, 2, sample, HashMap::new(), HashMap::new());
+        assert_eq!(d.cardinality, 5);
+        assert_eq!(d.service_count, 2);
+        assert_eq!(d.cardinality_class, CardinalityClass::VeryLow);
+    }
+
+    #[test]
+    fn test_dimension_analytics_is_suitable_for_correlation() {
+        let mut d = DimensionAnalytics::new("region".to_string());
+        d.update(3, 1, HashMap::new(), HashMap::new(), HashMap::new());
+        assert!(d.is_suitable_for_correlation());
+
+        // high cardinality — not suitable
+        d.update(5000, 1, HashMap::new(), HashMap::new(), HashMap::new());
+        assert!(!d.is_suitable_for_correlation());
+    }
+
+    #[test]
+    fn test_cardinality_class_boundary_values() {
+        // Exact boundary cases for from_cardinality
+        assert_eq!(
+            CardinalityClass::from_cardinality(0),
+            CardinalityClass::VeryLow
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(10),
+            CardinalityClass::VeryLow
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(11),
+            CardinalityClass::Low
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(100),
+            CardinalityClass::Low
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(101),
+            CardinalityClass::Medium
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(1000),
+            CardinalityClass::Medium
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(1001),
+            CardinalityClass::High
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(10000),
+            CardinalityClass::High
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(10001),
+            CardinalityClass::VeryHigh
+        );
+        assert_eq!(
+            CardinalityClass::from_cardinality(usize::MAX),
+            CardinalityClass::VeryHigh
+        );
+    }
+
+    #[test]
+    fn test_cardinality_class_ordering() {
+        // Derived PartialOrd should respect declaration order
+        assert!(CardinalityClass::VeryLow < CardinalityClass::Low);
+        assert!(CardinalityClass::Low < CardinalityClass::Medium);
+        assert!(CardinalityClass::Medium < CardinalityClass::High);
+        assert!(CardinalityClass::High < CardinalityClass::VeryHigh);
+    }
+
+    #[test]
+    fn test_dimension_analytics_update_truncates_sample_values() {
+        let mut d = DimensionAnalytics::new("pod".to_string());
+        // 15 sample values in one stream → should be truncated to 10
+        let many_values: Vec<String> = (0..15).map(|i| format!("v{i}")).collect();
+        let mut inner = HashMap::new();
+        inner.insert("stream1".to_string(), many_values);
+        let mut sample = HashMap::new();
+        sample.insert("logs".to_string(), inner);
+
+        d.update(15, 1, sample, HashMap::new(), HashMap::new());
+
+        // After update, samples should be truncated to first 10
+        let stream_samples = &d.sample_values["logs"]["stream1"];
+        assert_eq!(stream_samples.len(), 10);
+        assert_eq!(stream_samples[0], "v0");
+        assert_eq!(stream_samples[9], "v9");
+    }
+
+    #[test]
+    fn test_stream_info_filters_empty_absent() {
+        let s = StreamInfo::with_type("s".to_string(), StreamType::Logs);
+        let json = serde_json::to_value(&s).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("filters"));
+    }
+
+    #[test]
+    fn test_stream_info_filters_present_when_nonempty() {
+        let mut filters = HashMap::new();
+        filters.insert("env".to_string(), "prod".to_string());
+        let s = StreamInfo::with_type_and_filters("s".to_string(), StreamType::Logs, filters);
+        let json = serde_json::to_value(&s).unwrap();
+        assert!(json.as_object().unwrap().contains_key("filters"));
+    }
+
+    #[test]
+    fn test_correlation_response_all_streams_absent_when_empty() {
+        let r = CorrelationResponse {
+            service_name: "svc".to_string(),
+            matched_dimensions: HashMap::new(),
+            additional_dimensions: HashMap::new(),
+            related_streams: RelatedStreams {
+                logs: vec![],
+                traces: vec![],
+                metrics: vec![],
+            },
+            all_streams: vec![],
+            matched_set_id: None,
+            source_stream: None,
+            source_type: None,
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("all_streams"));
+        assert!(!obj.contains_key("matched_set_id"));
+    }
+
+    #[test]
+    fn test_correlation_response_all_streams_present_when_nonempty() {
+        let r = CorrelationResponse {
+            service_name: "svc".to_string(),
+            matched_dimensions: HashMap::new(),
+            additional_dimensions: HashMap::new(),
+            related_streams: RelatedStreams {
+                logs: vec![],
+                traces: vec![],
+                metrics: vec![],
+            },
+            all_streams: vec![StreamInfo::with_type("x".to_string(), StreamType::Logs)],
+            matched_set_id: Some("set1".to_string()),
+            source_stream: None,
+            source_type: None,
+        };
+        let json = serde_json::to_value(&r).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("all_streams"));
+        assert!(obj.contains_key("matched_set_id"));
+    }
+
+    #[test]
+    fn test_dimension_analytics_empty_maps_absent() {
+        let d = DimensionAnalytics::new("env".to_string());
+        let json = serde_json::to_value(&d).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("sample_values"));
+        assert!(!obj.contains_key("value_children"));
+        assert!(!obj.contains_key("value_counts"));
+    }
+
+    #[test]
+    fn test_service_streams_empty_vecs_absent() {
+        let s = ServiceStreams::default();
+        let json = serde_json::to_value(&s).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("logs"));
+        assert!(!obj.contains_key("traces"));
+        assert!(!obj.contains_key("metrics"));
+    }
+
+    #[test]
+    fn test_service_streams_vecs_present_when_nonempty() {
+        let s = ServiceStreams {
+            logs: vec!["l".to_string()],
+            traces: vec!["t".to_string()],
+            metrics: vec!["m".to_string()],
+        };
+        let json = serde_json::to_value(&s).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("logs"));
+        assert!(obj.contains_key("traces"));
+        assert!(obj.contains_key("metrics"));
     }
 }

@@ -1,9 +1,8 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`ShortUrl > should match snapshot 1`] = `
-"<div data-v-fb8cde2d="" data-test="loading-container" class="tw:h-[100vh] tw:flex tw:flex-col tw:items-center tw:justify-center"><svg data-v-fb8cde2d="" class="q-spinner text-primary q-spinner-mat" width="3em" height="3em" viewBox="25 25 50 50" data-test="spinner">
-    <circle class="path" cx="50" cy="50" r="20" fill="none" stroke="currentColor" stroke-width="2" stroke-miterlimit="10"></circle>
-  </svg>
-  <div data-v-fb8cde2d="" data-test="message" class="message">Redirecting...</div>
+"<div data-test="loading-container" class="flex h-[100vh] flex-col items-center justify-center">
+  <!-- Ring variant --><span class="inline-flex items-center justify-center shrink-0 size-12" role="status" aria-label="Loading" aria-live="polite" data-test="spinner"><svg class="text-spinner size-full animate-spin" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><!-- Track --><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-20"></circle><!-- Spinning arc --><path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" stroke-width="3" stroke-linecap="round" class="text-spinner"></path></svg></span>
+  <div data-test="message" class="text-text-secondary text-base">Redirecting...</div>
 </div>"
 `;

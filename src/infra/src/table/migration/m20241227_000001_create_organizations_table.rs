@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -88,21 +88,6 @@ mod tests {
                 "org_type" smallint NOT NULL,
                 "created_at" bigint NOT NULL,
                 "updated_at" bigint NOT NULL
-            )"#
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_organizations_table_statement().to_string(MysqlQueryBuilder),
-            r#"
-                CREATE TABLE IF NOT EXISTS `organizations` (
-                `identifier` varchar(256) NOT NULL PRIMARY KEY,
-                `org_name` varchar(200) NOT NULL,
-                `org_type` smallint NOT NULL,
-                `created_at` bigint NOT NULL,
-                `updated_at` bigint NOT NULL
             )"#
         );
     }

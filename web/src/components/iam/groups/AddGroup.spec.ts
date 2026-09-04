@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -12,325 +12,278 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+//
+// AddGroup is migrated to OForm + Zod (AddGroup.schema.ts). These tests mount
+// the REAL <OForm> (only ODialog is stubbed) so the schema actually gates the
+// submit — an unwired :schema would be caught here. They assert behavior
+// (validation + service call + emits), not removed internals (showNameError /
+// isValidGroupName / nameErrorMessage / the disabled gate are all gone).
 
-import { mount } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import AddGroup from "@/components/iam/groups/AddGroup.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar({
-  plugins: [Notify],
-});
 
 vi.mock("@/services/iam", () => ({
   createGroup: vi.fn(),
 }));
 
-const mockNotify = vi.fn();
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+vi.mock("@/services/reodotdev_analytics", () => ({
+  useReo: () => ({ track: vi.fn() }),
+}));
 
-describe("AddGroup Component", () => {
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(),
+}));
+
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
+
+// Lightweight ODialog stub: renders the default (body) slot so the REAL OForm
+// inside mounts, and exposes the footer primary/secondary buttons. The footer
+// Save submits via `form-id` in the real app; tests drive the form's own submit
+// (form.handleSubmit) so the schema runs deterministically.
+const ODialogStub = {
+  name: "ODialog",
+  props: ["open", "size", "title", "primaryButtonLabel", "secondaryButtonLabel", "formId"],
+  emits: ["update:open", "click:primary", "click:secondary"],
+  template: `
+    <div data-test-stub="o-dialog" :data-open="open" :data-title="title" :data-form-id="formId">
+      <div data-test-stub="o-dialog-body"><slot /></div>
+      <div data-test-stub="o-dialog-footer">
+        <slot name="footer" />
+        <button
+          v-if="secondaryButtonLabel"
+          data-test="o-dialog-secondary-btn"
+          @click="$emit('click:secondary')"
+        >{{ secondaryButtonLabel }}</button>
+        <button
+          v-if="primaryButtonLabel"
+          data-test="o-dialog-primary-btn"
+          @click="$emit('click:primary')"
+        >{{ primaryButtonLabel }}</button>
+      </div>
+    </div>
+  `,
+  inheritAttrs: false,
+};
+
+function mountComp(props: Record<string, any> = {}) {
+  return mount(AddGroup, {
+    global: {
+      plugins: [store, i18n],
+      stubs: { ODialog: ODialogStub },
+    },
+    props: {
+      open: true,
+      group: null,
+      org_identifier: "test-org",
+      ...props,
+    },
+  });
+}
+
+const getForm = (wrapper: any) => wrapper.findComponent({ name: "OForm" });
+const getNameInput = (wrapper: any) =>
+  wrapper.find('[data-test="add-group-groupname-input-btn"] input');
+
+const submitForm = async (wrapper: any) => {
+  // Drive the form's own submit so the schema runs + the handler is awaited
+  // deterministically (a fire-and-forget native submit wouldn't be).
+  await getForm(wrapper).vm.form.handleSubmit();
+  await flushPromises();
+};
+
+describe("AddGroup", () => {
   let wrapper: any;
 
   beforeEach(() => {
-    wrapper = mount(AddGroup, {
-      global: {
-        provide: { store },
-        plugins: [i18n],
-      },
-      props: {
-        width: "30vw",
-        group: null,
-        org_identifier: "test-org",
-      },
-    });
+    vi.clearAllMocks();
+    wrapper = mountComp();
   });
 
-  describe("Component Mounting", () => {
-    it("renders the component correctly", () => {
+  afterEach(() => {
+    try {
+      wrapper?.unmount();
+    } catch {
+      // teleported components can throw during unmount in jsdom
+    }
+  });
+
+  describe("rendering", () => {
+    it("renders the dialog and group name input", () => {
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.find('[data-test="add-group-section"]').exists()).toBe(true);
+      expect(getNameInput(wrapper).exists()).toBe(true);
     });
 
-    it("displays the correct title", () => {
-      const titleElement = wrapper.find('[data-test="add-group-section-title"]');
-      expect(titleElement.exists()).toBe(true);
-      expect(titleElement.text()).toContain("New user group");
-    });
-  });
-
-  describe("Form Input", () => {
-    it("renders the group name input field", () => {
-      const nameInput = wrapper.find('[data-test="add-group-groupname-input-btn"]');
-      expect(nameInput.exists()).toBe(true);
+    it("wires the OForm to the dialog via form-id", () => {
+      expect(getForm(wrapper).exists()).toBe(true);
+      expect(wrapper.find('[data-test-stub="o-dialog"]').attributes("data-form-id")).toBe(
+        "add-group-form",
+      );
     });
 
-    it("displays validation hint text", () => {
-      // Check if hint text is in the component (it's in the template)
-      expect(wrapper.text()).toContain("Use alphanumeric and '_' characters only, without spaces.");
+    it("passes a Zod schema to OForm (no per-field validators / disabled gate)", () => {
+      expect(getForm(wrapper).props("schema")).toBeDefined();
     });
 
-    it("updates name value when input changes", async () => {
-      const nameInput = wrapper.find('input[type="text"]');
-      await nameInput.setValue("test_group");
-      expect(wrapper.vm.name).toBe("test_group");
+    it("seeds blank default-values in create mode", () => {
+      expect(getForm(wrapper).props("defaultValues")).toEqual({ name: "" });
     });
 
-    it("trims whitespace from input", async () => {
-      const nameInput = wrapper.find('input[type="text"]');
-      await nameInput.setValue("  test_group  ");
-      expect(wrapper.vm.name).toBe("test_group");
-    });
-  });
-
-  describe("Form Validation", () => {
-    it("validates group name format correctly", () => {
-      wrapper.vm.name = "valid_group_123";
-      expect(wrapper.vm.isValidGroupName).toBe(true);
+    it("seeds the group name when a group prop is provided", () => {
+      const w = mountComp({ group: { name: "existing_group" } });
+      expect(getForm(w).props("defaultValues")).toEqual({ name: "existing_group" });
+      w.unmount();
     });
 
-    it("rejects group names with spaces", () => {
-      wrapper.vm.name = "invalid group";
-      expect(wrapper.vm.isValidGroupName).toBe(false);
+    it("preserves the maxlength attribute on the input", () => {
+      expect(getNameInput(wrapper).attributes("maxlength")).toBe("100");
     });
 
-    it("rejects group names with special characters", () => {
-      wrapper.vm.name = "invalid-group!";
-      expect(wrapper.vm.isValidGroupName).toBe(false);
-    });
-
-    it("accepts group names with underscores and alphanumeric characters", () => {
-      wrapper.vm.name = "valid_group_name_123";
-      expect(wrapper.vm.isValidGroupName).toBe(true);
-    });
-
-    it("rejects empty group names", () => {
-      wrapper.vm.name = "";
-      expect(wrapper.vm.isValidGroupName).toBe(false);
+    it("keeps Save enabled (R3 — no disabled gate)", () => {
+      const saveBtn = wrapper.find('[data-test="o-dialog-primary-btn"]');
+      expect(saveBtn.attributes("disabled")).toBeUndefined();
     });
   });
 
-  describe("Button Actions", () => {
-    it("renders cancel and save buttons", () => {
-      const cancelButton = wrapper.find('[data-test="add-group-cancel-btn"]');
-      const saveButton = wrapper.find('[data-test="add-group-submit-btn"]');
-      
-      expect(cancelButton.exists()).toBe(true);
-      expect(saveButton.exists()).toBe(true);
-      expect(cancelButton.text()).toContain("Cancel");
-      expect(saveButton.text()).toContain("Save");
+  describe("schema validation (real OForm)", () => {
+    it("does not validate before the first submit", async () => {
+      await getNameInput(wrapper).setValue("invalid name");
+      await flushPromises();
+      // R3: nothing validates until the first submit.
+      expect(wrapper.find('[role="alert"]').exists()).toBe(false);
     });
 
-    it("emits cancel event when close button is clicked", async () => {
-      const closeButton = wrapper.find('[data-test="add-group-close-dialog-btn"]');
-      await closeButton.trigger("click");
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-
-    it("emits cancel event when cancel button is clicked", async () => {
-      const cancelButton = wrapper.find('[data-test="add-group-cancel-btn"]');
-      await cancelButton.trigger("click");
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
-  });
-
-  describe("Group Creation", () => {
-    beforeEach(() => {
-      // Clear previous mock calls
-      mockNotify.mockClear();
-    });
-
-    it("does not save when group name is empty", async () => {
+    it("blocks submit and does NOT call createGroup when name is empty", async () => {
       const { createGroup } = await import("@/services/iam");
-      wrapper.vm.name = "";
-      
-      await wrapper.vm.saveGroup();
-      
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(createGroup).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain("Group name is required.");
+    });
+
+    it("blocks submit for a name with invalid characters (restored regex rule)", async () => {
+      const { createGroup } = await import("@/services/iam");
+      await getNameInput(wrapper).setValue("invalid name!");
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
+      expect(createGroup).not.toHaveBeenCalled();
+      expect(wrapper.text()).toContain(
+        "Use letters, numbers and underscores only, without spaces.",
+      );
+    });
+
+    it("blocks submit when the name exceeds 100 characters (max rule)", async () => {
+      const { createGroup } = await import("@/services/iam");
+      // maxlength caps typing, so set the value directly to exercise the schema.
+      getForm(wrapper).vm.form.setFieldValue("name", "a".repeat(101));
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(false);
       expect(createGroup).not.toHaveBeenCalled();
     });
 
-    it("does not save when group name is invalid", async () => {
+    it("submits and calls createGroup once when the name is valid", async () => {
       const { createGroup } = await import("@/services/iam");
-      wrapper.vm.name = "invalid group name";
-      
-      await wrapper.vm.saveGroup();
-      
-      expect(createGroup).not.toHaveBeenCalled();
+      vi.mocked(createGroup).mockResolvedValue({
+        data: { name: "test_group" },
+      } as any);
+
+      await getNameInput(wrapper).setValue("test_group");
+      await submitForm(wrapper);
+
+      expect(getForm(wrapper).vm.form.state.isValid).toBe(true);
+      expect(createGroup).toHaveBeenCalledTimes(1);
+      expect(createGroup).toHaveBeenCalledWith(
+        "test_group",
+        store.state.selectedOrganization.identifier,
+      );
+      // Emit contract consumed by AppGroups.onGroupAdded (routes to editGroup).
+      expect(wrapper.emitted("added:group")?.[0]).toEqual([
+        { group_name: "test_group", data: { name: "test_group" } },
+      ]);
     });
 
-    it("creates group successfully with valid data", async () => {
+    it("trims the submitted name via the schema", async () => {
       const { createGroup } = await import("@/services/iam");
-      const mockResponse = { data: { name: "test_group" } };
-      vi.mocked(createGroup).mockResolvedValue(mockResponse);
-      
-      wrapper.vm.name = "test_group";
-      
-      await wrapper.vm.saveGroup();
-      
-      expect(createGroup).toHaveBeenCalledWith("test_group", store.state.selectedOrganization.identifier);
-      expect(wrapper.emitted("added:group")).toBeTruthy();
-      expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
-    });
+      vi.mocked(createGroup).mockResolvedValue({ data: {} } as any);
 
-    it("displays success notification on successful creation", async () => {
+      await getNameInput(wrapper).setValue("  test_group  ");
+      await submitForm(wrapper);
+
+      expect(createGroup).toHaveBeenCalledWith(
+        "test_group",
+        store.state.selectedOrganization.identifier,
+      );
+    });
+  });
+
+  describe("group creation behavior", () => {
+    it("emits added:group + update:open(false) and shows success toast on success", async () => {
       const { createGroup } = await import("@/services/iam");
       const mockResponse = { data: { name: "test_group" } };
-      vi.mocked(createGroup).mockResolvedValue(mockResponse);
-      
-      wrapper.vm.name = "test_group";
-      
-      await wrapper.vm.saveGroup();
-      
-      expect(mockNotify).toHaveBeenCalledWith({
+      vi.mocked(createGroup).mockResolvedValue(mockResponse as any);
+
+      await getNameInput(wrapper).setValue("test_group");
+      await submitForm(wrapper);
+
+      expect(wrapper.emitted("added:group")?.[0]).toEqual([
+        { group_name: "test_group", data: mockResponse.data },
+      ]);
+      const updateOpen = wrapper.emitted("update:open");
+      expect(updateOpen[updateOpen.length - 1]).toEqual([false]);
+      expect(mockToast).toHaveBeenCalledWith({
         message: 'User Group "test_group" Created Successfully!',
-        color: "positive",
-        position: "bottom",
-        timeout: 3000,
+        variant: "success",
       });
     });
 
-    it("handles error during group creation", async () => {
+    it("shows an error toast on a non-403 failure and does not emit added:group", async () => {
       const { createGroup } = await import("@/services/iam");
-      const mockError = { response: { status: 400 } };
-      vi.mocked(createGroup).mockRejectedValue(mockError);
-      
-      wrapper.vm.name = "test_group";
-      
-      try {
-        await wrapper.vm.saveGroup();
-      } catch (e) {
-        // Error should be caught by component
-      }
-      
-      // Give time for async operations
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
-      expect(mockNotify).toHaveBeenCalledWith({
+      vi.mocked(createGroup).mockRejectedValue({ response: { status: 400 } });
+
+      await getNameInput(wrapper).setValue("test_group");
+      await submitForm(wrapper);
+
+      expect(mockToast).toHaveBeenCalledWith({
         message: "Error while creating group",
-        color: "negative",
-        position: "bottom",
-        timeout: 3000,
+        variant: "error",
       });
+      expect(wrapper.emitted("added:group")).toBeFalsy();
     });
 
-    it("does not show error notification for 403 status", async () => {
+    it("does not show an error toast for a 403 failure", async () => {
       const { createGroup } = await import("@/services/iam");
-      const mockError = { response: { status: 403 } };
-      vi.mocked(createGroup).mockRejectedValue(mockError);
-      
-      wrapper.vm.name = "test_group";
-      
-      await wrapper.vm.saveGroup();
-      
-      expect(mockNotify).not.toHaveBeenCalled();
+      vi.mocked(createGroup).mockRejectedValue({ response: { status: 403 } });
+
+      await getNameInput(wrapper).setValue("test_group");
+      await submitForm(wrapper);
+
+      expect(mockToast).not.toHaveBeenCalled();
     });
   });
 
-  describe("Props Handling", () => {
-    it("initializes with group prop data when provided", async () => {
-      const groupData = { name: "existing_group" };
-      const wrapper = mount(AddGroup, {
-        global: {
-          provide: { store },
-          plugins: [i18n],
-        },
-        props: {
-          group: groupData,
-        },
-      });
-
-      expect(wrapper.vm.name).toBe("existing_group");
+  describe("dialog interactions", () => {
+    it("emits update:open(false) when cancel is clicked", async () => {
+      await wrapper.find('[data-test="o-dialog-secondary-btn"]').trigger("click");
+      const emitted = wrapper.emitted("update:open");
+      expect(emitted[emitted.length - 1]).toEqual([false]);
     });
 
-    it("initializes with empty name when no group prop", () => {
-      expect(wrapper.vm.name).toBe("");
+    it("re-emits update:open from the dialog's update:open event", async () => {
+      await wrapper.findComponent(ODialogStub).vm.$emit("update:open", false);
+      const emitted = wrapper.emitted("update:open");
+      expect(emitted[emitted.length - 1]).toEqual([false]);
     });
 
-    it("uses default width when not provided", () => {
-      // The width prop has been removed from the component
-      // Verify the component mounts successfully without the width prop
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("uses provided org_identifier", () => {
+    it("uses the provided org_identifier prop", () => {
       expect(wrapper.props("org_identifier")).toBe("test-org");
-    });
-  });
-
-  describe("Input Validation Rules", () => {
-    it("validates required field rule", () => {
-      const input = wrapper.find('input[type="text"]');
-      const rules = wrapper.vm.$el.querySelector('.q-input').getAttribute('rules') || [];
-      
-      wrapper.vm.name = "";
-      wrapper.vm.isValidGroupName = false;
-      
-      const validationResult = wrapper.vm.name ? "valid" : "Name is required";
-      expect(validationResult).toBe("Name is required");
-    });
-
-    it("validates format rule when name exists", () => {
-      wrapper.vm.name = "invalid name";
-      wrapper.vm.isValidGroupName = false;
-      
-      const validationResult = wrapper.vm.isValidGroupName || "Use alphanumeric and '_' characters only, without spaces.";
-      expect(validationResult).toBe("Use alphanumeric and '_' characters only, without spaces.");
-    });
-  });
-
-  describe("Edge Cases", () => {
-    it("handles maxlength constraint", () => {
-      const nameInput = wrapper.find('input[type="text"]');
-      expect(nameInput.attributes("maxlength")).toBe("100");
-    });
-
-    it("handles empty organization identifier", async () => {
-      const wrapper = mount(AddGroup, {
-        global: {
-          provide: { store: { ...store, state: { ...store.state, selectedOrganization: { identifier: "" } } } },
-          plugins: [i18n],
-        },
-      });
-
-      const { createGroup } = await import("@/services/iam");
-      const mockResponse = { data: { name: "test_group" } };
-      vi.mocked(createGroup).mockResolvedValue(mockResponse);
-      
-      wrapper.vm.name = "test_group";
-      wrapper.vm.q = { notify: vi.fn() };
-      
-      await wrapper.vm.saveGroup();
-      
-      expect(createGroup).toHaveBeenCalledWith("test_group", "");
-    });
-  });
-
-  describe("Accessibility", () => {
-    it("has proper button attributes", () => {
-      const closeButton = wrapper.find('[data-test="add-group-close-dialog-btn"]');
-      const cancelButton = wrapper.find('[data-test="add-group-cancel-btn"]');
-      const saveButton = wrapper.find('[data-test="add-group-submit-btn"]');
-
-      expect(closeButton.exists()).toBe(true);
-      expect(cancelButton.exists()).toBe(true);
-      expect(saveButton.exists()).toBe(true);
-    });
-
-    it("has proper input labels", () => {
-      const input = wrapper.find('input[type="text"]');
-      expect(input.exists()).toBe(true);
-      expect(input.attributes("maxlength")).toBe("100");
     });
   });
 });

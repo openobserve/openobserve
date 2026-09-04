@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -67,7 +67,7 @@ mod tests {
     fn test_sysinfo_get_cpu_usage() {
         let usage = get_cpu_usage();
         assert!(
-            usage >= 0.0 && usage <= 100.0,
+            (0.0..=100.0).contains(&usage),
             "CPU usage should be between 0 and 100, got {}",
             usage
         );

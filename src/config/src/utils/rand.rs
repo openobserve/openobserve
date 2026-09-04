@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use rand::{
-    Rng,
+    RngExt,
     distr::{Alphanumeric, SampleString},
 };
 
@@ -42,6 +42,15 @@ pub fn get_rand_u128() -> u128 {
     let mut buf = [0u8; 16];
     rand::rng().fill(&mut buf);
     u128::from_le_bytes(buf)
+}
+
+/// Generate `n` cryptographically random bytes.
+///
+/// Intended for generating cryptographic key material (e.g. DEKs).
+pub fn random_bytes(n: usize) -> Vec<u8> {
+    let mut buf = vec![0u8; n];
+    rand::rng().fill(buf.as_mut_slice());
+    buf
 }
 
 #[cfg(test)]
@@ -90,6 +99,43 @@ mod tests {
         // Test that we get different values on multiple calls
         let values: HashSet<u128> = HashSet::from_iter((0..100).map(|_| get_rand_u128()));
         // We should have at least 90 different values out of 100 calls
+        assert!(values.len() > 90);
+    }
+
+    // -----------------------------------------------------------------------
+    // random_bytes
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_random_bytes_correct_length() {
+        assert_eq!(random_bytes(0).len(), 0);
+        assert_eq!(random_bytes(16).len(), 16);
+        assert_eq!(random_bytes(32).len(), 32);
+        assert_eq!(random_bytes(64).len(), 64); // DEK size for AES-256-SIV
+    }
+
+    #[test]
+    fn test_random_bytes_uniqueness() {
+        // Two calls must produce distinct results (the probability of collision
+        // for 32 random bytes is ~1 in 2^256 — negligible).
+        let a = random_bytes(32);
+        let b = random_bytes(32);
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn test_random_bytes_not_all_zeros() {
+        let bytes = random_bytes(64);
+        assert!(
+            !bytes.iter().all(|&b| b == 0),
+            "random_bytes should not return all zeros"
+        );
+    }
+
+    #[test]
+    fn test_random_bytes_distribution() {
+        // Collect 100 × 16-byte buffers and verify at least 90 are unique.
+        let values: HashSet<Vec<u8>> = HashSet::from_iter((0..100).map(|_| random_bytes(16)));
         assert!(values.len() > 90);
     }
 }

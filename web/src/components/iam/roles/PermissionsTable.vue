@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,43 +16,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    data-test="edit-role-permissions-table-title"
-    v-if="!level"
-    class="tw:py-[19px] tw:px-[16px] tw:font-bold tw:text-[14px]"
-  >
-     {{ visibleResourceCount }} Permissions
-  </div>
-  <div
-    :data-test="`iam-${
-      parent ? parent.name : 'main'
-    }-permissions-table-section`"
+    :data-test="`iam-${parent ? parent.name : 'main'}-permissions-table-section`"
     class="iam-permissions-table"
   >
     <div :style="{ marginTop: 0 }" class="app-table-container">
       <div
         data-test="edit-role-permissions-table-no-permissions-title"
-        v-if="!level && !rows.length"
-        class="w-full text-center q-mt-lg text-bold text-grey-9"
-        style="margin-top: 64px; font-size: 18px"
+        v-if="!level && !rows.length && !loading"
+        class="text-text-secondary mt-4 w-full text-center font-bold"
+        style="margin-top: 4rem; font-size: var(--text-lg)"
       >
-        <span> No Permissions Selected </span>
-      </div>
-      <div
-        data-test="edit-role-permissions-table-no-resources-title"
-        v-if="level && !parent.is_loading && !getFilteredRows.length"
-        class="q-py-sm text-left text-subtitle text-grey-9"
-        :style="{
-          paddingLeft: level
-            ? parent.has_entities
-              ? 16 + 8 + level * 20 + 'px'
-              : 16 +
-                8 +
-                (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) +
-                'px'
-            : '',
-        }"
-      >
-        No Resources Present
+        <span> {{ t("iam.permissionsTable.noPermissionsSelected") }} </span>
       </div>
       <div
         data-test="edit-role-permissions-table-loading-resources-loader"
@@ -62,191 +36,118 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           paddingLeft: level
             ? parent.has_entities
               ? 16 + 8 + level * 20 + 'px'
-              : 16 +
-                8 +
-                (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) +
-                'px'
+              : 16 + 8 + (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) + 'px'
             : '',
         }"
       >
-        <q-circular-progress
-          indeterminate
-          rounded
-          size="20px"
-          color="primary"
-          class="q-my-sm q-mx-none q-mr-sm"
-        />
-        <div>Loading Resources...</div>
+        <OSpinner size="xs" class="mx-0 my-2 me-2" />
+        <div>{{ t("iam.permissionsTable.loadingResources") }}</div>
       </div>
       <div
         v-if="level && getFilteredRows.length === 50"
-        class="q-py-sm text-left text-grey-10 bg-white relative-position"
+        class="text-text-body bg-surface-base relative py-2 text-left"
         :style="{
           paddingLeft: level
             ? parent.has_entities
               ? 16 + 8 + level * 20 + 'px'
-              : 16 +
-                8 +
-                (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) +
-                'px'
+              : 16 + 8 + (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) + 'px'
             : '',
         }"
       >
-        Showing <span class="text-bold"> Top 50 </span> resources (Search to get
-        specific resource)
+        {{ t("iam.permissionsTable.showing") }}
+        <span class="font-bold"> {{ t("iam.permissionsTable.top50") }} </span>
+        {{ t("iam.permissionsTable.resourcesSearchHint") }}
       </div>
-      <q-virtual-scroll
-        :data-test="`edit-role-${
-          parent ? parent.name : 'main'
-        }-permissions-table`"
+      <div
+        :data-test="`edit-role-${parent ? parent.name : 'main'}-permissions-table`"
         :id="`permissions-table-${parent.resourceName}`"
-        style="max-height: calc(100vh - 310px); overflow-x: hidden; overflow-y: auto;"
+        :class="level > 0 ? 'overflow-x-hidden overflow-y-auto' : ''"
         :style="{
-          'max-height': level > 0 ? '400px' : 'calc(100vh - 310px)',
-          'height': 'auto',
+          maxHeight: level > 0 ? '25rem' : undefined,
         }"
-        :items-size="getFilteredRows.length"
-        :virtual-scroll-item-size="39"
-        :virtual-scroll-slice-size="20"
-        :virtual-scroll-slice-ratio-before="20"
-        type="table"
-        :items="getFilteredRows"
-        flat
-        bordered
-        ref="permissionsTableRef"
-        :rows="getFilteredRows"
-        :columns="columns as []"
-        :table-colspan="9"
-        row-key="name"
-        dense
-        :hide-header="!!level"
-        :filter="filter && filter.value"
-        :filter-method="filter && filter.method"
-        hide-bottom
       >
-        <template v-if="!level" v-slot:before>
-          <thead class="thead-sticky text-left o2-custom-table-header-bg">
-            <tr
-              data-test="edit-role-permissions-table-header"
-              :props="props"
-              class="thead-sticky"
+        <OTable
+          ref="permissionsTableRef"
+          :data="getFilteredRows"
+          :columns="columns"
+          row-key="name"
+          :global-filter="filter?.value ?? ''"
+          filter-mode="client"
+          :default-columns="false"
+          :show-global-filter="false"
+          dense
+          pagination="none"
+          :virtual-scroll="false"
+          expansion="multiple"
+          :expanded-ids="expandedRowIds"
+          :show-header="level === 0"
+          :loading="level === 0 && props.loading"
+          :get-row-expansion-enabled="(row: any) => !!row.has_entities"
+          @update:expanded-ids="handleOTableExpansionChange"
+        >
+          <template #cell-display_name="{ row }">
+            <span :style="{ paddingLeft: level > 0 ? `${level * 20}px` : undefined }">{{
+              row.display_name
+            }}</span>
+          </template>
+          <!-- `row.type` is a sentinel compared in EditRole.vue and below, so the value
+               stays English and only the rendered label is translated. -->
+          <template #cell-type="{ row }">
+            <span>{{ objectTypeLabel(row.type) }}</span>
+          </template>
+          <template v-for="col in permissionColumnIds" :key="col" #[`cell-${col}`]="{ row }">
+            <OCheckbox
+              v-if="row.permission?.[col]?.show"
+              :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col}-checkbox`"
+              v-model="row.permission[col].value"
+              :value="col"
+              class="filter-check-box cursor-pointer"
+              @update:model-value="handlePermissionChange(row, col)"
+            />
+          </template>
+          <!-- expansion slot receives row.original (raw data), not the TanStack Row -->
+          <template #expansion="{ row }: { row: any }">
+            <template v-if="row.entities">
+              <PermissionsTable
+                :level="level + 1"
+                :rows="row.entities"
+                :customFilteredPermissions="customFilteredPermissions"
+                :parent="row"
+                @updated:permission="handlePermissionChange"
+                @updated:permission-batch="
+                  (changes: any) => emits('updated:permission-batch', changes)
+                "
+                @expand:row="expandPermission"
+              />
+            </template>
+          </template>
+          <template #empty>
+            <div v-if="level === 0" class="flex items-center justify-center py-16">
+              <NoData :filtered="!!filter" @action="emits('update:filter', '')" />
+            </div>
+            <div
+              v-else
+              data-test="edit-role-permissions-table-no-resources-title"
+              class="text-text-secondary px-4 py-2 text-sm"
             >
-              <th
-                v-for="col in columns"
-                :data-test="`edit-role-permissions-table-header-column-${col.name}`"
-                :key="col.name"
-                :props="props"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </th>
-            </tr>
-            <tr v-if="!visibleResourceCount">
-              <q-td
-                data-test="edit-role-permissions-table-no-permissions-title"
-                colspan="100%"
-                class="text-center text-bold text-grey-9"
-                style="padding-top: 16px; font-size: 16px"
-              >
-                No Permissions Selected</q-td
-              >
-            </tr>
-          </thead>
-        </template>
-
-        <template v-slot="{ item: row }">
-          <tr
-            :data-test="`edit-role-permissions-table-body-row-${row.name}`"
-            v-if="row.show"
-            :key="`m_${row.name}`"
-          >
-            <td
-              v-for="(col, index) in columns"
-              :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}`"
-              :key="col.name"
-              :props="props"
-              :style="{
-                width: col.style?.width,
-                paddingLeft:
-                  level && index === 0
-                    ? row.has_entities
-                      ? 16 + level * 20 + 'px'
-                      : 16 +
-                        (level * 20 - ((level > 1 ? level - 1 : 1) - 1) * 7) +
-                        'px'
-                    : '',
-              }"
-            >
-              <template v-if="col.name === 'expand' && row.has_entities">
-                <q-icon
-                  :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}-icon`"
-                  :name="
-                    row.expand ? 'keyboard_arrow_up' : 'keyboard_arrow_down'
-                  "
-                  class="cursor-pointer"
-                  :title="t('common.expand')"
-                  @click="() => expandPermission(row)"
-                />
-              </template>
-              <template v-else-if="col.field === 'permission'">
-                <q-checkbox
-                  :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}-checkbox`"
-                  v-if="row.permission[col.name]?.show"
-                  size="xs"
-                  v-model="row.permission[col.name].value"
-                  :val="col.name"
-                  class="filter-check-box cursor-pointer"
-                  @update:model-value="handlePermissionChange(row, col.name)"
-                />
-              </template>
-              <template
-                v-else-if="col.name !== 'expand' && col.field !== 'permission'"
-              >
-                <span
-                  :data-test="`edit-role-permissions-table-body-row-${row.name}-col-${col.name}-text`"
-                  :title="
-                    JSON.stringify({
-                      name: row.name,
-                      label: row.display_name,
-                    })
-                  "
-                >
-                  {{ row[col.field] }}</span
-                >
-              </template>
-            </td>
-          </tr>
-          <tr
-            v-show="row.expand && row.show"
-            :props="props"
-            :key="`e_${row.name + 'entity'}`"
-            class="q-virtual-scroll--with-prev"
-            style="transition: display 2s ease-in"
-          >
-            <td colspan="100%" style="padding: 0; border-bottom: none">
-              <template v-if="row.entities">
-                <PermissionsTable
-                  :level="level + 1"
-                  :rows="row.entities"
-                  :customFilteredPermissions="customFilteredPermissions"
-                  :parent="row"
-                  @updated:permission="handlePermissionChange"
-                  @expand:row="expandPermission"
-                />
-              </template>
-            </td>
-          </tr>
-        </template>
-      </q-virtual-scroll>
+              {{ t("iam.permissionsTable.noResourcesPresent") }}
+            </div>
+          </template>
+        </OTable>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import { defineEmits } from "vue";
-import { useI18n } from "vue-i18n";
-
+import { computed, ref, h } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
+import NoData from "@/components/shared/grid/NoData.vue";
 const props = defineProps({
   selectedPermissionsHash: {
     type: Set,
@@ -276,93 +177,214 @@ const props = defineProps({
     type: Object,
     default: () => ({}),
   },
+  loading: {
+    type: Boolean,
+    default: false,
+  },
 });
 
-const emits = defineEmits(["updated:permission", "expand:row"]);
+const emits = defineEmits([
+  "updated:permission",
+  "updated:permission-batch",
+  "expand:row",
+  "update:filter",
+]);
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const permissionsTableRef: any = ref(null);
 
-const columns: any = [
+const permissionColumnIds = computed(() =>
+  columns.value.filter((c) => c.id.startsWith("Allow")).map((c) => c.id),
+);
+
+const expandedRowIds = ref<string[]>([]);
+
+function handleOTableExpansionChange(ids: string[]) {
+  const newlyExpanded = ids.filter((id) => !expandedRowIds.value.includes(id));
+  expandedRowIds.value = ids;
+  newlyExpanded.forEach((id) => {
+    const row = props.rows.find((r: any) => r.name === id);
+    if (row) emits("expand:row", row);
+  });
+}
+
+/**
+ * Display label for the Object column. The underlying `row.type` is a machine value
+ * ("Resource" / "Type") compared in EditRole.vue and in `typeRows` below, so it must not
+ * be translated in place; an unrecognised value falls through to its raw form.
+ */
+const objectTypeLabel = (type: string): I18nText => {
+  if (type === "Resource") return t("iam.permissionsTable.objectResource");
+  if (type === "Type") return t("iam.permissionsTable.objectType");
+  return raw(type ?? "");
+};
+
+const columns = computed<OTableColumnDef[]>(() => [
   {
-    name: "expand",
-    label: "",
-    field: "expand",
-    align: "center",
-    slot: true,
-    slotName: "expand",
-    style: { width: "37px" },
-  },
-  {
-    name: "display_name",
-    field: "display_name",
-    label: t("quota.moduleName"),
-    align: "left",
+    id: "display_name",
+    header: t("quota.moduleName"),
+    accessorKey: "display_name",
     sortable: true,
+    size: COL.name,
+    meta: { align: "left", autoWidth: true },
   },
   {
-    name: "type",
-    field: "type",
-    label: t("iam.object"),
-    align: "left",
-    style: { width: "100px" },
+    id: "type",
+    header: t("iam.object"),
+    accessorKey: "type",
+    sortable: true,
+    size: 100,
+    meta: { align: "left" },
   },
   {
-    name: "AllowAll",
-    field: "permission",
-    label: t("iam.all"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: { width: "80px" },
+    id: "AllowAll",
+    header: () =>
+      h("div", { class: "flex items-center gap-1.5" }, [
+        h(OCheckbox, {
+          modelValue: getHeaderCheckboxState("AllowAll"),
+          indeterminateValue: "indeterminate",
+          "onUpdate:modelValue": () => toggleColumnAll("AllowAll"),
+          class: "filter-check-box cursor-pointer",
+        }),
+        h("span", {}, t("iam.all")),
+      ]),
+    accessorKey: "permission",
+    cell: (info: any) => info.getValue(),
+    size: 72,
+    minSize: 60,
+    maxSize: 84,
+    meta: { align: "left" },
   },
   {
-    name: "AllowList",
-    field: "permission",
-    label: t("iam.list"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: { width: "80px" },
+    id: "AllowList",
+    header: () =>
+      h("div", { class: "flex items-center gap-1.5" }, [
+        h(OCheckbox, {
+          modelValue: getHeaderCheckboxState("AllowList"),
+          indeterminateValue: "indeterminate",
+          "onUpdate:modelValue": () => toggleColumnAll("AllowList"),
+          class: "filter-check-box cursor-pointer",
+        }),
+        h("span", {}, t("iam.list")),
+      ]),
+    accessorKey: "permission",
+    cell: (info: any) => info.getValue(),
+    size: 72,
+    minSize: 60,
+    maxSize: 84,
+    meta: { align: "left" },
   },
   {
-    name: "AllowGet",
-    field: "permission",
-    label: t("iam.get"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: { width: "80px" },
+    id: "AllowGet",
+    header: () =>
+      h("div", { class: "flex items-center gap-1.5" }, [
+        h(OCheckbox, {
+          modelValue: getHeaderCheckboxState("AllowGet"),
+          indeterminateValue: "indeterminate",
+          "onUpdate:modelValue": () => toggleColumnAll("AllowGet"),
+          class: "filter-check-box cursor-pointer",
+        }),
+        h("span", {}, t("iam.get")),
+      ]),
+    accessorKey: "permission",
+    cell: (info: any) => info.getValue(),
+    size: 72,
+    minSize: 60,
+    maxSize: 84,
+    meta: { align: "left" },
   },
   {
-    name: "AllowPost",
-    field: "permission",
-    label: t("iam.create"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: { width: "80px" },
+    id: "AllowPost",
+    header: () =>
+      h("div", { class: "flex items-center gap-1.5 whitespace-nowrap" }, [
+        h(OCheckbox, {
+          modelValue: getHeaderCheckboxState("AllowPost"),
+          indeterminateValue: "indeterminate",
+          "onUpdate:modelValue": () => toggleColumnAll("AllowPost"),
+          class: "filter-check-box cursor-pointer",
+        }),
+        h("span", {}, t("iam.create")),
+      ]),
+    accessorKey: "permission",
+    cell: (info: any) => info.getValue(),
+    size: 90,
+    minSize: 82,
+    maxSize: 104,
+    meta: { align: "left" },
   },
   {
-    name: "AllowPut",
-    field: "permission",
-    label: t("iam.update"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: { width: "80px" },
+    id: "AllowPut",
+    header: () =>
+      h("div", { class: "flex items-center gap-1.5 whitespace-nowrap" }, [
+        h(OCheckbox, {
+          modelValue: getHeaderCheckboxState("AllowPut"),
+          indeterminateValue: "indeterminate",
+          "onUpdate:modelValue": () => toggleColumnAll("AllowPut"),
+          class: "filter-check-box cursor-pointer",
+        }),
+        h("span", {}, t("iam.update")),
+      ]),
+    accessorKey: "permission",
+    cell: (info: any) => info.getValue(),
+    size: 90,
+    minSize: 82,
+    maxSize: 104,
+    meta: { align: "left" },
   },
   {
-    name: "AllowDelete",
-    field: "permission",
-    label: t("iam.delete"),
-    align: "center",
-    slot: true,
-    slotName: "permission",
-    style: { width: "80px" },
+    id: "AllowDelete",
+    header: () =>
+      h("div", { class: "flex items-center gap-1.5 whitespace-nowrap" }, [
+        h(OCheckbox, {
+          modelValue: getHeaderCheckboxState("AllowDelete"),
+          indeterminateValue: "indeterminate",
+          "onUpdate:modelValue": () => toggleColumnAll("AllowDelete"),
+          class: "filter-check-box cursor-pointer",
+        }),
+        h("span", {}, t("iam.delete")),
+      ]),
+    accessorKey: "permission",
+    cell: (info: any) => info.getValue(),
+    size: 90,
+    minSize: 82,
+    maxSize: 104,
+    meta: { align: "left" },
+  },
+]);
+
+// Only top-level "Type" rows are toggled by the header checkbox.
+// Child/nested rows inherit permissions through their parent type row,
+// so toggling them individually here is not needed.
+const getTopLevelTypeRows = computed(() => {
+  return props.rows.filter((row: any) => row?.show && row.type === "Type");
+});
+
+const getHeaderCheckboxState = (colName: string) => {
+  const visibleRows = getTopLevelTypeRows.value.filter(
+    (row: any) => row.permission?.[colName]?.show,
+  );
+  if (!visibleRows.length) return false;
+  const checkedCount = visibleRows.filter((row: any) => row.permission[colName].value).length;
+  if (checkedCount === 0) return false;
+  if (checkedCount === visibleRows.length) return true;
+  return "indeterminate";
+};
+
+const toggleColumnAll = (colName: string) => {
+  const visibleRows = getTopLevelTypeRows.value.filter(
+    (row: any) => row.permission?.[colName]?.show,
+  );
+  const allChecked = visibleRows.every((row: any) => row.permission[colName].value);
+  const newValue = !allChecked;
+  const changedRows = visibleRows
+    .filter((row: any) => row.permission[colName].value !== newValue)
+    .map((row: any) => ({ row, permission: colName, newValue }));
+
+  if (changedRows.length) {
+    emits("updated:permission-batch", changedRows);
   }
-];
+};
 
 const expandPermission = async (resource: any) => {
   emits("expand:row", resource);
@@ -374,26 +396,17 @@ const handlePermissionChange = (row: any, permission: string) => {
 
 const getFilteredRows = computed(() => {
   return props.rows.filter((row: any) => row?.show);
-})
+});
 defineExpose({
   permissionsTableRef,
 });
 </script>
 
-<style scoped></style>
-<style lang="scss">
+<style scoped>
+/* keep(complex-state): :deep override of the OTable header cell height */
 .iam-permissions-table {
-  th{
-    height: 48px !important;
-  }
-  .q-table--bordered {
-    border: none;
-  }
-  .q-table__card{
-    border-radius: 0px !important;
-  }
-
-  .q-virtual-scroll__padding {
+  :deep(th) {
+    height: 3rem !important;
   }
 }
 </style>

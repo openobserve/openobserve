@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,7 +17,7 @@ use std::str::FromStr;
 
 use config::{
     ider,
-    meta::destinations::{Template, TemplateType},
+    meta::destinations::{Template, TemplateKind, TemplateType},
 };
 use sea_orm::{
     ActiveModelTrait, ActiveValue::NotSet, ColumnTrait, DatabaseConnection, EntityTrait,
@@ -25,12 +25,9 @@ use sea_orm::{
 };
 
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{Error, TemplateError},
-    table::{
-        entity::templates::{ActiveModel, Column, Entity, Model},
-        get_lock,
-    },
+    table::entity::templates::{ActiveModel, Column, Entity, Model},
 };
 
 const DEFAULT_ORG: &str = "default";
@@ -55,15 +52,13 @@ impl TryFrom<Model> for Template {
             is_default: value.is_default,
             template_type,
             body: value.body,
+            kind: TemplateKind::from(value.kind.as_str()),
         })
     }
 }
 
 pub async fn put(template: Template) -> Result<Template, Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let title = match &template.template_type {
         TemplateType::Email { title } => Some(title.to_string()),
         _ => None,
@@ -76,6 +71,7 @@ pub async fn put(template: Template) -> Result<Template, Error> {
         r#type: Set(template.template_type.to_string()),
         body: Set(template.body),
         title: Set(title),
+        kind: Set(template.kind.to_string()),
     };
     let model: Model = match get_model(client, &template.org_id, &template.name).await? {
         Some(model) => {
@@ -91,7 +87,7 @@ pub async fn put(template: Template) -> Result<Template, Error> {
 }
 
 pub async fn get(org_id: &str, name: &str) -> Result<Option<Template>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     match get_model(client, org_id, name).await? {
         Some(model) => Ok(Some(Template::try_from(model)?)),
         None => Ok(None),
@@ -99,7 +95,7 @@ pub async fn get(org_id: &str, name: &str) -> Result<Option<Template>, Error> {
 }
 
 pub async fn list(org_id: &str) -> Result<Vec<Template>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let templates = list_models(client, Some(org_id))
         .await?
         .into_iter()
@@ -109,7 +105,7 @@ pub async fn list(org_id: &str) -> Result<Vec<Template>, Error> {
 }
 
 pub async fn list_all() -> Result<Vec<(String, Template)>, Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let templates = list_models(client, None)
         .await?
         .into_iter()
@@ -119,10 +115,7 @@ pub async fn list_all() -> Result<Vec<(String, Template)>, Error> {
 }
 
 pub async fn delete(org_id: &str, name: &str) -> Result<(), Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let model = get_model(client, org_id, name).await?;
 
     if let Some(model) = model {
@@ -156,4 +149,104 @@ async fn list_models(
         .order_by(Column::Name, sea_orm::Order::Asc)
         .all(db)
         .await
+}
+
+/// Deletes all templates belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), Error> {
+    let client = get_orm_client_rw().await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use svix_ksuid::KsuidLike;
+
+    use super::*;
+
+    fn make_model(id: &str, title: Option<&str>, tmpl_type: &str) -> Model {
+        Model {
+            id: id.to_string(),
+            org: "myorg".to_string(),
+            name: "my-template".to_string(),
+            is_default: false,
+            r#type: tmpl_type.to_string(),
+            body: r#"{"text": "alert"}"#.to_string(),
+            title: title.map(|s| s.to_string()),
+            kind: "custom".to_string(),
+        }
+    }
+
+    #[test]
+    fn test_try_from_model_email_template() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id, Some("Alert Subject"), "email");
+        let tmpl = Template::try_from(model).unwrap();
+        assert_eq!(tmpl.org_id, "myorg");
+        assert_eq!(tmpl.name, "my-template");
+        assert!(!tmpl.is_default);
+        assert!(
+            matches!(tmpl.template_type, TemplateType::Email { title } if title == "Alert Subject")
+        );
+    }
+
+    #[test]
+    fn test_try_from_model_http_template() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id, None, "http");
+        let tmpl = Template::try_from(model).unwrap();
+        assert!(matches!(tmpl.template_type, TemplateType::Http));
+    }
+
+    #[test]
+    fn test_try_from_model_sns_template() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id, None, "slack");
+        let tmpl = Template::try_from(model).unwrap();
+        assert!(matches!(tmpl.template_type, TemplateType::Sns));
+    }
+
+    #[test]
+    fn test_try_from_model_invalid_ksuid() {
+        let model = make_model("bad-id", None, "http");
+        let result = Template::try_from(model);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_try_from_model_http_type_case_insensitive() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id, None, "HTTP");
+        let tmpl = Template::try_from(model).unwrap();
+        assert!(matches!(tmpl.template_type, TemplateType::Http));
+    }
+
+    #[test]
+    fn test_try_from_model_is_default_true() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id, None, "http");
+        model.is_default = true;
+        let tmpl = Template::try_from(model).unwrap();
+        assert!(tmpl.is_default);
+    }
+
+    #[test]
+    fn test_try_from_model_body_preserved() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let model = make_model(&id, None, "http");
+        let tmpl = Template::try_from(model).unwrap();
+        assert_eq!(tmpl.body, r#"{"text": "alert"}"#);
+    }
+
+    #[test]
+    fn test_try_from_model_kind_content() {
+        let id = svix_ksuid::Ksuid::new(None, None).to_string();
+        let mut model = make_model(&id, None, "http");
+        model.kind = "content".to_string();
+        let tmpl = Template::try_from(model).unwrap();
+        assert_eq!(tmpl.kind, TemplateKind::Content);
+    }
 }

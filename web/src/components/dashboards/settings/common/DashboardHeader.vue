@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,41 +15,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div class="row items-center no-wrap q-mb-sm">
-      <div v-if="backButton" class="col-auto">
-        <q-btn
-          class="q-mr-md el-border"
-          no-caps
+  <div data-test="dashboard-header-root">
+    <div data-test="dashboard-header-row" class="mx-2 my-2 flex flex-nowrap items-center">
+      <div v-if="backButton" data-test="dashboard-header-back-button-container" class="col-auto">
+        <OButton
+          data-test="dashboard-header-back-button"
+          variant="outline"
+          size="icon-xs"
+          class="me-2"
           @click="onBackClicked"
-          padding="xs"
-          outline
-          icon="arrow_back_ios_new"
-        />
+          icon-left="arrow-back-ios-new"
+        >
+        </OButton>
       </div>
-      <div class="col">
-        <div class="text-h6">
+      <div data-test="dashboard-header-title-container" class="flex flex-1 flex-col">
+        <div data-test="dashboard-header-title" class="text-base font-semibold">
           {{ title }}
         </div>
       </div>
-      <div class="col-auto">
+      <div data-test="dashboard-header-right-slot-container" class="col-auto">
         <slot name="right"></slot>
       </div>
     </div>
-    <q-separator class="q-mb-sm" />
+    <OSeparator data-test="dashboard-header-separator" />
   </div>
 </template>
-  
+
 <script lang="ts">
-import { defineComponent } from "vue";
+import { raw, type I18nText } from "@/types/i18n";
+import { defineComponent, type PropType } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 
 export default defineComponent({
   name: "DashboardHeader",
-  components: {},
+  components: { OSeparator, OButton },
   props: {
     title: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
     backButton: {
       type: Boolean,
@@ -63,11 +67,9 @@ export default defineComponent({
     };
 
     return {
+      raw,
       onBackClicked,
     };
   },
 });
 </script>
-  
-<style scoped lang="scss"></style>
-  

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,11 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="invitations-page tw:h-[100vh-128px] ">
-    <InvitationList
-      :userEmail="userEmail"
-      @invitations-processed="handleInvitationsProcessed"
-    />
+  <div class="invitations-page h-full">
+    <InvitationList :userEmail="userEmail" @invitations-processed="handleInvitationsProcessed" />
   </div>
 </template>
 
@@ -45,9 +42,3 @@ const handleInvitationsProcessed = (data: any) => {
   }
 };
 </script>
-
-<style scoped>
-.invitations-page {
-  padding: 0;
-}
-</style>

@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
 import TraceDetails from "@/plugins/traces/TraceDetails.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -34,17 +32,6 @@ vi.mock("@/composables/useNotifications", () => ({
     showErrorNotification: vi.fn(),
   }),
 }));
-
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify],
-});
-
-// Mock clipboard API
-Object.assign(navigator, {
-  clipboard: {
-    writeText: vi.fn().mockResolvedValue(undefined),
-  },
-});
 
 /**
  * Test Suite: TraceDetails Component - Missing span_kind Field
@@ -105,8 +92,8 @@ describe("TraceDetails - Missing span_kind Field", () => {
         reference_parent_span_id: "",
         reference_parent_trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
         reference_ref_type: "ChildOf",
-        service_name: "alertmanager",
-        service_service_instance: "dev2-openobserve-alertmanager-0",
+        service_name: "scheduler",
+        service_service_instance: "dev2-openobserve-scheduler-0",
         service_service_version: "v0.15.0-rc5",
         span_id: "6b080023171f5767",
         // span_kind is intentionally missing
@@ -134,8 +121,8 @@ describe("TraceDetails - Missing span_kind Field", () => {
         reference_parent_span_id: "6b080023171f5767",
         reference_parent_trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
         reference_ref_type: "ChildOf",
-        service_name: "alertmanager",
-        service_service_instance: "dev2-openobserve-alertmanager-0",
+        service_name: "scheduler",
+        service_service_instance: "dev2-openobserve-scheduler-0",
         service_service_version: "v0.15.0-rc5",
         span_id: "d427ced59acf399b",
         // span_kind is intentionally missing
@@ -165,8 +152,8 @@ describe("TraceDetails - Missing span_kind Field", () => {
         reference_parent_span_id: "d427ced59acf399b",
         reference_parent_trace_id: "eab4575014a1fe101dba7de80a3cf6c3",
         reference_ref_type: "ChildOf",
-        service_name: "alertmanager",
-        service_service_instance: "dev2-openobserve-alertmanager-0",
+        service_name: "scheduler",
+        service_service_instance: "dev2-openobserve-scheduler-0",
         service_service_version: "v0.15.0-rc5",
         span_id: "bf6bde74cdcc245f",
         span_kind: null, // span_kind is explicitly null
@@ -182,6 +169,11 @@ describe("TraceDetails - Missing span_kind Field", () => {
   };
 
   beforeEach(async () => {
+    // The active tab and tab order persist to localStorage, so a test that
+    // switches tabs would otherwise leak its selection into every later test.
+    localStorage.removeItem("o2_trace_active_tab");
+    localStorage.removeItem("o2_trace_tab_order");
+
     // Mock router query params
     vi.spyOn(router, "currentRoute", "get").mockReturnValue({
       value: {
@@ -198,6 +190,10 @@ describe("TraceDetails - Missing span_kind Field", () => {
 
     // Mock API to return data without span_kind
     globalThis.server.use(
+      http.get(
+        `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/:stream/traces/:traceId/details`,
+        () => HttpResponse.json(mockSpansWithoutSpanKind),
+      ),
       http.post(
         `${store.state.API_ENDPOINT}/api/${store.state.selectedOrganization.identifier}/_search`,
         async ({ request }) => {
@@ -250,7 +246,7 @@ describe("TraceDetails - Missing span_kind Field", () => {
           },
           meta: {
             serviceColors: {
-              alertmanager: "#b7885e",
+              scheduler: "#b7885e",
             },
             redirectedFromLogs: false,
           },
@@ -268,7 +264,6 @@ describe("TraceDetails - Missing span_kind Field", () => {
         plugins: [i18n, router],
         provide: { store },
         stubs: {
-          "q-resize-observer": true,
           "chart-renderer": {
             template: '<div data-test="chart-renderer">Chart</div>',
             props: ["data", "id"],
@@ -286,12 +281,7 @@ describe("TraceDetails - Missing span_kind Field", () => {
               "searchQuery",
               "spanList",
             ],
-            emits: [
-              "toggle-collapse",
-              "select-span",
-              "update-current-index",
-              "search-result",
-            ],
+            emits: ["toggle-collapse", "select-span", "update-current-index", "search-result"],
             methods: {
               nextMatch: vi.fn(),
               prevMatch: vi.fn(),
@@ -340,15 +330,14 @@ describe("TraceDetails - Missing span_kind Field", () => {
       expect(result).toBe("Unspecified");
     });
 
-    it("should return undefined for unmapped span_kind values", () => {
+    it("should return the raw value as-is for unmapped span_kind values", () => {
+      // SPAN_KIND_MAP only covers "0"–"5"; anything else falls back to String(spanKind)
       const result = wrapper.vm.getSpanKind("999");
-      expect(result).toBe("Unknown");
+      expect(result).toBe("999");
     });
 
-    it("should handle non-string span_kind gracefully", () => {
-      expect(() => {
-        wrapper.vm.getSpanKind(undefined);
-      }).not.toThrow();
+    it("should return Unspecified for null span_kind", () => {
+      expect(wrapper.vm.getSpanKind(null)).toBe("Unspecified");
     });
   });
 
@@ -359,12 +348,11 @@ describe("TraceDetails - Missing span_kind Field", () => {
     });
 
     it("should not display any error messages", () => {
-      const errorMessages = wrapper.findAll(".q-notification");
+      const errorMessages = wrapper.findAll('[role="alert"]');
       expect(errorMessages.length).toBe(0);
     });
 
     it("should render trace content area", () => {
-      const content = wrapper.find(".trace-details-content");
       // Component should handle missing data gracefully
       expect(wrapper.vm).toBeDefined();
     });
@@ -402,22 +390,24 @@ describe("TraceDetails - Missing span_kind Field", () => {
     });
 
     it("should not crash when formatting span with missing span_kind", () => {
+      // hits[0] has no span_kind property — getSpanKind(undefined) must return "Unspecified"
       const mockSpan = mockSpansWithoutSpanKind.hits[0];
-      expect(() => {
-        // This simulates what happens in getFormattedSpan
-        const spanKind = mockSpan.span_kind
-          ? wrapper.vm.getSpanKind(mockSpan.span_kind.toString())
-          : undefined;
-        expect(spanKind).toBeUndefined();
-      }).not.toThrow();
+      expect(mockSpan.span_kind).toBeUndefined();
+      expect(() => wrapper.vm.getSpanKind(mockSpan.span_kind)).not.toThrow();
+      expect(wrapper.vm.getSpanKind(mockSpan.span_kind)).toBe("Unspecified");
     });
   });
 
   describe("Critical: UI rendering with missing span_kind", () => {
+    // The trace tree and header render inside the waterfall view; the component
+    // defaults to the flame graph, so opt in explicitly.
+    beforeEach(async () => {
+      wrapper.vm.activeTab = "waterfall";
+      await wrapper.vm.$nextTick();
+    });
+
     it("should render operation name correctly", () => {
-      const operationName = wrapper.find(
-        '[data-test="trace-details-operation-name"]',
-      );
+      const operationName = wrapper.find('[data-test="trace-details-operation-name"]');
       if (operationName.exists()) {
         expect(operationName.text()).toBeTruthy();
       }
@@ -433,7 +423,7 @@ describe("TraceDetails - Missing span_kind Field", () => {
     it("should render span count correctly", () => {
       const spanCount = wrapper.find('[data-test="trace-details-spans-count"]');
       if (spanCount.exists()) {
-        expect(spanCount.text()).toContain("Spans:");
+        expect(spanCount.text()).toContain("spans");
       }
     });
 
@@ -470,9 +460,7 @@ describe("TraceDetails - Missing span_kind Field", () => {
     });
 
     it("should toggle timeline without errors", async () => {
-      const toggleBtn = wrapper.find(
-        '[data-test="trace-details-toggle-timeline-btn"]',
-      );
+      const toggleBtn = wrapper.find('[data-test="trace-details-toggle-timeline-btn"]');
       if (toggleBtn.exists()) {
         await toggleBtn.trigger("click");
         expect(wrapper.vm.isTimelineExpanded).toBe(true);
@@ -513,18 +501,14 @@ describe("TraceDetails - Missing span_kind Field", () => {
 
     it("should process all spans regardless of span_kind presence", () => {
       const processedSpanIds = Object.keys(wrapper.vm.spanMap);
-      const originalSpanIds = mockSpansWithoutSpanKind.hits.map(
-        (s) => s.span_id,
-      );
+      const originalSpanIds = mockSpansWithoutSpanKind.hits.map((s) => s.span_id);
       expect(processedSpanIds.length).toBe(originalSpanIds.length);
     });
   });
 
   describe("Critical: Navigation and actions with missing span_kind", () => {
     it("should navigate to logs without errors", async () => {
-      const viewLogsBtn = wrapper.find(
-        '[data-test="trace-details-view-logs-btn"]',
-      );
+      const viewLogsBtn = wrapper.find('[data-test="trace-details-view-logs-btn"]');
       if (viewLogsBtn.exists()) {
         const routerPushSpy = vi.spyOn(router, "push");
         await viewLogsBtn.trigger("click");
@@ -533,9 +517,7 @@ describe("TraceDetails - Missing span_kind Field", () => {
     });
 
     it("should copy trace ID without errors", async () => {
-      const copyBtn = wrapper.find(
-        '[data-test="trace-details-copy-trace-id-btn"]',
-      );
+      const copyBtn = wrapper.find('[data-test="trace-details-copy-trace-id-btn"]');
       if (copyBtn.exists()) {
         await copyBtn.trigger("click");
         expect(navigator.clipboard.writeText).toHaveBeenCalled();

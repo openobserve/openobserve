@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -51,4 +51,29 @@ pub async fn emit_delete_event(org_id: &str, service_key: &str) -> Result<(), Er
 /// This is useful after bulk operations.
 pub async fn emit_reload_event(org_id: &str) -> Result<(), Error> {
     emit_put_event(org_id).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_service_streams_watch_prefix_value() {
+        assert_eq!(SERVICE_STREAMS_WATCH_PREFIX, "/service_streams/");
+    }
+
+    #[test]
+    fn test_service_streams_put_key_format() {
+        let org = "myorg";
+        let key = format!("{}{}", SERVICE_STREAMS_WATCH_PREFIX, org);
+        assert_eq!(key, "/service_streams/myorg");
+    }
+
+    #[test]
+    fn test_service_streams_delete_key_format() {
+        let org = "myorg";
+        let svc = "my-service";
+        let key = format!("{}{}/{}", SERVICE_STREAMS_WATCH_PREFIX, org, svc);
+        assert_eq!(key, "/service_streams/myorg/my-service");
+    }
 }

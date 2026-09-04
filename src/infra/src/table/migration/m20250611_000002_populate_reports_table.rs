@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -189,9 +189,8 @@ impl OrgWithReport {
         let select_statement = Self::statement();
         let backend = db.get_database_backend();
         let (sql, values) = match backend {
-            sea_orm::DatabaseBackend::MySql => select_statement.build(MysqlQueryBuilder),
             sea_orm::DatabaseBackend::Postgres => select_statement.build(PostgresQueryBuilder),
-            sea_orm::DatabaseBackend::Sqlite => select_statement.build(SqliteQueryBuilder),
+            _ => select_statement.build(SqliteQueryBuilder),
         };
         let statement = Statement::from_sql_and_values(backend, sql, values);
         Self::find_by_statement(statement).paginate(db, page_size)
@@ -252,9 +251,8 @@ impl MetaReportWithFolder {
         let select_statement = Self::statement();
         let backend = db.get_database_backend();
         let (sql, values) = match backend {
-            sea_orm::DatabaseBackend::MySql => select_statement.build(MysqlQueryBuilder),
             sea_orm::DatabaseBackend::Postgres => select_statement.build(PostgresQueryBuilder),
-            sea_orm::DatabaseBackend::Sqlite => select_statement.build(SqliteQueryBuilder),
+            _ => select_statement.build(SqliteQueryBuilder),
         };
         let statement = Statement::from_sql_and_values(backend, sql, values);
         Self::find_by_statement(statement).paginate(db, page_size)
@@ -490,7 +488,9 @@ mod meta_table_reports {
         pub created_at: DateTime<FixedOffset>,
         #[serde(skip_serializing_if = "Option::is_none")]
         pub updated_at: Option<DateTime<FixedOffset>>,
+        #[serde(default)]
         pub owner: String,
+        #[serde(default)]
         pub last_edited_by: String,
     }
 
@@ -831,15 +831,6 @@ mod tests {
     }
 
     #[test]
-    fn org_with_report_mysql() {
-        let stmnt = OrgWithReport::statement();
-        assert_eq!(
-            &stmnt.to_string(MysqlQueryBuilder),
-            r#"SELECT `key1` FROM `meta` WHERE `module` = 'reports' GROUP BY `key1` ORDER BY `key1` ASC"#
-        );
-    }
-
-    #[test]
     fn org_with_report_sqlite() {
         let stmnt = OrgWithReport::statement();
         assert_eq!(
@@ -863,25 +854,6 @@ mod tests {
                 WHERE "meta"."module" = 'reports' 
                 AND "folders"."type" = 2 
                 AND "folders"."folder_id" = 'default'
-            "#
-        );
-    }
-
-    #[test]
-    fn meta_with_folder_mysql() {
-        let stmnt = MetaReportWithFolder::statement();
-        collapsed_eq!(
-            &stmnt.to_string(MysqlQueryBuilder),
-            r#"
-                SELECT 
-                `meta`.`value`, 
-                `folders`.`id` 
-                FROM `meta` 
-                LEFT JOIN `folders` 
-                ON `folders`.`org` = `meta`.`key1` 
-                WHERE `meta`.`module` = 'reports' 
-                AND `folders`.`type` = 2 
-                AND `folders`.`folder_id` = 'default'
             "#
         );
     }

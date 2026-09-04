@@ -1,672 +1,768 @@
-import { mount } from "@vue/test-utils";
-import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { nextTick, reactive } from "vue";
 import ApiDashboard from "./ApiDashboard.vue";
-import { createI18n } from "vue-i18n";
-import { nextTick } from "vue";
 
-// Mock child components and services
+// ---------------------------------------------------------------------------
+// Module mocks — must be at top level
+// ---------------------------------------------------------------------------
+
+// Shared reactive `_rumdata` schema state, mirroring the module-level singleton the real
+// usePerformance() exposes. `mock` prefix so the vi.mock factories may reference it.
+const mockPerformanceState = reactive({
+  data: {
+    datetime: { startTime: 0, endTime: 0, relativeTimePeriod: "15m", valueType: "relative" },
+    streams: {} as Record<string, any>,
+  },
+});
+
+const mockGetStream = vi.fn();
+
+vi.mock("@/composables/rum/usePerformance", () => ({
+  default: () => ({ performanceState: mockPerformanceState }),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStream: mockGetStream }),
+}));
+
 vi.mock("@/views/Dashboards/RenderDashboardCharts.vue", () => ({
   default: {
     name: "RenderDashboardCharts",
-    template:
-      '<div class="render-dashboard-charts-mock" ref="renderDashboardRef"><slot /></div>',
+    template: '<div data-test="render-dashboard-charts"><slot /></div>',
     props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
-    emits: ["variablesData"],
-    methods: {
-      layoutUpdate: vi.fn(),
-    },
+    emits: ["variablesManagerReady"],
     setup() {
-      return {
-        layoutUpdate: vi.fn(),
-      };
+      return { layoutUpdate: vi.fn() };
     },
   },
 }));
 
+// At least one panel is required: the capability filter treats a zero-panel dashboard as
+// "everything dropped", which flips the component into its empty state. This panel's SQL
+// references gated resource columns, so it survives a network-capable schema and is
+// dropped by a stream without resource instrumentation.
 vi.mock("@/utils/rum/api.json", () => ({
   default: {
     title: "RUM API Dashboard",
-    panels: [],
+    panels: [
+      {
+        id: "slow-resources",
+        title: "Slowest resources",
+        layout: { x: 0, y: 0, w: 12, h: 4, i: 1 },
+        queries: [
+          {
+            query:
+              'SELECT avg(resource_duration) as y_axis, resource_url as x_axis FROM "_rumdata"',
+          },
+        ],
+      },
+    ],
     variables: { list: [] },
   },
 }));
 
 vi.mock("@/services/search", () => ({
   default: {
-    search: vi.fn().mockResolvedValue({
-      data: {
-        hits: [],
-      },
-    }),
+    search: vi.fn().mockResolvedValue({ data: { hits: [] } }),
   },
 }));
 
 vi.mock("@/utils/dashboard/convertDashboardSchemaVersion", () => ({
-  convertDashboardSchemaVersion: vi.fn(
-    (data) => data || { variables: { list: [] } },
-  ),
+  convertDashboardSchemaVersion: vi.fn((data) => data || { variables: { list: [] } }),
 }));
-
-// Mock Vue Router
-const mockRouterPush = vi.fn();
-const mockRouterReplace = vi.fn();
 
 vi.mock("vue-router", () => ({
-  useRouter: () => ({
-    push: mockRouterPush,
-    replace: mockRouterReplace,
-  }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
   useRoute: () => ({
-    query: {
-      dashboard: "test-dashboard",
-      folder: "test-folder",
-      org_identifier: "test-org",
-    },
+    query: { dashboard: "test-dashboard", folder: "test-folder", org_identifier: "test-org" },
   }),
 }));
 
-// Mock Vuex store
 const mockStore = {
-  state: {
-    selectedOrganization: {
-      identifier: "test-org",
-    },
-  },
+  state: { selectedOrganization: { identifier: "test-org" } },
 };
 
-vi.mock("vuex", () => ({
-  useStore: () => mockStore,
-}));
+vi.mock("vuex", () => ({ useStore: () => mockStore }));
 
-// Mock Vue i18n
-vi.mock("vue-i18n", () => ({
-  useI18n: () => ({
-    t: vi.fn((key) => key),
-  }),
-}));
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-// Mock console methods
-global.console = {
-  ...console,
-  error: vi.fn(),
-  warn: vi.fn(),
-  log: vi.fn(),
+// Columns the API dashboard's panels gate on — a stream that instruments network calls.
+const RESOURCE_FIELDS = [
+  "resource_url",
+  "resource_duration",
+  "resource_size",
+  "resource_status_code",
+  "resource_method",
+];
+
+function buildSchemaMap(fieldNames: string[]): Record<string, any> {
+  const schemaMap: Record<string, any> = {};
+  fieldNames.forEach((name) => {
+    schemaMap[name] = { name };
+  });
+  return schemaMap;
+}
+
+// A schema carrying every resource column the API panels need.
+const resourceSchemaMap = buildSchemaMap(RESOURCE_FIELDS);
+
+// Seeds the shared performanceState so ensureRumSchema() short-circuits without calling
+// getStream — the dashboard branch then renders after a single flush.
+function seedRumSchema(schemaMap: Record<string, any> | null) {
+  if (schemaMap === null) {
+    delete mockPerformanceState.data.streams["_rumdata"];
+    return;
+  }
+  mockPerformanceState.data.streams["_rumdata"] = { schema: schemaMap, name: "_rumdata" };
+}
+
+/** Mounts with a resolved, network-capable schema so the dashboard branch is rendered. */
+async function createResolvedWrapper(props: Record<string, any> = {}) {
+  seedRumSchema(resourceSchemaMap);
+  const mounted = createWrapper(props);
+  await flushPromises();
+  return mounted;
+}
+
+const defaultProps = {
+  dateTime: { startTime: 1234567890, endTime: 1234568000, type: "relative", period: "15m" },
+  selectedDate: { startTime: 1234567890, endTime: 1234568000 },
 };
 
-// i18n is handled by mock
-
-describe("ApiDashboard", () => {
-  let wrapper: any;
-
-  const defaultProps = {
-    dateTime: {
-      startTime: 1234567890,
-      endTime: 1234568000,
-      type: "relative",
-      period: "15m",
-    },
-    selectedDate: {
-      startTime: 1234567890,
-      endTime: 1234568000,
-    },
-  };
-
-  const createWrapper = (props = {}) => {
-    const wrapper = mount(ApiDashboard, {
-      props: {
-        ...defaultProps,
-        ...props,
-      },
-      global: {
-        stubs: {
-          "q-page": {
-            name: "q-page",
-            template: '<div class="q-page"><slot /></div>',
-            props: ["class", "key"],
-          },
-          "q-spinner-hourglass": {
-            name: "q-spinner-hourglass",
-            template: '<div class="q-spinner-hourglass"></div>',
-            props: ["color", "size", "style"],
-          },
-          RenderDashboardCharts: {
-            name: "RenderDashboardCharts",
-            template:
-              '<div class="render-dashboard-charts-mock" data-test="render-dashboard-charts"><slot /></div>',
-            props: [
-              "viewOnly",
-              "dashboardData",
-              "currentTimeObj",
-              "searchType",
-            ],
-            emits: ["variablesData"],
-            methods: {
-              layoutUpdate: vi.fn(),
-            },
+function createWrapper(props: Record<string, any> = {}) {
+  return mount(ApiDashboard, {
+    props: { ...defaultProps, ...props },
+    global: {
+      stubs: {
+        RenderDashboardCharts: {
+          name: "RenderDashboardCharts",
+          template: '<div data-test="render-dashboard-charts"><slot /></div>',
+          props: ["viewOnly", "dashboardData", "currentTimeObj", "searchType"],
+          emits: ["variablesManagerReady"],
+          setup() {
+            return { layoutUpdate: vi.fn() };
           },
         },
+        OSpinner: { template: '<div data-test="spinner" />' },
+        OEmptyState: {
+          name: "OEmptyState",
+          template: '<div><slot name="title" /><slot name="description" /></div>',
+        },
       },
-    });
+    },
+  });
+}
 
-    // Initialize variablesData ref to prevent null reference errors
-    if (wrapper.vm.variablesData === null) {
-      wrapper.vm.variablesData = {
-        value: { isVariablesLoading: false, values: [] },
-      };
-    } else if (wrapper.vm.variablesData.value === null) {
-      wrapper.vm.variablesData.value = {
-        isVariablesLoading: false,
-        values: [],
-      };
-    }
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
 
-    return wrapper;
-  };
+describe("ApiDashboard", () => {
+  let wrapper: ReturnType<typeof createWrapper>;
 
-  beforeEach(async () => {
-    vi.clearAllMocks();
-
-    // Reset search service mock
-    const searchModule = await import("@/services/search");
-    const mockSearchService = vi.mocked(searchModule.default);
-    mockSearchService.search.mockResolvedValue({
-      data: {
-        hits: [
-          {
-            url: "https://api.example.com/users?id=1",
-            max_duration: 150.25,
-            max_resource_size: 1024.5,
-            error_count: 5,
-          },
-          {
-            url: "https://api.example.com/orders",
-            max_duration: 89.75,
-            max_resource_size: 512.0,
-            error_count: 2,
-          },
-        ],
-      },
-      status: 200,
-      statusText: "OK",
-      headers: {},
-      config: {} as any,
-    });
+  beforeEach(() => {
+    // Every test starts with no known `_rumdata` schema; tests opt into one as needed.
+    seedRumSchema(null);
+    mockGetStream.mockReset();
+    mockGetStream.mockResolvedValue({ schema: [] });
   });
 
   afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
-      vi.clearAllMocks();
-      vi.resetAllMocks();
-    }
+    wrapper?.unmount();
+    vi.clearAllMocks();
   });
 
-  describe("Component Initialization", () => {
-    it("should render component with default props", () => {
+  describe("component initialization", () => {
+    it("renders without errors when given valid props", () => {
+      // Arrange + Act
       wrapper = createWrapper();
+
+      // Assert
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
     });
 
-    it("should initialize with correct default props", () => {
+    it("exposes viewOnly as true", () => {
+      // Arrange + Act
       wrapper = createWrapper();
-      expect(wrapper.vm.$props.dateTime).toEqual({
-        startTime: 1234567890,
-        endTime: 1234568000,
-        type: "relative",
-        period: "15m",
-      });
-      expect(wrapper.vm.$props.selectedDate).toEqual({
-        startTime: 1234567890,
-        endTime: 1234568000,
-      });
-    });
 
-    it("should accept custom props", () => {
-      const customProps = {
-        dateTime: {
-          startTime: 1609459200,
-          endTime: 1609545600,
-          type: "absolute",
-          period: "1h",
-        },
-        selectedDate: {
-          startTime: 1609459200,
-          endTime: 1609545600,
-        },
-      };
-
-      wrapper = createWrapper(customProps);
-      expect(wrapper.vm.$props.dateTime).toEqual(customProps.dateTime);
-      expect(wrapper.vm.$props.selectedDate).toEqual(customProps.selectedDate);
-    });
-
-    it("should initialize reactive data correctly", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.currentDashboardData).toBeTruthy();
-      expect(wrapper.vm.currentDashboardData.data).toBeDefined();
+      // Assert
       expect(wrapper.vm.viewOnly).toBe(true);
+    });
+
+    it("initializes isLoading as empty array", () => {
+      // Arrange + Act
+      wrapper = createWrapper();
+
+      // Assert
       expect(wrapper.vm.isLoading).toEqual([]);
+    });
+
+    it("initializes eventLog as empty array", () => {
+      // Arrange + Act
+      wrapper = createWrapper();
+
+      // Assert
       expect(wrapper.vm.eventLog).toEqual([]);
+    });
+
+    it("initializes refreshInterval as 0", () => {
+      // Arrange + Act
+      wrapper = createWrapper();
+
+      // Assert
       expect(wrapper.vm.refreshInterval).toBe(0);
-      expect(wrapper.vm.variablesData).toEqual({
-        isVariablesLoading: false,
-        values: [],
-      });
+    });
+
+    it("initializes variablesData as loading with empty values", () => {
+      // Arrange + Act
+      wrapper = createWrapper();
+
+      // Assert
+      expect(wrapper.vm.variablesData).toEqual({ isVariablesLoading: true, values: [] });
+    });
+
+    it("exposes the capability-filtered dashboard as dashboardData", () => {
+      // Arrange + Act
+      wrapper = createWrapper();
+
+      // Assert
+      expect(wrapper.vm.dashboardData).toMatchObject({ title: "RUM API Dashboard" });
+    });
+
+    it("accepts dateTime prop correctly", () => {
+      // Arrange + Act
+      wrapper = createWrapper();
+
+      // Assert
+      expect(wrapper.vm.$props.dateTime).toEqual(defaultProps.dateTime);
+    });
+
+    it("accepts selectedDate prop correctly", () => {
+      // Arrange + Act
+      wrapper = createWrapper();
+
+      // Assert
+      expect(wrapper.vm.$props.selectedDate).toEqual(defaultProps.selectedDate);
+    });
+
+    it("accepts custom dateTime prop", () => {
+      // Arrange
+      const customDateTime = {
+        startTime: 1609459200,
+        endTime: 1609545600,
+        type: "absolute",
+        period: "1h",
+      };
+
+      // Act
+      wrapper = createWrapper({ dateTime: customDateTime });
+
+      // Assert
+      expect(wrapper.vm.$props.dateTime).toEqual(customDateTime);
+    });
+
+    it("handles empty dateTime prop gracefully", () => {
+      // Arrange + Act
+      wrapper = createWrapper({ dateTime: {} });
+
+      // Assert
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("handles undefined props gracefully", () => {
+      // Arrange + Act
+      wrapper = createWrapper({ dateTime: undefined, selectedDate: undefined });
+
+      // Assert
+      expect(wrapper.exists()).toBe(true);
     });
   });
 
-  describe("Template Rendering", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
+  describe("template rendering", () => {
+    beforeEach(async () => {
+      // A known network-capable schema resolves the gate without calling getStream, so
+      // the dashboard branch (not the spinner or the empty state) renders.
+      wrapper = await createResolvedWrapper();
     });
 
-    it("should render main container with correct classes", () => {
-      const mainContainer = wrapper.find(".api-performance-dashboards");
-      expect(mainContainer.exists()).toBe(true);
+    it("renders the api-performance-dashboards container", () => {
+      // Arrange (done in beforeEach)
+      // Act
+      const container = wrapper.find('[data-test="api-performance-dashboards"]');
+
+      // Assert
+      expect(container.exists()).toBe(true);
     });
 
-    it("should render performance dashboard section", () => {
-      const dashboardSection = wrapper.find(".performance-dashboard");
-      expect(dashboardSection.exists()).toBe(true);
+    it("renders the performance-dashboard section", () => {
+      // Act
+      const section = wrapper.find(".performance-dashboard");
+
+      // Assert
+      expect(section.exists()).toBe(true);
     });
 
-    it("should render RenderDashboardCharts component", () => {
-      const renderComponent = wrapper.findComponent({
-        name: "RenderDashboardCharts",
-      });
-      expect(renderComponent.exists()).toBe(true);
+    it("renders RenderDashboardCharts component", () => {
+      // Act
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
+
+      // Assert
+      expect(charts.exists()).toBe(true);
     });
 
-    it("should pass correct props to RenderDashboardCharts", () => {
-      const renderComponent = wrapper.findComponent({
-        name: "RenderDashboardCharts",
-      });
-      const props = renderComponent.props();
+    it("passes viewOnly=true to RenderDashboardCharts", () => {
+      // Act
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
 
-      expect(props.viewOnly).toBe(true);
-      expect(props.searchType).toBe("RUM");
-      expect(props.currentTimeObj).toEqual(defaultProps.dateTime);
-      expect(props.dashboardData).toBe(wrapper.vm.currentDashboardData.data);
+      // Assert
+      expect(charts.props("viewOnly")).toBe(true);
     });
 
-    it("should show loading spinner when isLoading has items", async () => {
-      wrapper.vm.isLoading = [true];
-      await wrapper.vm.$nextTick();
+    it("passes searchType='RUM' to RenderDashboardCharts", () => {
+      // Act
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
 
-      const loadingDiv = wrapper.find(".q-pb-lg.flex.items-center");
-      expect(loadingDiv.exists()).toBe(true);
+      // Assert
+      expect(charts.props("searchType")).toBe("RUM");
     });
 
-    it("should hide dashboard when loading", async () => {
-      wrapper.vm.isLoading = [true];
-      await wrapper.vm.$nextTick();
+    it("passes dateTime as currentTimeObj to RenderDashboardCharts", () => {
+      // Act
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
 
-      const dashboard = wrapper.find(".api-performance-dashboards");
-      expect(dashboard.classes()).toContain("tw:invisible");
+      // Assert
+      expect(charts.props("currentTimeObj")).toEqual(defaultProps.dateTime);
     });
 
-    it("should show dashboard when not loading", async () => {
-      wrapper.vm.isLoading = [];
-      await wrapper.vm.$nextTick();
+    it("passes the capability-filtered dashboardData to RenderDashboardCharts", () => {
+      // Act
+      const charts = wrapper.findComponent({ name: "RenderDashboardCharts" });
 
-      const dashboard = wrapper.find(".api-performance-dashboards");
-      expect(dashboard.classes()).toContain("tw:visible");
+      // Assert
+      expect(charts.props("dashboardData")).toEqual(wrapper.vm.dashboardData);
+    });
+
+    it("renders loading spinner when isLoading has items", async () => {
+      // Act
+      wrapper.vm.isLoading.push(true);
+      await nextTick();
+
+      // Assert
+      expect(wrapper.find('[data-test="spinner"]').exists()).toBe(true);
+    });
+
+    it("renders loading text when isLoading has items", async () => {
+      // Act
+      wrapper.vm.isLoading.push(true);
+      await nextTick();
+
+      // Assert
+      expect(wrapper.text()).toContain("Loading Dashboard");
     });
   });
 
-  describe("Dashboard Loading", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
+  describe("schema gating", () => {
+    it("migrates the dashboard schema while setting up", async () => {
+      // Arrange
+      const convertModule = await import("@/utils/dashboard/convertDashboardSchemaVersion");
+      const mockConvert = vi.mocked(convertModule.convertDashboardSchemaVersion);
 
-    it("should load dashboard data on mount", async () => {
-      expect(wrapper.vm.currentDashboardData.data).toBeDefined();
-      expect(wrapper.vm.loadDashboard).toBeInstanceOf(Function);
-    });
+      // Act
+      wrapper = await createResolvedWrapper();
 
-    it("should handle dashboard schema conversion", async () => {
-      const convertModule = await import(
-        "@/utils/dashboard/convertDashboardSchemaVersion"
-      );
-      const mockConvert = vi.mocked(
-        convertModule.convertDashboardSchemaVersion,
-      );
-
-      // Ensure variablesData ref is properly initialized
-      if (!wrapper.vm.variablesData.value) {
-        wrapper.vm.variablesData.value = {
-          isVariablesLoading: false,
-          values: [],
-        };
-      }
-
-      await wrapper.vm.loadDashboard();
-
+      // Assert
       expect(mockConvert).toHaveBeenCalled();
-      expect(wrapper.vm.currentDashboardData.data).toBeTruthy();
     });
 
-    it("should initialize variables data when no variables exist", async () => {
-      // Test the scenario where loadDashboard initializes variablesData when no variables exist
-      // First ensure variablesData.value exists
-      if (!wrapper.vm.variablesData.value) {
-        wrapper.vm.variablesData.value = {
-          isVariablesLoading: true,
-          values: null,
-        };
-      } else {
-        wrapper.vm.variablesData.value = {
-          isVariablesLoading: true,
-          values: null,
-        };
-      }
-
-      // Simulate what loadDashboard does when there are no variables
-      // Since we can't easily mock the internal function, let's test the behavior directly
-      wrapper.vm.currentDashboardData.data = { variables: { list: [] } };
-
-      // Manually trigger the same logic that loadDashboard would do
-      if (!wrapper.vm.currentDashboardData.data?.variables?.list?.length) {
-        if (wrapper.vm.variablesData.value) {
-          wrapper.vm.variablesData.value.isVariablesLoading = false;
-          wrapper.vm.variablesData.value.values = [];
-        }
-      }
-
-      // Verify the initialization happened
-      expect(wrapper.vm.variablesData.value.isVariablesLoading).toBe(false);
-      expect(wrapper.vm.variablesData.value.values).toEqual([]);
-    });
-
-    it("should not modify variables data when variables exist", async () => {
-      // Ensure variablesData.value exists before setting
-      if (!wrapper.vm.variablesData.value) {
-        wrapper.vm.variablesData.value = {
-          isVariablesLoading: true,
-          values: ["existing"],
-        };
-      } else {
-        wrapper.vm.variablesData.value = {
-          isVariablesLoading: true,
-          values: ["existing"],
-        };
-      }
-
-      // Mock the convertDashboardSchemaVersion to return data with variables list
-      const convertModule = await import(
-        "@/utils/dashboard/convertDashboardSchemaVersion"
+    it("shows the loading spinner and no dashboard while the schema is unresolved", async () => {
+      // Arrange — a getStream that never settles keeps the gate open.
+      let resolveStream!: (value: { schema: any[] }) => void;
+      mockGetStream.mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveStream = resolve;
+        }),
       );
-      const mockConvert = vi.mocked(
-        convertModule.convertDashboardSchemaVersion,
-      );
-      mockConvert.mockReturnValue({
-        variables: { list: [{ name: "var1" }] },
-      });
 
-      await wrapper.vm.loadDashboard();
-
-      // When variables exist with length > 0, variablesData should not be modified
-      expect(wrapper.vm.variablesData.value).toEqual({
-        isVariablesLoading: true,
-        values: ["existing"],
-      });
-    });
-  });
-
-  describe("Layout Management", () => {
-    beforeEach(() => {
+      // Act
       wrapper = createWrapper();
-      // Mock window.dispatchEvent
-      Object.defineProperty(window, "dispatchEvent", {
-        value: vi.fn(),
-        writable: true,
+
+      // Assert
+      expect(wrapper.find('[data-test="api-dashboard-schema-loading"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="api-dashboard-empty"]').exists()).toBe(false);
+
+      // Cleanup — settle the pending promise so it can't leak into other tests.
+      resolveStream({ schema: [] });
+      await flushPromises();
+    });
+
+    it("renders the dashboard when the resolved schema has the resource columns", async () => {
+      // Arrange
+      mockGetStream.mockResolvedValueOnce({
+        schema: RESOURCE_FIELDS.map((name) => ({ name })),
       });
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert
+      expect(mockGetStream).toHaveBeenCalledWith("_rumdata", "logs", true);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="api-dashboard-empty"]').exists()).toBe(false);
     });
 
-    it("should have apiDashboardChartsRef available", () => {
-      expect(wrapper.vm.apiDashboardChartsRef).toBeDefined();
+    it("renders the empty state when the resolved schema has no resource columns", async () => {
+      // Arrange — a stream with no network instrumentation.
+      mockGetStream.mockResolvedValueOnce({
+        schema: [{ name: "view_name" }, { name: "session_id" }],
+      });
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.find('[data-test="api-dashboard-empty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(false);
     });
 
-    it("should handle layout updates", async () => {
-      // Test that the component has necessary layout management capabilities
-      expect(wrapper.vm.apiDashboardChartsRef).toBeDefined();
+    it("does not call getStream when the schema is already in the shared state", async () => {
+      // Arrange + Act
+      wrapper = await createResolvedWrapper();
 
-      // Test that component doesn't crash when mounted
-      expect(wrapper.exists()).toBe(true);
+      // Assert
+      expect(mockGetStream).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
+    });
+
+    it("renders the full dashboard when getStream rejects and the schema stays inconclusive", async () => {
+      // Arrange
+      mockGetStream.mockRejectedValueOnce(new Error("network error"));
+
+      // Act
+      wrapper = createWrapper();
+      await flushPromises();
+
+      // Assert — a transient error must never degrade a working dashboard.
+      expect(wrapper.find('[data-test="api-dashboard-schema-loading"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="api-dashboard-empty"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="render-dashboard-charts"]').exists()).toBe(true);
     });
   });
 
-  describe("Variables Management", () => {
+  describe("settings management", () => {
     beforeEach(() => {
       wrapper = createWrapper();
     });
 
-    it("should handle variables data updates", () => {
-      // Test that variablesData can be updated
-      const newData = {
-        isVariablesLoading: true,
-        values: [{ variable1: "value1", variable2: "value2" }],
-      };
-
-      // Ensure variablesData.value exists before setting
-      if (!wrapper.vm.variablesData.value) {
-        wrapper.vm.variablesData.value = {};
-      }
-      wrapper.vm.variablesData.value = newData;
-
-      expect(wrapper.vm.variablesData.value).toEqual(newData);
-    });
-
-    it("should maintain variables data structure", () => {
-      const testData = { isVariablesLoading: false, values: [] };
-
-      // Ensure variablesData.value exists before setting
-      if (!wrapper.vm.variablesData.value) {
-        wrapper.vm.variablesData.value = {};
-      }
-      wrapper.vm.variablesData.value = testData;
-
-      // Verify the structure is maintained
-      expect(wrapper.vm.variablesData.value).toHaveProperty(
-        "isVariablesLoading",
-      );
-      expect(wrapper.vm.variablesData.value).toHaveProperty("values");
-      expect(wrapper.vm.variablesData.value.isVariablesLoading).toBe(false);
-      expect(wrapper.vm.variablesData.value.values).toEqual([]);
-    });
-
-    it("should handle RenderDashboardCharts variablesData event", async () => {
-      const renderComponent = wrapper.findComponent({
-        name: "RenderDashboardCharts",
-      });
-      const newVariablesData = {
-        isVariablesLoading: true,
-        values: [{ testVariable: "testValue" }],
-      };
-
-      // Test that the component can handle the event without error
-      await renderComponent.vm.$emit("variablesData", newVariablesData);
-
-      // Verify the component still exists and functions
-      expect(renderComponent.exists()).toBe(true);
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Settings Management", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it("should show settings dialog when addSettingsData is called", () => {
+    it("starts with showDashboardSettingsDialog as false", () => {
+      // Assert
       expect(wrapper.vm.showDashboardSettingsDialog).toBe(false);
+    });
 
+    it("sets showDashboardSettingsDialog to true when addSettingsData is called", () => {
+      // Act
       wrapper.vm.addSettingsData();
 
+      // Assert
       expect(wrapper.vm.showDashboardSettingsDialog).toBe(true);
     });
   });
 
-  describe("API Resource Data Fetching", () => {
+  describe("variables management", () => {
     beforeEach(() => {
       wrapper = createWrapper();
     });
 
-    it("should have component instance available", () => {
-      expect(wrapper.vm).toBeTruthy();
-      expect(wrapper.exists()).toBe(true);
+    it("handles variablesData updates", () => {
+      // Arrange
+      const newData = { isVariablesLoading: true, values: [{ variable1: "value1" }] };
+
+      // Act
+      wrapper.vm.variablesData = newData;
+
+      // Assert
+      expect(wrapper.vm.variablesData).toEqual(newData);
     });
 
-    it("should handle variables data structure", () => {
-      // Test that the component can handle variables data
-      console.log("wrapper.vm.variablesData ======", wrapper.vm.variablesData);
-      expect(wrapper.vm.variablesData).toBeDefined();
+    it("onVariablesManagerReady does not throw", () => {
+      // Arrange
+      const mockManager = { test: "manager" };
 
-      expect(wrapper.vm.variablesData).toEqual({
-        isVariablesLoading: false,
-        values: [],
-      });
-    });
-
-    it("should have reactive data properties", () => {
-      expect(wrapper.vm.currentDashboardData).toBeTruthy();
-      expect(wrapper.vm.isLoading).toBeDefined();
-      expect(wrapper.vm.eventLog).toBeDefined();
+      // Act + Assert
+      expect(() => wrapper.vm.onVariablesManagerReady(mockManager)).not.toThrow();
     });
   });
 
-  describe("Watch Effects", () => {
-    beforeEach(() => {
+  describe("store integration", () => {
+    it("accesses store state correctly", () => {
+      // Arrange + Act
       wrapper = createWrapper();
-    });
 
-    it("should handle prop changes", async () => {
-      const newSelectedDate = {
-        startTime: 1234567999,
-        endTime: 1234568999,
-      };
-
-      await wrapper.setProps({ selectedDate: newSelectedDate });
-      await nextTick();
-
-      expect(wrapper.props("selectedDate")).toEqual(newSelectedDate);
-    });
-
-    it("should maintain component state on prop changes", async () => {
-      await wrapper.setProps({ selectedDate: defaultProps.selectedDate });
-      await nextTick();
-
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
-    });
-  });
-
-  describe("Store Integration", () => {
-    beforeEach(() => {
-      wrapper = createWrapper();
-    });
-
-    it("should access store data correctly", () => {
+      // Assert
       expect(wrapper.vm.store).toBe(mockStore);
-      expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe(
-        "test-org",
-      );
+      expect(wrapper.vm.store.state.selectedOrganization.identifier).toBe("test-org");
     });
   });
 
-  describe("Component References", () => {
+  describe("component references", () => {
     beforeEach(() => {
       wrapper = createWrapper();
     });
 
-    it("should have reference to apiDashboardChartsRef", () => {
+    it("exposes apiDashboardChartsRef", () => {
+      // Assert
       expect(wrapper.vm.apiDashboardChartsRef).toBeDefined();
     });
 
-    it("should have access to apiDashboard import", () => {
+    it("exposes apiDashboard import", () => {
+      // Assert
       expect(wrapper.vm.apiDashboard).toBeDefined();
     });
   });
 
-  describe("Props Validation", () => {
-    it("should handle empty dateTime prop", () => {
-      wrapper = createWrapper({ dateTime: {} });
-      expect(wrapper.vm.$props.dateTime).toEqual({});
-    });
-
-    it("should handle empty selectedDate prop", () => {
-      wrapper = createWrapper({ selectedDate: {} });
-      expect(wrapper.vm.$props.selectedDate).toEqual({});
-    });
-
-    it("should handle undefined props gracefully", () => {
-      wrapper = createWrapper({ dateTime: undefined, selectedDate: undefined });
-      expect(wrapper.exists()).toBe(true);
-    });
-  });
-
-  describe("Component Integration", () => {
+  describe("prop changes", () => {
     beforeEach(() => {
       wrapper = createWrapper();
     });
 
-    it("should pass dashboard data to RenderDashboardCharts", () => {
-      const renderComponent = wrapper.findComponent({
-        name: "RenderDashboardCharts",
-      });
-      const props = renderComponent.props();
+    it("updates selectedDate prop correctly", async () => {
+      // Arrange
+      const newSelectedDate = { startTime: 1234567999, endTime: 1234568999 };
 
-      expect(props.dashboardData).toBe(wrapper.vm.currentDashboardData.data);
+      // Act
+      await wrapper.setProps({ selectedDate: newSelectedDate });
+      await nextTick();
+
+      // Assert
+      expect(wrapper.props("selectedDate")).toEqual(newSelectedDate);
     });
 
-    it("should pass current time object to RenderDashboardCharts", () => {
-      const renderComponent = wrapper.findComponent({
-        name: "RenderDashboardCharts",
-      });
-      const props = renderComponent.props();
+    it("remains functional after prop changes", async () => {
+      // Act
+      await wrapper.setProps({ selectedDate: defaultProps.selectedDate });
+      await nextTick();
 
-      expect(props.currentTimeObj).toEqual(defaultProps.dateTime);
-    });
-
-    it("should set search type to RUM for RenderDashboardCharts", () => {
-      const renderComponent = wrapper.findComponent({
-        name: "RenderDashboardCharts",
-      });
-      const props = renderComponent.props();
-
-      expect(props.searchType).toBe("RUM");
-    });
-
-    it("should set viewOnly to true for RenderDashboardCharts", () => {
-      const renderComponent = wrapper.findComponent({
-        name: "RenderDashboardCharts",
-      });
-      const props = renderComponent.props();
-
-      expect(props.viewOnly).toBe(true);
+      // Assert
+      expect(wrapper.exists()).toBe(true);
     });
   });
 
-  describe("Search Service Integration", () => {
+  describe("search service integration", () => {
     beforeEach(() => {
       wrapper = createWrapper();
     });
 
-    it("should have search service available", async () => {
+    it("makes search service available", async () => {
+      // Arrange
       const searchModule = await import("@/services/search");
-      const mockSearchService = vi.mocked(searchModule.default);
-      expect(mockSearchService.search).toBeDefined();
-      expect(typeof mockSearchService.search).toBe("function");
+
+      // Assert
+      expect(typeof searchModule.default.search).toBe("function");
     });
 
-    it("should handle search service errors gracefully", async () => {
+    it("does not crash when search service throws an error", async () => {
+      // Arrange
       const searchModule = await import("@/services/search");
-      const mockSearchService = vi.mocked(searchModule.default);
-      mockSearchService.search.mockRejectedValue(new Error("API Error"));
+      vi.mocked(searchModule.default.search).mockRejectedValue(new Error("API Error"));
 
-      // The component should not crash when search fails
+      // Assert
       expect(wrapper.exists()).toBe(true);
+    });
+  });
+
+  describe("resource data fetching", () => {
+    let mockSearch: ReturnType<typeof vi.fn>;
+
+    beforeEach(async () => {
+      const searchModule = await import("@/services/search");
+      mockSearch = vi.mocked(searchModule.default.search);
+      mockSearch.mockResolvedValue({
+        data: {
+          hits: [
+            {
+              url: "https://api.example.com/users?id=1",
+              max_duration: 150.25,
+              max_resource_size: 1024.5,
+              error_count: 5,
+            },
+            {
+              url: "https://api.example.com/orders",
+              max_duration: 89.75,
+              max_resource_size: 512.0,
+              error_count: 2,
+            },
+          ],
+        },
+      });
+      wrapper = createWrapper();
+    });
+
+    it("exposes getTopSlowResources as a function", () => {
+      // Assert
+      expect(typeof wrapper.vm.getTopSlowResources).toBe("function");
+    });
+
+    it("calls searchService when getTopSlowResources is invoked", async () => {
+      // Act
+      wrapper.vm.getTopSlowResources();
+      await nextTick();
+
+      // Assert
+      expect(mockSearch).toHaveBeenCalled();
+    });
+
+    it("getTopSlowResources calls searchService with org_identifier and RUM page_type", async () => {
+      // Act
+      wrapper.vm.getTopSlowResources();
+      await nextTick();
+
+      // Assert
+      expect(mockSearch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          org_identifier: "test-org",
+          page_type: "logs",
+        }),
+        "RUM",
+      );
+    });
+
+    it("exposes getTopHeavyResources as a function", () => {
+      // Assert
+      expect(typeof wrapper.vm.getTopHeavyResources).toBe("function");
+    });
+
+    it("calls searchService when getTopHeavyResources is invoked", async () => {
+      // Act
+      wrapper.vm.getTopHeavyResources();
+      await nextTick();
+
+      // Assert
+      expect(mockSearch).toHaveBeenCalled();
+    });
+
+    it("exposes getTopErrorResources as a function", () => {
+      // Assert
+      expect(typeof wrapper.vm.getTopErrorResources).toBe("function");
+    });
+
+    it("calls searchService when getTopErrorResources is invoked", async () => {
+      // Act
+      wrapper.vm.getTopErrorResources();
+      await nextTick();
+
+      // Assert
+      expect(mockSearch).toHaveBeenCalled();
+    });
+
+    it("initializes topSlowResources as empty array", () => {
+      // Assert
+      expect(wrapper.vm.topSlowResources).toEqual([]);
+    });
+
+    it("initializes topHeavyResources as empty array", () => {
+      // Assert
+      expect(wrapper.vm.topHeavyResources).toEqual([]);
+    });
+
+    it("initializes topErrorResources as empty array", () => {
+      // Assert
+      expect(wrapper.vm.topErrorResources).toEqual([]);
+    });
+  });
+
+  describe("getVariablesString", () => {
+    beforeEach(() => {
+      wrapper = createWrapper();
+    });
+
+    it("exposes getVariablesString as a function", () => {
+      // Assert
+      expect(typeof wrapper.vm.getVariablesString).toBe("function");
+    });
+
+    it("returns empty string when variablesData.values is empty", () => {
+      // Arrange
+      wrapper.vm.variablesData = { isVariablesLoading: false, values: [] };
+
+      // Act
+      const result = wrapper.vm.getVariablesString();
+
+      // Assert
+      expect(result).toBe("");
+    });
+
+    it("returns SQL clause for query_values type variables with a value", () => {
+      // Arrange
+      wrapper.vm.variablesData = {
+        isVariablesLoading: false,
+        values: [{ name: "service", value: "web-app", type: "query_values" }],
+      };
+
+      // Act
+      const result = wrapper.vm.getVariablesString();
+
+      // Assert
+      expect(result).toContain("service");
+      expect(result).toContain("web-app");
+    });
+
+    it("skips variables without a value", () => {
+      // Arrange
+      wrapper.vm.variablesData = {
+        isVariablesLoading: false,
+        values: [{ name: "service", value: "", type: "query_values" }],
+      };
+
+      // Act
+      const result = wrapper.vm.getVariablesString();
+
+      // Assert
+      expect(result).toBe("");
+    });
+  });
+
+  describe("selectedDate watcher triggers resource fetches", () => {
+    let mockSearch: ReturnType<typeof vi.fn>;
+
+    beforeEach(async () => {
+      const searchModule = await import("@/services/search");
+      mockSearch = vi.mocked(searchModule.default.search);
+      mockSearch.mockResolvedValue({ data: { hits: [] } });
+      wrapper = createWrapper();
+      mockSearch.mockClear();
+    });
+
+    it("calls getTopHeavyResources and getTopSlowResources when selectedDate prop changes", async () => {
+      // Arrange
+      const newSelectedDate = { startTime: 1234567999, endTime: 1234568999 };
+
+      // Act
+      await wrapper.setProps({ selectedDate: newSelectedDate });
+      await nextTick();
+
+      // Assert — both getTopHeavyResources and getTopSlowResources call searchService
+      expect(mockSearch).toHaveBeenCalled();
+    });
+  });
+
+  describe("onVariablesManagerReady emit", () => {
+    it("emits variablesManagerReady event with the manager payload", async () => {
+      // Arrange
+      wrapper = createWrapper();
+      const mockManager = { refresh: vi.fn() };
+
+      // Act
+      wrapper.vm.onVariablesManagerReady(mockManager);
+      await nextTick();
+
+      // Assert
+      expect(wrapper.emitted("variablesManagerReady")).toBeTruthy();
+      expect(wrapper.emitted("variablesManagerReady")?.[0]).toEqual([mockManager]);
     });
   });
 });

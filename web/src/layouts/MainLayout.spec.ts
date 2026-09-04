@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,18 +14,45 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { flushPromises, shallowMount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
-import i18n from "@/locales";
-import store from "@/test/unit/helpers/store";
-import MainLayout from "@/layouts/MainLayout.vue";
-import router from "@/test/unit/helpers/router";
+import { mount } from "@vue/test-utils";
+import { defineComponent, ref, h } from "vue";
 import * as cookies from "@/utils/cookies";
+
+// ODialog stub mirrors the migrated public contract (v-model:open, size, show-close,
+// update:open / click:* emits). Mirrors stubs used in other migrated specs.
+const ODialogStub = defineComponent({
+  name: "ODialog",
+  props: [
+    "open",
+    "size",
+    "title",
+    "subTitle",
+    "persistent",
+    "showClose",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "primaryVariant",
+    "secondaryVariant",
+    "neutralVariant",
+    "primaryDisabled",
+    "secondaryDisabled",
+    "neutralDisabled",
+    "primaryLoading",
+    "secondaryLoading",
+    "neutralLoading",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  setup(_, { slots }) {
+    return () =>
+      h("div", { class: "o-dialog-stub" }, [slots.header?.(), slots.default?.(), slots.footer?.()]);
+  },
+});
 
 // Mock cookies module
 vi.mock("@/utils/cookies", () => ({
-  getLanguage: vi.fn(() => "en-gb"),
+  getLanguage: vi.fn(() => "en-us"),
   setLanguage: vi.fn(),
   getSidebarStatus: vi.fn(),
   setSidebarStatus: vi.fn(),
@@ -40,14 +67,10 @@ const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
-
 describe.skip("Main Layout Component", async () => {
   // Component integration tests skipped due to complex dependency injection
   // All functions are tested individually in the methods section below
-  
+
   it("should have component tests", () => {
     expect(true).toBe(true);
   });
@@ -65,31 +88,28 @@ describe("MainLayout Methods and Functions", () => {
       location: { reload: vi.fn() },
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn()
+      dispatchEvent: vi.fn(),
     };
     global.window = mockWindow as any;
 
     mockRouter = {
       push: vi.fn(),
-      currentRoute: { value: { name: "home" } }
+      currentRoute: { value: { name: "home" } },
     };
 
     mockStore = {
       state: {
         selectedOrganization: { identifier: "test-org" },
-        zoConfig: { 
+        zoConfig: {
           custom_docs_url: "",
           custom_slack_url: "",
-          actions_enabled: true,
           custom_hide_menus: "",
-          rum: { enabled: false }
+          rum: { enabled: false },
         },
         userInfo: { given_name: "John", family_name: "Doe", email: "john@test.com" },
-        organizations: [
-          { id: 1, name: "Test Org", identifier: "test-org", type: "default" }
-        ]
+        organizations: [{ id: 1, name: "Test Org", identifier: "test-org", type: "default" }],
       },
-      dispatch: vi.fn()
+      dispatch: vi.fn(),
     };
   });
 
@@ -102,7 +122,7 @@ describe("MainLayout Methods and Functions", () => {
       const navigateToDocs = () => {
         const config = { isEnterprise: "false" };
         const store = { state: { zoConfig: { custom_docs_url: "" } } };
-        
+
         if (config.isEnterprise === "true" && store.state.zoConfig.custom_docs_url) {
           window.open(store.state.zoConfig.custom_docs_url, "_blank");
         } else {
@@ -118,7 +138,7 @@ describe("MainLayout Methods and Functions", () => {
       const navigateToDocs = () => {
         const config = { isEnterprise: "true" };
         const store = { state: { zoConfig: { custom_docs_url: "https://custom-docs.com" } } };
-        
+
         if (config.isEnterprise === "true" && store.state.zoConfig.custom_docs_url) {
           window.open(store.state.zoConfig.custom_docs_url, "_blank");
         } else {
@@ -194,7 +214,6 @@ describe("MainLayout Methods and Functions", () => {
       const langWithAllData = {
         code: "de",
         label: "Deutsch",
-        icon: "flag-icon flag-icon-de"
       };
 
       changeLanguage(langWithAllData);
@@ -208,14 +227,14 @@ describe("MainLayout Methods and Functions", () => {
     });
 
     it("should retrieve and use current language from cookies", () => {
-      // Mock returns "en-gb" by default
+      // Mock returns "en-us" by default
       const currentLang = cookies.getLanguage();
 
       // Verify the cookie function was called
       expect(cookies.getLanguage).toHaveBeenCalled();
 
       // Verify we can use the retrieved language
-      expect(currentLang).toBe("en-gb");
+      expect(currentLang).toBe("en-us");
       expect(typeof currentLang).toBe("string");
       expect(currentLang.length).toBeGreaterThan(0);
     });
@@ -226,55 +245,30 @@ describe("MainLayout Methods and Functions", () => {
       const orgOptions = [
         { label: "Test Organization", identifier: "test-org" },
         { label: "Another Org", identifier: "another-org" },
-        { label: "Third Company", identifier: "third-org" }
+        { label: "Third Company", identifier: "third-org" },
       ];
 
       const filteredOrganizations = (searchQuery: string) => {
         if (!searchQuery.trim()) return orgOptions;
-        return orgOptions.filter(org => 
-          org.label.toLowerCase().includes(searchQuery.toLowerCase())
+        return orgOptions.filter((org) =>
+          org.label.toLowerCase().includes(searchQuery.toLowerCase()),
         );
       };
 
       // Test empty search
       expect(filteredOrganizations("")).toEqual(orgOptions);
-      
+
       // Test with search query
       expect(filteredOrganizations("test")).toHaveLength(1);
       expect(filteredOrganizations("test")[0].label).toBe("Test Organization");
-      
+
       // Test case insensitive
       expect(filteredOrganizations("TEST")).toHaveLength(1);
     });
 
-    it("should compute isActionsEnabled correctly", () => {
-      const isActionsEnabled = (config: any, store: any) => {
-        return (config.isEnterprise === "true" || config.isCloud === "true") && 
-               store.state.zoConfig.actions_enabled;
-      };
-
-      // Test when not enterprise or cloud
-      expect(isActionsEnabled(
-        { isEnterprise: "false", isCloud: "false" }, 
-        mockStore
-      )).toBe(false);
-
-      // Test when enterprise
-      expect(isActionsEnabled(
-        { isEnterprise: "true", isCloud: "false" }, 
-        mockStore
-      )).toBe(true);
-
-      // Test when cloud
-      expect(isActionsEnabled(
-        { isEnterprise: "false", isCloud: "true" }, 
-        mockStore
-      )).toBe(true);
-    });
-
     it("should compute getBtnLogo based on state", () => {
       const getImageURL = vi.fn((path: string) => `mock-${path}`);
-      
+
       const getBtnLogo = (theme: string, isHovered: boolean, isAiChatEnabled: boolean) => {
         if (theme === "dark") {
           if (isAiChatEnabled) {
@@ -297,10 +291,10 @@ describe("MainLayout Methods and Functions", () => {
 
       // Test dark theme default
       expect(getBtnLogo("dark", false, false)).toContain("ai_icon_dark.svg");
-      
+
       // Test dark theme hovered
       expect(getBtnLogo("dark", true, false)).toContain("ai_icon_dark_hovered.svg");
-      
+
       // Test dark theme enabled
       expect(getBtnLogo("dark", false, true)).toContain("ai_icon_dark_enabled.svg");
     });
@@ -311,13 +305,13 @@ describe("MainLayout Methods and Functions", () => {
       const updateOrganization = async (selectedOrg: any) => {
         const resetStreams = vi.fn();
         resetStreams();
-        
+
         mockStore.dispatch("logs/resetLogs");
         mockStore.dispatch("setIsDataIngested", false);
-        
+
         mockRouter.push({
           path: "/",
-          query: { org_identifier: selectedOrg.identifier }
+          query: { org_identifier: selectedOrg.identifier },
         });
       };
 
@@ -328,7 +322,7 @@ describe("MainLayout Methods and Functions", () => {
       expect(mockStore.dispatch).toHaveBeenCalledWith("setIsDataIngested", false);
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: "/",
-        query: { org_identifier: "new-org" }
+        query: { org_identifier: "new-org" },
       });
     });
 
@@ -340,16 +334,16 @@ describe("MainLayout Methods and Functions", () => {
             name: "Test Org",
             identifier: "test-org",
             type: "default",
-            UserObj: { email: "test@example.com" }
-          }
+            UserObj: { email: "test@example.com" },
+          },
         ];
 
-        const orgOptions = organizations.map(org => ({
+        const orgOptions = organizations.map((org) => ({
           label: org.name,
           identifier: org.identifier,
           id: org.id,
           type: org.type,
-          UserObj: org.UserObj
+          UserObj: org.UserObj,
         }));
 
         return orgOptions;
@@ -368,15 +362,15 @@ describe("MainLayout Methods and Functions", () => {
             data: {
               scrape_interval: 30,
               span_id_field_name: "custom_span_id",
-              trace_id_field_name: "custom_trace_id"
-            }
-          }
+              trace_id_field_name: "custom_trace_id",
+            },
+          },
         };
 
         const settings = {
           scrape_interval: mockResponse.data.data.scrape_interval || 15,
           span_id_field_name: mockResponse.data.data.span_id_field_name || "spanId",
-          trace_id_field_name: mockResponse.data.data.trace_id_field_name || "traceId"
+          trace_id_field_name: mockResponse.data.data.trace_id_field_name || "traceId",
         };
 
         mockStore.dispatch("setOrganizationSettings", settings);
@@ -384,13 +378,139 @@ describe("MainLayout Methods and Functions", () => {
       };
 
       await getOrganizationSettings();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setOrganizationSettings", 
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setOrganizationSettings",
         expect.objectContaining({
           scrape_interval: 30,
-          span_id_field_name: "custom_span_id", 
-          trace_id_field_name: "custom_trace_id"
-        })
+          span_id_field_name: "custom_span_id",
+          trace_id_field_name: "custom_trace_id",
+        }),
       );
+    });
+
+    describe("getOrganizationSettings — usage_stream_enabled", () => {
+      it("defaults usage_stream_enabled to false when field is absent from API response", async () => {
+        // Arrange
+        const getOrganizationSettings = async () => {
+          const apiData = {
+            scrape_interval: 15,
+            span_id_field_name: "spanId",
+            trace_id_field_name: "traceId",
+            // usage_stream_enabled intentionally absent
+          };
+
+          const settings = {
+            scrape_interval: apiData?.scrape_interval ?? 15,
+            span_id_field_name: apiData?.span_id_field_name ?? "spanId",
+            trace_id_field_name: apiData?.trace_id_field_name ?? "traceId",
+            usage_stream_enabled: apiData?.usage_stream_enabled ?? false,
+          };
+
+          mockStore.dispatch("setOrganizationSettings", settings);
+          return settings;
+        };
+
+        // Act
+        const result = await getOrganizationSettings();
+
+        // Assert
+        expect(result.usage_stream_enabled).toBe(false);
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+          "setOrganizationSettings",
+          expect.objectContaining({ usage_stream_enabled: false }),
+        );
+      });
+
+      it("passes through usage_stream_enabled: true from API response", async () => {
+        // Arrange
+        const getOrganizationSettings = async () => {
+          const apiData = {
+            scrape_interval: 15,
+            span_id_field_name: "spanId",
+            trace_id_field_name: "traceId",
+            usage_stream_enabled: true,
+          };
+
+          const settings = {
+            scrape_interval: apiData?.scrape_interval ?? 15,
+            span_id_field_name: apiData?.span_id_field_name ?? "spanId",
+            trace_id_field_name: apiData?.trace_id_field_name ?? "traceId",
+            usage_stream_enabled: apiData?.usage_stream_enabled ?? false,
+          };
+
+          mockStore.dispatch("setOrganizationSettings", settings);
+          return settings;
+        };
+
+        // Act
+        const result = await getOrganizationSettings();
+
+        // Assert
+        expect(result.usage_stream_enabled).toBe(true);
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+          "setOrganizationSettings",
+          expect.objectContaining({ usage_stream_enabled: true }),
+        );
+      });
+
+      it("preserves usage_stream_enabled: false from API response without overriding via default", async () => {
+        // Arrange — API explicitly returns false; nullish coalescing must NOT override it
+        const getOrganizationSettings = async () => {
+          const apiData = {
+            scrape_interval: 15,
+            span_id_field_name: "spanId",
+            trace_id_field_name: "traceId",
+            usage_stream_enabled: false,
+          };
+
+          const settings = {
+            scrape_interval: apiData?.scrape_interval ?? 15,
+            span_id_field_name: apiData?.span_id_field_name ?? "spanId",
+            trace_id_field_name: apiData?.trace_id_field_name ?? "traceId",
+            usage_stream_enabled: apiData?.usage_stream_enabled ?? false,
+          };
+
+          mockStore.dispatch("setOrganizationSettings", settings);
+          return settings;
+        };
+
+        // Act
+        const result = await getOrganizationSettings();
+
+        // Assert — explicitly provided false must not be replaced by default true
+        expect(result.usage_stream_enabled).toBe(false);
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+          "setOrganizationSettings",
+          expect.objectContaining({ usage_stream_enabled: false }),
+        );
+      });
+
+      it("falls back to usage_stream_enabled: false when API response is null/undefined", async () => {
+        // Arrange — simulate absent/null org settings response
+        const getOrganizationSettings = async () => {
+          const apiData: any = null;
+
+          const settings = {
+            scrape_interval: apiData?.scrape_interval ?? 15,
+            span_id_field_name: apiData?.span_id_field_name ?? "spanId",
+            trace_id_field_name: apiData?.trace_id_field_name ?? "traceId",
+            usage_stream_enabled: apiData?.usage_stream_enabled ?? false,
+          };
+
+          mockStore.dispatch("setOrganizationSettings", settings);
+          return settings;
+        };
+
+        // Act
+        const result = await getOrganizationSettings();
+
+        // Assert
+        expect(result.usage_stream_enabled).toBe(false);
+        expect(mockStore.dispatch).toHaveBeenCalledWith(
+          "setOrganizationSettings",
+          expect.objectContaining({ usage_stream_enabled: false }),
+        );
+      });
     });
   });
 
@@ -433,68 +553,38 @@ describe("MainLayout Methods and Functions", () => {
 
     it("should handle removeFirstTimeLogin", () => {
       const removeFirstTimeLogin = (show: boolean) => {
-        localStorage.setItem('isFirstTimeLogin', 'true');
+        localStorage.setItem("isFirstTimeLogin", "true");
         if (!show) {
-          localStorage.removeItem('isFirstTimeLogin');
+          localStorage.removeItem("isFirstTimeLogin");
         }
         return !show;
       };
 
       const result = removeFirstTimeLogin(false);
       expect(result).toBe(true);
-      expect(localStorage.getItem('isFirstTimeLogin')).toBeNull();
+      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
     });
   });
 
   describe("Menu Management", () => {
-    it("should update actions menu when enabled", () => {
-      const updateActionsMenu = () => {
-        const linksList = [
-          { name: "home", title: "menu.home" },
-          { name: "logs", title: "menu.logs" }
-        ];
-        
-        const config = { isEnterprise: "true" };
-        const store = { state: { zoConfig: { actions_enabled: true } } };
-        
-        if ((config.isEnterprise === "true") && store.state.zoConfig.actions_enabled) {
-          const hasActions = linksList.find(link => link.name === "actionScripts");
-          if (!hasActions) {
-            linksList.push({
-              name: "actionScripts",
-              title: "menu.actions"
-            } as any);
-          }
-        }
-        
-        return linksList;
-      };
-
-      const result = updateActionsMenu();
-      const actionLink = result.find(link => link.name === "actionScripts");
-      
-      expect(actionLink).toBeDefined();
-      expect(actionLink?.title).toBe("menu.actions");
-    });
-
     it("should filter menus based on config", () => {
       const filterMenus = () => {
         const linksList = [
           { name: "home", title: "menu.home" },
           { name: "logs", title: "menu.logs" },
-          { name: "metrics", title: "menu.metrics" }
+          { name: "metrics", title: "menu.metrics" },
         ];
-        
+
         const customHideMenus = "logs,metrics";
-        const menusToHide = customHideMenus.split(',').map(menu => menu.trim());
-        
-        return linksList.filter(link => !menusToHide.includes(link.name));
+        const menusToHide = customHideMenus.split(",").map((menu) => menu.trim());
+
+        return linksList.filter((link) => !menusToHide.includes(link.name));
       };
 
       const result = filterMenus();
-      const hasLogs = result.some(link => link.name === "logs");
-      const hasMetrics = result.some(link => link.name === "metrics");
-      
+      const hasLogs = result.some((link) => link.name === "logs");
+      const hasMetrics = result.some((link) => link.name === "metrics");
+
       expect(hasLogs).toBe(false);
       expect(hasMetrics).toBe(false);
       expect(result.length).toBe(1); // Only home should remain
@@ -507,7 +597,7 @@ describe("MainLayout Methods and Functions", () => {
 
         if (!editorLink) {
           // Create prefetch link for Monaco editor
-          editorLink = document.createElement('link');
+          editorLink = document.createElement("link");
           (editorLink as HTMLLinkElement).rel = "prefetch";
           (editorLink as HTMLLinkElement).href = "/web/assets/editor.api.v1.js";
           document.head.appendChild(editorLink);
@@ -532,7 +622,7 @@ describe("MainLayout Methods and Functions", () => {
       const openSlack = () => {
         const config = { isEnterprise: "false" };
         const store = { state: { zoConfig: { custom_slack_url: "" } } };
-        
+
         if (config.isEnterprise === "true" && store.state.zoConfig.custom_slack_url) {
           window.open(store.state.zoConfig.custom_slack_url, "_blank");
         } else {
@@ -541,18 +631,21 @@ describe("MainLayout Methods and Functions", () => {
       };
 
       openSlack();
-      expect(mockWindow.open).toHaveBeenCalledWith("https://short.openobserve.ai/community", "_blank");
+      expect(mockWindow.open).toHaveBeenCalledWith(
+        "https://short.openobserve.ai/community",
+        "_blank",
+      );
     });
 
     it("should set RUM user when enabled", () => {
       const setRumUser = () => {
         const config = { state: { zoConfig: { rum: { enabled: true } } } };
         const userInfo = { given_name: "John", family_name: "Doe", email: "john@test.com" };
-        
+
         if (config.state.zoConfig.rum?.enabled) {
           const rumUser = {
             name: `${userInfo.given_name} ${userInfo.family_name}`,
-            email: userInfo.email
+            email: userInfo.email,
           };
           return rumUser;
         }
@@ -562,7 +655,7 @@ describe("MainLayout Methods and Functions", () => {
       const result = setRumUser();
       expect(result).toEqual({
         name: "John Doe",
-        email: "john@test.com"
+        email: "john@test.com",
       });
     });
   });
@@ -573,19 +666,20 @@ describe("MainLayout Methods and Functions", () => {
         const mockConfigData = {
           version: "2.0.0",
           rum: { enabled: true },
-          actions_enabled: true
         };
-        
+
         mockStore.dispatch("setConfig", mockConfigData);
         return mockConfigData;
       };
 
       await getConfig();
-      expect(mockStore.dispatch).toHaveBeenCalledWith("setConfig", expect.objectContaining({
-        version: "2.0.0",
-        rum: { enabled: true },
-        actions_enabled: true
-      }));
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setConfig",
+        expect.objectContaining({
+          version: "2.0.0",
+          rum: { enabled: true },
+        }),
+      );
     });
 
     it("should correctly determine if token is still valid", () => {
@@ -611,13 +705,12 @@ describe("MainLayout Methods and Functions", () => {
       const prefetch = () => {
         const existingLink = document.querySelector('link[href*="editor.api.v1.js"]');
         let isLoaded = false;
-        
+
         if (!existingLink) {
           // Simulate creating and appending link
-          const link = { rel: "prefetch", href: "/web/assets/editor.api.v1.js" };
           isLoaded = true;
         }
-        
+
         return isLoaded;
       };
 
@@ -631,20 +724,25 @@ describe("MainLayout Methods and Functions", () => {
   describe("Language Configuration", () => {
     it("should have correct language list", () => {
       const langList = [
-        { code: "en-gb", label: "English", icon: "flag-icon flag-icon-gb" },
-        { code: "zh-cn", label: "中文 (简体)", icon: "flag-icon flag-icon-cn" },
-        { code: "zh-tw", label: "中文 (繁體)", icon: "flag-icon flag-icon-tw" },
-        { code: "fr", label: "Français", icon: "flag-icon flag-icon-fr" },
-        { code: "de", label: "Deutsch", icon: "flag-icon flag-icon-de" },
-        { code: "es", label: "Español", icon: "flag-icon flag-icon-es" },
-        { code: "pt", label: "Português", icon: "flag-icon flag-icon-pt" },
-        { code: "it", label: "Italiano", icon: "flag-icon flag-icon-it" },
-        { code: "tr", label: "Türkçe", icon: "flag-icon flag-icon-tr" },
-        { code: "ko", label: "한국어", icon: "flag-icon flag-icon-kr" }
+        { code: "en-us", label: "English" },
+        { code: "tr-turk", label: "Türkçe" },
+        { code: "zh-cn", label: "简体中文" },
+        { code: "zh-tw", label: "繁體中文" },
+        { code: "fr", label: "Français" },
+        { code: "es", label: "Español" },
+        { code: "de", label: "Deutsch" },
+        { code: "it", label: "Italiano" },
+        { code: "ja", label: "日本語" },
+        { code: "ko", label: "한국어" },
+        { code: "nl", label: "Nederlands" },
+        { code: "pt", label: "Português" },
+        { code: "ru", label: "Русский" },
+        { code: "pl", label: "Polski" },
+        { code: "vi", label: "Tiếng Việt" },
       ];
 
-      expect(langList).toHaveLength(10);
-      expect(langList[0].code).toBe("en-gb");
+      expect(langList).toHaveLength(15);
+      expect(langList[0].code).toBe("en-us");
       expect(langList[0].label).toBe("English");
     });
   });
@@ -656,13 +754,13 @@ describe("MainLayout Methods and Functions", () => {
         { name: "logs", title: "menu.logs", link: "/logs" },
         { name: "metrics", title: "menu.metrics", link: "/metrics" },
         { name: "traces", title: "menu.traces", link: "/traces" },
-        { name: "dashboards", title: "menu.dashboards", link: "/dashboards" }
+        { name: "dashboards", title: "menu.dashboards", link: "/dashboards" },
       ];
 
       expect(Array.isArray(linksList)).toBe(true);
       expect(linksList.length).toBeGreaterThan(3);
-      
-      const homeLink = linksList.find(link => link.name === "home");
+
+      const homeLink = linksList.find((link) => link.name === "home");
       expect(homeLink).toBeDefined();
       expect(homeLink?.title).toBe("menu.home");
       expect(homeLink?.link).toBe("/");
@@ -679,7 +777,7 @@ describe("MainLayout Methods and Functions", () => {
 
       const error = new Error("API Error");
       const result = handleError("setSelectedOrganization", error);
-      
+
       expect(result.success).toBe(false);
       expect(result.error).toBe("API Error");
     });
@@ -690,7 +788,7 @@ describe("MainLayout Methods and Functions", () => {
       const verifyStreamExist = async () => {
         const mockStreams = { list: [] };
         const getStreams = vi.fn().mockResolvedValue(mockStreams);
-        
+
         const streams = await getStreams("", false);
         if (streams.list.length === 0) {
           mockStore.dispatch("setIsDataIngested", false);
@@ -709,7 +807,7 @@ describe("MainLayout Methods and Functions", () => {
       const verifyStreamExist = async () => {
         const mockStreams = { list: [{ name: "stream1" }] };
         const getStreams = vi.fn().mockResolvedValue(mockStreams);
-        
+
         const streams = await getStreams("", false);
         if (streams.list.length === 0) {
           mockStore.dispatch("setIsDataIngested", false);
@@ -730,46 +828,18 @@ describe("MainLayout Methods and Functions", () => {
           { name: "home", title: "Home" },
           { name: "logs", title: "Logs" },
           { name: "metrics", title: "Metrics" },
-          { name: "traces", title: "Traces" }
+          { name: "traces", title: "Traces" },
         ];
-        
+
         const customHideMenus = "logs,traces";
-        const menusToHide = new Set(customHideMenus.split(',').map(menu => menu.trim()));
-        
-        return linksList.filter(link => !menusToHide.has(link.name));
+        const menusToHide = new Set(customHideMenus.split(",").map((menu) => menu.trim()));
+
+        return linksList.filter((link) => !menusToHide.has(link.name));
       };
 
       const result = filterMenus();
       expect(result).toHaveLength(2);
-      expect(result.map(r => r.name)).toEqual(["home", "metrics"]);
-    });
-
-    it("should test updateActionsMenu when actions are disabled", () => {
-      const updateActionsMenu = () => {
-        const linksList = [
-          { name: "home", title: "Home" },
-          { name: "alertList", title: "Alerts" }
-        ];
-        
-        const isActionsEnabled = false;
-        if (!isActionsEnabled) {
-          return linksList;
-        }
-        
-        const alertIndex = linksList.findIndex(link => link.name === "alertList");
-        if (alertIndex !== -1) {
-          linksList.splice(alertIndex + 1, 0, {
-            name: "actionScripts",
-            title: "Actions"
-          } as any);
-        }
-        
-        return linksList;
-      };
-
-      const result = updateActionsMenu();
-      expect(result).toHaveLength(2);
-      expect(result.find(r => r.name === "actionScripts")).toBeUndefined();
+      expect(result.map((r) => r.name)).toEqual(["home", "metrics"]);
     });
 
     it("should test getConfig with error handling", async () => {
@@ -777,7 +847,7 @@ describe("MainLayout Methods and Functions", () => {
         try {
           const mockConfig = {
             version: "2.0.0",
-            rum: { enabled: true }
+            rum: { enabled: true },
           };
           mockStore.dispatch("setConfig", mockConfig);
           return mockConfig;
@@ -790,7 +860,7 @@ describe("MainLayout Methods and Functions", () => {
       const result = await getConfig();
       expect(result).toEqual({
         version: "2.0.0",
-        rum: { enabled: true }
+        rum: { enabled: true },
       });
       expect(mockStore.dispatch).toHaveBeenCalledWith("setConfig", result);
     });
@@ -798,15 +868,15 @@ describe("MainLayout Methods and Functions", () => {
     it("should test setRumUser when RUM is disabled", () => {
       const setRumUser = () => {
         const config = { state: { zoConfig: { rum: { enabled: false } } } };
-        
+
         if (!config.state.zoConfig.rum?.enabled) {
           return null;
         }
-        
+
         const userInfo = { given_name: "John", family_name: "Doe", email: "john@test.com" };
         return {
           name: `${userInfo.given_name} ${userInfo.family_name}`,
-          email: userInfo.email
+          email: userInfo.email,
         };
       };
 
@@ -818,17 +888,17 @@ describe("MainLayout Methods and Functions", () => {
   describe("Advanced Organization Management", () => {
     it("should handle organization mapping with billing info", () => {
       const mapOrganizationData = (organizations: any[]) => {
-        return organizations.map(data => ({
+        return organizations.map((data) => ({
           label: data.name,
           id: data.id,
           identifier: data.identifier,
-          subscription_type: data.hasOwnProperty("CustomerBillingObj") 
-            ? data.CustomerBillingObj.subscription_type 
+          subscription_type: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
+            ? data.CustomerBillingObj.subscription_type
             : "",
           status: data.status,
-          note: data.hasOwnProperty("CustomerBillingObj") 
-            ? data.CustomerBillingObj.note 
-            : ""
+          note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
+            ? data.CustomerBillingObj.note
+            : "",
         }));
       };
 
@@ -840,9 +910,9 @@ describe("MainLayout Methods and Functions", () => {
           status: "active",
           CustomerBillingObj: {
             subscription_type: "premium",
-            note: "Test note"
-          }
-        }
+            note: "Test note",
+          },
+        },
       ];
 
       const result = mapOrganizationData(orgs);
@@ -852,23 +922,23 @@ describe("MainLayout Methods and Functions", () => {
         identifier: "test",
         subscription_type: "premium",
         status: "active",
-        note: "Test note"
+        note: "Test note",
       });
     });
 
     it("should handle organization mapping without billing info", () => {
       const mapOrganizationData = (organizations: any[]) => {
-        return organizations.map(data => ({
+        return organizations.map((data) => ({
           label: data.name,
           id: data.id,
           identifier: data.identifier,
-          subscription_type: data.hasOwnProperty("CustomerBillingObj") 
-            ? data.CustomerBillingObj.subscription_type 
+          subscription_type: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
+            ? data.CustomerBillingObj.subscription_type
             : "",
           status: data.status,
-          note: data.hasOwnProperty("CustomerBillingObj") 
-            ? data.CustomerBillingObj.note 
-            : ""
+          note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
+            ? data.CustomerBillingObj.note
+            : "",
         }));
       };
 
@@ -877,8 +947,8 @@ describe("MainLayout Methods and Functions", () => {
           id: 1,
           name: "Basic Org",
           identifier: "basic",
-          status: "active"
-        }
+          status: "active",
+        },
       ];
 
       const result = mapOrganizationData(orgs);
@@ -888,7 +958,7 @@ describe("MainLayout Methods and Functions", () => {
         identifier: "basic",
         subscription_type: "",
         status: "active",
-        note: ""
+        note: "",
       });
     });
 
@@ -900,11 +970,11 @@ describe("MainLayout Methods and Functions", () => {
       const orgs = [
         { label: "Zebra Org", id: 3 },
         { label: "Alpha Org", id: 1 },
-        { label: "Beta Org", id: 2 }
+        { label: "Beta Org", id: 2 },
       ];
 
       const result = sortOrganizations(orgs);
-      expect(result.map(r => r.label)).toEqual(["Alpha Org", "Beta Org", "Zebra Org"]);
+      expect(result.map((r) => r.label)).toEqual(["Alpha Org", "Beta Org", "Zebra Org"]);
     });
   });
 
@@ -958,15 +1028,15 @@ describe("MainLayout Methods and Functions", () => {
   describe("Theme and UI State Management", () => {
     it("should compute button logo for light theme", () => {
       const getImageURL = vi.fn((path: string) => `mock-${path}`);
-      
+
       const getBtnLogo = (theme: string, isHovered: boolean, isEnabled: boolean) => {
         if (isHovered || isEnabled) {
-          return getImageURL('images/common/ai_icon_dark.svg');
+          return getImageURL("images/common/ai_icon_dark.svg");
         }
-        
-        return theme === 'dark'
-          ? getImageURL('images/common/ai_icon_dark.svg')
-          : getImageURL('images/common/ai_icon.svg');
+
+        return theme === "dark"
+          ? getImageURL("images/common/ai_icon_dark.svg")
+          : getImageURL("images/common/ai_icon.svg");
       };
 
       const result = getBtnLogo("light", false, false);
@@ -994,27 +1064,27 @@ describe("MainLayout Methods and Functions", () => {
 
   describe("Local Storage Operations", () => {
     it("should handle first time login flag removal", () => {
-      localStorage.setItem('isFirstTimeLogin', 'true');
-      
+      localStorage.setItem("isFirstTimeLogin", "true");
+
       const removeFirstTimeLogin = () => {
-        localStorage.removeItem('isFirstTimeLogin');
-        return localStorage.getItem('isFirstTimeLogin') === null;
+        localStorage.removeItem("isFirstTimeLogin");
+        return localStorage.getItem("isFirstTimeLogin") === null;
       };
 
       const result = removeFirstTimeLogin();
       expect(result).toBe(true);
-      expect(localStorage.getItem('isFirstTimeLogin')).toBeNull();
+      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
     });
 
     it("should check if first time login flag exists", () => {
       const checkFirstTimeLogin = () => {
-        return localStorage.getItem('isFirstTimeLogin') === 'true';
+        return localStorage.getItem("isFirstTimeLogin") === "true";
       };
 
-      localStorage.setItem('isFirstTimeLogin', 'true');
+      localStorage.setItem("isFirstTimeLogin", "true");
       expect(checkFirstTimeLogin()).toBe(true);
-      
-      localStorage.removeItem('isFirstTimeLogin');
+
+      localStorage.removeItem("isFirstTimeLogin");
       expect(checkFirstTimeLogin()).toBe(false);
     });
   });
@@ -1022,7 +1092,7 @@ describe("MainLayout Methods and Functions", () => {
   describe("Event Handling", () => {
     it("should dispatch window resize event", () => {
       const mockEventListeners: { [key: string]: Function[] } = {};
-      
+
       const mockWindow = {
         addEventListener: vi.fn((event: string, handler: Function) => {
           if (!mockEventListeners[event]) {
@@ -1033,14 +1103,14 @@ describe("MainLayout Methods and Functions", () => {
         removeEventListener: vi.fn(),
         dispatchEvent: vi.fn((event: Event) => {
           const handlers = mockEventListeners[event.type] || [];
-          handlers.forEach(handler => handler(event));
+          handlers.forEach((handler) => handler(event));
           return true;
-        })
+        }),
       };
 
-      Object.defineProperty(global, 'window', {
+      Object.defineProperty(global, "window", {
         value: mockWindow,
-        writable: true
+        writable: true,
       });
 
       const dispatchResize = () => {
@@ -1051,10 +1121,10 @@ describe("MainLayout Methods and Functions", () => {
 
       const spy = vi.fn();
       mockWindow.addEventListener("resize", spy);
-      
+
       dispatchResize();
       expect(spy).toHaveBeenCalled();
-      
+
       mockWindow.removeEventListener("resize", spy);
     });
 
@@ -1078,18 +1148,18 @@ describe("MainLayout Methods and Functions", () => {
         if (newOrg?.identifier !== oldOrg?.identifier) {
           return {
             shouldUpdate: true,
-            newIdentifier: newOrg?.identifier
+            newIdentifier: newOrg?.identifier,
           };
         }
         return {
           shouldUpdate: false,
-          newIdentifier: null
+          newIdentifier: null,
         };
       };
 
       const oldOrg = { identifier: "old-org" };
       const newOrg = { identifier: "new-org" };
-      
+
       const result = handleOrgChange(newOrg, oldOrg);
       expect(result.shouldUpdate).toBe(true);
       expect(result.newIdentifier).toBe("new-org");
@@ -1099,7 +1169,7 @@ describe("MainLayout Methods and Functions", () => {
       const handleSearchQueryChange = (newQuery: string) => {
         return {
           query: newQuery.toLowerCase().trim(),
-          isEmpty: !newQuery.trim()
+          isEmpty: !newQuery.trim(),
         };
       };
 
@@ -1114,8 +1184,8 @@ describe("MainLayout Methods and Functions", () => {
       const filteredOrganizations = (orgOptions: any[], searchQuery: string) => {
         if (!orgOptions || orgOptions.length === 0) return [];
         if (!searchQuery.trim()) return orgOptions;
-        return orgOptions.filter(org => 
-          org.label.toLowerCase().includes(searchQuery.toLowerCase())
+        return orgOptions.filter((org) =>
+          org.label.toLowerCase().includes(searchQuery.toLowerCase()),
         );
       };
 
@@ -1126,12 +1196,12 @@ describe("MainLayout Methods and Functions", () => {
     it("should handle organization search with special characters", () => {
       const orgOptions = [
         { label: "Test & Co.", identifier: "test-co" },
-        { label: "Normal Org", identifier: "normal" }
+        { label: "Normal Org", identifier: "normal" },
       ];
 
       const filteredOrganizations = (searchQuery: string) => {
-        return orgOptions.filter(org => 
-          org.label.toLowerCase().includes(searchQuery.toLowerCase())
+        return orgOptions.filter((org) =>
+          org.label.toLowerCase().includes(searchQuery.toLowerCase()),
         );
       };
 
@@ -1143,10 +1213,10 @@ describe("MainLayout Methods and Functions", () => {
     it("should handle null/undefined user info", () => {
       const getUserDisplayName = (userInfo: any) => {
         if (!userInfo) return "Guest";
-        
+
         const firstName = userInfo.given_name || "";
         const lastName = userInfo.family_name || "";
-        
+
         return `${firstName} ${lastName}`.trim() || userInfo.email || "Guest";
       };
 
@@ -1158,17 +1228,114 @@ describe("MainLayout Methods and Functions", () => {
     it("should handle empty menu links", () => {
       const processMenuLinks = (links: any[]) => {
         if (!Array.isArray(links)) return [];
-        return links.filter(link => link && link.name && link.title);
+        return links.filter((link) => link && link.name && link.title);
       };
 
       expect(processMenuLinks([])).toHaveLength(0);
       expect(processMenuLinks(null as any)).toHaveLength(0);
-      expect(processMenuLinks([
-        { name: "home", title: "Home" },
-        null,
-        { name: "logs", title: "Logs" },
-        { name: "", title: "Invalid" }
-      ])).toHaveLength(2);
+      expect(
+        processMenuLinks([
+          { name: "home", title: "Home" },
+          null,
+          { name: "logs", title: "Logs" },
+          { name: "", title: "Invalid" },
+        ]),
+      ).toHaveLength(2);
+    });
+  });
+
+  // The MainLayout template now uses <ODialog v-model:open="showGetStarted" size="full"
+  // :show-close="false"> to host <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />.
+  // The full layout requires complex DI (skipped above), so we exercise just the migrated
+  // fragment via a small host component plus an ODialogStub. This guards the migration
+  // contract: prop bindings, v-model:open round-trip, and the removeFirstTimeLogin handler.
+  describe("ODialog Migration - GetStarted Dialog", () => {
+    const GetStartedStub = defineComponent({
+      name: "GetStarted",
+      emits: ["removeFirstTimeLogin"],
+      setup(_, { emit }) {
+        return () =>
+          h(
+            "button",
+            {
+              class: "get-started-stub",
+              onClick: () => emit("removeFirstTimeLogin", false),
+            },
+            "submit",
+          );
+      },
+    });
+
+    const Host = defineComponent({
+      name: "MainLayoutDialogHost",
+      components: { ODialog: ODialogStub, GetStarted: GetStartedStub },
+      setup() {
+        const showGetStarted = ref(true);
+        const removeFirstTimeLogin = (val: boolean) => {
+          showGetStarted.value = val;
+          localStorage.removeItem("isFirstTimeLogin");
+        };
+        return { showGetStarted, removeFirstTimeLogin };
+      },
+      template: `
+        <ODialog v-model:open="showGetStarted" size="full" :show-close="false">
+          <GetStarted @removeFirstTimeLogin="removeFirstTimeLogin" />
+        </ODialog>
+      `,
+    });
+
+    beforeEach(() => {
+      localStorage.setItem("isFirstTimeLogin", "true");
+    });
+
+    afterEach(() => {
+      localStorage.removeItem("isFirstTimeLogin");
+    });
+
+    it("renders ODialog with size='full' and showClose=false", () => {
+      const wrapper = mount(Host);
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      expect(dialog.exists()).toBe(true);
+      expect(dialog.props("size")).toBe("full");
+      expect(dialog.props("showClose")).toBe(false);
+    });
+
+    it("binds open prop from showGetStarted (initially true)", () => {
+      const wrapper = mount(Host);
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      expect(dialog.props("open")).toBe(true);
+    });
+
+    it("closes via v-model:open when ODialog emits update:open=false", async () => {
+      const wrapper = mount(Host);
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      await dialog.vm.$emit("update:open", false);
+
+      expect(dialog.props("open")).toBe(false);
+      expect((wrapper.vm as any).showGetStarted).toBe(false);
+    });
+
+    it("closes and clears isFirstTimeLogin when GetStarted emits removeFirstTimeLogin", async () => {
+      const wrapper = mount(Host);
+      const getStarted = wrapper.findComponent(GetStartedStub);
+
+      await getStarted.vm.$emit("removeFirstTimeLogin", false);
+
+      expect((wrapper.vm as any).showGetStarted).toBe(false);
+      expect(localStorage.getItem("isFirstTimeLogin")).toBeNull();
+    });
+
+    it("does NOT forward any legacy dialog-specific props (migration removed maximized/full-height)", () => {
+      const wrapper = mount(Host);
+      const dialog = wrapper.findComponent(ODialogStub);
+
+      // ODialog has no `maximized` / `fullHeight` props — verify only the new contract is in use.
+      expect(dialog.props()).not.toHaveProperty("maximized");
+      expect(dialog.props()).not.toHaveProperty("fullHeight");
+      expect(dialog.props("size")).toBe("full");
     });
   });
 
@@ -1188,14 +1355,14 @@ describe("MainLayout Methods and Functions", () => {
 
     it("should memoize expensive calculations", () => {
       const cache = new Map();
-      
+
       const memoizedCalculation = (input: string) => {
         if (cache.has(input)) {
           return cache.get(input);
         }
-        
+
         // Simulate expensive calculation
-        const result = input.split('').reverse().join('');
+        const result = input.split("").reverse().join("");
         cache.set(input, result);
         return result;
       };
@@ -1212,17 +1379,17 @@ describe("MainLayout Methods and Functions", () => {
         const config = { isCloud: "true" };
         const organizations = [
           { id: 1, name: "Default Org", identifier: "default", type: "default" },
-          { id: 2, name: "Custom Org", identifier: "custom", type: "custom" }
+          { id: 2, name: "Custom Org", identifier: "custom", type: "custom" },
         ];
 
         // Find default org
-        const defaultOrg = organizations.find(org => org.type === "default");
+        const defaultOrg = organizations.find((org) => org.type === "default");
         if (defaultOrg && config.isCloud === "true") {
           return {
             label: defaultOrg.name,
             id: defaultOrg.id,
             identifier: defaultOrg.identifier,
-            type: defaultOrg.type
+            type: defaultOrg.type,
           };
         }
         return null;
@@ -1239,19 +1406,17 @@ describe("MainLayout Methods and Functions", () => {
         const config = { isCloud: "false" };
         const organizations = [
           { id: 1, name: "Org One", identifier: "org-one", type: "default" },
-          { id: 2, name: "Org Two", identifier: "org-two", type: "custom" }
+          { id: 2, name: "Org Two", identifier: "org-two", type: "custom" },
         ];
 
         if (config.isCloud === "false" && urlOrgIdentifier) {
-          const customOrg = organizations.find(
-            org => org.identifier === urlOrgIdentifier
-          );
+          const customOrg = organizations.find((org) => org.identifier === urlOrgIdentifier);
           if (customOrg) {
             return {
               label: customOrg.name,
               id: customOrg.id,
               identifier: customOrg.identifier,
-              type: customOrg.type
+              type: customOrg.type,
             };
           }
         }
@@ -1272,7 +1437,7 @@ describe("MainLayout Methods and Functions", () => {
           identifier: org.identifier,
           subscription_type: org.CustomerBillingObj?.subscription_type || "",
           status: org.status || "",
-          note: org.CustomerBillingObj?.note || ""
+          note: org.CustomerBillingObj?.note || "",
         };
       };
 
@@ -1283,8 +1448,8 @@ describe("MainLayout Methods and Functions", () => {
         status: "active",
         CustomerBillingObj: {
           subscription_type: "pro",
-          note: "Annual subscription"
-        }
+          note: "Annual subscription",
+        },
       };
 
       const result = mapOrganization(orgWithBilling);
@@ -1308,7 +1473,7 @@ describe("MainLayout Methods and Functions", () => {
         // Navigate with org identifier
         mockRouter.push({
           path: "/",
-          query: { org_identifier: newOrg.identifier }
+          query: { org_identifier: newOrg.identifier },
         });
 
         return true;
@@ -1321,7 +1486,7 @@ describe("MainLayout Methods and Functions", () => {
       expect(mockStore.dispatch).toHaveBeenCalledWith("setIsDataIngested", false);
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: "/",
-        query: { org_identifier: "new-org" }
+        query: { org_identifier: "new-org" },
       });
     });
 
@@ -1352,7 +1517,7 @@ describe("MainLayout Methods and Functions", () => {
       };
 
       const expiredSettings = {
-        free_trial_expiry: Date.now() - 1000000 // Expired
+        free_trial_expiry: Date.now() - 1000000, // Expired
       };
 
       const result = checkTrialExpiry(expiredSettings);
@@ -1368,7 +1533,7 @@ describe("MainLayout Methods and Functions", () => {
       const unsortedOrgs = [
         { label: "Zebra Corp", identifier: "zebra" },
         { label: "Alpha Inc", identifier: "alpha" },
-        { label: "Beta LLC", identifier: "beta" }
+        { label: "Beta LLC", identifier: "beta" },
       ];
 
       const sorted = sortOrganizations(unsortedOrgs);
@@ -1451,20 +1616,20 @@ describe("MainLayout Methods and Functions", () => {
 
         return {
           name: `${userInfo.given_name} ${userInfo.family_name}`,
-          email: userInfo.email
+          email: userInfo.email,
         };
       };
 
       const userInfo = {
         given_name: "Jane",
         family_name: "Smith",
-        email: "jane@test.com"
+        email: "jane@test.com",
       };
 
       const rumUser = initializeRUM(true, userInfo);
       expect(rumUser).toEqual({
         name: "Jane Smith",
-        email: "jane@test.com"
+        email: "jane@test.com",
       });
 
       const noRumUser = initializeRUM(false, userInfo);
@@ -1515,7 +1680,7 @@ describe("MainLayout Methods and Functions", () => {
           scrape_interval: apiResponse?.scrape_interval || 15,
           span_id_field_name: apiResponse?.span_id_field_name || "spanId",
           trace_id_field_name: apiResponse?.trace_id_field_name || "traceId",
-          free_trial_expiry: apiResponse?.free_trial_expiry || null
+          free_trial_expiry: apiResponse?.free_trial_expiry || null,
         };
 
         mockStore.dispatch("setOrganizationSettings", settings);
@@ -1564,7 +1729,7 @@ describe("MainLayout Methods and Functions", () => {
         return days;
       };
 
-      const futureExpiry = Date.now() + (7 * 24 * 60 * 60 * 1000); // 7 days from now
+      const futureExpiry = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days from now
       const days = calculateExpiryDays(futureExpiry);
 
       expect(days).toBeGreaterThan(6);
@@ -1573,7 +1738,7 @@ describe("MainLayout Methods and Functions", () => {
 
     it("should check trial period allowed paths", () => {
       const isAllowedPath = (currentPath: string, allowedPaths: string[]) => {
-        return allowedPaths.some(path => currentPath.includes(path));
+        return allowedPaths.some((path) => currentPath.includes(path));
       };
 
       const allowedPaths = ["iam", "users", "organizations"];
@@ -1588,109 +1753,51 @@ describe("MainLayout Methods and Functions", () => {
     it("should filter menus based on comma-separated config", () => {
       const filterMenus = (linksList: any[], hideMenusConfig: string) => {
         const menusToHide = hideMenusConfig
-          .split(',')
-          .map(menu => menu.trim())
-          .filter(menu => menu.length > 0);
+          .split(",")
+          .map((menu) => menu.trim())
+          .filter((menu) => menu.length > 0);
 
-        return linksList.filter(link => !menusToHide.includes(link.name));
+        return linksList.filter((link) => !menusToHide.includes(link.name));
       };
 
       const linksList = [
         { name: "home", title: "Home" },
         { name: "logs", title: "Logs" },
         { name: "metrics", title: "Metrics" },
-        { name: "traces", title: "Traces" }
+        { name: "traces", title: "Traces" },
       ];
 
       const filtered = filterMenus(linksList, "logs, metrics");
       expect(filtered).toHaveLength(2);
-      expect(filtered.map(l => l.name)).toEqual(["home", "traces"]);
+      expect(filtered.map((l) => l.name)).toEqual(["home", "traces"]);
     });
 
     it("should handle whitespace in custom_hide_menus config", () => {
       const parseHideMenus = (config: string) => {
-        return config.split(',').map(item => item.trim()).filter(item => item);
+        return config
+          .split(",")
+          .map((item) => item.trim())
+          .filter((item) => item);
       };
 
       const result = parseHideMenus("  logs  ,  metrics  ,  ");
       expect(result).toEqual(["logs", "metrics"]);
     });
 
-    it("should update actions menu at correct position after alertList", () => {
-      const updateActionsMenu = (linksList: any[], isEnabled: boolean) => {
-        if (!isEnabled) return linksList;
-
-        const alertIndex = linksList.findIndex(link => link.name === "alertList");
-
-        if (alertIndex !== -1 && !linksList.some(link => link.name === "actionScripts")) {
-          const newList = [...linksList];
-          newList.splice(alertIndex + 1, 0, {
-            name: "actionScripts",
-            title: "menu.actions",
-            link: "/actions"
-          });
-          return newList;
-        }
-
-        return linksList;
-      };
-
-      const linksList = [
-        { name: "home", title: "Home", link: "/" },
-        { name: "alertList", title: "Alerts", link: "/alerts" },
-        { name: "dashboards", title: "Dashboards", link: "/dashboards" }
-      ];
-
-      const result = updateActionsMenu(linksList, true);
-      expect(result).toHaveLength(4);
-      expect(result[2].name).toBe("actionScripts");
-      expect(result[2].title).toBe("menu.actions");
-    });
-
-    it("should prevent duplicate actions menu insertion", () => {
-      const updateActionsMenu = (linksList: any[], isEnabled: boolean) => {
-        if (!isEnabled) return linksList;
-
-        const hasActions = linksList.some(link => link.name === "actionScripts");
-        if (hasActions) return linksList;
-
-        const alertIndex = linksList.findIndex(link => link.name === "alertList");
-        if (alertIndex !== -1) {
-          const newList = [...linksList];
-          newList.splice(alertIndex + 1, 0, {
-            name: "actionScripts",
-            title: "menu.actions"
-          });
-          return newList;
-        }
-
-        return linksList;
-      };
-
-      const linksListWithActions = [
-        { name: "alertList", title: "Alerts" },
-        { name: "actionScripts", title: "Actions" }
-      ];
-
-      const result = updateActionsMenu(linksListWithActions, true);
-      expect(result).toHaveLength(2); // No duplicate added
-      expect(result.filter(l => l.name === "actionScripts")).toHaveLength(1);
-    });
-
     it("should handle link.hide property in filtering", () => {
       const filterHiddenLinks = (linksList: any[]) => {
-        return linksList.filter(link => !link.hide);
+        return linksList.filter((link) => !link.hide);
       };
 
       const linksList = [
         { name: "home", title: "Home", hide: false },
         { name: "logs", title: "Logs", hide: true },
-        { name: "metrics", title: "Metrics", hide: false }
+        { name: "metrics", title: "Metrics", hide: false },
       ];
 
       const result = filterHiddenLinks(linksList);
       expect(result).toHaveLength(2);
-      expect(result.map(l => l.name)).toEqual(["home", "metrics"]);
+      expect(result.map((l) => l.name)).toEqual(["home", "metrics"]);
     });
 
     it("should store filtered menu names in store", () => {
@@ -1710,7 +1817,7 @@ describe("MainLayout Methods and Functions", () => {
       const preserveQueryParams = (oldQuery: any, newOrgId: string) => {
         return {
           ...oldQuery,
-          org_identifier: newOrgId
+          org_identifier: newOrgId,
         };
       };
 
@@ -1778,7 +1885,7 @@ describe("MainLayout Methods and Functions", () => {
         mockStore.dispatch("setIsAiChatEnabled", true);
 
         // Simulate nextTick wait
-        await new Promise(resolve => setTimeout(resolve, 0));
+        await new Promise((resolve) => setTimeout(resolve, 0));
 
         return true;
       };
@@ -1824,16 +1931,17 @@ describe("MainLayout Methods and Functions", () => {
         if (!query.trim()) return orgs;
 
         const lowerQuery = query.toLowerCase().trim();
-        return orgs.filter(org =>
-          org.label.toLowerCase().includes(lowerQuery) ||
-          org.identifier.toLowerCase().includes(lowerQuery)
+        return orgs.filter(
+          (org) =>
+            org.label.toLowerCase().includes(lowerQuery) ||
+            org.identifier.toLowerCase().includes(lowerQuery),
         );
       };
 
       const orgs = [
         { label: "Test Organization", identifier: "test-org" },
         { label: "Production Env", identifier: "prod-env" },
-        { label: "Development", identifier: "dev-org" }
+        { label: "Development", identifier: "dev-org" },
       ];
 
       const byLabel = filterOrganizations(orgs, "test");
@@ -1855,7 +1963,7 @@ describe("MainLayout Methods and Functions", () => {
           scrape_interval: apiData?.scrape_interval || 15,
           span_id_field_name: apiData?.span_id_field_name || "spanId",
           trace_id_field_name: apiData?.trace_id_field_name || "traceId",
-          custom_setting: apiData?.custom_setting || "default_value"
+          custom_setting: apiData?.custom_setting || "default_value",
         };
       };
 

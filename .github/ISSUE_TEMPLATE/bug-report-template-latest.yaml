@@ -96,23 +96,16 @@ body:
       label: Which OpenObserve Functionalities Are Affected?
       description: Select all that apply
       options:
-        - label: Login
-        - label: Landing Page
-        - label: Logs
+        - label: Home & Login
+        - label: Logs / Metrics / Traces
         - label: Dashboards
-        - label: Streams
-        - label: Functions
-        - label: Ingestion
         - label: Alerts
-        - label: Pipelines
-        - label: Metrics
-        - label: Traces
+        - label: Streams, Pipelines & Functions
+        - label: Ingestion
         - label: Real User Monitoring (RUM)
         - label: Reports
-        - label: Data Sources
-        - label: IAM
-        - label: Management
-        - label: Cosmetic
-        - label: Not Known / Other
+        - label: IAM & Management
+        - label: UI / Styling
+        - label: Unknown / Other
     validations:
       required: true

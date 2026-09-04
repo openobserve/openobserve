@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,588 +15,464 @@
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import * as quasar from "quasar";
-import ErrorEvents from "@/components/rum/errorTracking/view/ErrorEvents.vue";
 import i18n from "@/locales";
 
-const node = document.createElement("div");
-node.setAttribute("id", "app");
-document.body.appendChild(node);
+// ---------------------------------------------------------------------------
+// Module mocks — hoisted before component import
+// ---------------------------------------------------------------------------
 
-// Install Quasar plugins
-installQuasar({
-  plugins: [quasar.Dialog, quasar.Notify, quasar.Loading],
-});
-
-// Mock AppTable component
-vi.mock("@/components/AppTable.vue", () => ({
+vi.mock("@/components/rum/errorTracking/view/ErrorEventDescription.vue", () => ({
   default: {
-    name: "AppTable",
-    template: `
-      <div data-test="app-table">
-        <div v-for="(column, index) in columns" :key="index" class="column">
-          {{ column.label }}
-        </div>
-        <div v-for="(row, index) in rows" :key="index" class="row-data">
-          {{ row.type }}
-        </div>
-        <template v-for="slot in Object.keys($slots)" :key="slot">
-          <div :data-test="'slot-' + slot">
-            <slot :name="slot" :column="{ row: mockRowData }" />
-          </div>
-        </template>
-      </div>
-    `,
-    props: ["columns", "rows"],
-    setup() {
-      return {
-        mockRowData: {
-          type: "error",
-          error_type: "TypeError",
-          _timestamp: 1704110400000000,
-        },
-      };
-    },
-  },
-}));
-
-// Mock ErrorEventDescription
-vi.mock(
-  "@/components/rum/errorTracking/view/ErrorEventDescription.vue",
-  () => ({
-    default: {
-      name: "ErrorEventDescription",
-      template:
-        '<div data-test="error-event-description">{{ column.type }}</div>',
-      props: ["column"],
-    },
-  }),
-);
-
-// Mock ErrorTypeIcons
-vi.mock("@/components/rum/errorTracking/view/ErrorTypeIcons.vue", () => ({
-  default: {
-    name: "ErrorTypeIcons",
-    template: '<div data-test="error-type-icons">{{ column.type }}</div>',
+    name: "ErrorEventDescription",
+    template: '<div data-test="error-event-description">{{ column.type }}</div>',
     props: ["column"],
   },
 }));
 
-// Mock date formatting
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("quasar")>();
-  return {
-    ...actual,
-    date: {
-      formatDate: vi.fn((timestamp, format) => {
-        if (format === "MMM DD, YYYY HH:mm:ss Z") {
-          return "Jan 01, 2024 10:00:00 +0000";
-        }
-        return "Jan 01, 2024 10:00:00 +0000";
-      }),
+vi.mock("@/components/rum/errorTracking/view/ErrorTypeIcons.vue", () => ({
+  default: {
+    name: "ErrorTypeIcons",
+    template: '<span data-test="error-type-icons">{{ column.type }}</span>',
+    props: ["column"],
+  },
+}));
+
+vi.mock("@/components/shared/grid/NoData.vue", () => ({
+  default: {
+    name: "NoData",
+    template: '<div data-test="no-data" />',
+  },
+}));
+
+vi.mock("@/lib/core/Badge/OTag.vue", () => ({
+  default: {
+    name: "OTag",
+    template: '<span data-test="o-tag">{{ label }}</span>',
+    props: ["label", "variant", "size"],
+  },
+}));
+
+vi.mock("@/utils/date", () => ({
+  formatDate: vi.fn(() => "Jan 01, 2024 10:00:00 +0000"),
+}));
+
+import ErrorEvents from "@/components/rum/errorTracking/view/ErrorEvents.vue";
+
+// ---------------------------------------------------------------------------
+// Test data
+// ---------------------------------------------------------------------------
+
+// Anchor error event — the one that is highlighted in the timeline.
+// _timestamp = 1_704_110_400_000_000 µs
+const ANCHOR_TS = 1_704_110_400_000_000;
+
+const makeError = (overrides: Record<string, any> = {}) => ({
+  error_id: "err-001",
+  _timestamp: ANCHOR_TS,
+  events: [
+    {
+      type: "error",
+      error_type: "TypeError",
+      error_id: "err-001",
+      _timestamp: ANCHOR_TS,
     },
-  };
+    {
+      type: "resource",
+      resource_type: "xhr",
+      _timestamp: ANCHOR_TS + 2_500_000, // +2.50s
+    },
+    {
+      type: "view",
+      view_loading_type: "route_change",
+      _timestamp: ANCHOR_TS - 1_500_000, // −1.50ms (wait — 1_500_000 µs = 1.50s? let's check)
+      // 1_500_000 µs → >= 1_000_000 (1s threshold) → "1.50s"
+    },
+    {
+      type: "action",
+      action_type: "click",
+      _timestamp: ANCHOR_TS + 1_500, // +1.50ms
+    },
+  ],
+  ...overrides,
 });
 
-describe("ErrorEvents Component", () => {
-  let wrapper: any;
+// ---------------------------------------------------------------------------
+// Mount factory
+// ---------------------------------------------------------------------------
 
-  const mockError = {
-    events: [
-      {
-        type: "error",
-        error_type: "TypeError",
-        error_message: "Cannot read property 'foo' of undefined",
-        _timestamp: 1704110400000000,
-      },
-      {
-        type: "resource",
-        resource_type: "xhr",
-        resource_url: "https://api.example.com/data",
-        _timestamp: 1704110410000000,
-      },
-      {
-        type: "view",
-        view_loading_type: "route_change",
-        view_url: "/dashboard",
-        _timestamp: 1704110420000000,
-      },
-      {
-        type: "action",
-        action_type: "click",
-        _oo_action_target_text: "Submit Button",
-        _timestamp: 1704110430000000,
-      },
-    ],
-  };
+function mountComponent(error: Record<string, any> = makeError()) {
+  return mount(ErrorEvents, {
+    props: { error },
+    global: { plugins: [i18n] },
+  });
+}
 
-  beforeEach(async () => {
+// ---------------------------------------------------------------------------
+// Tests
+// ---------------------------------------------------------------------------
+
+describe("ErrorEvents", () => {
+  let wrapper: ReturnType<typeof mountComponent>;
+
+  beforeEach(() => {
     vi.clearAllMocks();
-
-    wrapper = mount(ErrorEvents, {
-      attachTo: "#app",
-      props: {
-        error: mockError,
-      },
-      global: {
-        plugins: [i18n],
-      },
-    });
-
-    await flushPromises();
-    await wrapper.vm.$nextTick();
+    wrapper = mountComponent();
   });
 
   afterEach(() => {
-    if (wrapper) {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+  });
+
+  // =========================================================================
+  // Rendering — empty state
+  // =========================================================================
+
+  describe("empty state", () => {
+    it("renders NoData when events array is empty", async () => {
+      // Arrange
       wrapper.unmount();
-    }
-    vi.clearAllTimers();
-    vi.restoreAllMocks();
-  });
+      wrapper = mountComponent(makeError({ events: [] }));
+      await flushPromises();
 
-  describe("Component Mounting", () => {
-    it("should mount successfully", () => {
-      expect(wrapper.exists()).toBe(true);
-      expect(wrapper.vm).toBeTruthy();
+      // Assert
+      expect(wrapper.find('[data-test="error-events-empty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="no-data"]').exists()).toBe(true);
     });
 
-    it("should render main container with correct classes", () => {
-      const container = wrapper.find(".q-mt-lg");
-      expect(container.exists()).toBe(true);
-      expect(container.classes()).toContain("q-mt-lg");
+    it("does not render the timeline when events is empty", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent(makeError({ events: [] }));
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.find('[data-test="error-events-timeline"]').exists()).toBe(false);
     });
 
-    it("should render AppTable component", () => {
-      const appTable = wrapper.find('[data-test="app-table"]');
-      expect(appTable.exists()).toBe(true);
-    });
-  });
+    it("renders NoData when events prop is undefined", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent({ error_id: "e1", _timestamp: ANCHOR_TS });
+      await flushPromises();
 
-  describe("Title Display", () => {
-    it("should display 'Events' title", () => {
-      const title = wrapper.find(".tags-title");
-      expect(title.exists()).toBe(true);
-      expect(title.text()).toBe("Events");
+      // Assert
+      expect(wrapper.find('[data-test="error-events-empty"]').exists()).toBe(true);
     });
 
-    it("should have correct title styling", () => {
-      const title = wrapper.find(".tags-title");
-      expect(title.classes()).toContain("tags-title");
-      expect(title.classes()).toContain("text-bold");
-      expect(title.classes()).toContain("q-mb-sm");
-      expect(title.classes()).toContain("q-ml-xs");
-    });
-  });
+    it("renders the title even when events is empty", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent(makeError({ events: [] }));
+      await flushPromises();
 
-  describe("Column Configuration", () => {
-    it("should have correct number of columns", () => {
-      expect(wrapper.vm.columns).toHaveLength(5);
-    });
-
-    it("should have type column with slot", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      expect(typeColumn).toBeDefined();
-      expect(typeColumn.label).toBe("Type");
-      expect(typeColumn.slot).toBe(true);
-      expect(typeColumn.slotName).toBe("error-type");
-    });
-
-    it("should have category column with field function", () => {
-      const categoryColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "category",
-      );
-      expect(categoryColumn).toBeDefined();
-      expect(categoryColumn.label).toBe("Category");
-      expect(typeof categoryColumn.field).toBe("function");
-      expect(typeof categoryColumn.prop).toBe("function");
-    });
-
-    it("should have description column with slot", () => {
-      const descColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "description",
-      );
-      expect(descColumn).toBeDefined();
-      expect(descColumn.label).toBe("Description");
-      expect(descColumn.slot).toBe(true);
-      expect(descColumn.slotName).toBe("description");
-    });
-
-    it("should have level column with field function", () => {
-      const levelColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "level",
-      );
-      expect(levelColumn).toBeDefined();
-      expect(levelColumn.label).toBe("Level");
-      expect(typeof levelColumn.field).toBe("function");
-    });
-
-    it("should have timestamp column with field function", () => {
-      const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
-      );
-      expect(timestampColumn).toBeDefined();
-      expect(timestampColumn.label).toBe("Timestamp");
-      expect(typeof timestampColumn.field).toBe("function");
+      // Assert
+      expect(wrapper.find('[data-test="error-events-title"]').exists()).toBe(true);
     });
   });
 
-  describe("Error Category Logic", () => {
-    it("should return error type for error events", () => {
-      const mockRow = { type: "error", error_type: "TypeError" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
-      expect(result).toBe("TypeError");
+  // =========================================================================
+  // Rendering — non-empty state
+  // =========================================================================
+
+  describe("non-empty timeline", () => {
+    it("renders the timeline ol when events are present", () => {
+      // Assert
+      expect(wrapper.find('[data-test="error-events-timeline"]').exists()).toBe(true);
     });
 
-    it("should return 'Error' for error events without error_type", () => {
-      const mockRow = { type: "error" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
-      expect(result).toBe("Error");
+    it("does not render empty state when events are present", () => {
+      // Assert
+      expect(wrapper.find('[data-test="error-events-empty"]').exists()).toBe(false);
     });
 
-    it("should return resource type for resource events", () => {
-      const mockRow = { type: "resource", resource_type: "xhr" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
-      expect(result).toBe("xhr");
+    it("renders exactly as many li items as events", () => {
+      // Assert — default error has 4 events
+      const items = wrapper.findAll('[data-test^="error-events-timeline-item-"]');
+      expect(items).toHaveLength(4);
     });
 
-    it("should return 'Navigation' for route change views", () => {
-      const mockRow = { type: "view", view_loading_type: "route_change" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
-      expect(result).toBe("Navigation");
-    });
-
-    it("should return 'Reload' for non-route change views", () => {
-      const mockRow = { type: "view", view_loading_type: "initial_load" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
-      expect(result).toBe("Reload");
-    });
-
-    it("should return action type for action events", () => {
-      const mockRow = { type: "action", action_type: "click" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
-      expect(result).toBe("click");
-    });
-
-    it("should return type for unknown event types", () => {
-      const mockRow = { type: "unknown_type" };
-      const result = wrapper.vm.getErrorCategory(mockRow);
-      expect(result).toBe("unknown_type");
-    });
-  });
-
-  describe("Column Field Functions", () => {
-    it("should compute category field correctly", () => {
-      const categoryColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "category",
+    it("renders a single item when events has one element", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent(
+        makeError({
+          events: [
+            { type: "error", error_id: "err-001", error_type: "RangeError", _timestamp: ANCHOR_TS },
+          ],
+        }),
       );
-      const mockRow = { type: "error", error_type: "ReferenceError" };
+      await flushPromises();
 
-      const fieldResult = categoryColumn.field(mockRow);
-      const propResult = categoryColumn.prop(mockRow);
-
-      expect(fieldResult).toBe("ReferenceError");
-      expect(propResult).toBe("ReferenceError");
+      // Assert
+      const items = wrapper.findAll('[data-test^="error-events-timeline-item-"]');
+      expect(items).toHaveLength(1);
     });
 
-    it("should compute level field correctly for error events", () => {
-      const levelColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "level",
-      );
-      const errorRow = { type: "error" };
-      const nonErrorRow = { type: "view" };
-
-      expect(levelColumn.field(errorRow)).toBe("error");
-      expect(levelColumn.field(nonErrorRow)).toBe("info");
-      expect(levelColumn.prop(errorRow)).toBe("error");
-      expect(levelColumn.prop(nonErrorRow)).toBe("info");
-    });
-
-    it("should compute timestamp field correctly", () => {
-      const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
-      );
-      const mockRow = { _timestamp: 1704110400000000 };
-
-      const result = timestampColumn.field(mockRow);
-      expect(result).toBe("Jan 01, 2024 10:00:00 +0000");
-    });
-  });
-
-  describe("Column Styling", () => {
-    it("should apply error styling to error rows", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      const errorRow = { type: "error" };
-      const nonErrorRow = { type: "view" };
-
-      const errorStyle = typeColumn.style(errorRow);
-      const nonErrorStyle = typeColumn.style(nonErrorRow);
-
-      expect(errorStyle).toBe("border-bottom: 1px solid red");
-      expect(nonErrorStyle).toBe("");
-    });
-
-    it("should apply error styling to level column with color", () => {
-      const levelColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "level",
-      );
-      const errorRow = { type: "error" };
-      const nonErrorRow = { type: "view" };
-
-      const errorStyle = levelColumn.style(errorRow);
-      const nonErrorStyle = levelColumn.style(nonErrorRow);
-
-      expect(errorStyle).toBe("color: red; border-bottom: 1px solid red");
-      expect(nonErrorStyle).toBe("");
-    });
-
-    it("should apply consistent styling across all columns for error rows", () => {
-      const errorRow = { type: "error" };
-      const nonErrorRow = { type: "view" };
-
-      const columnsWithStyling = wrapper.vm.columns.filter(
-        (col: any) => col.style,
-      );
-
-      columnsWithStyling.forEach((column: any) => {
-        if (column.name === "level") {
-          expect(column.style(errorRow)).toContain("color: red");
-        } else {
-          expect(column.style(errorRow)).toBe("border-bottom: 1px solid red");
-        }
-        expect(column.style(nonErrorRow)).toBe("");
-      });
-    });
-  });
-
-  describe("Slot Integration", () => {
-    it("should render error-type slot", () => {
-      const errorTypeSlot = wrapper.find('[data-test="slot-error-type"]');
-      expect(errorTypeSlot.exists()).toBe(true);
-    });
-
-    it("should render description slot", () => {
-      const descriptionSlot = wrapper.find('[data-test="slot-description"]');
-      expect(descriptionSlot.exists()).toBe(true);
-    });
-
-    it("should pass correct data to error type slot", () => {
-      const errorTypeIcons = wrapper.findComponent({ name: "ErrorTypeIcons" });
-      expect(errorTypeIcons.exists()).toBe(true);
-      expect(errorTypeIcons.props("column")).toEqual({
-        type: "error",
-        error_type: "TypeError",
-        _timestamp: 1704110400000000,
-      });
-    });
-
-    it("should pass correct data to description slot", () => {
-      const errorEventDescription = wrapper.findComponent({
-        name: "ErrorEventDescription",
-      });
-      expect(errorEventDescription.exists()).toBe(true);
-      expect(errorEventDescription.props("column")).toEqual({
-        type: "error",
-        error_type: "TypeError",
-        _timestamp: 1704110400000000,
-      });
-    });
-  });
-
-  describe("Props Integration", () => {
-    it("should pass columns to AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("columns")).toEqual(wrapper.vm.columns);
-    });
-
-    it("should pass events data to AppTable", () => {
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual(mockError.events);
-    });
-
-    it("should handle empty events array", async () => {
-      await wrapper.setProps({
-        error: { events: [] },
-      });
-
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual([]);
-    });
-
-    it("should handle missing events property", async () => {
-      await wrapper.setProps({
-        error: {},
-      });
-
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual([]);
-    });
-
-    it("should handle null events", async () => {
-      await wrapper.setProps({
-        error: { events: null },
-      });
-
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual([]);
-    });
-  });
-
-  describe("Date Formatting", () => {
-    it("should have getFormattedDate function", () => {
-      expect(typeof wrapper.vm.getFormattedDate).toBe("function");
-    });
-
-    it("should format timestamps correctly", () => {
-      const result = wrapper.vm.getFormattedDate(1704110400);
-      expect(result).toBe("Jan 01, 2024 10:00:00 +0000");
-    });
-
-    it("should handle different timestamp formats", () => {
-      const microseconds = 1704110400000000;
-      const milliseconds = microseconds / 1000;
-
-      const result = wrapper.vm.getFormattedDate(milliseconds);
-      expect(result).toBe("Jan 01, 2024 10:00:00 +0000");
-    });
-  });
-
-  describe("Props Validation", () => {
-    it("should require error prop", () => {
-      expect(ErrorEvents.props?.error?.required).toBe(true);
-      expect(ErrorEvents.props?.error?.type).toBe(Object);
-    });
-
-    it("should handle different error structures", async () => {
-      const customError = {
-        events: [
-          {
-            type: "custom",
-            custom_field: "value",
-            _timestamp: 1704110500000000,
-          },
-        ],
-        other_field: "ignored",
-      };
-
-      await wrapper.setProps({ error: customError });
-
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toEqual(customError.events);
-    });
-  });
-
-  describe("Column Classes", () => {
-    it("should apply correct CSS classes to columns", () => {
-      const typeColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "type",
-      );
-      const descColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "description",
-      );
-      const levelColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "level",
-      );
-
-      expect(typeColumn.classes).toBe("error-type");
-      expect(descColumn.classes).toBe("description-column");
-      expect(levelColumn.classes).toBe("error-level");
-    });
-
-    it("should mark appropriate columns as sortable", () => {
-      const sortableColumns = wrapper.vm.columns.filter(
-        (col: any) => col.sortable,
-      );
-      const sortableNames = sortableColumns.map((col: any) => col.name);
-
-      expect(sortableNames).toContain("type");
-      expect(sortableNames).toContain("category");
-      expect(sortableNames).toContain("description");
-      expect(sortableNames).toContain("timestamp");
-      expect(sortableNames).not.toContain("level"); // level is not sortable
-    });
-  });
-
-  describe("Component Structure", () => {
-    it("should have proper element hierarchy", () => {
-      const container = wrapper.find(".q-mt-lg");
-      const title = container.find(".tags-title");
-      const appTable = container.findComponent({ name: "AppTable" });
-
-      expect(container.exists()).toBe(true);
-      expect(title.exists()).toBe(true);
-      expect(appTable.exists()).toBe(true);
-    });
-
-    it("should maintain correct order of elements", () => {
-      const container = wrapper.find(".q-mt-lg");
-      const children = Array.from(container.element.children);
-
-      expect(children[0].classList.contains("tags-title")).toBe(true);
-      expect(children[1].getAttribute("data-test")).toBe("app-table");
-    });
-  });
-
-  describe("Edge Cases", () => {
-    it("should handle events with missing fields", () => {
-      const incompleteRow = { type: "incomplete" };
-
-      const categoryResult = wrapper.vm.getErrorCategory(incompleteRow);
-      expect(categoryResult).toBe("incomplete");
-    });
-
-    it("should handle malformed timestamps", () => {
-      const timestampColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "timestamp",
-      );
-      const invalidRow = { _timestamp: "invalid" };
-
-      expect(() => timestampColumn.field(invalidRow)).not.toThrow();
-    });
-
-    it("should handle null row data", () => {
-      const categoryColumn = wrapper.vm.columns.find(
-        (col: any) => col.name === "category",
-      );
-
-      // The actual component will error on null data - this reflects real behavior
-      expect(() => categoryColumn.field(null)).toThrow();
-    });
-  });
-
-  describe("Performance", () => {
-    it("should efficiently handle large event arrays", async () => {
-      const largeEvents = Array.from({ length: 1000 }, (_, index) => ({
-        type: index % 2 === 0 ? "error" : "view",
-        error_type: "TestError" + index,
-        _timestamp: 1704110400000000 + index,
-      }));
-
-      await wrapper.setProps({
-        error: { events: largeEvents },
-      });
-
-      const appTable = wrapper.findComponent({ name: "AppTable" });
-      expect(appTable.props("rows")).toHaveLength(1000);
-    });
-  });
-
-  describe("Component Lifecycle", () => {
-    it("should handle rapid prop changes", async () => {
-      const events1 = [{ type: "error", _timestamp: 1 }];
-      const events2 = [{ type: "view", _timestamp: 2 }];
-      const events3 = [{ type: "action", _timestamp: 3 }];
-
-      for (const events of [events1, events2, events3]) {
-        await wrapper.setProps({ error: { events } });
-        const appTable = wrapper.findComponent({ name: "AppTable" });
-        expect(appTable.props("rows")).toEqual(events);
+    it("renders item-0 through item-3 with sequential data-test attrs", () => {
+      // Assert
+      for (let i = 0; i < 4; i++) {
+        expect(wrapper.find(`[data-test="error-events-timeline-item-${i}"]`).exists()).toBe(true);
       }
+    });
+  });
+
+  // =========================================================================
+  // Category label per event type
+  // =========================================================================
+
+  describe("category per event type", () => {
+    it("shows error_type for an error event", () => {
+      // events[0] = error with error_type "TypeError"
+      expect(wrapper.find('[data-test="error-events-timeline-category-0"]').text()).toBe(
+        "TypeError",
+      );
+    });
+
+    it("shows 'Error' for an error event with no error_type", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent(
+        makeError({
+          events: [{ type: "error", error_id: "err-001", _timestamp: ANCHOR_TS }],
+        }),
+      );
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.find('[data-test="error-events-timeline-category-0"]').text()).toBe("Error");
+    });
+
+    it("shows resource_type for a resource event", () => {
+      // events[1] = resource with resource_type "xhr"
+      expect(wrapper.find('[data-test="error-events-timeline-category-1"]').text()).toBe("xhr");
+    });
+
+    it("shows 'Navigation' for a view event with view_loading_type=route_change", () => {
+      // events[2] = view with view_loading_type "route_change"
+      expect(wrapper.find('[data-test="error-events-timeline-category-2"]').text()).toBe(
+        "Navigation",
+      );
+    });
+
+    it("shows 'Reload' for a view event with other loading type", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent(
+        makeError({
+          events: [{ type: "view", view_loading_type: "initial_load", _timestamp: ANCHOR_TS }],
+        }),
+      );
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.find('[data-test="error-events-timeline-category-0"]').text()).toBe("Reload");
+    });
+
+    it("shows action_type for an action event", () => {
+      // events[3] = action with action_type "click"
+      expect(wrapper.find('[data-test="error-events-timeline-category-3"]').text()).toBe("click");
+    });
+
+    it("shows the raw type for an unknown event type", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent(
+        makeError({
+          events: [{ type: "custom_event", _timestamp: ANCHOR_TS }],
+        }),
+      );
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.find('[data-test="error-events-timeline-category-0"]').text()).toBe(
+        "custom_event",
+      );
+    });
+  });
+
+  // =========================================================================
+  // Error-anchor OTag highlight
+  // =========================================================================
+
+  describe("error anchor OTag", () => {
+    it("renders the OTag only on the anchor error event (index 0)", () => {
+      // Assert — only item 0 matches type=error && error_id=error.error_id
+      expect(wrapper.find('[data-test="error-events-timeline-level-0"]').exists()).toBe(true);
+    });
+
+    it("does not render OTag on non-error events", () => {
+      // items 1, 2, 3 are resource/view/action — no OTag
+      expect(wrapper.find('[data-test="error-events-timeline-level-1"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="error-events-timeline-level-2"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="error-events-timeline-level-3"]').exists()).toBe(false);
+    });
+
+    it("does not render OTag on an error event whose error_id does not match", async () => {
+      // Arrange — event has type=error but different error_id
+      wrapper.unmount();
+      wrapper = mountComponent(
+        makeError({
+          error_id: "err-001",
+          events: [
+            {
+              type: "error",
+              error_id: "err-DIFFERENT",
+              error_type: "TypeError",
+              _timestamp: ANCHOR_TS,
+            },
+          ],
+        }),
+      );
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.find('[data-test="error-events-timeline-level-0"]').exists()).toBe(false);
+    });
+  });
+
+  // =========================================================================
+  // Offset labels
+  // =========================================================================
+
+  describe("offset labels", () => {
+    it("shows '0ms' for the anchor event (delta = 0)", () => {
+      // events[0] _timestamp === error._timestamp → delta 0
+      expect(wrapper.find('[data-test="error-events-timeline-offset-0"]').text()).toBe("0ms");
+    });
+
+    it("shows '+2.50s' for an event 2_500_000µs after the anchor", () => {
+      // events[1] is +2_500_000µs → formatTimeWithSuffix(2_500_000) = "2.50s"
+      expect(wrapper.find('[data-test="error-events-timeline-offset-1"]').text()).toBe("+2.50s");
+    });
+
+    it("shows '−1.50s' for an event 1_500_000µs before the anchor", () => {
+      // events[2] is −1_500_000µs → formatTimeWithSuffix(1_500_000) = "1.50s"
+      expect(wrapper.find('[data-test="error-events-timeline-offset-2"]').text()).toBe("−1.50s");
+    });
+
+    it("shows '+1.50ms' for an event 1_500µs after the anchor", () => {
+      // events[3] is +1_500µs → formatTimeWithSuffix(1_500) = "1.50ms"
+      expect(wrapper.find('[data-test="error-events-timeline-offset-3"]').text()).toBe("+1.50ms");
+    });
+
+    it("shows '0ms' when base timestamp is 0 (no anchor)", async () => {
+      // Arrange — error without _timestamp falls back to base=0
+      wrapper.unmount();
+      wrapper = mountComponent({
+        error_id: "e1",
+        events: [{ type: "error", error_id: "e1", _timestamp: 5_000_000 }],
+      });
+      await flushPromises();
+
+      // Assert — base is 0, so !base → "0ms"
+      expect(wrapper.find('[data-test="error-events-timeline-offset-0"]').text()).toBe("0ms");
+    });
+
+    it("shows '0ms' when delta is within the 1000µs dead zone", async () => {
+      // Arrange — event is only 999µs away
+      wrapper.unmount();
+      wrapper = mountComponent(
+        makeError({
+          events: [{ type: "resource", resource_type: "img", _timestamp: ANCHOR_TS + 999 }],
+        }),
+      );
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.find('[data-test="error-events-timeline-offset-0"]').text()).toBe("0ms");
+    });
+  });
+
+  // =========================================================================
+  // Title attribute (absolute date)
+  // =========================================================================
+
+  describe("offset title attribute", () => {
+    it("sets a non-empty title attribute on each offset span", () => {
+      for (let i = 0; i < 4; i++) {
+        const span = wrapper.find(`[data-test="error-events-timeline-offset-${i}"]`);
+        expect(span.attributes("title")).toBeTruthy();
+      }
+    });
+  });
+
+  // =========================================================================
+  // Child component integration
+  // =========================================================================
+
+  describe("child components", () => {
+    it("renders an ErrorTypeIcons stub per event", () => {
+      const icons = wrapper.findAll('[data-test="error-type-icons"]');
+      expect(icons).toHaveLength(4);
+    });
+
+    it("renders an ErrorEventDescription stub per event", () => {
+      const descs = wrapper.findAll('[data-test="error-event-description"]');
+      expect(descs).toHaveLength(4);
+    });
+  });
+
+  // =========================================================================
+  // Unicode message safety
+  // =========================================================================
+
+  describe("unicode message safety", () => {
+    it("renders event with unicode characters in error_type without throwing", async () => {
+      // Arrange
+      wrapper.unmount();
+      wrapper = mountComponent(
+        makeError({
+          events: [
+            {
+              type: "error",
+              error_id: "err-001",
+              error_type: "错误类型 🐛 <script>",
+              _timestamp: ANCHOR_TS,
+            },
+          ],
+        }),
+      );
+      await flushPromises();
+
+      // Assert
+      expect(wrapper.find('[data-test="error-events-timeline-category-0"]').text()).toBe(
+        "错误类型 🐛 <script>",
+      );
+    });
+  });
+
+  // =========================================================================
+  // Props reactivity
+  // =========================================================================
+
+  describe("props reactivity", () => {
+    it("updates item count when error prop changes to more events", async () => {
+      // Arrange — currently 4 events
+      const newError = makeError({
+        events: [
+          { type: "error", error_id: "err-001", _timestamp: ANCHOR_TS },
+          { type: "action", action_type: "tap", _timestamp: ANCHOR_TS + 1_000_000 },
+          { type: "resource", resource_type: "fetch", _timestamp: ANCHOR_TS + 2_000_000 },
+          { type: "view", view_loading_type: "route_change", _timestamp: ANCHOR_TS - 500_000 },
+          { type: "action", action_type: "scroll", _timestamp: ANCHOR_TS + 3_000_000 },
+        ],
+      });
+
+      // Act
+      await wrapper.setProps({ error: newError });
+
+      // Assert
+      expect(wrapper.findAll('[data-test^="error-events-timeline-item-"]')).toHaveLength(5);
+    });
+
+    it("switches to empty state when error.events is updated to []", async () => {
+      // Act
+      await wrapper.setProps({ error: makeError({ events: [] }) });
+
+      // Assert
+      expect(wrapper.find('[data-test="error-events-empty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="error-events-timeline"]').exists()).toBe(false);
     });
   });
 });

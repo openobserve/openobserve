@@ -2,49 +2,17 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
-const logsdata = require("../../../test-data/logs_data.json");
-
-// Utility Functions
-
-// Legacy setup function replaced by global authentication via navigateToBase
-
-async function ingestTestData(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_automate";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-
-
-
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(logsdata)
-    });
-    return await fetchResponse.json();
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logsdata: logsdata
-  });
-  testLogger.debug('API response received', { response });
-}
+const { ingestTestData } = require('../utils/data-ingestion.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 async function applyQuery(pm) {
-  const search = pm.page.waitForResponse(logData.applyQuery);
   // CRITICAL: Search preparation wait - allows histogram query partitioning to initialize
-  await pm.page.waitForTimeout(3000);
-  await pm.logsPage.clickRefreshButton();
-  await expect.poll(async () => (await search).status()).toBe(200);
+  // Wait for query button to be visible, then run query and wait for the
+  // execution to complete. runQueryAndWaitForResults keys off the button's
+  // UI state (Run -> Cancel -> Run) so it correctly waits for any in-flight
+  // auto-search to settle before clicking, then waits for the new search.
+  await pm.logsPage.expectRefreshButtonVisible();
+  await pm.logsPage.runQueryAndWaitForResults();
 }
 
 test.describe("Search Partition Tests", () => {
@@ -60,22 +28,25 @@ test.describe("Search Partition Tests", () => {
     pm = new PageManager(page);
     
     // CRITICAL: Post-authentication stabilization wait
-    await page.waitForTimeout(2000);
-    
+    await page.waitForLoadState('domcontentloaded');
+
     // Ingest test data for partition testing (preserve exact logic)
     await ingestTestData(page);
-    
+
     // Navigate to logs page and setup for partition testing
     await page.goto(
-      `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`
+      `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`
     );
+    await page.waitForLoadState('domcontentloaded');
     await pm.logsPage.selectStream("e2e_automate");
     await applyQuery(pm);
     
     testLogger.info('Search partition test setup completed');
   });
 
-  test("should verify search partition and search API calls for histogram query", async ({ page }) => {
+  test("should verify search partition and search API calls for histogram query", {
+    tag: ['@searchPartition', '@logs', '@all']
+  }, async ({ page }) => {
     testLogger.info('Testing search partition and histogram query functionality');
     
     const isStreamingEnabled = process.env["ZO_STREAMING_ENABLED"] === "true";
@@ -83,13 +54,28 @@ test.describe("Search Partition Tests", () => {
     
     // Setup and execute query
     await pm.logsPage.executeHistogramQuery(histogramQuery);
-    await pm.logsPage.toggleHistogramAndExecute();
 
     if (!isStreamingEnabled) {
       testLogger.info('Testing non-streaming mode partition verification');
-      
-      // Verify search partition response
-      const searchPartitionData = await pm.logsPage.verifySearchPartitionResponse();
+
+      // Set up response listeners BEFORE the action that triggers them
+      const orgName = getOrgIdentifier() || 'default';
+      const searchPartitionPromise = pm.page.waitForResponse(
+        response =>
+          response.url().includes(`/api/${orgName}/_search_partition`) &&
+          response.request().method() === 'POST',
+        { timeout: 90000 }
+      );
+
+      await pm.logsPage.toggleHistogramAndExecute();
+
+      // Verify search partition response (listener was set up before action)
+      const searchPartitionResponse = await searchPartitionPromise;
+      const searchPartitionData = await searchPartitionResponse.json();
+      expect(searchPartitionData).toHaveProperty('partitions');
+      expect(searchPartitionData).toHaveProperty('histogram_interval');
+      expect(searchPartitionData).toHaveProperty('order_by', 'asc');
+
       const searchCalls = await pm.logsPage.captureSearchCalls();
       
       expect(searchCalls.length).toBe(searchPartitionData.partitions.length);
@@ -109,8 +95,9 @@ test.describe("Search Partition Tests", () => {
         searchCalls: searchCalls.length
       });
     } else {
+      await pm.logsPage.toggleHistogramAndExecute();
       testLogger.info('Testing streaming mode response verification');
-      
+
       await pm.logsPage.clickRunQueryButtonAndVerifyStreamingResponse();
       
       testLogger.info('Streaming mode verification completed');

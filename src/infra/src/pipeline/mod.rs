@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,17 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::sync::LazyLock as Lazy;
+
 use async_trait::async_trait;
 use config::meta::{
     meta_store::MetaStore,
     pipeline::{Pipeline, components::PipelineSource},
     stream::StreamParams,
 };
-use once_cell::sync::Lazy;
 
 use crate::errors::Result;
 
-pub mod mysql;
 pub mod postgres;
 pub mod sqlite;
 
@@ -31,7 +31,6 @@ static CLIENT: Lazy<Box<dyn PipelineTable>> = Lazy::new(connect);
 
 pub fn connect() -> Box<dyn PipelineTable> {
     match config::get_config().common.meta_store.as_str().into() {
-        MetaStore::MySQL => Box::<mysql::MySqlPipelineTable>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresPipelineTable>::default(),
         _ => Box::<sqlite::SqlitePipelineTable>::default(),
     }
@@ -44,9 +43,9 @@ pub trait PipelineTable: Sync + Send + 'static {
     async fn drop_table(&self) -> Result<()>;
     async fn put(&self, pipeline: &Pipeline) -> Result<()>;
     async fn update(&self, pipeline: &Pipeline) -> Result<()>;
-    async fn get_by_stream(&self, stream_params: &StreamParams) -> Result<Pipeline>;
+    async fn get_by_stream(&self, stream_params: &StreamParams) -> Result<Vec<Pipeline>>;
     async fn get_by_id(&self, pipeline_id: &str) -> Result<Pipeline>;
-    async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Pipeline>;
+    async fn get_with_same_source_stream(&self, pipeline: &Pipeline) -> Result<Vec<Pipeline>>;
     async fn list(&self) -> Result<Vec<Pipeline>>;
     async fn list_by_org(&self, org: &str) -> Result<Vec<Pipeline>>;
     async fn list_streams_with_pipeline(&self, org: &str) -> Result<Vec<Pipeline>>;
@@ -70,13 +69,15 @@ pub async fn put(pipeline: &Pipeline) -> Result<()> {
     }
 }
 
-/// Finds the pipeline associated with the StreamParams within an organization
+/// Finds the pipelines associated with the StreamParams within an organization.
+/// User pipelines are ordered first, followed by evaluation pipelines.
 #[inline]
-pub async fn get_by_stream(stream_params: &StreamParams) -> Result<Pipeline> {
+pub async fn get_by_stream(stream_params: &StreamParams) -> Result<Vec<Pipeline>> {
     CLIENT.get_by_stream(stream_params).await
 }
 
-/// Finds all streams with existing pipelines.
+/// Finds all streams with existing user pipelines.
+/// Evaluation pipelines are excluded from this list.
 #[inline]
 pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>> {
     CLIENT
@@ -86,8 +87,8 @@ pub async fn list_streams_with_pipeline(org: &str) -> Result<Vec<StreamParams>> 
             pipelines
                 .into_iter()
                 .filter_map(|pl| match pl.source {
-                    PipelineSource::Realtime(stream_params) => Some(stream_params),
-                    PipelineSource::Scheduled(_) => None,
+                    PipelineSource::Realtime(stream_params) if pl.is_user() => Some(stream_params),
+                    PipelineSource::Realtime(_) | PipelineSource::Scheduled(_) => None,
                 })
                 .collect()
         })
@@ -99,9 +100,9 @@ pub async fn get_by_id(pipeline_id: &str) -> Result<Pipeline> {
     CLIENT.get_by_id(pipeline_id).await
 }
 
-/// Finds the pipeline with the same source and structure
+/// Finds the pipelines with the same source and structure
 #[inline]
-pub async fn get_with_same_source_stream(pipeline: &Pipeline) -> Result<Pipeline> {
+pub async fn get_with_same_source_stream(pipeline: &Pipeline) -> Result<Vec<Pipeline>> {
     CLIENT.get_with_same_source_stream(pipeline).await
 }
 

@@ -1,63 +1,33 @@
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600">
-      <span>Override Config</span>
-      <q-btn
-        no-caps
-        padding="xs"
-        size="sm"
-        flat
-        icon="info_outline"
-        data-test="dashboard-addpanel-config-drilldown-info"
-      >
-        <q-tooltip
-          class="bg-grey-8"
-          anchor="bottom middle"
-          self="top middle"
-          max-width="250px"
-        >
-          Map units to the selected columns for enhanced data visualization.
-        </q-tooltip>
-      </q-btn>
-    </div>
-
-    <q-btn
-      @click="openOverrideConfigPopup"
-      style="cursor: pointer; padding: 0px 5px"
-      :label="' Add field override'"
-      no-caps
-      data-test="dashboard-addpanel-config-override-config-add-btn"
-      class="el-border"
+    <OverrideConfigPopup
+      :open="showOverrideConfigPopup"
+      :columns="columns"
+      :override-config="{
+        overrideConfigs: dashboardPanelData.data.config.override_config || [],
+      }"
+      :preview-data="previewData"
+      :value-mapping="dashboardPanelData.data.config.mappings || []"
+      :panel-unit="dashboardPanelData.data.config.unit ?? ''"
+      :panel-unit-custom="dashboardPanelData.data.config.unit_custom ?? ''"
+      :panel-decimals="dashboardPanelData.data.config.decimals ?? 2"
+      :initial-field="pendingInitialField"
+      @close="showOverrideConfigPopup = false"
+      @save="saveOverrideConfigConfig"
     />
-
-    <q-dialog v-model="showOverrideConfigPopup">
-      <OverrideConfigPopup
-        :columns="columns"
-        :override-config="{
-          overrideConfigs: dashboardPanelData.data.config.override_config || [],
-        }"
-        @close="showOverrideConfigPopup = false"
-        @save="saveOverrideConfigConfig"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-      />
-    </q-dialog>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, inject, onBeforeMount } from "vue";
-import { useStore } from "vuex";
+import { defineComponent, ref, computed, inject, onBeforeMount } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
 import OverrideConfigPopup from "../OverrideConfigPopup.vue";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 
 interface Column {
   alias: string;
-  label: string;
+  label: I18nText;
   format?: (val: unknown) => string;
-}
-
-export interface OverrideConfig {
-  [key: string]: string;
 }
 
 export default defineComponent({
@@ -70,17 +40,37 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
+    const { t } = useI18nTyped();
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData, promqlMode, fetchPromQLLabels } = useDashboardPanelData(
+      dashboardPanelDataPageKey,
+      t,
     );
-    const { dashboardPanelData, promqlMode, fetchPromQLLabels } =
-      useDashboardPanelData(dashboardPanelDataPageKey);
 
     const showOverrideConfigPopup = ref(false);
     const columns: any = ref<Column[]>([]);
-    const overrideConfigs = ref<OverrideConfig[]>([]);
+    // Field to preselect when opened via the table-header format-icon shortcut.
+    const pendingInitialField = ref<string | undefined>(undefined);
+
+    // Per-alias sample rows + column defs for the dialog's live preview.
+    const previewData = computed(() => {
+      const cols = (props.panelData?.columns as any[]) || [];
+      const rows = (props.panelData?.rows as any[]) || [];
+      const map: Record<string, { column: any; rows: any[] }> = {};
+      for (const c of cols) {
+        const alias = String(c.alias ?? c.field ?? c.name ?? "").toLowerCase();
+        if (!alias) continue;
+        const key = c.field ?? c.alias ?? c.name;
+        const sample: any[] = [];
+        for (const row of rows) {
+          const v = row?.[key];
+          if (v !== null && v !== undefined && v !== "") sample.push(row);
+          if (sample.length >= 6) break;
+        }
+        map[alias] = { column: c, rows: sample };
+      }
+      return map;
+    });
 
     const fetchColumns = () => {
       // Different logic for PromQL vs SQL queries
@@ -89,12 +79,10 @@ export default defineComponent({
         // This ensures we get exactly what's shown in the table
         const columnNames = new Set<string>();
 
-        // Try to get columns from the actual rendered panelData first
+        // Numeric detection is name-based, not alignment (alignment is user-overridable).
         if (props.panelData?.options?.columns) {
           props.panelData.options.columns.forEach((col: any) => {
-            if (col.name) {
-              columnNames.add(col.name);
-            }
+            if (col.name) columnNames.add(col.name);
           });
         } else {
           // Fallback: Build columns based on table mode and available labels
@@ -105,27 +93,20 @@ export default defineComponent({
             // In "single" (Timestamp) mode: timestamp + value columns
             columnNames.add("timestamp");
             columnNames.add("value");
-          } else if (
-            tableMode === "expanded_timeseries" ||
-            tableMode === "all"
-          ) {
+          } else if (tableMode === "expanded_timeseries" || tableMode === "all") {
             if (tableMode === "expanded_timeseries") {
               columnNames.add("timestamp");
             }
 
             // Collect label keys from available labels (from PromQL label discovery)
             if (dashboardPanelData.meta?.promql?.availableLabels) {
-              dashboardPanelData.meta.promql.availableLabels.forEach(
-                (label: string) => {
-                  columnNames.add(label);
-                },
-              );
+              dashboardPanelData.meta.promql.availableLabels.forEach((label: string) => {
+                columnNames.add(label);
+              });
             }
 
             // Add value column(s)
-            const aggregations = config.table_aggregations || [
-              config.aggregation || "last",
-            ];
+            const aggregations = config.table_aggregations || [config.aggregation || "last"];
             if (aggregations.length === 1) {
               columnNames.add("value");
             } else {
@@ -143,16 +124,29 @@ export default defineComponent({
         columns.value = columnArray.map((columnName) => ({
           alias: columnName,
           label: columnName,
+          // panelData path uses align; fallback uses name heuristic
+          isNumeric: columnName === "value" || columnName.startsWith("value_"),
         }));
-
       } else {
-        const x = dashboardPanelData.data.queries[0].fields.x || [];
-        const y = dashboardPanelData.data.queries[0].fields.y || [];
-        columns.value = [...x, ...y];
+        const seen = new Set<string>();
+        const collected: any[] = [];
+        const addField = (col: any, isNumeric: boolean) => {
+          const key = String(col?.alias ?? "").toLowerCase();
+          if (!key || seen.has(key)) return;
+          seen.add(key);
+          collected.push({ ...col, isNumeric });
+        };
+        const queries = dashboardPanelData.data.queries || [];
+        queries.forEach((q: any) => (q?.fields?.x || []).forEach((c: any) => addField(c, false)));
+        queries.forEach((q: any) =>
+          (q?.fields?.breakdown || []).forEach((c: any) => addField(c, false)),
+        );
+        queries.forEach((q: any) => (q?.fields?.y || []).forEach((c: any) => addField(c, true)));
+        columns.value = collected;
       }
     };
 
-    const openOverrideConfigPopup = async () => {
+    const openOverrideConfigPopup = async (field?: string) => {
       // For PromQL mode, fetch labels first to ensure we have the latest label data
       if (promqlMode.value) {
         const query = dashboardPanelData.data.queries[0];
@@ -163,33 +157,16 @@ export default defineComponent({
       }
 
       fetchColumns();
+      pendingInitialField.value = field;
       showOverrideConfigPopup.value = true;
     };
 
     const saveOverrideConfigConfig = (overrideConfig: any) => {
       dashboardPanelData.data.config.override_config = overrideConfig;
-      applyOverrideConfigs();
       showOverrideConfigPopup.value = false;
     };
 
-    const applyOverrideConfigs = () => {
-      const overrides = dashboardPanelData.data.config.override_config || [];
-
-      columns.value = columns.value.map((col: any) => {
-        return {
-          name: col.alias,
-          label: col.label,
-          field: col.alias,
-          format: (val: any) => {
-            const unit = overrides[col.alias] || "";
-            return `${val} ${unit}`;
-          },
-        };
-      });
-    };
-
     fetchColumns();
-    applyOverrideConfigs();
 
     onBeforeMount(() => {
       // Ensure that the override_config object is initialized in config
@@ -199,13 +176,13 @@ export default defineComponent({
     });
 
     return {
-      store,
       dashboardPanelData,
       showOverrideConfigPopup,
+      pendingInitialField,
       openOverrideConfigPopup,
       saveOverrideConfigConfig,
       columns,
-      overrideConfigs,
+      previewData,
     };
   },
 });

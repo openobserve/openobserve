@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,35 +15,33 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify, Quasar } from "quasar";
-import { nextTick, ref } from 'vue';
+import { nextTick, ref } from "vue";
 import ReportList from "./ReportList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import router from "@/test/unit/helpers/router";
 import reports from "@/services/reports";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
-import * as vueRouter from 'vue-router';
+import * as vueRouter from "vue-router";
 
 // Mock vue-router
-vi.mock('vue-router', async () => {
-  const actual = await vi.importActual('vue-router');
+vi.mock("vue-router", async () => {
+  const actual = await vi.importActual("vue-router");
   return {
     ...actual,
     useRouter: vi.fn(() => ({
       push: vi.fn(),
-      replace: vi.fn()
-    }))
+      replace: vi.fn(),
+      currentRoute: { value: { query: {} } },
+    })),
   };
 });
 
 // Mock reports service
 vi.mock("@/services/reports", () => ({
   default: {
-    list: vi.fn(),
-    toggleReportState: vi.fn(),
-    deleteReport: vi.fn(),
+    listByFolderId: vi.fn(),
+    toggleReportStateById: vi.fn(),
+    deleteReportById: vi.fn(),
+    bulkDeleteById: vi.fn(),
   },
 }));
 
@@ -52,24 +50,24 @@ vi.mock("@/composables/useStreams", () => ({
   default: vi.fn(() => ({
     streamList: ref([]),
     loading: ref(false),
-    error: ref(null)
-  }))
+    error: ref(null),
+  })),
 }));
 
 vi.mock("@/composables/useLogs", () => ({
   default: vi.fn(() => ({
     searchObj: ref({ loading: false, data: { queryResults: [], aggs: { histogram: [] } } }),
     searchAggData: ref({ histogram: [], total: 0 }),
-    searchResultData: ref({ list: [] })
-  }))
+    searchResultData: ref({ list: [] }),
+  })),
 }));
 
 vi.mock("@/composables/useDashboard", () => ({
   default: vi.fn(() => ({
     dashboards: ref([]),
     loading: ref(false),
-    error: ref(null)
-  }))
+    error: ref(null),
+  })),
 }));
 
 vi.mock("@/utils/zincutils", async (importOriginal) => {
@@ -81,15 +79,19 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
     logsErrorMessage: vi.fn((code) => `Error: ${code}`),
     mergeRoutes: vi.fn((route1, route2) => [...(route1 || []), ...(route2 || [])]),
     getPath: vi.fn(() => "/"),
-    useLocalTimezone: vi.fn(() => "UTC")
+    useLocalTimezone: vi.fn(() => "UTC"),
   };
 });
+
+vi.mock("@/utils/commons", () => ({
+  getFoldersListByType: vi.fn(() => Promise.resolve()),
+}));
 
 // Mock segment analytics
 vi.mock("@/services/segment_analytics", () => ({
   default: {
-    track: vi.fn()
-  }
+    track: vi.fn(),
+  },
 }));
 
 const node = document.createElement("div");
@@ -107,13 +109,39 @@ const platform = {
   },
 };
 
-// Install Quasar with platform
-installQuasar({
-  plugins: [Dialog, Notify],
-  config: {
-    platform
-  }
-});
+// ODrawer stub: mirrors props/events from the real component so tests can drive
+// open/close via v-model:open and the @close emit (migrated to ODrawer).
+// Props are exposed via `data-stub-*` to avoid colliding with the parent's
+// `data-test` attr which fallthroughs to the stub root.
+const ODrawerStub = {
+  name: "ODrawer",
+  props: ["open", "size", "showClose", "title", "subTitle", "width", "persistent"],
+  emits: ["update:open", "close"],
+  inheritAttrs: false,
+  template: `
+    <div
+      v-if="open"
+      class="o-drawer-stub"
+      :data-stub-size="size"
+      :data-stub-show-close="String(showClose)"
+      v-bind="$attrs"
+    >
+      <slot />
+    </div>
+  `,
+};
+
+const MoveAcrossFoldersStub = {
+  name: "MoveAcrossFolders",
+  props: ["open", "activeFolderId", "moduleId", "type"],
+  emits: ["updated", "close", "update:open"],
+  inheritAttrs: false,
+  template: `
+    <div v-if="open" v-bind="$attrs">
+      <div data-test="move-across-folders-stub" />
+    </div>
+  `,
+};
 
 describe("ReportList Component", () => {
   let wrapper;
@@ -123,15 +151,21 @@ describe("ReportList Component", () => {
   let dialogMock;
 
   beforeEach(async () => {
+    // Install fake timers before mounting so OTable's 2-second skeleton-hold
+    // setTimeout is registered as a fake timer and can be advanced immediately.
+    // Only fake setTimeout/clearTimeout/Date to keep MSW and flushPromises working.
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+
     // Reset mock implementations
-    vi.mocked(reports.list).mockReset();
-    vi.mocked(reports.toggleReportState).mockReset();
-    vi.mocked(reports.deleteReport).mockReset();
+    vi.mocked(reports.listByFolderId).mockReset();
+    vi.mocked(reports.toggleReportStateById).mockReset();
+    vi.mocked(reports.deleteReportById).mockReset();
 
     // Setup default successful response for list
-    vi.mocked(reports.list).mockResolvedValue({
+    vi.mocked(reports.listByFolderId).mockResolvedValue({
       data: [
         {
+          report_id: "report-1",
           name: "Test Report 1",
           enabled: true,
           owner: "test-user",
@@ -142,6 +176,7 @@ describe("ReportList Component", () => {
           sql: "SELECT * FROM test1",
         },
         {
+          report_id: "report-2",
           name: "Test Report 2",
           enabled: false,
           owner: "test-user",
@@ -157,12 +192,14 @@ describe("ReportList Component", () => {
     // Setup store state
     store.state.selectedOrganization = { identifier: "test-org", name: "Test Org" };
     store.state.userInfo = { email: "test@example.com" };
-    store.state.theme = 'light';
+    store.state.theme = "light";
+    store.state.organizationData.allReportsListByFolderId = {};
 
     // Setup router mock
     mockRouter = {
       push: vi.fn(),
-      replace: vi.fn()
+      replace: vi.fn(),
+      currentRoute: { value: { query: {} } },
     };
     vi.mocked(vueRouter.useRouter).mockReturnValue(mockRouter);
 
@@ -173,38 +210,43 @@ describe("ReportList Component", () => {
 
     wrapper = mount(ReportList, {
       global: {
-        plugins: [
-          [Quasar, { platform }],
-          [i18n]
-        ],
-        provide: { 
+        plugins: [[{ platform }], [i18n]],
+        provide: {
           store,
           platform,
-          router: mockRouter
+          router: mockRouter,
         },
         mocks: {
           $router: mockRouter,
           q: {
             platform,
             notify: notifyMock,
-            dialog: dialogMock
+            dialog: dialogMock,
           },
-          router: mockRouter
-        }
+          router: mockRouter,
+        },
+        stubs: {
+          ODrawer: ODrawerStub,
+          MoveAcrossFolders: MoveAcrossFoldersStub,
+        },
       },
-      attachTo: document.body
+      attachTo: document.body,
     });
 
     // Set up wrapper's $q.notify and dialog after mount
     wrapper.vm.q.notify = notifyMock;
 
     await flushPromises();
+    // Advance past OTable's 2-second skeleton-hold timer so real rows are visible.
+    vi.advanceTimersByTime(2100);
+    await flushPromises();
   });
 
   afterEach(() => {
-    if (wrapper && typeof wrapper.unmount === 'function') {
+    if (wrapper && typeof wrapper.unmount === "function") {
       wrapper.unmount();
     }
+    vi.useRealTimers();
     vi.clearAllMocks();
   });
 
@@ -214,7 +256,7 @@ describe("ReportList Component", () => {
 
   describe("Component Initialization", () => {
     it("fetches reports on mount", async () => {
-      expect(reports.list).toHaveBeenCalledWith("test-org");
+      expect(reports.listByFolderId).toHaveBeenCalled();
     });
 
     it("should display correct number of reports", async () => {
@@ -226,45 +268,41 @@ describe("ReportList Component", () => {
     it("should initialize with correct default values", () => {
       expect(wrapper.vm.activeTab).toBe("shared");
       expect(wrapper.vm.filterQuery).toBe("");
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(20);
-    });
-
-    it("should update pagination when rows per page changes", async () => {
-      // Find the QTablePagination component
-      const paginationComponent = wrapper.findComponent(QTablePagination);
-      expect(paginationComponent.exists()).toBe(true);
-      
-      // Trigger the pagination change event
-      await paginationComponent.vm.$emit('update:changeRecordPerPage', {
-        label: "50 / page",
-        value: 50
-      });
-      
-      await nextTick();
-
-      // Verify the pagination state was updated
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-      expect(wrapper.vm.selectedPerPage).toBe(50);
     });
 
     it("should show loading state during initialization", async () => {
+      // Keep listByFolderId pending so isLoadingReports stays true while we check it
+      let resolveList;
+      vi.mocked(reports.listByFolderId).mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveList = resolve;
+        }),
+      );
+
+      // Clear cache so this mount actually calls the API (not served from beforeEach cache)
+      store.state.organizationData.allReportsListByFolderId = {};
+
       const newWrapper = mount(ReportList, {
         global: {
-          plugins: [[Quasar, { platform }], [i18n]],
+          plugins: [[{ platform }], [i18n]],
           provide: { store, platform, router: mockRouter },
           mocks: {
             $router: mockRouter,
-            $q: { 
-              platform, 
-              notify: notifyMock, 
-              dialog: dialogMock 
+            $q: {
+              platform,
+              notify: notifyMock,
+              dialog: dialogMock,
             },
-            router: mockRouter
-          }
-        }
+            router: mockRouter,
+          },
+        },
       });
 
+      // Advance past the getFoldersListByType microtask so loadReports is called
+      await nextTick();
+
       expect(newWrapper.vm.isLoadingReports).toBe(true);
+      resolveList({ data: [] });
       await flushPromises();
       expect(newWrapper.vm.isLoadingReports).toBe(false);
       newWrapper.unmount();
@@ -276,41 +314,35 @@ describe("ReportList Component", () => {
         response: {
           status: 500,
           data: {
-            message: "Internal server error"
-          }
-        }
+            message: "Internal server error",
+          },
+        },
       };
-      vi.mocked(reports.list).mockRejectedValue(error);
+      vi.mocked(reports.listByFolderId).mockRejectedValue(error);
 
       // Create new wrapper to trigger onBeforeMount
       const newWrapper = mount(ReportList, {
         global: {
-          plugins: [[Quasar, { platform }], [i18n]],
+          plugins: [[{ platform }], [i18n]],
           provide: { store, platform, router: mockRouter },
           mocks: {
             $router: mockRouter,
-            $q: { 
-              platform, 
-              notify: notifyMock, 
-              dialog: dialogMock 
+            $q: {
+              platform,
+              notify: notifyMock,
+              dialog: dialogMock,
             },
-            router: mockRouter
-          }
-        }
+            router: mockRouter,
+          },
+        },
       });
 
       await flushPromises();
-
-      console.log(wrapper,'notify here')
-
-      
 
       // Verify loading state is cleared
       expect(newWrapper.vm.isLoadingReports).toBe(false);
       newWrapper.unmount();
     });
-
-
   });
 
   describe("Report Filtering", () => {
@@ -332,120 +364,97 @@ describe("ReportList Component", () => {
     });
 
     describe("Tab Filtering", () => {
-      it("shows only cached reports", async () => {
+      it("maps all staticReportsList rows when tab is cached (server-side filtering)", async () => {
         wrapper.vm.staticReportsList = [...wrapper.vm.reportsTableRows];
-        wrapper.vm.staticReportsList[1].destinations = [];
         wrapper.vm.activeTab = "cached";
         await wrapper.vm.filterReports();
-        expect(wrapper.vm.reportsTableRows.length).toBe(1);
-        expect(wrapper.vm.reportsTableRows[0].destinations.length).toBe(0);
+        // filterReports just re-numbers; tab filtering is server-side via listByFolderId
+        expect(wrapper.vm.reportsTableRows.length).toBe(wrapper.vm.staticReportsList.length);
       });
 
-      it("shows only scheduled reports", async () => {
+      it("maps all staticReportsList rows when tab is shared (server-side filtering)", async () => {
         wrapper.vm.staticReportsList = [...wrapper.vm.reportsTableRows];
         wrapper.vm.activeTab = "shared";
         await wrapper.vm.filterReports();
-        expect(wrapper.vm.reportsTableRows.every(report => report.destinations.length > 0)).toBe(true);
+        expect(wrapper.vm.reportsTableRows.length).toBe(wrapper.vm.staticReportsList.length);
       });
     });
   });
 
-  describe("Date Formatting", () => {
-    it("formats unix timestamp correctly", () => {
-      const timestamp = 1234567890000000; // microseconds
-      const formatted = wrapper.vm.convertUnixToQuasarFormat(timestamp);
-      expect(formatted).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}$/);
-    });
-
-    it("handles null timestamp", () => {
-      const formatted = wrapper.vm.convertUnixToQuasarFormat(null);
-      expect(formatted).toBe("");
-    });
-
-    it("handles undefined timestamp", () => {
-      const formatted = wrapper.vm.convertUnixToQuasarFormat(undefined);
-      expect(formatted).toBe("");
-    });
-
-    it("handles invalid timestamp", () => {
-      try {
-        const formatted = wrapper.vm.convertUnixToQuasarFormat("invalid");
-        expect(formatted).toBe("");
-      } catch (error) {
-        expect(error).toBeInstanceOf(RangeError);
-      }
-    });
-  });
+  // The "Date Formatting" block that lived here called
+  // `wrapper.vm.convertUnixToDateFormat(...)` directly — asserting the shared
+  // util's null/undefined handling, which `date.spec.ts` owns, and which forced
+  // the component to `defineExpose` a function purely so a test could reach it.
+  // ReportList's own contribution — the `last_triggered_at` row mapping — is
+  // asserted in ReportList.spec.ts instead.
 
   describe("Report State Toggle", () => {
     it("successfully toggles report state from enabled to disabled", async () => {
       const report = {
+        report_id: "report-1",
         name: "Test Report 1",
         enabled: true,
-        owner: "test-user"
+        owner: "test-user",
       };
 
-      vi.mocked(reports.toggleReportState).mockResolvedValue({});
+      vi.mocked(reports.toggleReportStateById).mockResolvedValue({});
 
       await wrapper.vm.toggleReportState(report);
       await flushPromises();
 
       // Verify API call
-      expect(reports.toggleReportState).toHaveBeenCalledWith(
-        "test-org",
-        "Test Report 1",
-        false
-      );
+      expect(reports.toggleReportStateById).toHaveBeenCalledWith("test-org", "report-1", false);
 
       // Verify loading state
-      expect(wrapper.vm.reportsStateLoadingMap[report.name]).toBe(false);
+      expect(wrapper.vm.reportsStateLoadingMap[report.report_id]).toBe(false);
 
-      // Verify state updates in both lists
-      expect(wrapper.vm.staticReportsList.find(r => r.name === report.name).enabled).toBe(false);
-      expect(wrapper.vm.reportsTableRows.find(r => r.name === report.name).enabled).toBe(false);
+      // Verify state updated in staticReportsList
+      expect(
+        wrapper.vm.staticReportsList.find((r) => r.report_id === report.report_id).enabled,
+      ).toBe(false);
     });
-
 
     it("handles error when toggling report state (non-403)", async () => {
       const report = {
+        report_id: "report-1",
         name: "Test Report 1",
         enabled: true,
-        owner: "test-user"
+        owner: "test-user",
       };
 
       const error = {
         response: {
           status: 500,
           data: {
-            message: "Internal server error"
-          }
-        }
+            message: "Internal server error",
+          },
+        },
       };
 
-      vi.mocked(reports.toggleReportState).mockRejectedValue(error);
+      vi.mocked(reports.toggleReportStateById).mockRejectedValue(error);
 
       await wrapper.vm.toggleReportState(report);
       await flushPromises();
 
-
       // Verify loading state is cleared
-      expect(wrapper.vm.reportsStateLoadingMap[report.name]).toBe(false);
+      expect(wrapper.vm.reportsStateLoadingMap[report.report_id]).toBe(false);
     });
 
     it("handles 403 error silently when toggling report state", async () => {
       const report = {
+        report_id: "report-1",
         name: "Test Report 1",
         enabled: true,
-        owner: "test-user"
+        owner: "test-user",
       };
 
       const error = {
         response: {
-          status: 403
-        }
+          status: 403,
+        },
       };
 
-      vi.mocked(reports.toggleReportState).mockRejectedValue(error);
+      vi.mocked(reports.toggleReportStateById).mockRejectedValue(error);
 
       await wrapper.vm.toggleReportState(report);
       await flushPromises();
@@ -453,54 +462,52 @@ describe("ReportList Component", () => {
       // Verify no error notification for 403
       expect(notifyMock).not.toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "negative"
-        })
+          type: "negative",
+        }),
       );
 
       // Verify loading state is cleared
-      expect(wrapper.vm.reportsStateLoadingMap[report.name]).toBe(false);
+      expect(wrapper.vm.reportsStateLoadingMap[report.report_id]).toBe(false);
     });
 
     it("maintains loading state during toggle operation", async () => {
       const report = {
+        report_id: "report-1",
         name: "Test Report 1",
         enabled: true,
-        owner: "test-user"
+        owner: "test-user",
       };
 
       let resolvePromise;
-      const togglePromise = new Promise(resolve => {
+      const togglePromise = new Promise((resolve) => {
         resolvePromise = resolve;
       });
 
-      vi.mocked(reports.toggleReportState).mockReturnValue(togglePromise);
+      vi.mocked(reports.toggleReportStateById).mockReturnValue(togglePromise);
 
       const toggleOperation = wrapper.vm.toggleReportState(report);
 
       // Verify loading state is set
-      expect(wrapper.vm.reportsStateLoadingMap[report.name]).toBe(true);
+      expect(wrapper.vm.reportsStateLoadingMap[report.report_id]).toBe(true);
 
       resolvePromise({});
       await toggleOperation;
       await flushPromises();
 
       // Verify loading state is cleared
-      expect(wrapper.vm.reportsStateLoadingMap[report.name]).toBe(false);
+      expect(wrapper.vm.reportsStateLoadingMap[report.report_id]).toBe(false);
     });
   });
 
   describe("Edit Report", () => {
     it("navigates to edit page with correct query parameters", async () => {
       const report = {
+        report_id: "report-1",
         name: "Test Report 1",
         enabled: true,
         owner: "test-user",
-        description: "Test Description"
+        description: "Test Description",
       };
-
-      // Verify router is properly mocked
-      expect(vueRouter.useRouter()).toBeTruthy();
-      expect(typeof vueRouter.useRouter().push).toBe('function');
 
       await wrapper.vm.editReport(report);
 
@@ -509,156 +516,116 @@ describe("ReportList Component", () => {
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createReport",
         query: {
+          report_id: report.report_id,
           name: report.name,
-          org_identifier: "test-org"
-        }
+          org_identifier: "test-org",
+          folder: "default",
+        },
       });
-
-      // Verify report is cloned to editingReport
-      expect(wrapper.vm.editingReport).toEqual(report);
     });
 
     it("handles edit button click in the table", async () => {
       // Find and click the edit button for the first report
       const editButton = wrapper.find('[data-test="report-list-Test Report 1-edit-report"]');
       expect(editButton.exists()).toBe(true);
-      
-      await editButton.trigger('click');
+
+      await editButton.trigger("click");
 
       // Verify router navigation
       expect(mockRouter.push).toHaveBeenCalledTimes(1);
-      expect(mockRouter.push).toHaveBeenCalledWith({
-        name: "createReport",
-        query: {
-          name: "Test Report 1",
-          org_identifier: "test-org"
-        }
-      });
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        expect.objectContaining({ name: "createReport" }),
+      );
     });
   });
 
   describe("Delete Report", () => {
     it("confirms and deletes report successfully", async () => {
-      const reportName = "Test Report 1";
-      
-      // Setup successful delete response
-      vi.mocked(reports.deleteReport).mockResolvedValue({});
+      const report = { report_id: "report-1", name: "Test Report 1" };
 
-      // Store initial counts
+      // Setup successful delete response
+      vi.mocked(reports.deleteReportById).mockResolvedValue({});
+
+      // Store initial count
       const initialStaticListCount = wrapper.vm.staticReportsList.length;
-      const initialTableRowsCount = wrapper.vm.reportsTableRows.length;
 
       // Trigger delete confirmation
-      await wrapper.vm.confirmDeleteReport({ name: reportName });
+      await wrapper.vm.confirmDeleteReport(report);
 
       // Verify dialog is shown with correct message
       expect(wrapper.vm.deleteDialog.show).toBe(true);
-      expect(wrapper.vm.deleteDialog.message).toBe(`Are you sure you want to delete report "${reportName}"`);
-      expect(wrapper.vm.deleteDialog.data).toBe(reportName);
+      expect(wrapper.vm.deleteDialog.message).toBe(
+        `Are you sure you want to delete report "${report.name}"`,
+      );
+      expect(wrapper.vm.deleteDialog.data).toEqual({
+        report_id: report.report_id,
+        name: report.name,
+      });
 
       // Trigger delete action
       await wrapper.vm.deleteReport();
       await flushPromises();
 
       // Verify API call
-      expect(reports.deleteReport).toHaveBeenCalledWith(
-        "test-org",
-        reportName
-      );
+      expect(reports.deleteReportById).toHaveBeenCalledWith("test-org", report.report_id);
 
-      // Verify report is removed from lists
+      // Verify report is removed
       expect(wrapper.vm.staticReportsList.length).toBe(initialStaticListCount - 1);
-      expect(wrapper.vm.reportsTableRows.length).toBe(initialTableRowsCount - 1);
-      expect(wrapper.vm.staticReportsList.find(r => r.name === reportName)).toBeUndefined();
-      expect(wrapper.vm.reportsTableRows.find(r => r.name === reportName)).toBeUndefined();
-
-      // Manually close dialog as component would do
-      wrapper.vm.deleteDialog.show = false;
-      await nextTick();
-
-      // Verify dialog is closed
-      expect(wrapper.vm.deleteDialog.show).toBe(false);
+      expect(
+        wrapper.vm.staticReportsList.find((r) => r.report_id === report.report_id),
+      ).toBeUndefined();
     });
 
     it("handles error when deleting report (non-403)", async () => {
-      const reportName = "Test Report 1";
-      const error = {
-        response: {
-          status: 500,
-          data: {
-            message: "Internal server error"
-          }
-        }
-      };
+      const report = { report_id: "report-1", name: "Test Report 1" };
+      const error = { response: { status: 500, data: { message: "Internal server error" } } };
 
-      // Setup error response
-      vi.mocked(reports.deleteReport).mockRejectedValue(error);
+      vi.mocked(reports.deleteReportById).mockRejectedValue(error);
 
-      // Store initial counts
       const initialStaticListCount = wrapper.vm.staticReportsList.length;
-      const initialTableRowsCount = wrapper.vm.reportsTableRows.length;
 
-      // Trigger delete confirmation
-      await wrapper.vm.confirmDeleteReport({ name: reportName });
-      
-      // Trigger delete action
+      await wrapper.vm.confirmDeleteReport(report);
       await wrapper.vm.deleteReport();
 
-      // Verify API call was made
-      expect(reports.deleteReport).toHaveBeenCalledWith(
-        "test-org",
-        reportName
-      );
+      expect(reports.deleteReportById).toHaveBeenCalledWith("test-org", report.report_id);
 
       // Verify lists remain unchanged
       expect(wrapper.vm.staticReportsList.length).toBe(initialStaticListCount);
-      expect(wrapper.vm.reportsTableRows.length).toBe(initialTableRowsCount);
-      expect(wrapper.vm.staticReportsList.find(r => r.name === reportName)).toBeTruthy();
-      expect(wrapper.vm.reportsTableRows.find(r => r.name === reportName)).toBeTruthy();
+      expect(
+        wrapper.vm.staticReportsList.find((r) => r.report_id === report.report_id),
+      ).toBeTruthy();
     });
 
     it("handles 403 error silently when deleting report", async () => {
-      const reportName = "Test Report 1";
-      const error = {
-        response: {
-          status: 403
-        }
-      };
+      const report = { report_id: "report-1", name: "Test Report 1" };
+      const error = { response: { status: 403 } };
 
-      // Setup error response
-      vi.mocked(reports.deleteReport).mockRejectedValue(error);
+      vi.mocked(reports.deleteReportById).mockRejectedValue(error);
 
-      // Store initial counts
       const initialStaticListCount = wrapper.vm.staticReportsList.length;
 
-      // Trigger delete confirmation
-      await wrapper.vm.confirmDeleteReport({ name: reportName });
-      
-      // Trigger delete action
+      await wrapper.vm.confirmDeleteReport(report);
       await wrapper.vm.deleteReport();
 
-      // Verify API call was made
-      expect(reports.deleteReport).toHaveBeenCalledWith(
-        "test-org",
-        reportName
-      );
+      expect(reports.deleteReportById).toHaveBeenCalledWith("test-org", report.report_id);
 
-      // Verify lists remain unchanged
       expect(wrapper.vm.staticReportsList.length).toBe(initialStaticListCount);
-      expect(wrapper.vm.staticReportsList.find(r => r.name === reportName)).toBeTruthy();
+      expect(
+        wrapper.vm.staticReportsList.find((r) => r.report_id === report.report_id),
+      ).toBeTruthy();
     });
 
     it("handles delete button click in the table", async () => {
-      // Find and click the delete button for the first report
       const deleteButton = wrapper.find('[data-test="report-list-Test Report 1-delete-report"]');
       expect(deleteButton.exists()).toBe(true);
-      
-      await deleteButton.trigger('click');
 
-      // Verify confirmation dialog is shown with correct data
+      await deleteButton.trigger("click");
+
+      // Verify confirmation dialog is shown
       expect(wrapper.vm.deleteDialog.show).toBe(true);
-      expect(wrapper.vm.deleteDialog.message).toBe('Are you sure you want to delete report "Test Report 1"');
-      expect(wrapper.vm.deleteDialog.data).toBe('Test Report 1');
+      expect(wrapper.vm.deleteDialog.message).toBe(
+        'Are you sure you want to delete report "Test Report 1"',
+      );
     });
   });
 
@@ -667,15 +634,108 @@ describe("ReportList Component", () => {
       const addButton = wrapper.find('[data-test="report-list-add-report-btn"]');
       expect(addButton.exists()).toBe(true);
 
-      await addButton.trigger('click');
+      await addButton.trigger("click");
 
       expect(mockRouter.push).toHaveBeenCalledWith({
         name: "createReport",
         query: {
-          org_identifier: store.state.selectedOrganization.identifier
-        }
+          org_identifier: store.state.selectedOrganization.identifier,
+          folder: "default",
+        },
       });
     });
   });
 
+  // ── Move-to-folder ODrawer (migrated to ODrawer) ────────────────
+  describe("Move-to-folder ODrawer", () => {
+    it("should keep showMoveDialog false on initial render", () => {
+      expect(wrapper.vm.showMoveDialog).toBe(false);
+      expect(wrapper.find('[data-test="report-move-to-another-folder-dialog"]').exists()).toBe(
+        false,
+      ); // MoveAcrossFolders renders nothing when open=false
+    });
+
+    it("should open drawer with single row's report id and folder", async () => {
+      wrapper.vm.openMoveDialog({
+        report_id: "report-1",
+        folder_id: "folder-A",
+      });
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(true);
+      expect(wrapper.vm.activeFolderToMove).toBe("folder-A");
+      expect(wrapper.vm.reportIdsToMove).toEqual(["report-1"]);
+    });
+
+    it("should fall back to activeFolderId when row has no folder_id", async () => {
+      wrapper.vm.openMoveDialog({ report_id: "report-1" });
+      await nextTick();
+      expect(wrapper.vm.activeFolderToMove).toBe(wrapper.vm.activeFolderId);
+    });
+
+    it("should render MoveAcrossFolders element when open", async () => {
+      wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "f1" });
+      await nextTick();
+      const drawer = wrapper.find('[data-test="report-move-to-another-folder-dialog"]');
+      expect(drawer.exists()).toBe(true);
+    });
+
+    it("should render MoveAcrossFolders inside the drawer when open", async () => {
+      wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "f1" });
+      await nextTick();
+      expect(wrapper.findComponent(MoveAcrossFoldersStub).exists()).toBe(true);
+    });
+
+    it("should open drawer for bulk move via moveMultipleReports", async () => {
+      wrapper.vm.selectedReports = [{ report_id: "report-1" }, { report_id: "report-2" }];
+      wrapper.vm.moveMultipleReports();
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(true);
+      expect(wrapper.vm.reportIdsToMove).toEqual(["report-1", "report-2"]);
+    });
+
+    it("should close drawer when MoveAcrossFolders emits update:open false", async () => {
+      wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "f1" });
+      await nextTick();
+      const child = wrapper.findComponent(MoveAcrossFoldersStub);
+      expect(child.exists()).toBe(true);
+      await child.vm.$emit("update:open", false);
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(false);
+    });
+
+    it("should close drawer when showMoveDialog is set to false", async () => {
+      wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "f1" });
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(true);
+      wrapper.vm.showMoveDialog = false;
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(false);
+    });
+
+    it("should run onMoveUpdated when MoveAcrossFolders emits @updated", async () => {
+      wrapper.vm.openMoveDialog({ report_id: "report-1", folder_id: "from-f" });
+      await nextTick();
+      const child = wrapper.findComponent(MoveAcrossFoldersStub);
+      expect(child.exists()).toBe(true);
+      vi.mocked(reports.listByFolderId).mockClear();
+      vi.mocked(reports.listByFolderId).mockResolvedValue({ data: [] });
+      // Pass the active folder ("default") as the source folder so its cache
+      // is invalidated and loadReports() goes back to the API instead of cache.
+      await child.vm.$emit("updated", "default", "to-f");
+      await flushPromises();
+      expect(wrapper.vm.showMoveDialog).toBe(false);
+      expect(wrapper.vm.selectedReports).toEqual([]);
+      expect(wrapper.vm.reportIdsToMove).toEqual([]);
+      expect(reports.listByFolderId).toHaveBeenCalled();
+    });
+
+    it("should open drawer when row-level move button is clicked", async () => {
+      const btn = wrapper.find('[data-test="report-list-Test Report 1-move-report"]');
+      expect(btn.exists()).toBe(true);
+      await btn.trigger("click");
+      await nextTick();
+      expect(wrapper.vm.showMoveDialog).toBe(true);
+      expect(wrapper.vm.reportIdsToMove).toEqual(["report-1"]);
+    });
+  });
 });

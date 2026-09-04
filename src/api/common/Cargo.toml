@@ -1,0 +1,55 @@
+[package]
+name = "openobserve-api-common"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = [
+    "dep:o2_dex",
+    "dep:o2_enterprise",
+    "dep:o2_openfga",
+    "dep:transform",
+    "dep:usage_reporting",
+    "dep:vrl",
+    "openobserve-core/enterprise",
+    "usage_reporting/enterprise",
+]
+cloud = [
+    "enterprise",
+    "o2_enterprise/cloud",
+    "openobserve-core/cloud",
+]
+
+[dependencies]
+anyhow.workspace = true
+axum.workspace = true
+base64.workspace = true
+chrono.workspace = true
+common.workspace = true
+config.workspace = true
+db.workspace = true
+infra.workspace = true
+jsonwebtoken.workspace = true
+log.workspace = true
+o2_dex = { workspace = true, optional = true }
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+o2_openfga = { workspace = true, optional = true }
+openobserve-core.workspace = true
+regex.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+transform = { workspace = true, optional = true }
+url.workspace = true
+usage_reporting = { workspace = true, optional = true }
+utoipa.workspace = true
+vrl = { workspace = true, optional = true }
+
+[dev-dependencies]
+http.workspace = true

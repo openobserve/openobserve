@@ -1,0 +1,58 @@
+[
+  {
+    "name": "ci_seed_high_error_rate",
+    "stream_type": "logs",
+    "stream_name": "default",
+    "is_real_time": false,
+    "query_condition": {
+      "type": "sql",
+      "sql": "SELECT COUNT(*) as error_count FROM \"default\" WHERE level = 'error'",
+      "aggregation": null
+    },
+    "trigger_condition": {
+      "period": 15,
+      "threshold": 5,
+      "operator": ">",
+      "silence": 10,
+      "frequency": 5
+    },
+    "enabled": true,
+    "description": "CI-seed alert: fires when there are more than 5 error-level logs in a 15-minute window."
+  },
+  {
+    "name": "ci_seed_slow_query_detected",
+    "stream_type": "logs",
+    "stream_name": "default",
+    "is_real_time": true,
+    "query_condition": {
+      "type": "sql",
+      "sql": "SELECT * FROM \"default\" WHERE message LIKE '%slow query%'"
+    },
+    "trigger_condition": {
+      "threshold": 1,
+      "operator": ">=",
+      "silence": 5
+    },
+    "enabled": true,
+    "description": "CI-seed alert: real-time alert on any slow-query log line."
+  },
+  {
+    "name": "ci_seed_auth_failures",
+    "stream_type": "logs",
+    "stream_name": "default",
+    "is_real_time": false,
+    "query_condition": {
+      "type": "sql",
+      "sql": "SELECT COUNT(*) as auth_fails FROM \"default\" WHERE code = 401"
+    },
+    "trigger_condition": {
+      "period": 30,
+      "threshold": 3,
+      "operator": ">=",
+      "silence": 15,
+      "frequency": 10
+    },
+    "enabled": false,
+    "description": "CI-seed alert: disabled sample alert on repeated auth failures."
+  }
+]

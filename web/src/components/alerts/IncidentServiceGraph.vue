@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -7,72 +7,81 @@ the Free Software Foundation, either version 3 of the License, or
 
 This program is distributed in the hope that it will be useful
 but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 GNU Affero General Public License for more details.
 
 You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>.
+along with this program. If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="incident-service-graph" style="height: calc(100vh - 202px); position: relative;">
-    <!-- Info Icon Button -->
-    <q-btn
+  <div
+    class="incident-service-graph rounded-default border-border-default dark:ring-border-default/30 relative m-3 flex h-[calc(100vh-12.625rem)] min-h-100 flex-col overflow-hidden border bg-[linear-gradient(135deg,#f9fafb_0%,#ffffff_100%)] p-5 shadow-sm ring-1 ring-white/50 transition-all duration-200 ring-inset hover:shadow-md dark:bg-[linear-gradient(135deg,var(--color-grey-800)_0%,var(--color-grey-900)_100%)]"
+  >
+    <!-- Info Icon → Graph Legend popover (hover to show) -->
+    <span
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      round
-      flat
-      icon="info_outline"
-      size="sm"
-      class="info-icon-btn"
-      :class="isDarkMode ? 'tw-text-gray-400 hover:tw-text-gray-200' : 'tw-text-gray-500 hover:tw-text-gray-700'"
+      class="info-icon-btn group absolute top-4 right-4 z-10"
     >
-      <q-tooltip
-        :delay="200"
-        anchor="bottom left"
-        self="top right"
-        :offset="[10, 10]"
-        max-width="300px"
+      <OButton variant="ghost" size="icon-circle-sm">
+        <OIcon name="info-outline" size="sm" />
+      </OButton>
+      <div
+        class="graph-legend text-compact text-text-body bg-surface-overlay border-border-default rounded-default pointer-events-none invisible absolute top-[calc(100%+0.5rem)] right-0 min-w-60 -translate-y-1 border px-4 py-3.5 leading-normal whitespace-nowrap opacity-0 shadow-lg transition-all duration-150 group-focus-within:pointer-events-auto group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 dark:border-white/12 dark:shadow-lg"
+        role="tooltip"
       >
-        <div style="padding: 8px; font-size: 12px; line-height: 1.6;">
-          <div style="font-weight: 600; margin-bottom: 8px; font-size: 13px;">Graph Legend</div>
-
-          <div style="margin-bottom: 6px;">
-            <span style="color: #ef4444;">●</span> Red = Potential Root Cause
-          </div>
-          <div style="margin-bottom: 6px;">
-            <span style="color: #f97316;">●</span> Orange = High Frequency
-          </div>
-          <div style="margin-bottom: 6px;">
-            <span style="color: #3b82f6;">●</span> Blue = Normal
-          </div>
-          <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.2);">
-            <span style="color: #a78bfa;">→</span> Purple arrows show temporal flow
-          </div>
+        <div class="mb-2.5 text-sm font-semibold">{{ t("alerts.serviceGraphLegendTitle") }}</div>
+        <div class="graph-legend__row flex items-center gap-2 py-1">
+          <span
+            class="graph-legend__dot text-status-negative w-3.5 shrink-0 text-center text-sm leading-none"
+            >●</span
+          >
+          {{ t("alerts.serviceGraphRootCause") }}
         </div>
-      </q-tooltip>
-    </q-btn>
+        <div class="graph-legend__row flex items-center gap-2 py-1">
+          <span
+            class="graph-legend__dot text-status-warning-text w-3.5 shrink-0 text-center text-sm leading-none"
+            >●</span
+          >
+          {{ t("alerts.serviceGraphHighFrequency") }}
+        </div>
+        <div class="graph-legend__row flex items-center gap-2 py-1">
+          <span
+            class="graph-legend__dot text-text-link w-3.5 shrink-0 text-center text-sm leading-none"
+            >●</span
+          >
+          {{ t("alerts.serviceGraphNormal") }}
+        </div>
+        <div class="graph-legend__divider bg-border-default my-2 h-px dark:bg-white/15" />
+        <div class="graph-legend__row flex items-center gap-2 py-1">
+          <span
+            class="graph-legend__dot text-badge-purple-ol-text w-3.5 shrink-0 text-center text-sm leading-none"
+            >→</span
+          >
+          {{ t("alerts.serviceGraphTemporalFlow") }}
+        </div>
+      </div>
+    </span>
 
     <!-- Loading State -->
-    <div
-      v-if="loading"
-      class="tw-flex tw-items-center tw-justify-center tw-h-full"
-      :class="isDarkMode ? 'tw-bg-gray-900/50' : 'tw-bg-white/50'"
-    >
-      <q-spinner size="lg" color="primary" />
+    <div v-if="loading" class="bg-surface-base/50 flex h-full items-center justify-center">
+      <OSpinner size="md" />
     </div>
 
     <!-- Empty State -->
     <div
       v-else-if="!graphData || !graphData.nodes || graphData.nodes.length === 0"
-      class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-gap-3 tw-h-full"
+      class="flex h-full flex-col items-center justify-center gap-3"
     >
-      <q-icon name="hub" size="48px" :class="isDarkMode ? 'tw-text-gray-600' : 'tw-text-gray-300'" />
-      <div class="tw-text-center">
-        <div class="tw-text-sm tw-font-medium" :class="isDarkMode ? 'tw-text-gray-400' : 'tw-text-gray-600'">
-          Service Graph Unavailable
+      <!-- size-12! (48px) exceeds OIcon's largest `size` prop (xl = 40px); the `!`
+ is required because OIcon's own `size-6` default sits in the same layer. -->
+      <OIcon name="hub" class="text-text-muted size-12!" />
+      <div class="text-center">
+        <div class="text-text-secondary text-sm font-medium">
+          {{ t("alerts.serviceGraphUnavailable") }}
         </div>
-        <div class="tw-text-xs tw-mt-1" :class="isDarkMode ? 'tw-text-gray-500' : 'tw-text-gray-400'">
-          No topology data available for this incident.
+        <div class="text-text-secondary mt-1 text-xs">
+          {{ t("alerts.serviceGraphNoTopologyData") }}
         </div>
       </div>
     </div>
@@ -80,30 +89,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Graph Canvas using ECharts -->
     <div
       v-if="!loading && graphData && graphData.nodes && graphData.nodes.length > 0"
-      style="width: 100%; height: 100%;"
+      class="h-full w-full"
     >
-      <ChartRenderer
-        ref="chartRendererRef"
-        :data="chartData"
-        :key="chartKey"
-      />
+      <ChartRenderer ref="chartRendererRef" :data="chartData" :key="chartKey" />
     </div>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, computed, watch } from "vue";
-import { useStore } from "vuex";
-import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
+import { useI18nTyped } from "@/types/i18n";
+import { useTheme } from "@/composables/useTheme";
+import { forceSimulation, forceManyBody, forceLink, forceCollide, forceX, forceY } from "d3-force";
 import ChartRenderer from "@/components/dashboards/panels/ChartRenderer.vue";
 import { AlertNode } from "@/services/incidents";
-import DropzoneBackground from "@/plugins/pipelines/DropzoneBackground.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 
 export default defineComponent({
   name: "IncidentServiceGraph",
   components: {
     ChartRenderer,
-    DropzoneBackground,
+    OButton,
+    OSpinner,
+    OIcon,
   },
   props: {
     topologyContext: {
@@ -113,22 +123,22 @@ export default defineComponent({
     },
   },
   setup(props) {
-    const store = useStore();
+    const { t } = useI18nTyped();
 
     const loading = ref(false);
     const chartRendererRef = ref<any>(null);
     const chartKey = ref(0);
     const nodePositions = ref<Map<string, { x: number; y: number }>>(new Map());
 
-    const isDarkMode = computed(() => store.state.theme === "dark");
+    const { isDark: isDarkMode } = useTheme();
 
     // Use topology_context directly from props
     const graphData = computed(() => props.topologyContext);
 
     // D3-Force simulation to compute stable node positions with left-to-right layout
     const computeForceLayout = (nodes: any[], edges: any[], width = 800, height = 600) => {
-      const nodesCopy = nodes.map(n => ({ ...n }));
-      const edgesCopy = edges.map(e => ({
+      const nodesCopy = nodes.map((n) => ({ ...n }));
+      const edgesCopy = edges.map((e) => ({
         source: e.source,
         target: e.target,
         ...e,
@@ -136,18 +146,20 @@ export default defineComponent({
 
       // Calculate depth/level for each node (for left-to-right positioning)
       const nodeDepth = new Map<string, number>();
-      nodesCopy.forEach(n => nodeDepth.set(n.id, 0));
+      nodesCopy.forEach((n) => nodeDepth.set(n.id, 0));
 
       // Build adjacency list from temporal edges to determine hierarchy
-      const temporalEdges = edgesCopy.filter(e => e.originalEdge?.edge_type === 'temporal');
+      const temporalEdges = edgesCopy.filter((e) => e.originalEdge?.edge_type === "temporal");
       const visited = new Set<string>();
 
       // BFS to calculate depth
       const queue: Array<{ id: string; depth: number }> = [];
 
       // Find root nodes (nodes with no incoming temporal edges)
-      const hasIncoming = new Set(temporalEdges.map(e => typeof e.target === 'string' ? e.target : e.target.id));
-      nodesCopy.forEach(n => {
+      const hasIncoming = new Set(
+        temporalEdges.map((e) => (typeof e.target === "string" ? e.target : e.target.id)),
+      );
+      nodesCopy.forEach((n) => {
         if (!hasIncoming.has(n.id)) {
           queue.push({ id: n.id, depth: 0 });
         }
@@ -160,9 +172,9 @@ export default defineComponent({
         nodeDepth.set(id, depth);
 
         // Find outgoing temporal edges
-        temporalEdges.forEach(edge => {
-          const sourceId = typeof edge.source === 'string' ? edge.source : edge.source.id;
-          const targetId = typeof edge.target === 'string' ? edge.target : edge.target.id;
+        temporalEdges.forEach((edge) => {
+          const sourceId = typeof edge.source === "string" ? edge.source : edge.source.id;
+          const targetId = typeof edge.target === "string" ? edge.target : edge.target.id;
           if (sourceId === id) {
             queue.push({ id: targetId, depth: depth + 1 });
           }
@@ -170,36 +182,44 @@ export default defineComponent({
       }
 
       const simulation = forceSimulation(nodesCopy)
-        .force('charge', forceManyBody().strength(-400).distanceMax(1200))
-        .force('link', forceLink(edgesCopy)
-          .id((d: any) => d.id)
-          .distance(180)
-          .strength(0.5)
-          .iterations(2)
+        .force("charge", forceManyBody().strength(-400).distanceMax(1200))
+        .force(
+          "link",
+          forceLink(edgesCopy)
+            .id((d: any) => d.id)
+            .distance(180)
+            .strength(0.5)
+            .iterations(2),
         )
-        .force('x', forceX((d: any) => {
-          // Position nodes left-to-right based on their depth, starting from extreme left
-          const depth = nodeDepth.get(d.id) || 0;
-          const maxDepth = Math.max(...Array.from(nodeDepth.values()));
-          const leftMargin = 80; // Left margin to prevent nodes from touching the edge
-          const rightMargin = 80; // Right margin
-          const availableWidth = width - leftMargin - rightMargin;
-          const spacing = maxDepth > 0 ? availableWidth / maxDepth : 0;
-          return leftMargin + spacing * depth;
-        }).strength(1.5)) // Strong horizontal positioning
-        .force('y', forceY((d: any) => {
-          // Stronger vertical centering for root nodes (depth 0)
-          const depth = nodeDepth.get(d.id) || 0;
-          return height / 2;
-        }).strength((d: any) => {
-          // Stronger centering for root nodes
-          const depth = nodeDepth.get(d.id) || 0;
-          return depth === 0 ? 0.8 : 0.1; // Much stronger centering for root nodes
-        }))
-        .force('collision', forceCollide()
-          .radius((d: any) => (d.symbolSize || 60) / 2 + 50)
-          .strength(1.0)
-          .iterations(3)
+        .force(
+          "x",
+          forceX((d: any) => {
+            // Position nodes left-to-right based on their temporal-edge depth.
+            const depth = nodeDepth.get(d.id) || 0;
+            const maxDepth = Math.max(...Array.from(nodeDepth.values()));
+            const leftMargin = 80; // Left margin to prevent nodes from touching the edge
+            const rightMargin = 80; // Right margin
+            const availableWidth = width - leftMargin - rightMargin;
+            const spacing = maxDepth > 0 ? availableWidth / maxDepth : 0;
+            return leftMargin + spacing * depth;
+          }).strength(1.5),
+        ) // Strong horizontal positioning
+        .force(
+          "y",
+          forceY(() => {
+            return height / 2;
+          }).strength((d: any) => {
+            // Stronger centering for root nodes (depth 0).
+            const depth = nodeDepth.get(d.id) || 0;
+            return depth === 0 ? 0.8 : 0.1;
+          }),
+        )
+        .force(
+          "collision",
+          forceCollide()
+            .radius((d: any) => (d.symbolSize || 60) / 2 + 50)
+            .strength(1.0)
+            .iterations(3),
         )
         .velocityDecay(0.4)
         .stop();
@@ -209,10 +229,10 @@ export default defineComponent({
         simulation.tick();
       }
 
-      return simulation.nodes().map(n => ({ ...n }));
+      return simulation.nodes().map((n) => ({ ...n }));
     };
 
-    // No longer need to load graph via API - data comes from props
+    // Data comes from props.
     const loadGraph = () => {
       // Increment chartKey to force re-render if topology_context changes
       chartKey.value++;
@@ -229,8 +249,160 @@ export default defineComponent({
       return "#3b82f6"; // blue-500 - normal
     };
 
-    const getNodeSize = (node: AlertNode): number => {
-      return 60; // Fixed size for all nodes
+    const getNodeSize = (node: AlertNode, nodes: AlertNode[], maxSize = 120): number => {
+      // Scale node size based on alert_count relative to the max count in the dataset
+      const minSize = 30;
+      const maxCount = Math.max(...nodes.map((n) => n.alert_count || 0), 1);
+      if (maxCount === 0) return minSize;
+      const ratio = (node.alert_count || 0) / maxCount;
+      return Math.round(minSize + ratio * (maxSize - minSize));
+    };
+
+    // Above this raw-node count the graph is bucketed by time to stay legible;
+    // at or below it every firing is shown 1:1. The force layout blobs past ~15 nodes.
+    const NODE_CAP = 15;
+    // Pick the smallest time unit that yields no more than this many windows.
+    const BUCKET_TARGET_MAX = 24;
+    // Bucket-unit ladder in microseconds (backend timestamps are microseconds).
+    const US = 1000; // microseconds per millisecond
+    const BUCKET_UNITS_US = [
+      60 * US * 1000, // 1 minute
+      5 * 60 * US * 1000, // 5 minutes
+      15 * 60 * US * 1000, // 15 minutes
+      60 * 60 * US * 1000, // 1 hour
+      6 * 60 * 60 * US * 1000, // 6 hours
+      24 * 60 * 60 * US * 1000, // 1 day
+      7 * 24 * 60 * 60 * US * 1000, // 7 days
+    ];
+
+    // Format a bucket window start (microseconds) for the node label, using a
+    // time-of-day form for sub-day units and a date for day+ units.
+    const formatWindow = (startUs: number, unitUs: number): string => {
+      const d = new Date(startUs / 1000);
+      if (unitUs >= 24 * 60 * 60 * US * 1000) {
+        return d.toLocaleDateString();
+      }
+      return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+    };
+
+    /**
+     * Collapse many alert firings into time-window buckets, keyed by
+     * (window x alert_name) so distinct alerts never merge. With a single alert
+     * name (the common case) this degrades to one node per non-empty window —
+     * a pure left-to-right timeline. Edges are rebuilt by collapsing the
+     * backend's raw edges onto the buckets, so both within-alert sequences AND
+     * cross-alert temporal correlations are preserved.
+     */
+    const bucketFiringsByTime = (
+      rawNodes: any[],
+      rawEdges: any[],
+    ): { nodes: any[]; edges: any[] } => {
+      const times = rawNodes.map((n) => n.first_fired_at);
+      const minTime = Math.min(...times);
+      const maxTime = Math.max(...rawNodes.map((n) => n.last_fired_at));
+      const span = Math.max(maxTime - minTime, 1);
+
+      // Choose the smallest ladder unit whose window count fits the target. For
+      // spans so long even the largest ladder unit exceeds the target, derive a
+      // custom unit so the window count is ALWAYS capped at BUCKET_TARGET_MAX.
+      const unitUs =
+        BUCKET_UNITS_US.find((u) => Math.ceil(span / u) <= BUCKET_TARGET_MAX) ??
+        Math.ceil(span / BUCKET_TARGET_MAX);
+
+      const buckets = new Map<
+        string,
+        {
+          alert_id: string;
+          alert_name: string;
+          service_name: string;
+          alert_count: number;
+          first_fired_at: number;
+          last_fired_at: number;
+          windowStart: number;
+          serviceCounts: Map<string, number>;
+        }
+      >();
+
+      // Track which bucket key each raw node index falls into, for edge rebuild.
+      const rawIdxToKey = new Map<number, string>();
+
+      rawNodes.forEach((node, rawIdx) => {
+        const windowIdx = Math.floor((node.first_fired_at - minTime) / unitUs);
+        const name = node.alert_name || "unknown";
+        const key = `${windowIdx}|${name}`;
+        rawIdxToKey.set(rawIdx, key);
+        if (!buckets.has(key)) {
+          buckets.set(key, {
+            alert_id: node.alert_id,
+            alert_name: name,
+            service_name: node.service_name,
+            alert_count: 0,
+            first_fired_at: node.first_fired_at,
+            last_fired_at: node.last_fired_at,
+            windowStart: minTime + windowIdx * unitUs,
+            serviceCounts: new Map(),
+          });
+        }
+        const b = buckets.get(key)!;
+        b.alert_count += node.alert_count;
+        if (node.first_fired_at < b.first_fired_at) b.first_fired_at = node.first_fired_at;
+        if (node.last_fired_at > b.last_fired_at) b.last_fired_at = node.last_fired_at;
+        const svc = node.service_name || "";
+        b.serviceCounts.set(svc, (b.serviceCounts.get(svc) || 0) + 1);
+      });
+
+      // Materialize bucket nodes, sorted chronologically. Each node keeps its
+      // bucket `key` so the raw edges can be remapped onto buckets below. The
+      // force layout positions them by temporal depth, so no explicit
+      // coordinates are needed here.
+      const nodes = Array.from(buckets.entries())
+        .map(([key, b]) => {
+          let bestSvc = b.service_name;
+          let bestCount = 0;
+          b.serviceCounts.forEach((count, svc) => {
+            if (count > bestCount) {
+              bestCount = count;
+              bestSvc = svc;
+            }
+          });
+          return {
+            key,
+            alert_id: b.alert_id,
+            alert_name: b.alert_name,
+            service_name: bestSvc,
+            alert_count: b.alert_count,
+            first_fired_at: b.first_fired_at,
+            last_fired_at: b.last_fired_at,
+            // Label shows name + count + window, e.g."go_gc_rate_high x42 14:05"
+            display_label: `${b.alert_name} x${b.alert_count} ${formatWindow(b.windowStart, unitUs)}`,
+          };
+        })
+        .sort((a, b) => a.first_fired_at - b.first_fired_at);
+
+      // Map each bucket key to its final (post-sort) node index.
+      const keyToIdx = new Map<string, number>();
+      nodes.forEach((n, idx) => keyToIdx.set(n.key, idx));
+
+      // Rebuild edges by collapsing the backend's raw edges onto buckets. This
+      // preserves both within-alert sequences and cross-alert correlations.
+      // Drop self-loops (both endpoints in the same bucket) and de-duplicate.
+      const seen = new Set<string>();
+      const edges: any[] = [];
+      for (const e of rawEdges) {
+        const srcKey = rawIdxToKey.get(e.from_node_index);
+        const tgtKey = rawIdxToKey.get(e.to_node_index);
+        if (srcKey === undefined || tgtKey === undefined) continue;
+        const srcIdx = keyToIdx.get(srcKey);
+        const tgtIdx = keyToIdx.get(tgtKey);
+        if (srcIdx === undefined || tgtIdx === undefined) continue;
+        if (srcIdx === tgtIdx) continue; // self-loop within one bucket
+        const dedupe = `${srcIdx}->${tgtIdx}|${e.edge_type}`;
+        if (seen.has(dedupe)) continue;
+        seen.add(dedupe);
+        edges.push({ from_node_index: srcIdx, to_node_index: tgtIdx, edge_type: e.edge_type });
+      }
+
+      return { nodes, edges };
     };
 
     const chartData = computed(() => {
@@ -238,13 +410,35 @@ export default defineComponent({
         return { options: {}, notMerge: true };
       }
 
-      const { nodes, edges } = graphData.value;
+      const { nodes: rawNodes, edges: rawEdges } = graphData.value;
 
-      // Prepare nodes for D3-force simulation
+      // Adaptive node construction:
+      // - Detail mode (<= NODE_CAP firings): render each firing 1:1 with the
+      // backend's edges, preserving the clean left-to-right timeline.
+      // - Bucketed mode (> NODE_CAP): collapse firings into time-window x name
+      // buckets so the graph stays legible at high alert counts.
+      let nodes: any[];
+      let edges: any[];
+      if (rawNodes.length > NODE_CAP) {
+        const bucketed = bucketFiringsByTime(rawNodes, rawEdges);
+        nodes = bucketed.nodes;
+        edges = bucketed.edges;
+      } else {
+        nodes = rawNodes;
+        // Backend edges are index-based into the raw node array; in detail mode
+        // the node array IS the raw array, so indices are used directly.
+        edges = rawEdges;
+      }
+
+      // Prepare nodes for D3-force simulation. Bucketed nodes carry a
+      // display_label (name + count + window); detail nodes show the alert name.
+      // Bucketed nodes use a uniform size so the timeline reads as evenly-spaced
+      // circles (like the detail/main layout) rather than lumpy count-scaled blobs.
+      const bucketed = rawNodes.length > NODE_CAP;
       const preparedNodes = nodes.map((node, index) => ({
-        name: node.alert_name, // Show only alert name for cleaner labels
+        name: node.display_label || node.alert_name,
         id: index.toString(),
-        symbolSize: getNodeSize(node),
+        symbolSize: bucketed ? 60 : getNodeSize(node, nodes),
         originalNode: node,
         originalIndex: index,
       }));
@@ -259,17 +453,21 @@ export default defineComponent({
       // Compute force-directed layout positions using D3 with left-to-right layout
       // Only compute if we don't have cached positions for these nodes
       let positionedNodes;
-      const hasAllPositions = preparedNodes.every(n => nodePositions.value.has(n.id));
+      const hasAllPositions = preparedNodes.every((n) => nodePositions.value.has(n.id));
 
       if (hasAllPositions) {
         // Use cached positions
-        positionedNodes = preparedNodes.map(n => ({
+        positionedNodes = preparedNodes.map((n) => ({
           ...n,
           x: nodePositions.value.get(n.id)!.x,
           y: nodePositions.value.get(n.id)!.y,
         }));
       } else {
-        // Compute new positions and cache them with wider canvas for left-to-right layout
+        // Both modes use the same force-directed layout (main's algorithm),
+        // which positions nodes left-to-right by temporal depth and lets the
+        // charge/collision forces fan them into an organic vertical wave that
+        // fills the canvas. Bucketing already caps the node count (~24), so the
+        // simulation stays in the regime where it reads cleanly.
         positionedNodes = computeForceLayout(preparedNodes, preparedEdges, 1200, 400);
         positionedNodes.forEach((node: any) => {
           nodePositions.value.set(node.id, { x: node.x, y: node.y });
@@ -288,6 +486,7 @@ export default defineComponent({
           y: node.y,
           fixed: true, // Lock position so ECharts doesn't re-layout
           symbolSize: node.symbolSize,
+          originalNode: node.originalNode,
           itemStyle: {
             color: getNodeColor(originalNode, index),
             borderColor: index === 0 ? "#dc2626" : getNodeColor(originalNode, index),
@@ -298,29 +497,59 @@ export default defineComponent({
             position: "bottom",
             distance: 5,
             fontSize: 11,
+            fontWeight: 500,
             color: isDarkMode.value ? "#e5e7eb" : "#374151",
             formatter: `{b}`,
-            backgroundColor: isDarkMode.value ? "rgba(31, 41, 55, 0.9)" : "rgba(255, 255, 255, 0.9)",
+            backgroundColor: isDarkMode.value
+              ? "rgba(31, 41, 55, 0.85)"
+              : "rgba(255, 255, 255, 0.9)",
             borderRadius: 4,
-            padding: [4, 8],
-            shadowColor: "rgba(0, 0, 0, 0.3)",
-            shadowBlur: 4,
+            padding: [3, 7],
+            borderColor: isDarkMode.value ? "#4b5563" : "#e5e7eb",
+            borderWidth: 1,
+          },
+          emphasis: {
+            label: {
+              show: true,
+              position: "bottom",
+              distance: 5,
+              fontSize: 11,
+              fontWeight: 600,
+              color: isDarkMode.value ? "#e5e7eb" : "#374151",
+              formatter: `{b}`,
+              backgroundColor: isDarkMode.value
+                ? "rgba(31, 41, 55, 0.95)"
+                : "rgba(255, 255, 255, 1)",
+              borderRadius: 4,
+              padding: [3, 7],
+              borderColor: isDarkMode.value ? "#6b7280" : "#d1d5db",
+              borderWidth: 1,
+            },
           },
           tooltip: {
             formatter: () => {
               const firstTime = new Date(originalNode.first_fired_at / 1000).toLocaleString();
-              const lastTime = originalNode.alert_count > 1 ? new Date(originalNode.last_fired_at / 1000).toLocaleString() : null;
+              const lastTime =
+                originalNode.alert_count > 1
+                  ? new Date(originalNode.last_fired_at / 1000).toLocaleString()
+                  : null;
 
-              let html = `<div style="padding: 8px; font-size: 12px;">`;
-              html += `<strong style="font-size: 14px;">${originalNode.alert_name}</strong><br/>`;
-              html += `Service: <strong>${originalNode.service_name}</strong><br/><br/>`;
-              html += `Alert Count: <strong>${originalNode.alert_count}</strong><br/>`;
-              html += `First Fired: ${firstTime}<br/>`;
+              let html = `<div style="padding: 0.5rem; font-size: var(--text-xs);">`;
+              html += `<strong style="font-size: var(--text-sm);">${originalNode.alert_name}</strong><br/>`;
+              // The <strong> markup is passed through the interpolation slot so the
+              // message keeps the whole sentence (and its word order) translatable.
+              const serviceName = `<strong>${originalNode.service_name}</strong>`;
+              const alertCount = `<strong>${originalNode.alert_count}</strong>`;
+              html += `${t("alerts.serviceGraphTooltipService", { name: serviceName })}<br/><br/>`;
+              html += `${t("alerts.serviceGraphTooltipAlertCount", { count: alertCount })}<br/>`;
+              html += `${t("alerts.serviceGraphTooltipFirstFired", { time: firstTime })}<br/>`;
               if (lastTime) {
-                html += `Last Fired: ${lastTime}<br/>`;
+                html += `${t("alerts.serviceGraphTooltipLastFired", { time: lastTime })}<br/>`;
               }
               if (index === 0) {
-                html += `<br/><span style="color: #ef4444;">⚠ First Alert (Potential Root Cause)</span>`;
+                html += `<br/><span style="color: var(--color-status-negative);">${t(
+                  "alerts.serviceGraphTooltipRootCause",
+                )}</span>`;
               }
               html += `</div>`;
               return html;
@@ -337,9 +566,14 @@ export default defineComponent({
           source: edge.from_node_index.toString(),
           target: edge.to_node_index.toString(),
           lineStyle: {
-            color: edge.edge_type === "temporal"
-              ? (isDarkMode.value ? "#a78bfa" : "#8b5cf6") // purple for temporal
-              : (isDarkMode.value ? "#6b7280" : "#9ca3af"), // gray for service dependency
+            color:
+              edge.edge_type === "temporal"
+                ? isDarkMode.value
+                  ? "#a78bfa"
+                  : "#8b5cf6" // purple for temporal
+                : isDarkMode.value
+                  ? "#6b7280"
+                  : "#9ca3af", // gray for service dependency
             width: edge.edge_type === "temporal" ? 3 : 2,
             curveness: 0.2,
             type: "solid",
@@ -351,8 +585,8 @@ export default defineComponent({
           },
           tooltip: {
             formatter: () => {
-              let html = `<div style="padding: 8px; font-size: 12px; text-align: center;">`;
-              html += `<strong>${sourceNode.alert_name}</strong> <span style="color: #a78bfa;">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
+              let html = `<div style="padding: 0.5rem; font-size: var(--text-xs); text-align: center;">`;
+              html += `<strong>${sourceNode.alert_name}</strong> <span style="color: var(--color-badge-purple-ol-text);">→</span> <strong>${targetNode.alert_name}</strong><br/><br/>`;
 
               if (edge.edge_type === "temporal") {
                 const sourceTime = new Date(sourceNode.first_fired_at / 1000);
@@ -371,12 +605,24 @@ export default defineComponent({
                 else if (minutes > 0) timeStr = `${minutes}m ${seconds % 60}s`;
                 else timeStr = `${seconds}s`;
 
-                html += `<span style="color: #a78bfa;">⏱ Time difference: <strong>${timeStr}</strong></span><br/>`;
-                html += `From: ${sourceTime.toLocaleString()}<br/>`;
-                html += `To: ${targetTime.toLocaleString()}<br/>`;
-                html += `<br/><span style="color: #a78bfa;">Temporal correlation</span>`;
+                const duration = `<strong>${timeStr}</strong>`;
+                html += `<span style="color: var(--color-badge-purple-ol-text);">${t(
+                  "alerts.serviceGraphTooltipTimeDifference",
+                  { duration },
+                )}</span><br/>`;
+                html += `${t("alerts.serviceGraphTooltipFrom", {
+                  time: sourceTime.toLocaleString(),
+                })}<br/>`;
+                html += `${t("alerts.serviceGraphTooltipTo", {
+                  time: targetTime.toLocaleString(),
+                })}<br/>`;
+                html += `<br/><span style="color: var(--color-badge-purple-ol-text);">${t(
+                  "alerts.serviceGraphTooltipTemporalCorrelation",
+                )}</span>`;
               } else {
-                html += `<span style="color: #9ca3af;">Service dependency</span>`;
+                html += `<span style="color: var(--color-text-muted);">${t(
+                  "alerts.serviceGraphTooltipServiceDependency",
+                )}</span>`;
               }
 
               html += `</div>`;
@@ -433,10 +679,11 @@ export default defineComponent({
         nodePositions.value.clear();
         loadGraph();
       },
-      { deep: true }
+      { deep: true },
     );
 
     return {
+      t,
       loading,
       graphData,
       chartRendererRef,
@@ -448,62 +695,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-.incident-service-graph {
-  min-height: 400px;
-  display: flex;
-  flex-direction: column;
-  margin: 12px;
-  padding: 20px;
-  border-radius: 12px;
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-
-.info-icon-btn {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 10;
-  transition: all 0.2s ease;
-}
-
-.info-icon-btn:hover {
-  transform: scale(1.1);
-}
-
-/* Light mode */
-.incident-service-graph {
-  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%);
-  border: 1px solid #e5e7eb;
-  box-shadow:
-    0 1px 3px 0 rgba(0, 0, 0, 0.08),
-    0 1px 2px 0 rgba(0, 0, 0, 0.04),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-}
-
-.incident-service-graph:hover {
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.5);
-}
-
-/* Dark mode */
-.body--dark .incident-service-graph {
-  background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
-  border: 1px solid #374151;
-  box-shadow:
-    0 1px 3px 0 rgba(0, 0, 0, 0.3),
-    0 1px 2px 0 rgba(0, 0, 0, 0.2),
-    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
-}
-
-.body--dark .incident-service-graph:hover {
-  box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.4),
-    0 2px 4px -1px rgba(0, 0, 0, 0.3),
-    inset 0 0 0 1px rgba(75, 85, 99, 0.3);
-}
-</style>

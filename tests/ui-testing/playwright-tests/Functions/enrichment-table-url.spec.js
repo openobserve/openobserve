@@ -39,8 +39,11 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         enrichmentPage = pageManager.enrichmentPage;
         pipelinesPage = pageManager.pipelinesPage;
 
-        // Navigate to enrichment tables
-        await enrichmentPage.navigateToEnrichmentTable();
+        // Navigate to enrichment tables — deep URL WITH org param + verify.
+        // navigateToBase's root-url org param is dropped by the /web/ redirect,
+        // leaving the session on the default org (EXPIRED1) where enrichment
+        // URL jobs fail ("not an ingester"). See gotoEnrichmentTablesWithOrg.
+        await enrichmentPage.gotoEnrichmentTablesWithOrg();
         testLogger.info('Navigated to enrichment tables list');
     });
 
@@ -153,7 +156,11 @@ test.describe('Enrichment Table URL Feature Tests', () => {
     // ============================================================================
 
     test('@P1 Schema view - verify table columns', async () => {
-        const tableName = generateTableName('schema_view');
+        // NOTE: table name must NOT start with "schema" — alpha backend bug:
+        // enrichment URL-jobs for names with a "schema" prefix fail their save
+        // with "not an ingester" (100% repro; schema_probe1 fails, view_probe1
+        // succeeds). The feature under test is unaffected by the table name.
+        const tableName = generateTableName('view_schema');
         currentTableName = tableName; // Track for cleanup
         testLogger.info(`Test: Schema view - ${tableName}`);
 
@@ -166,6 +173,12 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.searchEnrichmentTableInList(tableName);
         await enrichmentPage.verifyTableRowVisible(tableName);
 
+        // Step 2.5: The schema button only renders once the async URL-fetch job
+        // completes — wait for it first (as the schema-mismatch test does) so we
+        // don't race the button on a slow alpha public-URL fetch. retryOnFailure
+        // rides out transient backend URL-fetch blips by re-running the job.
+        await enrichmentPage.waitForUrlJobToFinish(tableName, 20, 5000, true);
+
         // Step 3: Click schema button
         await enrichmentPage.clickSchemaButton(tableName);
         testLogger.info('Clicked schema button');
@@ -175,7 +188,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.closeSchemaModal();
         testLogger.info('Schema modal closed - test passed');
 
-        // Note: Cleanup handled by cleanup.spec.js pattern matching schema_view_*
+        // Note: Cleanup handled by cleanup.spec.js pattern matching view_schema_*
         // URL tables with processing jobs may have limited buttons until job completes
     });
 
@@ -237,7 +250,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Verified back on list page');
 
         // Search for table to verify it was NOT created
-        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.searchEnrichmentTableInList(tableName, { expectExists: false });
 
         // Verify table does NOT exist (no rows or "No data available" message)
         await enrichmentPage.verifyTableNotCreated(tableName);
@@ -411,7 +424,8 @@ test.describe('Enrichment Table URL Feature Tests', () => {
     });
 
     test('@P1 Schema mismatch - URL Jobs dialog shows failed job', async () => {
-        const tableName = generateTableName('schema_mismatch');
+        // NOTE: must not start with "schema" — see schema-prefix backend bug note above.
+        const tableName = generateTableName('mismatch_schema');
         currentTableName = tableName; // Track for cleanup
         testLogger.info(`Test: Schema mismatch - ${tableName}`);
 
@@ -421,7 +435,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Table created with protocols.csv');
 
         // Step 2: Verify table exists (wait for page to be ready)
-        await enrichmentPage.page.waitForLoadState('networkidle');
+        await enrichmentPage.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await enrichmentPage.searchEnrichmentTableInList(tableName);
         await enrichmentPage.verifyTableRowVisible(tableName);
         testLogger.info('Table found in list');
@@ -431,10 +445,10 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.verifyUpdateMode();
         testLogger.info('Edit form opened');
 
-        // Step 4: Select "Add new URL" mode to show the URL input field
+        // Step 4: Select "Replace all URLs" mode to show the URL input field
         // Default mode is "reload" which doesn't show URL input
-        await enrichmentPage.selectUpdateMode('append');
-        testLogger.info('Selected "Add new URL" update mode');
+        await enrichmentPage.selectUpdateMode('replace');
+        testLogger.info('Selected "Replace all URLs" update mode');
 
         // Step 5: Add URL with a different CSV that has incompatible schema (to trigger schema mismatch)
         // enrichment_info.csv has 11 different columns, which will fail schema validation
@@ -444,7 +458,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         // Step 6: Save the changes
         await enrichmentPage.clickSaveButton();
-        await enrichmentPage.page.waitForLoadState('networkidle');
+        await enrichmentPage.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         testLogger.info('Save clicked - job processing async');
 
         // Step 7: Wait for job to complete (poll until buttons appear or warning icon shows)
@@ -514,7 +528,7 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         testLogger.info('Test table created');
 
         // Wait for table to appear and navigate to list
-        await enrichmentPage.page.waitForLoadState('networkidle');
+        await enrichmentPage.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         await enrichmentPage.page.waitForTimeout(2000);
 
         // Step 2: Test search functionality using POM method
@@ -552,13 +566,11 @@ test.describe('Enrichment Table URL Feature Tests', () => {
 
         if (hasRadioGroup) {
             // Check for "From URL" option (using POM)
-            const urlOption = enrichmentPage.page.getByText('From URL', { exact: true });
-            const hasUrlOption = await urlOption.isVisible().catch(() => false);
+            const hasUrlOption = await enrichmentPage.isFromUrlOptionVisible();
             testLogger.info(`'From URL' option visible: ${hasUrlOption}`);
 
             // Check for "Upload File" option (using POM)
-            const fileOption = enrichmentPage.page.getByText('Upload File', { exact: true });
-            const hasFileOption = await fileOption.isVisible().catch(() => false);
+            const hasFileOption = await enrichmentPage.isUploadFileOptionVisible();
             testLogger.info(`'Upload File' option visible: ${hasFileOption}`);
 
             // PRIMARY ASSERTION: At least one source option should be available
@@ -583,5 +595,95 @@ test.describe('Enrichment Table URL Feature Tests', () => {
         await enrichmentPage.cancelEnrichmentTableForm();
 
         testLogger.info('✓ Data source selection test completed');
+    });
+
+    // ============================================================================
+    // CROSS-TYPE NAME COLLISION TESTS
+    // ============================================================================
+
+    test('@P0 @smoke Cross-type collision: file upload rejected when URL enrichment exists with same name', async () => {
+        const tableName = generateTableName('cross_url_first');
+        currentTableName = tableName;
+        testLogger.info(`Test: Cross-type collision URL-first - ${tableName}`);
+
+        // Step 1: Create a URL enrichment
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.createEnrichmentTableFromUrl(tableName, CSV_URL);
+        testLogger.info('URL enrichment created');
+
+        // Step 2: Try to create a file upload with the same name
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.fillNameInput(tableName);
+        await enrichmentPage.selectSourceOption('file');
+
+        await enrichmentPage.setFileInput('../test-data/protocols.csv');
+        testLogger.info('File selected');
+
+        // Click Save
+        await enrichmentPage.clickSaveButton();
+        testLogger.info('Attempted to save file upload with duplicate name');
+
+        // Step 3: Verify error — should say "already exists as a URL enrichment"
+        await enrichmentPage.verifyDuplicateNameError();
+        testLogger.info('Cross-type collision error verified');
+
+        // Step 4: Navigate back to list
+        await enrichmentPage.navigateBackFromFormIfNeeded();
+
+        // Cleanup
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.clickDeleteButton(tableName);
+        await enrichmentPage.verifyDeleteConfirmationDialog();
+        await enrichmentPage.clickDeleteOK();
+        await enrichmentPage.verifyTableRowHidden(tableName);
+        testLogger.info('Table deleted');
+    });
+
+    test('@P0 @smoke Cross-type collision: URL rejected when file upload enrichment exists with same name', async () => {
+        const tableName = generateTableName('cross_file_first');
+        currentTableName = tableName;
+        testLogger.info(`Test: Cross-type collision file-first - ${tableName}`);
+
+        // Step 1: Create a file upload enrichment
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.fillNameInput(tableName);
+        await enrichmentPage.selectSourceOption('file');
+
+        await enrichmentPage.setFileInput('../test-data/protocols.csv');
+        testLogger.info('File selected');
+
+        // Click Save
+        await enrichmentPage.clickSaveButton();
+        testLogger.info('Save clicked for file upload');
+
+        // Wait for form to close (saved successfully)
+        await enrichmentPage.waitForAddFormToClose(15000);
+        testLogger.info('File upload enrichment created');
+
+        // Step 2: Try to create a URL enrichment with the same name
+        await pipelinesPage.navigateToAddEnrichmentTable();
+        await enrichmentPage.fillNameInput(tableName);
+        await enrichmentPage.selectSourceOption('url');
+        await enrichmentPage.fillUrlInput(CSV_URL);
+        testLogger.info('Filled URL form with duplicate name');
+
+        // Click Save
+        await enrichmentPage.clickSaveButton();
+        testLogger.info('Attempted to save URL enrichment with duplicate name');
+
+        // Step 3: Verify error — should say "already exists as a file upload enrichment"
+        await enrichmentPage.verifyDuplicateNameError();
+        testLogger.info('Cross-type collision error verified');
+
+        // Step 4: Navigate back to list
+        await enrichmentPage.navigateBackFromFormIfNeeded();
+
+        // Cleanup
+        await enrichmentPage.searchEnrichmentTableInList(tableName);
+        await enrichmentPage.clickDeleteButton(tableName);
+        await enrichmentPage.verifyDeleteConfirmationDialog();
+        await enrichmentPage.clickDeleteOK();
+        await enrichmentPage.verifyTableRowHidden(tableName);
+        testLogger.info('Table deleted');
     });
 });

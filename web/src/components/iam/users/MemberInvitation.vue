@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,76 +15,61 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-pa-none" style="min-height: inherit">
-    <div
-      class="col-12 flex tw:ml-2"
-      v-if="currentUserRole == 'admin' || currentUserRole == 'root'"
-    >
-
-
-      <div
-        class="row invite-user"
-        style="width: calc(100% - 110px); display: inline-flex"
+  <div class="rounded-default p-0" style="min-height: inherit">
+    <div v-if="currentUserRole == 'admin' || currentUserRole == 'root'">
+      <!-- Inline form (no dialog): the Save button lives inside <OForm>, so it is
+           type="submit" — Enter submits natively, no form-id needed. -->
+      <OForm
+        id="member-invitation-form"
+        ref="memberInvitationForm"
+        class="flex items-center gap-3"
+        :schema="memberInvitationSchema"
+        :default-values="memberInvitationDefaults()"
+        @submit="onSubmit"
+        v-slot="{ isSubmitting }"
       >
-        <q-input
-          v-model="userEmail"
-          borderless
-          filled
-          dense
-          :placeholder="t('user.inviteByEmail')"
-          style="width: calc(100% - 120px)"
-          class="q-pr-sm"
-        />
-        <div class="flex justify-center">
-          <q-select
-            dense
-            filled
-            borderless
-            v-model="selectedRole"
-            option-label="label"
-            option-value="value"
-            emit-value
-            map-options
-            :options="options"
-            style="width: 120px"
-            class="q-pr-sm"
-          />
+        <div class="relative">
+          <OFormInput name="email" :placeholder="t('user.inviteByEmail')" class="w-56" />
+          <OTooltip :content="t('user.inviteByEmail')" side="top" max-width="16rem" />
         </div>
-      </div>
-      <q-btn
-        class="text-bold no-border"
-        padding="sm 0"
-        color="secondary"
-        no-caps
-        :label="t(`user.sendInvite`)"
-        @click="inviteUser()"
-        :disable="userEmail == ''"
-        style="
-          padding: 7px 9px;
-          min-height: 0px;
-          width: 100px;
-          display: block;
-          float: right;
-          top: 1px;
-        "
-      />
+        <OFormSelect
+          name="role"
+          :options="options"
+          labelKey="label"
+          valueKey="value"
+          style="width: 7.5rem"
+        />
+        <OButton variant="primary" size="xs" class="!h-8" type="submit" :loading="isSubmitting">
+          {{ t("user.sendInvite") }}
+        </OButton>
+      </OForm>
     </div>
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, ref, onBeforeMount } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
-import { useI18n } from "vue-i18n";
-import { validateEmail } from "@/utils/zincutils";
+import { useI18nTyped } from "@/types/i18n";
 import organizationsService from "@/services/organizations";
 import segment from "@/services/segment_analytics";
-import { getRoles } from "@/services/iam";
 import usersService from "@/services/users";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeMemberInvitationSchema,
+  memberInvitationDefaults,
+  splitInviteEmails,
+  type MemberInvitationForm,
+} from "./MemberInvitation.schema";
 
 export default defineComponent({
   name: "MemberInvitationPage",
+  components: { OButton, OForm, OFormInput, OFormSelect, OTooltip },
   props: {
     currentrole: {
       type: String,
@@ -94,91 +79,68 @@ export default defineComponent({
   emits: ["inviteSent"],
   setup(props: any, { emit }) {
     const store = useStore();
-    const { t } = useI18n();
-    const $q = useQuasar();
+    const { t } = useI18nTyped();
 
-    const userEmail: any = ref("");
+    const memberInvitationSchema = makeMemberInvitationSchema(t);
+
     const options = ref();
-    const selectedRole = ref("admin");
     const currentUserRole = ref(props.currentrole || "");
+    const memberInvitationForm: any = ref(null);
 
     onBeforeMount(async () => {
       currentUserRole.value = props.currentrole;
       await getRoles();
     });
 
-    const inviteUser = () => {
+    // Plain async @submit handler — fires only after the schema passes (email
+    // required + every address valid). The multi-email split/dedup stays here.
+    // OForm awaits it, so the inline Save button's spinner spans the request.
+    const onSubmit = async (value: MemberInvitationForm) => {
       const emailArray = Array.from(
-        new Set(
-          userEmail.value
-            .split(";")
-            .flatMap((email: any) => email.split(","))
-            .filter((email: any) => email.trim().length > 0)
-            .map((email: any) => email.trim().toLowerCase())
-        )
-      );
-      const validationArray = emailArray.map((email: any) =>
-        validateEmail(email),
+        new Set(splitInviteEmails(value.email).map((email) => email.toLowerCase())),
       );
 
-      if (!validationArray.includes(false)) {
-        const dismiss = $q.notify({
-          spinner: true,
-          message: "Please wait...",
-          timeout: 2000,
-        });
+      try {
+        const res = await organizationsService.add_members(
+          { invites: emailArray, role: value.role },
+          store.state.selectedOrganization.identifier,
+        );
+        const data = res.data;
 
-        organizationsService
-          .add_members(
-            { invites: emailArray, role: selectedRole.value },
-            store.state.selectedOrganization.identifier,
-          )
-          .then((res: { data: any }) => {
-            const data = res.data;
-
-            if (data.data.invalid_members != null) {
-              const message = `Error while member invitation: ${data.data.invalid_members.toString()}`;
-
-              $q.notify({
-                type: "negative",
-                message: message,
-                timeout: 15000,
-              });
-            } else {
-              $q.notify({
-                type: "positive",
-                message: data.message,
-                timeout: 5000,
-              });
-              // Emit event to parent to refresh the members list
-              emit("inviteSent");
-            }
-
-            dismiss();
-          })
-          .catch((error) => {
-            dismiss();
-            $q.notify({
-              type: "negative",
-              message: error?.response?.data?.message || error.message,
-              timeout: 5000,
-            });
+        if (data.data.invalid_members != null) {
+          toast({
+            variant: "error",
+            message: t("iam.memberInvitation.errorWhileInvitation", {
+              members: data.data.invalid_members.toString(),
+            }),
+            timeout: 15000,
           });
-
-        userEmail.value = "";
-
-        segment.track("Button Click", {
-          button: "Invite User",
-          user_org: store.state.selectedOrganization.identifier,
-          user_id: store.state.userInfo.email,
-          page: "Users",
-        });
-      } else {
-        $q.notify({
-          type: "negative",
-          message: `Please enter correct email id.`,
+        } else {
+          toast({
+            variant: "success",
+            message: data.message,
+            timeout: 5000,
+          });
+          // Emit event to parent to refresh the members list
+          emit("inviteSent");
+          // Clear the invite row (create / "add another"): reset email to blank
+          // and submit-state to 0 (no "required" flash) while keeping the role.
+          memberInvitationForm.value?.form.reset({ email: "", role: value.role });
+        }
+      } catch (error: any) {
+        toast({
+          variant: "error",
+          message: error?.response?.data?.message || error.message,
+          timeout: 5000,
         });
       }
+
+      segment.track("Button Click", {
+        button: "Invite User",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        page: "Users",
+      });
     };
 
     const getRoles = () => {
@@ -194,29 +156,13 @@ export default defineComponent({
 
     return {
       t,
-      userEmail,
-      selectedRole,
       options,
-      inviteUser,
       currentUserRole,
-      $q
+      memberInvitationForm,
+      memberInvitationSchema,
+      memberInvitationDefaults,
+      onSubmit,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.invite-user {
-  background: $input-bg;
-  border-radius: 4px;
-
-  .separator {
-    width: 1px;
-  }
-}
-
-.inputHint {
-  font-size: 11px;
-  color: $light-text;
-}
-</style>

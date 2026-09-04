@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -80,23 +80,9 @@ impl MetaDashboard {
     {
         let backend = db.get_database_backend();
         let sql = match backend {
-            sea_orm::DatabaseBackend::MySql => {
-                r#"
-                    SELECT 
-                        f.id AS folder_id,
-                        SUBSTRING_INDEX(m.key2,'/', -1) AS dashboard_id,
-                        m.value AS value
-                    FROM meta AS m
-                    JOIN folders f ON
-                        SUBSTRING_INDEX(m.key2,'/', 1) = f.folder_id AND
-                        m.key1 = f.org
-                    WHERE m.module = 'dashboard'
-                    ORDER BY m.id ASC
-                "#
-            }
             sea_orm::DatabaseBackend::Postgres => {
                 r#"
-                    SELECT 
+                    SELECT
                         f.id AS folder_id,
                         SPLIT_PART(m.key2, '/', 2) AS dashboard_id,
                         m.value AS value
@@ -108,9 +94,9 @@ impl MetaDashboard {
                     ORDER BY m.id ASC
                 "#
             }
-            sea_orm::DatabaseBackend::Sqlite => {
+            _ => {
                 r#"
-                    SELECT 
+                    SELECT
                         f.id AS folder_id,
                         SUBSTR(m.key2, INSTR(m.key2, '/') + 1) AS dashboard_id,
                         m.value AS value
@@ -232,4 +218,61 @@ mod dashboards {
     pub enum Relation {}
 
     impl ActiveModelBehavior for ActiveModel {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_meta(folder_id: Option<i64>, dashboard_id: &str, value: &str) -> MetaDashboard {
+        MetaDashboard {
+            folder_id,
+            dashboard_id: dashboard_id.to_string(),
+            value: value.to_string(),
+        }
+    }
+
+    const VALID_JSON: &str = r#"{"version":1,"owner":"alice","title":"My Dashboard","created":"2024-01-01T00:00:00+00:00"}"#;
+
+    #[test]
+    fn test_try_from_missing_folder_id_returns_error() {
+        let m = make_meta(None, "dash-1", VALID_JSON);
+        let result = dashboards::ActiveModel::try_from(m);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("folder"));
+    }
+
+    #[test]
+    fn test_try_from_empty_dashboard_id_returns_error() {
+        let m = make_meta(Some(1), "", VALID_JSON);
+        let result = dashboards::ActiveModel::try_from(m);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("missing a dasbhoard ID"));
+    }
+
+    #[test]
+    fn test_try_from_invalid_json_returns_error() {
+        let m = make_meta(Some(1), "dash-1", "not json");
+        let result = dashboards::ActiveModel::try_from(m);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not valid JSON"));
+    }
+
+    #[test]
+    fn test_try_from_non_object_json_returns_error() {
+        let m = make_meta(Some(1), "dash-1", r#"[1,2,3]"#);
+        let result = dashboards::ActiveModel::try_from(m);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("not a JSON object"));
+    }
+
+    #[test]
+    fn test_try_from_valid_succeeds() {
+        let m = make_meta(Some(42), "dash-abc", VALID_JSON);
+        let result = dashboards::ActiveModel::try_from(m);
+        assert!(result.is_ok());
+        let active = result.unwrap();
+        assert_eq!(active.folder_id.unwrap(), 42);
+        assert_eq!(active.dashboard_id.unwrap(), "dash-abc");
+    }
 }

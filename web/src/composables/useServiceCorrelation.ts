@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,25 +14,72 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref, computed } from "vue";
+import { gt } from "@/types/i18n";
 import { useStore } from "vuex";
 import serviceStreamsApi from "@/services/service_streams";
+import settingsApi from "@/services/settings";
 import type {
   ServiceMetadata,
-  SemanticFieldGroup,
+  FieldAlias,
   CorrelationResponse,
   StreamInfo,
 } from "@/services/service_streams";
-import type { TelemetryContext, TelemetryType, CorrelationResult } from "@/utils/telemetryCorrelation";
+import type {
+  TelemetryContext,
+  TelemetryType,
+  CorrelationResult,
+} from "@/utils/telemetryCorrelation";
 import {
   extractSemanticDimensions,
   generateCorrelationQueries,
-  findMatchingService,
+  filterDimensionsForCorrelation,
 } from "@/utils/telemetryCorrelation";
+import {
+  loadIdentityConfig,
+  clearIdentityConfigCache,
+  clearAllIdentityConfigCache,
+} from "@/utils/identityConfig";
+import type { ServiceDetectionConfig } from "@/ts/interfaces/traces/serviceDetection.types";
+import {
+  loadSemanticGroups as loadSemanticGroupsCached,
+  getCachedSemanticGroups,
+  clearSemanticGroupsCache,
+  clearSemanticGroupsCacheForOrg,
+  getSemanticGroupsCacheStatus as readSemanticGroupsCacheStatus,
+  SEMANTIC_GROUPS_CACHE_TTL_MS,
+} from "@/utils/semanticGroupsCache";
 
-// Global cache for semantic groups (shared across all instances)
-// Key: org_identifier, Value: semantic groups
-const semanticGroupsGlobalCache = new Map<string, SemanticFieldGroup[]>();
-const isLoadingSemanticGroupsGlobal = new Map<string, boolean>();
+// ---------------------------------------------------------------------------
+// Key fields config — per-stream-type pinned fields (fields + groups)
+// ---------------------------------------------------------------------------
+
+export interface KeyFieldsSpec {
+  fields: string[];
+  groups: string[];
+  service_detection?: ServiceDetectionConfig;
+}
+export type KeyFieldsConfig = Record<string, KeyFieldsSpec>;
+
+export interface FieldGroupingConfig {
+  prefix_aliases: Record<string, string>;
+  group_labels: Record<string, string>;
+}
+
+interface KeyFieldsCacheEntry {
+  data: KeyFieldsConfig;
+  timestamp: number;
+}
+
+interface FieldGroupingCacheEntry {
+  data: FieldGroupingConfig;
+  timestamp: number;
+}
+
+const keyFieldsGlobalCache = new Map<string, KeyFieldsCacheEntry>();
+const pendingKeyFieldsRequests = new Map<string, Promise<KeyFieldsConfig>>();
+
+const fieldGroupingGlobalCache = new Map<string, FieldGroupingCacheEntry>();
+const pendingFieldGroupingRequests = new Map<string, Promise<FieldGroupingConfig>>();
 
 /**
  * Composable for telemetry correlation using service_streams
@@ -45,48 +92,20 @@ export function useServiceCorrelation() {
   const orgIdentifier = computed(() => store.state.selectedOrganization.identifier);
 
   const error = ref<string | null>(null);
+  // True when the last correlation call completed successfully but matched no
+  // service (backend 200-null). Distinct from `error` so callers can render an
+  // informational empty state instead of a failure (F28).
+  const noMatch = ref(false);
 
   /**
-   * Load semantic field groups (once per organization per session)
+   * Load semantic field groups with TTL-based caching
    * Uses a global cache to avoid redundant API calls across all composable instances
    */
-  async function loadSemanticGroups(): Promise<SemanticFieldGroup[]> {
-    const org = orgIdentifier.value;
-
-    // Check global cache first
-    if (semanticGroupsGlobalCache.has(org)) {
-      const cached = semanticGroupsGlobalCache.get(org)!;
-      if (cached.length > 0) {
-        console.log(`[useServiceCorrelation] Using cached semantic groups for org '${org}' (${cached.length} groups)`);
-        return cached;
-      }
-    }
-
-    // Check if already loading for this org (prevent duplicate requests)
-    if (isLoadingSemanticGroupsGlobal.get(org)) {
-      console.log(`[useServiceCorrelation] Already loading semantic groups for org '${org}', waiting...`);
-      // Wait for the existing request to complete
-      await new Promise(resolve => setTimeout(resolve, 100));
-      return loadSemanticGroups(); // Retry (will hit cache)
-    }
-
-    // Mark as loading
-    isLoadingSemanticGroupsGlobal.set(org, true);
+  async function loadSemanticGroups(): Promise<FieldAlias[]> {
     error.value = null;
-
-    try {
-      console.log(`[useServiceCorrelation] Loading semantic groups for org '${org}'...`);
-      const response = await serviceStreamsApi.getSemanticGroups(org);
-      semanticGroupsGlobalCache.set(org, response.data);
-      console.log(`[useServiceCorrelation] Loaded ${response.data.length} semantic groups for org '${org}'`);
-      return response.data;
-    } catch (err: any) {
-      error.value = `Failed to load semantic groups: ${err.message || err}`;
-      console.error("Error loading semantic groups:", err);
-      return [];
-    } finally {
-      isLoadingSemanticGroupsGlobal.set(org, false);
-    }
+    return await loadSemanticGroupsCached(orgIdentifier.value, (err: any) => {
+      error.value = gt("traces.semanticGroupsLoadFailed", { error: err.message || err });
+    });
   }
 
   /**
@@ -104,38 +123,45 @@ export function useServiceCorrelation() {
     context: TelemetryContext,
     sourceType: TelemetryType,
     timeWindowMinutes: number = 5,
-    currentStream?: string
+    currentStream?: string,
   ): Promise<CorrelationResult | null> {
     error.value = null;
+    noMatch.value = false;
 
     try {
       // Validate inputs
       if (!currentStream) {
-        error.value = "Stream name is required for correlation";
+        error.value = gt("traces.streamNameRequiredForCorrelation");
         return null;
       }
 
-      // Load semantic groups
-      const semanticGroups = await loadSemanticGroups();
+      // Load semantic groups and identity config
+      const [semanticGroups, identityConfig] = await Promise.all([
+        loadSemanticGroups(),
+        loadIdentityConfig(orgIdentifier.value),
+      ]);
 
       if (semanticGroups.length === 0) {
-        error.value = "No semantic groups available";
+        error.value = gt("traces.noSemanticGroupsAvailable");
         return null;
       }
 
       // Extract ALL semantic dimensions from context (stable + unstable)
       // Backend will categorize them into matched_dimensions (stable) and additional_dimensions (unstable)
       // UI will use matched_dimensions with actual values, additional_dimensions with _o2_all wildcard
-      const dimensions = extractSemanticDimensions(context, semanticGroups, false);
+      const allDimensions = extractSemanticDimensions(context, semanticGroups, false);
 
-      console.log("[useServiceCorrelation] Context fields:", Object.keys(context.fields));
-      console.log("[useServiceCorrelation] Extracted dimensions:", dimensions);
-
-      if (Object.keys(dimensions).length === 0) {
-        error.value = "No recognizable dimensions found in context for correlation";
-        console.error("[useServiceCorrelation] No dimensions extracted. Check semantic groups configuration.");
+      if (Object.keys(allDimensions).length === 0) {
+        error.value = gt("traces.noRecognizableDimensionsForCorrelation");
+        console.error(
+          "[useServiceCorrelation] No dimensions extracted. Check semantic groups configuration.",
+        );
         return null;
       }
+
+      // Filter dimensions to only include fields that are used for disambiguation
+      // This matches the backend logic and reduces unnecessary data sent to API
+      const dimensions = filterDimensionsForCorrelation(allDimensions, identityConfig);
 
       // Call the new _correlate API
       const correlationRequest = {
@@ -144,26 +170,20 @@ export function useServiceCorrelation() {
         available_dimensions: dimensions,
       };
 
-      console.log("[useServiceCorrelation] Correlation request:", correlationRequest);
-
       const response = await serviceStreamsApi.correlate(orgIdentifier.value, correlationRequest);
 
       const correlationData: CorrelationResponse | null = response.data;
 
-      // Check if API returned null (no matching service found)
+      // API returned 200-null: a successful call with no matching service.
+      // This is NOT an error — flag it separately so callers show an
+      // informational empty state rather than a failure/retry UI (F28).
       if (!correlationData) {
-        error.value = "No matching service found for this stream with the provided dimensions.";
-        console.warn("[useServiceCorrelation] Correlation API returned null - no matching service found");
+        noMatch.value = true;
+        console.warn(
+          "[useServiceCorrelation] Correlation API returned null - no matching service found",
+        );
         return null;
       }
-
-      console.log("[useServiceCorrelation] Correlation response:", {
-        service_name: correlationData.service_name,
-        matched_dimensions: correlationData.matched_dimensions,
-        metrics_count: correlationData.related_streams.metrics.length,
-        logs_count: correlationData.related_streams.logs.length,
-        traces_count: correlationData.related_streams.traces.length,
-      });
 
       // Convert correlation response to the format expected by the UI
       // Create a "virtual" ServiceMetadata from the correlation result
@@ -189,7 +209,7 @@ export function useServiceCorrelation() {
         sourceType,
         semanticGroups,
         timeWindowMinutes,
-        correlationData
+        correlationData,
       );
 
       return {
@@ -201,13 +221,16 @@ export function useServiceCorrelation() {
     } catch (err: any) {
       // Provide user-friendly error messages
       if (err.response?.status === 403) {
-        error.value = "Service Discovery is not enabled. This is an enterprise feature.";
+        error.value = gt("traces.serviceDiscoveryNotEnabled");
       } else if (err.response?.status === 404) {
-        error.value = "No matching service found for this stream with the provided dimensions.";
+        // The backend signals "no match" with 200-null, never 404 — a genuine
+        // 404 means the endpoint/org is wrong and must not be presented as
+        // "no matching service" (F28).
+        error.value = gt("traces.correlationServiceNotFound");
       } else if (err.message?.includes("host") || err.code === "ERR_NETWORK") {
-        error.value = "Unable to connect to server. Please check if the application is running.";
+        error.value = gt("traces.unableToConnectToServer");
       } else if (!error.value) {
-        error.value = `Correlation failed: ${err.message || err}`;
+        error.value = gt("traces.correlationFailed", { error: err.message || err });
       }
       console.error("Error finding related telemetry:", err);
       return null;
@@ -215,23 +238,30 @@ export function useServiceCorrelation() {
   }
 
   /**
-   * Clear semantic groups cache for current org
-   * Call this when semantic groups are updated in settings
+   * Clear caches for current org
+   * Call this when semantic groups or identity config are updated in settings
    */
   function clearCache() {
     const org = orgIdentifier.value;
-    semanticGroupsGlobalCache.delete(org);
-    console.log(`[useServiceCorrelation] Cleared semantic groups cache for org '${org}'`);
+    clearSemanticGroupsCacheForOrg(org);
+    keyFieldsGlobalCache.delete(org);
+    pendingKeyFieldsRequests.delete(org);
+    fieldGroupingGlobalCache.delete(org);
+    pendingFieldGroupingRequests.delete(org);
+    clearIdentityConfigCache(org);
   }
 
   /**
-   * Clear semantic groups cache for all organizations
+   * Clear all caches for all organizations
    * Use when switching organizations or on logout
    */
   function clearAllCaches() {
-    semanticGroupsGlobalCache.clear();
-    isLoadingSemanticGroupsGlobal.clear();
-    console.log(`[useServiceCorrelation] Cleared all semantic groups caches`);
+    clearSemanticGroupsCache();
+    keyFieldsGlobalCache.clear();
+    pendingKeyFieldsRequests.clear();
+    fieldGroupingGlobalCache.clear();
+    pendingFieldGroupingRequests.clear();
+    clearAllIdentityConfigCache();
   }
 
   /**
@@ -246,14 +276,83 @@ export function useServiceCorrelation() {
     }
   }
 
+  async function loadKeyFields(): Promise<KeyFieldsConfig> {
+    const org = orgIdentifier.value;
+
+    if (keyFieldsGlobalCache.has(org)) {
+      const cached = keyFieldsGlobalCache.get(org)!;
+      if (Date.now() - cached.timestamp < SEMANTIC_GROUPS_CACHE_TTL_MS) {
+        return cached.data;
+      }
+      keyFieldsGlobalCache.delete(org);
+    }
+
+    if (pendingKeyFieldsRequests.has(org)) {
+      return pendingKeyFieldsRequests.get(org)!;
+    }
+
+    const requestPromise = (async (): Promise<KeyFieldsConfig> => {
+      try {
+        const response = await settingsApi.getSetting(org, "key_fields");
+        const data: KeyFieldsConfig = response.data?.setting_value ?? {};
+        keyFieldsGlobalCache.set(org, { data, timestamp: Date.now() });
+        return data;
+      } catch {
+        return {};
+      } finally {
+        pendingKeyFieldsRequests.delete(org);
+      }
+    })();
+
+    pendingKeyFieldsRequests.set(org, requestPromise);
+    return requestPromise;
+  }
+
+  async function loadFieldGrouping(): Promise<FieldGroupingConfig> {
+    const org = orgIdentifier.value;
+    const empty: FieldGroupingConfig = { prefix_aliases: {}, group_labels: {} };
+
+    if (fieldGroupingGlobalCache.has(org)) {
+      const cached = fieldGroupingGlobalCache.get(org)!;
+      if (Date.now() - cached.timestamp < SEMANTIC_GROUPS_CACHE_TTL_MS) {
+        return cached.data;
+      }
+      fieldGroupingGlobalCache.delete(org);
+    }
+
+    if (pendingFieldGroupingRequests.has(org)) {
+      return pendingFieldGroupingRequests.get(org)!;
+    }
+
+    const requestPromise = (async (): Promise<FieldGroupingConfig> => {
+      try {
+        const response = await settingsApi.getSetting(org, "field_grouping");
+        const data: FieldGroupingConfig = response.data?.setting_value ?? empty;
+        fieldGroupingGlobalCache.set(org, { data, timestamp: Date.now() });
+        return data;
+      } catch {
+        return empty;
+      } finally {
+        pendingFieldGroupingRequests.delete(org);
+      }
+    })();
+
+    pendingFieldGroupingRequests.set(org, requestPromise);
+    return requestPromise;
+  }
+
   return {
     // State
     error,
-    semanticGroups: computed(() => semanticGroupsGlobalCache.get(orgIdentifier.value) || []),
+    noMatch,
+    semanticGroups: computed(() => getCachedSemanticGroups(orgIdentifier.value) ?? []),
 
     // Methods
     findRelatedTelemetry,
     loadSemanticGroups,
+    loadKeyFields,
+    loadFieldGrouping,
+    loadIdentityConfig,
     clearCache,
     clearAllCaches,
     isCorrelationAvailable,
@@ -265,6 +364,17 @@ export function useServiceCorrelation() {
  * Useful for logout or org switching
  */
 export function clearSemanticGroupsCaches() {
-  semanticGroupsGlobalCache.clear();
-  isLoadingSemanticGroupsGlobal.clear();
+  clearSemanticGroupsCache();
+  clearAllIdentityConfigCache();
+}
+
+/**
+ * Get semantic groups cache status for debugging purposes
+ * Returns information about cached entries and their ages
+ */
+export function getSemanticGroupsCacheStatus(): Record<
+  string,
+  { age_seconds: number; expired: boolean; groups_count: number }
+> {
+  return readSemanticGroupsCacheStatus();
 }

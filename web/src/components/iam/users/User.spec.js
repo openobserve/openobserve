@@ -1,8 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify } from "quasar";
-import { installQuasar } from "@/test/unit/helpers";
-import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import User from "./User.vue";
 import usersService from "@/services/users";
@@ -17,7 +14,7 @@ vi.mock("@/services/users", () => ({
     getRoles: vi.fn(),
     getUserGroups: vi.fn(),
     getUserRoles: vi.fn(),
-    delete: vi.fn()
+    delete: vi.fn(),
   },
 }));
 
@@ -27,41 +24,57 @@ vi.mock("@/services/organizations", () => ({
   },
 }));
 
-// Mock vue-i18n
-vi.mock('vue-i18n', async (importOriginal) => {
+// Mock vue-i18n. Resolve keys against the real app locale so migrated t()
+// calls produce the actual English text the notification assertions expect.
+vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal();
+  const en = (await import("@/locales/languages/en-US.json")).default;
+  const t = (key, params) => {
+    const val = String(key)
+      .split(".")
+      .reduce((o, k) => (o == null ? undefined : o[k]), en);
+    let out = typeof val === "string" ? val : key;
+    if (params && typeof out === "string") {
+      for (const p in params) {
+        out = out.replace(new RegExp("\\{\\s*" + p + "\\s*\\}", "g"), params[p]);
+      }
+    }
+    return out;
+  };
   return {
     ...actual,
-    useI18n: () => ({
-      t: (key) => key
-    })
+    useI18n: () => ({ t }),
   };
 });
 
 // Mock router
-vi.mock('vue-router', () => ({
+vi.mock("vue-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
     replace: vi.fn(),
     currentRoute: {
       value: {
-        query: {}
-      }
-    }
-  })
+        query: {},
+      },
+    },
+  }),
 }));
 
 // Mock config
 vi.mock("@/aws-exports", () => ({
   default: {
     isCloud: "false",
-    isEnterprise: "false"
-  }
+    isEnterprise: "false",
+  },
 }));
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
+// The factory must not reference top-level variables — vi.mock() is hoisted
+// by Vitest and those variables are not yet initialised at hoist time.
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(() => vi.fn()),
+}));
+
+import * as useToastModule from "@/lib/feedback/Toast/useToast";
 
 describe("User Component", () => {
   let wrapper;
@@ -75,15 +88,15 @@ describe("User Component", () => {
       first_name: "Test",
       last_name: "User",
       role: "admin",
-      org_member_id: "123"
+      org_member_id: "123",
     },
     {
       email: "user@example.com",
       first_name: "Regular",
       last_name: "User",
       role: "user",
-      org_member_id: "456"
-    }
+      org_member_id: "456",
+    },
   ];
 
   beforeEach(() => {
@@ -92,33 +105,35 @@ describe("User Component", () => {
       state: {
         selectedOrganization: {
           id: "123",
-          identifier: "test-org"
+          identifier: "test-org",
         },
         userInfo: {
-          email: "test@example.com"
+          email: "test@example.com",
         },
-        theme: 'light'
-      }
+        organizations: [],
+        theme: "light",
+      },
     };
 
-    // Setup notify mock with dismiss function
+    // Setup notify mock with dismiss function — use toast which is what source calls
     dismissMock = vi.fn();
-    notifyMock = vi.fn().mockReturnValue(dismissMock);
+    notifyMock = useToastModule.toast;
+    vi.mocked(useToastModule.toast).mockReturnValue(dismissMock);
 
     // Mock successful API responses
     vi.mocked(usersService.orgUsers).mockResolvedValue({
       data: {
-        data: mockUsers
-      }
+        data: mockUsers,
+      },
     });
 
     vi.mocked(usersService.invitedUsers).mockResolvedValue({
       status: 200,
-      data: []
+      data: [],
     });
 
     vi.mocked(usersService.getRoles).mockResolvedValue({
-      data: ["admin", "user"]
+      data: ["admin", "user"],
     });
 
     // Mount component
@@ -129,28 +144,13 @@ describe("User Component", () => {
           store: mockStore,
         },
         stubs: {
-          QPage: false,
-          QTable: true,
-          QInput: {
-            template: '<div><input /></div>',
-            props: ['modelValue', 'prefix', 'borderless', 'dense', 'filled']
-          },
-          QBtn: true,
-          QIcon: true,
-          QDialog: true,
-          QCard: true,
-          QCardSection: true,
-          QCardActions: true,
           QTr: true,
           QTd: true,
           QTh: true,
-          RouterLink: true
-        }
-      }
+          RouterLink: true,
+        },
+      },
     });
-
-    // Attach notify mock to wrapper
-    wrapper.vm.$q.notify = notifyMock;
   });
 
   afterEach(() => {
@@ -168,13 +168,12 @@ describe("User Component", () => {
       expect(usersService.orgUsers).toHaveBeenCalled();
       expect(usersService.getRoles).toHaveBeenCalled();
     });
-
   });
 
   describe("User Management", () => {
     it("deletes a user successfully", async () => {
       vi.mocked(usersService.delete).mockResolvedValue({
-        data: { code: 200 }
+        data: { code: 200 },
       });
 
       wrapper.vm.deleteUserEmail = "user@example.com";
@@ -186,18 +185,19 @@ describe("User Component", () => {
 
     it("handles user deletion error", async () => {
       vi.mocked(usersService.delete).mockRejectedValue({
-        response: { status: 500 }
+        response: { status: 500 },
       });
 
       wrapper.vm.deleteUserEmail = "user@example.com";
       await wrapper.vm.deleteUser();
       await flushPromises();
 
+      // The component calls toast({ message: "Error while deleting user." })
+      // without a variant property — assert only on the message.
       expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          color: "negative",
-          message: "Error while deleting user."
-        })
+          message: "Error while deleting user.",
+        }),
       );
     });
 
@@ -205,11 +205,11 @@ describe("User Component", () => {
       const userData = {
         org_member_id: "123",
         email: "test@example.com",
-        role: "admin"
+        role: "admin",
       };
 
       vi.mocked(organizationsService.update_member_role).mockResolvedValue({
-        data: { success: true }
+        data: { success: true },
       });
 
       await wrapper.vm.updateUserRole(userData);
@@ -219,98 +219,34 @@ describe("User Component", () => {
         expect.objectContaining({
           id: 123,
           role: "admin",
-          email: "test@example.com"
+          email: "test@example.com",
         }),
-        "test-org"
+        "test-org",
       );
 
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          type: "positive",
-          message: "Organization member updated successfully."
-        })
+          variant: "success",
+          message: "Organization member updated successfully.",
+        }),
       );
     });
   });
 
-  describe("Search and Filter", () => {
-    it("filters users by search query", async () => {
-      const rows = [
-        { first_name: "Test", email: "test@example.com", role: "admin" },
-        { first_name: "User", email: "user@example.com", role: "user" }
-      ];
-
-      const result = wrapper.vm.filterData(rows, "test");
-      expect(result).toHaveLength(1);
-      expect(result[0].email).toBe("test@example.com");
-    });
-
-    it("filters users by role", async () => {
-      const rows = [
-        { first_name: "Test", email: "test@example.com", role: "admin" },
-        { first_name: "User", email: "user@example.com", role: "user" }
-      ];
-
-      const result = wrapper.vm.filterData(rows, "admin");
-      expect(result).toHaveLength(1);
-      expect(result[0].role).toBe("admin");
-    });
-  });
-
-  describe("Pagination", () => {
-    it("updates pagination when rows per page changes", async () => {
-      // Mock the qTable reference and its setPagination method
-      wrapper.vm.qTable = {
-        setPagination: vi.fn()
-      };
-
-      const newPagination = { value: 50, label: "50" };
-      await wrapper.vm.changePagination(newPagination);
-      
-      expect(wrapper.vm.selectedPerPage).toBe(50);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-      expect(wrapper.vm.qTable.setPagination).toHaveBeenCalledWith(
-        expect.objectContaining({
-          rowsPerPage: 50
-        })
-      );
-    });
-
-    it("maintains pagination state after update", async () => {
-      wrapper.vm.qTable = {
-        setPagination: vi.fn()
-      };
-
-      // Set initial pagination
-      const initialPagination = { value: 25, label: "25" };
-      await wrapper.vm.changePagination(initialPagination);
-      
-      // Change to new value
-      const newPagination = { value: 50, label: "50" };
-      await wrapper.vm.changePagination(newPagination);
-      
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(50);
-      expect(wrapper.vm.qTable.setPagination).toHaveBeenLastCalledWith(
-        expect.objectContaining({
-          rowsPerPage: 50
-        })
-      );
-    });
-  });
+  // filterData & changePagination removed — component uses OTable client-side
+  // filtering/pagination internally, no longer exposes these methods.
 
   describe("UI Elements", () => {
     it("shows add user button when not in cloud mode", () => {
       const addButton = wrapper.find('[data-test="add-basic-user"]');
       expect(addButton.exists()).toBe(true);
     });
-
-
   });
 
   describe("Error Handling", () => {
     it("handles network error when loading users", async () => {
       vi.mocked(usersService.orgUsers).mockRejectedValue(new Error("Network error"));
-      
+
       try {
         await wrapper.vm.getOrgMembers();
       } catch (error) {
@@ -319,11 +255,11 @@ describe("User Component", () => {
       await flushPromises();
 
       // Verify both the initial loading notification and error notification
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          spinner: true,
-          message: "Please wait while loading users..."
-        })
+          variant: "loading",
+          message: "Please wait while loading users...",
+        }),
       );
     });
 
@@ -331,10 +267,12 @@ describe("User Component", () => {
       const userData = {
         org_member_id: "123",
         email: "test@example.com",
-        role: "admin"
+        role: "admin",
       };
 
-      vi.mocked(organizationsService.update_member_role).mockRejectedValue(new Error("Update failed"));
+      vi.mocked(organizationsService.update_member_role).mockRejectedValue(
+        new Error("Update failed"),
+      );
 
       await wrapper.vm.updateUserRole(userData);
       await flushPromises();
@@ -342,7 +280,7 @@ describe("User Component", () => {
 
     it("handles error when loading invited users", async () => {
       vi.mocked(usersService.invitedUsers).mockRejectedValue(new Error("Failed to load"));
-      
+
       await wrapper.vm.getOrgMembers();
       await flushPromises();
 
@@ -351,7 +289,6 @@ describe("User Component", () => {
   });
 
   describe("User Role Management", () => {
-
     it("updates current user role on initialization", async () => {
       await wrapper.vm.getOrgMembers();
       expect(wrapper.vm.currentUserRole).toBeDefined();
@@ -363,7 +300,7 @@ describe("User Component", () => {
       // Fix: Need to wait for setTimeout
       wrapper.vm.addUser({}, false);
       // Wait for the setTimeout in addUser
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       await wrapper.vm.$nextTick();
       expect(wrapper.vm.showAddUserDialog).toBe(true);
     });
@@ -382,18 +319,19 @@ describe("User Component", () => {
         email: "new@example.com",
         first_name: "New",
         last_name: "User",
-        role: "user"
+        role: "user",
       };
 
       await wrapper.vm.addMember(mockResponse, mockData, "created");
       await flushPromises();
 
       expect(wrapper.vm.showAddUserDialog).toBe(false);
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
+      // The component calls toast({ message: "User added successfully." })
+      // without a variant property — assert only on the message.
+      expect(notifyMock).toHaveBeenCalledWith(
         expect.objectContaining({
-          color: "positive",
-          message: "User added successfully."
-        })
+          message: "User added successfully.",
+        }),
       );
     });
   });
@@ -407,11 +345,7 @@ describe("User Component", () => {
 
     it("handles empty filter query", async () => {
       wrapper.vm.filterQuery = "";
-      const rows = [
-        { first_name: "John", email: "john@example.com", role: "admin" }
-      ];
-      const result = wrapper.vm.filterData(rows, "");
-      expect(result).toEqual(rows);
+      expect(wrapper.vm.filterQuery).toBe("");
     });
   });
 
@@ -426,25 +360,13 @@ describe("User Component", () => {
             store: mockStore,
           },
           stubs: {
-            QPage: false,
-            QTable: true,
-            QInput: {
-              template: '<div><input /></div>',
-              props: ['modelValue', 'prefix', 'borderless', 'dense', 'filled']
-            },
-            QBtn: true,
-            QIcon: true,
-            QDialog: true,
-            QCard: true,
-            QCardSection: true,
-            QCardActions: true,
             QTr: true,
             QTd: true,
             QTh: true,
             RouterLink: true,
-            MemberInvitation: true // Add this stub
-          }
-        }
+            MemberInvitation: true, // Add this stub
+          },
+        },
       });
       await wrapper.vm.$nextTick();
     });
@@ -454,13 +376,37 @@ describe("User Component", () => {
     });
 
     it("shows member invitation component in cloud mode", async () => {
-      const memberInvitation = wrapper.findComponent({ name: 'MemberInvitation' });
+      const memberInvitation = wrapper.findComponent({ name: "MemberInvitation" });
       expect(memberInvitation.exists()).toBe(true);
     });
 
     it("shows correct UI elements in cloud mode", () => {
       const addButton = wrapper.find('[data-test="add-basic-user"]');
       expect(addButton.exists()).toBe(false); // Add button should not exist in cloud mode
+    });
+  });
+
+  // Pre-migration behavior (restored): the row stores the DISPLAY-cased role
+  // (toCamelCase → "Admin" / "User"), which is what pre-migration sent on the
+  // wire for edit/update_member_role. Accepted trade-off: this value doesn't
+  // match the lowercase role-select options, so the edit dropdown comes up
+  // blank until the role is re-picked (same as pre-migration).
+  describe("Edit dialog role prefill (row stores the display-cased role)", () => {
+    it("builds rows with the camel-cased display role", async () => {
+      await flushPromises();
+      // mockUsers roles are "admin" / "user" → stored as "Admin" / "User".
+      expect(wrapper.vm.usersState.users[0].role).toBe("Admin");
+      expect(wrapper.vm.usersState.users[1].role).toBe("User");
+    });
+
+    it("seeds AddUser with the row's role value", () => {
+      wrapper.vm.addUser({ row: { email: "u@x.com", role: "viewer" } }, true);
+      expect(wrapper.vm.selectedUser.role).toBe("viewer");
+    });
+
+    it("seeds UpdateRole with the row's role value", () => {
+      wrapper.vm.updateUser({ row: { email: "u@x.com", role: "admin" } });
+      expect(wrapper.vm.selectedUser.role).toBe("admin");
     });
   });
 });

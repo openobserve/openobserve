@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -140,4 +140,14 @@ macro_rules! spawn_pausable_job {
         tokio::time::sleep(tokio::time::Duration::from_secs($interval as u64)).await;
     };
     (@sleep_after, sleep_before, $interval:expr) => {};
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pause_sleep_duration_is_60() {
+        assert_eq!(PAUSE_SLEEP_DURATION, 60);
+    }
 }

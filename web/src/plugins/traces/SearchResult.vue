@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,167 +17,297 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div data-test="traces-search-result" class="col column overflow-hidden">
-    <div data-test="traces-search-result-list" class="search-list tw:w-full">
-      <!-- RED Metrics Dashboard -->
-      <transition
-        enter-active-class="transition-all duration-300 ease-in-out"
-        leave-active-class="transition-all duration-300 ease-in-out"
-        enter-from-class="opacity-0 -translate-y-4 max-h-0"
-        enter-to-class="opacity-100 translate-y-0 max-h-[1000px]"
-        leave-from-class="opacity-100 translate-y-0 max-h-[1000px]"
-        leave-to-class="opacity-0 -translate-y-4 max-h-0"
-      >
-        <TracesMetricsDashboard
-          v-if="searchObj.data.stream.selectedStream.value && searchObj.searchApplied"
-          ref="metricsDashboardRef"
-          :streamName="searchObj.data.stream.selectedStream.value"
-          :timeRange="{
-            startTime: searchObj.data.datetime.startTime,
-            endTime: searchObj.data.datetime.endTime,
-          }"
-          :filter="searchObj.data.editorValue"
-          :streamFields="searchObj.data.stream.selectedStreamFields"
-          :show="
-            searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length
-          "
-          @time-range-selected="onMetricsTimeRangeSelected"
-          @filters-updated="onMetricsFiltersUpdated"
-        />
-      </transition>
-
+  <div data-test="traces-search-result" class="h-full overflow-hidden">
+    <div class="bg-card-glass-bg flex h-full flex-col overflow-hidden">
+      <!-- Section header: title + count badge + insights + pagination -->
       <div
-        data-test="traces-search-result-count"
-        class="text-subtitle1 text-bold q-pt-sm q-px-sm"
-        v-show="
+        v-if="
           searchObj.data.stream.selectedStream.value &&
           !searchObj.data.errorMsg?.trim()?.length &&
-          !searchObj.loading &&
           searchObj.searchApplied
         "
+        ref="sectionHeaderRef"
+        data-test="traces-section-header"
+        class="border-border-default flex h-9 shrink-0 items-center border-b px-[0.4rem]!"
       >
-        {{ searchObj.data.queryResults?.hits?.length || 0 }} Traces
+        <!-- Field panel toggle — same style as logs page -->
+        <OButton
+          variant="outline"
+          size="icon-xs-sq"
+          class="me-1.5 shrink-0"
+          data-test="traces-search-field-list-collapse-btn"
+          @click="toggleFieldList"
+        >
+          <OIcon
+            :name="
+              searchObj.meta.showFields
+                ? 'keyboard-double-arrow-left'
+                : 'keyboard-double-arrow-right'
+            "
+            size="sm"
+          />
+          <OTooltip
+            :content="
+              searchObj.meta.showFields ? t('traces.collapseFields') : t('traces.openFields')
+            "
+            side="bottom"
+          />
+        </OButton>
+
+        <!-- Left: count chips -->
+        <OTag
+          data-test="traces-count-badge"
+          type="logsResultChip"
+          value="neutral"
+          class="me-[0.6rem]"
+          >{{
+            `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === "spans" ? t("traces.spansFound") : t("traces.tracesFound")}`
+          }}</OTag
+        >
+        <OTag
+          v-if="
+            searchObj.data.queryResults.errorCount != null &&
+            searchObj.data.queryResults.errorCount > 0
+          "
+          data-test="traces-error-count-badge"
+          variant="error"
+          :clickable="true"
+          class="rounded-default! px-2.5! py-[0.4rem]! text-xs text-xs!"
+          :class="
+            showErrorOnly
+              ? 'bg-badge-error-solid-bg! text-badge-error-solid-text!'
+              : 'bg-error-tag-bg! text-error-tag-text!'
+          "
+          @click="toggleErrorOnly"
+        >
+          {{
+            `${formatLargeNumber(searchObj.data.queryResults.errorCount)} ${searchObj.meta.searchMode === "traces" ? t("traces.errorTraces") : t("traces.errorSpans")}`
+          }}
+          <OTooltip
+            :content="showErrorOnly ? t('traces.clearErrorFilter') : t('traces.filterByErrors')"
+            side="bottom"
+          />
+          <template #trailing>
+            <OIcon name="filter-alt" size="xs" class="shrink-0" />
+          </template>
+        </OTag>
+
+        <div class="flex-1" />
+
+        <!-- Right: Refresh → Insights → rows per page → pagination (same sequence as logs) -->
+        <div
+          class="border-card-glass-border rounded-default me-1 inline-flex h-6 items-center overflow-hidden border px-1"
+        >
+          <ORefreshButton
+            :last-run-at="searchObj.meta.lastRunAt"
+            :loading="searchObj.loading"
+            :disabled="searchObj.loading"
+            @click="$emit('run-query')"
+          />
+        </div>
+        <!-- Same affordance as the logs table: a long operation name is often
+             the widest thing on a row, and clipping it hides the part that
+             distinguishes one trace or span from the next. -->
+        <OButton
+          variant="outline"
+          size="icon-chip"
+          :active="searchObj.meta.resultGrid.wrapCells"
+          @click.stop="toggleWrapCells"
+          data-test="traces-search-result-wrap-btn"
+        >
+          <OIcon name="wrap-text" size="sm" />
+          <OTooltip :content="t('search.messageWrapContent')" />
+        </OButton>
+        <OButton
+          variant="outline"
+          :size="showActionLabels ? 'chip' : 'icon-chip'"
+          @click.stop="openUnifiedAnalysisDashboard"
+          data-test="insights-button"
+        >
+          <OIcon name="timeline" size="sm" />
+          <span v-if="showActionLabels" class="whitespace-nowrap">{{
+            t("volumeInsights.analyzeBtnLabel")
+          }}</span>
+          <OTooltip v-if="!showActionLabels" :content="t('volumeInsights.analyzeTooltipTraces')" />
+        </OButton>
+        <template v-if="searchObj.meta.resultGrid.showPagination">
+          <OSelect
+            :model-value="searchObj.meta.resultGrid.rowsPerPage"
+            :options="rowsPerPageOptions"
+            class="select-pagination ms-1 me-1 mt-0!"
+            size="sm"
+            :searchable="false"
+            data-test="traces-search-result-records-per-page"
+            @update:model-value="changeRowsPerPage"
+          />
+          <OPagination
+            :disable="searchObj.loading"
+            :model-value="searchObj.data.resultGrid.currentPage + 1"
+            :max="totalPages"
+            class="paginator-section float-right mt-0!"
+            data-test="traces-search-result-pagination"
+            @update:model-value="changePage"
+          />
+        </template>
       </div>
 
-      <div
-        class="full-height flex justify-center items-center tw:pt-[4rem]"
-        v-if="searchObj.loading == true"
-      >
-        <div class="q-pb-lg">
-          <q-spinner-hourglass
-            color="primary"
-            size="40px"
-            style="margin: 0 auto; display: block"
+      <!-- Combined scroll area: RED metrics + trace list scroll together.
+           This is the single vertical scroller — the trace table delegates its
+           virtualizer here (via :scroll-el) so it doesn't add a nested one. -->
+      <div ref="scrollContainerRef" class="bg-card-glass-solid flex-1 overflow-auto">
+        <!-- ════════════════════ RED Metrics Section ════════════════════ -->
+        <transition
+          enter-active-class="transition-all duration-300 ease-in-out"
+          leave-active-class="transition-all duration-300 ease-in-out"
+          enter-from-class="opacity-0 -translate-y-4 max-h-0"
+          enter-to-class="opacity-100 translate-y-0 max-h-250"
+          leave-from-class="opacity-100 translate-y-0 max-h-250"
+          leave-to-class="opacity-0 -translate-y-4 max-h-0"
+        >
+          <TracesMetricsDashboard
+            v-show="searchObj.meta.showHistogram"
+            v-if="searchObj.data.stream.selectedStream.value && searchObj.searchApplied"
+            ref="metricsDashboardRef"
+            :streamName="searchObj.data.stream.selectedStream.value"
+            :timeRange="{
+              startTime: searchObj.data.datetime.startTime,
+              endTime: searchObj.data.datetime.endTime,
+            }"
+            :filter="searchObj.data.editorValue"
+            :streamFields="searchObj.data.stream.selectedStreamFields"
+            :show="searchObj.searchApplied && !searchObj.data.errorMsg?.trim()?.length"
+            @time-range-selected="onMetricsTimeRangeSelected"
+            @filters-updated="onMetricsFiltersUpdated"
           />
-          <span class="text-center">
-            Hold on tight, we're fetching your traces.
-          </span>
-        </div>
+        </transition>
+
+        <TracesSearchResultList
+          :hits="hits"
+          :wrap="searchObj.meta.resultGrid.wrapCells"
+          :scroll-el="scrollContainerRef"
+          :loading="searchObj.loading"
+          :search-performed="searchPerformed"
+          :total="searchObj.data.queryResults.total"
+          :error-count="searchObj.data.queryResults.errorCount"
+          :show-header="
+            !!(
+              searchObj.data.stream.selectedStream.value &&
+              !searchObj.data.errorMsg?.trim()?.length &&
+              searchObj.searchApplied
+            )
+          "
+          :current-page="searchObj.data.resultGrid.currentPage + 1"
+          :rows-per-page="searchObj.meta.resultGrid.rowsPerPage"
+          :show-pagination="searchObj.meta.resultGrid.showPagination"
+          :sort-by="searchObj.meta.resultGrid.sortBy"
+          :sort-order="searchObj.meta.resultGrid.sortOrder"
+          :search-mode="searchObj.meta.searchMode"
+          :ai-enabled="aiEnabled"
+          :stream-doc-time-range="streamDocTimeRange"
+          :query-window-us="queryWindowUs"
+          @row-click="expandRowDetail"
+          @page-change="changePage"
+          @rows-per-page-change="changeRowsPerPage"
+          @sort-change="changeSortBy"
+          @remove-filter="$emit('remove-filter')"
+          @jump-to-stream-data="(from, to) => $emit('jump-to-stream-data', from, to)"
+          @ask-ai="$emit('ask-ai')"
+          @send-to-ai-chat="(v) => $emit('send-to-ai-chat', v)"
+        />
       </div>
-      <div
-        v-else-if="
-          searchObj.data.queryResults.hasOwnProperty('total') &&
-          searchObj.data.queryResults?.hits?.length == 0 &&
-          searchObj.loading == false
-        "
-        class="text-center tw:mx-[10%] tw:my-[40px] tw:text-[20px]"
-      >
-        <q-icon name="info"
-color="primary" size="md" /> No traces found. Please
-        adjust the filters and try again.
-      </div>
-      <q-virtual-scroll
-        v-else
-        v-show="
-          searchObj.data.queryResults.hasOwnProperty('total') &&
-          !!searchObj.data.queryResults?.hits?.length
-        "
-        id="tracesSearchGridComponent"
-        data-test="traces-search-result-virtual-scroll"
-        :items="searchObj.data.queryResults.hits"
-        class="traces-table-container"
-        :class="
-          searchObj.meta.showHistogram
-            ? 'tw:h-[calc(100vh-30rem)]'
-            : 'tw:h-[calc(100vh-14.50rem)]'
-        "
-        v-slot="{ item, index }"
-        :virtual-scroll-item-size="25"
-        :virtual-scroll-sticky-size-start="0"
-        :virtual-scroll-sticky-size-end="0"
-        :virtual-scroll-slice-size="50"
-        :virtual-scroll-slice-ratio-before="10"
-        @virtual-scroll="onScroll"
-      >
-        <q-item data-test="traces-search-result-item" :key="index"
-dense>
-          <TraceBlock
-            :item="item"
-            :index="index"
-            @click="expandRowDetail(item)"
-          />
-        </q-item>
-      </q-virtual-scroll>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineAsyncComponent, defineComponent, ref } from "vue";
-import { useQuasar } from "quasar";
+import {
+  computed,
+  defineAsyncComponent,
+  defineComponent,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+  type PropType,
+} from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
-import { byString } from "../../utils/json";
 import useTraces from "../../composables/useTraces";
-import { getImageURL } from "../../utils/zincutils";
-import TraceBlock from "./TraceBlock.vue";
 import { useRouter } from "vue-router";
+import TracesSearchResultList from "./components/TracesSearchResultList.vue";
+import { formatLargeNumber } from "../../utils/zincutils";
+import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useLocalWrapTracesContent } from "@/utils/storage";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import OPagination from "@/lib/navigation/Pagination/OPagination.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 
 export default defineComponent({
   name: "SearchResult",
   components: {
-    TraceBlock,
+    ORefreshButton,
+    OButton,
+    OTooltip,
+    OSelect,
+    OPagination,
+    OTag,
+    TracesSearchResultList,
     TracesMetricsDashboard: defineAsyncComponent(
       () => import("./metrics/TracesMetricsDashboard.vue"),
     ),
+    OIcon,
+  },
+  props: {
+    showErrorOnly: {
+      type: Boolean,
+      default: false,
+    },
+    aiEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    streamDocTimeRange: {
+      type: Object as PropType<{ min: number; max: number }>,
+      default: undefined,
+    },
+    queryWindowUs: {
+      type: Object as PropType<{ start: number; end: number }>,
+      default: undefined,
+    },
   },
   emits: [
     "update:scroll",
     "update:datetime",
+    "update:sort",
     "remove:searchTerm",
     "search:timeboxed",
     "get:traceDetails",
     "metrics:filters-updated",
+    "run-query",
+    "remove-filter",
+    "jump-to-stream-data",
+    "error-only-toggled",
+    "ask-ai",
+    "send-to-ai-chat",
   ],
   methods: {
+    toggleErrorOnly() {
+      this.$emit("error-only-toggled", !this.showErrorOnly);
+    },
     closeColumn(col: any) {
       const RGIndex = this.searchObj.data.resultGrid.columns.indexOf(col.name);
       this.searchObj.data.resultGrid.columns.splice(RGIndex, 1);
 
-      const SFIndex = this.searchObj.data.stream.selectedFields.indexOf(
-        col.name,
-      );
+      const SFIndex = this.searchObj.data.stream.selectedFields.indexOf(col.name);
 
       this.searchObj.data.stream.selectedFields.splice(SFIndex, 1);
-      this.searchObj.organizationIdentifier =
-        this.store.state.selectedOrganization.identifier;
+      this.searchObj.organizationIdentifier = this.store.state.selectedOrganization.identifier;
       this.updatedLocalLogFilterField();
-    },
-    onScroll(info: any) {
-      if (
-        info.ref.items.length / info.index <= 1.2 &&
-        this.searchObj.loading == false &&
-        this.searchObj.data.resultGrid.currentPage <=
-          this.searchObj.data.queryResults.from /
-            this.searchObj.meta.resultGrid.rowsPerPage &&
-        this.searchObj.data.queryResults.hits.length >
-          this.searchObj.meta.resultGrid.rowsPerPage *
-            this.searchObj.data.resultGrid.currentPage
-      ) {
-        this.searchObj.data.resultGrid.currentPage += 1;
-        this.$emit("update:scroll");
-      }
     },
     onTimeBoxed(obj: any) {
       this.searchObj.meta.showDetailTab = false;
@@ -185,26 +315,76 @@ export default defineComponent({
       this.$emit("search:timeboxed", obj);
     },
   },
-  setup(props, { emit }) {
-    const { t } = useI18n();
+  setup(_props, { emit }) {
+    const { t } = useI18nTyped();
     const store = useStore();
-    const $q = useQuasar();
     const router = useRouter();
 
     const { searchObj, updatedLocalLogFilterField } = useTraces();
-    const totalHeight = ref(0);
 
-    const searchTableRef: any = ref(null);
     const metricsDashboardRef: any = ref(null);
 
+    // Single vertical scroll container for the results area. Delegated to the
+    // trace table's virtualizer (:scroll-el) so the table doesn't render its own
+    // nested scrollbar — fixes the double-scrollbar on the traces page.
+    const scrollContainerRef = ref<HTMLElement | null>(null);
+
+    const sectionHeaderRef = ref<HTMLElement | null>(null);
+    const containerWidth = ref(9999);
+    let headerResizeObserver: ResizeObserver | null = null;
+    const showActionLabels = computed(() => containerWidth.value >= 900);
+
+    onMounted(() => {
+      // Restore the wrap choice: a preference that resets on every reload is
+      // not much of a preference.
+      searchObj.meta.resultGrid.wrapCells = useLocalWrapTracesContent() === "true";
+
+      if (sectionHeaderRef.value) {
+        containerWidth.value = sectionHeaderRef.value.getBoundingClientRect().width;
+        headerResizeObserver = new ResizeObserver((entries) => {
+          containerWidth.value = entries[0]?.contentRect.width ?? 0;
+        });
+        headerResizeObserver.observe(sectionHeaderRef.value);
+      }
+    });
+
+    //Before unmount
+    onBeforeUnmount(() => {
+      headerResizeObserver?.disconnect();
+    });
+
+    watch(
+      () => searchObj.loading,
+      (loading, wasLoading) => {
+        if (wasLoading && !loading && searchObj.searchApplied) {
+          searchObj.meta.lastRunAt = Date.now();
+        }
+      },
+    );
+
     const expandRowDetail = (props: any) => {
+      let from: number;
+      let to: number;
+
+      if (searchObj.meta.searchMode === "spans") {
+        // start_time / end_time are nanoseconds in raw span rows — convert to µs
+        const spanStart = Math.floor((props.start_time || 0) / 1000);
+        const spanEnd = Math.ceil((props.end_time || props.start_time || 0) / 1000);
+        from = spanStart - 60_000_000; // -1 min in µs
+        to = spanEnd + 3_600_000_000; // +1 hr in µs
+      } else {
+        from = props.trace_start_time;
+        to = props.trace_end_time;
+      }
+
       router.push({
         name: "traceDetails",
         query: {
           stream: router.currentRoute.value.query.stream,
           trace_id: props.trace_id,
-          from: props.trace_start_time - 10000000,
-          to: props.trace_end_time + 10000000,
+          ...(searchObj.meta.searchMode === "spans" ? { span_id: props.span_id } : {}),
+          from,
+          to,
           org_identifier: store.state.selectedOrganization.identifier,
         },
       });
@@ -212,28 +392,7 @@ export default defineComponent({
       emit("get:traceDetails", props);
     };
 
-    const getRowIndex = (next: boolean, prev: boolean, oldIndex: number) => {
-      if (next) {
-        return oldIndex + 1;
-      } else {
-        return oldIndex - 1;
-      }
-    };
-
-    const addSearchTerm = (term: string) => {
-      // searchObj.meta.showDetailTab = false;
-      searchObj.data.stream.addToFilter = term;
-    };
-
-    const removeSearchTerm = (term: string) => {
-      emit("remove:searchTerm", term);
-    };
-
-    const onMetricsTimeRangeSelected = (range: {
-      start: number;
-      end: number;
-    }) => {
-      // Update the datetime and trigger a new search
+    const onMetricsTimeRangeSelected = (range: { start: number; end: number }) => {
       emit("update:datetime", {
         start: range.start,
         end: range.end,
@@ -241,7 +400,6 @@ export default defineComponent({
     };
 
     const onMetricsFiltersUpdated = (filters: string[]) => {
-      // Pass filters up to Index.vue to update Query Editor
       emit("metrics:filters-updated", filters);
     };
 
@@ -249,207 +407,134 @@ export default defineComponent({
       metricsDashboardRef?.value?.loadDashboard();
     };
 
+    // -----------------------------------------------------------------------
+    // Pagination
+    // -----------------------------------------------------------------------
+    const hits = computed<any[]>(() => searchObj.data.queryResults?.hits ?? []);
+
+    const searchPerformed = computed(() =>
+      Object.prototype.hasOwnProperty.call(searchObj.data.queryResults, "total"),
+    );
+
+    const rowsPerPageOptions = [10, 25, 50, 100];
+
+    const totalPages = computed(() =>
+      searchObj.data.queryResults.total && searchObj.meta.resultGrid.rowsPerPage
+        ? Math.max(
+            1,
+            Math.ceil(searchObj.data.queryResults.total / searchObj.meta.resultGrid.rowsPerPage),
+          )
+        : 1,
+    );
+
+    function changePage(page: number) {
+      if (searchObj.loading) return;
+      searchObj.data.resultGrid.currentPage = page - 1;
+      emit("update:scroll");
+    }
+
+    function changeRowsPerPage(val: SelectModelValue) {
+      if (searchObj.loading) return;
+      // rowsPerPageOptions are all numbers, so val is always a number here
+      searchObj.meta.resultGrid.rowsPerPage = val as number;
+      searchObj.data.resultGrid.currentPage = 0;
+      emit("update:scroll");
+    }
+
+    function changeSortBy(sortBy: string, sortOrder: "asc" | "desc") {
+      if (searchObj.loading) return;
+      searchObj.meta.resultGrid.sortBy = sortBy;
+      searchObj.meta.resultGrid.sortOrder = sortOrder;
+      searchObj.data.resultGrid.currentPage = 0;
+      emit("update:sort");
+    }
+
+    /** Persisted under its own key: the traces table and the logs table are
+     *  different views, and wrapping one is not a request to wrap the other. */
+    function toggleWrapCells() {
+      searchObj.meta.resultGrid.wrapCells = !searchObj.meta.resultGrid.wrapCells;
+      useLocalWrapTracesContent(searchObj.meta.resultGrid.wrapCells ? "true" : "false");
+    }
+
+    function openUnifiedAnalysisDashboard() {
+      if (metricsDashboardRef.value) {
+        metricsDashboardRef.value.openUnifiedAnalysisDashboard();
+      }
+    }
+
+    const toggleFieldList = () => {
+      searchObj.meta.showFields = !searchObj.meta.showFields;
+    };
+
     return {
       t,
       store,
       searchObj,
       updatedLocalLogFilterField,
-      byString,
-      searchTableRef,
       metricsDashboardRef,
-      addSearchTerm,
-      removeSearchTerm,
+      scrollContainerRef,
+      sectionHeaderRef,
+      showActionLabels,
       expandRowDetail,
-      totalHeight,
-      getImageURL,
-      getRowIndex,
       onMetricsTimeRangeSelected,
       onMetricsFiltersUpdated,
       getDashboardData,
+      hits,
+      searchPerformed,
+      changePage,
+      changeRowsPerPage,
+      changeSortBy,
+      rowsPerPageOptions,
+      totalPages,
+      openUnifiedAnalysisDashboard,
+      toggleWrapCells,
+      toggleFieldList,
+      formatLargeNumber,
     };
   },
 });
 </script>
 
-<style lang="scss" scoped>
-.max-result {
-  width: 170px;
-}
-
-.search-list {
-  width: 100%;
-
-  .my-sticky-header-table {
-    .q-table__top,
-    .q-table__bottom,
-    thead tr:first-child th {
-      /* bg color is important for th; just specify one */
-      background-color: white;
-    }
-
-    thead tr th {
-      position: sticky;
-      z-index: 1;
-    }
-
-    thead tr:first-child th {
-      top: 0;
-    }
-
-    /* this is when the loading indicator appears */
-    &.q-table--loading thead tr:last-child th {
-      /* height of all previous header rows */
-      top: 48px;
-    }
-  }
-
-  .q-table__top {
-    padding-left: 0;
-    padding-top: 0;
-  }
-
-  .q-table thead tr,
-  .q-table tbody td,
-  .q-table th,
-  .q-table td {
-    height: 25px;
-    padding: 0px 5px;
-    font-size: 0.75rem;
-  }
-
-  .q-table__bottom {
-    width: 100%;
-  }
-
-  .q-table__bottom {
-    min-height: 40px;
-    padding-top: 0;
-    padding-bottom: 0;
-  }
-
-  .q-td {
-    overflow: hidden;
-    min-width: 100px;
-
-    .expanded {
-      margin: 0;
-      white-space: pre-wrap;
-      word-wrap: break-word;
-      word-break: break-all;
-    }
-  }
-
-  .highlight {
-    background-color: rgb(255, 213, 0);
-  }
-
-  .table-header {
-    // text-transform: capitalize;
-
-    .table-head-chip {
-      background-color: $accent;
-      padding: 0px;
-
-      .q-chip__content {
-        margin-right: 0.5rem;
-        font-size: 0.75rem;
-        color: $dark;
-      }
-
-      .q-chip__icon--remove {
-        height: 1rem;
-        width: 1rem;
-        opacity: 1;
-        margin: 0;
-
-        &:hover {
-          opacity: 0.7;
-        }
-      }
-
-      .q-table th.sortable {
-        cursor: pointer;
-        text-transform: capitalize;
-        font-weight: bold;
-      }
-    }
-
-    &.isClosable {
-      padding-right: 26px;
-      position: relative;
-
-      .q-table-col-close {
-        transform: translateX(26px);
-        position: absolute;
-        margin-top: 2px;
-        color: grey;
-        transition: transform 0.3s cubic-bezier(0.25, 0.8, 0.5, 1);
-      }
-    }
-
-    .q-table th.sortable {
-      cursor: pointer;
-      text-transform: capitalize;
-      font-weight: bold;
-    }
-  }
-}
-.thead-sticky tr > *,
-.tfoot-sticky tr > * {
-  position: sticky;
-  opacity: 1;
-  z-index: 1;
-  background: #f5f5f5;
-}
-
-.q-table--dark .thead-sticky tr > *,
-.q-table--dark .tfoot-sticky tr > * {
-  background: #565656;
-}
-.thead-sticky tr:last-child > * {
-  top: 0;
-}
-
-.tfoot-sticky tr:first-child > * {
-  bottom: 0;
-}
-
-.field_list {
-  padding: 0px;
-  margin-bottom: 0.125rem;
-  position: relative;
+<style scoped>
+/* keep(lib-override:opagination): reaches into the OPagination/OSelect-rendered
+   button DOM to compress the pagination controls into the results toolbar. */
+.paginator-section {
+  line-height: 1.5rem;
+  max-height: 2rem;
+  border-radius: 0.5rem;
+  padding: 0.125rem 0.25rem;
+  background: color-mix(in srgb, var(--color-white) 10%, transparent);
+  backdrop-filter: blur(0.625rem);
+  margin-top: 0;
   overflow: visible;
-  cursor: default;
+}
 
-  .field_overlay {
-    position: absolute;
-    height: 100%;
-    right: 0;
-    top: 0;
-    background-color: #ffffff;
-    border-radius: 6px;
-    padding: 0 6px;
-    visibility: hidden;
-    display: flex;
-    align-items: center;
-    transition: all 0.3s linear;
+.paginator-section :deep(.o-pagination__btn) {
+  padding: 0.125rem 0.25rem !important;
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  min-width: 1.5rem !important;
+  font-size: var(--text-xs) !important;
+  border-radius: 0.25rem !important;
+  line-height: 1rem !important;
+}
 
-    .q-icon {
-      cursor: pointer;
-      opacity: 0;
-      transition: all 0.3s linear;
-      margin: 0 1px;
-    }
-  }
+.paginator-section :deep(.o-pagination__btn svg) {
+  width: 1rem !important;
+  height: 1rem !important;
+}
 
-  &:hover {
-    .field_overlay {
-      visibility: visible;
+.select-pagination {
+  position: relative;
+  width: 4rem !important;
+  height: 1.5rem !important;
+  margin-top: 0;
+}
 
-      .q-icon {
-        opacity: 1;
-      }
-    }
-  }
+.select-pagination :deep(button) {
+  height: 1.5rem !important;
+  min-height: 1.5rem !important;
+  font-size: var(--text-xs) !important;
+  padding-inline: 0.5rem !important;
 }
 </style>

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,6 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import http from "./http";
 
 const auth = {
@@ -28,7 +27,7 @@ const auth = {
   refresh_token: async () => {
     const res = await http().get("/config/dex_refresh");
     return res.data;
-  }
+  },
 };
 
 export default auth;

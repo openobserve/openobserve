@@ -14,8 +14,13 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { ref, computed, Ref } from "vue";
+import type { TranslateFn } from "@/types/i18n";
 import { useStore } from "vuex";
 import searchService from "@/services/search";
+import useStreams from "@/composables/useStreams";
+import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
+import { traceQueryWindow } from "@/utils/rum/traceWindow";
+import { normalizeTraceId, rumFieldEqualsAnySql, traceIdLookupVariants } from "@/utils/rum/fields";
 
 export interface TraceCorrelationData {
   trace_id: string;
@@ -31,11 +36,32 @@ export interface TraceCorrelationData {
   } | null;
 }
 
-export default function useTraceCorrelation(traceId: Ref<string>) {
+export interface CorrelationTimeRange {
+  /** µs */
+  startTime: number;
+  /** µs */
+  endTime: number;
+}
+
+export default function useTraceCorrelation(
+  traceId: Ref<string>,
+  t: TranslateFn,
+  timeRange?: Ref<CorrelationTimeRange | null>,
+) {
   const store = useStore();
+  const { getStream } = useStreams(t);
+  const { resolveTraceLocation, cancel: cancelTracesStream } = useCorrelatedTracesStream(t);
   const correlationData = ref<TraceCorrelationData | null>(null);
   const isLoading = ref(false);
   const error = ref<Error | null>(null);
+
+  // Callers correlating a specific event (e.g. an error) pass its time
+  // range; without one we fall back to the trailing hour.
+  const effectiveRange = (): CorrelationTimeRange =>
+    timeRange?.value ?? {
+      startTime: Date.now() * 1000 - 3600000000,
+      endTime: Date.now() * 1000,
+    };
 
   const hasBackendTrace = computed(() => {
     return correlationData.value?.has_backend_trace ?? false;
@@ -63,12 +89,34 @@ export default function useTraceCorrelation(traceId: Ref<string>) {
     error.value = null;
 
     try {
+      const range = effectiveRange();
+
+      // The trace-id column exists under two namespaces (`_o2_` on newer SDKs, `_oo_`
+      // on older ones and on everything already ingested). Ask the schema which are
+      // present: referencing a column the stream lacks fails the whole query, so a
+      // hardcoded name would break correlation for one SDK or the other. The id is
+      // matched in both its padded canonical form and the zero-stripped form SDK
+      // 0.4.x stored; non-hex ids fall back to an exact match.
+      const sanitized = String(traceId.value).replace(/'/g, "''");
+      const canonicalTraceId = normalizeTraceId(traceId.value) || sanitized;
+      const idVariants = traceIdLookupVariants(traceId.value);
+      const rumStream = await getStream("_rumdata", "logs", true);
+      const traceIdPredicate = rumFieldEqualsAnySql(
+        rumStream?.schema,
+        "trace_id",
+        idVariants.length ? idVariants : [sanitized],
+      );
+      if (!traceIdPredicate) {
+        correlationData.value = null;
+        return;
+      }
+
       // Query RUM data for this trace ID
       const rumQuery = {
         query: {
-          sql: `select * from _rumdata where "_oo.trace_id" = '${traceId.value}' order by ${store.state.zoConfig.timestamp_column} desc`,
-          start_time: Date.now() * 1000 - 3600000000, // Last hour in microseconds
-          end_time: Date.now() * 1000,
+          sql: `select * from _rumdata where ${traceIdPredicate} order by ${store.state.zoConfig.timestamp_column} desc`,
+          start_time: range.startTime,
+          end_time: range.endTime,
           from: 0,
           size: 100,
         },
@@ -85,18 +133,25 @@ export default function useTraceCorrelation(traceId: Ref<string>) {
 
       const rumEvents = rumResponse.data.hits || [];
 
-      // Try to query backend trace data
-      // Note: This assumes traces are stored in a stream like "_traces" or similar
-      // Adjust the stream name based on your actual trace storage
+      // Try to query backend trace data from whichever traces stream actually
+      // contains this trace (discovered + cached; falls back to the default
+      // stream), using the canonical padded id — the traces stream always
+      // stores the full 32-char form.
       let backendSpans: any[] = [];
       let hasTrace = false;
+
+      const location = await resolveTraceLocation(canonicalTraceId, range.startTime, range.endTime);
+      const tracesStream = location.stream;
+      // Spans can start before the RUM event and outlive it, so query the
+      // trace's own range where the index knew it.
+      const traceWindow = traceQueryWindow(location.range, range.startTime, range.endTime);
 
       try {
         const traceQuery = {
           query: {
-            sql: `select * from _traces where trace_id = '${traceId.value}' order by start_time`,
-            start_time: Date.now() * 1000 - 3600000000,
-            end_time: Date.now() * 1000,
+            sql: `select * from "${tracesStream}" where trace_id = '${canonicalTraceId}' order by start_time`,
+            start_time: traceWindow.startTime,
+            end_time: traceWindow.endTime,
             from: 0,
             size: 100,
           },
@@ -106,7 +161,7 @@ export default function useTraceCorrelation(traceId: Ref<string>) {
           {
             org_identifier: store.state.selectedOrganization.identifier,
             query: traceQuery,
-            page_type: "logs",
+            page_type: "traces",
           },
           "APM",
         );
@@ -143,7 +198,7 @@ export default function useTraceCorrelation(traceId: Ref<string>) {
       }
 
       correlationData.value = {
-        trace_id: traceId.value,
+        trace_id: canonicalTraceId,
         session_id: rumEvents[0]?.session_id || null,
         rum_events: rumEvents,
         backend_spans: backendSpans,
@@ -174,5 +229,6 @@ export default function useTraceCorrelation(traceId: Ref<string>) {
     performanceData,
     fetchCorrelation,
     reset,
+    cancelTracesStream,
   };
 }

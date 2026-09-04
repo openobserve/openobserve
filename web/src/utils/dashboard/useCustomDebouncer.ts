@@ -5,6 +5,7 @@ import {
   onActivated,
   onMounted,
   onBeforeUnmount,
+  getCurrentInstance,
 } from "vue";
 
 /**
@@ -58,30 +59,31 @@ export const useCustomDebouncer = (initialValue: any, delay: any) => {
     }, delay);
   };
 
-  // clear existing timeout onDeactivated
-  onDeactivated(() => {
-    resetTimeout();
-    isComponentActive.value = false;
-  });
+  // Only register lifecycle hooks when in a component context
+  if (getCurrentInstance()) {
+    onDeactivated(() => {
+      resetTimeout();
+      isComponentActive.value = false;
+    });
 
-  onActivated(() => {
-    isComponentActive.value = true;
-  });
+    onActivated(() => {
+      isComponentActive.value = true;
+    });
 
-  onMounted(() => {
-    isComponentActive.value = true;
-  });
+    onMounted(() => {
+      isComponentActive.value = true;
+    });
 
-  onBeforeUnmount(() => {
-    resetTimeout();
-    isComponentActive.value = false;
-  });
+    onBeforeUnmount(() => {
+      resetTimeout();
+      isComponentActive.value = false;
+    });
 
-  // clear existing timeout on unmount
-  onUnmounted(() => {
-    resetTimeout();
-    isComponentActive.value = false;
-  });
+    onUnmounted(() => {
+      resetTimeout();
+      isComponentActive.value = false;
+    });
+  }
 
   return { valueRef, setImmediateValue, setDebounceValue };
 };

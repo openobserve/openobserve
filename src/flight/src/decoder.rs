@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -230,6 +230,7 @@ mod tests {
             file_list_took: 25,
             aggs_cache_ratio: 90,
             peak_memory_usage: 1024000,
+            wait_in_queue: 0,
         };
         let custom_message = CustomMessage::ScanStats(scan_stats);
         let metadata = serde_json::to_string(&custom_message).unwrap();
@@ -264,6 +265,7 @@ mod tests {
             file_list_took: 25,
             aggs_cache_ratio: 90,
             peak_memory_usage: 1024000,
+            wait_in_queue: 0,
         };
         let custom_message = CustomMessage::ScanStats(scan_stats);
 

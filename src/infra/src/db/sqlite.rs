@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,13 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{collections::HashSet, str::FromStr, sync::Arc, time::Duration};
+use std::{
+    collections::HashSet,
+    str::FromStr,
+    sync::{Arc, LazyLock as Lazy},
+    time::Duration,
+};
 
 use async_trait::async_trait;
 use bytes::Bytes;
 use config::{FxIndexMap, cluster, utils::util::zero_or};
 use hashbrown::HashMap;
-use once_cell::sync::Lazy;
 use sqlx::{
     Pool, Sqlite,
     sqlite::{
@@ -27,7 +31,7 @@ use sqlx::{
         SqliteSynchronous,
     },
 };
-use tokio::sync::{Mutex, OnceCell, RwLock, mpsc};
+use tokio::sync::{OnceCell, RwLock, mpsc};
 
 use super::{DBIndex, IndexStatement};
 use crate::{
@@ -35,9 +39,9 @@ use crate::{
     errors::*,
 };
 
-pub static CLIENT_RO: Lazy<Pool<Sqlite>> = Lazy::new(connect_ro);
-pub static CLIENT_RW: Lazy<Arc<Mutex<Pool<Sqlite>>>> =
-    Lazy::new(|| Arc::new(Mutex::new(connect_rw())));
+pub(crate) static CLIENT_RO: Lazy<Pool<Sqlite>> = Lazy::new(connect_ro);
+/// Holds a single connection, so every writer serializes on it.
+pub(crate) static CLIENT_RW: Lazy<Pool<Sqlite>> = Lazy::new(connect_rw);
 static INDICES: OnceCell<HashSet<DBIndex>> = OnceCell::const_new();
 
 pub static CHANNEL: Lazy<SqliteDbChannel> = Lazy::new(SqliteDbChannel::new);
@@ -68,9 +72,12 @@ fn connect_rw() -> Pool<Sqlite> {
         .busy_timeout(Duration::from_secs(acquire_timeout))
         .create_if_missing(true);
 
+    // SQLite has one writer anyway. A second write connection only lets a
+    // deferred transaction upgrade onto a moved snapshot, which fails as
+    // SQLITE_BUSY_SNAPSHOT (517) without ever consulting busy_timeout.
     SqlitePoolOptions::new()
-        .min_connections(cfg.limit.sql_db_connections_min)
-        .max_connections(cfg.limit.sql_db_connections_max)
+        .min_connections(1)
+        .max_connections(1)
         .acquire_timeout(Duration::from_secs(acquire_timeout))
         .idle_timeout(Some(Duration::from_secs(idle_timeout)))
         .max_lifetime(Some(Duration::from_secs(max_lifetime)))
@@ -224,10 +231,14 @@ impl super::Db for SqliteDb {
     async fn get(&self, key: &str) -> Result<Bytes> {
         let (module, key1, key2) = super::parse_key(key);
         let pool = CLIENT_RO.clone();
-        let query = format!(
-            "SELECT value FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}' ORDER BY start_dt DESC;"
-        );
-        let value: String = match sqlx::query_scalar(&query).fetch_one(&pool).await {
+        let query = "SELECT value FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 ORDER BY start_dt DESC;";
+        let value: String = match sqlx::query_scalar(query)
+            .bind(&module)
+            .bind(&key1)
+            .bind(&key2)
+            .fetch_one(&pool)
+            .await
+        {
             Ok(v) => v,
             Err(e) => {
                 if let sqlx::Error::RowNotFound = e {
@@ -253,7 +264,6 @@ impl super::Db for SqliteDb {
         let (module, key1, key2) = super::parse_key(key);
         let local_start_dt = start_dt.unwrap_or_default();
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
         if let Err(e) = sqlx::query(
             r#"INSERT OR IGNORE INTO meta (module, key1, key2, start_dt, value) VALUES ($1, $2, $3, $4, '');"#
@@ -328,7 +338,6 @@ impl super::Db for SqliteDb {
     ) -> Result<()> {
         let (module, key1, key2) = super::parse_key(key);
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
         let mut need_watch_dt = 0;
         let row = if let Some(start_dt) = start_dt {
@@ -517,54 +526,116 @@ impl super::Db for SqliteDb {
         }
 
         let (module, key1, key2) = super::parse_key(key);
-        // Escape ' (single quote) character with ''
-        let (key1, key2) = (key1.replace("'", "''"), key2.replace("'", "''"));
-        let sql = if with_prefix {
+        let client = CLIENT_RW.clone();
+
+        if with_prefix {
             if key1.is_empty() {
-                format!(r#"DELETE FROM meta WHERE module = '{module}';"#)
+                // module = $1 [, start_dt = $2]
+                if let Some(dt) = start_dt {
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND start_dt = $2")
+                        .bind(&module)
+                        .bind(dt)
+                        .execute(&client)
+                        .await?;
+                } else {
+                    sqlx::query("DELETE FROM meta WHERE module = $1")
+                        .bind(&module)
+                        .execute(&client)
+                        .await?;
+                }
             } else if key2.is_empty() {
-                format!(r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}';"#)
+                // module = $1, key1 = $2 [, start_dt = $3]
+                if let Some(dt) = start_dt {
+                    sqlx::query(
+                        "DELETE FROM meta WHERE module = $1 AND key1 = $2 AND start_dt = $3",
+                    )
+                    .bind(&module)
+                    .bind(&key1)
+                    .bind(dt)
+                    .execute(&client)
+                    .await?;
+                } else {
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2")
+                        .bind(&module)
+                        .bind(&key1)
+                        .execute(&client)
+                        .await?;
+                }
             } else {
-                format!(
-                    r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND (key2 = '{key2}' OR key2 LIKE '{key2}/%');"#
-                )
+                // module = $1, key1 = $2, key2 = $3, key2/% = $4 [, start_dt = $5]
+                if let Some(dt) = start_dt {
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4) AND start_dt = $5")
+                        .bind(&module)
+                        .bind(&key1)
+                        .bind(&key2)
+                        .bind(format!("{}/%", key2))
+                        .bind(dt)
+                        .execute(&client)
+                        .await?;
+                } else {
+                    sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND (key2 = $3 OR key2 LIKE $4)")
+                        .bind(&module)
+                        .bind(&key1)
+                        .bind(&key2)
+                        .bind(format!("{}/%", key2))
+                        .execute(&client)
+                        .await?;
+                }
             }
         } else {
-            format!(
-                r#"DELETE FROM meta WHERE module = '{module}' AND key1 = '{key1}' AND key2 = '{key2}';"#
-            )
-        };
-
-        let sql = if let Some(start_dt) = start_dt {
-            sql.replace(';', &format!(" AND start_dt = {start_dt};"))
-        } else {
-            sql
-        };
-
-        let client = CLIENT_RW.clone();
-        let client = client.lock().await;
-        sqlx::query(&sql).execute(&*client).await?;
+            // module = $1, key1 = $2, key2 = $3 [, start_dt = $4]
+            if let Some(dt) = start_dt {
+                sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3 AND start_dt = $4")
+                    .bind(&module)
+                    .bind(&key1)
+                    .bind(&key2)
+                    .bind(dt)
+                    .execute(&client)
+                    .await?;
+            } else {
+                sqlx::query("DELETE FROM meta WHERE module = $1 AND key1 = $2 AND key2 = $3")
+                    .bind(&module)
+                    .bind(&key1)
+                    .bind(&key2)
+                    .execute(&client)
+                    .await?;
+            }
+        }
         Ok(())
     }
 
     async fn list(&self, prefix: &str) -> Result<HashMap<String, Bytes>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
+        let mut sql =
+            "SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1".to_string();
+        let mut params = Vec::new();
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            sql.push_str(" AND module = $1");
+            params.push(module);
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+            params.push(key1);
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            sql.push_str(&format!(
+                " AND (key2 = ${} OR key2 LIKE ${})",
+                params.len() + 1,
+                params.len() + 2
+            ));
+            let key2_prefix = format!("{}/%", key2);
+            params.push(key2);
+            params.push(key2_prefix);
         }
-        sql = format!("{sql} ORDER BY start_dt ASC");
+        sql.push_str(" ORDER BY start_dt ASC");
 
         let pool = CLIENT_RO.clone();
-        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        for p in params {
+            query = query.bind(p);
+        }
+        let ret = query.fetch_all(&pool).await?;
         Ok(ret
             .into_iter()
             .map(|r| {
@@ -578,22 +649,36 @@ impl super::Db for SqliteDb {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta".to_string();
+        let mut sql =
+            "SELECT id, module, key1, key2, start_dt, '' AS value FROM meta WHERE 1=1".to_string();
+        let mut params = Vec::new();
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            sql.push_str(" AND module = $1");
+            params.push(module);
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+            params.push(key1);
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            sql.push_str(&format!(
+                " AND (key2 = ${} OR key2 LIKE ${})",
+                params.len() + 1,
+                params.len() + 2
+            ));
+            let key2_prefix = format!("{}/%", key2);
+            params.push(key2);
+            params.push(key2_prefix);
         }
 
-        sql = format!("{sql} ORDER BY start_dt ASC");
+        sql.push_str(" ORDER BY start_dt ASC");
         let pool = CLIENT_RO.clone();
-        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        for p in params {
+            query = query.bind(p);
+        }
+        let ret = query.fetch_all(&pool).await?;
         Ok(ret
             .into_iter()
             .map(|r| format!("/{}/{}/{}", r.module, r.key1, r.key2))
@@ -621,24 +706,17 @@ impl super::Db for SqliteDb {
         }
 
         let (min_dt, max_dt) = start_dt.unwrap();
-        let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta".to_string();
-        if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
-        }
-        if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
-        }
-        if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
-        }
-        sql = format!("{sql} AND start_dt >= {min_dt} AND start_dt <= {max_dt}");
-        sql = format!("{sql} ORDER BY start_dt ASC");
+        let (sql, str_params) = build_list_by_start_dt_sql(prefix, min_dt, max_dt);
 
         let pool = CLIENT_RO.clone();
-        let ret = sqlx::query_as::<_, super::MetaRecord>(&sql)
-            .fetch_all(&pool)
-            .await?;
+        let mut query = sqlx::query_as::<_, super::MetaRecord>(&sql);
+        for p in str_params {
+            query = query.bind(p);
+        }
+        // Bind min_dt / max_dt as i64 so SQLite receives them as INTEGER, not TEXT.
+        query = query.bind(min_dt);
+        query = query.bind(max_dt);
+        let ret = query.fetch_all(&pool).await?;
         Ok(ret
             .into_iter()
             .map(|r| (r.start_dt, Bytes::from(r.value)))
@@ -647,19 +725,34 @@ impl super::Db for SqliteDb {
 
     async fn count(&self, prefix: &str) -> Result<i64> {
         let (module, key1, key2) = super::parse_key(prefix);
-        let mut sql = "SELECT COUNT(*) AS num FROM meta".to_string();
+        let mut sql = "SELECT COUNT(*) AS num FROM meta WHERE 1=1".to_string();
+        let mut params = Vec::new();
+
         if !module.is_empty() {
-            sql = format!("{sql} WHERE module = '{module}'");
+            sql.push_str(" AND module = $1");
+            params.push(module);
         }
         if !key1.is_empty() {
-            sql = format!("{sql} AND key1 = '{key1}'");
+            sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+            params.push(key1);
         }
         if !key2.is_empty() {
-            sql = format!("{sql} AND (key2 = '{key2}' OR key2 LIKE '{key2}/%')");
+            sql.push_str(&format!(
+                " AND (key2 = ${} OR key2 LIKE ${})",
+                params.len() + 1,
+                params.len() + 2
+            ));
+            let key2_prefix = format!("{}/%", key2);
+            params.push(key2);
+            params.push(key2_prefix);
         }
 
         let pool = CLIENT_RO.clone();
-        let count: i64 = sqlx::query_scalar(&sql).fetch_one(&pool).await?;
+        let mut query = sqlx::query_scalar::<_, i64>(&sql);
+        for p in params {
+            query = query.bind(p);
+        }
+        let count: i64 = query.fetch_one(&pool).await?;
         Ok(count)
     }
 
@@ -685,7 +778,6 @@ impl super::Db for SqliteDb {
 
 async fn create_table() -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
     // create table
     sqlx::query(
         r#"
@@ -700,7 +792,7 @@ CREATE TABLE IF NOT EXISTS meta
 );
         "#,
     )
-    .execute(&*client)
+    .execute(&client)
     .await?;
     drop(client);
 
@@ -735,7 +827,6 @@ CREATE TABLE IF NOT EXISTS meta
 
 async fn add_start_dt_column() -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
 
     add_column(&client, "meta", "start_dt", "INTEGER NOT NULL DEFAULT 0").await?;
     drop(client);
@@ -754,7 +845,6 @@ async fn add_start_dt_column() -> Result<()> {
 
 async fn create_meta_backup() -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
     let mut tx = client.begin().await?;
     if let Err(e) =
         sqlx::query(r#"CREATE TABLE IF NOT EXISTS meta_backup_20240330 AS SELECT * FROM meta;"#)
@@ -775,7 +865,6 @@ async fn create_meta_backup() -> Result<()> {
 
 pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
     let indices = INDICES.get_or_init(cache_indices).await;
     if indices.contains(&DBIndex {
         name: index.idx_name.into(),
@@ -796,14 +885,13 @@ pub async fn create_index(index: IndexStatement<'_>) -> Result<()> {
         index.table,
         index.fields.join(",")
     );
-    sqlx::query(&sql).execute(&*client).await?;
+    sqlx::query(&sql).execute(&client).await?;
     log::info!("[SQLITE] index {} created successfully", index.idx_name);
     Ok(())
 }
 
 pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     let client = CLIENT_RW.clone();
-    let client = client.lock().await;
     let indices = INDICES.get_or_init(cache_indices).await;
     if !indices.contains(&DBIndex {
         name: idx_name.into(),
@@ -813,7 +901,7 @@ pub async fn delete_index(idx_name: &str, table: &str) -> Result<()> {
     }
     log::info!("[SQLITE] deleting index {idx_name} on table {table}");
     let sql = format!("DROP INDEX IF EXISTS {idx_name};");
-    sqlx::query(&sql).execute(&*client).await?;
+    sqlx::query(&sql).execute(&client).await?;
     log::info!("[SQLITE] index {idx_name} deleted successfully");
     Ok(())
 }
@@ -847,6 +935,56 @@ pub async fn drop_column(client: &Pool<Sqlite>, table: &str, column: &str) -> Re
         sqlx::query(&alter_sql).execute(client).await?;
     }
     Ok(())
+}
+
+/// Builds the SQL string and string-typed bind parameters for `list_values_by_start_dt`.
+///
+/// Returns `(sql, str_params)` where `str_params` contains the string-typed positional
+/// parameters (module / key1 / key2). The caller must then bind `min_dt` and `max_dt`
+/// as `i64` **after** the string params so that the database receives them as INTEGER,
+/// not TEXT.
+///
+/// Keeping this logic in a standalone function makes the SQL generation unit-testable
+/// without requiring a live database connection.
+pub(crate) fn build_list_by_start_dt_sql(
+    prefix: &str,
+    min_dt: i64,
+    max_dt: i64,
+) -> (String, Vec<String>) {
+    let (module, key1, key2) = super::parse_key(prefix);
+    let mut sql = "SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1".to_string();
+    let mut params: Vec<String> = Vec::new();
+
+    if !module.is_empty() {
+        sql.push_str(" AND module = $1");
+        params.push(module);
+    }
+    if !key1.is_empty() {
+        sql.push_str(&format!(" AND key1 = ${}", params.len() + 1));
+        params.push(key1);
+    }
+    if !key2.is_empty() {
+        sql.push_str(&format!(
+            " AND (key2 = ${} OR key2 LIKE ${})",
+            params.len() + 1,
+            params.len() + 2
+        ));
+        let key2_prefix = format!("{key2}/%");
+        params.push(key2);
+        params.push(key2_prefix);
+    }
+    // min_dt / max_dt are intentionally NOT pushed into params here.
+    // The caller binds them as i64 after the string-params loop.
+    let n = params.len();
+    sql.push_str(&format!(
+        " AND start_dt >= ${} AND start_dt <= ${}",
+        n + 1,
+        n + 2
+    ));
+    let _ = (min_dt, max_dt);
+    sql.push_str(" ORDER BY start_dt ASC");
+
+    (sql, params)
 }
 
 #[cfg(test)]
@@ -1138,5 +1276,87 @@ mod tests {
         assert_eq!(module, "module");
         assert_eq!(k1, "key1");
         assert!(k2.starts_with("key2"));
+    }
+
+    // ── build_list_by_start_dt_sql unit tests ─────────────────────────────────
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_full_prefix() {
+        let (sql, params) = build_list_by_start_dt_sql("/module/key1/key2", 100, 200);
+        assert_eq!(params.len(), 4);
+        assert_eq!(params[0], "module");
+        assert_eq!(params[1], "key1");
+        assert_eq!(params[2], "key2");
+        assert_eq!(params[3], "key2/%");
+        assert!(
+            sql.contains("AND module = $1"),
+            "module param missing: {sql}"
+        );
+        assert!(sql.contains("AND key1 = $2"), "key1 param missing: {sql}");
+        assert!(
+            sql.contains("AND (key2 = $3 OR key2 LIKE $4)"),
+            "key2 param missing: {sql}"
+        );
+        assert!(
+            sql.contains("AND start_dt >= $5 AND start_dt <= $6"),
+            "start_dt bounds wrong: {sql}"
+        );
+        assert!(
+            sql.ends_with("ORDER BY start_dt ASC"),
+            "missing ORDER BY: {sql}"
+        );
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_module_only() {
+        let (sql, params) = build_list_by_start_dt_sql("/module", 1, 999);
+        assert_eq!(params.len(), 1);
+        assert_eq!(params[0], "module");
+        assert!(sql.contains("AND module = $1"));
+        assert!(
+            sql.contains("AND start_dt >= $2 AND start_dt <= $3"),
+            "start_dt bounds wrong: {sql}"
+        );
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_module_and_key1() {
+        let (sql, params) = build_list_by_start_dt_sql("/module/key1", 10, 20);
+        assert_eq!(params.len(), 2);
+        assert_eq!(params[0], "module");
+        assert_eq!(params[1], "key1");
+        assert!(sql.contains("AND module = $1"));
+        assert!(sql.contains("AND key1 = $2"));
+        assert!(
+            sql.contains("AND start_dt >= $3 AND start_dt <= $4"),
+            "start_dt bounds wrong: {sql}"
+        );
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_empty_prefix() {
+        let (sql, params) = build_list_by_start_dt_sql("", 0, 9999);
+        assert!(params.is_empty());
+        assert!(
+            sql.contains("AND start_dt >= $1 AND start_dt <= $2"),
+            "start_dt bounds wrong for empty prefix: {sql}"
+        );
+        assert!(sql.contains("WHERE 1=1"));
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_key2_prefix_pattern() {
+        let (sql, params) = build_list_by_start_dt_sql("/m/k1/k2", 0, 0);
+        assert_eq!(params[3], "k2/%");
+        assert!(sql.contains("OR key2 LIKE $4"));
+    }
+
+    #[test]
+    fn test_build_list_by_start_dt_sql_starts_with_base_select() {
+        let (sql, _) = build_list_by_start_dt_sql("/m/k1/k2", 1, 2);
+        assert!(
+            sql.starts_with("SELECT id, module, key1, key2, start_dt, value FROM meta WHERE 1=1"),
+            "unexpected SQL start: {sql}"
+        );
     }
 }

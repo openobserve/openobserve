@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -24,4 +24,39 @@ pub struct ShortenUrlRequest {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema)]
 pub struct ShortenUrlResponse {
     pub short_url: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_shorten_url_request_default_empty() {
+        let req = ShortenUrlRequest::default();
+        assert!(req.original_url.is_empty());
+    }
+
+    #[test]
+    fn test_shorten_url_response_default_empty() {
+        let resp = ShortenUrlResponse::default();
+        assert!(resp.short_url.is_empty());
+    }
+
+    #[test]
+    fn test_shorten_url_request_with_value() {
+        let req = ShortenUrlRequest {
+            original_url: "https://example.com/very/long/path".to_string(),
+        };
+        assert_eq!(req.original_url, "https://example.com/very/long/path");
+    }
+
+    #[test]
+    fn test_shorten_url_response_serde_roundtrip() {
+        let resp = ShortenUrlResponse {
+            short_url: "https://example.com/abc".to_string(),
+        };
+        let json = serde_json::to_string(&resp).unwrap();
+        let back: ShortenUrlResponse = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.short_url, resp.short_url);
+    }
 }

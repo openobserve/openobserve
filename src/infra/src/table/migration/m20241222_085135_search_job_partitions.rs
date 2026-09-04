@@ -82,3 +82,22 @@ enum SearchJobPartitions {
     ResultPath,
     ErrorMessage,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_create_table_contains_search_job_partitions() {
+        let sql = create_table_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains("search_job_partitions"));
+    }
+
+    #[test]
+    fn test_create_table_has_primary_key() {
+        let sql = create_table_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains("pk_search_job_partitions"));
+    }
+}

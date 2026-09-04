@@ -13,7 +13,7 @@
       "panels": [
         {
           "id": "Panel_ID1425310",
-          "type": "line",
+          "type": "scatter",
           "title": "Duration",
           "description": "",
           "config": {
@@ -27,6 +27,12 @@
             "axis_border_show": false,
             "label_option": {
               "rotate": 0
+            },
+            "custom_chart_options": {
+              "tooltip": {
+                "appendToBody": true,
+                "confine": false
+              }
             },
             "show_symbol": false,
             "line_interpolation": "smooth",
@@ -62,11 +68,12 @@
             "table_dynamic_columns": false,
             "color": {
               "mode": "palette-classic-by-series",
-              "fixedColor": [
-                "#53ca53"
-              ],
-              "seriesBy": "last",
-              "colorBySeries": []
+              "colorBySeries": [
+                { "value": "p50 (Median)", "color": "#4caf50" },
+                { "value": "p70", "color": "#cddc39" },
+                { "value": "p95", "color": "#ff9800" },
+                { "value": "p99", "color": "#f44336" }
+              ]
             },
             "trellis": {
               "layout": null,
@@ -78,7 +85,7 @@
           "queryType": "sql",
           "queries": [
             {
-              "query": "SELECT histogram(_timestamp) AS time_bucket, max(duration) AS max_trace_duration, approx_distinct(trace_id) AS max_rate, approx_distinct(trace_id) filter (where span_status = 'ERROR') AS error_rate FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY time_bucket ORDER BY time_bucket ASC",
+              "query": "SELECT histogram(_timestamp) AS x_axis, approx_percentile_cont(duration, 0.50) AS p50, approx_percentile_cont(duration, 0.75) AS p75, approx_percentile_cont(duration, 0.95) AS p95, approx_percentile_cont(duration, 0.99) AS p99 FROM [STREAM_NAME] [WHERE_CLAUSE] GROUP BY x_axis ORDER BY x_axis ASC",
               "vrlFunctionQuery": "",
               "customQuery": true,
               "fields": {
@@ -87,8 +94,8 @@
                 "x": [
                   {
                     "label": "",
-                    "alias": "time_bucket",
-                    "column": "time_bucket",
+                    "alias": "x_axis",
+                    "column": "x_axis",
                     "color": null,
                     "isDerived": true,
                     "havingConditions": [],
@@ -97,10 +104,37 @@
                 ],
                 "y": [
                   {
-                    "label": "",
-                    "alias": "max_trace_duration",
-                    "column": "max_trace_duration",
-                    "color": "#5960b2",
+                    "label": "p50 (Median)",
+                    "alias": "p50",
+                    "column": "p50",
+                    "color": "#4caf50",
+                    "isDerived": true,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true
+                  },
+                  {
+                    "label": "p75",
+                    "alias": "p75",
+                    "column": "p75",
+                    "color": "#cddc39",
+                    "isDerived": true,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true
+                  },
+                  {
+                    "label": "p95",
+                    "alias": "p95",
+                    "column": "p95",
+                    "color": "#ff9800",
+                    "isDerived": true,
+                    "havingConditions": [],
+                    "treatAsNonTimestamp": true
+                  },
+                  {
+                    "label": "p99",
+                    "alias": "p99",
+                    "column": "p99",
+                    "color": "#f44336",
                     "isDerived": true,
                     "havingConditions": [],
                     "treatAsNonTimestamp": true
@@ -129,7 +163,7 @@
             "x": 33,
             "y": 0,
             "w": 15,
-            "h": 7,
+            "h": 4.5,
             "i": 2
           },
           "htmlContent": "",
@@ -152,16 +186,16 @@
             "label_option": {
               "rotate": 0
             },
+            "custom_chart_options": {
+              "tooltip": {
+                "appendToBody": true,
+                "confine": false
+              }
+            },
             "show_symbol": false,
             "line_interpolation": "smooth",
             "legend_width": {
               "unit": "px"
-            },
-            "tooltip": {
-              "trigger": "axis",
-              "confine": true,
-              "appendToBody": true,
-              "renderMode": "html"
             },
             "base_map": {
               "type": "osm"
@@ -191,10 +225,8 @@
             "table_transpose": false,
             "table_dynamic_columns": false,
             "color": {
-              "mode": "palette-classic-by-series",
-              "fixedColor": [
-                "#53ca53"
-              ],
+              "mode": "fixed",
+              "fixedColor": ["#79abfc"],
               "seriesBy": "last",
               "colorBySeries": []
             },
@@ -260,7 +292,7 @@
             "x": 0,
             "y": 0,
             "w": 16,
-            "h": 7,
+            "h": 4.5,
             "i": 3
           },
           "htmlContent": "",
@@ -282,6 +314,12 @@
             "axis_border_show": false,
             "label_option": {
               "rotate": 0
+            },
+            "custom_chart_options": {
+              "tooltip": {
+                "appendToBody": true,
+                "confine": false
+              }
             },
             "show_symbol": true,
             "line_interpolation": "smooth",
@@ -317,9 +355,7 @@
             "table_dynamic_columns": false,
             "color": {
               "mode": "fixed",
-              "fixedColor": [
-                "#ff0000"
-              ],
+              "fixedColor": ["#fc7b7b"],
               "seriesBy": "last",
               "colorBySeries": []
             },
@@ -372,9 +408,7 @@
                   "conditions": [
                     {
                       "type": "condition",
-                      "values": [
-                        "ERROR"
-                      ],
+                      "values": ["ERROR"],
                       "column": "span_status",
                       "operator": "=",
                       "value": "ERROR",
@@ -399,7 +433,7 @@
             "x": 16,
             "y": 0,
             "w": 17,
-            "h": 7,
+            "h": 4.5,
             "i": 1
           },
 

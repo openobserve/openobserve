@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,13 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import { createI18n } from "vue-i18n";
-
-installQuasar();
 
 // ==================== TEST DATA FACTORIES ====================
 
@@ -34,8 +31,7 @@ function createMockI18n() {
       en: {
         alerts: {
           customDestination: "Custom Destination",
-          customDestinationDescription:
-            "Configure a custom webhook destination",
+          customDestinationDescription: "Configure a custom webhook destination",
         },
       },
     },
@@ -189,9 +185,7 @@ describe("PrebuiltDestinationSelector", () => {
     it("should display custom destination description from i18n", () => {
       wrapper = mountComponent();
       const customCard = findCardByType(wrapper, "custom");
-      const description = customCard.find(
-        '[data-test="destination-type-description"]'
-      );
+      const description = customCard.find('[data-test="destination-type-description"]');
 
       expect(description.text()).toBe("Configure a custom webhook destination");
     });
@@ -199,7 +193,7 @@ describe("PrebuiltDestinationSelector", () => {
     it("should render icon for custom destination", () => {
       wrapper = mountComponent();
       const customCard = findCardByType(wrapper, "custom");
-      const icon = customCard.findComponent({ name: "QIcon" });
+      const icon = customCard.findComponent({ name: "OIcon" });
 
       expect(icon.exists()).toBe(true);
       expect(icon.props("name")).toBe("settings");
@@ -229,8 +223,8 @@ describe("PrebuiltDestinationSelector", () => {
       const checkIcon = customCard.find(".check-icon");
 
       expect(checkIcon.exists()).toBe(true);
-      const qIcon = checkIcon.findComponent({ name: "QIcon" });
-      expect(qIcon.props("name")).toBe("check_circle");
+      const qIcon = checkIcon.findComponent({ name: "OIcon" });
+      expect(qIcon.props("name")).toBe("check");
     });
 
     it("should not show check icon on unselected cards", () => {
@@ -240,7 +234,7 @@ describe("PrebuiltDestinationSelector", () => {
       cards.forEach((card) => {
         const typeAttr = card.attributes("data-type");
         if (typeAttr !== "custom") {
-          const checkIcons = card.findAll('[name="check_circle"]');
+          const checkIcons = card.findAll('[name="check-circle"]');
           expect(checkIcons.length).toBe(0);
         }
       });
@@ -333,28 +327,31 @@ describe("PrebuiltDestinationSelector", () => {
     it("should render settings icon for custom destination", () => {
       wrapper = mountComponent();
       const customCard = findCardByType(wrapper, "custom");
-      const icon = customCard.findComponent({ name: "QIcon" });
+      const icon = customCard.findComponent({ name: "OIcon" });
 
       expect(icon.props("name")).toBe("settings");
     });
 
-    it("should render icons with correct size", () => {
+    it("should render icons with a size prop", () => {
       wrapper = mountComponent();
       const customCard = findCardByType(wrapper, "custom");
-      const icon = customCard.findComponent({ name: "QIcon" });
+      const icon = customCard.findComponent({ name: "OIcon" });
 
-      expect(icon.props("size")).toBe("1.5rem");
+      // The OIcon size prop is set to "md" in the template
+      expect(icon.props("size")).toBe("md");
     });
 
     it("should render check icon with positive color when selected", () => {
       wrapper = mountComponent({ modelValue: "custom" });
       const customCard = findCardByType(wrapper, "custom");
       const checkIcon = customCard
-        .findAllComponents({ name: "QIcon" })
-        .find((icon) => icon.props("name") === "check_circle");
+        .findAllComponents({ name: "OIcon" })
+        .find((icon) => icon.props("name") === "check");
 
       expect(checkIcon).toBeDefined();
-      expect(checkIcon?.props("color")).toBe("positive");
+      // OIcon no longer has a `color` prop — color comes from the `.check-icon` parent class
+      const wrapperDiv = checkIcon?.element.parentElement;
+      expect(wrapperDiv?.classList.contains("check-icon")).toBe(true);
     });
   });
 
@@ -390,7 +387,7 @@ describe("PrebuiltDestinationSelector", () => {
       const cards = getAllCards(wrapper);
 
       cards.forEach((card) => {
-        const icon = card.find(".card-icon");
+        const icon = card.find('[data-test="destination-type-icon"]');
         expect(icon.exists()).toBe(true);
       });
     });
@@ -573,9 +570,7 @@ describe("PrebuiltDestinationSelector", () => {
 
       // All cards should be within the grid
       cards.forEach((card) => {
-        expect(card.element.parentElement?.classList.contains("selector-grid")).toBe(
-          true
-        );
+        expect(card.element.parentElement?.classList.contains("selector-grid")).toBe(true);
       });
     });
 

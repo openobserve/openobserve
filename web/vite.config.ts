@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,11 +14,28 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { fileURLToPath, URL } from "node:url";
+import { spawn } from "node:child_process";
 
-import { defineConfig } from "vite";
+import { defineConfig, loadEnv } from "vite";
+
+// Runs `node <scriptPath>` as a child process and resolves when it finishes.
+// We use spawn (not execFileSync/execFile) for two reasons:
+//   - stdio: "inherit" streams the script's logs straight to the terminal so a
+//     slow/failed fetch is visible instead of looking like a silent hang.
+//   - it's async, so awaiting it doesn't block Vite's event loop synchronously.
+// spawn is event-based, so we wrap it in a Promise: resolve on exit code 0,
+// reject otherwise — the rejection propagates out of the async config hook and
+// FAILS the build (this is what makes DS_CONTENT_STRICT actually abort).
+const runNode = (scriptPath: string, env: NodeJS.ProcessEnv): Promise<void> =>
+  new Promise((resolve, reject) => {
+    const child = spawn("node", [scriptPath], { stdio: "inherit", env });
+    child.on("error", reject); // process could not be started at all
+    child.on("close", (code) =>
+      code === 0 ? resolve() : reject(new Error(`fetch-datasource-content exited with ${code}`)),
+    );
+  });
 import vue from "@vitejs/plugin-vue";
 import vueJsx from "@vitejs/plugin-vue-jsx";
-import { quasar, transformAssetUrls } from "@quasar/vite-plugin";
 import nodePolyfills from "rollup-plugin-node-polyfills";
 import { NodeGlobalsPolyfillPlugin } from "@esbuild-plugins/node-globals-polyfill";
 import path from "path";
@@ -29,6 +46,7 @@ import "dotenv/config";
 
 import istanbul from "vite-plugin-istanbul";
 import monacoEditorPlugin from "vite-plugin-monaco-editor";
+import Icons from "unplugin-icons/vite";
 
 // Load environment variables from the appropriate .env file
 if (process.env.NODE_ENV === "production") {
@@ -49,21 +67,33 @@ const enterpriseResolverPlugin = {
     if (source.startsWith("@zo/")) {
       const fileName = source.replace("@zo/", "");
 
-      const enterprisePath = path.resolve(
-        __dirname,
-        `./src/enterprise/${fileName}`,
-      );
+      const enterprisePath = path.resolve(__dirname, `./src/enterprise/${fileName}`);
       const defaultPath = path.resolve(__dirname, `./src/${fileName}`);
 
-      if (
-        process.env.VITE_OPENOBSERVE_CLOUD == "true" &&
-        (await fs.pathExists(enterprisePath))
-      ) {
+      if (process.env.VITE_OPENOBSERVE_CLOUD == "true" && (await fs.pathExists(enterprisePath))) {
         return enterprisePath;
       }
 
       return defaultPath;
     }
+
+    return undefined;
+  },
+};
+
+// The Geist fonts are vendored and get compiled into the OpenObserve binary
+// with the rest of dist/, and the OFL requires its text to travel with them.
+// Vite only emits assets that are imported, so the license is copied explicitly.
+const fontLicensePlugin = {
+  name: "font-license",
+  apply: "build" as const,
+  generateBundle() {
+    const src = path.resolve(__dirname, "src/styles/fonts/OFL.txt");
+    (this as any).emitFile({
+      type: "asset",
+      fileName: "fonts/OFL.txt",
+      source: fs.readFileSync(src, "utf8"),
+    });
   },
 };
 
@@ -82,6 +112,35 @@ function monacoEditorTestResolver() {
   };
 }
 
+// Fetches AI data-source UI markdown from the content repo before Vite starts,
+// so import.meta.glob can bundle it. Covers `vite dev` and every build mode.
+// Builds (CI/prod) force a fresh pull AND fail if it can't be fetched, so we
+// never ship stale or missing content; the dev server stays lenient (uses the
+// cached generated/ dir). Override with DS_CONTENT_STRICT / DS_CONTENT_FORCE.
+// See scripts/fetch-datasource-content.mjs.
+const datasourceContentPlugin = {
+  name: "datasource-content",
+  enforce: "pre" as const,
+  // async so it doesn't block Vite's event loop; the script itself caps each
+  // fetch with a timeout and only retries under DS_CONTENT_STRICT (builds/CI).
+  async config(_config: any, env: { command: string }) {
+    // env.command is "build" (vite build / CI / prod) or "serve" (dev server).
+    const isBuild = env?.command === "build";
+    await runNode(path.resolve(__dirname, "scripts/fetch-datasource-content.mjs"), {
+      // Inherit the parent env (PATH, etc.) so git/node resolve, and so any
+      // DS_CONTENT_* the dev set (REPO/REF/TIMEOUT) flows through to the script.
+      ...process.env,
+      // Policy flags (the `?? ` lets an explicitly-set env var override):
+      //   STRICT: a failed fetch exits non-zero → build fails. On for builds,
+      //   off for dev (dev falls back to cache / the legacy snippet).
+      DS_CONTENT_STRICT: process.env.DS_CONTENT_STRICT ?? (isBuild ? "1" : ""),
+      //   FORCE: re-fetch the latest instead of reusing the cached generated/
+      //   dir. On for builds (always ship fresh), off for dev (fast restarts).
+      DS_CONTENT_FORCE: process.env.DS_CONTENT_FORCE ?? (isBuild ? "1" : ""),
+    });
+  },
+};
+
 // let filePath = path.resolve(process.cwd(), "src");
 // if (process.env.VITE_OPENOBSERVE_CLOUD === "true") {
 // const filePath = path.resolve(process.cwd(), "src/enterprise");
@@ -91,129 +150,202 @@ function monacoEditorTestResolver() {
 // const srcPath = path.resolve(process.cwd(), 'src');
 
 // https://vitejs.dev/config/
-export default defineConfig({
-  define: {
-    __VUE_I18N_FULL_INSTALL__: true,
-    __VUE_I18N_LEGACY_API__: false,
-    __INTLIFY_PROD_DEVTOOLS__: false,
-    __INTLIFY_JIT_COMPILATION__: true,
-    __BUILD_TIME__: buildTime,
-  },
-  server: {
-    port: 8081,
-    // headers: {
-    //   "Content-Security-Policy":
-    //     "default-src 'self'; connect-src 'self' http://localhost:5080;  script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com;img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; block-all-mixed-content;",
-    // },
-  },
-  base: "./",
-  plugins: [
-    vue({
-      template: { transformAssetUrls },
-    }),
-    quasar({
-      sassVariables: fileURLToPath(
-        new URL("src/styles/quasar-variables.sass", import.meta.url),
-      ),
-    }),
-    process.env.VITE_COVERAGE === "true" &&
-      istanbul({
-        include: "src/**/*",
-        exclude: ["node_modules", "test/", "src/**/*.spec.{ts,js}"],
-        extension: [".js", ".ts", ".vue"],
-        requireEnv: false,
-        forceBuildInstrument: true,
-      }),
-    enterpriseResolverPlugin,
-    vueJsx(),
-    (monacoEditorPlugin as any).default({
-      customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
-    }),
-    isTesting && monacoEditorTestResolver(),
-  ].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": fileURLToPath(new URL("./src", import.meta.url)),
-      "@enterprise": fileURLToPath(
-        new URL("./src/enterprise", import.meta.url),
-      ),
-      stream: "rollup-plugin-node-polyfills/polyfills/stream",
-      events: "rollup-plugin-node-polyfills/polyfills/events",
-      assert: "assert",
-      crypto: "crypto-browserify",
-      util: "util",
-      "./runtimeConfig": "./runtimeConfig.browser",
+export default defineConfig(({ mode }) => {
+  const isProd = mode === "production";
+
+  // Feature-group logging: console.log/debug/info('<namespace>', ...) calls
+  // are kept in dev only when their namespace matches VITE_DEBUG_GROUPS
+  // (.env, comma-separated, supports trailing-* wildcards). loadEnv reads
+  // every .env* file. console.error/warn are never filtered or stripped.
+  const allowedGroups = (loadEnv(mode, process.cwd(), "").VITE_DEBUG_GROUPS ?? "")
+    .split(",")
+    .map((g) => g.trim())
+    .filter(Boolean);
+
+  const debugFilterPlugin = {
+    name: "vite-plugin-debug-filter",
+    transform(code: string, id: string) {
+      if (isProd || id.includes("node_modules") || !id.match(/\.(vue|ts|js)$/)) return;
+      return {
+        code: code.replace(
+          /console\.(?:log|debug|info)\(\s*['"`]([^'"`]+)['"`]/g,
+          (match, namespace) => {
+            const isAllowed = allowedGroups.some((group) => {
+              if (group.endsWith("*")) return namespace.startsWith(group.slice(0, -1));
+              return namespace === group || namespace.startsWith(`${group}:`);
+            });
+            // `false &&` instead of commenting out: multi-line calls stay
+            // valid JS, and short-circuiting keeps the args unevaluated.
+            return isAllowed ? match : `false && ${match}`;
+          },
+        ),
+        map: null,
+      };
     },
-  },
-  build: {
-    sourcemap: false,
-    target: "es2020",
-    chunkSizeWarningLimit: 3000,
-    rollupOptions: {
-      plugins: [
-        nodePolyfills() as any,
-        visualizer({
-          open: true,
-          gzipSize: true,
-          brotliSize: true,
+  };
+
+  return {
+    define: {
+      __VUE_I18N_FULL_INSTALL__: true,
+      __VUE_I18N_LEGACY_API__: false,
+      __INTLIFY_PROD_DEVTOOLS__: false,
+      __INTLIFY_JIT_COMPILATION__: true,
+      __BUILD_TIME__: buildTime,
+    },
+    server: {
+      port: 8081,
+      // headers: {
+      //   "Content-Security-Policy":
+      //     "default-src 'self'; connect-src 'self' http://localhost:5080;  script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self' data:;img-src 'self' data:; frame-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; block-all-mixed-content;",
+      // },
+    },
+    base: "./",
+    plugins: [
+      vue(),
+      fontLicensePlugin,
+      debugFilterPlugin,
+      process.env.VITE_COVERAGE === "true" &&
+        istanbul({
+          include: "src/**/*",
+          exclude: ["node_modules", "test/", "src/**/*.spec.{ts,js}"],
+          extension: [".js", ".ts", ".vue"],
+          requireEnv: false,
+          forceBuildInstrument: true,
         }),
-      ],
-      output: {
-        manualChunks: {
-          "o2cs-analytics": ["@rudderstack/analytics-js"],
-          "o2cs-oo-rum": [
-            "@openobserve/browser-logs",
-            "@openobserve/browser-rum",
-          ],
-          "o2cs-date-fns": ["date-fns", "date-fns-tz"],
-          // monaco-editor removed from manualChunks to enable true lazy loading
-          // "monaco-editor": ["monaco-editor"],
-          moment: ["moment", "moment-timezone"],
-          lodash: ["lodash-es"],
-          echarts: [
-            "echarts/core",
-            "echarts/renderers",
-            "echarts/components",
-            "echarts/features",
-            "echarts/charts",
-          ],
-          luxon: ["luxon"],
-          marked: ["marked"],
-          jszip: ["jszip"],
-          leaflet: ["leaflet"],
-          gridstack: ["gridstack"],
-          "flag-icons": ["flag-icons"],
-          "highlight.js": ["highlight.js"],
-        },
-        chunkFileNames: ({ name }) => {
-          if (name.startsWith("o2cs-")) {
-            return `assets/vendor/${name}.[hash].js`;
-          }
-
-          if (name.includes("editor.api")) {
-            return `assets/${name}.v1.js`;
-          }
-
-          if (name.includes("monaco-editor")) {
-            return `assets/${name}.v1.js`;
-          }
-
-          if (name.includes("moment")) {
-            return `assets/${name}.v1.js`;
-          }
-
-          return `assets/${name}.[hash].js`;
-        },
+      enterpriseResolverPlugin,
+      // Register the content fetcher for dev + builds, but NOT under vitest
+      // (tests mock the content/manifest and must stay offline/deterministic).
+      // `false` entries are dropped by the `.filter(Boolean)` at the end.
+      !isTesting && datasourceContentPlugin,
+      Icons({
+        compiler: "vue3",
+        autoInstall: false,
+      }),
+      vueJsx(),
+      !isTesting &&
+        (monacoEditorPlugin as any).default({
+          customDistPath: () => path.resolve(__dirname, "dist/monacoeditorwork"),
+        }),
+      isTesting && monacoEditorTestResolver(),
+    ].filter(Boolean),
+    css: {},
+    resolve: {
+      alias: {
+        "@": fileURLToPath(new URL("./src", import.meta.url)),
+        "@enterprise": fileURLToPath(new URL("./src/enterprise", import.meta.url)),
+        stream: "rollup-plugin-node-polyfills/polyfills/stream",
+        events: "rollup-plugin-node-polyfills/polyfills/events",
+        assert: "assert",
+        crypto: "crypto-browserify",
+        util: "util",
+        "./runtimeConfig": "./runtimeConfig.browser",
       },
     },
-    outDir: path.resolve(__dirname, "dist"),
-  },
-  optimizeDeps: {
-    esbuildOptions: {
-      plugins: [NodeGlobalsPolyfillPlugin({ buffer: true })],
+    build: {
+      sourcemap: false,
       target: "es2020",
+      chunkSizeWarningLimit: 4000,
+      rollupOptions: {
+        plugins: [
+          nodePolyfills() as any,
+          visualizer({
+            // Opt in with ANALYZE=true; every build used to pop the report open.
+            open: process.env.ANALYZE === "true",
+            gzipSize: true,
+            brotliSize: true,
+          }),
+        ],
+        output: {
+          manualChunks: (() => {
+            const byPackage: Record<string, string[]> = {
+              "o2cs-analytics": ["@rudderstack/analytics-js"],
+              "o2cs-oo-rum": ["@openobserve/browser-logs", "@openobserve/browser-rum"],
+              "o2cs-date-fns": ["date-fns", "date-fns-tz"],
+              moment: ["moment", "moment-timezone"],
+              lodash: ["lodash-es"],
+              echarts: [
+                "echarts/core",
+                "echarts/renderers",
+                "echarts/components",
+                "echarts/features",
+                "echarts/charts",
+              ],
+              luxon: ["luxon"],
+              marked: ["marked"],
+              jszip: ["jszip"],
+              leaflet: ["leaflet"],
+              gridstack: ["gridstack"],
+              "highlight.js": ["highlight.js"],
+            };
+
+            return (id: string) => {
+              // Monaco is one chunk, and has to be.
+              //
+              // `loadMonaco()` imports editor.api before editor.all.js because
+              // the api bootstraps the DI container that the feature
+              // contributions register against. Awaiting them in that order
+              // only fixes the order they are FETCHED; what decides the order
+              // their module bodies RUN is how rollup groups them. Left to the
+              // size heuristic, editor.all.js landed in a chunk that also
+              // carried echarts and jszip and got evaluated first, and every
+              // contribution then failed to instantiate:
+              //
+              //   [createInstance] ps depends on UNKNOWN service ISuggestMemories
+              //   [createInstance] an depends on UNKNOWN service actionWidgetService
+              //
+              // The editor still renders and still highlights, so this reads as
+              // "autocomplete stopped working" rather than as a load failure —
+              // getContribution("editor.contrib.suggestController") is simply
+              // null and Ctrl+Space does nothing. Keeping every monaco module in
+              // one chunk keeps its own import order intact.
+              //
+              // Still lazily loaded: nothing in the entry graph imports monaco,
+              // so the chunk is fetched when an editor first mounts.
+              if (id.includes("node_modules/monaco-editor/")) return "monaco-editor";
+
+              for (const [chunk, packages] of Object.entries(byPackage)) {
+                if (packages.some((pkg) => id.includes(`node_modules/${pkg}/`))) {
+                  return chunk;
+                }
+              }
+              return undefined;
+            };
+          })(),
+          chunkFileNames: ({ name }) => {
+            if (name.startsWith("o2cs-")) {
+              return `assets/vendor/${name}.[hash].js`;
+            }
+
+            if (name.includes("editor.api")) {
+              return `assets/${name}.[hash].js`;
+            }
+
+            if (name.includes("monaco-editor")) {
+              return `assets/${name}.[hash].js`;
+            }
+
+            if (name.includes("moment")) {
+              return `assets/${name}.[hash].js`;
+            }
+
+            return `assets/${name}.[hash].js`;
+          },
+        },
+      },
+      outDir: path.resolve(__dirname, "dist"),
     },
-    exclude: [],
-    force: false,
-  },
+    optimizeDeps: {
+      esbuildOptions: {
+        plugins: [NodeGlobalsPolyfillPlugin({ buffer: true })],
+        target: "es2020",
+      },
+      exclude: [],
+      force: false,
+    },
+    esbuild: {
+      // Production hard-drop: dead-code elimination erases all
+      // console.log/debug/info lines (console.error/warn are kept)
+      pure: isProd ? ["console.log", "console.debug", "console.info"] : [],
+    },
+  };
 });

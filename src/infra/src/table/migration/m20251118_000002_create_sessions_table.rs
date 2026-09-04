@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -68,4 +68,23 @@ pub(super) enum Sessions {
     AccessToken,
     CreatedAt,
     UpdatedAt,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_create_table_contains_sessions() {
+        let sql = create_sessions_table_statement().build(SqliteQueryBuilder);
+        assert!(sql.contains("sessions"));
+    }
+
+    #[test]
+    fn test_create_table_if_not_exists() {
+        let sql = create_sessions_table_statement().build(SqliteQueryBuilder);
+        assert!(sql.contains("IF NOT EXISTS"));
+    }
 }

@@ -1,97 +1,134 @@
 <template>
   <div
-    v-if="error || maxQueryRangeWarning || limitNumberOfSeriesWarningMessage || isCachedDataDifferWithCurrentTimeRange || (isPartialData && !isPanelLoading) || (lastTriggeredAt && !viewOnly && !simplifiedPanelView)"
-    class="row items-center no-wrap"
+    v-if="
+      error ||
+      maxQueryRangeWarning ||
+      limitNumberOfSeriesWarningMessage ||
+      sparklineWarning ||
+      xAliasInconsistencyWarning ||
+      isCachedDataDifferWithCurrentTimeRange ||
+      (isPartialData && !isPanelLoading) ||
+      (lastTriggeredAt && !viewOnly && !simplifiedPanelView)
+    "
+    class="flex flex-nowrap items-center"
   >
-    <q-btn
+    <OButton
       v-if="error"
       :key="error"
-      :icon="outlinedWarning"
-      flat
-      size="xs"
-      padding="2px"
+      variant="ghost-warning"
+      size="icon"
+      icon-left="warning"
       data-test="panel-error-data"
-      class="warning"
     >
-      <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-        <div style="white-space: pre-wrap">
-          {{ error }}
-        </div>
-      </q-tooltip>
-    </q-btn>
-    <q-btn
+      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
+        <template #content
+          ><div class="whitespace-pre-wrap">{{ error }}</div></template
+        >
+      </OTooltip>
+    </OButton>
+    <OButton
       v-if="maxQueryRangeWarning"
-      :icon="outlinedWarning"
-      flat
-      size="xs"
-      padding="2px"
+      variant="ghost-warning"
+      size="icon"
+      icon-left="warning"
       data-test="panel-max-duration-warning"
-      class="warning"
     >
-      <q-tooltip anchor="bottom right" self="top right" max-width="220px">
-        <div style="white-space: pre-wrap">
-          {{ maxQueryRangeWarning }}
-        </div>
-      </q-tooltip>
-    </q-btn>
-    <q-btn
+      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
+        <template #content
+          ><div class="whitespace-pre-wrap" data-test="panel-max-duration-warning-content">
+            {{ maxQueryRangeWarning }}
+          </div></template
+        >
+      </OTooltip>
+    </OButton>
+    <OButton
       v-if="limitNumberOfSeriesWarningMessage"
-      :icon="symOutlinedDataInfoAlert"
-      flat
-      size="xs"
-      padding="2px"
+      variant="ghost-warning"
+      size="icon"
       data-test="panel-limit-number-of-series-warning"
-      class="warning"
     >
-      <q-tooltip anchor="bottom right" self="top right">
-        <div style="white-space: pre-wrap">
-          {{ limitNumberOfSeriesWarningMessage }}
-        </div>
-      </q-tooltip>
-    </q-btn>
-    <q-btn
+      <template #icon-left><OIcon name="data-info-alert" size="sm" /></template>
+      <OTooltip side="bottom" align="end" hoverable>
+        <template #content
+          ><div class="whitespace-pre-wrap">{{ limitNumberOfSeriesWarningMessage }}</div></template
+        >
+      </OTooltip>
+    </OButton>
+    <OButton
+      v-if="sparklineWarning"
+      variant="ghost-warning"
+      size="icon"
+      data-test="panel-sparkline-warning"
+    >
+      <template #icon-left><OIcon name="show-chart" size="sm" /></template>
+      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
+        <template #content
+          ><div class="whitespace-pre-wrap" data-test="panel-sparkline-warning-content">
+            {{ sparklineWarning }}
+          </div></template
+        >
+      </OTooltip>
+    </OButton>
+    <OButton
+      v-if="xAliasInconsistencyWarning"
+      variant="ghost-warning"
+      size="icon"
+      icon-left="warning"
+      data-test="panel-x-alias-inconsistency-warning"
+    >
+      <OTooltip side="bottom" align="end" max-width="26.25rem" hoverable>
+        <template #content>
+          <div class="whitespace-pre-wrap">{{ t("dashboard.xAliasInconsistencyWarning") }}</div>
+        </template>
+      </OTooltip>
+    </OButton>
+    <OButton
       v-if="isCachedDataDifferWithCurrentTimeRange"
-      :icon="outlinedRunningWithErrors"
-      flat
-      size="xs"
-      padding="2px"
+      variant="ghost-warning"
+      size="icon"
       data-test="panel-is-cached-data-differ-with-current-time-range-warning"
     >
-      <q-tooltip anchor="bottom right" self="top right">
-        <div style="white-space: pre-wrap">
-          The data shown is cached and is different from the selected time
-          range.
-        </div>
-      </q-tooltip>
-    </q-btn>
-    <q-btn
+      <template #icon-left><OIcon name="running-with-errors" size="sm" /></template>
+      <OTooltip
+        side="bottom"
+        align="end"
+        hoverable
+        :content="t('dashboard.panelErrorButtons.cachedDataDiffers')"
+      />
+    </OButton>
+    <OButton
       v-if="isPartialData && !isPanelLoading"
-      :icon="symOutlinedClockLoader20"
-      flat
-      size="xs"
-      padding="2px"
+      variant="ghost-warning"
+      size="icon"
       data-test="panel-partial-data-warning"
-      class="warning"
     >
-      <q-tooltip anchor="bottom right" self="top right">
-        <div style="white-space: pre-wrap">
-          The data shown is incomplete because the loading was interrupted.
-          Refresh to load complete data.
-        </div>
-      </q-tooltip>
-    </q-btn>
+      <template #icon-left><OIcon name="clock-loader-20" size="sm" /></template>
+      <OTooltip
+        side="bottom"
+        align="end"
+        hoverable
+        :content="t('dashboard.panelErrorButtons.partialData')"
+      />
+    </OButton>
 
     <!-- Universal Last Refreshed Clock Icon and Time -->
-    <span v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView" class="lastRefreshedAt">
-      <span class="lastRefreshedAtIcon">
-        🕑
-        <q-tooltip anchor="bottom right" self="top right">
-          Last Refreshed: <RelativeTime :timestamp="lastTriggeredAt" />
-        </q-tooltip>
+    <span
+      v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView"
+      class="lastRefreshedAt ms-1.25 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap"
+      data-test="panel-last-refreshed-at"
+    >
+      <span class="lastRefreshedAtIcon me-0.5 text-[smaller]">
+        {{ "🕑" }}
+        <OTooltip side="bottom" align="end">
+          <template #content
+            >{{ t("dashboard.panelErrorButtons.lastRefreshed")
+            }}<RelativeTime :timestamp="lastTriggeredAt"
+          /></template>
+        </OTooltip>
       </span>
       <RelativeTime
         :timestamp="lastTriggeredAt"
-        fullTimePrefix="Last Refreshed At: "
+        :fullTimePrefix="t('dashboard.panelErrorButtons.lastRefreshedAt')"
       />
     </span>
   </div>
@@ -99,18 +136,14 @@
 
 <script lang="ts">
 import { defineComponent } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import RelativeTime from "@/components/common/RelativeTime.vue";
-import {
-  outlinedWarning,
-  outlinedRunningWithErrors,
-} from "@quasar/extras/material-icons-outlined";
-import {
-  symOutlinedClockLoader20,
-  symOutlinedDataInfoAlert,
-} from "@quasar/extras/material-symbols-outlined";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "PanelErrorButtons",
-  components: { RelativeTime },
+  components: { RelativeTime, OButton, OIcon, OTooltip },
   props: {
     error: {
       type: String,
@@ -121,6 +154,10 @@ export default defineComponent({
       default: "",
     },
     limitNumberOfSeriesWarningMessage: {
+      type: String,
+      default: "",
+    },
+    sparklineWarning: {
       type: String,
       default: "",
     },
@@ -148,40 +185,16 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    xAliasInconsistencyWarning: {
+      type: Boolean,
+      default: false,
+    },
   },
   setup() {
+    const { t } = useI18nTyped();
     return {
-      outlinedWarning,
-      outlinedRunningWithErrors,
-      symOutlinedClockLoader20,
-      symOutlinedDataInfoAlert,
+      t,
     };
   },
 });
 </script>
-
-<style scoped>
-.warning {
-  color: var(--q-warning);
-}
-.lastRefreshedAt {
-  font-size: smaller;
-  margin-left: 5px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  &::after {
-    content: "";
-  }
-
-  &::before {
-    content: "";
-  }
-
-  & .lastRefreshedAtIcon {
-    font-size: smaller;
-    margin-right: 2px;
-  }
-}
-</style>

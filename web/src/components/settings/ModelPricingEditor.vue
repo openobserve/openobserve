@@ -1,0 +1,1223 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <OPageLayout
+    :back="{
+      label: t('modelPricing.header'),
+      onClick: goBack,
+      dataTest: 'model-pricing-editor-back-btn',
+    }"
+    :title="headerTitle"
+    bleed
+  >
+    <template #title>
+      <span data-test="model-pricing-editor-title">{{ headerTitle }}</span>
+    </template>
+
+    <!-- Form Body -->
+    <OForm :form="form" v-slot="{ isSubmitting }" class="flex min-h-0 flex-1 flex-col">
+      <div class="h-[calc(100vh-10.625rem)] min-h-0 flex-1 overflow-y-auto px-3 py-3">
+        <div class="flex max-w-190 flex-col gap-6">
+          <!-- ── Model Details Card ── -->
+          <div class="border-card-glass-border rounded-default border">
+            <div
+              class="bg-surface-panel border-card-glass-border rounded-t-default flex flex-row items-center justify-between gap-3 border-b px-4 py-2.5"
+            >
+              <div>
+                <OText variant="panel-title" class="text-compact font-semibold">
+                  {{ t("modelPricing.modelDetails") }}
+                </OText>
+                <OText variant="meta" class="text-2xs mt-px block">
+                  {{ t("modelPricing.modelDetailsDesc") }}
+                </OText>
+              </div>
+            </div>
+            <div class="flex flex-row gap-4 px-4 pt-2.5 pb-2">
+              <div class="flex-1">
+                <OFormInput
+                  name="name"
+                  :label="t('modelPricing.modelNameField')"
+                  :placeholder="t('modelPricing.modelNamePlaceholder', { example: raw('GPT-4o') })"
+                  data-test="model-pricing-name-input"
+                >
+                  <template #tooltip>
+                    <OTooltip
+                      side="right"
+                      max-width="18.75rem"
+                      :content="t('modelPricing.modelNameTooltip')"
+                    />
+                  </template>
+                </OFormInput>
+              </div>
+              <div class="flex flex-1 items-end gap-1">
+                <div class="flex-1">
+                  <OFormInput
+                    name="match_pattern"
+                    :label="t('modelPricing.matchPatternField')"
+                    :placeholder="
+                      t('modelPricing.matchPatternPlaceholder', { example: raw('gpt-4.*') })
+                    "
+                    data-test="model-pricing-pattern-input"
+                  >
+                    <template #tooltip>
+                      <OTooltip
+                        side="right"
+                        max-width="18.75rem"
+                        :content="t('modelPricing.matchPatternTooltip')"
+                      />
+                    </template>
+                  </OFormInput>
+                </div>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="text-theme-accent opacity-50 hover:opacity-100"
+                  data-test="model-pricing-pattern-examples-btn"
+                  @click="showExamples = true"
+                >
+                  <OIcon name="lightbulb-outline" size="xs" />
+                  <OTooltip
+                    side="top"
+                    align="end"
+                    :side-offset="4"
+                    :content="t('modelPricing.patternExamplesBtn')"
+                  />
+                </OButton>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pattern Examples Dialog -->
+          <ODialog
+            data-test="model-pricing-editor-examples-dialog"
+            v-model:open="showExamples"
+            size="sm"
+            :title="t('modelPricing.patternExamplesTitle')"
+            :sub-title="t('modelPricing.patternExamplesDesc')"
+          >
+            <div
+              class="examples-table border-card-glass-border rounded-default overflow-hidden border"
+            >
+              <div
+                class="bg-surface-subtle border-card-glass-border text-3xs grid grid-cols-[11.25rem_1fr_auto] gap-3 border-b px-3 py-1.5 font-bold tracking-[0.06em] uppercase opacity-45"
+              >
+                <span>{{ t("modelPricing.patternExamplesModelCol") }}</span>
+                <span>{{ t("modelPricing.patternExamplesPatternCol") }}</span>
+              </div>
+              <div
+                v-for="ex in patternExamples"
+                :key="ex.name"
+                class="border-card-glass-border grid grid-cols-[11.25rem_1fr_auto] items-center gap-3 border-b px-3 py-2 text-xs last:border-b-0"
+              >
+                <OText variant="body-strong" class="text-xs">{{ ex.name }}</OText>
+                <!-- Presentation only. The copy button beside it keeps using
+                     @/utils/clipboard: OCode's own `copyable` is
+                     navigator.clipboard-only, which fails silently on HTTP and
+                     inside reka-ui's focus trap. -->
+                <OCode truncate>{{ ex.match_pattern }}</OCode>
+                <OButton
+                  variant="ghost"
+                  size="icon-xs-sq"
+                  class="opacity-40 hover:opacity-100"
+                  :data-test="`model-pricing-example-copy-btn-${ex.name}`"
+                  @click="copyPattern(ex.match_pattern)"
+                >
+                  <OIcon
+                    :name="copiedPattern === ex.match_pattern ? 'check' : 'content-copy'"
+                    size="xs"
+                    :class="copiedPattern === ex.match_pattern ? 'text-status-positive' : ''"
+                  />
+                  <OTooltip
+                    :side-offset="4"
+                    :content="
+                      copiedPattern === ex.match_pattern
+                        ? t('modelPricing.copied')
+                        : t('modelPricing.copyPattern')
+                    "
+                  />
+                </OButton>
+              </div>
+            </div>
+          </ODialog>
+
+          <!-- ── Pricing Tiers ── -->
+          <div class="border-card-glass-border rounded-default border">
+            <div
+              class="bg-surface-panel border-card-glass-border rounded-t-default flex flex-row items-center justify-between gap-3 border-b px-4 py-2.5"
+            >
+              <div>
+                <OText variant="panel-title" class="text-compact font-semibold">
+                  {{ t("modelPricing.pricingTiers") }}
+                </OText>
+                <OText variant="meta" class="text-2xs mt-px block">
+                  {{ t("modelPricing.pricingTiersDesc") }}
+                </OText>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-3 px-4 pt-2.5 pb-2">
+              <div
+                v-for="(tier, idx) in formTiers"
+                :key="idx"
+                class="border-card-glass-border rounded-default overflow-hidden border"
+              >
+                <!-- Tier Header -->
+                <div
+                  class="bg-surface-panel border-card-glass-border flex items-center justify-between gap-2 border-b px-4 py-2"
+                >
+                  <div class="flex items-center gap-2">
+                    <span
+                      class="tier-name-label shrink-0 text-xs font-medium whitespace-nowrap opacity-50"
+                      >{{ t("modelPricing.tierName") }}</span
+                    >
+                    <OFormInput
+                      :name="`tiers[${idx}].name`"
+                      :placeholder="t('modelPricing.tierNamePlaceholder')"
+                      :data-test="`model-pricing-tier-name-input-${idx}`"
+                    />
+                  </div>
+                  <div class="flex shrink-0 items-center gap-2">
+                    <OButton
+                      v-if="formTiers.length > 1"
+                      variant="outline-destructive"
+                      size="icon"
+                      type="button"
+                      :data-test="`model-pricing-tier-remove-btn-${idx}`"
+                      @click="removeTier(idx)"
+                    >
+                      <OIcon name="delete" size="sm" />
+                    </OButton>
+                  </div>
+                </div>
+
+                <!-- Tier Body -->
+                <div class="tier-body flex flex-col gap-3 p-3 px-4">
+                  <!-- Condition row (non-default tiers only) -->
+                  <div
+                    v-if="idx > 0 && tier.condition"
+                    class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
+                  >
+                    <div class="mb-2 flex items-center justify-between gap-2">
+                      <OText variant="section">
+                        {{ t("modelPricing.applyTierWhen") }}
+                      </OText>
+                      <OButton
+                        variant="ghost"
+                        size="icon-xs-sq"
+                        type="button"
+                        :data-test="`model-pricing-tier-condition-remove-btn-${idx}`"
+                        @click="removeCondition(idx)"
+                      >
+                        <OIcon name="close" size="xs" />
+                        <OTooltip
+                          :side-offset="4"
+                          :content="t('modelPricing.removeUsageCondition')"
+                        />
+                      </OButton>
+                    </div>
+                    <div class="flex flex-nowrap items-end gap-2">
+                      <div class="min-w-32.5 flex-1">
+                        <OFormInput
+                          :name="`tiers[${idx}].condition.usage_key`"
+                          :label="t('modelPricing.usageKeyCol')"
+                          :placeholder="
+                            t('modelPricing.usageKeyPlaceholder', {
+                              example: raw('input'),
+                            })
+                          "
+                          :data-test="`model-pricing-tier-condition-key-input-${idx}`"
+                        />
+                      </div>
+                      <div class="w-22.5 shrink-0">
+                        <OFormSelect
+                          :name="`tiers[${idx}].condition.operator`"
+                          :options="operators"
+                          label-key="label"
+                          value-key="value"
+                          :data-test="`model-pricing-tier-condition-operator-select-${idx}`"
+                        />
+                      </div>
+                      <div class="w-35 shrink-0">
+                        <OFormInput
+                          :name="`tiers[${idx}].condition.value`"
+                          :label="t('modelPricing.threshold')"
+                          type="number"
+                          :data-test="`model-pricing-tier-condition-value-input-${idx}`"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- Recurring UTC time windows (non-default tiers only). Used by
+                       providers that bill peak / off-peak rates, e.g. DeepSeek. -->
+                  <div
+                    v-if="idx > 0 && tierWindows(tier).length"
+                    class="rounded-default bg-surface-panel border-card-glass-border border px-3.5 py-3"
+                  >
+                    <OText variant="section">
+                      {{ t("modelPricing.timeWindows") }}
+                    </OText>
+                    <div class="text-2xs mt-px mb-2 opacity-55">
+                      {{ t("modelPricing.timeWindowsDesc") }}
+                    </div>
+                    <!-- Key by INDEX to match the index-based field names — see the
+                         price-row comment below for why a stable-id key breaks binding. -->
+                    <div v-for="(win, winIdx) in tierWindows(tier)" :key="winIdx" class="py-0.5">
+                      <div class="flex flex-nowrap items-end gap-2">
+                        <div class="w-35 shrink-0">
+                          <OFormTime
+                            :name="`tiers[${idx}].utc_windows[${winIdx}].start`"
+                            :label="t('modelPricing.timeWindowFrom')"
+                            format24
+                            :data-test="`model-pricing-tier-window-start-${idx}-${winIdx}`"
+                          />
+                        </div>
+                        <div class="w-35 shrink-0">
+                          <OFormTime
+                            :name="`tiers[${idx}].utc_windows[${winIdx}].end`"
+                            :label="t('modelPricing.timeWindowTo')"
+                            format24
+                            :data-test="`model-pricing-tier-window-end-${idx}-${winIdx}`"
+                          />
+                        </div>
+                        <div class="flex h-8.5 items-center gap-2">
+                          <OButton
+                            variant="outline-destructive"
+                            size="icon"
+                            type="button"
+                            :data-test="`model-pricing-tier-window-remove-btn-${idx}-${winIdx}`"
+                            @click="removeWindow(idx, winIdx)"
+                          >
+                            <OIcon name="delete" size="sm" />
+                            <OTooltip
+                              :side-offset="4"
+                              :content="t('modelPricing.removeTimeWindow')"
+                            />
+                          </OButton>
+                          <span
+                            v-if="windowWraps(win)"
+                            class="text-2xs whitespace-nowrap opacity-55"
+                            :data-test="`model-pricing-tier-window-wrap-hint-${idx}-${winIdx}`"
+                          >
+                            {{ t("modelPricing.timeWindowWrapsHint") }}
+                          </span>
+                        </div>
+                      </div>
+                      <!-- The same window in the viewer's timezone -->
+                      <div
+                        v-if="windowLocalHint(win)"
+                        class="text-2xs mt-1 opacity-55"
+                        :data-test="`model-pricing-tier-window-local-hint-${idx}-${winIdx}`"
+                      >
+                        {{ t("modelPricing.localTimeHint", { range: windowLocalHint(win) }) }}
+                      </div>
+                    </div>
+                    <!-- Live 24h preview of the hours the tier covers -->
+                    <UtcHoursBar
+                      v-if="parsedTierWindows(tier).length"
+                      class="mt-3"
+                      :windows="parsedTierWindows(tier)"
+                      :data-test="`model-pricing-tier-window-bar-${idx}`"
+                    />
+                  </div>
+
+                  <!-- Add a restriction to a non-default tier -->
+                  <div v-if="idx > 0" class="flex flex-wrap items-center gap-2">
+                    <OButton
+                      v-if="!tier.condition"
+                      variant="outline"
+                      size="sm-action"
+                      type="button"
+                      :data-test="`model-pricing-tier-add-condition-btn-${idx}`"
+                      @click="addCondition(idx)"
+                    >
+                      {{ t("modelPricing.addUsageCondition") }}
+                    </OButton>
+                    <OButton
+                      variant="outline"
+                      size="sm-action"
+                      type="button"
+                      :data-test="`model-pricing-tier-add-window-btn-${idx}`"
+                      @click="addWindow(idx)"
+                    >
+                      {{ t("modelPricing.addTimeWindow") }}
+                    </OButton>
+                  </div>
+
+                  <!-- Quick Setup -->
+                  <div class="flex flex-wrap items-center gap-2">
+                    <OText variant="section">{{ t("modelPricing.quickSetup") }}</OText>
+                    <OButton
+                      v-for="tpl in usageTemplates"
+                      :key="tpl.name"
+                      variant="pricing-chip"
+                      type="button"
+                      :active="isTemplateActive(idx, tpl.keys)"
+                      class="h-auto! gap-1.5! rounded-full! px-3.5! py-1.25! text-xs! font-medium!"
+                      :data-test="`model-pricing-tier-template-btn-${idx}-${tpl.name.toLowerCase()}`"
+                      @click="applyTemplate(idx, tpl.keys)"
+                    >
+                      <template #icon-left>
+                        <span
+                          class="pricing-chip-dot inline-block h-1.75 w-1.75 shrink-0 rounded-full"
+                          :style="{ background: tpl.color }"
+                        />
+                      </template>
+                      {{ tpl.name }}
+                      <span
+                        v-if="isTemplateActive(idx, tpl.keys)"
+                        class="ms-0.5 text-sm leading-none opacity-75 hover:opacity-100"
+                        @click.stop="clearTemplate(idx, tpl.keys)"
+                      >
+                        {{ "×" }}</span
+                      >
+                    </OButton>
+                  </div>
+
+                  <!-- Price Table -->
+                  <div>
+                    <div class="mb-2">
+                      <OText variant="label">{{ t("modelPricing.tokenPrices") }}</OText>
+                      <OText variant="meta"> {{ t("modelPricing.tokenPricesUnit") }}</OText>
+                    </div>
+
+                    <div class="price-table overflow-hidden">
+                      <!-- Column headers (only when rows exist) -->
+                      <div
+                        v-if="tier.prices.length"
+                        class="price-table-head text-2xs grid grid-cols-[1fr_10rem_auto] gap-2 px-3 py-1.5 font-semibold tracking-[0.01em] opacity-45"
+                      >
+                        <span>{{ t("modelPricing.usageKeyCol") }}</span>
+                        <span>{{ t("modelPricing.pricePerMillionHeader") }}</span>
+                        <span></span>
+                      </div>
+
+                      <!-- Existing rows — form-owned (tiers[i].prices[j]); value
+                         is held PER-MILLION so it binds directly. -->
+                      <!-- Key by INDEX (matching the index-based field names): a
+                         stable-id key makes Vue reuse+reorder row components on a
+                         middle delete, but each field's `form.Field` binds to its
+                         `name` at creation and does NOT re-bind when the name
+                         shifts — so reused rows would show stale (shifted) values.
+                         Index keys keep each position's name fixed. -->
+                      <div
+                        v-for="(_entry, entryIdx) in tier.prices"
+                        :key="entryIdx"
+                        class="price-row grid grid-cols-[1fr_10rem_auto] items-start gap-2 px-3 py-0.5"
+                      >
+                        <OFormInput
+                          :name="`tiers[${idx}].prices[${entryIdx}].key`"
+                          :placeholder="
+                            t('modelPricing.usageKeyPlaceholder', {
+                              example: raw('input'),
+                            })
+                          "
+                          :data-test="`model-pricing-price-key-input-${idx}-${entryIdx}`"
+                        />
+                        <OFormInput
+                          :name="`tiers[${idx}].prices[${entryIdx}].value`"
+                          type="number"
+                          :min="0"
+                          step="0.01"
+                          :placeholder="raw('0.00')"
+                          :data-test="`model-pricing-price-value-input-${idx}-${entryIdx}`"
+                        >
+                          <template #icon-left>
+                            <span class="price-dollar pb-0.5 text-xs">$</span></template
+                          >
+                        </OFormInput>
+                        <!-- Fixed input-height band keeps the delete button centered
+                           against the input row even when the key field grows a
+                           below-field error (row is items-start so the error can't
+                           push the value input / this button downward). -->
+                        <div class="flex h-8.5 items-center">
+                          <OButton
+                            variant="outline-destructive"
+                            size="icon"
+                            type="button"
+                            :data-test="`model-pricing-price-delete-btn-${idx}-${entryIdx}`"
+                            @click="removePrice(idx, entryIdx)"
+                          >
+                            <OIcon name="delete" size="sm" />
+                          </OButton>
+                        </div>
+                      </div>
+
+                      <!-- Empty state -->
+                      <OEmptyState
+                        v-if="!tier.prices.length"
+                        size="inline"
+                        hide-action
+                        :title="t('modelPricing.noPricesDefined')"
+                        :description="t('modelPricing.noPricesDesc')"
+                      />
+
+                      <!-- Add row (staging draft, form-owned) -->
+                      <div
+                        class="price-add-row grid grid-cols-[1fr_10rem_auto] items-center gap-2 px-3 py-1"
+                        :class="{
+                          'price-add-row--no-top': !tier.prices.length,
+                        }"
+                      >
+                        <OFormInput
+                          :name="`tiers[${idx}].draftKey`"
+                          :placeholder="
+                            t('modelPricing.addUsageKeyPlaceholder', {
+                              example: raw('input'),
+                            })
+                          "
+                          :data-test="`model-pricing-add-price-key-input-${idx}`"
+                        />
+                        <OFormInput
+                          :name="`tiers[${idx}].draftValue`"
+                          type="number"
+                          :min="0"
+                          step="0.01"
+                          :placeholder="raw('0.00')"
+                          :data-test="`model-pricing-add-price-value-input-${idx}`"
+                        >
+                          <template #icon-left>
+                            <span class="price-dollar pb-0.5 text-xs">$</span></template
+                          >
+                        </OFormInput>
+                        <OButton
+                          variant="outline"
+                          size="icon"
+                          type="button"
+                          :disabled="!String(tier.draftKey ?? '').trim()"
+                          :data-test="`model-pricing-add-price-btn-${idx}`"
+                          @click="addPrice(idx)"
+                        >
+                          <OIcon name="add" size="xs" />
+                        </OButton>
+                      </div>
+                    </div>
+
+                    <!-- Price Preview Table -->
+                    <div
+                      v-if="previewEntries(tier).length"
+                      class="rounded-default bg-surface-panel border-card-glass-border mt-5 border"
+                    >
+                      <div
+                        class="text-text-secondary border-card-glass-border border-b px-4 py-2 text-xs font-semibold"
+                      >
+                        {{ t("modelPricing.pricePreview") }}
+                      </div>
+                      <table class="w-full border-collapse text-xs">
+                        <thead>
+                          <tr
+                            class="text-text-secondary border-card-glass-border border-b text-left"
+                          >
+                            <th class="px-4 py-2 font-medium">
+                              {{ t("modelPricing.usageType") }}
+                            </th>
+                            <th class="px-4 py-2 font-medium">
+                              {{ t("modelPricing.perThousand") }}
+                            </th>
+                            <th class="px-4 py-2 font-medium">
+                              {{ t("modelPricing.perMillion") }}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr
+                            v-for="entry in previewEntries(tier)"
+                            :key="entry.pending ? '__pending__' : entry.key"
+                            class="border-card-glass-border border-b last:border-none"
+                            :class="{
+                              'preview-row-pending italic opacity-50': entry.pending,
+                            }"
+                          >
+                            <td class="text-text-body px-4 py-2 font-medium">
+                              {{ entry.key }}
+                            </td>
+                            <td class="text-text-body px-4 py-2">
+                              {{ "$" + formatPreviewCost(fromPerMillion(entry.value), 1000) }}
+                            </td>
+                            <td class="text-text-body px-4 py-2">
+                              {{ "$" + formatPreviewCost(fromPerMillion(entry.value), 1000000) }}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <OButton
+                variant="outline"
+                size="sm-action"
+                type="button"
+                class="self-start"
+                data-test="model-pricing-add-tier-btn"
+                @click="addTier"
+              >
+                {{ t("modelPricing.addTier") }}
+              </OButton>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div
+        class="page-footer border-card-glass-border flex h-12.5 shrink-0 items-center justify-end gap-2 border-t px-6"
+      >
+        <OButton
+          variant="outline"
+          size="sm-action"
+          type="button"
+          :disabled="isSubmitting"
+          @click="goBack"
+          data-test="model-pricing-editor-cancel-btn"
+        >
+          {{ t("modelPricing.cancel") }}
+        </OButton>
+        <OButton
+          variant="primary"
+          size="sm-action"
+          type="submit"
+          :loading="isSubmitting"
+          data-test="model-pricing-editor-save-btn"
+        >
+          {{ t("modelPricing.save") }}
+        </OButton>
+      </div>
+    </OForm>
+  </OPageLayout>
+</template>
+
+<script lang="ts" setup>
+import { ref, computed, onBeforeMount } from "vue";
+import { useI18nTyped, raw } from "@/types/i18n";
+import { useStore } from "vuex";
+import { useRouter, useRoute } from "vue-router";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import modelPricingService from "@/services/model_pricing";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import OFormTime from "@/lib/forms/Time/OFormTime.vue";
+import UtcHoursBar, { type UtcHoursWindow } from "@/components/settings/UtcHoursBar.vue";
+import OCode from "@/lib/core/Code/OCode.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OText from "@/lib/core/Typography/OText.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import { copyToClipboard } from "@/utils/clipboard";
+import { formatUtcWindowsInTz } from "@/utils/formatters";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import {
+  makeModelPricingSchema,
+  type ModelPricingForm,
+  type ModelPricingTier,
+  type ModelPricingTierWindow,
+} from "./ModelPricingEditor.schema";
+
+const { t } = useI18nTyped();
+const store = useStore();
+const router = useRouter();
+const route = useRoute();
+
+const existingModels = ref<any[]>([]);
+
+const showExamples = ref(false);
+const copiedPattern = ref<string | null>(null);
+
+function copyPattern(pattern: string) {
+  copyToClipboard(pattern, t, { silent: true }).then((success) => {
+    if (success) {
+      copiedPattern.value = pattern;
+      setTimeout(() => {
+        copiedPattern.value = null;
+      }, 1500);
+    }
+  });
+}
+
+const patternExamples = [
+  { name: raw("GPT-4o"), match_pattern: "gpt-4o" },
+  { name: "o3", match_pattern: "o3" },
+  { name: raw("Claude Sonnet 4.6"), match_pattern: "claude-sonnet-4-6" },
+  { name: raw("Gemini 2.5 Pro"), match_pattern: "gemini-2.5-pro" },
+  { name: raw("GPT-4o Mini"), match_pattern: "gpt-4o-mini" },
+];
+
+const orgIdentifier = computed(() => store.state.selectedOrganization?.identifier || "");
+
+// Scalar validation is schema-driven (name + match_pattern).
+const modelPricingSchema = makeModelPricingSchema(t);
+
+const isEdit = computed(() => !!route.query.id && route.query.duplicate !== "true");
+const headerTitle = computed(() =>
+  isEdit.value ? t("modelPricing.editTitle") : t("modelPricing.newTitle"),
+);
+
+const model = ref<any>(createEmptyModel());
+
+// Dynamic defaults (edit-prefill projects the working model) → a typed computed.
+// `model.value` holds the API-shaped record (per-token price MAP); the form holds
+// the per-million ROW shape, so convert. For edit mode the async load re-seeds
+// the form via form.reset(modelToForm(...)) in onBeforeMount once data arrives.
+const modelPricingDefaults = computed((): ModelPricingForm => modelToForm(model.value));
+
+// This component reads the form-owned `tiers` array reactively to drive the
+// v-for rows, so it creates the form here with useOForm and hands it to
+// <OForm :form="form">. `save` is the awaited submit handler (auto Save
+// spinner). Async edit-prefill re-seeds via form.reset() once data loads.
+const form = useOForm<ModelPricingForm>({
+  defaultValues: modelPricingDefaults.value,
+  schema: modelPricingSchema,
+  onSubmit: save,
+});
+
+// Reactive view of the form-owned `tiers` array — form.useStore tracks array
+// mutations (a plain form.state.values read in a computed would not).
+const formTiers = form.useStore((s): ModelPricingTier[] => s.values.tiers ?? []);
+
+function createEmptyModel() {
+  return {
+    id: null,
+    name: "",
+    match_pattern: "",
+    enabled: true,
+    // English on purpose: this is persisted verbatim as `tier.name` in the saved
+    // model, so a translated default would store different data per locale.
+    tiers: [newTier(raw("Default"))],
+  };
+}
+
+// API-shaped tier (per-token price map). Used to seed the working `model`.
+function newTier(name: string, condition: any = null) {
+  return {
+    name,
+    condition,
+    prices: {} as Record<string, number>,
+    utc_windows: [] as Array<{ start_minute: number; end_minute: number }>,
+  };
+}
+
+// ── map ↔ rows converters (the field-array unlock) ───────────────────────────
+// One blank FORM tier (per-million row shape) for "Add tier".
+function newFormTier(name: string, condition: any = null) {
+  return {
+    name,
+    condition,
+    utc_windows: [] as ModelPricingTierWindow[],
+    prices: [] as Array<{ key: string; value: number }>,
+    draftKey: "",
+    draftValue: 0,
+  };
+}
+
+// ── UTC time-window converters ───────────────────────────────────────────────
+// The API stores minutes past UTC midnight; OFormTime binds `HH:MM`. A window
+// whose start is later than its end wraps past midnight (e.g. 22:00 → 02:00).
+
+function minutesToHhmm(minutes: number): string {
+  // 1440 (24:00) is a valid API bound but not a valid <input type="time"> value;
+  // it means the same instant as 00:00, so normalise it.
+  const m = ((Math.round(Number(minutes) || 0) % 1440) + 1440) % 1440;
+  const hh = String(Math.floor(m / 60)).padStart(2, "0");
+  const mm = String(m % 60).padStart(2, "0");
+  return `${hh}:${mm}`;
+}
+
+/** `HH:MM` → minutes past UTC midnight, or null when unparseable. */
+function hhmmToMinutes(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(String(value ?? "").trim());
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const mins = Number(match[2]);
+  if (hours > 23 || mins > 59) return null;
+  return hours * 60 + mins;
+}
+
+/** A tier's windows, tolerant of form state seeded before the field existed. */
+function tierWindows(tier: any): ModelPricingTierWindow[] {
+  return (tier?.utc_windows ?? []) as ModelPricingTierWindow[];
+}
+
+/** True when a window crosses UTC midnight — surfaced as a hint next to the row. */
+function windowWraps(win: ModelPricingTierWindow): boolean {
+  const start = hhmmToMinutes(win.start);
+  const end = hhmmToMinutes(win.end);
+  return start !== null && end !== null && start > end;
+}
+
+/** One window rendered in the user's configured timezone, or "" when there is
+ *  nothing meaningful to show (unparseable bounds, or the timezone is UTC). */
+function windowLocalHint(win: ModelPricingTierWindow): string {
+  const start = hhmmToMinutes(win.start);
+  const end = hhmmToMinutes(win.end);
+  if (start === null || end === null) return "";
+  return formatUtcWindowsInTz([{ start_minute: start, end_minute: end }], store.state.timezone);
+}
+
+/** The tier's windows as minutes, keeping only rows the 24h preview can draw. */
+function parsedTierWindows(tier: any): UtcHoursWindow[] {
+  return tierWindows(tier)
+    .map((w) => ({
+      start_minute: hhmmToMinutes(w?.start),
+      end_minute: hhmmToMinutes(w?.end),
+    }))
+    .filter(
+      (w): w is UtcHoursWindow =>
+        w.start_minute !== null && w.end_minute !== null && w.start_minute !== w.end_minute,
+    );
+}
+
+// API model (per-token price MAP) → FORM value (per-million ROW array).
+function modelToForm(m: any): ModelPricingForm {
+  const tiers = (m?.tiers ?? []).map((tier: any, i: number) => {
+    const windows: ModelPricingTierWindow[] = (tier.utc_windows ?? []).map((w: any) => ({
+      start: minutesToHhmm(w?.start_minute),
+      end: minutesToHhmm(w?.end_minute),
+    }));
+    return {
+      name: tier.name ?? "",
+      // Tier 0 is the unconditional default. A later tier keeps its own condition;
+      // one restricted only by time windows keeps `null` rather than being handed a
+      // usage condition it never had.
+      condition:
+        i === 0
+          ? null
+          : tier.condition
+            ? { ...tier.condition }
+            : windows.length
+              ? null
+              : { usage_key: "input", operator: "gt", value: 0 },
+      utc_windows: i === 0 ? [] : windows,
+      prices: Object.entries(tier.prices ?? {}).map(([k, v]) => ({
+        key: k,
+        value: toPerMillion(Number(v)),
+      })),
+      draftKey: "",
+      draftValue: 0,
+    };
+  });
+  return {
+    name: m?.name ?? "",
+    match_pattern: m?.match_pattern ?? "",
+    tiers,
+  };
+}
+
+// FORM value (per-million ROW array) → API tiers (per-token price MAP). Drops
+// blank keys and auto-commits each tier's non-empty draft row.
+function formToModelTiers(tiers: any[]): any[] {
+  return (tiers ?? []).map((tier: any, i: number) => {
+    const prices: Record<string, number> = {};
+    for (const row of tier.prices ?? []) {
+      const k = String(row.key ?? "").trim();
+      if (k) prices[k] = fromPerMillion(Number(row.value) || 0);
+    }
+    const dk = String(tier.draftKey ?? "").trim();
+    if (dk) prices[dk] = fromPerMillion(Number(tier.draftValue) || 0);
+    // Drop unparseable rows and degenerate windows (start === end), which the API
+    // rejects as ambiguous — an always-active tier carries no window at all.
+    const utcWindows =
+      i === 0
+        ? []
+        : (tier.utc_windows ?? [])
+            .map((w: any) => ({
+              start_minute: hhmmToMinutes(w?.start),
+              end_minute: hhmmToMinutes(w?.end),
+            }))
+            .filter(
+              (w: any) =>
+                w.start_minute !== null && w.end_minute !== null && w.start_minute !== w.end_minute,
+            );
+    return {
+      name: tier.name,
+      condition:
+        i === 0
+          ? null
+          : tier.condition
+            ? {
+                usage_key: tier.condition.usage_key,
+                operator: tier.condition.operator,
+                value: Number(tier.condition.value) || 0,
+              }
+            : null,
+      utc_windows: utcWindows,
+      prices,
+    };
+  });
+}
+
+// Replace the whole form-owned tiers array; `formTiers` (form.useStore)
+// re-syncs reactively and the template re-renders.
+function setTiers(next: any[]) {
+  form.setFieldValue("tiers", next, { dontUpdateMeta: true });
+}
+
+const usageTemplates = [
+  {
+    name: "OpenAI",
+    color: "#10a37f",
+    keys: ["input", "output", "cache_read_input_tokens", "output_reasoning_tokens"],
+  },
+  {
+    name: "Anthropic",
+    color: "#d97706",
+    keys: ["input", "output", "cache_read_input_tokens", "cache_creation_input_tokens"],
+  },
+];
+
+const operators = [
+  { label: raw(">"), value: "gt" },
+  { label: raw(">="), value: "gte" },
+  { label: raw("<"), value: "lt" },
+  { label: raw("<="), value: "lte" },
+  { label: raw("="), value: "eq" },
+  { label: raw("!="), value: "neq" },
+];
+
+// ── Field-array operations (whole-array setFieldValue; `formTiers`
+//    (form.useStore) re-syncs reactively + re-renders) ──────────────────────
+function addTier() {
+  setTiers([
+    ...formTiers.value,
+    // Seeded with a usage condition (the long-standing default). It can be swapped
+    // for — or combined with — a UTC time window from the tier body.
+    // Untranslated on purpose: this is persisted verbatim as `tier.name`.
+    newFormTier(raw("Conditional Tier"), {
+      usage_key: "input",
+      operator: "gt",
+      value: 200000,
+    }),
+  ]);
+}
+
+function removeTier(idx: number) {
+  setTiers(formTiers.value.filter((_: any, i: number) => i !== idx));
+}
+
+function patchTier(idx: number, patch: (_tier: any) => any) {
+  setTiers(formTiers.value.map((tier: any, i: number) => (i === idx ? patch(tier) : tier)));
+}
+
+function addCondition(idx: number) {
+  patchTier(idx, (tier) => ({
+    ...tier,
+    condition: { usage_key: "input", operator: "gt", value: 200000 },
+  }));
+}
+
+function removeCondition(idx: number) {
+  patchTier(idx, (tier) => ({ ...tier, condition: null }));
+}
+
+// Seeded with DeepSeek's first peak window (01:00-04:00 UTC) — the common case
+// this exists for, and a concrete example of the HH:MM format.
+function addWindow(idx: number) {
+  patchTier(idx, (tier) => ({
+    ...tier,
+    utc_windows: [...(tier.utc_windows ?? []), { start: "01:00", end: "04:00" }],
+  }));
+}
+
+function removeWindow(tierIdx: number, winIdx: number) {
+  patchTier(tierIdx, (tier) => ({
+    ...tier,
+    utc_windows: (tier.utc_windows ?? []).filter((_: any, j: number) => j !== winIdx),
+  }));
+}
+
+function removePrice(tierIdx: number, entryIdx: number) {
+  setTiers(
+    formTiers.value.map((tier: any, i: number) =>
+      i !== tierIdx
+        ? tier
+        : {
+            ...tier,
+            prices: tier.prices.filter((_: any, j: number) => j !== entryIdx),
+          },
+    ),
+  );
+}
+
+// Commit a tier's staging draft row into its committed price rows, then clear
+// the draft. (Validation of the key happens schema-side / at submit.)
+function addPrice(tierIdx: number) {
+  setTiers(
+    formTiers.value.map((tier: any, i: number) => {
+      if (i !== tierIdx) return tier;
+      const dk = String(tier.draftKey ?? "").trim();
+      if (!dk) return tier;
+      return {
+        ...tier,
+        prices: [...tier.prices, { key: dk, value: Number(tier.draftValue) || 0 }],
+        draftKey: "",
+        draftValue: 0,
+      };
+    }),
+  );
+}
+
+function isTemplateActive(tierIdx: number, templateKeys: string[]): boolean {
+  const tier = formTiers.value[tierIdx];
+  if (!tier) return false;
+  const priceKeys = (tier.prices ?? []).map((r: any) => r.key);
+  if (priceKeys.length !== templateKeys.length) return false;
+  return templateKeys.every((k) => priceKeys.includes(k));
+}
+
+function applyTemplate(tierIdx: number, keys: string[]) {
+  setTiers(
+    formTiers.value.map((tier: any, i: number) => {
+      if (i !== tierIdx) return tier;
+      const newPrices = keys.map((k) => {
+        const found = (tier.prices ?? []).find((r: any) => r.key === k);
+        return { key: k, value: found ? found.value : 0 };
+      });
+      return { ...tier, prices: newPrices };
+    }),
+  );
+}
+
+function clearTemplate(tierIdx: number, keys: string[]) {
+  setTiers(
+    formTiers.value.map((tier: any, i: number) =>
+      i !== tierIdx
+        ? tier
+        : {
+            ...tier,
+            prices: (tier.prices ?? []).filter((r: any) => !keys.includes(r.key)),
+          },
+    ),
+  );
+}
+
+function toPerMillion(perToken: number): number {
+  return perToken ? +(perToken * 1_000_000).toPrecision(10) : 0;
+}
+
+function fromPerMillion(perMillion: number): number {
+  return perMillion > 0 ? perMillion / 1_000_000 : 0;
+}
+
+/** Live preview = committed price rows + the (non-empty) draft. Values are
+ *  PER-MILLION; the template converts to per-token for the cost columns. */
+function previewEntries(tier: any): Array<{ key: string; value: number; pending?: boolean }> {
+  const out = (tier.prices ?? [])
+    .filter((r: any) => String(r.key ?? "").trim())
+    .map((r: any) => ({ key: String(r.key), value: Number(r.value) || 0 }));
+  const dk = String(tier.draftKey ?? "").trim();
+  if (dk && !out.find((e: any) => e.key === dk)) {
+    out.push({ key: dk, value: Number(tier.draftValue) || 0, pending: true });
+  }
+  return out;
+}
+
+function formatPreviewCost(costPerUnit: number, multiplier: number) {
+  if (!costPerUnit) return "0";
+  const c = costPerUnit * multiplier;
+  if (c === 0) return "0";
+  if (c < 0.00001) return c.toExponential(2);
+  let str = c.toFixed(8);
+  str = str.replace(/0+$/, "").replace(/\.$/, "");
+  return str;
+}
+
+function validateUsageKey(key: string): string | null {
+  if (/^\d+$/.test(key)) return t("modelPricing.usageKeyPureInteger");
+  if (/\s/.test(key)) return t("modelPricing.usageKeyContainsSpaces");
+  return null;
+}
+
+function goBack() {
+  router.push({
+    name: "modelPricing",
+    query: { org_identifier: orgIdentifier.value },
+  });
+}
+
+function notifyWarn(message: string) {
+  toast({ variant: "error", message: raw(message) });
+}
+
+/** Show error notification only for non-403 errors.
+ *  403 errors are already handled by the global HTTP interceptor (persistent top banner). */
+function notifyError(prefix: string, e: any) {
+  if (e?.response?.status === 403) return;
+  const msg = e?.response?.data?.message || e?.message || t("modelPricing.errUnknown");
+  toast({
+    variant: "error",
+    message: t("toastMessages.settings.message", { prefix: prefix, message: msg }),
+    timeout: 5000,
+  });
+}
+
+// @submit handler. The schema validates name/match_pattern + per-row key
+// validity + condition.usage_key before @submit fires. Two STRUCTURAL rules
+// that don't map to a single field stay here as guards (toasts): a draft row
+// with a value but no key, and "the default tier needs ≥1 non-zero price".
+// `value` is the raw form value (per-million ROW shape); convert to the API
+// (per-token MAP) shape for the payload.
+async function save(value?: ModelPricingForm) {
+  const tiers = (value?.tiers ?? formTiers.value) as any[];
+
+  // Draft-row guards: a non-empty draft key must be a valid usage key; a draft
+  // with a value but no key is an error.
+  for (const tier of tiers) {
+    const dk = String(tier.draftKey ?? "").trim();
+    if (dk) {
+      const keyError = validateUsageKey(dk);
+      if (keyError) {
+        notifyWarn(keyError);
+        return;
+      }
+    } else if (Number(tier.draftValue) > 0) {
+      notifyWarn(t("modelPricing.tierPriceMissingKey", { name: tier.name }));
+      return;
+    }
+  }
+
+  // A non-default tier with neither a usage condition nor a time window can never
+  // be selected — the unconditional tier 0 always wins first.
+  for (let i = 1; i < tiers.length; i++) {
+    const tier = tiers[i];
+    if (!tier.condition && !(tier.utc_windows ?? []).length) {
+      notifyWarn(t("modelPricing.tierNeedsRestriction", { name: tier.name || `#${i + 1}` }));
+      return;
+    }
+  }
+
+  // Require at least one non-zero price in the default tier (committed + draft).
+  const defaultTier = tiers[0];
+  if (defaultTier) {
+    const values = (defaultTier.prices ?? [])
+      .filter((r: any) => String(r.key ?? "").trim())
+      .map((r: any) => Number(r.value) || 0);
+    if (String(defaultTier.draftKey ?? "").trim()) {
+      values.push(Number(defaultTier.draftValue) || 0);
+    }
+    if (values.length === 0 || values.every((v: number) => v === 0)) {
+      notifyWarn(t("modelPricing.addDefaultPrice"));
+      return;
+    }
+  }
+
+  // Build the API-shaped payload: keep the loaded record's metadata (id,
+  // enabled, valid_from, sort_order, org_id, source) from `model`, take the
+  // validated scalars + converted tiers from the form.
+  const m: any = {
+    ...model.value,
+    name: value?.name ?? model.value.name,
+    match_pattern: value?.match_pattern ?? model.value.match_pattern,
+    tiers: formToModelTiers(tiers),
+  };
+
+  // Warn if another enabled org entry has the same pattern and higher priority
+  // (same valid_from context — it will shadow this entry at runtime).
+  const patternConflicts = existingModels.value.filter((other: any) => {
+    if (other.id && other.id === m.id) return false; // skip self (edit mode)
+    if (other.match_pattern !== m.match_pattern) return false;
+    const otherVf = other.valid_from ?? 0;
+    const thisVf = m.valid_from ?? 0;
+    if (otherVf !== thisVf) return false; // different time windows — not a conflict
+    // Check if 'other' would win over 'this'
+    const otherSo = other.sort_order ?? 0;
+    const thisSo = m.sort_order ?? 0;
+    if (otherSo !== thisSo) return otherSo < thisSo;
+    return other.name.localeCompare(m.name) < 0;
+  });
+
+  // Loading is form-driven: OForm awaits this handler, so the Save button's
+  // spinner (isSubmitting) spans the POST — no manual flag needed.
+  try {
+    if (m.id) {
+      await modelPricingService.update(orgIdentifier.value, m.id, m);
+    } else {
+      await modelPricingService.create(orgIdentifier.value, m);
+    }
+    if (patternConflicts.length > 0) {
+      const winner = patternConflicts[0].name;
+      toast({
+        variant: "warning",
+        message: t("modelPricing.saveShadowedWarning", { winner }),
+        timeout: 8000,
+      });
+    } else {
+      toast({
+        variant: "success",
+        message: t("modelPricing.modelPricingSaved"),
+      });
+    }
+    goBack();
+  } catch (e: any) {
+    notifyError(t("modelPricing.errSave"), e);
+  }
+}
+
+onBeforeMount(async () => {
+  const id = route.query.id as string | undefined;
+  const isDuplicate = route.query.duplicate === "true";
+
+  // Load all existing org models for duplicate-pattern detection on save
+  try {
+    const listRes = await modelPricingService.list(orgIdentifier.value);
+    existingModels.value = (listRes.data || []).filter(
+      (m: any) =>
+        (m.source === "org" || !m.source) &&
+        m.org_id === orgIdentifier.value &&
+        m.enabled !== false,
+    );
+  } catch {
+    /* non-critical */
+  }
+  if (id) {
+    try {
+      const res = await modelPricingService.get(orgIdentifier.value, id);
+      const found = res.data;
+      if (found) {
+        model.value = JSON.parse(JSON.stringify(found));
+        if (isDuplicate) {
+          model.value.id = null;
+          model.value.org_id = orgIdentifier.value;
+          model.value.name = model.value.name + t("settings.modelPricingEditor.copySuffix");
+          // Clear source so create endpoint assigns the correct one
+          delete model.value.source;
+        }
+        for (let i = 1; i < model.value.tiers.length; i++) {
+          const tier = model.value.tiers[i];
+          // A tier restricted only by UTC time windows legitimately has no usage
+          // condition — leave it alone rather than fabricating one.
+          if (!tier.condition && !(tier.utc_windows ?? []).length) {
+            tier.condition = {
+              usage_key: "input",
+              operator: "gt",
+              value: 0,
+            };
+          }
+        }
+        // Data arrived after mount → re-seed the whole form (scalars + the
+        // converted tier/price rows) once. formTiers (form.useStore) updates
+        // reactively from the reset.
+        form.reset(modelToForm(model.value));
+      }
+    } catch (e: any) {
+      notifyError(t("modelPricing.errLoadModel"), e);
+    }
+  }
+});
+</script>

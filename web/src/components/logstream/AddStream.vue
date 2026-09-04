@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,156 +15,179 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    :class="[store.state.theme === 'dark' ? 'bg-dark' : 'bg-white', !isInPipeline ? 'q-pt-md' : '']"
+  <ODialog
+    v-if="!isInPipeline"
+    data-test="add-stream-dialog"
+    :open="open"
+    size="md"
+    :title="t('logStream.add')"
+    :secondary-button-label="t('logStream.cancel')"
+    :primary-button-label="t('common.save')"
+    form-id="add-stream-form"
+    @update:open="emits('update:open', $event)"
+    @click:secondary="emits('update:open', false)"
   >
-    <div class="add-stream-header row items-center no-wrap q-px-md">
-      <div class="col">
-        <div style="font-size: 18px" data-test="add-stream-title">
-          {{ t("logStream.add") }}
-        </div>
-      </div>
-      <div class="col-auto">
-        <q-btn
-          data-test="add-stream-close-btn"
-          v-close-popup="true"
-          round
-          flat
-          icon="cancel"
-        />
-      </div>
-    </div>
-    <q-separator />
-    <div class="q-px-md  add-stream-inputs">
-      <q-form @submit="saveStream">
-        <div data-test="add-stream-name-input">
-          <q-input
-            v-model="streamInputs.name"
-            :label="t('common.name') + ' *'"
+    <div class="w-full">
+      <OForm id="add-stream-form" :form="addStreamForm">
+        <div class="mt-2">
+          <OFormInput
+            data-test="add-stream-name-input"
+            name="name"
+            :label="t('common.name')"
+            required
             class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
-            :rules="[(val: any) => !!val.trim() || 'Field is required!']"
+            :help-text="t('logStream.streamNameHelpText')"
             tabindex="0"
-            style="min-width: 480px"
           />
         </div>
 
-        <div data-test="add-stream-type-input">
-          <q-select
-            v-model="streamInputs.stream_type"
+        <div class="mt-2">
+          <OFormSelect
+            data-test="add-stream-type-input"
+            name="stream_type"
             :options="filteredStreamTypes"
-            :label="t('alerts.streamType') + ' *'"
-            :popup-content-style="{ textTransform: 'capitalize' }"
-            class="showLabelOnTop no-case"
-            map-options
-            stack-label
-            emit-value
-            borderless
-            dense
-            :rules="[(val: any) => !!val || 'Field is required!']"
-            style="min-width: 220px"
-          />
-        </div>
-
-        <div data-test="add-stream-data-retention-input">
-          <q-input
-            v-model="streamInputs.dataRetentionDays"
-            :label="t('logStream.dataRetention') + ' *'"
+            :label="t('alerts.streamType')"
+            required
+            labelKey="label"
+            valueKey="value"
             class="showLabelOnTop"
-            stack-label
-            borderless
-            dense
+          />
+        </div>
+
+        <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="mt-2">
+          <OFormInput
+            data-test="add-stream-data-retention"
+            name="dataRetentionDays"
+            :label="t('logStream.dataRetention')"
+            required
+            class="showLabelOnTop"
             type="number"
-            :rules="[(val: any) => val > 0 || 'Field is required!']"
-            style="min-width: 480px"
           />
         </div>
 
-        <StreamFieldInputs
-          :fields="fields"
-          @add="addField"
-          @remove="removeField"
-        />
-
-        <div class="flex justify-start q-mt-md">
-          <q-btn
-            v-close-popup="true"
-            data-test="add-stream-cancel-btn"
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('logStream.cancel')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-          />
-          <q-btn
-            data-test="save-stream-btn"
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('common.save')"
-            type="submit"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-          />
-        </div>
-      </q-form>
+        <StreamFieldInputs class="mt-4" form-field-name="fields" />
+      </OForm>
     </div>
+  </ODialog>
+
+  <!-- Inline form for pipeline usage: rendered inside <ODrawer> in Stream.vue.
+       The drawer owns the footer Cancel/Save (built-in ODrawer footer); its Save
+       submits this form via `form-id="add-stream-node-form"`, so no inline
+       buttons here. -->
+  <div v-else class="w-full">
+    <OForm id="add-stream-node-form" :form="addStreamForm">
+      <div class="mt-2">
+        <OFormInput
+          data-test="add-stream-name-input"
+          name="name"
+          :label="t('common.name')"
+          required
+          class="showLabelOnTop"
+          :help-text="t('logStream.streamNameHelpText')"
+          tabindex="0"
+        />
+      </div>
+
+      <div class="mt-2">
+        <OFormSelect
+          data-test="add-stream-type-input"
+          name="stream_type"
+          :options="filteredStreamTypes"
+          :label="t('alerts.streamType')"
+          required
+          labelKey="label"
+          valueKey="value"
+          class="showLabelOnTop"
+        />
+      </div>
+
+      <div data-test="add-stream-data-retention-input" v-if="showDataRetention" class="mt-2">
+        <OFormInput
+          data-test="add-stream-data-retention"
+          name="dataRetentionDays"
+          :label="t('logStream.dataRetention')"
+          required
+          class="showLabelOnTop"
+          type="number"
+        />
+      </div>
+
+      <StreamFieldInputs class="mt-4" form-field-name="fields" />
+    </OForm>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import StreamFieldInputs from "./StreamFieldInputs.vue";
-import type { Ref } from "vue";
 import streamService from "@/services/stream";
 import { useStore } from "vuex";
 import { computed } from "vue";
-import { useQuasar } from "quasar";
 import useStreams from "@/composables/useStreams";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { makeAddStreamSchema, addStreamDefaults, type AddStreamForm } from "./AddStream.schema";
 
-const { t } = useI18n();
-
+const { t } = useI18nTyped();
 
 const streamTypes = [
-  { label: "Logs", value: "logs" },
-  { label: "Metrics", value: "metrics" },
-  { label: "Traces", value: "traces" },
+  { label: t("common.logs"), value: "logs" },
+  { label: t("common.metrics"), value: "metrics" },
+  { label: t("common.traces"), value: "traces" },
 ];
 
-const emits = defineEmits(["streamAdded", "close","added:stream-added"]);
+const emits = defineEmits(["streamAdded", "close", "added:stream-added", "update:open"]);
 const props = defineProps<{
   isInPipeline: boolean;
+  open?: boolean;
 }>();
 
-
-const { addStream, getStream } = useStreams();
-
-const fields: Ref<any[]> = ref([]);
+const { addStream, getStream } = useStreams(t);
 
 const store = useStore();
 
-const q = useQuasar();
+// The retention rule is conditional on org config (`data_retention_days`),
+// captured here; the stream-type half of the condition is read from the form in
+// superRefine.
+const addStreamSchema = makeAddStreamSchema(
+  !!(store.state.zoConfig.data_retention_days || false),
+  t,
+);
+
+// This component owns <OForm> and reads form state (stream_type) to drive the
+// parent-side `v-if="showDataRetention"`, so the form is created here with
+// useOForm and read reactively with form.useStore. onSubmit fires only when the
+// whole schema passes — scalars and the dynamic `fields` rows (an empty/invalid
+// row blocks submit and shows per-row errors).
+const addStreamForm = useOForm<AddStreamForm>({
+  defaultValues: addStreamDefaults(),
+  schema: addStreamSchema,
+  onSubmit: (value) => saveStream(value),
+});
 
 const { track } = useReo();
 
-const streamInputs = ref({
-  name: "",
-  stream_type: "",
-  index_type: [],
-  dataRetentionDays: 14,
-});
+// Read the form-owned stream_type so `showDataRetention` — which also depends on
+// org config the schema can't read — re-evaluates when the user changes the type.
+// Must use form.useStore; a `form.state.values` read inside a computed would not
+// track changes.
+const formStreamType = addStreamForm.useStore((s: any) => (s.values.stream_type as string) ?? "");
 
-const getDefaultField = () => {
-  return {
-    name: "",
-    type: "",
-    index_type: [],
-  };
-};
-
+// Reset to fresh defaults whenever the dialog opens so each reopen starts blank.
+// reset() also zeroes submissionAttempts so no stale "required" errors flash.
+// Dialog mode only; the inline pipeline form has no `open` toggle.
+watch(
+  () => props.open,
+  (isOpen, wasOpen) => {
+    if (isOpen && !wasOpen) addStreamForm.reset();
+  },
+);
 
 const isSchemaUDSEnabled = computed(() => {
   return store.state.zoConfig.user_defined_schemas_enabled;
@@ -176,26 +199,25 @@ const filteredStreamTypes = computed(() => {
   return streamTypes;
 });
 
-
 const showDataRetention = computed(
   () =>
     !!(store.state.zoConfig.data_retention_days || false) &&
-    streamInputs.value.stream_type !== "enrichment_tables"
+    formStreamType.value !== "enrichment_tables",
 );
 
-const saveStream = async () => {
+// `value` is the fully-validated submit payload — scalars and the `fields`
+// rows — the single source of truth.
+const saveStream = async (value: AddStreamForm) => {
   let isStreamPresent = false;
 
-  await getStream(
-    streamInputs.value.name,
-    streamInputs.value.stream_type,
-    false
-  )
+  await getStream(value.name, value.stream_type, false)
     .then(() => {
-      q.notify({
-        color: "negative",
-        message: `Stream "${streamInputs.value.name}" of type "${streamInputs.value.stream_type}" is already present.`,
-        timeout: 4000,
+      toast({
+        message: t("toastMessages.logstream.streamOfTypeIsAlreadyPresent", {
+          name: value.name,
+          streamType: value.stream_type,
+        }),
+        variant: "warning",
       });
       isStreamPresent = true;
     })
@@ -203,51 +225,46 @@ const saveStream = async () => {
 
   if (isStreamPresent) return;
 
-  const payload = getStreamPayload();
-  streamService
+  const payload = getStreamPayload(Number(value.dataRetentionDays), value.fields ?? []);
+  if (!payload) return;
+
+  await streamService
     .createStream(
       store.state.selectedOrganization.identifier,
-      streamInputs.value.name,
-      streamInputs.value.stream_type,
-      payload
+      value.name,
+      value.stream_type,
+      payload,
     )
     .then(() => {
-      q.notify({
-        color: "positive",
-        message: "Stream created successfully",
-        timeout: 4000,
+      toast({
+        message: t("toastMessages.logstream.streamCreatedSuccessfully"),
+        variant: "success",
       });
 
-      streamService
-        .schema(
-          store.state.selectedOrganization.identifier,
-          streamInputs.value.name,
-          streamInputs.value.stream_type
-        )
+      return streamService
+        .schema(store.state.selectedOrganization.identifier, value.name, value.stream_type)
         .then((streamRes: any) => {
           addStream(streamRes.data);
           emits("streamAdded");
           emits("close");
-          emits("added:stream-added", streamInputs.value);
+          emits("added:stream-added", value);
         });
     })
     .catch((err) => {
-      if(err.response.status != 403){
-        q.notify({
-        color: "negative",
-        message: err.response?.data?.message || "Failed to create stream",
-        timeout: 4000,
-      });
+      if (err.response.status != 403) {
+        toast({
+          message: err.response?.data?.message || t("logStream.createStreamFailed"),
+          variant: "error",
+        });
       }
     });
-    track("Button Click", {
-      button: "Save Stream",
-      page: "Add Stream"
-    });
-
+  track("Button Click", {
+    button: "Save Stream",
+    page: "Add Stream",
+  });
 };
 
-const getStreamPayload = () => {
+const getStreamPayload = (dataRetentionDays: number, rows: any[]) => {
   let stream: {
     fields: any[];
     settings: {
@@ -257,7 +274,7 @@ const getStreamPayload = () => {
       bloom_filter_fields: any[];
       data_retention?: number;
       defined_schema_fields: any[];
-    }
+    };
   } = {
     fields: [],
     settings: {
@@ -266,32 +283,24 @@ const getStreamPayload = () => {
       full_text_search_keys: [],
       bloom_filter_fields: [],
       defined_schema_fields: [],
-    }
+    },
   };
 
-  if (showDataRetention.value && streamInputs.value.dataRetentionDays < 1) {
-    q.notify({
-      color: "negative",
-      message:
-        "Invalid Data Retention Period: Retention period must be at least 1 day.",
-      timeout: 4000,
+  if (showDataRetention.value && dataRetentionDays < 1) {
+    toast({
+      message: t("toastMessages.logstream.invalidDataRetentionPeriodRetentionPeriod"),
+      variant: "error",
     });
     return;
   }
 
   if (showDataRetention.value) {
-    stream.settings["data_retention"] = Number(streamInputs.value.dataRetentionDays);
+    stream.settings["data_retention"] = Number(dataRetentionDays);
   }
 
-  fields.value.forEach((field) => {
+  rows.forEach((field) => {
+    field.name = field.name.trim().toLowerCase().replace(/ /g, "_").replace(/-/g, "_");
 
-    field.name = field.name
-      .trim()
-      .toLowerCase()
-      .replace(/ /g, "_")
-      .replace(/-/g, "_");
-    
-    // add to field list
     stream.fields.push(field);
 
     // process index types
@@ -339,24 +348,4 @@ const getStreamPayload = () => {
 
   return stream;
 };
-
-const addField = () => {
-  fields.value.push(getDefaultField());
-};
-
-const removeField = (field: any, index: number) => {
-  fields.value.splice(index, 1);
-};
 </script>
-
-<style lang="scss">
-.add-stream-inputs {
-  .q-field__label {
-    font-weight: normal !important;
-    font-size: 13px;
-    transform: translate(-0.75rem, -155%);
-    color: #3a3a3a;
-    top: 12px !important;
-  }
-}
-</style>

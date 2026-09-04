@@ -15,7 +15,8 @@
 
 use crate::meta::stream::StreamType;
 
-pub const DISTINCT_STREAM_PREFIX: &str = "distinct_values";
+pub const DISTINCT_STREAM_PREFIX: &str = "distinct_values_";
+pub const TRACE_TIME_INDEX_STREAM_PREFIX: &str = "trace_time_index_";
 
 pub fn zero_or<T>(v: T, def: T) -> T
 where
@@ -29,7 +30,15 @@ pub fn is_power_of_two(n: u64) -> bool {
 }
 
 pub fn get_distinct_stream_name(st: StreamType, s: &str) -> String {
-    format!("{}_{}_{}", DISTINCT_STREAM_PREFIX, st.as_str(), s)
+    format!("{DISTINCT_STREAM_PREFIX}{st}_{s}")
+}
+
+pub fn get_trace_time_index_stream_name(s: &str) -> String {
+    format!("{TRACE_TIME_INDEX_STREAM_PREFIX}{s}")
+}
+
+pub fn is_trace_time_index_stream(s: &str) -> bool {
+    s.starts_with(TRACE_TIME_INDEX_STREAM_PREFIX)
 }
 
 #[cfg(test)]
@@ -58,5 +67,62 @@ mod tests {
         assert!(!is_power_of_two(6));
         assert!(!is_power_of_two(7));
         assert!(is_power_of_two(8));
+    }
+
+    #[test]
+    fn test_is_power_of_two_large_values() {
+        // u64 max powers of two
+        assert!(is_power_of_two(1u64 << 32));
+        assert!(is_power_of_two(1u64 << 63));
+        assert!(!is_power_of_two((1u64 << 63) - 1));
+        assert!(!is_power_of_two(u64::MAX));
+    }
+
+    #[test]
+    fn test_get_distinct_stream_name_logs() {
+        assert_eq!(
+            get_distinct_stream_name(StreamType::Logs, "app"),
+            "distinct_values_logs_app"
+        );
+    }
+
+    #[test]
+    fn test_get_distinct_stream_name_all_types() {
+        let cases = [
+            (StreamType::Logs, "distinct_values_logs_x"),
+            (StreamType::Metrics, "distinct_values_metrics_x"),
+            (StreamType::Traces, "distinct_values_traces_x"),
+            (StreamType::Metadata, "distinct_values_metadata_x"),
+            (StreamType::Index, "distinct_values_index_x"),
+            (StreamType::Filelist, "distinct_values_file_list_x"),
+            (
+                StreamType::EnrichmentTables,
+                "distinct_values_enrichment_tables_x",
+            ),
+            (StreamType::ServiceGraph, "distinct_values_service_graph_x"),
+        ];
+
+        for (st, expected) in cases {
+            assert_eq!(get_distinct_stream_name(st, "x"), expected);
+        }
+    }
+
+    #[test]
+    fn test_get_distinct_stream_name_empty_name() {
+        // The function does not validate the name; an empty string is stitched in.
+        assert_eq!(
+            get_distinct_stream_name(StreamType::Logs, ""),
+            "distinct_values_logs_"
+        );
+    }
+
+    #[test]
+    fn test_trace_time_index_stream_name() {
+        assert_eq!(
+            get_trace_time_index_stream_name("default"),
+            "trace_time_index_default"
+        );
+        assert!(is_trace_time_index_stream("trace_time_index_default"));
+        assert!(!is_trace_time_index_stream("default"));
     }
 }

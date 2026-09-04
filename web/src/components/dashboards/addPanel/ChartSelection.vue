@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,78 +15,39 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div style="height: 100%">
-    <div class="q-pa-none" style="width: 100px">
-      <q-list separator style="display: flex; flex-wrap: wrap">
-        <q-item
-          :class="[
-            'q-pa-none',
-            selectedChartType === item.id
-              ? store.state.theme === 'dark'
-                ? 'bg-grey-5'
-                : 'bg-grey-3'
-              : '',
-          ]"
-          class="dashboard-chart-border"
+  <div class="h-full">
+    <div class="w-25 p-0">
+      <ul class="m-0 flex list-none flex-wrap p-0">
+        <li
+          class="w-12.5"
           v-for="(item, index) in ChartsArray"
-          :disable="
-            (promqlMode &&
-              item.id != 'line' &&
-              item.id != 'area' &&
-              item.id != 'bar' &&
-              item.id != 'scatter' &&
-              item.id != 'area-stacked' &&
-              item.id != 'metric' &&
-              item.id != 'gauge' &&
-              item.id != 'pie' &&
-              item.id != 'donut' &&
-              item.id != 'table' &&
-              item.id != 'heatmap' &&
-              item.id != 'h-bar' &&
-              item.id != 'stacked' &&
-              item.id != 'h-stacked' &&
-              item.id != 'geomap' &&
-              item.id != 'maps' &&
-              item.id != 'html' &&
-              item.id != 'markdown' &&
-              item.id != 'custom_chart') ||
-            (allowedchartstype &&
-              allowedchartstype.length > 0 &&
-              !allowedchartstype.includes(item.id))
-          "
           :key="index"
-          clickable
-          v-ripple="true"
-          @click="$emit('update:selectedChartType', item.id)"
-          style="width: 50px"
+          :class="[
+            'border-card-glass-border border-e border-b',
+            'hover:bg-surface-subtle transition-colors duration-150 ease-in-out',
+            selectedChartType === item.id ? 'bg-label-chip-url-bg' : '',
+            isChartDisabled(item) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+          ]"
+          @click="!isChartDisabled(item) && $emit('update:selectedChartType', item.id)"
           data-test="dashboard-addpanel-chart-selection-item"
+          :data-test-selected="selectedChartType === item.id ? item.id : undefined"
         >
-          <q-item-section
+          <div
             :data-test="`selected-chart-${item.id}-item`"
-            class=""
+            :data-selected="selectedChartType === item.id ? 'true' : 'false'"
+            class="relative flex flex-col items-center"
           >
-            <q-icon
-              size="sm"
-              color="primary"
-              :name="item.image"
-              class="q-mx-auto q-my-sm"
+            <img
+              :src="item.image.replace('img:', '')"
+              :alt="item.title"
+              class="mx-auto my-2 scheme-light dark:scheme-dark"
+              :class="item.id === 'maps' ? 'h-6 w-8' : 'h-6 w-6'"
               data-test="dashboard-addpanel-chart-selection-icon"
             />
-            <!-- <q-item-label
-              class="q-pa-none q-mx-auto"
-              style="text-align: center; font-size: 8px;"
-              caption
-              >{{ item.title }}</q-item-label
-            > -->
-            <q-tooltip
-              style="text-align: center"
-              caption
-              data-test="dashboard-addpanel-chart-selection-tooltip"
-              >{{ item.title }}</q-tooltip
-            >
-          </q-item-section>
-        </q-item>
-      </q-list>
+            <OTooltip class="text-center" :content="item.title" />
+          </div>
+        </li>
+      </ul>
     </div>
   </div>
 </template>
@@ -94,141 +55,171 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineComponent, inject, ref } from "vue";
 import { getImageURL } from "../../../utils/zincutils";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 export default defineComponent({
   name: "ChartSelection",
   props: ["selectedChartType", "allowedchartstype"],
   emits: ["update:selectedChartType"],
 
-  setup() {
+  setup(props) {
     const store = useStore();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     // array of charts
     const chartsArray = ref([
       {
-        image: "img:" + getImageURL("images/dashboard/charts/area.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/area.svg"),
         title: t("dashboard.areaLabel"),
         id: "area",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/area-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/area-graph.svg"),
         title: t("dashboard.areaStackedLabel"),
         id: "area-stacked",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/bar-chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/bar-chart.svg"),
         title: t("dashboard.barLabel"),
         id: "bar",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/bar-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/bar-graph.svg"),
         title: t("dashboard.horizontalLabel"),
         id: "h-bar",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/line-chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/line-chart.svg"),
         title: t("dashboard.lineLabel"),
         id: "line",
       },
       {
-        image:
-          "img:" + getImageURL("images/dashboard/charts/scatter-graph.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/scatter-graph.svg"),
         title: t("dashboard.scatterLabel"),
         id: "scatter",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/stacked.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/stacked.svg"),
         title: t("dashboard.stackedLabel"),
         id: "stacked",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/h-stacked.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/h-stacked.svg"),
         title: t("dashboard.hstackedLabel"),
         id: "h-stacked",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/geomap.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/geomap.svg"),
         title: t("dashboard.geomapLabel"),
         id: "geomap",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/world-map.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/world-map.svg"),
         title: t("dashboard.worldmapLabel"),
         id: "maps",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/pie-chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/pie-chart.svg"),
         title: t("dashboard.pieLabel"),
         id: "pie",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/donut-chart.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/donut-chart.svg"),
         title: t("dashboard.donutLabel"),
         id: "donut",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/heatmap.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/heatmap.svg"),
         title: t("dashboard.heatmapLabel"),
         id: "heatmap",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/table.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/table.svg"),
         title: t("dashboard.tableLabel"),
         id: "table",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/123.png"),
+        image: "img:" + getImageURL("images/dashboard/charts/123.svg"),
         title: t("dashboard.metricTextLabel"),
         id: "metric",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/Gauge.png"),
-        title: "Gauge",
+        image: "img:" + getImageURL("images/dashboard/charts/Gauge.svg"),
+        title: t("dashboard.chartSelection.gauge"),
         id: "gauge",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/HTML.png"),
-        title: "HTML",
+        image: "img:" + getImageURL("images/dashboard/charts/HTML.svg"),
+        title: t("dashboard.chartSelection.html"),
         id: "html",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/Markdown.svg"),
-        title: "Markdown",
+        title: t("dashboard.chartSelection.markdown"),
         id: "markdown",
       },
       {
         image: "img:" + getImageURL("images/dashboard/charts/sankey.svg"),
-        title: "Sankey",
+        title: t("dashboard.chartSelection.sankey"),
         id: "sankey",
       },
       {
-        image: "img:" + getImageURL("images/dashboard/charts/chart.png"),
-        title: "Custom Chart",
+        image: "img:" + getImageURL("images/dashboard/charts/chart.svg"),
+        title: t("dashboard.chartSelection.customChart"),
         id: "custom_chart",
       },
     ]);
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { promqlMode, dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { promqlMode, dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
+
+    const promqlAllowedCharts = new Set([
+      "line",
+      "area",
+      "bar",
+      "scatter",
+      "area-stacked",
+      "metric",
+      "gauge",
+      "pie",
+      "donut",
+      "table",
+      "heatmap",
+      "h-bar",
+      "stacked",
+      "h-stacked",
+      "geomap",
+      "maps",
+      "html",
+      "markdown",
+      "custom_chart",
+    ]);
+
+    const isChartDisabled = (item: any) => {
+      if (promqlMode.value && !promqlAllowedCharts.has(item.id)) {
+        return true;
+      }
+      if (
+        props.allowedchartstype &&
+        props.allowedchartstype.length > 0 &&
+        !props.allowedchartstype.includes(item.id)
+      ) {
+        return true;
+      }
+      return false;
+    };
+
     return {
       t,
       ChartsArray: chartsArray,
       promqlMode,
       dashboardPanelData,
       store,
+      isChartDisabled,
     };
   },
-  components: {},
+  components: { OTooltip },
 });
 </script>
-
-<style scoped>
-</style>

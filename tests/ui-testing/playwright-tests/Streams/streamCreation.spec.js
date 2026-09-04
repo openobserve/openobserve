@@ -16,6 +16,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
+const { isCloudEnvironment } = require('../../pages/cloudPages/cloud-env.js');
 
 // Test stream names - all prefixed for easy cleanup
 const TEST_STREAMS = {
@@ -196,6 +197,7 @@ test.describe('Stream Creation', { tag: ['@streams', '@all', '@streamCreation'] 
     test('TC005: Duplicate stream name shows error', {
         tag: ['@edgeCase', '@P2']
     }, async ({ page }) => {
+        test.skip(isCloudEnvironment(), 'Cloud does not show duplicate stream error toast');
         testLogger.info('TC005: Testing duplicate stream error');
 
         const streamName = TEST_STREAMS.duplicate;

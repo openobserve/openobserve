@@ -1,4 +1,4 @@
-<!-- Copyright 2026 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,197 +15,162 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height no-wrap tw:w-[70vw]!">
-    <!-- Header -->
-    <q-card-section class="tw:px-2 tw:py-[0.625rem]!">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <!-- Event Header -->
-          <div>
-            <div class="row items-center justify-between tw:mb-[0.625rem]">
-              <div
-                class="row items-center tw:w-full tw:max-w-[calc(100%-1.9rem)]"
-              >
+  <ODrawer
+    data-test="event-detail-drawer"
+    bleed
+    :open="open"
+    size="xl"
+    @update:open="emit('update:open', $event)"
+  >
+    <template #header>
+      <div class="w-full px-1 py-2.5">
+        <div class="flex w-full flex-nowrap items-center">
+          <div class="flex w-full flex-col">
+            <!-- Event Header -->
+            <div class="mb-2.5 flex items-center justify-between">
+              <div class="flex w-full items-center">
                 <div
-                  class="tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-semibold tw:uppercase tw:mr-1.5"
+                  class="rounded-default text-3xs me-1.5 px-1.5 py-0.5 font-semibold uppercase"
                   :class="getEventTypeClass(event.type)"
                 >
                   {{ event.type }}
                 </div>
 
-                <template
-                  v-if="
-                    event.frustration_types &&
-                    event.frustration_types.length > 0
-                  "
-                >
+                <template v-if="event.frustration_types && event.frustration_types.length > 0">
                   <FrustrationEventBadge
                     :frustration-types="event.frustration_types"
-                    class="q-mr-xs inline"
+                    class="me-1 inline"
                   />
                 </template>
                 <div
-                  class="tw:text-sm tw:semi-bold tw:leading-tight tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:max-w-[calc(100%-12rem)]"
+                  class="semi-bold flex-1 overflow-hidden text-sm leading-tight text-ellipsis whitespace-nowrap"
                   :title="event.name"
                 >
                   {{ event.name }}
                 </div>
               </div>
-              <div class="col-auto">
-                <q-btn
-                  round
-                  flat
-                  dense
-                  size="sm"
-                  icon="cancel"
-                  data-test="close-drawer-btn"
-                  @click="$emit('close')"
-                />
-              </div>
             </div>
             <div
               data-test="event-session-meta-data"
-              class="row items-center tw:flex-wrap tw:gap-x-3 tw:gap-y-1 event-metadata"
+              class="event-metadata flex flex-wrap items-center gap-x-3 gap-y-1"
             >
-              <div class="text-caption ellipsis tw:flex tw:items-center">
-                <q-icon name="language" size="0.75rem" class="q-pr-xs" />
+              <div class="flex items-center truncate text-xs">
+                <OIcon name="language" size="sm" class="pe-1" />
                 {{ sessionDetails.ip }}
               </div>
-              <div class="text-caption tw:flex tw:items-center">
-                <q-icon :name="outlinedCode" size="1rem" class="q-pr-xs" />
-                {{ rawEvent.service || "Unknown User" }}
+              <div class="flex items-center text-xs">
+                <OIcon name="code" size="sm" class="pe-1" />
+                {{ rawEvent.service || t("common.unknownUser") }}
               </div>
-              <div class="text-caption tw:flex tw:items-center">
-                V {{ rawEvent.version || "Unknown User" }}
+              <div class="flex items-center text-xs">
+                {{ t("common.versionAbbreviation") }}
+                {{ rawEvent.version || t("common.unknownUser") }}
               </div>
-              <div class="text-caption tw:flex tw:items-center">
-                <q-icon name="mail" size="0.75rem" class="q-pr-xs" />
-                {{ sessionDetails.user_email || "Unknown User" }}
+              <div class="flex items-center text-xs">
+                <OIcon name="mail" size="sm" class="pe-1" />
+                {{ sessionDetails.user_email || t("common.unknownUser") }}
               </div>
-              <div class="text-caption ellipsis tw:flex tw:items-center">
-                <q-icon name="settings" size="0.75rem" class="q-pr-xs" />
+              <div class="flex items-center truncate text-xs">
+                <OIcon name="settings" size="sm" class="pe-1" />
                 {{ sessionDetails.browser }}, {{ sessionDetails.os }}
               </div>
-              <div class="text-caption ellipsis tw:flex tw:items-center">
-                <q-icon name="location_on" size="0.75rem" class="q-pr-xs" />
+              <div class="flex items-center truncate text-xs">
+                <OIcon name="location-on" size="sm" class="pe-1" />
                 {{ sessionDetails.city }}, {{ sessionDetails.country }}
               </div>
-              <div class="text-caption ellipsis tw:flex tw:items-center">
-                <q-icon name="schedule" size="0.75rem" class="q-pr-xs" />
+              <div class="flex items-center truncate text-xs">
+                <OIcon name="schedule" size="sm" class="pe-1" />
                 {{ sessionDetails.date }}
               </div>
             </div>
           </div>
         </div>
       </div>
-    </q-card-section>
+    </template>
 
     <!-- Tabs Navigation -->
-    <q-separator />
-    <div class="row q-pt-sm q-px-sm">
-      <div class="col-12">
-        <q-tabs v-model="activeTab" shrink align="left">
-          <q-tab
+    <div class="px-page-edge flex pt-2">
+      <div class="w-full">
+        <OTabs v-model="activeTab" align="left" dense>
+          <OTab
             data-test="event-detail-overview-tab"
             name="overview"
-            label="Overview"
+            :label="t('common.overview')"
           />
-          <q-tab
-            data-test="event-detail-network-tab"
-            name="network"
-            label="Network"
-          />
-          <q-tab
+          <OTab data-test="event-detail-network-tab" name="network" :label="t('common.network')" />
+          <OTab
             data-test="event-detail-attributes-tab"
             name="attributes"
-            label="Attributes"
+            :label="t('common.attributes')"
           />
-        </q-tabs>
+        </OTabs>
       </div>
     </div>
 
-    <q-separator />
-
     <!-- Tab Content -->
-    <q-tab-panels
+    <OTabPanels
       v-model="activeTab"
       animated
       keep-alive
-      class="tw:flex-1 tw:overflow-y-auto"
+      grow
+      scroll="y"
       data-test="tab-content-container"
     >
       <!-- Overview Tab -->
-      <q-tab-panel name="overview" class="q-pa-sm" data-test="overview-tab">
+      <OTabPanel name="overview" padding="sm" data-test="overview-tab">
         <template v-if="event && Object.keys(event).length">
           <!-- Error Details -->
-          <div
-            v-if="event.type === 'error'"
-            class="tw:mb-3"
-            data-test="error-details"
-          >
-            <div class="tw:font-bold tw:mb-1 tw:text-sm">Error Details</div>
+          <div v-if="event.type === 'error'" class="mb-3" data-test="error-details">
+            <div class="mb-1 text-sm font-bold">{{ t("common.errorDetails") }}</div>
             <div>
               <div
                 v-if="rawEvent?.error_type"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+                class="border-card-glass-border flex border-b border-solid px-1.5 py-1 text-xs"
               >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  Error Type:
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.errorTypeLabel") }}
                 </div>
-                <div class="tw:flex-1 tw:break-words">
+                <div class="flex-1 break-words">
                   {{ rawEvent.error_type }}
                 </div>
               </div>
               <div
                 v-if="rawEvent?.error_message"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+                class="border-card-glass-border flex border-b border-solid px-1.5 py-1 text-xs"
               >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  Message:
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.messageLabel") }}
                 </div>
-                <div class="tw:flex-1 tw:break-words">
+                <div class="flex-1 break-words">
                   {{ rawEvent.error_message }}
                 </div>
               </div>
               <div
                 v-if="rawEvent?.error_handling"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+                class="border-card-glass-border flex border-b border-solid px-1.5 py-1 text-xs"
               >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  Handling:
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.handlingLabel") }}
                 </div>
-                <div class="tw:flex-1 tw:break-words">
+                <div class="flex-1 break-words">
                   <span
-                    class="tw:px-1 tw:py-0.5 tw:rounded tw:text-[10px]"
+                    class="rounded-default text-3xs px-1 py-0.5"
                     :class="
                       rawEvent.error_handling === 'unhandled'
-                        ? 'text-red-6 tw:border tw:border-solid tw:border-red-6'
-                        : 'text-grey-8'
+                        ? 'text-status-error-text border-status-negative border border-solid'
+                        : 'text-text-secondary'
                     "
                   >
                     {{ rawEvent.error_handling }}
                   </span>
                 </div>
               </div>
-              <div
-                v-if="rawEvent?.error_id"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:text-xs"
-              >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  Error ID:
+              <div v-if="rawEvent?.error_id" class="flex px-1.5 py-1 text-xs">
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.errorIdLabel") }}
                 </div>
-                <div class="tw:flex-1 tw:break-words">
-                  <code
-                    class="tw:font-mono tw:text-[10px] tw:px-1 tw:py-0.5 tw:bg-[var(--o2-hover-accent)] tw:rounded"
-                  >
+                <div class="flex-1 break-words">
+                  <code class="text-3xs bg-surface-accent rounded-default px-1 py-0.5 font-mono">
                     {{ formatId(rawEvent.error_id) }}
                   </code>
                 </div>
@@ -214,55 +179,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- View Details -->
-          <div
-            v-if="event.type === 'view'"
-            class="tw:mb-3"
-            data-test="view-details"
-          >
-            <div class="tw:font-bold tw:mb-1 tw:text-sm">View Details</div>
+          <div v-if="event.type === 'view'" class="mb-3" data-test="view-details">
+            <div class="mb-1 text-sm font-bold">{{ t("common.viewDetails") }}</div>
             <div>
               <div
                 v-if="rawEvent?.view_loading_type"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+                class="border-card-glass-border flex border-b border-solid px-1.5 py-1 text-xs"
               >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  Loading Type:
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.loadingTypeLabel") }}
                 </div>
-                <div class="tw:flex-1 text-capitalize tw:break-words">
+                <div class="flex-1 break-words capitalize">
                   {{ rawEvent.view_loading_type.replace("_", " ") }}
                 </div>
               </div>
               <div
                 v-if="rawEvent?.view_url"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)] tw:text-xs"
+                class="border-card-glass-border flex border-b border-solid px-1.5 py-1 text-xs"
               >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  URL:
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.urlLabel") }}
                 </div>
                 <div
-                  class="tw:flex-1 tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap"
+                  class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
                   :title="rawEvent.view_url"
                 >
                   {{ rawEvent.view_url }}
                 </div>
               </div>
-              <div
-                v-if="rawEvent?.view_id"
-                class="tw:flex tw:py-1 tw:px-1.5 tw:text-xs"
-              >
-                <div
-                  class="tw:w-[100px] tw:font-medium tw:text-[var(--o2-text-secondary)] tw:shrink-0"
-                >
-                  View ID:
+              <div v-if="rawEvent?.view_id" class="flex px-1.5 py-1 text-xs">
+                <div class="text-text-secondary w-25 shrink-0 font-medium">
+                  {{ t("common.viewIdLabel") }}
                 </div>
-                <div class="tw:flex-1 tw:break-words">
-                  <code
-                    class="tw:font-mono tw:text-[10px] tw:px-1 tw:py-0.5 tw:bg-[var(--o2-hover-accent)] tw:rounded"
-                  >
+                <div class="flex-1 break-words">
+                  <code class="text-3xs bg-surface-accent rounded-default px-1 py-0.5 font-mono">
                     {{ formatId(rawEvent.view_id) }}
                   </code>
                 </div>
@@ -273,38 +223,38 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Action Details -->
           <EventDetailsSection
             v-if="event.type === 'action'"
-            title="Action Details"
+            :title="t('common.actionDetails')"
             :fields="actionFields"
             data-test="action-details"
-            class="tw:mb-3"
+            class="mb-3"
           />
 
           <!-- Related Events for Actions -->
-          <div v-if="event.type === 'action'" class="tw:mb-3">
+          <div v-if="event.type === 'action'" class="mb-3">
             <template v-if="isLoadingRelatedResources">
-              <div class="tw:mt-2 tw:p-2 text-center">
-                <q-spinner-hourglass color="primary" size="1rem" />
-                <div class="tw:mt-1 text-grey-7 tw:text-xs">
-                  Loading related events...
+              <div class="mt-2 p-2 text-center">
+                <OSpinner size="xs" />
+                <div class="text-text-secondary mt-1 text-xs">
+                  {{ t("common.loadingRelatedEvents") }}
                 </div>
               </div>
             </template>
             <template v-else-if="relatedResources.length > 0">
-              <div class="tw:font-bold tw:mb-1 tw:text-sm">
-                Related Events ({{ relatedResources.length }})
+              <div class="mb-1 text-sm font-bold">
+                {{ t("common.relatedEvents") }} ({{ relatedResources.length }})
               </div>
               <div>
                 <div
                   v-for="item in relatedResources"
                   :key="item[`${item.type}_id`] || item.id"
-                  class="tw:p-1.5 tw:mb-1 tw:bg-[var(--o2-hover-accent)] tw:rounded tw:cursor-pointer hover:tw:bg-[#e0e0e0] tw:transition-colors"
+                  class="bg-surface-accent rounded-default hover:bg-interactive-hover-bg mb-1 cursor-pointer p-1.5 transition-colors"
                   data-test="related-resource-item"
                   @click="viewResourceDetails(item)"
                 >
                   <!-- Event Type Badge -->
-                  <div class="row items-center tw:mb-0.5">
+                  <div class="mb-0.5 flex items-center">
                     <div
-                      class="tw:px-1 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-semibold tw:uppercase tw:mr-1.5"
+                      class="rounded-default text-3xs me-1.5 px-1 py-0.5 font-semibold uppercase"
                       :class="getEventTypeClass(item.type)"
                     >
                       {{ item.type }}
@@ -312,149 +262,122 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
-                      <span
-                        class="tw:mr-1 text-bold tw:text-[10px] tw:text-[var(--o2-primary-btn-bg)]"
-                      >
+                      <span class="text-3xs text-button-primary me-1 font-bold">
                         {{ item.resource_method || "GET" }}
                       </span>
-                      <span
-                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
-                      >
+                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
                         {{ item.resource_url }}
                       </span>
                     </template>
 
                     <!-- Error -->
                     <template v-else-if="item.type === 'error'">
-                      <span
-                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
-                      >
+                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
                         {{ item.error_message || item.error_type }}
                       </span>
                     </template>
 
                     <!-- View -->
                     <template v-else-if="item.type === 'view'">
-                      <span
-                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
-                      >
+                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
                         {{ item.view_url }}
                       </span>
                     </template>
 
                     <!-- Action -->
                     <template v-else-if="item.type === 'action'">
-                      <span
-                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
-                      >
-                        {{ item.action_type }} on {{ item.action_target_name }}
+                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
+                        {{ item.action_type }} {{ t("common.on") }} {{ item.action_target_name }}
                       </span>
                     </template>
 
                     <!-- Other -->
                     <template v-else>
-                      <span
-                        class="tw:overflow-hidden tw:text-ellipsis tw:whitespace-nowrap tw:text-xs"
-                      >
-                        {{ item.type }} event
+                      <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
+                        {{ item.type }} {{ t("common.event") }}
                       </span>
                     </template>
                   </div>
 
                   <!-- Event Details Row -->
-                  <div class="tw:flex items-center text-grey-7 tw:text-[10px]">
-                    <q-icon name="schedule" size="0.75rem" class="tw:mr-1" />
-                    <span class="tw:mr-2">{{
-                      formatTimestamp(item.date)
-                    }}</span>
+                  <div class="text-text-secondary text-3xs flex items-center">
+                    <OIcon name="schedule" size="xs" class="me-1" />
+                    <span class="me-2">{{ formatTimestamp(item.date) }}</span>
 
                     <!-- Resource-specific details -->
                     <template v-if="item.type === 'resource'">
-                      <q-icon
-                        name="access_time"
-                        size="0.75rem"
-                        class="tw:mr-0.5"
-                      />
-                      <span class="tw:mr-2">{{
+                      <OIcon name="access-time" size="xs" class="me-0.5" />
+                      <span class="me-2">{{
                         formatDuration(item.resource_duration / 1000000)
                       }}</span>
-                      <q-icon
+                      <OIcon
                         :name="getStatusIcon(item.resource_status_code)"
-                        :color="getStatusColor(item.resource_status_code)"
-                        size="0.75rem"
-                        class="tw:mr-0.5"
+                        :class="['me-0.5', getStatusColorClass(item.resource_status_code)]"
+                        size="xs"
                       />
                       <span>{{ item.resource_status_code }}</span>
                     </template>
 
                     <!-- Clickable Trace Button -->
-                    <q-btn
-                      v-if="item._oo_trace_id"
-                      dense
-                      :icon="outlinedAccountTree"
-                      outline
-                      size="0.75rem"
-                      class="tw:ml-[0.625rem]! tw:py-[0]! tw:px-[0.2rem]! tw:border-1! tw:border-[var(--o2-theme-color)]! tw:text-[var(--o2-theme-color)]!"
-                      title="View trace details"
+                    <OButton
+                      v-if="rumField(item, 'trace_id')"
+                      variant="outline"
+                      size="xs"
+                      :title="t('common.viewTraceDetails')"
                       data-test="view-trace-btn"
-                      @click.stop="navigateToSpecificTrace(item._oo_trace_id)"
+                      class="ms-2 h-5! px-1.5"
+                      :loading="isResolvingTraceNav"
+                      @click.stop="navigateToSpecificTrace(rumField(item, 'trace_id'))"
                     >
-                      <span
-                        v-if="item._oo_trace_id"
-                        class="tw:text-[10px] tw:pl-[0.2rem] tw:py-[0]! tw:text-[var(--o2-theme-primary)]"
-                      >
-                        Trace
-                      </span>
-                    </q-btn>
+                      <OIcon name="account-tree" size="xs" />
+                      <span v-if="rumField(item, 'trace_id')">{{ t("common.viewTrace") }}</span>
+                    </OButton>
                   </div>
                 </div>
               </div>
             </template>
           </div>
         </template>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Network Tab -->
-      <q-tab-panel name="network" class="q-pa-sm" data-test="network-tab">
+      <OTabPanel name="network" padding="sm" data-test="network-tab">
         <template v-if="networkResources.length > 0">
-          <div class="tw:font-bold tw:mb-2 tw:text-sm">
-            Network Requests ({{ networkResources.length }})
+          <div class="mb-2 text-sm font-bold">
+            {{ t("common.networkRequests") }} ({{ networkResources.length }})
           </div>
           <div>
             <div
               v-for="resource in networkResources"
               :key="resource.resource_id"
-              class="tw:p-2 tw:mb-2 tw:bg-[var(--o2-hover-accent)] tw:rounded"
+              class="bg-surface-accent rounded-default mb-2 p-2"
               data-test="network-resource-item"
             >
-              <div class="tw:flex tw:items-center tw:mb-1">
+              <div class="mb-1 flex items-center">
                 <span
-                  class="tw:px-1.5 tw:py-0.5 tw:rounded tw:text-[10px] tw:font-bold tw:mr-2 tw:bg-blue-100 tw:text-blue-700"
+                  class="rounded-default text-3xs bg-badge-blue-soft-bg text-badge-blue-soft-text me-2 px-1.5 py-0.5 font-bold"
                 >
                   {{ resource.resource_method || "GET" }}
                 </span>
-                <span class="tw:text-xs tw:break-all">
+                <span class="text-xs break-all">
                   {{ resource.resource_url }}
                 </span>
               </div>
-              <div
-                class="row items-center tw:gap-x-3 tw:text-[10px] text-grey-7"
-              >
-                <div class="tw:flex tw:items-center">
-                  <q-icon name="access_time" size="0.75rem" class="tw:mr-1" />
+              <div class="text-3xs text-text-secondary flex items-center gap-x-3">
+                <div class="flex items-center">
+                  <OIcon name="access-time" size="xs" class="me-1" />
                   {{ formatDuration(resource.resource_duration / 1000000) }}
                 </div>
-                <div class="tw:flex tw:items-center">
-                  <q-icon
+                <div class="flex items-center">
+                  <OIcon
                     :name="getStatusIcon(resource.resource_status_code)"
-                    :color="getStatusColor(resource.resource_status_code)"
-                    size="0.75rem"
-                    class="tw:mr-1"
+                    :class="['me-1', getStatusColorClass(resource.resource_status_code)]"
+                    size="xs"
                   />
                   {{ resource.resource_status_code }}
                 </div>
-                <div class="tw:flex tw:items-center">
-                  <q-icon name="schedule" size="0.75rem" class="tw:mr-1" />
+                <div class="flex items-center">
+                  <OIcon name="schedule" size="xs" class="me-1" />
                   {{ formatTimestamp(resource.date) }}
                 </div>
               </div>
@@ -463,57 +386,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </template>
         <div
           v-else
-          class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm"
+          class="text-text-muted py-8 text-center text-sm"
           data-test="network-empty-state"
         >
-          No network requests found for this event
+          {{ t("common.noNetworkRequestsFound") }}
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Console Tab -->
-      <q-tab-panel name="console" class="q-pa-sm" data-test="console-tab">
-        <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
-          Console logs coming soon
+      <OTabPanel name="console" padding="sm" data-test="console-tab">
+        <div class="text-text-muted py-8 text-center text-sm">
+          {{ t("common.consoleLogsComingSoon") }}
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Performance Tab -->
-      <q-tab-panel
-        name="performance"
-        class="q-pa-sm"
-        data-test="performance-tab"
-      >
-        <div class="tw:text-center tw:py-8 tw:text-grey-6 tw:text-sm">
-          Performance metrics coming soon
+      <OTabPanel name="performance" padding="sm" data-test="performance-tab">
+        <div class="text-text-muted py-8 text-center text-sm">
+          {{ t("common.performanceMetricsComingSoon") }}
         </div>
-      </q-tab-panel>
+      </OTabPanel>
 
       <!-- Attributes Tab -->
-      <q-tab-panel name="attributes" class="q-pa-sm" data-test="attributes-tab">
-        <div class="tw:flex tw:justify-start">
-          <q-btn
-            :label="t('common.copyToClipboard')"
-            dense
-            size="sm"
-            no-caps
-            class="q-px-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
-            icon="content_copy"
-            @click="copyAttributesToClipboard"
+      <OTabPanel name="attributes" padding="sm" data-test="attributes-tab">
+        <div class="flex justify-start">
+          <OButton
+            icon-left="content-copy"
+            variant="outline"
+            size="xs"
             data-test="attributes-copy-btn"
-          />
+            @click="copyAttributesToClipboard"
+          >
+            {{ t("common.copyToClipboard") }}
+          </OButton>
         </div>
         <div
-          class="tw:p-2 tw:rounded tw:overflow-x-auto tw:font-mono tw:text-[10px]"
+          class="rounded-default text-3xs overflow-x-auto p-2 font-mono"
           data-test="raw-event-json"
         >
           <div>
             {
-            <div
-              v-for="(key, index) in Object.keys(rawEvent)"
-              :key="key"
-              class="tw:ml-4"
-            >
-              <span :class="store.state.theme === 'dark' ? 'dark' : ''">
+            <div v-for="(key, index) in Object.keys(rawEvent)" :key="key" class="ms-4">
+              <span>
                 <LogsHighLighting
                   :data="{ [key]: rawEvent[key] }"
                   :show-braces="false"
@@ -524,30 +438,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             }
           </div>
         </div>
-      </q-tab-panel>
-    </q-tab-panels>
-  </q-card>
+      </OTabPanel>
+    </OTabPanels>
+  </ODrawer>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { rumField, normalizeTraceId } from "@/utils/rum/fields";
+import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
+import { traceQueryWindow } from "@/utils/rum/traceWindow";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import { ref, watch, computed, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
-import { useQuasar, copyToClipboard } from "quasar";
-import { useI18n } from "vue-i18n";
+import { copyToClipboard } from "@/utils/clipboard";
+import { raw, useI18nTyped } from "@/types/i18n";
 import searchService from "@/services/search";
-import {
-  outlinedAccountTree,
-  outlinedCode,
-} from "@quasar/extras/material-icons-outlined";
 import FrustrationEventBadge from "./FrustrationEventBadge.vue";
 import LogsHighLighting from "@/components/logs/LogsHighLighting.vue";
 import EventDetailsSection from "./common/EventDetailsSection.vue";
-import EventTypeBadge from "./common/EventTypeBadge.vue";
 import { useEventFormatters } from "@/composables/useEventFormatters";
 import { formatDuration } from "@/utils/zincutils";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
   event: {
     type: Object,
     default: () => ({}),
@@ -574,109 +498,49 @@ const props = defineProps({
   },
 });
 
-const emit = defineEmits(["close", "resource-selected"]);
+const emit = defineEmits(["update:open", "resource-selected"]);
 
 const store = useStore();
 const router = useRouter();
-const q = useQuasar();
-const { t } = useI18n();
+const { t } = useI18nTyped();
+const { resolveTraceLocation, cancel: cancelCorrelatedTracesStream } = useCorrelatedTracesStream(t);
+
+onUnmounted(() => cancelCorrelatedTracesStream());
 const relatedResources = ref<any[]>([]);
 const isLoadingRelatedResources = ref(false);
 const selectedResourceWithTrace = ref<any>(null);
 const activeTab = ref("overview");
 
-const {
-  formatTimestamp,
-  formatId,
-  getStatusIcon,
-  getStatusColor,
-  formatResourceDuration,
-  getEventTypeClass,
-} = useEventFormatters();
+const { formatTimestamp, formatId, getStatusIcon, getStatusColorClass, getEventTypeClass } =
+  useEventFormatters();
 
 const copyAttributesToClipboard = () => {
-  copyToClipboard(JSON.stringify(props.rawEvent, null, 2))
-    .then(() => {
-      q.notify({
-        type: "positive",
-        message: t("common.copyToClipboard") + " - " + t("common.success"),
-        timeout: 1500,
-      });
-    })
-    .catch(() => {
-      q.notify({
-        type: "negative",
-        message: "Error while copying content.",
-        timeout: 1500,
-      });
-    });
+  copyToClipboard(JSON.stringify(props.rawEvent, null, 2), t, {
+    successMessage: t("common.copyToClipboardSuccess"),
+    errorMessage: t("common.copyContentError"),
+    timeout: 1500,
+  });
 };
 
 const networkResources = computed(() => {
   return relatedResources.value.filter((item) => item.type === "resource");
 });
 
-// Computed fields for different event types
-const errorFields = computed(() => [
-  {
-    key: "error_type",
-    label: "Error Type",
-    value: props.rawEvent?.error_type,
-  },
-  {
-    key: "error_message",
-    label: "Message",
-    value: props.rawEvent?.error_message,
-  },
-  {
-    key: "error_handling",
-    label: "Handling",
-    value: props.rawEvent?.error_handling,
-    slot: true,
-  },
-  {
-    key: "error_id",
-    label: "Error ID",
-    value: props.rawEvent?.error_id,
-    slot: true,
-  },
-]);
-
-const viewFields = computed(() => [
-  {
-    key: "view_loading_type",
-    label: "Loading Type",
-    value: props.rawEvent?.view_loading_type?.replace("_", " "),
-    valueClass: "text-capitalize",
-  },
-  {
-    key: "view_url",
-    label: "URL",
-    value: props.rawEvent?.view_url,
-  },
-  {
-    key: "view_id",
-    label: "View ID",
-    value: props.rawEvent?.view_id,
-    slot: true,
-  },
-]);
-
 const actionFields = computed(() => [
   {
     key: "action_type",
-    label: "Action Type",
-    value: props.rawEvent?.action_type || "N/A",
-    valueClass: "text-capitalize",
+    label: t("common.actionType"),
+    value: props.rawEvent?.action_type || raw("N/A"),
+    valueClass: "capitalize",
   },
   {
     key: "action_target_name",
-    label: "Target",
-    value: props.rawEvent?.action_target_name || "N/A",
+    label: t("common.actionTarget"),
+    value: props.rawEvent?.action_target_name || raw("N/A"),
   },
   {
     key: "action_id",
-    label: "Action ID",
+    label: t("common.actionId"),
     value: props.rawEvent?.action_id,
     slot: true,
   },
@@ -715,9 +579,7 @@ const fetchRelatedResources = async () => {
     relatedResources.value = res.data.hits || [];
 
     // Auto-select first resource with trace_id for trace correlation
-    const resourceWithTrace = relatedResources.value.find(
-      (r: any) => r._oo_trace_id,
-    );
+    const resourceWithTrace = relatedResources.value.find((r: any) => rumField(r, "trace_id"));
     if (resourceWithTrace) {
       selectedResourceWithTrace.value = resourceWithTrace;
     }
@@ -740,7 +602,7 @@ watch(
 
 const viewResourceDetails = (resource: any) => {
   // Update selected resource for trace correlation
-  if (resource._oo_trace_id) {
+  if (rumField(resource, "trace_id")) {
     selectedResourceWithTrace.value = resource;
   }
 
@@ -753,12 +615,17 @@ const viewResourceDetails = (resource: any) => {
  * Used when clicking on individual trace icons
  * Opens in a new tab
  */
-const navigateToSpecificTrace = (traceId: string) => {
-  if (!traceId) return;
+const isResolvingTraceNav = ref(false);
+const navigateToSpecificTrace = async (traceId: string) => {
+  // Canonicalize: SDK 0.4.x stored ids zero-stripped, but the traces stream
+  // (and therefore the trace-details page) uses the padded 32-char form.
+  const canonicalTraceId = normalizeTraceId(traceId) || traceId;
+  if (!canonicalTraceId) return;
 
   // Find the resource with this trace_id to get timing information
   const resource = relatedResources.value.find(
-    (r: any) => r._oo_trace_id === traceId,
+    (r: any) =>
+      (normalizeTraceId(rumField(r, "trace_id")) || rumField(r, "trace_id")) === canonicalTraceId,
   );
 
   // Use resource timing if available, otherwise use event timing
@@ -769,27 +636,35 @@ const navigateToSpecificTrace = (traceId: string) => {
     ? resource.date * 1000 + 10000000 // 10 seconds after
     : props.rawEvent?.date * 1000 + 10000000;
 
-  // Build the route object
-  const route = router.resolve({
-    name: "traceDetails",
-    query: {
-      stream: "default", // RUM traces stream
-      trace_id: traceId,
-      from: startTime,
-      to: endTime,
-      org_identifier: store.state.selectedOrganization.identifier,
-    },
-  });
-
-  // Open in new tab
-  window.open(route.href, "_blank");
+  // Popup-safe: window.open after an await loses the user-gesture context and
+  // popup blockers kill the tab — open synchronously, then point the window at
+  // whichever traces stream actually contains the trace (discovered + cached;
+  // falls back to the default correlation stream).
+  const win = window.open("", "_blank");
+  isResolvingTraceNav.value = true;
+  try {
+    const location = await resolveTraceLocation(canonicalTraceId, startTime, endTime);
+    // The ±10s guess above only frames the lookup; the indexed range is what
+    // the trace actually spans, so a slow call is no longer cut off.
+    const traceWindow = traceQueryWindow(location.range, startTime, endTime);
+    const route = router.resolve({
+      name: "traceDetails",
+      query: {
+        stream: location.stream,
+        trace_id: canonicalTraceId,
+        from: traceWindow.startTime,
+        to: traceWindow.endTime,
+        org_identifier: store.state.selectedOrganization.identifier,
+      },
+    });
+    if (win) win.location.href = route.href;
+    else window.open(route.href, "_blank");
+  } finally {
+    isResolvingTraceNav.value = false;
+  }
 };
 
 defineExpose({
-  outlinedAccountTree,
+  outlinedAccountTree: "account-tree",
 });
 </script>
-
-<style lang="scss">
-@import "@/assets/styles/log-highlighting.css";
-</style>

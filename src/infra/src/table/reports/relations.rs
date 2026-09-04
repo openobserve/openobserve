@@ -1,4 +1,4 @@
-// Copyright 2024 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,7 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use config::meta::dashboards::reports::ReportDashboard as MetaReportDashboard;
+use config::meta::dashboards::reports::{
+    ReportAttachmentDimensions, ReportDashboard as MetaReportDashboard,
+};
 use sea_orm::{ActiveValue::NotSet, ConnectionTrait, Set};
 
 use super::{super::entity::report_dashboards, Error, intermediate, queries};
@@ -65,12 +67,23 @@ pub async fn relations_to_create<C: ConnectionTrait>(
             serde_json::to_value(updated_timerange_intermediate)?;
         let timerange = Set(updated_timerange_json);
 
+        let report_type = Set(i16::from(rltn.report_type.clone()));
+        let email_attachment_type = Set(i16::from(rltn.email_attachment_type.clone()));
+        let attachment_dimensions = Set(rltn
+            .attachment_dimensions
+            .as_ref()
+            .map(serde_json::to_value)
+            .transpose()?);
+
         to_create.push(report_dashboards::ActiveModel {
             report_id: Set(report_id.to_owned()),
             dashboard_id: Set(dashboard.id.clone()),
             tab_names,
             variables,
             timerange,
+            report_type,
+            email_attachment_type,
+            attachment_dimensions,
         });
     }
 
@@ -135,7 +148,48 @@ pub fn relations_to_update(
             NotSet
         };
 
-        if tab_names.is_not_set() && variables.is_not_set() && timerange.is_not_set() {
+        let existing_report_type = ex_rltn.report_dashboard_report_type;
+        let desired_report_type = i16::from(des_rltn.report_type.clone());
+        let report_type = if existing_report_type != desired_report_type {
+            Set(desired_report_type)
+        } else {
+            NotSet
+        };
+
+        let existing_attachment_type = ex_rltn.report_dashboard_email_attachment_type;
+        let desired_attachment_type = i16::from(des_rltn.email_attachment_type.clone());
+        let email_attachment_type = if existing_attachment_type != desired_attachment_type {
+            Set(desired_attachment_type)
+        } else {
+            NotSet
+        };
+
+        let existing_dims: Option<ReportAttachmentDimensions> = ex_rltn
+            .report_dashboard_attachment_dimensions
+            .as_ref()
+            .and_then(|v| serde_json::from_value(v.clone()).ok());
+        let attachment_dimensions = if existing_dims.as_ref().map(|d| (d.width, d.height))
+            != des_rltn
+                .attachment_dimensions
+                .as_ref()
+                .map(|d| (d.width, d.height))
+        {
+            Set(des_rltn
+                .attachment_dimensions
+                .as_ref()
+                .map(serde_json::to_value)
+                .transpose()?)
+        } else {
+            NotSet
+        };
+
+        if tab_names.is_not_set()
+            && variables.is_not_set()
+            && timerange.is_not_set()
+            && report_type.is_not_set()
+            && email_attachment_type.is_not_set()
+            && attachment_dimensions.is_not_set()
+        {
             continue;
         }
 
@@ -145,6 +199,9 @@ pub fn relations_to_update(
             tab_names,
             variables,
             timerange,
+            report_type,
+            email_attachment_type,
+            attachment_dimensions,
         });
     }
 
@@ -172,4 +229,94 @@ pub fn relations_to_delete(
         })
         .map(|e| (e.report_id.clone(), e.dashboard_id.clone()))
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::dashboards::reports::{
+        ReportDashboard as MetaReportDashboard, ReportEmailAttachmentType, ReportMediaType,
+        ReportTimerange,
+    };
+
+    use super::*;
+
+    fn make_existing(
+        report_id: &str,
+        dashboard_id: &str,
+        dashboard_snowflake_id: &str,
+        folder_snowflake_id: &str,
+    ) -> queries::JoinReportDashboardFolderResults {
+        queries::JoinReportDashboardFolderResults {
+            report_id: report_id.to_string(),
+            report_dashboard_tab_names: serde_json::json!([]),
+            report_dashboard_variables: serde_json::json!([]),
+            report_dashboard_timerange: serde_json::json!({}),
+            report_dashboard_report_type: 0,
+            report_dashboard_email_attachment_type: 0,
+            report_dashboard_attachment_dimensions: None,
+            dashboard_id: dashboard_id.to_string(),
+            dashboard_snowflake_id: dashboard_snowflake_id.to_string(),
+            dashboard_folder_id: "fk1".to_string(),
+            dashboard_folder_snowflake_id: folder_snowflake_id.to_string(),
+        }
+    }
+
+    fn make_desired(dashboard: &str, folder: &str) -> MetaReportDashboard {
+        MetaReportDashboard {
+            dashboard: dashboard.to_string(),
+            folder: folder.to_string(),
+            tabs: vec![],
+            variables: vec![],
+            timerange: ReportTimerange::default(),
+            report_type: ReportMediaType::default(),
+            email_attachment_type: ReportEmailAttachmentType::default(),
+            attachment_dimensions: None,
+        }
+    }
+
+    #[test]
+    fn test_relations_to_delete_empty_existing() {
+        let result = relations_to_delete(&[], &[make_desired("dash1", "folder1")]);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_relations_to_delete_empty_desired_removes_all() {
+        let existing = vec![
+            make_existing("r1", "dk1", "dash1", "f1"),
+            make_existing("r1", "dk2", "dash2", "f2"),
+        ];
+        let result = relations_to_delete(&existing, &[]);
+        assert_eq!(result.len(), 2);
+    }
+
+    #[test]
+    fn test_relations_to_delete_matching_kept() {
+        let existing = vec![make_existing("r1", "dk1", "dash1", "folder1")];
+        let desired = vec![make_desired("dash1", "folder1")];
+        let result = relations_to_delete(&existing, &desired);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_relations_to_delete_partial_match() {
+        let existing = vec![
+            make_existing("r1", "dk1", "dash1", "f1"),
+            make_existing("r1", "dk2", "dash2", "f2"),
+        ];
+        let desired = vec![make_desired("dash1", "f1")];
+        let result = relations_to_delete(&existing, &desired);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], ("r1".to_string(), "dk2".to_string()));
+    }
+
+    #[test]
+    fn test_relations_to_delete_folder_mismatch_counts_as_deletion() {
+        // Same dashboard but different folder — not a match, should be deleted.
+        let existing = vec![make_existing("r1", "dk1", "dash1", "folder_old")];
+        let desired = vec![make_desired("dash1", "folder_new")];
+        let result = relations_to_delete(&existing, &desired);
+        assert_eq!(result.len(), 1);
+        assert_eq!(result[0], ("r1".to_string(), "dk1".to_string()));
+    }
 }

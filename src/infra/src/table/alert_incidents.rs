@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,34 +20,19 @@
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
     QuerySelect, Set, TransactionTrait,
+    sea_query::{Expr, LockType},
 };
 use svix_ksuid::KsuidLike;
 
 use super::entity::{alert_incident_alerts, alert_incidents};
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors::{self, DbError, Error},
 };
 
-/// Find an open incident by org and correlation key
-pub async fn find_open_by_correlation_key(
-    org_id: &str,
-    correlation_key: &str,
-) -> Result<Option<alert_incidents::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-
-    alert_incidents::Entity::find()
-        .filter(alert_incidents::Column::OrgId.eq(org_id))
-        .filter(alert_incidents::Column::CorrelationKey.eq(correlation_key))
-        .filter(alert_incidents::Column::Status.ne("resolved"))
-        .one(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
-}
-
 /// Get incident by ID
 pub async fn get(org_id: &str, id: &str) -> Result<Option<alert_incidents::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     alert_incidents::Entity::find_by_id(id)
         .filter(alert_incidents::Column::OrgId.eq(org_id))
@@ -59,23 +44,23 @@ pub async fn get(org_id: &str, id: &str) -> Result<Option<alert_incidents::Model
 /// Create a new incident
 pub async fn create(
     org_id: &str,
-    correlation_key: &str,
     severity: &str,
-    stable_dimensions: serde_json::Value,
+    group_values: serde_json::Value,
+    key_type: &str,
     first_alert_at: i64,
     title: Option<String>,
 ) -> Result<alert_incidents::Model, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
     let id = svix_ksuid::Ksuid::new(None, None).to_string();
 
     let model = alert_incidents::ActiveModel {
         id: Set(id),
         org_id: Set(org_id.to_string()),
-        correlation_key: Set(correlation_key.to_string()),
         status: Set("open".to_string()),
         severity: Set(severity.to_string()),
-        stable_dimensions: Set(stable_dimensions),
+        group_values: Set(group_values),
+        key_type: Set(key_type.to_string()),
         topology_context: Set(None),
         first_alert_at: Set(first_alert_at),
         last_alert_at: Set(first_alert_at),
@@ -94,14 +79,20 @@ pub async fn create(
 }
 
 /// Add an alert to an existing incident (updates last_alert_at and alert_count)
+/// Add an alert to an incident and return whether this is the first time this
+/// `alert_id` appears in the incident (`true` = new alert type, `false` = repeat).
+///
+/// The check and the insert happen inside the same transaction to avoid the
+/// read-then-write race that would occur if they were separate operations.
 pub async fn add_alert_to_incident(
     incident_id: &str,
     alert_id: &str,
     alert_name: &str,
+    alert_kind: &str,
     alert_fired_at: i64,
     correlation_reason: &str,
-) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+) -> Result<bool, errors::Error> {
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
 
     // Use transaction for atomic update
@@ -110,12 +101,37 @@ pub async fn add_alert_to_incident(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
+    // Lock the incident row first so that concurrent transactions serialise on
+    // it. Without this lock, two READ COMMITTED transactions can both read
+    // prior_count == 0 before either commits (the PK includes alert_fired_at,
+    // so both inserts succeed), resulting in duplicate NewAlertTypeJoined
+    // notifications. FOR UPDATE is a no-op on SQLite (file-level locking
+    // already serialises writes there).
+    let incident = alert_incidents::Entity::find_by_id(incident_id)
+        .lock(LockType::Update)
+        .one(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
+        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
+
+    // With the incident row locked, check whether this alert_id already
+    // appears in the incident. Only one transaction can hold the lock at a
+    // time, so this count is stable until we commit.
+    let prior_count = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .count(&txn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let is_new_alert_type = prior_count == 0;
+
     // Insert alert link
     let alert_link = alert_incident_alerts::ActiveModel {
         incident_id: Set(incident_id.to_string()),
         alert_id: Set(alert_id.to_string()),
         alert_fired_at: Set(alert_fired_at),
         alert_name: Set(alert_name.to_string()),
+        alert_kind: Set(alert_kind.to_string()),
         correlation_reason: Set(Some(correlation_reason.to_string())),
         created_at: Set(now),
     };
@@ -124,13 +140,6 @@ pub async fn add_alert_to_incident(
         .insert(&txn)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
-
-    // Update incident: increment count, update last_alert_at
-    let incident = alert_incidents::Entity::find_by_id(incident_id)
-        .one(&txn)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?
-        .ok_or_else(|| Error::DbError(DbError::SeaORMError("Incident not found".to_string())))?;
 
     let mut active: alert_incidents::ActiveModel = incident.into();
     active.alert_count = Set(active.alert_count.unwrap() + 1);
@@ -145,7 +154,7 @@ pub async fn add_alert_to_incident(
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    Ok(())
+    Ok(is_new_alert_type)
 }
 
 /// Update incident status
@@ -154,7 +163,7 @@ pub async fn update_status(
     id: &str,
     status: &str,
 ) -> Result<alert_incidents::Model, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
 
     let incident = get(org_id, id)
@@ -181,7 +190,7 @@ pub async fn update_title(
     id: &str,
     title: &str,
 ) -> Result<alert_incidents::Model, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
 
     let incident = get(org_id, id)
@@ -204,7 +213,7 @@ pub async fn update_severity(
     id: &str,
     severity: &str,
 ) -> Result<alert_incidents::Model, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
 
     let incident = get(org_id, id)
@@ -228,17 +237,17 @@ pub async fn list(
     limit: u64,
     offset: u64,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let mut query = alert_incidents::Entity::find()
         .select_only()
         // Select all columns EXCEPT topology_context for performance
         .column(alert_incidents::Column::Id)
         .column(alert_incidents::Column::OrgId)
-        .column(alert_incidents::Column::CorrelationKey)
         .column(alert_incidents::Column::Status)
         .column(alert_incidents::Column::Severity)
-        .column(alert_incidents::Column::StableDimensions)
+        .column(alert_incidents::Column::GroupValues)
+        .column(alert_incidents::Column::KeyType)
         .column(alert_incidents::Column::FirstAlertAt)
         .column(alert_incidents::Column::LastAlertAt)
         .column(alert_incidents::Column::ResolvedAt)
@@ -254,9 +263,10 @@ pub async fn list(
         query = query.filter(alert_incidents::Column::Status.eq(s));
     }
 
+    let page_size = limit.max(1);
     query
-        .paginate(client, limit)
-        .fetch_page(offset / limit)
+        .paginate(client, page_size)
+        .fetch_page(offset / page_size)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
@@ -265,12 +275,78 @@ pub async fn list(
 pub async fn get_incident_alerts(
     incident_id: &str,
 ) -> Result<Vec<alert_incident_alerts::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     alert_incident_alerts::Entity::find()
         .filter(alert_incident_alerts::Column::IncidentId.eq(incident_id))
         .order_by_desc(alert_incident_alerts::Column::AlertFiredAt)
         .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Find an open AlertId incident that already contains a given alert_id.
+///
+/// Uses two queries (junction lookup + incident fetch) instead of loading all
+/// open incidents and calling get_incident_alerts in a loop.
+pub async fn find_open_incident_by_alert_id(
+    org_id: &str,
+    alert_id: &str,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
+    let client = get_orm_client_ro().await;
+
+    // Step 1: find all incident IDs that reference this alert_id in the junction table
+    let rows = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    if rows.is_empty() {
+        return Ok(None);
+    }
+
+    let incident_ids: Vec<String> = rows.into_iter().map(|r| r.incident_id).collect();
+
+    // Step 2: find the open AlertId incident from those IDs
+    alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(alert_incidents::Column::KeyType.eq("AlertId"))
+        .filter(alert_incidents::Column::Id.is_in(incident_ids))
+        .one(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
+
+/// Find the open incident (of any key type) that a given alert_id currently
+/// belongs to, via the junction table. Unlike `find_open_incident_by_alert_id`,
+/// this does not filter to `KeyType::AlertId` — used to locate an incident to
+/// auto-resolve when its source alert clears, regardless of how it was
+/// originally correlated.
+pub async fn find_open_incident_containing_alert(
+    org_id: &str,
+    alert_id: &str,
+) -> Result<Option<alert_incidents::Model>, errors::Error> {
+    let client = get_orm_client_ro().await;
+
+    let rows = alert_incident_alerts::Entity::find()
+        .filter(alert_incident_alerts::Column::AlertId.eq(alert_id))
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    if rows.is_empty() {
+        return Ok(None);
+    }
+
+    let incident_ids: Vec<String> = rows.into_iter().map(|r| r.incident_id).collect();
+
+    alert_incidents::Entity::find()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incidents::Column::Status.ne("resolved"))
+        .filter(alert_incidents::Column::Id.is_in(incident_ids))
+        .one(client)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
@@ -288,7 +364,7 @@ pub async fn get_alert_counts(
         return Ok(std::collections::HashMap::new());
     }
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     #[derive(Debug, FromQueryResult)]
     struct CountResult {
@@ -318,7 +394,7 @@ pub async fn get_alert_counts(
 
 /// Count open incidents for an org
 pub async fn count_open(org_id: &str) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     alert_incidents::Entity::find()
         .filter(alert_incidents::Column::OrgId.eq(org_id))
@@ -330,7 +406,7 @@ pub async fn count_open(org_id: &str) -> Result<u64, errors::Error> {
 
 /// Count incidents with optional status filter
 pub async fn count(org_id: &str, status: Option<&str>) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let mut query =
         alert_incidents::Entity::find().filter(alert_incidents::Column::OrgId.eq(org_id));
@@ -388,7 +464,7 @@ pub async fn update_topology(
     id: &str,
     topology: &config::meta::alerts::incidents::IncidentTopology,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
 
     let incident = get(org_id, id)
@@ -415,20 +491,21 @@ pub async fn update_topology(
     Ok(())
 }
 
-/// Update incident metadata (alert_count, last_alert_at, optionally stable_dimensions)
+/// Update incident metadata (alert_count, last_alert_at, optionally group_values)
 ///
 /// Used when adding alerts to existing incidents to:
 /// - Increment alert counter
 /// - Update last alert timestamp
-/// - Optionally merge new dimensions (for dimension accumulation)
+/// - Optionally merge new group_values (for dimension accumulation on superset upgrade)
 pub async fn update_incident_metadata(
     org_id: &str,
     id: &str,
     alert_count: i32,
     last_alert_at: i64,
-    stable_dimensions: Option<serde_json::Value>,
+    group_values: Option<serde_json::Value>,
+    key_type: Option<&str>,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
 
     let incident = get(org_id, id)
@@ -441,9 +518,12 @@ pub async fn update_incident_metadata(
     active.last_alert_at = Set(last_alert_at);
     active.updated_at = Set(now);
 
-    // Only update dimensions if provided (when dimensions change)
-    if let Some(dims) = stable_dimensions {
-        active.stable_dimensions = Set(dims);
+    if let Some(gv) = group_values {
+        active.group_values = Set(gv);
+    }
+
+    if let Some(kt) = key_type {
+        active.key_type = Set(kt.to_string());
     }
 
     active
@@ -482,7 +562,7 @@ pub async fn find_open_incidents_filtered(
     created_after: Option<i64>,
     limit: Option<u64>,
 ) -> Result<Vec<alert_incidents::Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let mut query = alert_incidents::Entity::find()
         .filter(alert_incidents::Column::OrgId.eq(org_id))
@@ -505,25 +585,25 @@ pub async fn find_open_incidents_filtered(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }
 
-/// Upgrade incident correlation key and dimensions during hierarchical upgrade
+/// Upgrade incident group_values and key_type during hierarchical upgrade
 ///
-/// This function is called when an incident is upgraded from a weaker correlation key
-/// (e.g., alert_id or WORKLOAD) to a stronger one (e.g., SCOPE).
+/// This function is called when an incident is upgraded from a weaker key_type
+/// (e.g., AlertId or Secondary) to a stronger one (e.g., Primary).
 ///
 /// Atomically updates:
-/// - correlation_key: The new stronger key
-/// - stable_dimensions: Merged/refined dimensions
+/// - group_values: Merged/refined dimension values
+/// - key_type: The new stronger key type
 /// - alert_count: Current count (after alert was added)
 /// - last_alert_at: Latest alert timestamp
-pub async fn upgrade_incident_correlation(
+pub async fn upgrade_incident_group_values(
     org_id: &str,
     id: &str,
-    new_correlation_key: &str,
-    new_stable_dimensions: serde_json::Value,
+    new_group_values: serde_json::Value,
+    new_key_type: &str,
     alert_count: i32,
     last_alert_at: i64,
 ) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
 
     let incident = get(org_id, id)
@@ -532,13 +612,8 @@ pub async fn upgrade_incident_correlation(
 
     let mut active: alert_incidents::ActiveModel = incident.into();
 
-    // Upgrade correlation key
-    active.correlation_key = Set(new_correlation_key.to_string());
-
-    // Upgrade dimensions
-    active.stable_dimensions = Set(new_stable_dimensions);
-
-    // Update metadata
+    active.group_values = Set(new_group_values);
+    active.key_type = Set(new_key_type.to_string());
     active.alert_count = Set(alert_count);
     active.last_alert_at = Set(last_alert_at);
     active.updated_at = Set(now);
@@ -549,9 +624,9 @@ pub async fn upgrade_incident_correlation(
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
     log::info!(
-        "[DB::alert_incidents] Upgraded incident {} correlation_key to {}",
+        "[DB::alert_incidents] Upgraded incident {} key_type to {}",
         id,
-        new_correlation_key
+        new_key_type
     );
 
     Ok(())
@@ -560,33 +635,64 @@ pub async fn upgrade_incident_correlation(
 /// Auto-resolve stale incidents that haven't received new alerts
 ///
 /// Returns the number of incidents resolved
-pub async fn auto_resolve_stale(stale_threshold_micros: i64) -> Result<u64, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+/// Returns (count, Vec<(org_id, incident_id)>) of resolved incidents
+pub async fn auto_resolve_stale(
+    stale_threshold_micros: i64,
+) -> Result<(u64, Vec<(String, String)>), errors::Error> {
+    const PAGE_SIZE: u64 = 500;
+
+    let client = get_orm_client_rw().await;
     let now = chrono::Utc::now().timestamp_micros();
     let cutoff = now - stale_threshold_micros;
 
-    // Find all open/acknowledged incidents with last_alert_at older than threshold
-    let stale_incidents = alert_incidents::Entity::find()
-        .filter(alert_incidents::Column::Status.ne("resolved"))
-        .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
-        .all(client)
-        .await
-        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+    let mut resolved_ids = Vec::new();
+    loop {
+        // Find open/acknowledged incidents with last_alert_at older than threshold
+        let stale_incidents = alert_incidents::Entity::find()
+            .filter(alert_incidents::Column::Status.ne("resolved"))
+            .filter(alert_incidents::Column::LastAlertAt.lt(cutoff))
+            .limit(PAGE_SIZE)
+            .all(client)
+            .await
+            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+        if stale_incidents.is_empty() {
+            break;
+        }
+        let page_full = stale_incidents.len() as u64 == PAGE_SIZE;
 
-    let count = stale_incidents.len() as u64;
+        let page_ids: Vec<String> = stale_incidents.iter().map(|i| i.id.clone()).collect();
+        alert_incidents::Entity::update_many()
+            .col_expr(alert_incidents::Column::Status, Expr::value("resolved"))
+            .col_expr(alert_incidents::Column::ResolvedAt, Expr::value(Some(now)))
+            .col_expr(alert_incidents::Column::UpdatedAt, Expr::value(now))
+            .filter(alert_incidents::Column::Id.is_in(page_ids))
+            .filter(alert_incidents::Column::Status.ne("resolved"))
+            .exec(client)
+            .await
+            .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
 
-    for incident in stale_incidents {
-        let mut active: alert_incidents::ActiveModel = incident.into();
-        active.status = Set("resolved".to_string());
-        active.resolved_at = Set(Some(now));
-        active.updated_at = Set(now);
-
-        if let Err(e) = active.update(client).await {
-            log::warn!("[incidents] Failed to auto-resolve incident: {}", e);
+        resolved_ids.extend(
+            stale_incidents
+                .into_iter()
+                .map(|incident| (incident.org_id, incident.id)),
+        );
+        if !page_full {
+            break;
         }
     }
 
-    Ok(count)
+    let count = resolved_ids.len() as u64;
+    Ok((count, resolved_ids))
+}
+
+/// Deletes all alert incidents belonging to the given org.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+    alert_incidents::Entity::delete_many()
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .exec(client)
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -633,6 +739,7 @@ mod tests {
             edges: vec![edge],
             related_incident_ids: vec![],
             suggested_root_cause: Some("# RCA Analysis\n\nTest markdown".to_string()),
+            previous_analyses: vec![],
         };
 
         // Serialize to JSON

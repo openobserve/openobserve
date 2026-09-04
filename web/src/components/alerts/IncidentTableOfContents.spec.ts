@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,12 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import IncidentTableOfContents from "./IncidentTableOfContents.vue";
-
-installQuasar();
 
 // ==================== TEST DATA FACTORIES ====================
 
@@ -108,10 +105,13 @@ function createDeeplyNestedToc(): TocItem[] {
  * Creates mock expanded sections object
  */
 function createExpandedSections(itemIds: string[]): Record<string, boolean> {
-  return itemIds.reduce((acc, id) => {
-    acc[id] = true;
-    return acc;
-  }, {} as Record<string, boolean>);
+  return itemIds.reduce(
+    (acc, id) => {
+      acc[id] = true;
+      return acc;
+    },
+    {} as Record<string, boolean>,
+  );
 }
 
 // ==================== HELPER FUNCTIONS ====================
@@ -154,7 +154,7 @@ async function clickExpandButton(wrapper: VueWrapper, level: number, itemId: str
 function mountComponent(
   tableOfContents: TocItem[] = [],
   expandedSections: Record<string, boolean> = {},
-  isDarkMode = false
+  isDarkMode = false,
 ) {
   return mount(IncidentTableOfContents, {
     props: {
@@ -202,8 +202,8 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent();
       const icon = findByTestId(wrapper, "toc-header-icon");
       expect(icon.exists()).toBe(true);
-      const qIcon = icon.findComponent({ name: "QIcon" });
-      expect(qIcon.props("name")).toBe("format_list_bulleted");
+      const qIcon = icon.findComponent({ name: "OIcon" });
+      expect(qIcon.props("name")).toBe("format-list-bulleted");
     });
 
     it("should display header title", () => {
@@ -217,8 +217,8 @@ describe("IncidentTableOfContents", () => {
       const header = findByTestId(wrapper, "toc-header");
       const title = findByTestId(wrapper, "toc-header-title");
 
-      expect(header.classes()).toContain("tw:border-gray-700");
-      expect(title.classes()).toContain("tw:text-gray-300");
+      expect(header.classes()).toContain("border-border-default");
+      expect(title.classes()).toContain("text-text-body");
     });
 
     it("should apply light mode styles to header in light mode", () => {
@@ -226,8 +226,8 @@ describe("IncidentTableOfContents", () => {
       const header = findByTestId(wrapper, "toc-header");
       const title = findByTestId(wrapper, "toc-header-title");
 
-      expect(header.classes()).toContain("tw:border-gray-200");
-      expect(title.classes()).toContain("tw:text-gray-700");
+      expect(header.classes()).toContain("border-border-default");
+      expect(title.classes()).toContain("text-text-body");
     });
   });
 
@@ -246,13 +246,13 @@ describe("IncidentTableOfContents", () => {
     it("should apply dark mode styles to empty state", () => {
       wrapper = mountComponent([], {}, true);
       const emptyState = findByTestId(wrapper, "toc-empty-state");
-      expect(emptyState.classes()).toContain("tw:text-gray-500");
+      expect(emptyState.classes()).toContain("text-text-secondary");
     });
 
     it("should apply light mode styles to empty state", () => {
       wrapper = mountComponent([], {}, false);
       const emptyState = findByTestId(wrapper, "toc-empty-state");
-      expect(emptyState.classes()).toContain("tw:text-gray-400");
+      expect(emptyState.classes()).toContain("text-text-secondary");
     });
 
     it("should not display empty state when items exist", () => {
@@ -286,7 +286,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc);
 
       const icon = findByTestId(wrapper, "toc-level1-icon-parent1");
-      const qIcon = icon.findComponent({ name: "QIcon" });
+      const qIcon = icon.findComponent({ name: "OIcon" });
       expect(qIcon.props("name")).toBe("folder");
     });
 
@@ -295,7 +295,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc);
 
       const icon = findByTestId(wrapper, "toc-level1-icon-parent2");
-      const qIcon = icon.findComponent({ name: "QIcon" });
+      const qIcon = icon.findComponent({ name: "OIcon" });
       expect(qIcon.props("name")).toBe("article");
     });
 
@@ -322,7 +322,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, {}, true);
 
       const content = findByTestId(wrapper, "toc-level1-content-sec1");
-      expect(content.classes()).toContain("tw:text-gray-200");
+      expect(content.classes()).toContain("text-text-heading");
     });
 
     it("should apply light mode styles to level 1 items", () => {
@@ -330,7 +330,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, {}, false);
 
       const content = findByTestId(wrapper, "toc-level1-content-sec1");
-      expect(content.classes()).toContain("tw:text-gray-900");
+      expect(content.classes()).toContain("text-text-heading");
     });
   });
 
@@ -368,7 +368,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]));
 
       const icon = findByTestId(wrapper, "toc-level2-icon-child1-1");
-      const qIcon = icon.findComponent({ name: "QIcon" });
+      const qIcon = icon.findComponent({ name: "OIcon" });
       expect(qIcon.props("name")).toBe("label");
     });
 
@@ -387,7 +387,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]), true);
 
       const content = findByTestId(wrapper, "toc-level2-content-child1-1");
-      expect(content.classes()).toContain("tw:text-gray-300");
+      expect(content.classes()).toContain("text-text-body");
     });
 
     it("should apply light mode styles to level 2 items", () => {
@@ -395,7 +395,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]), false);
 
       const content = findByTestId(wrapper, "toc-level2-content-child1-1");
-      expect(content.classes()).toContain("tw:text-gray-700");
+      expect(content.classes()).toContain("text-text-body");
     });
   });
 
@@ -433,8 +433,8 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["l1", "l2"]));
 
       const icon = findByTestId(wrapper, "toc-level3-icon-l3-1");
-      const qIcon = icon.findComponent({ name: "QIcon" });
-      expect(qIcon.props("name")).toBe("fiber_manual_record");
+      const qIcon = icon.findComponent({ name: "OIcon" });
+      expect(qIcon.props("name")).toBe("fiber-manual-record");
     });
 
     it("should emit scroll-to-section when clicking level 3 item", async () => {
@@ -454,8 +454,8 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["l1", "l2"]), true);
 
       const item = findByTestId(wrapper, "toc-level3-item-l3-1");
-      expect(item.classes()).toContain("hover:tw:bg-gray-700");
-      expect(item.classes()).toContain("tw:text-gray-400");
+      expect(item.classes()).toContain("hover:bg-surface-subtle-hover");
+      expect(item.classes()).toContain("text-text-secondary");
     });
 
     it("should apply light mode hover styles to level 3 items", () => {
@@ -463,28 +463,31 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc, createExpandedSections(["l1", "l2"]), false);
 
       const item = findByTestId(wrapper, "toc-level3-item-l3-1");
-      expect(item.classes()).toContain("hover:tw:bg-blue-50");
-      expect(item.classes()).toContain("tw:text-gray-600");
+      expect(item.classes()).toContain("hover:bg-surface-subtle-hover");
+      expect(item.classes()).toContain("text-text-secondary");
     });
   });
 
   describe("Expand/Collapse Functionality", () => {
-    it("should show chevron_right icon when collapsed", () => {
+    it("should show chevron-right icon when collapsed", () => {
       const toc = createNestedToc();
       wrapper = mountComponent(toc, {});
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      const qBtn = button.findComponent({ name: "QBtn" });
-      expect(qBtn.props("icon")).toBe("chevron_right");
+      // OBadge/OIcon renders SVG components — check via component lookup
+      const icon = button.findComponent({ name: "OIcon" });
+      expect(icon.exists()).toBe(true);
+      expect(icon.props("name")).toBe("chevron-right");
     });
 
-    it("should show expand_more icon when expanded", () => {
+    it("should show expand-more icon when expanded", () => {
       const toc = createNestedToc();
       wrapper = mountComponent(toc, createExpandedSections(["parent1"]));
 
       const button = findByTestId(wrapper, "toc-level1-expand-btn-parent1");
-      const qBtn = button.findComponent({ name: "QBtn" });
-      expect(qBtn.props("icon")).toBe("expand_more");
+      const icon = button.findComponent({ name: "OIcon" });
+      expect(icon.exists()).toBe(true);
+      expect(icon.props("name")).toBe("expand-more");
     });
 
     it("should emit toggle-section when clicking expand button", async () => {
@@ -495,7 +498,7 @@ describe("IncidentTableOfContents", () => {
 
       expect(wrapper.emitted("toggle-section")).toBeTruthy();
       expect(wrapper.emitted("toggle-section")?.[0][0]).toEqual(
-        expect.objectContaining({ id: "parent1" })
+        expect.objectContaining({ id: "parent1" }),
       );
     });
 
@@ -507,7 +510,7 @@ describe("IncidentTableOfContents", () => {
 
       expect(wrapper.emitted("toggle-section")).toBeTruthy();
       expect(wrapper.emitted("toggle-section")?.[0][0]).toEqual(
-        expect.objectContaining({ id: "l2" })
+        expect.objectContaining({ id: "l2" }),
       );
     });
   });
@@ -564,7 +567,7 @@ describe("IncidentTableOfContents", () => {
       wrapper = mountComponent(toc);
 
       const text = findByTestId(wrapper, "toc-level1-text-long");
-      expect(text.classes()).toContain("tw:truncate");
+      expect(text.classes()).toContain("truncate");
       expect(text.text()).toBe(longText);
     });
 
@@ -578,7 +581,7 @@ describe("IncidentTableOfContents", () => {
 
     it("should handle many level 1 items", () => {
       const toc = Array.from({ length: 20 }, (_, i) =>
-        createMockTocItem({ id: `item-${i}`, text: `Item ${i}` })
+        createMockTocItem({ id: `item-${i}`, text: `Item ${i}` }),
       );
       wrapper = mountComponent(toc);
 
@@ -673,15 +676,15 @@ describe("IncidentTableOfContents", () => {
 
       // Level 1 dark mode
       const l1Content = findByTestId(wrapper, "toc-level1-content-l1");
-      expect(l1Content.classes()).toContain("tw:text-gray-200");
+      expect(l1Content.classes()).toContain("text-text-heading");
 
       // Level 2 dark mode
       const l2Content = findByTestId(wrapper, "toc-level2-content-l2");
-      expect(l2Content.classes()).toContain("tw:text-gray-300");
+      expect(l2Content.classes()).toContain("text-text-body");
 
       // Level 3 dark mode
       const l3Item = findByTestId(wrapper, "toc-level3-item-l3-1");
-      expect(l3Item.classes()).toContain("tw:text-gray-400");
+      expect(l3Item.classes()).toContain("text-text-secondary");
     });
 
     it("should handle complex nested structure with multiple branches", () => {
@@ -720,7 +723,7 @@ describe("IncidentTableOfContents", () => {
 
       wrapper = mountComponent(
         toc,
-        createExpandedSections(["root1", "branch1-1", "branch1-2", "root2", "branch2-1"])
+        createExpandedSections(["root1", "branch1-1", "branch1-2", "root2", "branch2-1"]),
       );
 
       // Verify all branches are rendered

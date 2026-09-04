@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -34,4 +34,21 @@ pub async fn emit_delete_event(pipeline_id: &str) -> Result<(), Error> {
     let key = format!("{PIPELINES_WATCH_PREFIX}{pipeline_id}");
     let cluster_coordinator = super::get_coordinator().await;
     cluster_coordinator.delete(&key, false, true, None).await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_pipelines_watch_prefix_value() {
+        assert_eq!(PIPELINES_WATCH_PREFIX, "/pipelines/");
+    }
+
+    #[test]
+    fn test_pipelines_key_format() {
+        let id = "pipe-123";
+        let key = format!("{PIPELINES_WATCH_PREFIX}{id}");
+        assert_eq!(key, "/pipelines/pipe-123");
+    }
 }

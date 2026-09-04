@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,36 +15,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="html-editor card-container" style="width: 100%; height: 100%; overflow: hidden">
-    <div style="width: 100%; height: 100%">
-      <q-splitter
+  <div
+    data-test="dashboard-custom-html-editor-container"
+    class="bg-card-glass-bg h-full w-full overflow-hidden"
+  >
+    <div class="h-full w-full" data-test="dashboard-custom-html-editor-inner">
+      <OSplitter
         v-model="splitterModel"
-        style="width: 100%; height: 100% !important"
+        class="h-full! w-full"
         @update:modelValue="layoutSplitterUpdated"
         data-test="dashboard-html-editor-splitter"
       >
         <template #before>
-          <div class="col" style="height: 100%; display: flex; flex-direction: column;">
+          <div data-test="dashboard-custom-html-editor-flex-col" class="flex h-full flex-col">
             <CodeQueryEditor
+              class="h-full flex-1"
               language="html"
               v-model:query="htmlContent"
               :debounceTime="500"
               @update:query="onEditorValueChange"
               data-test="dashboard-html-editor"
-              style="height: 100%; flex: 1;"
             />
           </div>
         </template>
         <template #separator>
-          <div class="splitter-vertical splitter-enabled"></div>
-          <q-avatar
-            color="primary"
-            text-color="white"
-            size="20px"
-            icon="drag_indicator"
-            style="top: 10px; left: 3.5px"
-            data-test="dashboard-html-editor-drag-indicator"
-          />
+          <div
+            class="bg-border-default hover:bg-table-resize-handle h-full w-1 transition-colors"
+          ></div>
         </template>
         <template #after>
           <HTMLRenderer
@@ -54,7 +51,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :panelId="panelId"
           />
         </template>
-      </q-splitter>
+      </OSplitter>
     </div>
   </div>
 </template>
@@ -62,13 +59,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { defineAsyncComponent, defineComponent, ref } from "vue";
 import HTMLRenderer from "../panels/HTMLRenderer.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   components: {
-    CodeQueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     HTMLRenderer,
+    OSplitter,
   },
   name: "CustomHTMLEditor",
   props: {
@@ -111,32 +108,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-.html-editor {
-  display: flex;
-  height: 100%;
-}
-
-.splitter {
-  height: 4px;
-  width: 100%;
-}
-.splitter-vertical {
-  width: 4px;
-  height: 100%;
-}
-.splitter-enabled {
-  background-color: #ffffff00;
-  transition: 0.3s;
-  transition-delay: 0.2s;
-}
-
-.splitter-enabled:hover {
-  background-color: orange;
-}
-
-:deep(.query-editor-splitter .q-splitter__separator) {
-  background-color: transparent !important;
-}
-</style>

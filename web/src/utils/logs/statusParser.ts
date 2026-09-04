@@ -1,4 +1,4 @@
-//  Copyright 2023 OpenObserve Inc.
+//  Copyright 2026 OpenObserve Inc.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -30,10 +30,10 @@
  * 5: notice, 6: info, 7: debug, 8: ok/success
  *
  * Examples:
- * - extractStatusFromLog({ "severity": 0 }) → { level: "info", color: "#84a8f6ff", priority: 6 }
- * - extractStatusFromLog({ "level": "ERROR" }) → { level: "error", color: "#dc2626", priority: 3 }
- * - extractStatusFromLog({ "syslog.severity": 4 }) → { level: "warning", color: "#eab308", priority: 4 }
- * - extractStatusFromLog({ "status": "ok" }) → { level: "ok", color: "#059669", priority: 8 }
+ * - extractStatusFromLog({ "severity": 0 }) → { level: "info", color: "#1E88E5", priority: 6 }
+ * - extractStatusFromLog({ "level": "ERROR" }) → { level: "error", color: "#EF5350", priority: 3 }
+ * - extractStatusFromLog({ "syslog.severity": 4 }) → { level: "warning", color: "#FB8C00", priority: 4 }
+ * - extractStatusFromLog({ "status": "ok" }) → { level: "ok", color: "#43A047", priority: 8 }
  */
 
 export interface StatusInfo {
@@ -44,93 +44,130 @@ export interface StatusInfo {
 
 /**
  * Color mapping for different log levels
- * Uses Tailwind CSS color palette for consistent theming
+ * Keys must stay aligned with SEMANTIC_COLORS_LIGHT / SEMANTIC_COLORS_DARK in convertLogData.ts.
  */
 export const STATUS_COLORS = {
-  emergency: '#dc2626', // red-600
-  alert: '#ea580c', // orange-600
-  critical: '#d97706', // amber-600
-  error: '#dc2626', // red-600
-  warning: '#eab308', // yellow-500
-  notice: '#16a34a', // green-600
-  info: '#84a8f6ff', // blue-600
-  debug: '#6b7280', // gray-500
-  ok: '#059669', // emerald-600
+  emergency: "#E53935", // aligned with convertLogData fatal/emergency
+  alert: "#ea580c",
+  critical: "#F4511E", // aligned with convertLogData critical
+  error: "#EF5350", // aligned with convertLogData error
+  warning: "#FB8C00", // aligned with convertLogData warn/warning
+  notice: "#16a34a",
+  info: "#1E88E5", // aligned with convertLogData info
+  debug: "#00ACC1", // aligned with convertLogData debug
+  ok: "#43A047", // aligned with convertLogData success/ok
 } as const;
+
+/**
+ * Dark-mode color overrides sourced from convertLogData.ts SEMANTIC_COLORS_DARK.
+ * Categories without a convertLogData dark equivalent (alert, notice) fall back to STATUS_COLORS.
+ */
+export const STATUS_COLORS_DARK: Partial<Record<keyof typeof STATUS_COLORS, string>> = {
+  emergency: "#E07070",
+  critical: "#DC6030",
+  error: "#D95C5C",
+  warning: "#D4944A",
+  info: "#4D8FD4",
+  debug: "#3DAAB8",
+  ok: "#4DAD55",
+};
 
 /**
  * Standard field names to search for status information
  * Ordered by preference - first match will be used
  */
-const STATUS_FIELDS = ['status', 'severity', 'level', 'syslog.severity'] as const;
+const STATUS_FIELDS = ["severity", "level", "log_level", "syslog.severity", "status"] as const;
+
+/**
+ * Regex to find a standalone log-level keyword in a template or log message string.
+ * Matches common syslog / OTEL levels at word boundaries (e.g. "INFO", "ERROR").
+ */
+const TEMPLATE_LEVEL_RE =
+  /\b(emergency|emerg|fatal|alert|critical|crit|error|err|warning|warn|notice|info|information|debug|trace|verbose|ok|success)\b/i;
+
+/**
+ * Extract status color from a pattern template or example log message string.
+ *
+ * Searches the text for a recognised log-level keyword and delegates to
+ * `extractStatusFromLog` so the existing colour logic stays in one place.
+ *
+ * @param text - Pattern template or example log message string
+ * @param isDark - Whether dark-mode colours should be used
+ * @returns StatusInfo with level, color, and priority (defaults to info)
+ */
+export function extractStatusFromTemplate(text: string, isDark = false): StatusInfo {
+  if (!text || typeof text !== "string") {
+    return extractStatusFromLog(null, isDark);
+  }
+  const match = text.match(TEMPLATE_LEVEL_RE);
+  if (match) {
+    return extractStatusFromLog({ level: match[1] }, isDark);
+  }
+  return extractStatusFromLog(null, isDark);
+}
 
 /**
  * Extracts status information from a log entry object
  * Searches through common status field names and parses the value
- * 
+ *
  * @param logEntry - The log entry object to analyze
  * @returns StatusInfo with level, color, and priority
  */
-export function extractStatusFromLog(logEntry: any): StatusInfo {
-  // Handle null, undefined, or non-object inputs
-  //this is a fallback for when the log entry is not an object 
-  //we simply return info level and info color
-  // Example: extractStatusFromLog(null) → { level: 'info', color: '#84a8f6ff', priority: 6 }
-  if (!logEntry || typeof logEntry !== 'object') {
-    return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+export function extractStatusFromLog(logEntry: any, isDark = false): StatusInfo {
+  if (!logEntry || typeof logEntry !== "object") {
+    return {
+      level: "info",
+      color: isDark ? (STATUS_COLORS_DARK.info ?? STATUS_COLORS.info) : STATUS_COLORS.info,
+      priority: 6,
+    };
   }
 
-  // Search through predefined status fields in order of preference
-  // Example: { "status": "error", "level": "info" } → uses "error" from status field
-  //if we dont find a status field, we return info level and info color
+  // Search through predefined status fields in order of preference.
   for (const field of STATUS_FIELDS) {
     let statusValue = logEntry[field];
-    
-    // Found a valid status value - parse and return it
-    // Example: logEntry["level"] = "WARNING" → parseStatusValue("WARNING")
-    // Also handles numeric strings: "200", "404", "500"
+
     if (statusValue !== undefined && statusValue !== null) {
-      // Skip empty or whitespace-only strings to avoid incorrect conversion to 0
-      // Example: "" → skip (would become 0/emergency), "   " → skip
-      if (typeof statusValue === 'string' && statusValue.trim() === '') {
+      // Skip empty/whitespace-only strings to avoid incorrect conversion to 0.
+      if (typeof statusValue === "string" && statusValue.trim() === "") {
         continue;
       }
 
-      // Convert numeric strings to numbers before parsing
-      // Example: "0" → 0, "1" → 1, "error" → "error"
+      // Convert numeric strings to numbers before parsing.
       statusValue = isNaN(Number(statusValue)) ? statusValue : Number(statusValue);
-      return parseStatusValue(statusValue);
+      return applyDarkColor(parseStatusValue(statusValue), isDark);
     }
   }
 
-  // No status field found - default to info level
-  // Example: { "message": "Hello world" } → { level: 'info', color: '#84a8f6ff', priority: 6 }
-  return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+  // No status field found - default to info level.
+  return applyDarkColor({ level: "info", color: STATUS_COLORS.info, priority: 6 }, isDark);
+}
+
+function applyDarkColor(info: StatusInfo, isDark: boolean): StatusInfo {
+  if (!isDark) return info;
+  const darkColor = STATUS_COLORS_DARK[info.level as keyof typeof STATUS_COLORS_DARK];
+  return darkColor ? { ...info, color: darkColor } : info;
 }
 
 /**
  * Routes status value parsing based on data type
  * Handles both numeric (syslog) and string formats
- * 
+ *
  * @param value - The status value to parse (number or string)
  * @returns StatusInfo object
  */
 function parseStatusValue(value: any): StatusInfo {
-  // Handle numeric syslog severity levels (0-7)
-  // Example: parseStatusValue(3) → { level: 'error', color: '#dc2626', priority: 3 }
-  if (typeof value === 'number') {
+  // Numeric syslog severity levels (0-7).
+  if (typeof value === "number") {
     return mapNumericStatus(value);
   }
 
-  // Handle string status levels (case-insensitive)
-  // Example: parseStatusValue("ERROR") → { level: 'error', color: '#dc2626', priority: 3 }
-  if (typeof value === 'string') {
+  // String status levels (case-insensitive).
+  if (typeof value === "string") {
     return mapStringStatus(value);
   }
 
-  // Handle unexpected data types (boolean, object, etc.)
-  // Example: parseStatusValue(true) → { level: 'info', color: '#84a8f6ff', priority: 6 }
-  return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+  // Unexpected data types (boolean, object, etc.) default to info.
+  return { level: "info", color: STATUS_COLORS.info, priority: 6 };
 }
 
 /**
@@ -144,50 +181,41 @@ function parseStatusValue(value: any): StatusInfo {
  */
 function mapNumericStatus(value: number): StatusInfo {
   switch (value) {
-    // OTEL UNSPECIFIED level (0) - treat as info
-    // Example: mapNumericStatus(0) → { level: 'info', color: '#84a8f6ff', priority: 6 }
+    // OTEL UNSPECIFIED (0) - treat as info
     case 0:
-      return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
-    
+      return { level: "info", color: STATUS_COLORS.info, priority: 6 };
+
     // Action must be taken immediately
-    // Example: mapNumericStatus(1) → { level: 'alert', color: '#ea580c', priority: 1 }
     case 1:
-      return { level: 'alert', color: STATUS_COLORS.alert, priority: 1 };
-    
+      return { level: "alert", color: STATUS_COLORS.alert, priority: 1 };
+
     // Critical conditions
-    // Example: mapNumericStatus(2) → { level: 'critical', color: '#d97706', priority: 2 }
     case 2:
-      return { level: 'critical', color: STATUS_COLORS.critical, priority: 2 };
-    
+      return { level: "critical", color: STATUS_COLORS.critical, priority: 2 };
+
     // Error conditions
-    // Example: mapNumericStatus(3) → { level: 'error', color: '#dc2626', priority: 3 }
     case 3:
-      return { level: 'error', color: STATUS_COLORS.error, priority: 3 };
-    
+      return { level: "error", color: STATUS_COLORS.error, priority: 3 };
+
     // Warning conditions
-    // Example: mapNumericStatus(4) → { level: 'warning', color: '#eab308', priority: 4 }
     case 4:
-      return { level: 'warning', color: STATUS_COLORS.warning, priority: 4 };
-    
+      return { level: "warning", color: STATUS_COLORS.warning, priority: 4 };
+
     // Normal but significant condition
-    // Example: mapNumericStatus(5) → { level: 'notice', color: '#16a34a', priority: 5 }
     case 5:
-      return { level: 'notice', color: STATUS_COLORS.notice, priority: 5 };
-    
+      return { level: "notice", color: STATUS_COLORS.notice, priority: 5 };
+
     // Informational messages
-    // Example: mapNumericStatus(6) → { level: 'info', color: '#84a8f6ff', priority: 6 }
     case 6:
-      return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
-    
+      return { level: "info", color: STATUS_COLORS.info, priority: 6 };
+
     // Debug-level messages
-    // Example: mapNumericStatus(7) → { level: 'debug', color: '#6b7280', priority: 7 }
     case 7:
-      return { level: 'debug', color: STATUS_COLORS.debug, priority: 7 };
-    
-    // Handle unexpected numeric values (negative, >7, etc.)
-    // Example: mapNumericStatus(99) → { level: 'info', color: '#84a8f6ff', priority: 6 }
+      return { level: "debug", color: STATUS_COLORS.debug, priority: 7 };
+
+    // Unexpected numeric values (negative, >7, etc.)
     default:
-      return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+      return { level: "info", color: STATUS_COLORS.info, priority: 6 };
   }
 }
 
@@ -201,61 +229,51 @@ function mapNumericStatus(value: number): StatusInfo {
 function mapStringStatus(value: string): StatusInfo {
   const lowerValue = value.toLowerCase().trim();
 
-  // Emergency/Fatal levels - system unusable
-  // Examples: "emergency", "emerg", "fatal" → emergency
-  if (lowerValue === 'emergency' || lowerValue === 'emerg' || lowerValue === 'fatal') {
-    return { level: 'emergency', color: STATUS_COLORS.emergency, priority: 0 };
+  // Emergency/Fatal - system unusable
+  if (lowerValue === "emergency" || lowerValue === "emerg" || lowerValue === "fatal") {
+    return { level: "emergency", color: STATUS_COLORS.emergency, priority: 0 };
   }
 
-  // Alert levels - immediate action required
-  // Examples: "alert" → alert
-  if (lowerValue === 'alert') {
-    return { level: 'alert', color: STATUS_COLORS.alert, priority: 1 };
+  // Alert - immediate action required
+  if (lowerValue === "alert") {
+    return { level: "alert", color: STATUS_COLORS.alert, priority: 1 };
   }
 
-  // Critical levels - critical conditions
-  // Examples: "critical", "crit" → critical
-  if (lowerValue === 'critical' || lowerValue === 'crit') {
-    return { level: 'critical', color: STATUS_COLORS.critical, priority: 2 };
+  // Critical conditions
+  if (lowerValue === "critical" || lowerValue === "crit") {
+    return { level: "critical", color: STATUS_COLORS.critical, priority: 2 };
   }
 
-  // Error levels - error conditions
-  // Examples: "error", "err" → error
-  if (lowerValue === 'error' || lowerValue === 'err') {
-    return { level: 'error', color: STATUS_COLORS.error, priority: 3 };
+  // Error conditions
+  if (lowerValue === "error" || lowerValue === "err") {
+    return { level: "error", color: STATUS_COLORS.error, priority: 3 };
   }
 
-  // Warning levels - warning conditions
-  // Examples: "warning", "warn" → warning
-  if (lowerValue === 'warning' || lowerValue === 'warn') {
-    return { level: 'warning', color: STATUS_COLORS.warning, priority: 4 };
+  // Warning conditions
+  if (lowerValue === "warning" || lowerValue === "warn") {
+    return { level: "warning", color: STATUS_COLORS.warning, priority: 4 };
   }
 
-  // Notice levels - significant but normal condition
-  // Examples: "notice" → notice
-  if (lowerValue === 'notice') {
-    return { level: 'notice', color: STATUS_COLORS.notice, priority: 5 };
+  // Notice - significant but normal condition
+  if (lowerValue === "notice") {
+    return { level: "notice", color: STATUS_COLORS.notice, priority: 5 };
   }
 
-  // Info levels - informational messages
-  // Examples: "info", "information" → info
-  if (lowerValue === 'info' || lowerValue === 'information') {
-    return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+  // Informational messages
+  if (lowerValue === "info" || lowerValue === "information") {
+    return { level: "info", color: STATUS_COLORS.info, priority: 6 };
   }
 
-  // Debug levels - debug messages and detailed logging
-  // Examples: "debug", "trace", "verbose" → debug
-  if (lowerValue === 'debug' || lowerValue === 'trace' || lowerValue === 'verbose') {
-    return { level: 'debug', color: STATUS_COLORS.debug, priority: 7 };
+  // Debug messages and detailed logging
+  if (lowerValue === "debug" || lowerValue === "trace" || lowerValue === "verbose") {
+    return { level: "debug", color: STATUS_COLORS.debug, priority: 7 };
   }
 
-  // Success/OK levels - positive status indicators
-  // Examples: "ok", "success" → ok
-  if (lowerValue === 'ok' || lowerValue === 'success') {
-    return { level: 'ok', color: STATUS_COLORS.ok, priority: 8 };
+  // Success/OK - positive status indicators
+  if (lowerValue === "ok" || lowerValue === "success") {
+    return { level: "ok", color: STATUS_COLORS.ok, priority: 8 };
   }
 
   // Fallback for unrecognized string values
-  // Examples: "unknown", "xyz", "" → info
-  return { level: 'info', color: STATUS_COLORS.info, priority: 6 };
+  return { level: "info", color: STATUS_COLORS.info, priority: 6 };
 }

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,113 +15,175 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem]">
-    <div class="card-container tw:mb-[0.8rem]">
-      <div class="tw:flex tw:items-center tw:justify-between tw:py-3 tw:pl-4 tw:pr-2 tw:h-[68px]">
-          <FunctionsToolbar
-            v-model:name="formData.name"
-            v-model:trans-type="formData.transType"
-            ref="functionsToolbarRef"
-            :disable-name="beingUpdated"
-            :transform-type-options="transformTypeOptions"
-            @test="onTestFunction"
-            @save="onSubmit"
-            @back="closeAddFunction"
-            @cancel="cancelAddFunction"
-            @open:chat="openChat"
-            :is-add-function-component="isAddFunctionComponent"
-            class="tw:pr-4"
-          />
-      </div>
-    </div>
+  <div class="flex h-full min-h-0 w-full flex-col">
+    <!-- The toolbar hosts the form-owned name + transType fields and the Save
+         button (type="submit"), so it lives INSIDE the <OForm>. The editor +
+         TestFunction below stay OUTSIDE the form. Inline form → Enter submits
+         natively via the type="submit" Save button (no form-id needed). -->
+    <!-- Embedded (workflow NDV): the whole toolbar is hidden. Naming happens at SAVE
+         time in the host's Update|Create dialog, and After Flattening + Save live at the
+         bottom of the host panel — so the editor is the only thing here. -->
+    <OForm
+      v-if="!hideTestPanel"
+      id="add-function-form"
+      :form="addFunctionForm"
+      class="border-border-default shrink-0 border-b px-2"
+      v-slot="{ isSubmitting }"
+    >
+      <FunctionsToolbar
+        :is-submitting="isSubmitting"
+        :disable-name="beingUpdated"
+        :transform-type-options="transformTypeOptions"
+        :hide-trans-type="!!forcedLanguage"
+        :hide-chat="hideAiAssist"
+        @test="onTestFunction"
+        @back="closeAddFunction"
+        @cancel="cancelAddFunction"
+        @open:chat="openChat"
+      />
+    </OForm>
 
-    <div class="tw:flex">
-
-
+    <div class="flex min-h-0 flex-1">
       <div
-        class="tw:flex tw:overflow-auto "
-        :style="{
-          width: store.state.isAiChatEnabled && !isAddFunctionComponent ? '75%' : '100%',
-        }"
+        class="flex min-h-0 overflow-hidden"
+        :class="[store.state.isAiChatEnabled && !isAddFunctionComponent ? 'w-3/4' : 'w-full']"
       >
-        <q-splitter
+        <!-- Workflows (hideTestPanel): the NDV supplies Input · Output around this
+             pane, so the embedded test panel is redundant — collapse the splitter to
+             an editor-only, full-width surface (no drag handle). -->
+        <OSplitter
           v-model="splitterModel"
-          :limits="[30, Infinity]"
-          class="tw:overflow-hidden tw:w-full"
-          reverse
+          :limits="hideTestPanel ? [100, 100] : [30, 100]"
+          class="w-full overflow-hidden"
+          :horizontal="false"
+          :separator-class="hideTestPanel ? 'hidden' : 'w-[0.0625rem] bg-card-glass-border'"
         >
           <template v-slot:before>
-            <div class="q-px-md q-pt-sm q-pb-md tw:h-max card-container tw:h-[calc(100vh-128px)]">
-              <q-form id="addFunctionForm" ref="addJSTransformForm">
-                <div class="add-function-name-input q-pb-sm o2-input">
-                  <FullViewContainer
-                    name="function"
-                    v-model:is-expanded="expandState.functions"
-                    :label="(formData.transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) + '*'"
-                    class="tw-mt-1"
+            <!-- Workflows (hideTestPanel): drop the horizontal padding so the editor
+                 sits flush with the panel edges. -->
+            <div
+              class="bg-card-glass-bg flex h-full min-h-0 flex-col pt-2 pb-3"
+              :class="hideTestPanel ? 'px-0' : 'px-2'"
+            >
+              <div class="o2-input flex min-h-0 flex-1 flex-col pb-2">
+                <FullViewContainer
+                  name="function"
+                  v-model:is-expanded="expandState.functions"
+                  :label="
+                    raw(
+                      (transType === '1' ? t('function.jsfunction') : t('function.vrlfunction')) +
+                        '*',
+                    )
+                  "
+                  min-header-height="2.125rem"
+                  :show-expand-icon="!hideTestPanel"
+                  :label-class="hideTestPanel ? 'ps-2' : ''"
+                />
+                <div v-show="expandState.functions" class="relative mb-1.5 min-h-0 flex-1">
+                  <!-- Unified Query Editor (with built-in AI bar) -->
+                  <UnifiedQueryEditor
+                    data-test="logs-vrl-function-editor"
+                    data-test-prefix="function-vrl"
+                    ref="editorRef"
+                    :languages="['vrl', 'javascript']"
+                    :default-language="transType === '1' ? 'javascript' : 'vrl'"
+                    :query="formData.function"
+                    :hide-nl-toggle="!store.state.zoConfig.ai_enabled"
+                    :disable-ai="!store.state.zoConfig.ai_enabled"
+                    :disable-ai-reason="raw('')"
+                    :ai-placeholder="t('function.askAIFunctionPlaceholder')"
+                    :ai-tooltip="t('function.enterFunctionPrompt')"
+                    editor-height="100%"
+                    @focus="functionEditorPlaceholderFlag = false"
+                    @blur="functionEditorPlaceholderFlag = true"
+                    @update:query="handleFunctionUpdate"
+                    @language-change="handleLanguageChange"
+                    @toggle-nlp-mode="handleToggleNlpMode"
+                    @generation-start="handleGenerationStart"
+                    @generation-end="handleGenerationEnd"
+                    @generation-success="handleGenerationSuccess"
                   />
+                  <!-- Typewriter placeholder for an empty editor.
+                         Deliberately NOT gated on `!forcedLanguage`: a forced
+                         language is no reason to drop the placeholder. transType
+                         is locked to the forced language (see the mounted hook),
+                         so the ternary below still picks the right one, and
+                         `!formData.function` already hides this whenever a host
+                         seeded `defaultCode`. Excluding forced hosts left the
+                         pipeline Function node with a blank editor — it forces
+                         vrl but passes no defaultCode. -->
                   <div
-                    v-show="expandState.functions"
-                    class="tw:border-[1px] tw:border-gray-200"
+                    v-if="!formData.function && functionEditorPlaceholderFlag"
+                    class="pointer-events-none absolute inset-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
                   >
-                    <query-editor
-                      data-test="logs-vrl-function-editor"
-                      ref="editorRef"
-                      editor-id="add-function-editor"
-                      class="monaco-editor"
-                      :style="{ height: `calc(100vh - (180px + ${heightOffset}px))` }"
-                      v-model:query="formData.function"
-                      :language="formData.transType === '1' ? 'javascript' : 'vrl'"
-                    />
+                    <span
+                      class="text-text-placeholder overflow-hidden font-mono [line-height:1.3125rem] [text-overflow:ellipsis] whitespace-nowrap text-[var(--text-sm)]"
+                      >{{ transType === "1" ? jsPlaceholder : vrlPlaceholder }}</span
+                    >
                   </div>
-                  <div class="text-subtitle2">
-                    <div v-if="vrlFunctionError">
-                      <FullViewContainer
-                        name="function"
-                        v-model:is-expanded="expandState.functionError"
-                        :label="formData.transType === '1' ? 'JavaScript Error Details' : t('function.errorDetails')"
-                        labelClass="tw:text-red-600 tw:font-semibold"
-                      />
-                      <div
-                        v-if="expandState.functionError"
-                        class="q-px-sm q-pb-sm tw:border-l-4 tw:border-red-500"
-                        :class="
-                          store.state.theme === 'dark'
-                            ? 'bg-grey-10'
-                            : 'bg-grey-2'
-                        "
-                      >
-                        <pre class="q-my-none tw:text-red-700" :class="store.state.theme === 'dark' ? 'tw:text-red-400' : 'tw:text-red-700'" style="white-space: pre-wrap; font-family: 'Courier New', monospace; font-size: 13px;">{{
-                          vrlFunctionError
-                        }}</pre>
-                      </div>
+                </div>
+                <div class="text-sm font-medium">
+                  <div v-if="vrlFunctionError">
+                    <FullViewContainer
+                      name="function"
+                      v-model:is-expanded="expandState.functionError"
+                      :label="
+                        transType === '1'
+                          ? t('function.jsErrorDetails')
+                          : t('function.errorDetails')
+                      "
+                      labelClass="text-status-error-text font-semibold"
+                    />
+                    <div
+                      v-if="expandState.functionError"
+                      data-test="function-error-details"
+                      class="border-status-negative bg-surface-subtle border-s-4 px-2 pb-2"
+                    >
+                      <pre
+                        class="text-status-error-text my-0 whitespace-pre-wrap"
+                        style="font-family: var(--font-mono); font-size: var(--text-compact)"
+                        >{{ vrlFunctionError }}</pre>
                     </div>
                   </div>
                 </div>
-              </q-form>
+              </div>
             </div>
           </template>
           <template v-slot:after>
-            <div class="q-px-md q-pt-sm q-pb-md tw:h-max q-ml-sm card-container">
+            <div
+              v-if="!hideTestPanel"
+              class="bg-card-glass-bg h-full overflow-y-auto px-2 pt-2 pb-3"
+            >
               <TestFunction
                 ref="testFunctionRef"
-                :vrlFunction="formData"
+                :vrlFunction="vrlFunctionData"
                 @function-error="handleFunctionError"
                 :heightOffset="heightOffset"
+                :sample-events="sampleEvents"
+                :hide-query="hideQuery"
+                :hide-ai-assist="hideAiAssist"
                 @sendToAiChat="sendToAiChat"
               />
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
       </div>
-      <div v-if="store.state.isAiChatEnabled && !isAddFunctionComponent" style="width: 25%; max-width: 100%; min-width: 75px;   " :class="store.state.theme == 'dark' ? 'dark-mode-chat-container' : 'light-mode-chat-container'" >
-        <O2AIChat :style="{
-          height: `calc(100vh - (112px + ${heightOffset}px))`
-        }"  :is-open="store.state.isAiChatEnabled" @close="store.state.isAiChatEnabled = false" :aiChatInputContext="aiChatInputContext" />
+      <div
+        v-if="store.state.isAiChatEnabled && !isAddFunctionComponent"
+        :class="['w-1/4 max-w-full min-w-19', heightOffset ? '[--ai-chat-offset:4.6875rem]' : '']"
+      >
+        <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+        <O2AIChat
+          class="h-[calc(100vh-(112px+var(--ai-chat-offset,0px)))]"
+          :is-open="store.state.isAiChatEnabled"
+          @close="store.state.isAiChatEnabled = false"
+          :aiChatInputContext="aiChatInputContext"
+        />
+        <!-- eslint-enable local/no-hardcoded-px -->
       </div>
     </div>
-  </div>  
-  <confirm-dialog
+  </div>
+  <ConfirmDialog
     :title="confirmDialogMeta.title"
     :message="confirmDialogMeta.message"
     @update:ok="confirmDialogMeta.onConfirm()"
@@ -143,9 +205,9 @@ import {
 } from "vue";
 
 import jsTransformService from "../../services/jstransform";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import config from "@/aws-exports";
 import segment from "../../services/segment_analytics";
 import TestFunction from "@/components/functions/TestFunction.vue";
 import FunctionsToolbar from "@/components/functions/FunctionsToolbar.vue";
@@ -155,7 +217,13 @@ import { onBeforeRouteLeave } from "vue-router";
 import O2AIChat from "@/components/O2AIChat.vue";
 import { useRouter } from "vue-router";
 import { useReo } from "@/services/reodotdev_analytics";
-const defaultValue: any = () => {
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { useVrlPlaceholder, useJsPlaceholder } from "@/composables/useVrlPlaceholder";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import { makeAddFunctionSchema, type AddFunctionForm } from "./AddFunction.schema";
+export const defaultValue: any = () => {
   return {
     name: "",
     function: "",
@@ -163,8 +231,6 @@ const defaultValue: any = () => {
     transType: "0",
   };
 };
-
-let callTransform: Promise<{ data: any }>;
 
 export default defineComponent({
   name: "ComponentAddUpdateFunction",
@@ -181,11 +247,49 @@ export default defineComponent({
       type: Number,
       default: 0,
     },
+    // Optional sample events for the TestFunction "Events" editor (workflows pass
+    // the alert payload; omitted elsewhere → generic log sample).
+    sampleEvents: {
+      type: Array,
+      default: undefined,
+    },
+    // Hide the SQL "Query" section of the test panel (workflows run on the trigger
+    // event, not a stream query). Forwarded to TestFunction.
+    hideQuery: {
+      type: Boolean,
+      default: false,
+    },
+    // Hide the chat-panel AI buttons (the toolbar "Ask AI" toggle + the Events
+    // send-to-chat button); the inline editor AI bar stays. Workflows set this.
+    hideAiAssist: {
+      type: Boolean,
+      default: false,
+    },
+    // Drop the embedded test panel (Events input + Output) entirely, leaving only
+    // the code editor at full width. Workflows set this: the NDV already frames the
+    // editor with its own Input · Output panes, so a nested test panel is redundant
+    // (and confusing) inside the Config pane.
+    hideTestPanel: {
+      type: Boolean,
+      default: false,
+    },
+    // When set ('vrl' | 'javascript'), the language is locked to this value and
+    // the VRL/JS toggle is hidden (workflow function nodes force 'javascript').
+    forcedLanguage: {
+      type: String,
+      default: "",
+    },
+    // Seed code for a fresh function editor (replaces the typewriter placeholder
+    // with ready-to-edit boilerplate + a worked example in comments).
+    defaultCode: {
+      type: String,
+      default: "",
+    },
   },
   components: {
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    OSplitter,
+    OForm,
+    UnifiedQueryEditor: defineAsyncComponent(() => import("@/components/QueryEditor.vue")),
     FunctionsToolbar,
     FullViewContainer,
     TestFunction,
@@ -193,13 +297,12 @@ export default defineComponent({
     O2AIChat,
   },
   emits: ["update:list", "cancel:hideform", "sendToAiChat"],
-  setup(props, { emit }) {
+  setup(props, { emit, expose }) {
     const store: any = useStore();
     const router = useRouter();
     const { track } = useReo();
 
     // let beingUpdated: boolean = false;
-    const addJSTransformForm: any = ref(null);
     const disableColor: any = ref("");
     const formData: any = ref({
       name: "",
@@ -208,19 +311,21 @@ export default defineComponent({
       transType: "0",
     });
     const indexOptions = ref([]);
-    const { t } = useI18n();
-    const $q = useQuasar();
+    const { t } = useI18nTyped();
     const editorRef: any = ref(null);
+    const functionEditorPlaceholderFlag = ref(true);
+    const { placeholder: vrlPlaceholder } = useVrlPlaceholder();
+    const { placeholder: jsPlaceholder } = useJsPlaceholder();
     let editorobj: any = null;
-    const streams: any = ref({});
     const isFetchingStreams = ref(false);
     const testFunctionRef = ref<typeof TestFunction>();
-    const functionsToolbarRef = ref<typeof FunctionsToolbar>();
-    const splitterModel = ref(50);
+    // Editor-only (workflows) starts full width; the test-panel split is locked out.
+    const splitterModel = ref(props.hideTestPanel ? 100 : 50);
     const aiChatInputContext = ref("");
     const confirmDialogMeta = ref({
-      title: "",
-      message: "",
+      // raw("") is only the empty placeholder — the real values are assigned from t().
+      title: raw(""),
+      message: raw(""),
       show: false,
       onConfirm: () => {},
       data: null,
@@ -235,15 +340,27 @@ export default defineComponent({
 
     let compilationErr = ref("");
 
-    // Transform type options for radio buttons
-    const transformTypeOptions = computed(() => {
-      const options = [
-        { label: t("function.vrl"), value: "0" },
-      ];
+    // JavaScript functions are an enterprise/cloud feature; OSS stays VRL-only.
+    // EXCEPT the _meta org, which keeps JS even on OSS — that predates the
+    // entitlement (SSO claim parsing) and must not break.
+    const isJsAllowed = computed(
+      () =>
+        config.isEnterprise === "true" ||
+        config.isCloud === "true" ||
+        store.state.selectedOrganization?.identifier === "_meta",
+    );
 
-      // JavaScript functions are only allowed in _meta organization (for SSO claim parsing)
-      if (store.state.selectedOrganization.identifier === "_meta") {
-        options.push({ label: t("function.javascript"), value: "1" });
+    // Transform type options for the VRL/JS radio group.
+    const transformTypeOptions = computed(() => {
+      const options = [{ label: t("function.vrl"), value: "0" }];
+
+      // An already-JS function keeps the JS option even where JS isn't offered
+      // (e.g. a build that lost the entitlement), so editing it renders the right
+      // language instead of a radio group with nothing selected.
+      const editingJsFunction = String((props.modelValue as any)?.transType ?? "0") === "1";
+
+      if (isJsAllowed.value || editingJsFunction) {
+        options.push({ label: raw("JavaScript"), value: "1" });
       }
 
       return options;
@@ -251,14 +368,44 @@ export default defineComponent({
 
     const beingUpdated = computed(() => props.isUpdated);
 
+    // AddFunction OWNS the <OForm> but also reads form state (transType drives
+    // the Monaco editor language + placeholder) and writes it (the editor's
+    // language toggle). The owner cannot inject the form it renders, so it
+    // creates the form here with useOForm, reads it reactively via form.useStore,
+    // and hands it to <OForm :form="addFunctionForm">. Defaults are seeded from
+    // modelValue (edit-prefill); the VRL/JS body + `params` stay in `formData`
+    // (the bare Monaco editor lives outside the form and is merged in at @submit).
+    const addFunctionForm = useOForm<AddFunctionForm>({
+      defaultValues: {
+        name: props.modelValue?.name ?? "",
+        transType: String(props.modelValue?.transType ?? "0"),
+      },
+      // Built with the component's `t` so validation messages are localized.
+      schema: makeAddFunctionSchema(t),
+      onSubmit: (value) => onSubmit(value),
+    });
+
+    // Reactive, read-only views of the form-owned fields.
+    const nameValue = addFunctionForm.useStore((s: any) => String(s.values.name ?? ""));
+    const transType = addFunctionForm.useStore((s: any) => String(s.values.transType ?? "0"));
+
+    // What TestFunction consumes: the live form-owned name/transType combined
+    // with the non-form Monaco body + params held in `formData`.
+    const vrlFunctionData = computed(() => ({
+      ...formData.value,
+      name: nameValue.value,
+      transType: transType.value,
+    }));
+
     const streamTypes = ["logs", "metrics", "traces"];
 
     const isFunctionDataChanged = ref(false);
-    const isAddFunctionComponent = computed(() => router.currentRoute.value.path.includes('functions'))
-
+    const isAddFunctionComponent = computed(() =>
+      router.currentRoute.value.path.includes("functions"),
+    );
 
     watch(
-      () => formData.value.name + formData.value.function,
+      () => nameValue.value + formData.value.function,
       () => {
         isFunctionDataChanged.value = true;
       },
@@ -313,129 +460,81 @@ export default defineComponent({
       }
     });
 
-    const editorUpdate = (e: any) => {
-      formData.value.function = e.target.value;
-    };
-    const prefixCode = ref("");
-    const suffixCode = ref("");
+    // @submit handler — OForm only calls it once the schema passes (name
+    // required + method-name regex), so the schema, not a manual validate()
+    // shim, gates the save. `value` carries the form-owned name + transType;
+    // `function`/`params` (Monaco body / hidden constant) come from formData.
+    // Awaited so OForm's isSubmitting drives the Save spinner.
+    const onSubmit = async (value: AddFunctionForm) => {
+      const loadingNotification = toast({
+        variant: "loading",
+        message: t("toastMessages.functions.pleaseWait"),
+        timeout: 0,
+      });
 
-    const isValidParam = () => {
-      const methodPattern = /^[A-Za-z0-9]+(?:,[A-Za-z0-9]+)*$/g;
-      return methodPattern.test(formData.value.params) || "Invalid params.";
-    };
+      // Both VRL and JS use the params field (e.g., "row") — no clearing needed.
+      const payload: any = {
+        ...formData.value,
+        name: value.name,
+        transType: parseInt(value.transType ?? "0"),
+      };
 
-    const isValidMethodName = () => {
-      const methodPattern = /^[$A-Z_][0-9A-Z_$]*$/i;
-      return (
-        methodPattern.test(formData.value.name) || "Invalid Function name."
-      );
-    };
-    const updateEditorContent = () => {
-      // JS functions don't need prefix/suffix, only VRL functions might
-      // For now, both VRL and JS are written as-is
-      prefixCode.value = ``;
-      suffixCode.value = ``;
+      forceSkipBeforeUnloadListener = true;
 
-      formData.value.function = `${prefixCode.value}
-    ${formData.value.function}
-    ${suffixCode.value}`;
-    };
+      try {
+        const res = beingUpdated.value
+          ? await jsTransformService.update(store.state.selectedOrganization.identifier, payload)
+          : await jsTransformService.create(store.state.selectedOrganization.identifier, payload);
 
-    const isValidFnName = () => {
-      return formData.value.name.trim().length > 0;
-    };
+        const _formData: any = { ...payload };
+        formData.value = { ...defaultValue() };
 
-    const onSubmit = () => {
-      if (!functionsToolbarRef.value) return;
+        emit("update:list", _formData);
 
-      functionsToolbarRef.value.addFunctionForm
-        .validate()
-        .then((valid: any) => {
-          if (!valid) {
-            return false;
-          }
-
-          const loadingNotification = $q.notify({
-            spinner: true,
-            message: "Please wait...",
-            timeout: 0,
-          });
-
-          try {
-            if (!beingUpdated.value) {
-              formData.value.transType = parseInt(formData.value.transType);
-              // Both VRL and JS use params field (e.g., "row")
-              // No need to clear params for JS
-
-              callTransform = jsTransformService.create(
-                store.state.selectedOrganization.identifier,
-                formData.value,
-              );
-            } else {
-              formData.value.transType = parseInt(formData.value.transType);
-              // Both VRL and JS use params field (e.g., "row")
-              // No need to clear params for JS
-
-              callTransform = jsTransformService.update(
-                store.state.selectedOrganization.identifier,
-                formData.value,
-              );
-            }
-
-            forceSkipBeforeUnloadListener = true;
-
-            callTransform
-              .then((res: { data: any }) => {
-                const data = res.data;
-                const _formData: any = { ...formData.value };
-                formData.value = { ...defaultValue() };
-
-                emit("update:list", _formData);
-                addJSTransformForm?.value?.resetValidation();
-
-                loadingNotification();
-                $q.notify({
-                  type: "positive",
-                  message: res.data.message || "Function saved successfully",
-                });
-              })
-              .catch((err) => {
-                compilationErr.value = err?.response?.data["message"];
-                $q.notify({
-                  type: "negative",
-                  message:
-                    err.response?.data?.message ?? "Function creation failed",
-                });
-                loadingNotification();
-              });
-          } catch (error) {
-            console.error("Error while saving function:", error);
-            loadingNotification();
-          }
-
-          segment.track("Button Click", {
-            button: "Save Function",
-            user_org: store.state.selectedOrganization.identifier,
-            user_id: store.state.userInfo.email,
-            function_name: formData.value.name,
-            page: "Add/Update Function",
-          });
-          track("Button Click", {
-            button: "Save Function",
-            page: "Add Function"
-          });
+        loadingNotification();
+        toast({
+          variant: "success",
+          message: res.data.message || t("functions.functionSaved"),
         });
+      } catch (err: any) {
+        compilationErr.value = err?.response?.data?.["message"];
+        toast({
+          variant: "error",
+          message: err.response?.data?.message ?? t("functions.functionCreationFailed"),
+        });
+        loadingNotification();
+      }
+
+      segment.track("Button Click", {
+        button: "Save Function",
+        user_org: store.state.selectedOrganization.identifier,
+        user_id: store.state.userInfo.email,
+        function_name: value.name,
+        page: "Add/Update Function",
+      });
+      track("Button Click", {
+        button: "Save Function",
+        page: "Add Function",
+      });
     };
 
     const onTestFunction = () => {
       if (testFunctionRef.value) testFunctionRef.value.testFunction();
     };
 
+    // Embedded (workflow): the host's bottom Save reads the live editor code from here,
+    // then drives its own Update|Create dialog. Exposed for the parent ref.
+    // Live buffer (formData lags by the debounce), trimmed like the debounced commit.
+    expose({
+      getCode: () => (editorRef.value?.getValue?.() ?? formData.value.function ?? "").trim(),
+    });
+
     const handleFunctionError = (err: string) => {
       vrlFunctionError.value = err;
-      // Auto-expand error section when error occurs
       if (err) {
         expandState.value.functionError = true;
+      } else {
+        expandState.value.functionError = false;
       }
     };
 
@@ -467,26 +566,27 @@ export default defineComponent({
       }
       track("Button Click", {
         button: "Cancel Function",
-        page: "Add Function"
+        page: "Add Function",
       });
     };
 
     const resetConfirmDialog = () => {
       confirmDialogMeta.value.show = false;
-      confirmDialogMeta.value.title = "";
-      confirmDialogMeta.value.message = "";
+      // raw("") clears the fields back to the empty placeholder.
+      confirmDialogMeta.value.title = raw("");
+      confirmDialogMeta.value.message = raw("");
       confirmDialogMeta.value.onConfirm = () => {};
       confirmDialogMeta.value.data = null;
     };
     const openChat = (val: boolean) => {
-        store.dispatch("setIsAiChatEnabled", val);
+      store.dispatch("setIsAiChatEnabled", val);
     };
 
     const sendToAiChat = (value: any) => {
       //this is for when user in pipeline add function page and click on ai chat button
       //here we reset the value befoere setting it because if user clears the input then again click on the same value it wont trigger the watcher that is there in the child component
       //so to force trigger we do this
-      aiChatInputContext.value = '';
+      aiChatInputContext.value = "";
       nextTick(() => {
         aiChatInputContext.value = value;
       });
@@ -495,34 +595,75 @@ export default defineComponent({
       emit("sendToAiChat", value);
     };
 
+    // Unified Query Editor: Handle function update
+    const handleFunctionUpdate = (newFunction: string) => {
+      formData.value.function = newFunction;
+    };
+
+    // Unified Query Editor: Handle language change
+    const handleLanguageChange = (newLanguage: "sql" | "promql" | "vrl" | "javascript") => {
+      // transType is form-owned — write it straight to the form; the useStore
+      // reads above make the editor + tooltip react.
+      const tt = newLanguage === "javascript" ? "1" : "0";
+      addFunctionForm.setFieldValue("transType", tt);
+    };
+
+    /**
+     * Handle NLP mode toggle from AI icon in editor
+     */
+    const handleToggleNlpMode = () => {
+      // UnifiedQueryEditor manages its own NLP mode state internally
+    };
+
+    /**
+     * Handle generation start event from UnifiedQueryEditor
+     */
+    const handleGenerationStart = () => {
+      // Can add loading indicators here if needed
+    };
+
+    /**
+     * Handle generation end event from UnifiedQueryEditor
+     */
+    const handleGenerationEnd = () => {
+      // Can remove loading indicators here if needed
+    };
+
+    /**
+     * Handle successful generation from UnifiedQueryEditor
+     */
+    const handleGenerationSuccess = (_payload: { type: string; message: string }) => {
+      // Function code is already updated via @update:query handler
+    };
+
     return {
+      raw,
       t,
-      $q,
       emit,
       disableColor,
       beingUpdated,
       formData,
-      addJSTransformForm,
       store,
       compilationErr,
       indexOptions,
       editorRef,
+      functionEditorPlaceholderFlag,
+      vrlPlaceholder,
+      jsPlaceholder,
       editorobj,
-      prefixCode,
-      suffixCode,
-      editorUpdate,
-      updateEditorContent,
       streamTypes,
       isFetchingStreams,
-      isValidParam,
-      isValidMethodName,
       onSubmit,
+      // Returned so the Options-API template can see them (a module-level import
+      // is out of scope in setup()-driven templates).
+      addFunctionForm,
+      transType,
+      vrlFunctionData,
       expandState,
       testFunctionRef,
       onTestFunction,
       handleFunctionError,
       vrlFunctionError,
-      functionsToolbarRef,
       splitterModel,
       closeAddFunction,
       confirmDialogMeta,
@@ -532,18 +673,20 @@ export default defineComponent({
       openChat,
       isAddFunctionComponent,
       sendToAiChat,
-      aiChatInputContext
+      aiChatInputContext,
+      handleFunctionUpdate,
+      handleLanguageChange,
+      handleToggleNlpMode,
+      handleGenerationStart,
+      handleGenerationEnd,
+      handleGenerationSuccess,
     };
   },
   created() {
     this.formData = { ...defaultValue(), ...this.modelValue };
     this.beingUpdated = this.isUpdated;
 
-    if (
-      this.modelValue &&
-      this.modelValue.name != undefined &&
-      this.modelValue.name != ""
-    ) {
+    if (this.modelValue && this.modelValue.name != undefined && this.modelValue.name != "") {
       this.beingUpdated = true;
       this.disableColor = "grey-5";
       this.formData = this.modelValue;
@@ -552,71 +695,24 @@ export default defineComponent({
         this.formData.transType = String(this.formData.transType);
       }
     }
+
+    // Host-forced language (e.g. workflow function nodes are JS-only) — lock the
+    // transType to the forced language. The host HIDES the VRL/JS toggle, so the
+    // displayed + saved language must match forcedLanguage on BOTH the create and
+    // the edit path — otherwise editing a function whose saved transType differs
+    // would run/save the wrong language with no way to correct it.
+    if (this.forcedLanguage) {
+      const tt = this.forcedLanguage === "javascript" ? "1" : "0";
+      this.formData.transType = tt;
+      // transType is form-owned (drives the editor language, the "*Function*"
+      // label, and the info tooltip), so it must be written to the FORM — setting
+      // formData alone leaves the display on VRL.
+      (this as any).addFunctionForm?.setFieldValue?.("transType", tt);
+      // Seed boilerplate only for a brand-new function; never clobber saved code.
+      if (!this.beingUpdated && this.defaultCode && !this.formData.function) {
+        this.formData.function = this.defaultCode;
+      }
+    }
   },
 });
 </script>
-
-<style scoped lang="scss">
-.monaco-editor {
-  width: 100%;
-  border-radius: 5px;
-}
-
-.add-function-name-input {
-  :deep(.q-field--dense .q-field__control) {
-    height: 36px;
-    min-height: auto;
-    border-radius: 3px;
-
-    .q-field__control-container {
-      height: 32px;
-
-      .q-field__native {
-        height: 32px !important;
-      }
-    }
-
-    .q-field__marginal {
-      height: 32px;
-      min-height: auto;
-    }
-  }
-
-  :deep(.q-field__bottom) {
-    padding-top: 4px !important;
-    min-height: auto;
-  }
-}
-
-.function-stream-select-input {
-  :deep(.q-field--auto-height .q-field__control) {
-    height: 32px;
-    min-height: auto;
-
-    .q-field__control-container {
-      height: 32px;
-
-      .q-field__native {
-        min-height: 32px !important;
-        height: 32px !important;
-      }
-    }
-
-    .q-field__marginal {
-      height: 32px;
-      min-height: auto;
-    }
-  }
-}
-
-.functions-duration-input {
-  :deep(.date-time-button) {
-    width: 100%;
-  }
-}
-</style>
-<style>
-.no-case .q-field__native span {
-  text-transform: none !important;
-}
-</style>

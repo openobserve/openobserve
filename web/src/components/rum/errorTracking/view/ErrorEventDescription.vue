@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,40 +15,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="description">
-    <template
-      v-if="
-        column.type === 'view' && column.view_loading_type === 'route_change'
-      "
-    >
-      <pre class="navigation q-pa-sm">
+  <div class="overflow-hidden wrap-break-word whitespace-break-spaces">
+    <template v-if="column.type === 'view' && column.view_loading_type === 'route_change'">
+      <pre
+        data-test="error-event-description-navigation"
+        class="bg-surface-subtle rounded-default p-2"
+      >
 {
-  <span class="text-primary">from</span> : {{ column.view_referrer }},
-  <span class="text-primary">to</span> : {{ column.view_url }}
+  <span class="text-primary">{{ t('rum.from') }}</span> : {{ column.view_referrer }},
+  <span class="text-primary">{{ t('rum.to') }}</span> : {{ column.view_url }}
 }</pre>
     </template>
-    <template
-      v-else-if="column.type === 'resource' && column.resource_type === 'xhr'"
-    >
-      <span class="text-bold q-pr-sm tw:text-[0.75rem]">{{
-        column.resource_method
-      }}</span>
+    <template v-else-if="column.type === 'resource' && column.resource_type === 'xhr'">
+      <span class="pe-2 text-xs font-bold">{{ column.resource_method }}</span>
       <a
         :href="column.resource_url"
         target="_blank"
-        class="resource-url text-primary"
+        data-test="error-event-description-resource-url"
+        class="resource-url text-primary text-sm no-underline"
         >{{ column.resource_url }}</a
       >
-      <span class="q-pl-sm">[ {{ column.resource_status_code }} ]</span>
+      <span class="ps-2">[ {{ column.resource_status_code }} ]</span>
     </template>
     <template v-else>
-      <span class="tw:text-[0.875rem]">{{ getDescription }}</span>
+      <span data-test="error-event-description-default" class="text-sm">{{ getDescription }}</span>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, defineProps } from "vue";
+import { rumField } from "@/utils/rum/fields";
+import { computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = defineProps({
   column: {
@@ -60,7 +60,7 @@ const props = defineProps({
 // resource : resource_url
 // error : error_message
 // view : view_referrer -> view_ur
-// action :  _oo_action_target_text : _oo_action_target_selector
+// action :  <ns>_action_target_text : <ns>_action_target_selector  (_o2_ or _oo_)
 const getDescription = computed(() => {
   if (props.column["type"] === "resource") {
     return props.column["resource_url"];
@@ -73,29 +73,11 @@ const getDescription = computed(() => {
     return props.column["view_url"];
   } else if (props.column["type"] === "action") {
     return (
-      props.column["_oo_action_target_text"] +
+      rumField(props.column, "action_target_text") +
       " : " +
-      props.column["_oo_action_target_selector"]
+      rumField(props.column, "action_target_selector")
     );
   }
   return "";
 });
 </script>
-
-<style scoped>
-.description {
-  word-wrap: break-word;
-  overflow: hidden;
-  white-space: break-spaces;
-}
-
-.navigation {
-  background-color: #ececec;
-  border-radius: 4px;
-}
-
-.resource-url {
-  text-decoration: none;
-  font-size: 14px;
-}
-</style>

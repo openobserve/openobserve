@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,10 +14,9 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 use std::{
-    collections::HashSet,
     path::PathBuf,
     sync::{
-        Arc,
+        Arc, LazyLock as Lazy,
         atomic::{AtomicI64, AtomicU64, Ordering},
     },
     time::Instant,
@@ -26,11 +25,14 @@ use std::{
 use arrow_schema::Schema;
 use chrono::{Duration, Utc};
 use config::{
-    MEM_TABLE_INDIVIDUAL_STREAMS, get_config, metrics,
+    MEM_TABLE_INDIVIDUAL_STREAMS, get_config,
+    meta::stream::StreamType,
+    metrics,
     stats::MemorySize,
     utils::hash::{Sum64, gxhash},
 };
-use once_cell::sync::Lazy;
+use hashbrown::HashSet;
+use infra::runtime::WAL_RUNTIME;
 use snafu::ResultExt;
 use tokio::sync::{RwLock, mpsc};
 use wal::{Writer as WalWriter, build_file_path};
@@ -52,26 +54,6 @@ static WRITERS: Lazy<Vec<RwMap<WriterKey, Arc<Writer>>>> = Lazy::new(|| {
         writers.push(RwMap::default());
     }
     writers
-});
-
-static WAL_RUNTIME: Lazy<Option<Arc<tokio::runtime::Runtime>>> = Lazy::new(|| {
-    let cfg = get_config();
-    if !cfg.common.wal_dedicated_runtime_enabled {
-        return None;
-    }
-
-    match create_shared_wal_runtime() {
-        Some(rt) => {
-            log::info!("[INGESTER:RUNTIME] Created single shared WAL runtime successfully");
-            Some(rt)
-        }
-        None => {
-            log::warn!(
-                "[INGESTER:RUNTIME] Failed to create shared WAL runtime, falling back to default runtime"
-            );
-            None
-        }
-    }
 });
 
 pub struct Writer {
@@ -152,8 +134,8 @@ fn get_table_idx(thread_id: usize, org_id: &str, stream_name: &str) -> usize {
     if let Some(idx) = MEM_TABLE_INDIVIDUAL_STREAMS.get(stream_name) {
         *idx
     } else if get_config().common.feature_shared_memtable_enabled {
-        // When shared memtable is enabled, hash by thread_id and org_id
-        let hash_key = format!("{thread_id}_{org_id}");
+        // When shared memtable is enabled, hash by org_id and stream_name
+        let hash_key = format!("{org_id}_{stream_name}");
         let hash_id = gxhash::new().sum64(&hash_key);
         hash_id as usize % (WRITERS.len() - MEM_TABLE_INDIVIDUAL_STREAMS.len())
     } else {
@@ -322,8 +304,8 @@ impl Writer {
         log::info!(
             "[INGESTER:MEM:{idx}] create file: {}/{}/{}/{}.wal",
             wal_dir.display(),
-            &key.org_id,
-            &key.stream_type,
+            key.org_id,
+            key.stream_type,
             wal_id
         );
 
@@ -426,7 +408,9 @@ impl Writer {
         let processed_batch = self.preprocess_batch(entries)?;
 
         let cfg = get_config();
-        if !cfg.common.wal_write_queue_enabled {
+        if self.key.stream_type.as_ref() == StreamType::Metadata.as_str()
+            || !cfg.common.wal_write_queue_enabled
+        {
             return self.consume_processed(processed_batch, fsync).await;
         }
 
@@ -456,11 +440,10 @@ impl Writer {
 
     fn preprocess_batch(&self, mut entries: Vec<Entry>) -> Result<crate::ProcessedBatch> {
         let _start_preprocess_batch = Instant::now();
-        // Serialize entries to bytes for WAL writing
-        let bytes_entries = entries
-            .iter_mut()
-            .map(|entry| entry.into_bytes())
-            .collect::<Result<Vec<_>>>()?;
+        // data_size == 0 is treated as an empty entry downstream
+        for entry in entries.iter_mut() {
+            entry.normalize_data_size();
+        }
 
         // Bulk convert to Arrow RecordBatch
         let batch_entries = entries
@@ -470,16 +453,21 @@ impl Writer {
             })
             .collect::<Result<Vec<_>>>()?;
 
-        // Calculate total sizes for rotation check
-        let (entries_json_size, entries_arrow_size) = batch_entries
+        // Serialize entries to bytes for WAL writing, reusing the RecordBatch
+        // in Arrow IPC format instead of serializing the data back to JSON
+        let bytes_entries = entries
             .iter()
-            .map(|entry| (entry.data_json_size, entry.data_arrow_size))
-            .fold(
-                (0, 0),
-                |(acc_json_size, acc_arrow_size), (json_size, arrow_size)| {
-                    (acc_json_size + json_size, acc_arrow_size + arrow_size)
-                },
-            );
+            .zip(batch_entries.iter())
+            .map(|(entry, batch)| entry.into_bytes_arrow(&batch.data))
+            .collect::<Result<Vec<_>>>()?;
+
+        // Calculate total sizes for rotation check: the WAL grows by the
+        // serialized bytes, the memtable by the Arrow in-memory size
+        let entries_wal_size = bytes_entries.iter().map(Vec::len).sum();
+        let entries_arrow_size = batch_entries
+            .iter()
+            .map(|entry| entry.data_arrow_size)
+            .sum();
 
         // Move entries into ProcessedBatch
         // Clear the heavy data field after conversion to avoid memory duplication
@@ -488,15 +476,15 @@ impl Writer {
             let _ = std::mem::take(&mut entry.data);
         }
 
-        let _start_preprocess_batch_duration = _start_preprocess_batch.elapsed();
-        if _start_preprocess_batch_duration.as_millis() > 100 {
-            log::warn!("_start_preprocess_batch: {_start_preprocess_batch_duration:?}");
+        let start_preprocess_batch_duration = _start_preprocess_batch.elapsed();
+        if start_preprocess_batch_duration.as_millis() > 100 {
+            log::warn!("start_preprocess_batch_duration: {start_preprocess_batch_duration:?}");
         }
         Ok(crate::ProcessedBatch {
             entries,
             bytes_entries,
             batch_entries,
-            entries_json_size,
+            entries_wal_size,
             entries_arrow_size,
         })
     }
@@ -507,7 +495,7 @@ impl Writer {
         }
         let _start_consume_processed = Instant::now();
         // Check rotation
-        self.rotate(batch.entries_json_size, batch.entries_arrow_size)
+        self.rotate(batch.entries_wal_size, batch.entries_arrow_size)
             .await?;
 
         // Write into WAL - pure IO, no CPU-intensive processing
@@ -526,9 +514,9 @@ impl Writer {
             tokio::task::coop::consume_budget().await;
         }
         drop(wal);
-        let _start_wal_processed_duration = _start_wal_processed.elapsed();
-        if _start_wal_processed_duration.as_millis() > 50 {
-            log::warn!("_start_wal_processed_duration: {_start_wal_processed_duration:?}");
+        let start_wal_processed_duration = _start_wal_processed.elapsed();
+        if start_wal_processed_duration.as_millis() > 100 {
+            log::warn!("start_wal_processed_duration: {start_wal_processed_duration:?}");
         }
 
         // Write into Memtable - pure IO, no CPU-intensive processing
@@ -540,16 +528,16 @@ impl Writer {
             .observe(mem_lock_time);
         let _start_mem_processed = Instant::now();
         for (entry, batch_entry) in batch.entries.into_iter().zip(batch.batch_entries) {
-            if entry.data_size == 0 {
+            if batch_entry.data.num_rows() == 0 {
                 continue;
             }
             mem.write(entry.schema.clone().unwrap(), entry, batch_entry)?;
             tokio::task::coop::consume_budget().await;
         }
         drop(mem);
-        let _start_mem_processed_duration = _start_mem_processed.elapsed();
-        if _start_mem_processed_duration.as_millis() > 50 {
-            log::warn!("_start_mem_processed_duration: {_start_mem_processed_duration:?}");
+        let start_mem_processed_duration = _start_mem_processed.elapsed();
+        if start_mem_processed_duration.as_millis() > 100 {
+            log::warn!("start_mem_processed_duration: {start_mem_processed_duration:?}");
         }
 
         // Check fsync
@@ -559,9 +547,9 @@ impl Writer {
             drop(wal);
         }
 
-        let _start_consume_processed_duration = _start_consume_processed.elapsed();
-        if _start_consume_processed_duration.as_millis() > 500 {
-            log::warn!("_start_consume_processed_duration: {_start_consume_processed_duration:?}");
+        let start_consume_processed_duration = _start_consume_processed.elapsed();
+        if start_consume_processed_duration.as_millis() > 500 {
+            log::warn!("start_consume_processed_duration: {start_consume_processed_duration:?}");
         }
 
         Ok(())
@@ -569,8 +557,10 @@ impl Writer {
 
     // rotate is used to rotate the wal and memtable if the size exceeds the threshold
     async fn rotate(&self, entry_bytes_size: usize, entry_batch_size: usize) -> Result<()> {
-        if !self.check_wal_threshold(self.wal.read().await.size(), entry_bytes_size)
-            && !self.check_mem_threshold(self.memtable.read().await.size(), entry_batch_size)
+        let wal_size = self.wal.read().await.size();
+        if !self
+            .should_rotate(wal_size, entry_bytes_size, entry_batch_size)
+            .await
         {
             return Ok(());
         }
@@ -582,8 +572,12 @@ impl Writer {
         metrics::INGEST_WAL_LOCK_TIME
             .with_label_values(&[&self.key.org_id])
             .observe(wal_lock_time);
-        if !self.check_wal_threshold(wal.size(), entry_bytes_size) {
-            return Ok(()); // check again to avoid race condition
+        // check again to avoid race condition
+        if !self
+            .should_rotate(wal.size(), entry_bytes_size, entry_batch_size)
+            .await
+        {
+            return Ok(());
         }
         let cfg = get_config();
         let wal_id = self.next_seq.fetch_add(1, Ordering::SeqCst);
@@ -593,8 +587,8 @@ impl Writer {
         log::info!(
             "[INGESTER:MEM] create file: {}/{}/{}/{}.wal",
             wal_dir.display(),
-            &self.key.org_id,
-            &self.key.stream_type,
+            self.key.org_id,
+            self.key.stream_type,
             wal_id
         );
         let (new_wal, _header_size) = WalWriter::new(
@@ -678,6 +672,21 @@ impl Writer {
         memtable.read(org_id, stream_name, time_range, partition_filters)
     }
 
+    /// Check if the wal file or memtable is over its threshold, or the wal file is too old.
+    ///
+    /// `rotate()` calls this twice - before and after taking the wal write lock - and both
+    /// calls must check the same thresholds, otherwise memtable-triggered rotations would
+    /// be dropped by the re-check.
+    async fn should_rotate(
+        &self,
+        wal_size: (usize, usize),
+        entry_bytes_size: usize,
+        entry_batch_size: usize,
+    ) -> bool {
+        self.check_wal_threshold(wal_size, entry_bytes_size)
+            || self.check_mem_threshold(self.memtable.read().await.size(), entry_batch_size)
+    }
+
     /// Check if the wal file size is over the threshold or the file is too old
     fn check_wal_threshold(&self, written_size: (usize, usize), data_size: usize) -> bool {
         let cfg = get_config();
@@ -703,95 +712,6 @@ impl Writer {
     }
 }
 
-fn create_shared_wal_runtime() -> Option<Arc<tokio::runtime::Runtime>> {
-    let cfg = get_config();
-
-    if !cfg.common.wal_dedicated_runtime_enabled {
-        return None;
-    }
-
-    let total_cpus = cfg.limit.cpu_num;
-    // Security Check: At least 2 CPU cores are required for isolation (1 for HTTP, 1 for WAL)
-    if total_cpus < 2 {
-        log::warn!(
-            "[INGESTER:RUNTIME] Cannot enable dedicated runtime: need at least 2 CPUs, got {total_cpus}"
-        );
-        return None;
-    }
-
-    // CPU reservation strategy for shared runtime:
-    // - Small systems (<= 8 CPU cores): Reserve 1 CPU core with 1 worker thread
-    // - Medium systems (9-32 CPU cores): Reserve max(1, total_cpus / 8) CPU cores
-    // - Large systems (> 32 CPU cores): Reserve max(4, total_cpus / 8) CPU cores
-    let reserved_cpus_for_wal = if total_cpus <= 8 {
-        1
-    } else if total_cpus <= 32 {
-        std::cmp::max(1, total_cpus / 8)
-    } else {
-        std::cmp::max(4, total_cpus / 8)
-    };
-    // Ensure the number of reserved CPU cores is reasonable (no more than half of the total)
-    let reserved_cpus_for_wal = std::cmp::min(reserved_cpus_for_wal, total_cpus / 2);
-
-    // WAL runtime uses the last few CPU cores
-    // Example: 8-core system with 1 reserved core -> WAL uses CPU 7
-    // 32-core system with 4 reserved cores -> WAL uses CPUs 28-31
-    let wal_cpu_start = total_cpus - reserved_cpus_for_wal;
-
-    log::info!(
-        "[INGESTER:RUNTIME] Creating shared WAL runtime with {} worker threads on CPU cores {}-{} (total CPUs: {}, HTTP can use: 0-{})",
-        reserved_cpus_for_wal,
-        wal_cpu_start,
-        total_cpus - 1,
-        total_cpus,
-        wal_cpu_start - 1
-    );
-
-    // Create CPU affinity list for the worker threads
-    let cpu_ids: Vec<usize> = (wal_cpu_start..total_cpus).collect();
-    let cpu_ids_for_log = cpu_ids.clone();
-
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(reserved_cpus_for_wal)
-        .thread_name("wal-runtime")
-        .on_thread_start(move || {
-            if let Some(core_ids) = core_affinity::get_core_ids() {
-                // Get current thread index by parsing thread name or use round-robin
-                // Since we can't easily get thread index here, bind to the first available CPU in the range
-                // The OS scheduler will distribute threads across the reserved CPUs
-                for &cpu_id in &cpu_ids {
-                    if cpu_id < core_ids.len()
-                        && core_affinity::set_for_current(core_ids[cpu_id]) {
-                            log::info!(
-                                "[INGESTER:RUNTIME] Successfully bound WAL worker thread to CPU core {cpu_id}"
-                            );
-                            break;
-                        }
-                }
-            } else {
-                log::warn!("[INGESTER:RUNTIME] Failed to get CPU core IDs for binding");
-            }
-        })
-        .enable_all()
-        .build();
-
-    match runtime {
-        Ok(rt) => {
-            log::info!(
-                "[INGESTER:RUNTIME] Created shared WAL runtime successfully with {} threads on CPUs: {:?}",
-                reserved_cpus_for_wal,
-                cpu_ids_for_log
-            );
-            Some(Arc::new(rt))
-        }
-        Err(e) => {
-            log::error!(
-                "[INGESTER:RUNTIME] Failed to create shared WAL runtime: {e}, falling back to default runtime"
-            );
-            None
-        }
-    }
-}
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub(crate) struct WriterKey {
     pub(crate) org_id: Arc<str>,
@@ -825,5 +745,30 @@ impl WriterKey {
 impl MemorySize for WriterKey {
     fn mem_size(&self) -> usize {
         std::mem::size_of::<WriterKey>() + self.org_id.len() + self.stream_type.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_writer_key_new_replay_sets_fields() {
+        let key = WriterKey::new_replay("myorg", "logs");
+        assert_eq!(key.org_id.as_ref(), "myorg");
+        assert_eq!(key.stream_type.as_ref(), "logs");
+    }
+
+    #[test]
+    fn test_writer_key_mem_size_at_least_struct_size() {
+        let key = WriterKey::new_replay("org", "metrics");
+        assert!(key.mem_size() >= std::mem::size_of::<WriterKey>());
+    }
+
+    #[test]
+    fn test_writer_key_mem_size_includes_string_lengths() {
+        let key = WriterKey::new_replay("abc", "xyz");
+        let min_expected = std::mem::size_of::<WriterKey>() + "abc".len() + "xyz".len();
+        assert_eq!(key.mem_size(), min_expected);
     }
 }

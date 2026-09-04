@@ -17,7 +17,7 @@ jobs:
     steps:
       - name: Check team membership
         id: check
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
           script: |
@@ -73,7 +73,7 @@ jobs:
     steps:
       - name: Determine Context (PR or Issue)
         id: context
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.E2E_DEV_CI_TOKEN }}
           script: |

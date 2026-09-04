@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,154 +15,135 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page
-    class="q-pa-none"
-    style="height: calc(100vh - 88px); min-height: inherit"
-  >
-    <div v-if="!showDestinationEditor">
-      <div
-        class="tw:flex tw:justify-between tw:items-center tw:px-4 tw:py-3 tw:h-[68px] tw:border-b-[1px]"
-      >
-        <div
-          class="q-table__title tw:font-[600]"
-          data-test="alert-destinations-list-title"
+  <div class="flex h-full flex-col p-0">
+    <OPageLayout
+      bleed
+      v-if="!showDestinationEditor"
+      :title="t('pipeline_destinations.header')"
+      icon="person-pin-circle"
+      :subtitle="t('settings.pipelineDestinationsDesc')"
+    >
+      <template #actions>
+        <OButton
+          data-test="pipeline-destination-list-add-btn"
+          variant="primary"
+          size="sm"
+          @click="editDestination(null)"
+          >{{ t(`alert_destinations.add`) }}</OButton
         >
-          {{ t("pipeline_destinations.header") }}
-        </div>
-        <div class="tw:flex tw:justify-end">
-          <q-input
-            v-model="filterQuery"
-            borderless
-            dense
-            class="q-ml-auto no-border o2-search-input"
-            :placeholder="t('pipeline_destinations.search')"
-          >
-            <template #prepend>
-              <q-icon class="o2-search-input-icon" name="search" />
-            </template>
-          </q-input>
-          <q-btn
-            data-test="pipeline-destination-list-add-btn"
-            class="o2-primary-button q-ml-sm tw:h-[36px]"
-            no-caps
-            flat
-            :label="t(`alert_destinations.add`)"
-            @click="editDestination(null)"
-          />
-        </div>
-      </div>
-      <q-table
-        data-test="alert-destinations-list-table"
-        ref="qTable"
-        :rows="visibleRows"
-        :columns="columns"
-        row-key="name"
-        :pagination="pagination"
-        selection="multiple"
-        v-model:selected="selectedDestinations"
-        class="o2-quasar-table o2-row-md o2-quasar-table-header-sticky o2-last-row-border"
-        :style="
-          hasVisibleRows
-            ? 'width: 100%; height: calc(100vh - 112px); overflow-y: auto;'
-            : 'width: 100%'
-        "
-      >
-        <template #no-data>
-          <template>
-            <NoData />
+      </template>
+      <div class="bg-card-glass-bg min-h-0 flex-1 overflow-hidden">
+        <OTable
+          :frame="false"
+          data-test="alert-destinations-list-table"
+          :data="visibleRows"
+          :columns="columns"
+          row-key="name"
+          :loading="loading"
+          :selected-ids="selectedDestinationIds"
+          selection="multiple"
+          pagination="client"
+          :page-size="20"
+          :page-size-options="[5, 10, 20, 50, 100]"
+          :footer-title="t('pipeline_destinations.header')"
+          sorting="client"
+          :default-columns="false"
+          :enable-column-resize="true"
+          :persist-columns="true"
+          table-id="settings-pipeline-destinations"
+          show-index
+          :show-global-filter="false"
+          @update:selected-ids="handleSelectedIdsUpdate"
+        >
+          <template #toolbar>
+            <OSearchInput
+              v-model="filterQuery"
+              class="flex-1"
+              :placeholder="t('pipeline_destinations.search')"
+            />
           </template>
-        </template>
-        <template v-slot:body-cell-actions="props">
-          <q-td :props="props">
-            <div class="tw:flex tw:justify-center tw:items-center">
-              <q-btn
-                :data-test="`alert-destination-list-${props.row.name}-update-destination`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                icon="edit"
-                :title="t('alert_destinations.edit')"
-                @click="editDestination(props.row)"
-              >
-              </q-btn>
-              <q-btn
-                :data-test="`alert-destination-list-${props.row.name}-delete-destination`"
-                padding="sm"
-                unelevated
-                size="sm"
-                round
-                flat
-                :icon="outlinedDelete"
-                :title="t('alert_destinations.delete')"
-                @click="conformDeleteDestination(props.row)"
-              >
-              </q-btn>
-            </div>
-          </q-td>
-        </template>
-
-        <template v-slot:body-selection="scope">
-          <q-checkbox v-model="scope.selected" size="sm" class="o2-table-checkbox" />
-        </template>
-
-        <template #bottom="scope">
-          <div class="tw:flex tw:items-center tw:justify-between tw:w-full tw:h-[48px]">
-            <div class="o2-table-footer-title tw:flex tw:items-center tw:w-[230px] tw:mr-md">
-                  {{ resultTotal }} {{ t('pipeline_destinations.header') }}
-                </div>
-            <q-btn
-              v-if="selectedDestinations.length > 0"
-              data-test="pipeline-destination-list-delete-destinations-btn"
-              class="flex items-center q-mr-sm no-border o2-secondary-button tw:h-[36px]"
-              :class="
-                store.state.theme === 'dark'
-                  ? 'o2-secondary-button-dark'
-                  : 'o2-secondary-button-light'
+          <template #toolbar-trailing>
+            <OButton
+              variant="outline"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="loading"
+              data-test="pipeline-destination-list-refresh-btn"
+              @click="getDestinations"
+            >
+              <OTooltip
+                side="bottom"
+                :content="t('common.refresh')"
+                shortcut-id="pipelineDestinationsRefresh"
+              />
+            </OButton>
+          </template>
+          <template #empty>
+            <OEmptyState
+              size="hero"
+              preset="no-pipeline-destinations"
+              :filtered="!!filterQuery"
+              @action="
+                (id) => (id === 'clear-filters' ? (filterQuery = '') : editDestination(null))
               "
-              no-caps
-              dense
+            />
+          </template>
+
+          <template #cell-destination_type="{ row }">
+            <OTag v-if="row.destination_type_name" type="fieldTag" value="soft">{{
+              row.destination_type_name
+            }}</OTag>
+            <span v-else class="text-text-body">—</span>
+          </template>
+
+          <template #cell-output_format="{ row }">
+            <OTag v-if="row.output_format" type="fieldTag" value="soft">{{
+              formatOutputFormat(row.output_format)
+            }}</OTag>
+            <span v-else class="text-text-body">—</span>
+          </template>
+
+          <template #cell-actions="{ row }">
+            <OButton
+              :data-test="`alert-destination-list-${row.name}-update-destination`"
+              data-row-action="edit"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('alert_destinations.edit')"
+              @click="editDestination(row)"
+            >
+              <OIcon name="edit" size="sm" />
+            </OButton>
+            <OButton
+              :data-test="`alert-destination-list-${row.name}-delete-destination`"
+              data-row-action="delete"
+              variant="ghost"
+              size="icon-sm"
+              :title="t('alert_destinations.delete')"
+              @click="conformDeleteDestination(row)"
+            >
+              <OIcon name="delete" size="sm" />
+            </OButton>
+          </template>
+
+          <template v-if="selectedDestinations.length > 0" #bottom>
+            <span class="text-text-secondary text-xs font-medium">
+              {{ selectedDestinations.length }} {{ t("alert_destinations.selected") }}
+            </span>
+            <OButton
+              data-test="pipeline-destination-list-delete-destinations-btn"
+              variant="outline-destructive"
+              size="sm"
+              icon-left="delete"
+              :loading="bulkDeleteLoading"
               @click="openBulkDeleteDialog"
             >
-              <q-icon name="delete" size="16px" />
-              <span class="tw:ml-2">Delete</span>
-            </q-btn>
-          <QTablePagination
-            :scope="scope"
-            :position="'bottom'"
-            :resultTotal="resultTotal"
-            :perPageOptions="perPageOptions"
-            @update:changeRecordPerPage="changePagination"
-          />
-          </div>
-        </template>
-        <template v-slot:header="props">
-            <q-tr :props="props">
-              <!-- Adding this block to render the select-all checkbox -->
-              <q-th v-if="columns.length > 0" auto-width>
-                <q-checkbox
-                  v-model="props.selected"
-                  size="sm"
-                  :class="store.state.theme === 'dark' ? 'o2-table-checkbox-dark' : 'o2-table-checkbox-light'"
-                  class="o2-table-checkbox"
-                />
-              </q-th>
-
-              <!-- render the table headers -->
-              <q-th
-                v-for="col in props.cols"
-                :key="col.name"
-                :props="props"
-                :class="col.classes"
-                :style="col.style"
-              >
-                {{ col.label }}
-              </q-th>
-            </q-tr>
+              {{ t("common.delete") }}
+            </OButton>
           </template>
-      </q-table>
-    </div>
+        </OTable>
+      </div>
+    </OPageLayout>
     <div v-else>
       <PipelineDestinationEditor
         :destination="editingDestination"
@@ -173,36 +154,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <ConfirmDialog
-      title="Delete Destination"
-      message="Are you sure you want to delete destination?"
+      :title="t('alert_destinations.deleteDestinationTitle')"
+      :message="t('alert_destinations.deleteDestinationMessage')"
       @update:ok="deleteDestination"
       @update:cancel="cancelDeleteDestination"
       v-model="confirmDelete.visible"
     />
 
     <ConfirmDialog
-      title="Delete Destinations"
-      :message="`Are you sure you want to delete ${selectedDestinations.length} destination(s)?`"
+      :title="t('alert_destinations.deleteDestinationsTitle')"
+      :message="t('alerts.confirmDeleteDestinations', { count: selectedDestinations.length })"
       @update:ok="bulkDeleteDestinations"
       @update:cancel="confirmBulkDelete = false"
       v-model="confirmBulkDelete"
     />
-  </q-page>
+  </div>
 </template>
 <script lang="ts">
-import {
-  ref,
-  onBeforeMount,
-  onActivated,
-  watch,
-  defineComponent,
-  onMounted,
-  computed,
-} from "vue";
+import { ref, onBeforeMount, onActivated, watch, defineComponent, onMounted, computed } from "vue";
 import type { Ref } from "vue";
-import { useI18n } from "vue-i18n";
-import { useQuasar, type QTableProps } from "quasar";
-import NoData from "../shared/grid/NoData.vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { getImageURL } from "@/utils/zincutils";
 import PipelineDestinationEditor from "../pipeline/PipelineDestinationEditor.vue";
 import destinationService from "@/services/alert_destination";
@@ -210,120 +181,138 @@ import templateService from "@/services/alert_templates";
 import { useStore } from "vuex";
 import ConfirmDialog from "../ConfirmDialog.vue";
 import { useRouter } from "vue-router";
-import QTablePagination from "@/components/shared/grid/Pagination.vue";
 import type { DestinationPayload } from "@/ts/interfaces";
 import type { Template } from "@/ts/interfaces/index";
 
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
 import { useReo } from "@/services/reodotdev_analytics";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { COL } from "@/lib/core/Table/OTable.types";
 
 interface ConformDelete {
   visible: boolean;
   data: any;
 }
+
+const formatOutputFormat = (val: any): string => {
+  if (!val) return raw("N/A");
+  if (typeof val === "string") return val.toUpperCase();
+  if (typeof val === "object" && val.esbulk) return "ESBULK";
+  return raw("N/A");
+};
+
 export default defineComponent({
   name: "PageAlerts",
   components: {
+    OPageLayout,
     PipelineDestinationEditor,
-    NoData,
+    OEmptyState,
     ConfirmDialog,
-    QTablePagination,
+    OButton,
+    OTooltip,
+    OIcon,
+    OTag,
+    OSearchInput,
+    OTable,
   },
   setup() {
-    const qTable = ref();
     const store = useStore();
     const editingDestination: Ref<DestinationPayload | null> = ref(null);
-    const { t } = useI18n();
-    const q = useQuasar();
+    const { t } = useI18nTyped();
     const { track } = useReo();
-    const columns: any = ref<QTableProps["columns"]>([
+    const columns: OTableColumnDef[] = [
       {
-        name: "#",
-        label: "#",
-        field: "#",
-        align: "left",
-        style: "width: 67px",
-      },
-      {
-        name: "name",
-        field: "name",
-        label: t("alert_destinations.name"),
-        align: "left",
+        id: "name",
+        header: t("alert_destinations.name"),
+        accessorKey: "name",
         sortable: true,
+        resizable: true,
+        hideable: true,
+        size: COL.name,
+        minSize: 160,
+        meta: { align: "left", flex: true },
       },
       {
-        name: "destination_type",
-        field: "destination_type_name",
-        label: "Destination Type",
-        align: "left",
+        id: "destination_type",
+        header: t("alert_destinations.destination_type"),
+        accessorKey: "destination_type_name",
         sortable: true,
-        style: "width: 150px",
-        format: (val: string) => val || "N/A",
+        resizable: true,
+        hideable: true,
+        size: 150,
+        meta: { align: "left" },
       },
       {
-        name: "url",
-        field: "url",
-        label: t("alert_destinations.url"),
-        align: "left",
-        sortable: false,
+        id: "url",
+        header: t("alert_destinations.url"),
+        accessorKey: "url",
+        resizable: true,
+        hideable: true,
+        size: COL.url,
+        meta: { align: "left" },
       },
       {
-        name: "method",
-        field: "method",
-        label: t("alert_destinations.method"),
-        align: "left",
+        id: "method",
+        header: t("alert_destinations.method"),
+        accessorKey: "method",
         sortable: true,
-        style: "width: 120px",
+        resizable: true,
+        hideable: true,
+        size: 120,
+        meta: { align: "left" },
       },
       {
-        name: "output_format",
-        field: "output_format",
-        label: "Output Format",
-        align: "left",
+        id: "output_format",
+        header: t("alert_destinations.output_format"),
+        accessorKey: "output_format",
         sortable: true,
-        style: "width: 140px",
-        format: (val: any) => {
-          if (!val) return "N/A";
-          if (typeof val === "string") return val.toUpperCase();
-          if (typeof val === "object" && val.esbulk) return "ESBULK";
-          return "N/A";
-        },
+        resizable: true,
+        hideable: true,
+        size: 140,
+        meta: { align: "left" },
       },
       {
-        name: "actions",
-        field: "actions",
-        label: t("alert_destinations.actions"),
-        align: "center",
-        sortable: false,
-        classes: "actions-column",
+        id: "actions",
+        header: t("alert_destinations.actions"),
+        isAction: true,
+        pinned: "right",
+        size: 100,
+        meta: { align: "center", actionCount: 2 },
       },
-    ]);
+    ];
     const destinations: Ref<DestinationPayload[]> = ref([]);
-    const templates: Ref<Template[]> = ref([
-      { name: "test", body: "", type: "http" },
-    ]);
+    const templates: Ref<Template[]> = ref([{ name: "test", body: "", type: "http" }]);
     const confirmDelete: Ref<ConformDelete> = ref({
       visible: false,
       data: null,
     });
     const confirmBulkDelete = ref<boolean>(false);
+    const bulkDeleteLoading = ref(false);
     const selectedDestinations = ref<any[]>([]);
     const showDestinationEditor = ref(false);
     const router = useRouter();
     const filterQuery = ref("");
-    const perPageOptions: any = [
-      { label: "5", value: 5 },
-      { label: "10", value: 10 },
-      { label: "20", value: 20 },
-      { label: "50", value: 50 },
-      { label: "100", value: 100 },
-      { label: "All", value: 0 },
-    ];
     const resultTotal = ref(0);
-    const selectedPerPage = ref(20);
-    const pagination: any = ref({
-      rowsPerPage: 20,
-    });
+
+    const selectedDestinationIds = computed(() =>
+      selectedDestinations.value.map((d: any) => d.name),
+    );
+
+    const handleSelectedIdsUpdate = (ids: string[]) => {
+      const map = new Map(destinations.value.map((r: any) => [r.name, r]));
+      selectedDestinations.value = ids.map((id: any) => map.get(id)).filter(Boolean);
+    };
+
     onActivated(() => {
       getTemplates();
       if (!destinations.value.length) getDestinations();
@@ -344,11 +333,14 @@ export default defineComponent({
       updateRoute();
     });
 
+    const loading = ref(false);
     const getDestinations = () => {
-      const dismiss = q.notify({
-        spinner: true,
-        message: "Please wait while loading destinations...",
+      const dismiss = toast({
+        variant: "loading",
+        message: t("toastMessages.alerts.pleaseWaitWhileLoadingDestinations"),
+        timeout: 0,
       });
+      loading.value = true;
       destinationService
         .list({
           page_num: 1,
@@ -359,27 +351,23 @@ export default defineComponent({
           module: "pipeline",
         })
         .then((res) => {
-          // res.data = res.data.filter(
-          //   (destination: any) => destination.type == "external_destination",
-          // );
           resultTotal.value = res.data.length;
-          destinations.value = res.data.map((data: any, index: number) => ({
-            ...data,
-            "#": index + 1 <= 9 ? `0${index + 1}` : index + 1,
-          }));
+          destinations.value = res.data;
           updateRoute();
         })
         .catch((err) => {
           if (err.response.status != 403) {
-            q.notify({
-              type: "negative",
-              message: "Error while pulling destinations.",
-              timeout: 2000,
+            toast({
+              variant: "error",
+              message: t("toastMessages.alerts.errorWhilePullingDestinations"),
             });
           }
           dismiss();
         })
-        .finally(() => dismiss());
+        .finally(() => {
+          dismiss();
+          loading.value = false;
+        });
     };
     const getTemplates = () => {
       templateService
@@ -389,17 +377,12 @@ export default defineComponent({
         .then((res) => (templates.value = res.data));
     };
     const updateRoute = () => {
-      if (router.currentRoute.value.query.action === "add")
-        editDestination(null);
+      if (router.currentRoute.value.query.action === "add") editDestination(null);
       if (router.currentRoute.value.query.action === "update")
-        editDestination(
-          getDestinationByName(router.currentRoute.value.query.name as string),
-        );
+        editDestination(getDestinationByName(router.currentRoute.value.query.name as string));
     };
     const getDestinationByName = (name: string) => {
-      return destinations.value.find(
-        (destination) => destination.name === name,
-      );
+      return destinations.value.find((destination) => destination.name === name);
     };
     const editDestination = (destination: any) => {
       if (!destination) {
@@ -441,10 +424,11 @@ export default defineComponent({
             destination_name: confirmDelete.value.data.name,
           })
           .then(() => {
-            q.notify({
-              type: "positive",
-              message: `Destination ${confirmDelete.value.data.name} deleted successfully`,
-              timeout: 2000,
+            toast({
+              variant: "success",
+              message: t("toastMessages.alerts.destinationDeletedSuccessfully", {
+                name: confirmDelete.value.data.name,
+              }),
             });
             getDestinations();
           })
@@ -453,11 +437,10 @@ export default defineComponent({
               const message =
                 err.response.data?.message ||
                 err.response.data?.error ||
-                "Error while deleting destination";
-              q.notify({
-                type: "negative",
+                t("alerts.messages.deleteDestinationFailed");
+              toast({
+                variant: "error",
                 message,
-                timeout: 2000,
               });
             }
           });
@@ -483,37 +466,33 @@ export default defineComponent({
     };
 
     const handleDestinationCreated = (destinationName: string) => {
-      // Close the editor and refresh the list
       toggleDestinationEditor();
       getDestinations();
 
-      q.notify({
-        type: "positive",
-        message: `Destination "${destinationName}" created successfully.`,
+      toast({
+        variant: "success",
+        message: t("toastMessages.alerts.destinationCreatedSuccessfully", {
+          name: destinationName,
+        }),
       });
     };
 
     const handleDestinationUpdated = (destinationName: string) => {
-      // Close the editor and refresh the list
       toggleDestinationEditor();
       getDestinations();
 
-      q.notify({
-        type: "positive",
-        message: `Destination "${destinationName}" updated successfully.`,
+      toast({
+        variant: "success",
+        message: t("toastMessages.alerts.destinationUpdatedSuccessfully", {
+          name: destinationName,
+        }),
       });
     };
 
-    const changePagination = (val: { label: string; value: any }) => {
-      selectedPerPage.value = val.value;
-      pagination.value.rowsPerPage = val.value;
-      qTable.value.setPagination(pagination.value);
-    };
     const filterData = (rows: any, terms: any) => {
       var filtered = [];
       terms = terms.toLowerCase();
       for (var i = 0; i < rows.length; i++) {
-        // Convert output_format to string for filtering
         let outputFormatStr = "";
         if (rows[i]["output_format"]) {
           if (typeof rows[i]["output_format"] === "string") {
@@ -527,10 +506,10 @@ export default defineComponent({
         }
 
         if (
-          rows[i]["name"].toLowerCase().includes(terms) ||
-          rows[i]["destination_type_name"].toLowerCase().includes(terms) ||
-          rows[i]["url"].toLowerCase().includes(terms) ||
-          rows[i]["method"].toLowerCase().includes(terms) ||
+          (rows[i]["name"] || "").toLowerCase().includes(terms) ||
+          (rows[i]["destination_type_name"] || "").toLowerCase().includes(terms) ||
+          (rows[i]["url"] || "").toLowerCase().includes(terms) ||
+          (rows[i]["method"] || "").toLowerCase().includes(terms) ||
           outputFormatStr.includes(terms)
         ) {
           filtered.push(rows[i]);
@@ -553,9 +532,7 @@ export default defineComponent({
       if (!filterQuery.value) return destinations.value || [];
       return filterData(destinations.value || [], filterQuery.value);
     });
-    const hasVisibleRows = computed(() => visibleRows.value.length > 0);
 
-    // Watch visibleRows to sync resultTotal with search filter
     watch(
       visibleRows,
       (newVisibleRows) => {
@@ -569,102 +546,111 @@ export default defineComponent({
     };
 
     const bulkDeleteDestinations = async () => {
-      const dismiss = q.notify({
-        spinner: true,
-        message: "Deleting destinations...",
+      bulkDeleteLoading.value = true;
+      const dismiss = toast({
+        variant: "loading",
+        message: t("toastMessages.alerts.deletingDestinations"),
         timeout: 0,
       });
 
       try {
         if (selectedDestinations.value.length === 0) {
-          q.notify({
-            type: "negative",
-            message: "No destinations selected for deletion",
-            timeout: 2000,
+          toast({
+            variant: "error",
+            message: t("toastMessages.alerts.noDestinationsSelectedForDeletion"),
           });
           dismiss();
           return;
         }
 
-        // Extract destination names for the API call (BE supports names)
         const payload = {
           ids: selectedDestinations.value.map((d: any) => d.name),
         };
 
         const response = await destinationService.bulkDelete(
           store.state.selectedOrganization.identifier,
-          payload
+          payload,
         );
 
         dismiss();
 
-        // Handle response based on successful/unsuccessful arrays
         if (response.data) {
           const { successful = [], unsuccessful = [] } = response.data;
           const successCount = successful.length;
           const failCount = unsuccessful.length;
 
           if (failCount > 0 && successCount > 0) {
-            // Partial success
-            q.notify({
-              type: "warning",
-              message: `${successCount} destination(s) deleted successfully, ${failCount} failed`,
+            toast({
+              variant: "warning",
+              message: t("toastMessages.alerts.destinationsDeletedWithFailures", {
+                count: successCount,
+                failed: failCount,
+              }),
               timeout: 5000,
             });
           } else if (failCount > 0) {
-            // All failed
-            q.notify({
-              type: "negative",
-              message: `Failed to delete ${failCount} destination(s)`,
-              timeout: 3000,
+            toast({
+              variant: "error",
+              message: t("toastMessages.alerts.failedToDeleteDestinations", { count: failCount }),
             });
           } else {
-            // All successful
-            q.notify({
-              type: "positive",
-              message: `${successCount} destination(s) deleted successfully`,
-              timeout: 2000,
+            toast({
+              variant: "success",
+              message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+                count: successCount,
+              }),
             });
           }
         } else {
-          // Fallback success message
-          q.notify({
-            type: "positive",
-            message: `${selectedDestinations.value.length} destination(s) deleted successfully`,
-            timeout: 2000,
+          toast({
+            variant: "success",
+            message: t("toastMessages.alerts.destinationsDeletedSuccessfully", {
+              count: selectedDestinations.value.length,
+            }),
           });
         }
 
         selectedDestinations.value = [];
-        // Refresh destinations list
         getDestinations();
       } catch (error: any) {
         dismiss();
         console.error("Error deleting destinations:", error);
 
-        // Show error message from response if available
-        const errorMessage = error.response?.data?.message || error?.message || "Error deleting destinations. Please try again.";
+        const errorMessage =
+          error.response?.data?.message ||
+          error?.message ||
+          t("alerts.messages.bulkDeleteDestinationsFailed");
         if (error.response?.status != 403 || error?.status != 403) {
-          q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: errorMessage,
-            timeout: 3000,
           });
         }
+      } finally {
+        bulkDeleteLoading.value = false;
       }
 
       confirmBulkDelete.value = false;
     };
 
+    useShortcuts([
+      {
+        id: "pipelineDestinationsRefresh",
+        handler: () => {
+          if (!isInputFocused()) getDestinations();
+        },
+      },
+    ]);
+
     return {
       t,
-      qTable,
       showDestinationEditor,
       destinations,
       columns,
       editDestination,
       getImageURL,
       conformDeleteDestination,
+      loading,
       filterQuery,
       filterData,
       editingDestination,
@@ -676,25 +662,22 @@ export default defineComponent({
       deleteDestination,
       cancelDeleteDestination,
       confirmDelete,
-      changePagination,
-      perPageOptions,
       resultTotal,
-      selectedPerPage,
-      pagination,
-      outlinedDelete,
       routeTo,
       store,
-      // Exposed helper functions for testing
       getTemplates,
       updateRoute,
       getDestinationByName,
       resetEditingDestination,
       visibleRows,
-      hasVisibleRows,
+      selectedDestinationIds,
+      handleSelectedIdsUpdate,
       openBulkDeleteDialog,
       bulkDeleteDestinations,
       confirmBulkDelete,
+      bulkDeleteLoading,
       selectedDestinations,
+      formatOutputFormat,
     };
   },
 });

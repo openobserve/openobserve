@@ -3,11 +3,15 @@
 // This includes changing the dashboard name, adding tabs, managing variables, and more.
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
 const { getTabSelector } = require('./dashboard-selectors.js');
+const { selectStreamFromDropdown, selectFieldFromDropdown } = require('./dashboard-stream-field-utils.js');
 
 export default class DashboardSetting {
   constructor(page) {
     this.page = page;
     this.setting = page.locator('[data-test="dashboard-setting-btn"]');
+    this.addVariableBtn = page.locator(
+      '[data-test="dashboard-add-variable-btn"]'
+    );
     this.general = page.locator('[data-test="dashboard-settings-general-tab"]');
     this.variables = page.locator(
       '[data-test="dashboard-settings-variable-tab"]'
@@ -18,7 +22,7 @@ export default class DashboardSetting {
     this.dynamicFilter = page.locator(
       '[data-test="dashboard-general-setting-dynamic-filter"]'
     );
-    this.newName = page.locator('[data-test="dashboard-general-setting-name"]');
+    this.newName = page.locator('[data-test="dashboard-general-setting-name-field"]');
     this.saveSettingBtn = page.locator(
       '[data-test="dashboard-general-setting-save-btn"]'
     );
@@ -29,23 +33,40 @@ export default class DashboardSetting {
     this.editBtn = page.locator(
       '[data-test="dashboard-tab-settings-tab-edit-btn"]'
     );
-    this.deleteconfirmBtn = page.locator('[data-test="confirm-button"]');
+    this.deleteconfirmBtn = page.locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]');
     this.editName = page.locator(
       '[data-test="dashboard-tab-settings-tab-name-edit"]'
     );
     this.fullScreen = page.locator('[data-test="dashboard-fullscreen-btn"]');
-    this.tabName = page.locator('[data-test="dashboard-add-tab-name"]');
-    this.saveTab = page.locator('[data-test="dashboard-add-tab-submit"]');
+    this.tabName = page.locator('[data-test="dashboard-add-tab-name-field"]');
+    this.saveTab = page.locator(
+      '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-dialog-primary-btn"]'
+    );
     this.closeSetting = page.locator(
-      '[data-test="dashboard-settings-close-btn"]'
+      '[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]'
     );
     this.timeBtn = page.locator('[data-test="date-time-btn"]');
     this.relativeTime = page.locator('[data-test="date-time-relative-tab"]');
 
-    this.addTabCancel = page.locator('[data-test="dashboard-add-cancel"]');
+    this.addTabCancel = page.locator(
+      '[data-test="dashboard-tab-settings-add-tab-dialog"] [data-test="o-dialog-secondary-btn"]'
+    );
     this.EditSave = page.locator(
       '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
     );
+    // Tab name cells inside the OTable (one per tab row).
+    this.tabNameCells = page.locator(
+      '[data-test="dashboard-tab-settings-tab-name"]'
+    );
+    // Resolve a tab's OTable row from its name cell. The tabs table migrated
+    // to OTable, so rows are `o2-table-row-{index}` — walk up to that row from
+    // the name cell to reach its edit/delete actions.
+    this.getTabRowByName = (tabName) =>
+      page
+        .locator(
+          `[data-test="dashboard-tab-settings-tab-name"][data-test-tab-name="${tabName}"]`
+        )
+        .locator(`xpath=ancestor::*[starts-with(@data-test,'o2-table-row-')]`);
   }
 
   //Dashboard Settings//
@@ -56,19 +77,31 @@ export default class DashboardSetting {
 
   //Open Dashboard Setting//
   async openSetting() {
+    // Idempotent: if the settings ODrawer is already open, do nothing.
+    // The settings UI is rendered as an ODrawer with a backdrop overlay; clicking
+    // the dashboard-setting-btn while the drawer is open causes the overlay to
+    // intercept the pointer and dismiss the drawer (onInteractOutside), so blindly
+    // re-clicking after a save would close the drawer mid-test.
+    const generalTab = this.page.locator('[data-test="dashboard-settings-general-tab"]');
+    const alreadyOpen = await generalTab.isVisible().catch(() => false);
+    if (alreadyOpen) {
+      return;
+    }
+
     await this.page.waitForSelector('[data-test="dashboard-setting-btn"]', {
       state: "visible",
       timeout: 15000,
     });
     await this.setting.click();
     // Wait for settings dialog to open - use more specific selector
-    await this.page.locator('[data-test="dashboard-settings-general-tab"]').waitFor({ state: "visible", timeout: 10000 });
+    await generalTab.waitFor({ state: "visible", timeout: 10000 });
     await this.page.waitForLoadState('domcontentloaded').catch(() => {});
 
     // Wait for all tabs to be rendered in the dialog
     // The dialog has General, Tab, and Variables tabs - wait for the container to stabilize
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    await this.page.waitForTimeout(500); // Allow Vue to finish rendering all tabs
+    // Wait deterministically for the variables tab to mount (proxy for full tab render)
+    await this.page.locator('[data-test="dashboard-settings-variable-tab"]').waitFor({ state: "attached", timeout: 5000 }).catch(() => {});
   }
   //General Setting//
   //Change Dashboard Name//
@@ -87,9 +120,20 @@ export default class DashboardSetting {
       )
       .click();
 
-    await this.page
-      .locator(`[data-test="date-time-relative-${date}-${time}-btn"]`)
-      .click();
+    // The picker renders in a portal that mounts on click — clicking the option
+    // in the same tick lands before it exists (or on a node still animating in).
+    const relativeBtn = this.page.locator(
+      `[data-test="date-time-relative-${date}-${time}-btn"]`
+    );
+    await relativeBtn.waitFor({ state: "visible", timeout: 10000 });
+    await relativeBtn.click();
+  }
+
+  // Toast message locator scoped to a given text (assert visibility in the spec)
+  getToastMessageByText(text) {
+    return this.page
+      .locator('[data-test="o-toast-message"]')
+      .filter({ hasText: text });
   }
 
   //Save Setting//
@@ -107,6 +151,13 @@ export default class DashboardSetting {
   async closeSettingDashboard() {
     await this.closeSetting.waitFor({ state: "visible" });
     await this.closeSetting.click();
+    // The ODrawer animates out over a backdrop that still swallows pointer
+    // events mid-transition, so a following click (e.g. the back button) can be
+    // eaten. Wait for it to actually be gone.
+    await this.page
+      .locator('[data-test="dashboard-settings-drawer"]')
+      .waitFor({ state: "hidden", timeout: 10000 })
+      .catch(() => {});
   }
 
   //show dynamic filter//
@@ -121,17 +172,36 @@ export default class DashboardSetting {
 
   //Tab Settings//
 
+  //Click the "Tab" settings tab (tabs management view)//
+  async clickTabsSettingsTab() {
+    await this.tab.click();
+  }
+
   //Add new tab//
   async addTabSetting(tabnewName) {
     await this.tab.waitFor({ state: "visible" });
     await this.tab.click();
+    // TabsSettings loads dashboard data async on mount; wait for the first
+    // tab row (the default tab) to appear before clicking "Add Tab",
+    // otherwise dashboardId is still undefined and the API call fails.
+    await this.tabNameCells
+      .first()
+      .waitFor({ state: "visible", timeout: 10000 });
     await this.addtab.click();
+    await this.tabName.waitFor({ state: "visible", timeout: 10000 });
     await this.tabName.fill(tabnewName);
   }
 
   //save new tab setting//
   async saveTabSetting() {
     await this.saveTab.click();
+    // The dialog closes only once the tab has actually been created, so this is
+    // the signal that the save landed — without it a caller can close the
+    // settings drawer out from under an in-flight request and lose the tab.
+    await this.page
+      .locator('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+      .waitFor({ state: "hidden", timeout: 15000 })
+      .catch(() => {});
   }
 
   /**
@@ -170,18 +240,39 @@ export default class DashboardSetting {
 
   //cancel changes
   async cancelTabwithoutSave() {
-    await this.page.locator('[data-test="dashboard-add-cancel"]').click();
+    await this.addTabCancel.waitFor({ state: "visible", timeout: 10000 });
+    await this.addTabCancel.click();
+    await this.page
+      .locator('[data-test="dashboard-tab-settings-add-tab-dialog"]')
+      .waitFor({ state: "hidden", timeout: 10000 })
+      .catch(() => {});
   }
 
   //Cancel edit tab name
   async cancelEditedtab() {
-    await this.page
-      .locator('[data-test="dashboard-tab-settings-tab-name-edit-cancel"]')
-      .click();
+    const cancelBtn = this.page.locator(
+      '[data-test="dashboard-tab-settings-tab-name-edit-cancel"]'
+    );
+    await cancelBtn.waitFor({ state: "visible", timeout: 10000 });
+    await cancelBtn.click();
   }
 
   //Variables Settings
   //Open Variables tab
+
+  // The variables tab click can be swallowed mid drawer-transition, leaving the
+  // General tab showing. Callers then wait out their full timeout on a control
+  // that was never going to render, so gate the tab switch on the variables panel
+  // actually appearing — either its list (add-variable button) or, if a variable
+  // form is already open, the form's name field.
+  async waitForVariablesPanel(timeout = 5000) {
+    await this.page
+      .locator(
+        '[data-test="dashboard-add-variable-btn"], [data-test="dashboard-variable-name-field"]'
+      )
+      .first()
+      .waitFor({ state: "visible", timeout });
+  }
 
   async openVariables() {
     // Check if the settings dialog is already open
@@ -198,9 +289,8 @@ export default class DashboardSetting {
     await generalTab.waitFor({ state: "visible", timeout: 10000 });
     await this.page.waitForLoadState('domcontentloaded').catch(() => {});
 
-    // Wait for dialog tabs to be fully loaded - the tabs are in a q-tabs container
+    // Wait for dialog tabs to be fully loaded - the tabs are in a tabs container
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    await this.page.waitForTimeout(500); // Allow Vue to finish rendering tabs
 
     // Retry pattern for clicking variables tab (element can get detached during dialog transitions)
     const maxRetries = 5;
@@ -212,19 +302,19 @@ export default class DashboardSetting {
         const tabCount = await variablesTab.count();
         if (tabCount === 0) {
           testLogger.warn(`openVariables attempt ${attempt}: Variables tab not found in DOM, waiting...`);
-          await this.page.waitForTimeout(1000);
+          await variablesTab.waitFor({ state: "attached", timeout: 3000 }).catch(() => {});
           continue;
         }
 
         await variablesTab.waitFor({ state: "visible", timeout: 10000 });
-        await this.page.waitForTimeout(200); // Brief pause to let DOM stabilize
         await variablesTab.scrollIntoViewIfNeeded();
         await variablesTab.click();
+        await this.waitForVariablesPanel();
         return; // Success
       } catch (e) {
         testLogger.warn(`openVariables attempt ${attempt} failed: ${e.message}`);
         if (attempt === maxRetries) throw e;
-        await this.page.waitForTimeout(1000); // Wait before retry
+        await this.page.locator('[data-test="dashboard-settings-variable-tab"]').waitFor({ state: "attached", timeout: 2000 }).catch(() => {});
       }
     }
   }
@@ -233,7 +323,6 @@ export default class DashboardSetting {
   async goToVariablesTab() {
     // Wait for dialog to be fully loaded
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
-    await this.page.waitForTimeout(500); // Allow Vue to finish rendering tabs
 
     // Retry pattern for clicking variables tab (element can get detached during dialog transitions)
     const maxRetries = 5;
@@ -245,19 +334,19 @@ export default class DashboardSetting {
         const tabCount = await variablesTab.count();
         if (tabCount === 0) {
           testLogger.warn(`goToVariablesTab attempt ${attempt}: Variables tab not found in DOM, waiting...`);
-          await this.page.waitForTimeout(1000);
+          await variablesTab.waitFor({ state: "attached", timeout: 3000 }).catch(() => {});
           continue;
         }
 
         await variablesTab.waitFor({ state: "visible", timeout: 10000 });
-        await this.page.waitForTimeout(200); // Brief pause to let DOM stabilize
         await variablesTab.scrollIntoViewIfNeeded();
         await variablesTab.click();
+        await this.waitForVariablesPanel();
         return; // Success
       } catch (e) {
         testLogger.warn(`goToVariablesTab attempt ${attempt} failed: ${e.message}`);
         if (attempt === maxRetries) throw e;
-        await this.page.waitForTimeout(1000); // Wait before retry
+        await this.page.locator('[data-test="dashboard-settings-variable-tab"]').waitFor({ state: "attached", timeout: 2000 }).catch(() => {});
       }
     }
   }
@@ -281,139 +370,28 @@ export default class DashboardSetting {
       .click();
 
     // Wait for the type option to be visible before clicking
-    const typeOption = this.page.getByRole("option", { name: type });
+    await this.page.locator(`[data-test="dashboard-variable-type-select-popover"]`).waitFor({ state: "visible", timeout: 10000 });
+    const typeValue = type.toLowerCase().replace(/\s+/g, '_');
+    const typeOption = this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${typeValue}"]`);
     await typeOption.waitFor({ state: "visible", timeout: 10000 });
     await typeOption.click();
-    await this.page.locator('[data-test="dashboard-variable-name"]').click();
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').click();
     await this.page
-      .locator('[data-test="dashboard-variable-name"]')
+      .locator('[data-test="dashboard-variable-name-field"]')
       .fill(variableName);
     await this.page
       .locator('[data-test="dashboard-variable-stream-type-select"]')
       .click();
 
-    // Wait for the dropdown option to be visible before clicking
-    const streamTypeOption = this.page.getByRole("option", { name: streamType });
+    // Wait for the stream-type dropdown option to be visible before clicking
+    await this.page.locator(`[data-test="dashboard-variable-stream-type-select-popover"]`).waitFor({ state: "visible", timeout: 10000 });
+    const streamTypeOption = this.page.locator(`[data-test="dashboard-variable-stream-type-select-option"][data-test-value="${streamType}"]`);
     await streamTypeOption.waitFor({ state: "visible", timeout: 10000 });
     await streamTypeOption.click();
 
-    // Click the stream selector to open and focus it
-    const streamSelector = this.page.locator('[data-test="dashboard-variable-stream-select"]');
-    await streamSelector.click();
-
-    // Wait for the dropdown to open
-    await this.page.waitForSelector('[role="listbox"]', { state: 'visible', timeout: 10000 });
-
-    // The stream dropdown supports search filtering via use-input
-    // Type the stream name to filter the list using keyboard
-    await this.page.keyboard.type(Stream, { delay: 50 });
-
-    // Wait a moment for filtering to complete
-    await this.page.waitForTimeout(500);
-
-    // Wait for dropdown to have options available after filtering
-    await this.page.waitForFunction(
-      () => {
-        const options = document.querySelectorAll('[role="option"]');
-        return options.length > 0;
-      },
-      { timeout: 10000, polling: 100 }
-    );
-
-    // Select the stream from filtered dropdown options
-    let streamSelected = false;
-
-    // Strategy 1: Try exact match option
-    try {
-      const streamOption = this.page.getByRole("option", { name: Stream, exact: true });
-      await streamOption.waitFor({ state: "visible", timeout: 5000 });
-      await streamOption.click();
-      streamSelected = true;
-    } catch (e) {
-      testLogger.warn(`Stream selection strategy 1 (exact match) failed for "${Stream}": ${e.message}`);
-      // Strategy 2: Try partial match
-      try {
-        const streamOption = this.page.getByRole("option", { name: Stream, exact: false }).first();
-        await streamOption.waitFor({ state: "visible", timeout: 5000 });
-        await streamOption.click();
-        streamSelected = true;
-      } catch (e2) {
-        testLogger.warn(`Stream selection strategy 2 (partial match) failed for "${Stream}": ${e2.message}`);
-        // Strategy 3: Use keyboard navigation
-        try {
-          await this.page.keyboard.press('ArrowDown');
-          await this.page.waitForTimeout(200);
-          await this.page.keyboard.press('Enter');
-          streamSelected = true;
-        } catch (e3) {
-          testLogger.warn(`Stream selection strategy 3 (keyboard) failed for "${Stream}": ${e3.message}`);
-        }
-      }
-    }
-
-    if (!streamSelected) {
-      throw new Error(`Failed to select stream: ${Stream}`);
-    }
-
-    // Wait for field data to load after stream selection
-    await this.page.waitForTimeout(1000);
-
-    // Wait for the field select dropdown to be ready
-    const fieldSelect = this.page.locator('[data-test="dashboard-variable-field-select"]');
-    await fieldSelect.waitFor({ state: "visible", timeout: 10000 });
-    await fieldSelect.click();
-    await fieldSelect.fill(field);
-
-    // Wait for dropdown to have options available
-    await this.page.waitForFunction(
-      () => {
-        const options = document.querySelectorAll('[role="option"]');
-        return options.length > 0;
-      },
-      { timeout: 10000, polling: 100 }
-    );
-
-    // Try to select the field from dropdown - use multiple strategies (from dashboard-variables.js)
-    let fieldSelected = false;
-
-    // Strategy 1: Try exact match
-    try {
-      const fieldOption = this.page.getByRole("option", { name: field, exact: true });
-      await fieldOption.waitFor({ state: "visible", timeout: 5000 });
-      await fieldOption.click();
-      fieldSelected = true;
-    } catch (e) {
-      // Strategy 2: Try partial match
-      try {
-        const fieldOption = this.page.getByRole("option", { name: field, exact: false }).first();
-        await fieldOption.waitFor({ state: "visible", timeout: 5000 });
-        await fieldOption.click();
-        fieldSelected = true;
-      } catch (e2) {
-        // Strategy 3: Use keyboard to select the first visible option
-        try {
-          await this.page.keyboard.press('ArrowDown');
-          // Wait for selection to be highlighted
-          await this.page.waitForFunction(
-            () => {
-              const highlighted = document.querySelector('[role="option"][aria-selected="true"]') ||
-                                 document.querySelector('[role="option"].q-manual-focusable--focused') ||
-                                 document.querySelector('[role="option"].q-focusable--focused');
-              return highlighted !== null;
-            },
-            { timeout: 3000, polling: 100 }
-          );
-          await this.page.keyboard.press('Enter');
-          fieldSelected = true;
-        } catch (e3) {
-          fieldSelected = false;
-        }
-      }
-    }
-
-    if (!fieldSelected) {
-      throw new Error(`Failed to select field: ${field}`);
-    }
+    // Select Stream and Field using shared utilities
+    await selectStreamFromDropdown(this.page, Stream);
+    await selectFieldFromDropdown(this.page, field);
   }
 
   //select Constant type
@@ -429,17 +407,10 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .click();
-    await this.page.getByRole("option", { name: type }).click();
-    await this.page.locator('[data-test="dashboard-variable-name"]').click();
-    await this.page
-      .locator('[data-test="dashboard-variable-name"]')
-      .fill(variableName);
-    await this.page
-      .locator('[data-test="dashboard-variable-constant-value"]')
-      .click();
-    await this.page
-      .locator('[data-test="dashboard-variable-constant-value"]')
-      .fill(value);
+    await this.page.locator(`[data-test="dashboard-variable-type-select-popover"]`).waitFor({ state: "visible", timeout: 10000 });
+    await this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${type.toLowerCase()}"]`).click();
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(variableName);
+    await this.page.locator('[data-test="dashboard-variable-constant-value-field"]').fill(value);
   }
 
   //select Textbox type
@@ -454,11 +425,9 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .click();
-    await this.page.getByRole("option", { name: type }).click();
-    await this.page.locator('[data-test="dashboard-variable-name"]').click();
-    await this.page
-      .locator('[data-test="dashboard-variable-name"]')
-      .fill(variableName);
+    await this.page.locator(`[data-test="dashboard-variable-type-select-popover"]`).waitFor({ state: "visible", timeout: 10000 });
+    await this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${type.toLowerCase()}"]`).click();
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(variableName);
   }
 
   //select Custom type
@@ -473,33 +442,21 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-variable-type-select"]')
       .click();
-    await this.page.getByRole("option", { name: type }).click();
-    await this.page.locator('[data-test="dashboard-variable-name"]').click();
-    await this.page
-      .locator('[data-test="dashboard-variable-name"]')
-      .fill(variableName);
-    await this.page.getByRole("button", { name: "Add Option" }).click();
-
+    await this.page.locator(`[data-test="dashboard-variable-type-select-popover"]`).waitFor({ state: "visible", timeout: 10000 });
+    await this.page.locator(`[data-test="dashboard-variable-type-select-option"][data-test-value="${type.toLowerCase()}"]`).click();
+    await this.page.locator('[data-test="dashboard-variable-name-field"]').fill(variableName);
+    // Selecting "Custom" type auto-creates the first option row (index 0).
+    // Do NOT click "Add Option" — that would add a second empty row and fail validation.
     await this.page
       .locator('[data-test="dashboard-custom-variable-0-label"]')
-      .click();
-    await this.page
-      .locator('[data-test="dashboard-custom-variable-0-label"]')
-      .fill(label);
-    await this.page
-      .locator('[data-test="dashboard-custom-variable-0-value"]')
-      .click();
-    await this.page
-      .locator('[data-test="dashboard-custom-variable-0-value"]')
-      .fill(value);
+      .waitFor({ state: "visible", timeout: 10000 });
+    await this.page.locator('[data-test="dashboard-custom-variable-0-label-field"]').fill(label);
+    await this.page.locator('[data-test="dashboard-custom-variable-0-value-field"]').fill(value);
   }
   //add max record size
   async addMaxRecord(value) {
     await this.page
-      .locator('[data-test="dashboard-variable-max-record-size"]')
-      .click();
-    await this.page
-      .locator('[data-test="dashboard-variable-max-record-size"]')
+      .locator('[data-test="dashboard-variable-max-record-size-field"]')
       .fill(value);
   }
 
@@ -518,10 +475,7 @@ export default class DashboardSetting {
       )
       .click();
     await this.page
-      .locator('[data-test="dashboard-variable-custom-value-0"]')
-      .click();
-    await this.page
-      .locator('[data-test="dashboard-variable-custom-value-0"]')
+      .locator('[data-test="dashboard-variable-custom-value-0-field"]')
       .fill(value);
   }
 
@@ -530,6 +484,11 @@ export default class DashboardSetting {
     await this.page
       .locator('[data-test="dashboard-variable-save-btn"]')
       .click();
+  }
+
+  // Wait for the "Add Variable" button to be visible (variables list view)
+  async waitForAddVariableBtnVisible() {
+    await this.addVariableBtn.waitFor({ state: "visible" });
   }
 
   //Cancel variable
@@ -548,9 +507,11 @@ export default class DashboardSetting {
 
   //close setting window
   async closeSettingWindow() {
-    // Use multiple selectors to detect if settings dialog is open
-    const settingsDialog = this.page.locator('[data-test="dashboard-settings-dialog"]').or(this.page.locator('.q-dialog'));
-    const closeBtn = this.page.locator('[data-test="dashboard-settings-close-btn"]');
+    // The settings UI is now an ODrawer, scoped by data-test="dashboard-settings-drawer"
+    const settingsDialog = this.page.locator('[data-test="dashboard-settings-drawer"]');
+    const closeBtn = this.page.locator(
+      '[data-test="dashboard-settings-drawer"] [data-test="o-drawer-close-btn"]'
+    );
 
     // First, check if the dialog exists and is visible
     const dialogExists = await settingsDialog.isVisible().catch(() => false);
@@ -592,8 +553,8 @@ export default class DashboardSetting {
           throw error;
         }
 
-        // Wait before retry
-        await this.page.waitForTimeout(500);
+        // Wait for close button to be ready before retry
+        await closeBtn.waitFor({ state: "visible", timeout: 1000 }).catch(() => {});
       }
     }
   }
@@ -608,19 +569,20 @@ export default class DashboardSetting {
       .waitFor({ state: "visible" });
 
     // Locate the tab to be edited based on oldTabName
-    const tabLocator = page
-      .locator('[data-test="dashboard-tab-settings-drag"] div')
-      .filter({ hasText: oldTabName });
+    const tabLocator = this.getTabRowByName(oldTabName);
 
     // Click Edit button for the tab
     await tabLocator
       .locator('[data-test="dashboard-tab-settings-tab-edit-btn"]')
       .click();
 
-    // Click to enable name editing
+    // Click to enable name editing. The input is rendered only after the row
+    // swaps into edit mode, so clicking in the same tick as the edit button
+    // above lands on a node that does not exist yet.
     const nameEditLocator = page.locator(
       '[data-test="dashboard-tab-settings-tab-name-edit"]'
     );
+    await nameEditLocator.waitFor({ state: "visible", timeout: 10000 });
     await nameEditLocator.click();
 
     // Fill new tab name
@@ -629,9 +591,11 @@ export default class DashboardSetting {
 
   //save edited tab name
   async saveEditedtab() {
-    await this.page
-      .locator('[data-test="dashboard-tab-settings-tab-name-edit-save"]')
-      .click();
+    const saveBtn = this.page.locator(
+      '[data-test="dashboard-tab-settings-tab-name-edit-save"]'
+    );
+    await saveBtn.waitFor({ state: "visible", timeout: 10000 });
+    await saveBtn.click();
   }
 
   // Delete tab in edit tab options//
@@ -645,9 +609,7 @@ export default class DashboardSetting {
       .waitFor({ state: "visible" });
 
     // Locate the tab to be deleted based on oldTabName
-    const tabLocator = page
-      .locator('[data-test="dashboard-tab-settings-drag"] div')
-      .filter({ hasText: oldTabName });
+    const tabLocator = this.getTabRowByName(oldTabName);
 
     // Click delete button for the tab
     await tabLocator
@@ -656,8 +618,8 @@ export default class DashboardSetting {
 
     // Confirm deletion
     await page
-      .locator('[data-test="confirm-button"]')
+      .locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]')
       .waitFor({ state: "visible" });
-    await page.locator('[data-test="confirm-button"]').click();
+    await page.locator('[data-test="tabs-delete-popup-dialog"] [data-test="o-dialog-primary-btn"]').click();
   }
 }

@@ -33,3 +33,23 @@ impl Related<super::templates::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "dest-1".to_string(),
+            org: "myorg".to_string(),
+            name: "slack-dest".to_string(),
+            module: "alert".to_string(),
+            template_id: None,
+            r#type: serde_json::json!({"kind": "slack"}),
+        };
+        assert_eq!(m.id, "dest-1");
+        assert_eq!(m.name, "slack-dest");
+        assert!(m.template_id.is_none());
+    }
+}

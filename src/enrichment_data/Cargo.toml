@@ -1,0 +1,48 @@
+[package]
+name = "enrichment-data"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[features]
+default = []
+enterprise = ["dep:o2_enterprise"]
+
+[dependencies]
+anyhow.workspace = true
+arrow.workspace = true
+arrow-json.workspace = true
+arrow-schema.workspace = true
+axum.workspace = true
+bytes.workspace = true
+chrono.workspace = true
+common.workspace = true
+compaction.workspace = true
+config.workspace = true
+csv.workspace = true
+datafusion.workspace = true
+db.workspace = true
+futures.workspace = true
+futures-util.workspace = true
+hashbrown.workspace = true
+infra.workspace = true
+log.workspace = true
+maxminddb.workspace = true
+multer.workspace = true
+o2_enterprise = { workspace = true, optional = true, default-features = false }
+parquet.workspace = true
+proto.workspace = true
+rayon.workspace = true
+reqwest.workspace = true
+schema.workspace = true
+search_service.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+transform.workspace = true
+vector-enrichment.workspace = true
+vrl.workspace = true

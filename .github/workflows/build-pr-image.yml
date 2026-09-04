@@ -1,57 +1,111 @@
 name: Build PR Docker Image
 
 on:
-  pull_request:
-    branches:
-      - "*"
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to build (e.g., feature/my-branch)'
+        required: true
+        type: string
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ inputs.branch }}
   cancel-in-progress: true
 
 env:
   AWS_REGION: us-east-1
 
 jobs:
-  check_changes:
-    runs-on: ubuntu-latest
+  build_frontend:
+    name: build_frontend
+    runs-on: ubicloud-standard-4
     permissions:
       contents: read
     outputs:
-      has_changes: ${{ steps.check_changes.outputs.has_changes }}
-      should_build: ${{ steps.check_changes.outputs.should_build }}
+      # we cache the git tag and hash and pass it to other jobs
+      GIT_TAG: ${{ steps.set-git-tag.outputs.GIT_TAG }}
+      GIT_HASH: ${{ steps.set-git-tag.outputs.GIT_HASH }}
     steps:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
+          fetch-tags: true
 
-      - name: Check if relevant code has changes
-        id: check_changes
+      # Inlined rather than `uses: ./.github/actions/github-auth`: this job checks out a caller-chosen
+      # ref, and running a local action from that checkout is a cache-poisoning vector (CodeQL).
+      - name: Authenticate github.com fetches
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
         run: |
-          if git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }} | grep -qvE '\.(md|yml|yaml)$'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          fi
+          # Sent on every github.com request, so throttled anonymous downloads never happen. A credential helper
+          # or a token in the URL is only used after a 401, and GitHub never challenges for a public repository.
+          B64=$(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')
+          echo "::add-mask::$B64"
+          git config --global http.https://github.com/.extraheader "AUTHORIZATION: basic $B64"
+          # actions/checkout keeps the same header in each checked-out repository; two copies make GitHub answer 400.
+          for d in "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE"/*/; do
+            [ -d "$d/.git" ] && git -C "$d" config --local --unset-all http.https://github.com/.extraheader || true
+          done
+          echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
+          # cargo's libgit2 transport ignores http.extraheader; the git CLI honours it.
+          echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"
+      - name: Set GIT_TAG env
+        id: set-git-tag
+        run: |
+          GIT_TAG=$(git describe --tags --abbrev=0)
+          GIT_HASH=$(git rev-parse --short=7 HEAD)
+          echo "GIT_TAG=$GIT_TAG" >> $GITHUB_OUTPUT
+          echo "GIT_HASH=$GIT_HASH" >> $GITHUB_OUTPUT
 
-          # Also check if this is a non-fork PR
-          if [ "${{ github.event_name }}" == "pull_request" ] && \
-             [ "${{ github.event.pull_request.head.repo.full_name }}" == "${{ github.repository }}" ] && \
-             [ "${{ github.event.pull_request.head.repo.fork }}" == "false" ]; then
-            echo "should_build=true" >> $GITHUB_OUTPUT
-          else
-            echo "should_build=false" >> $GITHUB_OUTPUT
-          fi
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: 'npm'
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install frontend dependencies
+        run: cd web && npm ci
+
+      - name: Lint frontend code
+        run: cd web && npm run lint:ci
+
+      - name: Check for undefined CSS custom properties
+        run: cd web && npm run lint:tokens
+
+      - name: Check design-token consistency (strict ratchet — no raw-token creep, no slack)
+        run: cd web && npm run lint:design:strict
+
+      - name: Lint styles (stylelint — bans legacy --o2-* tokens)
+        run: cd web && npm run lint:styles
+
+      - name: Check token-file purity (token files contain tokens only)
+        run: cd web && npm run lint:token-purity
+
+      - name: Build frontend code
+        env:
+          NODE_OPTIONS: "--max-old-space-size=8192"
+        run: cd web && npm run build
+
+      - name: Upload frontend artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: web/dist
+          retention-days: 1
+          if-no-files-found: error
 
   build_pr_image_amd64:
     name: build_pr_image_amd64
-    needs: check_changes
+    needs: [build_frontend]
     permissions:
       id-token: write
       contents: read
-    if: needs.check_changes.outputs.has_changes == 'true' && needs.check_changes.outputs.should_build == 'true'
-    runs-on: ubicloud-standard-8
+      packages: write
+    runs-on: ubicloud-standard-16
     steps:
       - name: Remove unused tools
         run: |
@@ -63,31 +117,49 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
           fetch-tags: true
 
+      # Inlined rather than `uses: ./.github/actions/github-auth`: this job checks out a caller-chosen
+      # ref, and running a local action from that checkout is a cache-poisoning vector (CodeQL).
+      - name: Authenticate github.com fetches
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          # Sent on every github.com request, so throttled anonymous downloads never happen. A credential helper
+          # or a token in the URL is only used after a 401, and GitHub never challenges for a public repository.
+          B64=$(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')
+          echo "::add-mask::$B64"
+          git config --global http.https://github.com/.extraheader "AUTHORIZATION: basic $B64"
+          # actions/checkout keeps the same header in each checked-out repository; two copies make GitHub answer 400.
+          for d in "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE"/*/; do
+            [ -d "$d/.git" ] && git -C "$d" config --local --unset-all http.https://github.com/.extraheader || true
+          done
+          echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
+          # cargo's libgit2 transport ignores http.extraheader; the git CLI honours it.
+          echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-11-11
+          toolchain: nightly-2026-05-20
 
       - uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-          prefix-key: amd64
+          shared-key: openobserve-amd64
+          save-if: ${{ inputs.branch == 'main' }}
 
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
         with:
-          node-version: 22
-
-      - name: Build frontend code
-        run: cd web && npm install && npm run build
+          name: frontend-dist
+          path: web/dist
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
@@ -111,21 +183,24 @@ jobs:
         with:
           registry-type: public
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set GIT_TAG env
-        run: |
-          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-          echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           file: deploy/build/Dockerfile.pr
           context: .
           tags: |
-            public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
+            public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-amd64
+            ghcr.io/openobserve/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-amd64
           push: true
           cache-from: type=gha,scope=amd64
           cache-to: type=gha,mode=max,scope=amd64
@@ -133,11 +208,11 @@ jobs:
 
   build_pr_image_arm64:
     name: build_pr_image_arm64
-    needs: check_changes
+    needs: [build_frontend]
     permissions:
       id-token: write
       contents: read
-    if: needs.check_changes.outputs.has_changes == 'true' && needs.check_changes.outputs.should_build == 'true'
+      packages: write
     runs-on: "ubicloud-standard-16-arm"
     steps:
       - name: Remove unused tools
@@ -150,31 +225,49 @@ jobs:
       - name: Clone the current repo
         uses: actions/checkout@v5
         with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          repository: ${{ github.repository }}
+          ref: ${{ inputs.branch }}
           fetch-depth: 0
           fetch-tags: true
 
+      # Inlined rather than `uses: ./.github/actions/github-auth`: this job checks out a caller-chosen
+      # ref, and running a local action from that checkout is a cache-poisoning vector (CodeQL).
+      - name: Authenticate github.com fetches
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          # Sent on every github.com request, so throttled anonymous downloads never happen. A credential helper
+          # or a token in the URL is only used after a 401, and GitHub never challenges for a public repository.
+          B64=$(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')
+          echo "::add-mask::$B64"
+          git config --global http.https://github.com/.extraheader "AUTHORIZATION: basic $B64"
+          # actions/checkout keeps the same header in each checked-out repository; two copies make GitHub answer 400.
+          for d in "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE"/*/; do
+            [ -d "$d/.git" ] && git -C "$d" config --local --unset-all http.https://github.com/.extraheader || true
+          done
+          echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
+          # cargo's libgit2 transport ignores http.extraheader; the git CLI honours it.
+          echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-11-11
+          toolchain: nightly-2026-05-20
 
       - uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-          prefix-key: arm64
+          shared-key: openobserve-arm64
+          save-if: ${{ inputs.branch == 'main' }}
 
       - name: Install Protoc
         run: |
           bash ./.github/protoc.sh
 
-      - uses: actions/setup-node@v5
+      - name: Download frontend artifact
+        uses: actions/download-artifact@v4
         with:
-          node-version: 22
-
-      - name: Build frontend code
-        run: cd web && npm install && npm run build
+          name: frontend-dist
+          path: web/dist
 
       - name: Print rustc cfg
         run: rustc -C target-cpu=native --print cfg
@@ -198,45 +291,39 @@ jobs:
         with:
           registry-type: public
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Set GIT_TAG env
-        run: |
-          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-          echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
 
       - name: Build and push
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           file: deploy/build/Dockerfile.pr
           context: .
           tags: |
-            public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
+            public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-arm64
+            ghcr.io/openobserve/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-arm64
           push: true
           cache-from: type=gha,scope=arm64
           cache-to: type=gha,mode=max,scope=arm64
           platforms: linux/arm64
 
   build:
-    needs: [build_pr_image_amd64, build_pr_image_arm64]
+    needs: [build_pr_image_amd64, build_pr_image_arm64, build_frontend]
     if: ${{ needs.build_pr_image_amd64.result == 'success' && needs.build_pr_image_arm64.result == 'success' }}
-    runs-on: ubicloud-standard-16-arm
+    # This job only publishes multi-arch manifests; it does not build either image.
+    runs-on: ubicloud-standard-4
     permissions:
       id-token: write
       contents: read
+      packages: write
     steps:
-      - name: Clone the current repo
-        uses: actions/checkout@v5
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.ref || github.ref }}
-          fetch-depth: 0
-          fetch-tags: true
-      - name: Set GIT_TAG env
-        run: |
-          echo "GIT_TAG=$(git describe --tags --abbrev=0)" >> $GITHUB_ENV
-          echo "GIT_HASH=$(git rev-parse --short=7 HEAD)" >> $GITHUB_ENV
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -250,25 +337,42 @@ jobs:
         with:
           registry-type: public
 
+      - name: Login to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
       - uses: int128/docker-manifest-create-action@v2
         with:
           tags: |
-            public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}
+            public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}
           sources: |
-            public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-amd64
-            public.ecr.aws/zinclabs/openobserve-dev:${{ env.GIT_TAG }}-${{ env.GIT_HASH}}-arm64
+            public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-amd64
+            public.ecr.aws/zinclabs/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-arm64
+
+      - uses: int128/docker-manifest-create-action@v2
+        with:
+          tags: |
+            ghcr.io/openobserve/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}
+          sources: |
+            ghcr.io/openobserve/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-amd64
+            ghcr.io/openobserve/openobserve-dev:${{ needs.build_frontend.outputs.GIT_TAG }}-${{ needs.build_frontend.outputs.GIT_HASH}}-arm64
 
   build_pr_image_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [check_changes, build_pr_image_amd64, build_pr_image_arm64, build]
+    needs: [build_frontend, build_pr_image_amd64, build_pr_image_arm64, build]
     if: always()
     steps:
       - name: Check build results
         run: |
-          if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ] || [ "${{ needs.check_changes.outputs.should_build }}" != "true" ]; then
-            echo "No relevant changes or not a non-fork PR - builds skipped"
-            exit 0
+          if [ "${{ needs.build_frontend.result }}" == "success" ]; then
+            echo "Frontend build passed"
+          else
+            echo "Frontend build failed"
+            exit 1
           fi
 
           if [ "${{ needs.build_pr_image_amd64.result }}" == "success" ] || [ "${{ needs.build_pr_image_amd64.result }}" == "skipped" ]; then

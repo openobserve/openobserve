@@ -1,3 +1,5 @@
+use std::sync::LazyLock as Lazy;
+
 use chromiumoxide::{
     Page,
     browser::{Browser, BrowserConfig, BrowserConfigBuilder},
@@ -16,7 +18,6 @@ use lettre::{
         client::{Tls, TlsParameters},
     },
 };
-use once_cell::sync::Lazy;
 use tokio::time::{Duration, sleep};
 
 use crate::models::{self, ReportType};
@@ -292,7 +293,7 @@ pub async fn generate_report(
         models::ReportTimerangeType::Absolute => {
             let url = format!(
                 "{web_url}/dashboards/view?org_identifier={org_id}&dashboard={dashboard_id}&folder={folder_id}&tab={tab_id}&refresh=Off&{search_type_params}&from={}&to={}&timezone={timezone}&var-Dynamic+filters=%255B%255D&print=true{dashb_vars}",
-                &timerange.from, &timerange.to
+                timerange.from, timerange.to
             );
             log::debug!("dashb_url for dashboard {folder_id}/{dashboard_id}: {url}");
 
@@ -436,7 +437,7 @@ pub async fn send_email(
         Ok(_) => {
             log::info!(
                 "email sent successfully for the report {}",
-                &email_details.name
+                email_details.name
             );
             Ok(())
         }
@@ -685,7 +686,7 @@ mod tests {
 
     #[test]
     fn test_dashboard_variables_generation() {
-        let variables = vec![
+        let variables = [
             ReportDashboardVariable {
                 key: "env".to_string(),
                 value: "prod".to_string(),

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -14,35 +14,39 @@
 -->
 
 <!-- eslint-disable vue/no-unused-components -->
+<!--
+  OForm migration: the whole form is the dynamic `series[]` array, a FORM-OWNED
+  field-array. This component OWNS <OForm>, so it creates the form with useOForm
+  and reads `series` reactively via form.useStore (rule ③: one source, no mirror)
+  to render the draggable v-for. Each row's `value` is an OFormCombobox and
+  `color` an OFormColor, both with indexed names (`series[i].value/color`); rows
+  are added/removed/reordered through form.pushFieldValue / removeFieldValue /
+  setFieldValue. The per-row Zod rules (non-empty value + non-null color) gate
+  submit — replacing the old `isFormValid` Save-disabled gate (R3). Save submits
+  via `form-id` (R4); the save handler is baked into useOForm({ onSubmit }).
+-->
 <template>
-  <div
-    class="scroll"
-    data-test="dashboard-color-by-series-popup"
-    style="padding: 5px 10px; min-width: min(1200px, 90vw)"
+  <ODialog
+    data-test="color-by-series-popup-dialog"
+    :open="open"
+    @update:open="
+      (v) => {
+        if (!v) cancelEdit();
+      }
+    "
+    :title="t('dashboard.colorBySeriesPopUp.title')"
+    size="lg"
+    :neutral-button-label="t('dashboard.colorBySeriesPopUp.addNewColor')"
+    neutral-button-variant="outline"
+    :primary-button-label="t('dashboard.colorBySeriesPopUp.save')"
+    form-id="color-by-series-form"
+    @click:neutral="addcolorBySeries"
   >
-    <div
-      class="flex justify-between items-center q-pa-md header tw:top-0 tw:sticky"
-      style="border-bottom: 2px solid gray; margin-bottom: 5px"
-    >
-      <div class="flex items-center q-table__title q-mr-md">
-        <span>Color by series</span>
-      </div>
-      <q-btn
-        icon="close"
-        class="q-ml-xs"
-        unelevated
-        size="sm"
-        round
-        borderless
-        :title="t('dashboard.cancel')"
-        @click.stop="cancelEdit"
-        data-test="dashboard-color-by-series-cancel"
-      ></q-btn>
-    </div>
-    <div class="flex tw:justify-between tw:flex-col">
-      <div class="tw:mt-2 scrollable-content scroll tw:min-h-52">
+    <OForm id="color-by-series-form" :form="form">
+      <div data-test="dashboard-color-by-series-popup">
         <draggable
-          v-model="editColorBySeries"
+          :model-value="editColorBySeries"
+          @update:model-value="onReorder"
           :options="dragOptions"
           @mousedown.stop="() => {}"
           data-test="dashboard-addpanel-config-color-by-series-drag"
@@ -50,144 +54,106 @@
           <div
             v-for="(series, index) in editColorBySeries"
             :key="index"
-            class="draggable-row"
+            class="mb-2 flex items-center justify-between"
           >
-            <div class="draggable-handle tw:self-center">
-              <q-icon
-                name="drag_indicator"
-                color="grey-13"
-                class="q-mr-xs"
+            <div class="cursor-move self-center p-2">
+              <OIcon
+                name="drag-indicator"
+                size="sm"
+                class="me-1"
                 :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
               />
             </div>
-            <div class="draggable-content tw:flex tw:gap-x-6">
-              <div class="input-container tw:flex-1">
-                <CommonAutoComplete
-                  v-model="series.value"
+            <div class="flex flex-1 items-center justify-between gap-x-3">
+              <div class="min-w-0 flex-1">
+                <OFormCombobox
+                  :name="`series[${index}].value`"
                   :items="seriesDataItems"
-                  searchRegex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
-                  label="Select Series"
-                  color="input-border"
-                  bg-color="input-bg"
-                  stack-label
-                  borderless
-                  label-slot
-                  style="
-                    top: none !important;
-                    margin-top: none !important;
-                    padding-top: 1px !important;
-                    width: auto !important;
-                  "
+                  search-regex="(?:{([^}])(?:{.})*$|([a-zA-Z-_]+)$)"
+                  :label="t('dashboard.colorBySeriesPopUp.selectSeries')"
+                  label-position="inside"
+                  required
                   :value-replace-fn="selectColorBySeriesOption"
-                >
-                  <template v-slot:label>
-                    <div class="row items-center all-pointer-events">
-                      Select series
-                    </div>
-                  </template>
-                </CommonAutoComplete>
+                  :data-test="`dashboard-addpanel-config-color-by-series-series-select-${index}`"
+                />
               </div>
 
               <!-- Color Picker -->
-              <div class="color-section tw:flex-1">
-                <div
-                  v-if="series.color !== null"
-                  class="tw:items-center tw:flex"
-                >
-                  <q-input
-                    v-model="series.color"
-                    style="width: 90%"
-                    class="input-spacing"
-                    dense
-                   borderless hide-bottom-space>
-                    <template v-slot:append>
-                      <q-icon
-                        name="colorize"
-                        class="cursor-pointer"
-                        :ref="`colorize-icon-${index}`"
-                        @click="openColorPicker(index)"
-                      >
-                        <q-popup-proxy cover transition-show="scale">
-                          <q-color v-model="series.color" />
-                        </q-popup-proxy>
-                      </q-icon>
-                    </template>
-                  </q-input>
-                  <q-icon
-                    :name="outlinedCancel"
-                    style="width: 10%"
-                    class="cursor-pointer tw:align-middle"
-                    size="xs"
-                    title="Remove color"
-                    @click="removeColorByIndex(index)"
+              <div
+                class="flex shrink-0 items-center"
+                :data-test="`dashboard-addpanel-config-color-by-series-color-section-${index}`"
+              >
+                <div v-if="series.color !== null" class="flex items-center gap-1">
+                  <OFormColor
+                    :name="`series[${index}].color`"
+                    class="flex-1"
+                    clearable
+                    @clear="removeColorByIndex(index)"
                   />
                 </div>
-                <div v-else class="tw:w-full">
-                  <q-btn
-                    label="Set color"
-                    no-caps
-                    flat
-                    dense
-                    class="tw:text-blue-700 tw:font-semibold tw:w-full"
+                <div v-else class="w-full">
+                  <OButton
+                    variant="ghost-primary"
+                    size="sm"
+                    class="w-full"
+                    :data-test="`dashboard-addpanel-config-color-by-series-set-color-btn-${index}`"
                     @click="setColorByIndex(index)"
-                  />
+                    >{{ t("dashboard.colorBySeriesPopUp.setColor") }}</OButton
+                  >
                 </div>
               </div>
 
               <!-- Delete series -->
-              <q-btn
-                icon="close"
-                class="delete-btn"
-                dense
-                flat
-                round
+              <OButton
+                variant="ghost"
+                size="icon"
                 @click="removecolorBySeriesByIndex(index)"
                 :data-test="`dashboard-addpanel-config-color-by-series-delete-btn-${index}`"
-              />
+              >
+                <template #icon-left><OIcon name="close" size="sm" /></template>
+              </OButton>
             </div>
           </div>
         </draggable>
       </div>
-      <!-- Footer Buttons -->
-    </div>
-    <div class="flex justify-between tw:sticky tw:bottom-0 sticky-footer">
-      <q-btn
-        @click="addcolorBySeries"
-        label="+ Add a new color"
-        no-caps
-        outline
-        dense
-        data-test="dashboard-addpanel-config-color-by-series-add-btn"
-        class="el-border"
-      />
-      <q-btn
-        @click="applycolorBySeries"
-        color="primary"
-        label="Save"
-        style="margin-right: 10px"
-        padding="5px 14px"
-        no-caps
-        dense
-        :disable="!isFormValid"
-        data-test="dashboard-addpanel-config-color-by-series-apply-btn"
-      />
-    </div>
-  </div>
+    </OForm>
+  </ODialog>
 </template>
 <script lang="ts">
 import { computed, ref, nextTick } from "vue";
 import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import { onMounted } from "vue";
 import { VueDraggableNext } from "vue-draggable-next";
-import { outlinedCancel } from "@quasar/extras/material-icons-outlined";
-import CommonAutoComplete from "./CommonAutoComplete.vue";
 import { watch } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormColor from "@/lib/forms/Color/OFormColor.vue";
+import OFormCombobox from "@/lib/forms/Combobox/OFormCombobox.vue";
+import { useOForm } from "@/lib/forms/Form/useOForm";
+import {
+  makeColorBySeriesPopUpSchema,
+  type ColorBySeriesPopUpForm,
+} from "./ColorBySeriesPopUp.schema";
 
 export default defineComponent({
   name: "colorBySeriesPopUp",
-  components: { draggable: VueDraggableNext as any, CommonAutoComplete },
+  components: {
+    draggable: VueDraggableNext as any,
+    OButton,
+    ODialog,
+    OForm,
+    OFormColor,
+    OFormCombobox,
+    OIcon,
+  },
   props: {
+    open: {
+      type: Boolean,
+      required: true,
+    },
     colorBySeries: {
       type: Array,
       default: () => [],
@@ -199,52 +165,53 @@ export default defineComponent({
   },
   emits: ["close", "save"],
   setup(props: any, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
-    // Initialize with colorBySeries (edited data) if available, otherwise default empty
-    const editColorBySeries = ref(
+    // The whole form is the `series[]` field-array — the FORM is the SOLE source
+    // (rule ②). This component OWNS <OForm> and needs to read `series` to render
+    // the draggable v-for, so it creates the form here with useOForm and reads it
+    // reactively via form.useStore — ONE source of truth, no mirror (rule ③).
+    const makeDefaultRows = () =>
       props.colorBySeries?.length
-        ? props.colorBySeries.map((m: any) => ({
-            ...m,
-            value: typeof m.value === "string" ? m.value : "",
-            color: m.color || null,
-          }))
-        : [{ type: "value", value: "", color: null }],
-    );
+        ? JSON.parse(JSON.stringify(props.colorBySeries))
+        : [{ type: "value", value: "", color: null }];
 
-    // Validate for save button click
-    // Each series must have both value (series name) and color selected for save it
-    const isFormValid = computed(() => {
-      return editColorBySeries.value.every((series: any) => {
-        return (
-          series.value && series.value.trim() !== "" && series.color !== null
-        );
-      });
+    // onSubmit (baked into useOForm) fires only when the schema passes (every row
+    // has a non-empty value + a non-null color). The validated value carries the
+    // row order from the drag. Save submits via form-id (R4) → handleSubmit.
+    const form = useOForm<ColorBySeriesPopUpForm>({
+      defaultValues: { series: makeDefaultRows() },
+      schema: makeColorBySeriesPopUpSchema(t),
+      onSubmit: (value) => {
+        emit("save", value.series);
+      },
     });
 
-    // Watch for changes in series.value to ensure proper reactivity
+    // Reactive READ of the form's `series` array (rule ③: form.useStore, NOT a
+    // local copy) — drives the draggable + v-for.
+    const editColorBySeries = form.useStore(
+      (s: any): ColorBySeriesPopUpForm["series"] => s.values?.series ?? [],
+    );
+
+    // Re-seed the form on open (the overlay may keep the body mounted).
     watch(
-      editColorBySeries,
-      (newVal) => {
-        newVal.forEach((series: any) => {
-          if (
-            typeof series.value !== "string" ||
-            series.value === undefined ||
-            series.value === null
-          ) {
-            series.value = "";
-          }
-        });
+      () => props.open,
+      async (isOpen) => {
+        if (!isOpen) return;
+        await nextTick();
+        form.reset({ series: makeDefaultRows() });
       },
-      { deep: true },
     );
 
     const dragOptions = ref({
       animation: 200,
     });
 
+    // Structural mutations go through the form (the single source).
+    // Cast: useOForm erases TFormData to Record<string, unknown>, so array
+    // field keys don't survive DeepKeysOfType and resolve to `never`.
     const addcolorBySeries = () => {
-      editColorBySeries.value.push({
+      (form.pushFieldValue as (field: string, value: unknown) => void)("series", {
         type: "value",
         value: "",
         color: null,
@@ -267,119 +234,56 @@ export default defineComponent({
     };
 
     const removecolorBySeriesByIndex = (index: number) => {
-      editColorBySeries.value.splice(index, 1);
+      (form.removeFieldValue as (field: string, index: number) => void)("series", index);
+    };
+
+    // Draggable reorder → write the new order back to the form.
+    const onReorder = (newOrder: any[]) => {
+      form.setFieldValue("series", newOrder);
     };
 
     onMounted(() => {
-      // if editColorBySeries is empty, add default color
-      if (editColorBySeries.value.length === 0) {
+      if (((form.getFieldValue("series") ?? []) as ColorBySeriesPopUpForm["series"]).length === 0) {
         addcolorBySeries();
       }
     });
 
     const setColorByIndex = (index: number) => {
-      editColorBySeries.value[index].color = "#5960b2";
+      form.setFieldValue(`series[${index}].color`, "#5960b2");
     };
 
     const removeColorByIndex = (index: number) => {
-      editColorBySeries.value[index].color = null;
-    };
-
-    const applycolorBySeries = () => {
-      // Only save if fields are not empty
-      if (isFormValid.value) {
-        emit("save", editColorBySeries.value);
-      }
+      form.setFieldValue(`series[${index}].color`, null);
     };
 
     const cancelEdit = () => {
+      // Reset to last saved state so unsaved edits are discarded
+      form.reset({ series: makeDefaultRows() });
       emit("close");
     };
 
     // Method to open color picker directly
-    const openColorPicker = (index: number) => {
+    const openColorPicker = () => {
       // This method is called when the colorize icon is clicked
-      // The color picker should open automatically due to q-popup-proxy
+      // The color picker should open automatically via its popup proxy
     };
 
     return {
       t,
+      form,
       addcolorBySeries,
       removecolorBySeriesByIndex,
+      onReorder,
       dragOptions,
       setColorByIndex,
       removeColorByIndex,
-      applycolorBySeries,
       cancelEdit,
       editColorBySeries,
-      outlinedCancel,
+      cancel: "cancel",
       seriesDataItems,
       openColorPicker,
       selectColorBySeriesOption,
-      isFormValid,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.draggable-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  border-bottom: 1px solid #cccccc70;
-  margin-bottom: 8px;
-}
-
-.draggable-handle {
-  cursor: move;
-  padding: 8px;
-}
-
-.draggable-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex: 1;
-}
-
-.input-spacing {
-  margin-right: 10px;
-}
-
-.color-section {
-  display: flex;
-  align-items: center;
-}
-
-.delete-btn {
-  margin-left: 10px;
-}
-.scrollable-content {
-  overflow-y: auto;
-  max-height: calc(100vh - 190px);
-  &::-webkit-scrollbar {
-    width: 6px;
-    background: transparent;
-  }
-  &::-webkit-scrollbar-thumb {
-    background: #d1d5db;
-    border-radius: 4px;
-  }
-  scrollbar-width: thin;
-  scrollbar-color: #d1d5db transparent;
-}
-.sticky-footer {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  width: 100%;
-  padding: 12px 0 8px 0;
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  z-index: 10;
-  border-top: 1px solid #eee;
-  box-shadow: rgb(240, 240, 240) 0px -4px 7px 0px;
-}
-</style>

@@ -36,3 +36,24 @@ impl Related<super::re_patterns::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: 42,
+            org: "myorg".to_string(),
+            stream: "mystream".to_string(),
+            stream_type: "logs".to_string(),
+            field: "message".to_string(),
+            pattern_id: "pat-1".to_string(),
+            policy: "mask".to_string(),
+            apply_at: "ingestion".to_string(),
+        };
+        assert_eq!(m.id, 42);
+        assert_eq!(m.field, "message");
+    }
+}

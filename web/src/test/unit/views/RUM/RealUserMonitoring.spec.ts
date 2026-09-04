@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -19,7 +19,6 @@ import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
 import RealUserMonitoring from "@/views/RUM/RealUserMonitoring.vue";
 import i18n from "@/locales";
-import { Quasar } from "quasar";
 
 // Mock composables
 vi.mock("@/composables/useSessionReplay", () => ({
@@ -79,45 +78,9 @@ vi.mock("@/composables/useStreams", () => ({
 describe("RealUserMonitoring.vue", () => {
   let store: any;
   let router: any;
-  let $q: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Mock Quasar
-    $q = {
-      dark: { isActive: false, mode: false },
-      platform: {
-        is: {
-          mobile: false,
-          desktop: true,
-          cordova: false,
-          capacitor: false,
-          electron: false,
-          chrome: true,
-          safari: false,
-          firefox: false,
-          edge: false,
-          ie: false,
-          linux: false,
-          mac: true,
-          win: false,
-          android: false,
-          ios: false,
-        },
-        has: {
-          touch: false,
-        },
-        within: {
-          iframe: false,
-        },
-      },
-      iconMapFn: vi.fn((iconName: string) => iconName),
-      iconSet: {
-        name: 'material-icons',
-      },
-      notify: vi.fn(),
-    };
 
     store = createStore({
       state: {
@@ -176,22 +139,18 @@ describe("RealUserMonitoring.vue", () => {
     it("should show loading spinner when RUM status is being checked", async () => {
       let resolveGetStream: any;
       mockGetStream.mockImplementation(
-        () => new Promise((resolve) => { resolveGetStream = resolve; })
+        () =>
+          new Promise((resolve) => {
+            resolveGetStream = resolve;
+          }),
       );
 
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": {
-              template: '<div class="q-spinner-hourglass">Loading...</div>',
-            },
-            "q-btn": true,
-            "q-icon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -200,10 +159,8 @@ describe("RealUserMonitoring.vue", () => {
       // Wait for the component to mount and start loading
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.find(".q-spinner-hourglass").exists()).toBe(true);
-      expect(wrapper.text()).toContain(
-        "Hold on tight, we're loading RUM data."
-      );
+      expect(wrapper.find('[data-test="rum-loading-indicator"]').exists()).toBe(true);
+      expect(wrapper.text()).toContain("Hold on tight, we're loading RUM data.");
 
       // Resolve the promise
       resolveGetStream(null);
@@ -218,16 +175,9 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
-            "q-btn": {
-              template: '<button @click="$attrs.onClick"><slot /></button>',
-            },
-            "q-icon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -235,8 +185,7 @@ describe("RealUserMonitoring.vue", () => {
 
       await flushPromises();
 
-      expect(wrapper.text()).toContain("Discover Real User Monitoring");
-      expect(wrapper.text()).toContain("Get Started");
+      expect(wrapper.text()).toContain("Monitor your users with Real User Monitoring");
     });
 
     it("should navigate to frontend monitoring on get started click", async () => {
@@ -246,16 +195,9 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
-            "q-btn": {
-              template: '<button @click="$attrs.onClick"><slot /></button>',
-            },
-            "q-icon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -278,6 +220,7 @@ describe("RealUserMonitoring.vue", () => {
       mockGetStream.mockImplementation((streamName) => {
         if (streamName === "_rumdata") {
           return Promise.resolve({
+            name: "_rumdata",
             schema: [
               { name: "service_name", type: "Utf8" },
               { name: "rum_type", type: "Utf8" },
@@ -286,6 +229,7 @@ describe("RealUserMonitoring.vue", () => {
         }
         if (streamName === "_sessionreplay") {
           return Promise.resolve({
+            name: "_sessionreplay",
             schema: [
               { name: "session_id", type: "Utf8" },
               { name: "event_type", type: "Utf8" },
@@ -302,18 +246,22 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
-            "q-btn": true,
-            "q-icon": true,
+            OIcon: true,
             AppTabs: {
               template:
                 '<div class="app-tabs"><slot v-for="tab in tabs" :name="tab.value" /></div>',
               props: ["tabs", "activeTab"],
+            },
+            OTabs: {
+              template: '<div class="app-tabs"><slot></slot></div>',
+              props: ["modelValue", "align", "dense"],
+              emits: ["update:modelValue", "change"],
+            },
+            OTab: {
+              template: "<div></div>",
+              props: ["name", "label"],
             },
           },
         },
@@ -330,14 +278,11 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": {
               template: '<div class="router-view"><slot /></div>',
             },
-            "q-spinner-hourglass": true,
-            "q-btn": true,
-            "q-icon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -356,19 +301,15 @@ describe("RealUserMonitoring.vue", () => {
         props: ["isRumEnabled", "isSessionReplayEnabled"],
       };
 
-      const wrapper = mount(RealUserMonitoring, {
+      mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": {
-              template:
-                '<component :is="Component" v-bind="$attrs" v-slot="{ Component }" />',
+              template: '<component :is="Component" v-bind="$attrs" v-slot="{ Component }" />',
               components: { component: childComponentStub },
             },
-            "q-spinner-hourglass": true,
-            "q-btn": true,
-            "q-icon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -377,11 +318,7 @@ describe("RealUserMonitoring.vue", () => {
       await flushPromises();
 
       expect(mockGetStream).toHaveBeenCalledWith("_rumdata", "logs", false);
-      expect(mockGetStream).toHaveBeenCalledWith(
-        "_sessionreplay",
-        "logs",
-        false
-      );
+      expect(mockGetStream).toHaveBeenCalledWith("_sessionreplay", "logs", false);
     });
 
     it("should load schema when RUM is enabled", async () => {
@@ -390,14 +327,9 @@ describe("RealUserMonitoring.vue", () => {
       mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
-            "q-btn": true,
-            "q-icon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -416,6 +348,7 @@ describe("RealUserMonitoring.vue", () => {
       mockGetStream.mockImplementation((streamName) => {
         if (streamName === "_rumdata") {
           return Promise.resolve({
+            name: "_rumdata",
             schema: [{ name: "service_name", type: "Utf8" }],
           });
         }
@@ -429,12 +362,9 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -452,12 +382,9 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -474,12 +401,9 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -496,12 +420,9 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -518,6 +439,7 @@ describe("RealUserMonitoring.vue", () => {
       mockGetStream.mockImplementation((streamName) => {
         if (streamName === "_sessionreplay") {
           return Promise.resolve({
+            name: "_sessionreplay",
             schema: [{ name: "session_id", type: "Utf8" }],
           });
         }
@@ -528,13 +450,11 @@ describe("RealUserMonitoring.vue", () => {
 
       const wrapper = mount(RealUserMonitoring, {
         global: {
-          plugins: [store, router, i18n, Quasar],
-          mocks: { $q },
+          plugins: [store, router, i18n],
           stubs: {
             "router-view": {
               template: '<div class="router-view" />',
             },
-            "q-spinner-hourglass": true,
             AppTabs: true,
           },
         },
@@ -552,6 +472,7 @@ describe("RealUserMonitoring.vue", () => {
       mockGetStream.mockImplementation((streamName) => {
         if (streamName === "_rumdata") {
           return Promise.resolve({
+            name: "_rumdata",
             schema: [{ name: "service_name", type: "Utf8" }],
           });
         }
@@ -562,16 +483,14 @@ describe("RealUserMonitoring.vue", () => {
     it("should use keep-alive for routes with keepAlive meta", async () => {
       await router.push({ name: "Sessions" });
 
-      const wrapper = mount(RealUserMonitoring, {
+      mount(RealUserMonitoring, {
         global: {
-          plugins: [store, router, i18n, Quasar],
-          mocks: { $q },
+          plugins: [store, router, i18n],
           stubs: {
             "router-view": {
               template:
                 '<div><keep-alive v-if="$route.meta.keepAlive" class="keep-alive-wrapper" /></div>',
             },
-            "q-spinner-hourglass": true,
             AppTabs: true,
           },
         },
@@ -591,14 +510,9 @@ describe("RealUserMonitoring.vue", () => {
       const wrapper = mount(RealUserMonitoring, {
         global: {
           plugins: [store, router, i18n],
-          mocks: { $q },
           stubs: {
             "router-view": true,
-            "q-btn": true,
-            "q-icon": true,
-            "q-spinner-hourglass": true,
-            "q-btn": true,
-            "q-icon": true,
+            OIcon: true,
             AppTabs: true,
           },
         },
@@ -606,8 +520,8 @@ describe("RealUserMonitoring.vue", () => {
 
       await flushPromises();
 
-      // Should show get started screen when streams fail to load
-      expect(wrapper.text()).toContain("Discover Real User Monitoring");
+      // Should show empty state when streams fail to load
+      expect(wrapper.text()).toContain("Monitor your users with Real User Monitoring");
     });
   });
 });

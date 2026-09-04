@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,139 +15,240 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="showDialog" @hide="onDialogHide">
-    <q-card class="enterprise-dialog-v3" style="min-width: 1200px; max-width: 1400px">
+  <ODialog
+    v-model:open="showDialog"
+    data-test="enterprise-upgrade-dialog"
+    :show-close="false"
+    :width="75"
+    @update:open="(v) => !v && onDialogHide()"
+  >
+    <div
+      class="enterprise-dialog-v3 relative -mx-(--spacing-dialog-content-px) -my-(--spacing-dialog-content-py) overflow-hidden"
+    >
       <!-- Close Button -->
-      <q-btn
-        icon="cancel"
-        flat
-        round
-        dense
-        v-close-popup
-        class="close-btn-top-right"
-      />
+      <div class="text-text-secondary hover:text-text-body absolute top-4 right-4 z-100">
+        <OButton variant="ghost" size="icon" @click="showDialog = false">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </OButton>
+      </div>
 
-      <div class="dialog-split-layout" :class="{ 'cloud-layout': dialogConfig.isCloudLayout }">
+      <div
+        class="dialog-split-layout flex max-h-[92vh] max-[56.25rem]:flex-col"
+        :class="{ 'cloud-layout': dialogConfig.isCloudLayout }"
+      >
         <!-- Left Panel - Hero Section (hidden for Cloud) -->
-        <div v-if="!dialogConfig.isCloudLayout" class="hero-panel">
-
-          <div class="hero-content">
-            <div class="hero-icon">
-              <q-icon name="workspace_premium" size="48px" />
+        <div
+          v-if="!dialogConfig.isCloudLayout"
+          class="hero-panel relative flex min-h-0 [flex:0_0_35%] flex-col overflow-y-auto bg-[linear-gradient(135deg,var(--color-theme-accent)_0%,color-mix(in_srgb,var(--color-theme-accent)_85%,black_15%)_100%)] p-10 text-white max-[56.25rem]:min-h-100 max-[56.25rem]:flex-none"
+        >
+          <div class="m-auto flex w-full max-w-100 flex-1 flex-col items-center justify-center">
+            <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom -->
+            <div
+              class="rounded-default mb-6 flex h-20 w-20 items-center justify-center bg-[rgba(255,255,255,0.15)] backdrop-blur-[10px]"
+            >
+              <!-- eslint-enable local/no-hardcoded-px -->
+              <OIcon name="workspace-premium" size="xl" />
             </div>
 
-            <h2 class="hero-title">{{ dialogConfig.heroTitle }}</h2>
+            <div
+              data-test="enterprise-upgrade-hero-title"
+              class="mb-4 text-center text-3xl leading-[1.2] font-bold text-white"
+            >
+              {{ dialogConfig.heroTitle }}
+            </div>
 
-            <p class="offer-text">
+            <div class="mb-6 text-center text-sm leading-[1.6] text-white opacity-[0.95]">
               {{ dialogConfig.offerText }}
-            </p>
+            </div>
 
-            <div class="hero-offer">
+            <div class="mb-8 flex flex-row items-center justify-center gap-4">
               <!-- Loading State: Show skeleton -->
               <template v-if="isLoadingLicense && dialogConfig.showUsageIndicator">
-                <q-skeleton
-                  type="circle"
-                  size="40px"
-                  class="usage-indicator"
-                  animation="pulse"
-                  style="background: rgba(255, 255, 255, 0.2);"
+                <OSkeleton
+                  class="h-10 w-10 shrink-0 rounded-full"
+                  data-test="enterprise-upgrade-usage-indicator-skeleton"
                 />
-                <q-skeleton
-                  type="rect"
-                  width="200px"
-                  height="44px"
-                  class="offer-badge-skeleton"
-                  animation="pulse"
-                  style="background: rgba(255, 255, 255, 0.2); border-radius: 24px;"
+                <OSkeleton
+                  class="rounded-default shrink-0"
+                  style="width: 12.5rem; height: 2.75rem"
+                  data-test="enterprise-upgrade-offer-badge-skeleton"
                 />
               </template>
 
               <!-- Loaded State: Show actual data -->
               <template v-else>
-                <q-circular-progress
-                  v-if="dialogConfig.showUsageIndicator"
-                  :value="dialogConfig.usagePercentage"
-                  size="40px"
-                  :thickness="0.18"
-                  :color="getProgressColor(dialogConfig.usagePercentage)"
-                  track-color="rgba(255, 255, 255, 0.3)"
-                  class="usage-indicator"
-                  show-value
-                  font-size="10px"
+                <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling shadow and blur with text makes elevation bloom -->
+                <div
+                  data-test="enterprise-upgrade-offer-badge"
+                  class="rounded-default shadow-success-500/40 inline-flex items-center bg-[linear-gradient(135deg,#22c55e_0%,#4ade80_100%)] px-5 py-2.5 text-sm font-bold text-white shadow-lg backdrop-blur-[10px]"
+                  :class="{
+                    'bg-[rgba(255,255,255,0.2)]! shadow-md!': dialogConfig.isLicensed,
+                  }"
                 >
-                  <span style="color: white; font-weight: 700; font-size: 10px;">{{ Math.round(dialogConfig.usagePercentage) }}%</span>
-                </q-circular-progress>
-                <div class="offer-badge" :class="{ 'licensed-badge': dialogConfig.isLicensed }">
-                  <q-icon v-if="!dialogConfig.showUsageIndicator" :name="dialogConfig.badgeIcon" size="20px" class="q-mr-xs" />
+                  <!-- eslint-enable local/no-hardcoded-px -->
+                  <OIcon
+                    v-if="!dialogConfig.showUsageIndicator"
+                    :name="dialogConfig.badgeIcon"
+                    size="md"
+                    class="me-1"
+                  />
                   <span>{{ dialogConfig.badgeText }}</span>
                 </div>
               </template>
             </div>
 
-            <!-- License Limit Note (only for Enterprise without license) -->
-            <div v-if="dialogConfig.showLicenseNote" class="license-note">
-              <q-icon name="info" size="14px" class="q-mr-xs" />
-              <span>{{ dialogConfig.licenseNoteText }}</span>
+            <!-- Usage Chart (only for Enterprise with license) -->
+            <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — scaling the backdrop blur with text makes elevation bloom -->
+            <div
+              v-if="dialogConfig.isLicensed"
+              class="rounded-default mb-6 w-full border border-[rgba(255,255,255,0.2)] bg-[rgba(255,255,255,0.1)] p-4 backdrop-blur-[10px]"
+            >
+              <!-- eslint-enable local/no-hardcoded-px -->
+              <!-- Loading skeleton -->
+              <template v-if="isLoadingLicense">
+                <OSkeleton
+                  class="chart-skeleton rounded-default"
+                  style="height: 9.375rem"
+                  data-test="enterprise-upgrade-chart-skeleton"
+                />
+              </template>
+              <!-- Loaded chart -->
+              <template v-else-if="chartData">
+                <div class="relative w-full">
+                  <div
+                    class="usage-chart-container mx-auto max-h-37.5 min-h-37.5 w-full overflow-visible p-0"
+                    style="height: 9.375rem"
+                  >
+                    <ChartRenderer :key="dashboardRenderKey" :data="chartData" />
+                  </div>
+                  <div
+                    v-if="isIngestionUnlimited"
+                    class="mt-1 text-center text-xs"
+                    style="color: rgba(255, 255, 255, 0.7); font-size: var(--text-3xs)"
+                  >
+                    {{ t("about.usage_shows_zero_unlimited") }}
+                  </div>
+                </div>
+              </template>
             </div>
 
-            <div class="hero-actions">
-              <q-btn
+            <div class="flex w-full flex-col gap-3">
+              <!-- eslint-disable local/no-hardcoded-px -- optical effect, not layout — shadow offsets/blurs and the 1px active-press nudge must not scale with text -->
+              <OButton
                 v-if="dialogConfig.showPrimaryButton"
-                unelevated
-                :label="dialogConfig.primaryButtonText"
+                variant="on-dark-primary"
+                size="lg"
                 @click="handlePrimaryButtonClick"
-                :icon-right="dialogConfig.primaryButtonIcon"
-                no-caps
-                class="download-btn"
-              />
-              <q-btn
+                data-test="enterprise-upgrade-download-btn"
+                class="rounded-default! text-theme-accent! bg-white! px-8 py-2.5 text-sm font-bold! [letter-spacing:0.01875rem] shadow-md transition-all duration-300 [transition-timing-function:cubic-bezier(0.4,0,0.2,1)] hover:[transform:translateY(-0.1875rem)_scale(1.02)] hover:shadow-lg active:[transform:translateY(-1px)_scale(0.98)]"
+              >
+                <!-- eslint-enable local/no-hardcoded-px -->
+                {{ dialogConfig.primaryButtonText }}
+                <template v-if="dialogConfig.primaryButtonIcon" #icon-right>
+                  <OIcon :name="dialogConfig.primaryButtonIcon" size="sm" />
+                </template>
+              </OButton>
+              <OButton
                 v-if="dialogConfig.showContactSales"
-                flat
-                :label="t('about.enterprise_offer.buttons.contact_sales')"
+                variant="on-dark-ghost"
+                size="lg"
                 @click="contactSales"
-                no-caps
-                class="learn-more-btn"
-                color="white"
-              />
-              <q-btn
+                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.0125rem] transition-all duration-300 hover:[transform:translateX(0.25rem)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
+              >
+                {{ t("about.enterprise_offer.buttons.contact_sales") }}
+              </OButton>
+              <OButton
                 v-else
-                flat
-                :label="t('about.enterprise_offer.buttons.learn_more')"
+                variant="on-dark-ghost"
+                size="lg"
                 @click="openDocsLink"
-                no-caps
-                class="learn-more-btn"
-                color="white"
-              />
+                data-test="enterprise-upgrade-learn-more-btn"
+                class="rounded-default! border-2 border-[rgba(255,255,255,0.3)] bg-transparent px-6 py-2.5 text-sm font-semibold! [letter-spacing:0.0125rem] transition-all duration-300 hover:[transform:translateX(0.25rem)] hover:border-[rgba(255,255,255,0.5)] hover:bg-[rgba(255,255,255,0.15)] active:[transform:scale(0.96)]"
+              >
+                {{ t("about.enterprise_offer.buttons.learn_more") }}
+              </OButton>
             </div>
           </div>
         </div>
 
         <!-- Right Panel - Features List -->
-        <div class="features-panel">
-          <div class="features-header">
-            <h4>{{ dialogConfig.featuresTitle }}</h4>
-            <p class="header-subtitle">{{ dialogConfig.featuresSubtitle }}</p>
+        <div
+          class="bg-surface-base flex flex-1 flex-col overflow-hidden"
+          :class="[{ 'max-w-full': dialogConfig.isCloudLayout }]"
+        >
+          <div
+            class="bg-surface-base border-border-default sticky top-0 z-10 border-b px-8 pt-4 pb-3 text-center"
+          >
+            <div
+              data-test="enterprise-upgrade-features-title"
+              class="text-text-heading mb-1 text-lg font-bold [letter-spacing:-0.01875rem]"
+            >
+              {{ dialogConfig.featuresTitle }}
+            </div>
+            <div class="text-text-secondary text-xs font-medium">
+              {{ dialogConfig.featuresSubtitle }}
+            </div>
           </div>
 
           <!-- Cloud 3-column layout -->
-          <div v-if="dialogConfig.isCloudLayout" class="features-list cloud-three-column">
+          <div
+            v-if="dialogConfig.isCloudLayout"
+            data-test="enterprise-upgrade-features-list-cloud"
+            class="grid flex-1 grid-cols-3 content-start gap-x-[0.875rem] gap-y-[0.4375rem] overflow-y-auto px-8 pt-2 pb-4"
+          >
             <!-- Column 1: Core Features -->
             <div
               v-for="feature in coreFeatures"
               :key="feature.name"
-              class="feature-list-item"
-              :class="{ 'has-link': feature.link }"
+              data-test="enterprise-upgrade-feature-item"
+              class="rounded-default flex gap-2.5 border p-[0.5rem_0.75rem] transition-all duration-200"
+              :class="[
+                'border-border-default',
+                feature.link
+                  ? isDark
+                    ? 'hover:border-theme-accent/40 hover:bg-theme-accent/10 cursor-pointer hover:[transform:translateX(0.125rem)] active:[transform:translateX(0)]'
+                    : 'hover:border-theme-accent/30 hover:bg-theme-accent/5 cursor-pointer hover:[transform:translateX(0.125rem)] active:[transform:translateX(0)]'
+                  : isDark
+                    ? 'hover:bg-[rgba(255,255,255,0.05)]'
+                    : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
+              ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="15px" />
+              <div
+                class="rounded-default bg-theme-accent/10 text-theme-accent dark:bg-theme-accent/15 flex h-7.5 w-7.5 shrink-0 items-center justify-center"
+              >
+                <OIcon :name="feature.icon" size="sm" />
               </div>
-              <div class="feature-content">
-                <div class="feature-name">
+              <div class="min-w-0 flex-1">
+                <div
+                  class="text-compact mb-0.5 flex items-center gap-1.5 leading-[1.25] font-semibold"
+                  :class="'text-text-heading'"
+                >
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <OIcon
+                    v-if="feature.link"
+                    name="open-in-new"
+                    size="xs"
+                    class="ms-1 align-middle opacity-60"
+                  />
                 </div>
-                <div class="feature-desc">{{ feature.note }}</div>
+                <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">
+                  {{ feature.note }}
+                </div>
               </div>
             </div>
 
@@ -156,64 +257,145 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="feature in enterpriseFeatures"
               v-show="!feature.cloudHidden"
               :key="feature.name"
-              class="feature-list-item"
-              :class="{ 'has-link': feature.link }"
+              data-test="enterprise-upgrade-feature-item"
+              class="rounded-default flex gap-2.5 border p-[0.5rem_0.75rem] transition-all duration-200"
+              :class="[
+                'border-border-default',
+                feature.link
+                  ? isDark
+                    ? 'hover:border-theme-accent/40 hover:bg-theme-accent/10 cursor-pointer hover:[transform:translateX(0.125rem)] active:[transform:translateX(0)]'
+                    : 'hover:border-theme-accent/30 hover:bg-theme-accent/5 cursor-pointer hover:[transform:translateX(0.125rem)] active:[transform:translateX(0)]'
+                  : isDark
+                    ? 'hover:bg-[rgba(255,255,255,0.05)]'
+                    : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
+              ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="15px" />
+              <div
+                class="rounded-default bg-theme-accent/10 text-theme-accent dark:bg-theme-accent/15 flex h-7.5 w-7.5 shrink-0 items-center justify-center"
+              >
+                <OIcon :name="feature.icon" size="sm" />
               </div>
-              <div class="feature-content">
-                <div class="feature-name">
+              <div class="min-w-0 flex-1">
+                <div
+                  class="text-compact mb-0.5 flex items-center gap-1.5 leading-[1.25] font-semibold"
+                  :class="'text-text-heading'"
+                >
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
+                  <OIcon
+                    v-if="feature.link"
+                    name="open-in-new"
+                    size="xs"
+                    class="ms-1 align-middle opacity-60"
+                  />
+                  <OTag
+                    v-if="feature.beta"
+                    type="featureFlag"
+                    value="beta"
+                    data-test="enterprise-upgrade-feature-beta-badge"
+                  />
                 </div>
-                <div class="feature-desc">{{ feature.note }}</div>
+                <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">
+                  {{ feature.note }}
+                </div>
               </div>
             </div>
           </div>
 
           <!-- Standard 2-column layout for non-Cloud -->
-          <div v-else class="features-list">
+          <div
+            v-else
+            data-test="enterprise-upgrade-features-list-standard"
+            class="grid flex-1 grid-cols-2 content-start gap-x-[0.875rem] gap-y-[0.4375rem] overflow-y-auto px-8 pt-2 pb-4"
+          >
             <div
               v-for="feature in enterpriseFeatures"
+              v-show="!feature.cloudOnly"
               :key="feature.name"
-              class="feature-list-item"
-              :class="{ 'has-link': feature.link }"
+              data-test="enterprise-upgrade-feature-item"
+              class="rounded-default flex gap-2.5 border p-[0.5rem_0.75rem] transition-all duration-200"
+              :class="[
+                'border-border-default',
+                feature.link
+                  ? isDark
+                    ? 'hover:border-theme-accent/40 hover:bg-theme-accent/10 cursor-pointer hover:[transform:translateX(0.125rem)] active:[transform:translateX(0)]'
+                    : 'hover:border-theme-accent/30 hover:bg-theme-accent/5 cursor-pointer hover:[transform:translateX(0.125rem)] active:[transform:translateX(0)]'
+                  : isDark
+                    ? 'hover:bg-[rgba(255,255,255,0.05)]'
+                    : 'hover:border-[rgba(0,0,0,0.12)] hover:bg-[rgba(0,0,0,0.03)]',
+              ]"
               @click="feature.link && openFeatureLink(feature.link)"
             >
-              <div class="feature-icon-badge">
-                <q-icon :name="feature.icon" size="15px" />
+              <div
+                class="rounded-default bg-theme-accent/10 text-theme-accent dark:bg-theme-accent/15 flex h-7.5 w-7.5 shrink-0 items-center justify-center"
+              >
+                <OIcon :name="feature.icon" size="sm" />
               </div>
-              <div class="feature-content">
-                <div class="feature-name">
+              <div class="min-w-0 flex-1">
+                <div
+                  data-test="enterprise-upgrade-feature-name"
+                  class="text-compact mb-0.5 flex items-center gap-1.5 leading-[1.25] font-semibold"
+                  :class="'text-text-heading'"
+                >
                   {{ feature.name }}
-                  <q-icon v-if="feature.link" name="open_in_new" size="12px" class="external-link-icon" />
-                  <span v-if="feature.requiresHA" class="ha-badge">
-                    HA
-                    <q-tooltip anchor="top middle" self="bottom middle" :offset="[0, 8]">
-                      {{ t('about.enterprise_offer.tooltip.high_availability_mode_only') }}
-                    </q-tooltip>
+                  <OIcon
+                    v-if="feature.link"
+                    name="open-in-new"
+                    size="xs"
+                    data-test="enterprise-upgrade-feature-external-link"
+                    class="ms-1 align-middle opacity-60"
+                  />
+                  <OTag
+                    v-if="feature.beta"
+                    type="featureFlag"
+                    value="beta"
+                    data-test="enterprise-upgrade-feature-beta-badge"
+                  />
+                  <span v-if="feature.requiresHA" class="inline-flex">
+                    <OTag
+                      type="featureFlag"
+                      value="ha"
+                      data-test="enterprise-upgrade-feature-ha-badge"
+                    />
+                    <OTooltip
+                      side="top"
+                      align="center"
+                      :sideOffset="8"
+                      :content="t('about.enterprise_offer.tooltip.high_availability_mode_only')"
+                    />
                   </span>
                 </div>
-                <div class="feature-desc">{{ feature.note }}</div>
+                <div class="text-2xs leading-[1.25]" :class="'text-text-secondary'">
+                  {{ feature.note }}
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </q-card>
-  </q-dialog>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, PropType, watch } from "vue";
+import { defineComponent, ref, computed, watch, defineAsyncComponent } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import config from "@/aws-exports";
 import licenseServer from "@/services/license_server";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSkeleton from "@/lib/feedback/Skeleton/OSkeleton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+
+const ChartRenderer = defineAsyncComponent(
+  () => import("@/components/dashboards/panels/ChartRenderer.vue"),
+);
 
 // Feature documentation links configuration
 const FEATURE_DOCS_BASE_URL = "https://o2.ws/";
@@ -237,27 +419,32 @@ const FEATURE_LINKS = {
   rbac: "rbac",
   federated_search: "fed_search",
   query_management: "query_mgmt",
-  workload_management: "workload_mgmt",
   audit_trail: "audit_trail",
-  action_scripts: "action_scripts",
   sensitive_data_redaction: "data_redact",
   pipeline_remote_destinations: "pipeline_remote",
-  query_optimizer: "query_opt",
   incident_management: "incident_mgmt",
   sre_agent: "sre_agent",
   ai_assistant: "ai_assistant",
   anomaly_detection: "anomaly_detect",
   metrics_auto_downsampling: "metrics_downsample",
   log_patterns: "log_patterns",
-  mcp_server: "mcp_server",
   rate_limiting: "rate_limit",
-  broadcast_join: "broadcast_join",
   logs_metrics_traces_correlation: "telemetry_corr",
   service_maps: "service_maps",
+  byob: "byob",
 };
 
 export default defineComponent({
   name: "EnterpriseUpgradeDialog",
+  components: {
+    OIcon,
+    ChartRenderer,
+    OButton,
+    ODialog,
+    OSkeleton,
+    OTooltip,
+    OTag,
+  },
   props: {
     modelValue: {
       type: Boolean,
@@ -269,16 +456,22 @@ export default defineComponent({
     const showDialog = ref(props.modelValue);
     const store = useStore();
     const router = useRouter();
-    const $q = useQuasar();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const licenseData = ref<any>(null);
     const isLoadingLicense = ref(false);
+    const chartData = ref<any>(null);
+    const dashboardRenderKey = ref(0);
+
+    // Dark-mode flag from the sanctioned theme seam; used to toggle classes via
+    // :class bindings for the few genuinely theme-divergent (translucent) styles.
+    const { isDark } = useTheme();
 
     // Fetch license data when dialog opens for Enterprise with license
     const fetchLicenseData = async () => {
-      const isEnterprise = config.isEnterprise === 'true';
-      const isCloud = config.isCloud === 'true';
-      const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
+      const isEnterprise = config.isEnterprise === "true";
+      const isCloud = config.isCloud === "true";
+      const hasLicense =
+        store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
 
       // Only fetch for Enterprise with license (not Cloud)
       if (isEnterprise && hasLicense && !isCloud) {
@@ -286,6 +479,8 @@ export default defineComponent({
         try {
           const response = await licenseServer.get_license();
           licenseData.value = response.data;
+          // Generate dashboard after license data is fetched
+          generateUsageDashboard();
         } catch (error) {
           console.error("Failed to fetch license data:", error);
           // On error, set default values (0% usage, unlimited)
@@ -293,11 +488,11 @@ export default defineComponent({
             license: {
               limits: {
                 Ingestion: {
-                  value: 0
-                }
-              }
+                  value: 0,
+                },
+              },
             },
-            ingestion_used: 0
+            ingestion_used: 0,
           };
         } finally {
           isLoadingLicense.value = false;
@@ -307,13 +502,14 @@ export default defineComponent({
 
     // Dialog configuration based on deployment type
     const dialogConfig = computed(() => {
-      const isEnterprise = config.isEnterprise === 'true';
-      const isCloud = config.isCloud === 'true';
-      const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
+      const isEnterprise = config.isEnterprise === "true";
+      const isCloud = config.isCloud === "true";
+      const hasLicense =
+        store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
 
       // Calculate ingestion quota limit for non-licensed enterprise
       // Use ingestion_quota (the limit), not ingestion_quota_used (the usage percentage)
-      const ingestionQuota = store.state.zoConfig?.ingestion_quota ?? 200; // Use nullish coalescing to allow 0
+      const ingestionQuota = store.state.zoConfig?.ingestion_quota ?? 50; // Use nullish coalescing to allow 0
 
       // Get usage percentage for circular indicator (this is already a percentage)
       const usagePercentage = store.state.zoConfig?.ingestion_quota_used ?? 0;
@@ -339,13 +535,19 @@ export default defineComponent({
         return {
           heroTitle: t("about.enterprise_offer.enterprise_without_license.hero_title"),
           offerText: t("about.enterprise_offer.enterprise_without_license.offer_text"),
-          badgeText: t("about.enterprise_offer.enterprise_without_license.badge_text", { quota: ingestionQuota }),
+          badgeText: t("about.enterprise_offer.enterprise_without_license.badge_text", {
+            quota: ingestionQuota,
+          }),
           badgeIcon: "data_usage",
           showUsageIndicator: true,
           usagePercentage: usagePercentage,
           featuresTitle: t("about.enterprise_offer.enterprise_without_license.features_title"),
-          featuresSubtitle: t("about.enterprise_offer.enterprise_without_license.features_subtitle"),
-          primaryButtonText: t("about.enterprise_offer.enterprise_without_license.primary_button_text"),
+          featuresSubtitle: t(
+            "about.enterprise_offer.enterprise_without_license.features_subtitle",
+          ),
+          primaryButtonText: t(
+            "about.enterprise_offer.enterprise_without_license.primary_button_text",
+          ),
           primaryButtonIcon: "key",
           showPrimaryButton: true,
           showLicenseNote: true, // Show note about license limits
@@ -358,9 +560,12 @@ export default defineComponent({
         // Calculate ingestion usage from license data
         const ingestionLimit = licenseData.value?.license?.limits?.Ingestion?.value || 0;
         const ingestionUsedPercentage = licenseData.value?.ingestion_used || 0;
-        const badgeText = ingestionLimit > 0
-          ? t("about.enterprise_offer.enterprise_with_license.badge_text_limited", { limit: ingestionLimit })
-          : t("about.enterprise_offer.enterprise_with_license.badge_text_unlimited");
+        const badgeText =
+          ingestionLimit > 0
+            ? t("about.enterprise_offer.enterprise_with_license.badge_text_limited", {
+                limit: ingestionLimit,
+              })
+            : t("about.enterprise_offer.enterprise_with_license.badge_text_unlimited");
 
         return {
           heroTitle: t("about.enterprise_offer.enterprise_with_license.hero_title"),
@@ -371,7 +576,9 @@ export default defineComponent({
           usagePercentage: ingestionUsedPercentage,
           featuresTitle: t("about.enterprise_offer.enterprise_with_license.features_title"),
           featuresSubtitle: t("about.enterprise_offer.enterprise_with_license.features_subtitle"),
-          primaryButtonText: t("about.enterprise_offer.enterprise_with_license.primary_button_text"),
+          primaryButtonText: t(
+            "about.enterprise_offer.enterprise_with_license.primary_button_text",
+          ),
           primaryButtonIcon: "key",
           showPrimaryButton: true,
           showContactSales: true,
@@ -402,7 +609,7 @@ export default defineComponent({
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.logs_metrics_traces,
       },
       {
-        name: t("about.enterprise_offer.core_features.rum.name"),
+        name: raw("RUM"),
         note: t("about.enterprise_offer.core_features.rum.note"),
         icon: "visibility",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.rum,
@@ -410,7 +617,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.core_features.alerts.name"),
         note: t("about.enterprise_offer.core_features.alerts.note"),
-        icon: "notifications_active",
+        icon: "notifications-active",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.alerts,
       },
       {
@@ -427,26 +634,28 @@ export default defineComponent({
       },
       {
         name: t("about.enterprise_offer.core_features.vrl_functions.name"),
-        note: t("about.enterprise_offer.core_features.vrl_functions.note"),
+        note: t("about.enterprise_offer.core_features.vrl_functions.note", {
+          product: raw("Vector Remap Language"),
+        }),
         icon: "functions",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.vrl_functions,
       },
       {
         name: t("about.enterprise_offer.core_features.pipelines.name"),
         note: t("about.enterprise_offer.core_features.pipelines.note"),
-        icon: "account_tree",
+        icon: "account-tree",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.pipelines,
       },
       {
         name: t("about.enterprise_offer.core_features.high_availability.name"),
         note: t("about.enterprise_offer.core_features.high_availability.note"),
-        icon: "cloud_done",
+        icon: "cloud-done",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.high_availability,
       },
       {
         name: t("about.enterprise_offer.core_features.multitenancy.name"),
         note: t("about.enterprise_offer.core_features.multitenancy.note"),
-        icon: "corporate_fare",
+        icon: "corporate-fare",
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.multitenancy,
       },
       {
@@ -464,7 +673,16 @@ export default defineComponent({
     ];
 
     // Enterprise features list - all 21 features
-    const enterpriseFeatures = [
+    const enterpriseFeatures: {
+      name: string;
+      note: string;
+      icon: string;
+      link?: string;
+      requiresHA?: boolean;
+      beta?: boolean;
+      cloudOnly?: boolean;
+      cloudHidden?: boolean;
+    }[] = [
       {
         name: t("about.enterprise_offer.enterprise_features.single_sign_on.name"),
         note: t("about.enterprise_offer.enterprise_features.single_sign_on.note"),
@@ -475,7 +693,7 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.rbac.name"),
         note: t("about.enterprise_offer.enterprise_features.rbac.note"),
-        icon: "admin_panel_settings",
+        icon: "admin-panel-settings",
         requiresHA: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.rbac,
       },
@@ -494,26 +712,11 @@ export default defineComponent({
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.query_management,
       },
       {
-        name: t("about.enterprise_offer.enterprise_features.workload_management.name"),
-        note: t("about.enterprise_offer.enterprise_features.workload_management.note"),
-        icon: "speed",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.workload_management,
-      },
-      {
         name: t("about.enterprise_offer.enterprise_features.audit_trail.name"),
         note: t("about.enterprise_offer.enterprise_features.audit_trail.note"),
-        icon: "fact_check",
+        icon: "fact-check",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.audit_trail,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.action_scripts.name"),
-        note: t("about.enterprise_offer.enterprise_features.action_scripts.note"),
-        icon: "code",
-        requiresHA: true,
-        cloudHidden: true, // Hide from Cloud layout
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.action_scripts,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.sensitive_data_redaction.name"),
@@ -525,29 +728,24 @@ export default defineComponent({
       {
         name: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.name"),
         note: t("about.enterprise_offer.enterprise_features.pipeline_remote_destinations.note"),
-        icon: "alt_route",
+        icon: "alt-route",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.pipeline_remote_destinations,
-      },
-      {
-        name: t("about.enterprise_offer.enterprise_features.query_optimizer.name"),
-        note: t("about.enterprise_offer.enterprise_features.query_optimizer.note"),
-        icon: "memory",
-        requiresHA: false,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.query_optimizer,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.incident_management.name"),
         note: t("about.enterprise_offer.enterprise_features.incident_management.note"),
         icon: "emergency",
         requiresHA: true,
+        beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.incident_management,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.sre_agent.name"),
         note: t("about.enterprise_offer.enterprise_features.sre_agent.note"),
-        icon: "smart_toy",
+        icon: "smart-toy",
         requiresHA: true,
+        beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.sre_agent,
       },
       {
@@ -555,13 +753,15 @@ export default defineComponent({
         note: t("about.enterprise_offer.enterprise_features.ai_assistant.note"),
         icon: "psychology",
         requiresHA: true,
+        beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.ai_assistant,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.anomaly_detection.name"),
         note: t("about.enterprise_offer.enterprise_features.anomaly_detection.note"),
-        icon: "query_stats",
+        icon: "query-stats",
         requiresHA: false,
+        beta: true,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.anomaly_detection,
       },
       {
@@ -579,13 +779,6 @@ export default defineComponent({
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.log_patterns,
       },
       {
-        name: t("about.enterprise_offer.enterprise_features.mcp_server.name"),
-        note: t("about.enterprise_offer.enterprise_features.mcp_server.note"),
-        icon: "dns",
-        requiresHA: true,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.mcp_server,
-      },
-      {
         name: t("about.enterprise_offer.enterprise_features.rate_limiting.name"),
         note: t("about.enterprise_offer.enterprise_features.rate_limiting.note"),
         icon: "speed",
@@ -593,25 +786,27 @@ export default defineComponent({
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.rate_limiting,
       },
       {
-        name: t("about.enterprise_offer.enterprise_features.broadcast_join.name"),
-        note: t("about.enterprise_offer.enterprise_features.broadcast_join.note"),
-        icon: "call_merge",
-        requiresHA: true,
-        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.broadcast_join,
-      },
-      {
         name: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.name"),
         note: t("about.enterprise_offer.enterprise_features.logs_metrics_traces_correlation.note"),
-        icon: "auto_graph",
+        icon: "auto-graph",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.logs_metrics_traces_correlation,
       },
       {
         name: t("about.enterprise_offer.enterprise_features.service_maps.name"),
         note: t("about.enterprise_offer.enterprise_features.service_maps.note"),
-        icon: "account_tree",
+        icon: "account-tree",
         requiresHA: false,
         link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.service_maps,
+      },
+      {
+        name: t("about.enterprise_offer.enterprise_features.byob.name"),
+        note: t("about.enterprise_offer.enterprise_features.byob.note"),
+        icon: "database",
+        requiresHA: false,
+        beta: true,
+        cloudOnly: true,
+        link: FEATURE_DOCS_BASE_URL + FEATURE_LINKS.byob,
       },
     ];
 
@@ -624,9 +819,10 @@ export default defineComponent({
     };
 
     const openDocsLink = () => {
-      const isEnterprise = config.isEnterprise === 'true';
-      const isCloud = config.isCloud === 'true';
-      const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
+      const isEnterprise = config.isEnterprise === "true";
+      const isCloud = config.isCloud === "true";
+      const hasLicense =
+        store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
 
       let docsUrl = "https://openobserve.ai/docs/";
 
@@ -651,12 +847,13 @@ export default defineComponent({
     };
 
     const navigateToLicense = () => {
-      // Get meta org identifier
-      const metaOrgIdentifier = store.state.zoConfig.meta_org;
+      // Get meta org identifier; "_meta" fallback covers the window before the
+      // authenticated full config (which carries meta_org) has loaded.
+      const metaOrgIdentifier = store.state.zoConfig.meta_org || "_meta";
 
       // Find the meta org from the organizations list
       const metaOrg = store.state.organizations?.find(
-        (org: any) => org.identifier === metaOrgIdentifier
+        (org: any) => org.identifier === metaOrgIdentifier,
       );
 
       if (metaOrg) {
@@ -678,23 +875,23 @@ export default defineComponent({
 
         // Navigate to license page with the meta org identifier
         router.push({
-          name: 'license',
-          query: { org_identifier: metaOrgIdentifier }
+          name: "license",
+          query: { org_identifier: metaOrgIdentifier },
         });
       } else {
         // Show error notification when user doesn't have access to meta org
-        $q.notify({
+        toast({
           message: t("about.enterprise_offer.error_messages.not_authorized_manage_license"),
-          color: 'negative',
-          timeout: 5000,
+          variant: "error",
         });
       }
     };
 
     const handlePrimaryButtonClick = () => {
-      const isEnterprise = config.isEnterprise === 'true';
-      const isCloud = config.isCloud === 'true';
-      const hasLicense = store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
+      const isEnterprise = config.isEnterprise === "true";
+      const isCloud = config.isCloud === "true";
+      const hasLicense =
+        store.state.zoConfig?.license_expiry && store.state.zoConfig.license_expiry !== 0;
 
       // Cloud - open download page
       if (isCloud) {
@@ -725,6 +922,259 @@ export default defineComponent({
       }
     };
 
+    // Check if ingestion is unlimited
+    const isIngestionUnlimited = computed(() => {
+      return licenseData.value?.license?.limits?.Ingestion?.typ === "Unlimited";
+    });
+
+    // Get ingestion limit value for threshold
+    const ingestionLimitGB = computed(() => {
+      if (isIngestionUnlimited.value) {
+        return null; // No limit for unlimited plans
+      }
+      return licenseData.value?.license?.limits?.Ingestion?.value || 100;
+    });
+
+    // Generate usage chart data for ChartRenderer
+    const generateUsageDashboard = async () => {
+      try {
+        // Get ingestion history from store
+        const ingestionHistory = store.state.zoConfig?.ingestion_history || [];
+
+        // Don't generate chart if there's no ingestion history data
+        if (!ingestionHistory || ingestionHistory.length === 0) {
+          chartData.value = null;
+          return;
+        }
+
+        const dates: string[] = [];
+        let values: number[] = [];
+        let dataUnit = "GB"; // Default unit
+        let unitDivisor = 1024; // Default: MB to GB
+
+        // Use actual ingestion history data
+        // Data format: [{ ts: "2026-02-27T00:00:00", value: 202.90125079791258 }]
+        // Values are in MB, determine best unit based on data range
+        if (ingestionHistory.length > 0) {
+          // Sort by timestamp to ensure chronological order
+          const sortedHistory = [...ingestionHistory].sort(
+            (a, b) => new Date(a.ts).getTime() - new Date(b.ts).getTime(),
+          );
+
+          // Find max value to determine appropriate unit
+          const maxValueMB = Math.max(...sortedHistory.map((item: any) => item.value));
+
+          // Determine best unit based on max value
+          if (maxValueMB >= 1024 * 1024) {
+            // Use TB if max value is >= 1 TB
+            dataUnit = "TB";
+            unitDivisor = 1024 * 1024;
+          } else if (maxValueMB >= 1024) {
+            // Use GB if max value is >= 1 GB
+            dataUnit = "GB";
+            unitDivisor = 1024;
+          } else {
+            // Use MB for smaller values
+            dataUnit = "MB";
+            unitDivisor = 1;
+          }
+
+          sortedHistory.forEach((item: any) => {
+            const date = new Date(item.ts);
+            const day = date.getDate();
+            dates.push(`${day}`);
+            // Convert MB to appropriate unit
+            values.push(item.value / unitDivisor);
+          });
+        }
+
+        // Calculate Y-axis max and interval based on ingestion limit
+        const thresholdGB = ingestionLimitGB.value;
+        const maxDataValue = values.length > 0 ? Math.max(...values) : 0;
+
+        // Convert threshold to the same unit as data
+        let thresholdInDataUnit = 0;
+        if (thresholdGB && thresholdGB > 0) {
+          if (dataUnit === "TB") {
+            thresholdInDataUnit = thresholdGB / 1024; // GB to TB
+          } else if (dataUnit === "GB") {
+            thresholdInDataUnit = thresholdGB; // Already in GB
+          } else {
+            thresholdInDataUnit = thresholdGB * 1024; // GB to MB
+          }
+        }
+
+        // Determine Y-axis max: use the greater of (threshold * 1.2) or (maxData * 1.2)
+        let yAxisMax;
+        if (thresholdInDataUnit > 0) {
+          yAxisMax = Math.max(thresholdInDataUnit * 1.2, maxDataValue * 1.2);
+        } else {
+          yAxisMax = maxDataValue * 1.2;
+        }
+
+        // Calculate nice interval for Y-axis (aim for 4-5 grid lines)
+        const calculateInterval = (max: number) => {
+          const targetIntervals = 4;
+          const rawInterval = max / targetIntervals;
+
+          // Round to nice numbers (1, 2, 5, 10, 20, 50, 100, etc.)
+          const magnitude = Math.pow(10, Math.floor(Math.log10(rawInterval)));
+          const normalized = rawInterval / magnitude;
+
+          let niceInterval;
+          if (normalized <= 1) niceInterval = 1 * magnitude;
+          else if (normalized <= 2) niceInterval = 2 * magnitude;
+          else if (normalized <= 5) niceInterval = 5 * magnitude;
+          else niceInterval = 10 * magnitude;
+
+          return niceInterval;
+        };
+
+        const yAxisInterval = yAxisMax > 0 ? calculateInterval(yAxisMax) : undefined;
+
+        // Create mark line for threshold if limit exists
+        const markLine: any =
+          thresholdGB && thresholdGB > 0
+            ? {
+                silent: true,
+                symbol: "none",
+                label: {
+                  show: false,
+                },
+                lineStyle: {
+                  color: "#FF0000",
+                  width: 2,
+                  type: "solid",
+                },
+                data: [
+                  {
+                    yAxis: thresholdInDataUnit,
+                  },
+                ],
+              }
+            : undefined;
+
+        // Simple echarts configuration for bar chart
+        // ChartRenderer expects data in format: { options: { ... } }
+        chartData.value = {
+          options: {
+            backgroundColor: "transparent",
+            grid: {
+              left: "10%",
+              right: "5%",
+              top: "10%",
+              bottom: "15%",
+              containLabel: true,
+            },
+            xAxis: {
+              type: "category",
+              data: dates,
+              axisLine: {
+                show: true,
+                lineStyle: { color: "rgba(255, 255, 255, 0.3)" },
+              },
+              axisTick: {
+                show: true,
+                lineStyle: { color: "rgba(255, 255, 255, 0.3)" },
+              },
+              axisLabel: {
+                show: true,
+                color: "rgba(255, 255, 255, 0.8)",
+                fontSize: 10,
+                interval: Math.floor(dates.length / 6), // Show ~6 labels based on actual data length
+              },
+            },
+            yAxis: {
+              type: "value",
+              min: 0,
+              max: yAxisMax,
+              interval: yAxisInterval,
+              axisLine: {
+                show: true,
+                lineStyle: { color: "rgba(255, 255, 255, 0.3)" },
+              },
+              axisTick: {
+                show: true,
+                lineStyle: { color: "rgba(255, 255, 255, 0.3)" },
+              },
+              axisLabel: {
+                show: true,
+                color: "rgba(255, 255, 255, 0.8)",
+                fontSize: 10,
+                formatter: (value: number) => {
+                  return value.toFixed(0) + dataUnit;
+                },
+              },
+              splitLine: {
+                show: true,
+                lineStyle: {
+                  color: "rgba(255, 255, 255, 0.1)",
+                  type: "dashed",
+                },
+              },
+            },
+            series: [
+              {
+                type: "bar",
+                data: values.map((value) => {
+                  // Color bars red if they exceed threshold, otherwise green
+                  const exceeds = thresholdInDataUnit > 0 && value > thresholdInDataUnit;
+                  return {
+                    value: value,
+                    itemStyle: {
+                      color: exceeds ? "#FF6B6B" : "#22c55e", // Red if exceeds, green if within limit
+                    },
+                  };
+                }),
+                barWidth: "60%",
+                markLine: markLine,
+              },
+            ],
+            tooltip: {
+              show: true,
+              trigger: "axis",
+              backgroundColor: "rgba(0, 0, 0, 0.8)",
+              borderColor: "rgba(255, 255, 255, 0.2)",
+              borderWidth: 1,
+              textStyle: {
+                color: "#fff",
+                fontSize: 12,
+              },
+              formatter: (params: any) => {
+                const dayNum = params[0].name;
+                const value = params[0].value;
+                const formattedValue = value.toFixed(2) + " " + dataUnit;
+
+                // Get the actual date from ingestion history for this day
+                const ingestionHistory = store.state.zoConfig?.ingestion_history || [];
+                const matchingEntry = ingestionHistory.find((item: any) => {
+                  const date = new Date(item.ts);
+                  return date.getDate() === parseInt(dayNum);
+                });
+
+                // The <br/> stays in code — each line is a whole translated
+                // sentence, so the markup never has to live in a message.
+                const usageLine = t("about.usageChartUsage", { value: formattedValue });
+                if (matchingEntry) {
+                  const fullDate = new Date(matchingEntry.ts);
+                  const monthName = fullDate.toLocaleString("default", { month: "short" });
+                  const dateLine = t("about.usageChartDate", { month: monthName, day: dayNum });
+                  return `${dateLine}<br/>${usageLine}`;
+                }
+
+                return `${t("about.usageChartDay", { day: dayNum })}<br/>${usageLine}`;
+              },
+            },
+            animation: true,
+          },
+        };
+
+        dashboardRenderKey.value++;
+      } catch (error) {
+        console.error("Failed to generate chart data:", error);
+      }
+    };
+
     // Watch for dialog opening to fetch license data
     watch(showDialog, (newVal) => {
       if (newVal) {
@@ -746,6 +1196,11 @@ export default defineComponent({
       handlePrimaryButtonClick,
       getProgressColor,
       isLoadingLicense,
+      licenseData,
+      chartData,
+      dashboardRenderKey,
+      isIngestionUnlimited,
+      isDark,
       t,
       Math,
     };
@@ -763,425 +1218,10 @@ export default defineComponent({
 });
 </script>
 
-<style scoped lang="scss">
-.enterprise-dialog-v3 {
-  overflow: hidden;
-  position: relative;
-}
-
-.close-btn-top-right {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-  z-index: 100;
-  color: rgba(0, 0, 0, 0.6);
-
-  &:hover {
-    color: rgba(0, 0, 0, 0.87);
-  }
-}
-
-.dialog-split-layout {
-  display: flex;
-  height: 780px;
-  max-height: 92vh;
-
-  &.cloud-layout {
-    .features-panel {
-      flex: 1;
-      max-width: 100%;
-    }
-  }
-}
-
-// Left Panel - Hero Section
-.hero-panel {
-  flex: 0 0 35%;
-  background: linear-gradient(135deg, var(--q-primary) 0%, color-mix(in srgb, var(--q-primary) 85%, black 15%) 100%);
-  padding: 40px;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  color: white;
-  overflow: hidden;
-
-  .hero-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    max-width: 400px;
-    width: 100%;
-  }
-
-  .hero-icon {
-    width: 80px;
-    height: 80px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 24px;
-    backdrop-filter: blur(10px);
-
-    .q-icon {
-      color: white;
-    }
-  }
-
-  .hero-title {
-    font-size: 32px;
-    font-weight: 700;
-    margin: 0 0 16px 0;
-    line-height: 1.2;
-    text-align: center;
-  }
-
-  .offer-text {
-    margin: 0 0 24px 0;
-    font-size: 14px;
-    line-height: 1.6;
-    opacity: 0.95;
-    text-align: center;
-  }
-
-  .hero-offer {
-    margin-bottom: 32px;
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-
-    .usage-indicator {
-      flex-shrink: 0;
-    }
-
-    .offer-badge-skeleton {
-      flex-shrink: 0;
-    }
-
-    .offer-badge {
-      display: inline-flex;
-      align-items: center;
-      background: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
-      padding: 10px 20px;
-      border-radius: 24px;
-      font-weight: 700;
-      font-size: 15px;
-      backdrop-filter: blur(10px);
-      color: white;
-      box-shadow: 0 4px 16px rgba(34, 197, 94, 0.4);
-
-      .q-icon {
-        color: white;
-        font-size: 20px;
-      }
-
-      // Licensed badge styling - neutral white/transparent for users who already have license
-      &.licensed-badge {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-
-        .q-icon {
-          color: white;
-        }
-      }
-    }
-  }
-
-  .license-note {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-top: -8px;
-    margin-bottom: 16px;
-    padding: 8px 16px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 12px;
-    font-weight: 500;
-    backdrop-filter: blur(10px);
-    white-space: nowrap;
-
-    .q-icon {
-      color: rgba(255, 255, 255, 0.85);
-    }
-  }
-
-  .hero-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    width: 100%;
-
-    .download-btn {
-      background: white !important;
-      color: var(--q-primary) !important;
-      font-weight: 700;
-      padding: 10px 32px;
-      font-size: 15px;
-      border-radius: 8px !important;
-      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      letter-spacing: 0.3px;
-
-      &:hover {
-        transform: translateY(-3px) scale(1.02);
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
-      }
-
-      &:active {
-        transform: translateY(-1px) scale(0.98);
-      }
-    }
-
-    .learn-more-btn {
-      font-weight: 600;
-      padding: 10px 24px;
-      font-size: 15px;
-      border-radius: 8px !important;
-      border: 2px solid rgba(255, 255, 255, 0.3);
-      transition: all 0.3s ease;
-      letter-spacing: 0.2px;
-      background: transparent;
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.15);
-        border-color: rgba(255, 255, 255, 0.5);
-        transform: translateX(4px);
-      }
-
-      &:active {
-        transform: scale(0.96);
-      }
-    }
-  }
-}
-
-// Right Panel - Features List
-.features-panel {
-  flex: 1;
-  background: white;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-
-  .features-header {
-    padding: 16px 32px 12px 32px;
-    background: white;
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-    text-align: center;
-
-    .header-icon-wrapper {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 36px;
-      height: 36px;
-      background: linear-gradient(135deg, var(--q-primary), color-mix(in srgb, var(--q-primary) 85%, purple 15%));
-      border-radius: 12px;
-      margin-bottom: 8px;
-
-      .header-icon {
-        color: white;
-        font-size: 18px;
-      }
-    }
-
-    h4 {
-      font-size: 18px;
-      font-weight: 800;
-      margin: 0 0 4px 0;
-      color: rgba(0, 0, 0, 0.9);
-      letter-spacing: -0.3px;
-    }
-
-    .header-subtitle {
-      font-size: 12px;
-      color: rgba(0, 0, 0, 0.6);
-      margin: 0;
-      font-weight: 500;
-    }
-  }
-
-  .features-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 32px 16px 32px;
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 7px 14px;
-    align-content: start;
-
-    &.cloud-three-column {
-      grid-template-columns: repeat(3, 1fr);
-    }
-  }
-
-  .feature-list-item {
-    display: flex;
-    gap: 10px;
-    padding: 8px 12px;
-    border-radius: 6px;
-    border: 1px solid rgba(0, 0, 0, 0.08);
-    transition: all 0.2s ease;
-
-    &:hover {
-      background: rgba(0, 0, 0, 0.03);
-      border-color: rgba(0, 0, 0, 0.12);
-    }
-
-    &.has-link {
-      cursor: pointer;
-
-      &:hover {
-        background: rgba(var(--q-primary-rgb), 0.05);
-        border-color: rgba(var(--q-primary-rgb), 0.3);
-        transform: translateX(2px);
-      }
-
-      &:active {
-        transform: translateX(0);
-      }
-    }
-
-    .feature-icon-badge {
-      flex-shrink: 0;
-      width: 30px;
-      height: 30px;
-      border-radius: 8px;
-      background: rgba(var(--q-primary-rgb), 0.1);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--q-primary);
-
-      .q-icon {
-        font-size: 15px;
-      }
-    }
-
-    .feature-content {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .feature-name {
-      font-size: 13px;
-      font-weight: 600;
-      color: rgba(0, 0, 0, 0.87);
-      margin-bottom: 2px;
-      line-height: 1.25;
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .external-link-icon {
-      opacity: 0.6;
-      margin-left: 4px;
-      vertical-align: middle;
-    }
-
-    .ha-badge {
-      display: inline-flex;
-      align-items: center;
-      padding: 2px 7px;
-      background: rgba(var(--q-primary-rgb), 0.15);
-      color: var(--q-primary);
-      border-radius: 4px;
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.5px;
-      line-height: 1;
-      cursor: pointer;
-      margin-left: 4px;
-    }
-
-    .feature-desc {
-      font-size: 11px;
-      color: rgba(0, 0, 0, 0.55);
-      line-height: 1.25;
-    }
-  }
-}
-
-// Dark mode
-body.body--dark {
-  .close-btn-top-right {
-    color: rgba(255, 255, 255, 0.7);
-
-    &:hover {
-      color: rgba(255, 255, 255, 0.95);
-    }
-  }
-
-  .features-panel {
-    background: #1e1e1e;
-
-    .features-header {
-      background: #1e1e1e;
-      border-bottom-color: rgba(255, 255, 255, 0.1);
-
-      h4 {
-        color: rgba(255, 255, 255, 0.95);
-      }
-
-      .header-subtitle {
-        color: rgba(255, 255, 255, 0.6);
-      }
-    }
-
-    .feature-list-item {
-      border: 1px solid rgba(255, 255, 255, 0.12);
-
-      &:hover {
-        background: rgba(255, 255, 255, 0.05);
-      }
-
-      &.has-link {
-        &:hover {
-          background: rgba(var(--q-primary-rgb), 0.1);
-          border-color: rgba(var(--q-primary-rgb), 0.4);
-        }
-      }
-
-      .feature-icon-badge {
-        background: rgba(var(--q-primary-rgb), 0.15);
-      }
-
-      .feature-name {
-        color: rgba(255, 255, 255, 0.95);
-      }
-
-      .ha-badge {
-        background: rgba(var(--q-primary-rgb), 0.2);
-        color: var(--q-primary);
-      }
-
-      .feature-desc {
-        color: rgba(255, 255, 255, 0.55);
-      }
-    }
-  }
-}
-
-@media (max-width: 900px) {
-  .dialog-split-layout {
-    flex-direction: column;
-  }
-
-  .hero-panel {
-    flex: 0 0 auto;
-    min-height: 400px;
-  }
+<style scoped>
+/* keep(lib-override): strip the gridstack widget's default border inside the usage chart
+   (.grid-stack-item-content is gridstack-generated DOM, not addressable via template utilities) */
+.usage-chart-container :deep(.grid-stack-item-content) {
+  border: 0 !important;
 }
 </style>

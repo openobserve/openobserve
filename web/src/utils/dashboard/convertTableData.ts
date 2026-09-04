@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,133 +13,17 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { toZonedTime } from "date-fns-tz";
-import {
-  findFirstValidMappedValue,
-  formatDate,
-  formatUnitValue,
-  getUnitValue,
-  isTimeSeries,
-  isTimeStamp,
-} from "./convertDataIntoUnitValue";
 import { getDataValue } from "./aliasUtils";
-
-// Build a lookup map for value mappings to avoid repeated searches
-const buildValueMappingCache = (mappings: any) => {
-  if (!mappings || !Array.isArray(mappings)) {
-    return null;
-  }
-
-  const cache = new Map<any, string>();
-
-  mappings.forEach((mapping: any) => {
-    if (mapping && mapping.text) {
-      // Handle range mappings
-      if (mapping.from !== undefined && mapping.to !== undefined) {
-        // Store range info for later lookup
-        cache.set(`__range_${mapping.from}_${mapping.to}`, mapping.text);
-      } else if (mapping.value !== undefined && mapping.value !== null) {
-        // Direct value mapping
-        cache.set(mapping.value, mapping.text);
-      }
-    }
-  });
-
-  return cache.size > 0 ? cache : null;
-};
-
-const applyValueMapping = (value: any, mappings: any) => {
-  // Find the first valid mapping with a valid text
-  const foundValue = findFirstValidMappedValue(value, mappings, "text");
-
-  // if foundValue is not null and foundValue.text is not null, then return foundValue.text
-  if (foundValue && foundValue.text) {
-    return foundValue.text;
-  }
-
-  return null;
-};
-
-// Fast lookup using pre-built cache
-const lookupValueMapping = (value: any, cache: Map<any, string> | null) => {
-  if (!cache) return null;
-
-  // Direct lookup first
-  if (cache.has(value)) {
-    return cache.get(value);
-  }
-
-  // Check range mappings
-  if (typeof value === 'number') {
-    const entries = Array.from(cache.entries());
-    for (let i = 0; i < entries.length; i++) {
-      const [key, text] = entries[i];
-      if (typeof key === 'string' && key.startsWith('__range_')) {
-        const parts = key.split('_');
-        const from = parseFloat(parts[2]);
-        const to = parseFloat(parts[3]);
-        if (!isNaN(from) && !isNaN(to) && value >= from && value <= to) {
-          return text;
-        }
-      }
-    }
-  }
-
-  return null;
-};
-
-/**
- * Parses a potential timestamp value (string, number, or Date) and returns a formatted string.
- * This handles 16-digit microseconds (string or number), ISO strings, and standard milliseconds.
- * 
- * @param value - The value to parse
- * @param timezone - The target timezone for conversion
- * @returns Formatted timestamp string or null
- */
-const parseTimestampValue = (value: any, timezone: string) => {
-  if (value === undefined || value === null || value === "") return null;
-
-  let timestamp: number;
-
-  // Handle 16-digit microseconds (string or number)
-  // This is the key fix for the "year 50002" issue where numeric micros were treated as millis
-  if (
-    (typeof value === "number" || typeof value === "string") &&
-    /^\d{16}$/.test(value.toString())
-  ) {
-    timestamp = parseInt(value.toString()) / 1000;
-  } else if (typeof value === "string") {
-    // If the string is already a formatted date (no 'T', looks like "YYYY-MM-DD HH:mm:ss")
-    // return it as-is to avoid double timezone conversion
-    if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}/.test(value)) {
-      return value;
-    }
-
-    // Regular ISO string - treat as UTC timestamp
-    // Only append 'Z' if it looks like an ISO string with 'T' and lacks an offset/timezone indicator
-    const iso8601WithT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(value);
-    const hasOffsetOrZ = /[+-]\d{2}(:?\d{2})?$/.test(value) || value.endsWith("Z");
-
-    const isoString = (iso8601WithT && !hasOffsetOrZ) ? `${value}Z` : value;
-    timestamp = new Date(isoString).getTime();
-
-    // Fallback if the 'Z' trick failed (already has an offset or is invalid)
-    if (isNaN(timestamp)) {
-      timestamp = new Date(value).getTime();
-    }
-  } else if (typeof value === "number") {
-    // Numeric timestamp - assume it's already in milliseconds
-    timestamp = value;
-  } else if (value instanceof Date) {
-    timestamp = value.getTime();
-  } else {
-    timestamp = new Date(value)?.getTime();
-  }
-
-  if (isNaN(timestamp)) return null;
-
-  return formatDate(toZonedTime(timestamp, timezone));
-};
+import {
+  buildValueMappingCache,
+  lookupValueMapping,
+  parseOverrideConfigs,
+  parseTimestampValue,
+  detectTimestampFields,
+  applyColumnOverrides,
+  formatNumericValue,
+  resolveIsNumber,
+} from "./tableConfigUtils";
 
 /**
  * Converts table data based on the panel schema and search query data.
@@ -148,11 +32,7 @@ const parseTimestampValue = (value: any, timezone: string) => {
  * @param {any} searchQueryData - The search query data.
  * @return {object} An object containing rows and columns.
  */
-export const convertTableData = (
-  panelSchema: any,
-  searchQueryData: any,
-  store: any,
-) => {
+export const convertTableData = (panelSchema: any, searchQueryData: any, store: any) => {
   // if no data than return it
   if (
     !Array.isArray(searchQueryData) ||
@@ -163,8 +43,8 @@ export const convertTableData = (
     return { rows: [], columns: [] };
   }
 
-  const x = panelSchema?.queries[0].fields?.x || [];
-  const y = panelSchema?.queries[0].fields?.y || [];
+  const x = (panelSchema?.queries || []).flatMap((q: any) => q?.fields?.x || []);
+  const y = (panelSchema?.queries || []).flatMap((q: any) => q?.fields?.y || []);
   let columnData = [...x, ...y];
   // Avoid deep cloning - use shallow copy and work with original data
   let tableRows = searchQueryData[0];
@@ -173,40 +53,26 @@ export const convertTableData = (
   // Build value mapping cache once for all cells
   const valueMappingCache = buildValueMappingCache(panelSchema.config?.mappings);
 
-  const overrideConfigs = panelSchema.config.override_config || [];
-  const colorConfigMap: Record<string, any> = {};
-  const unitConfigMap: Record<string, any> = {};
+  const overrideMaps = parseOverrideConfigs(panelSchema.config.override_config);
+  const { unitConfigMap, fieldTypeMap } = overrideMaps;
   const fieldNameCache: Record<string, string> = {}; // Cache for case-insensitive lookups
 
- // Cache timezone to avoid repeated store lookups
+  // Cache timezone to avoid repeated store lookups
   const timezone = store.state.timezone;
 
+  // Value to display when a cell is null/undefined/empty (configured per panel)
+  const missingValue = String(panelSchema.config?.no_value_replacement ?? "");
+
   try {
-    // Build maps for both color and unit configs
-    overrideConfigs.forEach((o: any) => {
-      const alias = o?.field?.value;
-      const config = o?.config?.[0];
-
-      if (alias && config) {
-        const aliasLower = alias.toLowerCase();
-        if (config.type === "unique_value_color") {
-          const autoColor = config.autoColor;
-          colorConfigMap[aliasLower] = { autoColor };
-        } else if (config.type === "unit") {
-          const unit = config.value?.unit;
-          const customUnit = config.value?.customUnit;
-          unitConfigMap[aliasLower] = { unit, customUnit };
-        }
-      }
-    });
-
     // Pre-build case-insensitive field name cache
     if (tableRows.length > 0) {
       Object.keys(tableRows[0]).forEach((key) => {
         fieldNameCache[key.toLowerCase()] = key;
       });
     }
-  } catch (e) {}
+  } catch (e) {
+    // ignore: best-effort field-name cache
+  }
 
   // use all response keys if tableDynamicColumns is true
   if (panelSchema?.config?.table_dynamic_columns == true) {
@@ -243,41 +109,9 @@ export const convertTableData = (
     columnData = [...columnData, ...responseKeys];
   }
 
-  // identify histogram fields for auto and custom sql
-  if (panelSchema?.queries[0]?.customQuery === false) {
-    for (const field of columnData) {
-      if (field?.functionName === "histogram") {
-        histogramFields.push(field.alias);
-      } else {
-        const sample = tableRows
-          ?.slice(0, Math.min(20, tableRows.length))
-          ?.map((it: any) => getDataValue(it, field.alias));
-        const isTimeSeriesData = isTimeSeries(sample);
-        const isTimeStampData = isTimeStamp(sample, field.treatAsNonTimestamp);
-
-        if (isTimeSeriesData || isTimeStampData) {
-          histogramFields.push(field.alias);
-        }
-      }
-    }
-  } else {
-    // need sampling to identify timeseries data
-    for (const field of columnData) {
-      if (field?.functionName === "histogram") {
-        histogramFields.push(field.alias);
-      } else {
-        const sample = tableRows
-          ?.slice(0, Math.min(20, tableRows.length))
-          ?.map((it: any) => getDataValue(it, field.alias));
-        const isTimeSeriesData = isTimeSeries(sample);
-        const isTimeStampData = isTimeStamp(sample, field.treatAsNonTimestamp);
-
-        if (isTimeSeriesData || isTimeStampData) {
-          histogramFields.push(field.alias);
-        }
-      }
-    }
-  }
+  // identify histogram / timestamp fields (shared logic with pivot converter)
+  const detectedTimestampAliases = detectTimestampFields(columnData, tableRows);
+  detectedTimestampAliases.forEach((alias) => histogramFields.push(alias));
 
   const isTransposeEnabled = panelSchema.config.table_transpose;
   const transposeColumn = columnData[0]?.alias || "";
@@ -287,21 +121,24 @@ export const convertTableData = (
   if (!isTransposeEnabled) {
     columns = columnData.map((it: any) => {
       let obj: any = {};
-      const isNumber = isSampleValuesNumbers(tableRows, it.alias, 20);
       // Use cached field name lookup
       const aliasLower = it.alias.toLowerCase();
+      const isNumber = resolveIsNumber(
+        isSampleValuesNumbers(tableRows, it.alias, 20),
+        fieldTypeMap[aliasLower],
+      );
       const actualField = fieldNameCache[aliasLower] || it.alias;
 
-      obj["name"] = it.label;
+      obj["name"] = it.label || it.alias;
       obj["field"] = actualField;
-      obj["label"] = it.label;
-      obj["align"] = !isNumber ? "left" : "right";
+      obj["label"] = it.label || it.alias;
+      // override_config is keyed by alias; the TanStack column id is the data field.
+      obj["alias"] = it.alias;
+      obj["isNumeric"] = isNumber;
+      obj["mono"] = isNumber || histogramFields.includes(it.alias);
       obj["sortable"] = true;
 
-      // pass color mode info for renderer - use pre-lowercased lookup
-      if (colorConfigMap?.[aliasLower]?.autoColor) {
-        obj["colorMode"] = "auto";
-      }
+      applyColumnOverrides(obj, aliasLower, overrideMaps, !isNumber ? "left" : "right");
 
       // pass showFieldAsJson flag to renderer
       if (it.showFieldAsJson) {
@@ -309,9 +146,9 @@ export const convertTableData = (
       }
 
       obj["format"] = (val: any) => {
+        if (val === null || val === undefined || val === "") return missingValue;
         // value mapping - use cached lookup
         const valueMapping = lookupValueMapping(val, valueMappingCache);
-
         if (valueMapping != null) {
           return valueMapping;
         }
@@ -335,33 +172,22 @@ export const convertTableData = (
         }
         const decimals = panelSchema.config?.decimals ?? 2;
 
-        obj["format"] = (val: any) => {
-          // value mapping - use cached lookup
-          const valueMapping = lookupValueMapping(val, valueMappingCache);
-
-          if (valueMapping != null) {
-            return valueMapping;
-          }
-
-          return !Number.isNaN(val)
-            ? `${
-                formatUnitValue(
-                  getUnitValue(
-                    val,
-                    unitToUse,
-                    customUnitToUse,
-                    decimals,
-                  ),
-                ) ?? 0
-              }`
-            : val;
-        };
+        obj["format"] = (val: any) =>
+          formatNumericValue(
+            val,
+            valueMappingCache,
+            unitToUse,
+            customUnitToUse,
+            decimals,
+            missingValue,
+          );
       }
 
       // if current field is histogram field, timestamps are pre-formatted in rows
       // Just apply value mapping if needed
       if (histogramFields.includes(it.alias)) {
         obj["format"] = (val: any) => {
+          if (val === null || val === undefined || val === "") return missingValue;
           // value mapping - use cached lookup
           const valueMapping = lookupValueMapping(val, valueMappingCache);
           if (valueMapping != null) {
@@ -375,14 +201,15 @@ export const convertTableData = (
     });
   } else {
     // lets get all columns from a particular field
-    const transposeColumns = searchQueryData[0].map(
-      (it: any) => getDataValue(it, transposeColumn) ?? "",
-    );
+    // Note: do NOT use ?? "" here — null/undefined values must stay as-is so that
+    // String(null) = "null" gives a non-empty column key that passes TanStack's filter.
+    // Using "" as a fallback would produce an empty column id that TanStack can't handle.
+    const transposeColumns = searchQueryData[0].map((it: any) => getDataValue(it, transposeColumn));
 
     let uniqueTransposeColumns: any = [];
     const columnDuplicationMap: any = {};
 
-    transposeColumns.forEach((col: any, index: any) => {
+    transposeColumns.forEach((col: any) => {
       if (!columnDuplicationMap[col]) {
         uniqueTransposeColumns.push(col);
         columnDuplicationMap[col] = 1;
@@ -415,9 +242,7 @@ export const convertTableData = (
           formattedDate = parseTimestampValue(baseVal, timezone);
 
           // Append the underscore part (if it exists) back to the formatted date
-          formattedDate = formattedDate
-            ? `${formattedDate}${underscorePart}`
-            : null;
+          formattedDate = formattedDate ? `${formattedDate}${underscorePart}` : null;
         }
 
         // Return the formatted date with the underscore or the original value if it can't be parsed
@@ -438,26 +263,34 @@ export const convertTableData = (
       }, // Add label column with the first column's label
       ...uniqueTransposeColumns.map((it: any) => {
         let obj: any = {};
-        const isNumber = isSampleValuesNumbers(tableRows, it, 20);
+        const isNumber = resolveIsNumber(
+          isSampleValuesNumbers(tableRows, it, 20),
+          fieldTypeMap[String(it).toLowerCase()],
+        );
 
-        obj["name"] = it;
-        obj["field"] = it;
-        obj["label"] = it;
-        obj["align"] = !isNumber ? "left" : "right";
+        // String(null) = "null", String(undefined) = "undefined" — always non-empty,
+        // so the TanStack filter never strips this column. The label is blank for
+        // null/undefined values so the header renders as empty visually.
+        obj["name"] = String(it);
+        obj["field"] = String(it);
+        obj["label"] = it != null && it !== "" ? String(it) : "";
         obj["sortable"] = true;
-        // pass color mode info for renderer
-        if (colorConfigMap?.[it]?.autoColor) {
-          obj["colorMode"] = "auto";
-        }
+        obj["mono"] = isNumber || histogramFields.includes(it);
+        // Overrides keyed by the lower-cased transposed value (transpose path).
+        applyColumnOverrides(
+          obj,
+          String(it).toLowerCase(),
+          overrideMaps,
+          !isNumber ? "left" : "right",
+        );
 
         obj["format"] = (val: any) => {
+          if (val === null || val === undefined || val === "") return missingValue;
           // value mapping - use cached lookup
           const valueMapping = lookupValueMapping(val, valueMappingCache);
-
           if (valueMapping != null) {
             return valueMapping;
           }
-
           return val;
         };
 
@@ -469,32 +302,14 @@ export const convertTableData = (
           const unitCustom = panelSchema.config?.unit_custom;
           const decimals = panelSchema.config?.decimals ?? 2;
 
-          obj["format"] = (val: any) => {
-            // value mapping - use cached lookup
-            const valueMapping = lookupValueMapping(val, valueMappingCache);
-
-            if (valueMapping != null) {
-              return valueMapping;
-            }
-
-            return !Number.isNaN(val)
-              ? `${
-                  formatUnitValue(
-                    getUnitValue(
-                      val,
-                      unit,
-                      unitCustom,
-                      decimals,
-                    ),
-                  ) ?? 0
-                }`
-              : val;
-          };
+          obj["format"] = (val: any) =>
+            formatNumericValue(val, valueMappingCache, unit, unitCustom, decimals, missingValue);
         }
 
         // Check if it's a histogram field
         if (histogramFields.includes(it)) {
           obj["format"] = (val: any) => {
+            if (val === null || val === undefined || val === "") return missingValue;
             // value mapping - use cached lookup
             const valueMapping = lookupValueMapping(val, valueMappingCache);
             if (valueMapping != null) {
@@ -512,16 +327,11 @@ export const convertTableData = (
     // Transpose rows, adding 'label' as the first column
 
     tableRows = columnData.map((it: any) => {
-      const isHistogramField = histogramFields.includes(it.alias);
-      let obj = uniqueTransposeColumns.reduce(
-        (acc: any, curr: any, reduceIndex: any) => {
-          const value =
-            getDataValue(searchQueryData[0][reduceIndex], it.alias) ?? "";
-          acc[curr] = value;
-          return acc;
-        },
-        {},
-      );
+      let obj = uniqueTransposeColumns.reduce((acc: any, curr: any, reduceIndex: any) => {
+        const value = getDataValue(searchQueryData[0][reduceIndex], it.alias) ?? "";
+        acc[curr] = value;
+        return acc;
+      }, {});
       obj["label"] = it.label || transposeColumnLabel; // Add the label corresponding to each column
       return obj;
     });
@@ -548,11 +358,292 @@ const isSampleValuesNumbers = (arr: any, key: string, sampleSize: number) => {
   const sample = arr.slice(0, Math.min(sampleSize, arr.length));
   return sample.every((obj) => {
     const value = getDataValue(obj, key);
-    return (
-      value === undefined ||
-      value === null ||
-      value === "" ||
-      typeof value === "number"
+    return value === undefined || value === null || value === "" || typeof value === "number";
+  });
+};
+
+/**
+ * Merges table data from multiple SQL queries in UNION mode.
+ * Rows from all queries are combined into a single list.
+ * Column set is the union of all queries' columns, ordered per query:
+ *   - Query 1 selected fields, (Query 1 dynamic fields if enabled),
+ *   - Query 2 selected fields, (Query 2 dynamic fields if enabled), ...
+ * Supports value mapping, unit formatting, and timestamp formatting.
+ * Transpose is not supported — a warning should be shown at the UI level.
+ */
+export const convertMultiQueryTableData = (
+  panelSchema: any,
+  searchQueryData: any[],
+  store: any,
+): { rows: any[]; columns: any[] } => {
+  if (!searchQueryData || searchQueryData.length <= 1) {
+    return convertTableData(panelSchema, searchQueryData, store);
+  }
+
+  const allRows: any[] = [];
+  const isDynamicColumns = panelSchema?.config?.table_dynamic_columns == true;
+
+  searchQueryData.forEach((queryData: any[], queryIndex: number) => {
+    if (!queryData || !Array.isArray(queryData)) return;
+    queryData.forEach((row: any) => {
+      allRows.push({ ...row, __q: queryIndex });
+    });
+  });
+
+  // Build value mapping cache once for all cells
+  const valueMappingCache = buildValueMappingCache(panelSchema.config?.mappings);
+
+  const overrideMaps = parseOverrideConfigs(panelSchema.config.override_config);
+  const { unitConfigMap, fieldTypeMap } = overrideMaps;
+
+  const timezone = store.state.timezone;
+  const missingValue = String(panelSchema.config?.no_value_replacement ?? "");
+
+  // Build ordered column list:
+  // Columns are grouped by axis ACROSS queries (not per-query): all queries'
+  // X-axis fields first, then all queries' breakdown fields, then all queries'
+  // Y-axis fields. Dynamic (non-selected) response columns are appended last.
+  const orderedColumnNames: string[] = [];
+  const seenColumns = new Set<string>();
+
+  // Collect field configs from all queries for known columns
+  const knownAliases = new Map<string, any>();
+
+  // Helper: register a field's alias (deduped) and remember its config.
+  const addField = (f: any) => {
+    if (!f?.alias) return;
+    if (!seenColumns.has(f.alias)) {
+      orderedColumnNames.push(f.alias);
+      seenColumns.add(f.alias);
+    }
+    if (!knownAliases.has(f.alias)) {
+      knownAliases.set(f.alias, f);
+    }
+  };
+
+  // 1) Q1..Qn X-axis fields, 2) Q1..Qn breakdown fields, 3) Q1..Qn Y-axis fields
+  panelSchema.queries.forEach((q: any) => (q.fields?.x || []).forEach(addField));
+  panelSchema.queries.forEach((q: any) => (q.fields?.breakdown || []).forEach(addField));
+  panelSchema.queries.forEach((q: any) => (q.fields?.y || []).forEach(addField));
+
+  // Then add dynamic (non-selected) response columns per query, if enabled.
+  if (isDynamicColumns) {
+    panelSchema.queries.forEach((query: any, queryIdx: number) => {
+      const selectedAliases = new Set(
+        [
+          ...(query.fields?.x || []),
+          ...(query.fields?.y || []),
+          ...(query.fields?.breakdown || []),
+        ].map((f: any) => f.alias),
+      );
+      const queryData = searchQueryData[queryIdx];
+      if (queryData && Array.isArray(queryData)) {
+        queryData.forEach((row: any) => {
+          Object.keys(row).forEach((key) => {
+            if (!seenColumns.has(key) && !selectedAliases.has(key)) {
+              orderedColumnNames.push(key);
+              seenColumns.add(key);
+            }
+          });
+        });
+      }
+    });
+  }
+
+  // When dynamic columns is disabled, only show explicitly selected fields.
+  // Extra response keys (e.g. VRL-computed fields) are not added.
+
+  // Detect timestamp fields from all rows
+  const allFields: any[] = [];
+  panelSchema.queries.forEach((query: any) => {
+    allFields.push(
+      ...(query.fields?.x || []),
+      ...(query.fields?.y || []),
+      ...(query.fields?.breakdown || []),
     );
   });
+  const detectedTimestampAliases = detectTimestampFields(allFields, allRows);
+
+  const isTransposeEnabled = panelSchema.config?.table_transpose;
+  const transposeColumn = orderedColumnNames[0] || "";
+  const transposeColumnConfig = knownAliases.get(transposeColumn);
+  const transposeColumnLabel = transposeColumnConfig?.label || transposeColumn;
+
+  if (isTransposeEnabled && transposeColumn) {
+    // Transpose: first column's values become column headers,
+    // remaining columns become rows (works on the unioned allRows)
+    const transposeValues = allRows.map((row: any) => getDataValue(row, transposeColumn) ?? "");
+
+    let uniqueTransposeColumns: any[] = [];
+    const columnDuplicationMap: any = {};
+
+    transposeValues.forEach((col: any) => {
+      if (!columnDuplicationMap[col]) {
+        uniqueTransposeColumns.push(col);
+        columnDuplicationMap[col] = 1;
+      } else {
+        const uniqueCol = `${col}_${columnDuplicationMap[col]}`;
+        uniqueTransposeColumns.push(uniqueCol);
+        columnDuplicationMap[col] += 1;
+      }
+    });
+
+    const isFirstColumnTimestamp = detectedTimestampAliases.has(transposeColumn);
+
+    if (isFirstColumnTimestamp) {
+      uniqueTransposeColumns = uniqueTransposeColumns.map((val: any) => {
+        if (!val) return val;
+        let baseVal = val;
+        let underscorePart = "";
+        if (typeof val === "string" && val.includes("_")) {
+          const parts = val.split("_");
+          baseVal = parts[0];
+          underscorePart = `_${parts[1]}`;
+        }
+        const formattedDate = parseTimestampValue(baseVal, timezone);
+        return formattedDate ? `${formattedDate}${underscorePart}` : val;
+      });
+    }
+
+    // Remaining columns (excluding the transpose pivot column)
+    const remainingColumns = orderedColumnNames.filter((c) => c !== transposeColumn);
+
+    // Build column definitions: label column + transposed value columns
+    const columns: any[] = [
+      {
+        name: "label",
+        field: "label",
+        label: transposeColumnLabel,
+        align: "left" as const,
+      },
+      ...uniqueTransposeColumns.map((it: any) => {
+        const isNumber = resolveIsNumber(
+          isSampleValuesNumbers(allRows, it, 20),
+          fieldTypeMap[String(it).toLowerCase()],
+        );
+        const col: any = {
+          name: it,
+          field: it,
+          label: it,
+          sortable: true,
+          mono: isNumber || detectedTimestampAliases.has(it),
+        };
+        applyColumnOverrides(
+          col,
+          String(it).toLowerCase(),
+          overrideMaps,
+          isNumber ? "right" : "left",
+        );
+
+        col["format"] = (val: any) => {
+          const valueMapping = lookupValueMapping(val, valueMappingCache);
+          if (valueMapping != null) return valueMapping;
+          return val;
+        };
+
+        if (isNumber) {
+          col["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
+          const unit = panelSchema.config?.unit;
+          const unitCustom = panelSchema.config?.unit_custom;
+          const decimals = panelSchema.config?.decimals ?? 2;
+
+          col["format"] = (val: any) =>
+            formatNumericValue(val, valueMappingCache, unit, unitCustom, decimals, missingValue);
+        }
+
+        if (detectedTimestampAliases.has(it)) {
+          col["format"] = (val: any) => {
+            const valueMapping = lookupValueMapping(val, valueMappingCache);
+            if (valueMapping != null) return valueMapping;
+            return parseTimestampValue(val, timezone) || val;
+          };
+        }
+
+        return col;
+      }),
+    ];
+
+    // Transpose rows: each remaining column becomes a row
+    const tableRows = remainingColumns.map((colName) => {
+      const fieldConfig = knownAliases.get(colName);
+      const obj = uniqueTransposeColumns.reduce((acc: any, curr: any, reduceIndex: number) => {
+        acc[curr] = getDataValue(allRows[reduceIndex], colName) ?? "";
+        return acc;
+      }, {} as any);
+      obj["label"] = fieldConfig?.label || colName;
+      return obj;
+    });
+
+    return { rows: tableRows, columns };
+  }
+
+  // Non-transpose: build column definitions in the determined order
+  const columns: any[] = [];
+
+  orderedColumnNames.forEach((colName) => {
+    const fieldConfig = knownAliases.get(colName);
+    const colNameLower = colName.toLowerCase();
+    const isNumber = resolveIsNumber(
+      isSampleValuesNumbers(allRows, colName, 20),
+      fieldTypeMap[colNameLower],
+    );
+    const isTimestamp = detectedTimestampAliases.has(colName);
+
+    const col: any = {
+      name: colName,
+      field: colName,
+      label: fieldConfig?.label || colName,
+      sortable: true,
+      mono: isNumber || isTimestamp,
+    };
+
+    applyColumnOverrides(
+      col,
+      colNameLower,
+      overrideMaps,
+      isNumber || fieldConfig?.aggregationFunction ? "right" : "left",
+    );
+
+    if (isTimestamp) {
+      col["format"] = (val: any) => {
+        const valueMapping = lookupValueMapping(val, valueMappingCache);
+        if (valueMapping != null) return valueMapping;
+        return parseTimestampValue(val, timezone) || val;
+      };
+    } else if (isNumber) {
+      col["sort"] = (a: any, b: any) => parseFloat(a) - parseFloat(b);
+
+      let unitToUse = null;
+      let customUnitToUse = null;
+      if (unitConfigMap[colNameLower]) {
+        unitToUse = unitConfigMap[colNameLower].unit;
+        customUnitToUse = unitConfigMap[colNameLower].customUnit;
+      }
+      if (!unitToUse) {
+        unitToUse = panelSchema.config?.unit;
+        customUnitToUse = panelSchema.config?.unit_custom;
+      }
+      const decimals = panelSchema.config?.decimals ?? 2;
+
+      col["format"] = (val: any) =>
+        formatNumericValue(
+          val,
+          valueMappingCache,
+          unitToUse,
+          customUnitToUse,
+          decimals,
+          missingValue,
+        );
+    } else {
+      col["format"] = (val: any) => {
+        const valueMapping = lookupValueMapping(val, valueMappingCache);
+        if (valueMapping != null) return valueMapping;
+        return val;
+      };
+    }
+
+    columns.push(col);
+  });
+
+  return { rows: allRows, columns };
 };

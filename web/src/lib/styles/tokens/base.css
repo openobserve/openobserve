@@ -1,0 +1,687 @@
+/* ── Font faces ── */
+
+/* Geist variable fonts — served locally */
+@font-face {
+  font-family: "Geist";
+  src: url(@/styles/fonts/Geist-Variable.woff2) format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Geist Mono";
+  src: url(@/styles/fonts/GeistMono-Variable.woff2) format("woff2-variations");
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ============================================================
+   BASE TOKENS — raw palette, spacing, radius, shadows, fonts
+   These are NEVER referenced directly in components.
+   Components use semantic or component tokens only.
+   ============================================================ */
+
+:root {
+  /* --- Font family tokens --- */
+  --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  /* Fallbacks are per-glyph: any character Geist Mono lacks (CJK, box-drawing,
+     symbols in log data) falls through to the next family automatically. Do NOT
+     add families we don't ship a @font-face for — they resolve only on machines
+     that happen to have them installed, giving a different look per OS. */
+  --font-mono: "Geist Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  /* --- Font size scale — single source of truth ---
+     Values match Tailwind's conventional scale, so token-driven element rules and
+     the text-* utilities agree pixel-for-pixel. Do NOT use raw text-[..px]. */
+  --text-3xs: 0.625rem; /* 10px — chart axis micro-labels, dense table sub-text */
+  --text-2xs: 0.6875rem; /* 11px — tiny labels, chips, badge text */
+  --text-xs: 0.75rem; /* 12px — captions, metadata, timestamps */
+  --text-compact: 0.8125rem; /* 13px — dense body / data tables */
+  --text-sm: 0.875rem; /* 14px — DEFAULT body text */
+  --text-base: 1rem; /* 16px — comfortable body, form inputs */
+  --text-lg: 1.125rem; /* 18px — card / panel titles */
+  --text-xl: 1.25rem; /* 20px — section headings */
+  --text-2xl: 1.5rem; /* 24px — page / modal titles */
+  --text-3xl: 1.875rem; /* 30px — hero numbers / large display */
+  --text-4xl: 2.25rem; /* 36px — display */
+
+  /* --- Line-height scale --- */
+  --leading-sm: 1.125rem; /* 18px */
+  --leading-base: 1.25rem; /* 20px */
+  --leading-md: 1.375rem; /* 22px */
+  --leading-lg: 1.5rem; /* 24px */
+  --leading-xl: 1.75rem; /* 28px */
+  --leading-2xl: 2rem; /* 32px */
+  --leading-3xl: 2.25rem; /* 36px */
+  --leading-4xl: 2.5rem; /* 40px */
+
+  /* --- Letter-spacing scale --- */
+  --tracking-tight: -0.025em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.025em;
+
+  /* --- Font weight scale --- */
+  --font-normal: normal;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  /* --- Primary palette — blue-teal #3F7994 ---
+     The runtime theme engine is the AUTHORITY for brand colour. `constants/themes.ts`
+     defines the selectable themes; `utils/theme.ts#generatePrimaryPalette` derives the
+     full 50–950 ramp from the chosen base and writes it as inline styles on <html>,
+     which beat this stylesheet. The values below are the DEFAULT O2 theme only —
+     theme.ts removes its inline overrides when the default theme is active, so these
+     then apply. To change the brand: edit constants/themes.ts (or pick a theme in the
+     UI) — do NOT edit this ramp and expect custom themes to follow. */
+  --color-primary-50: #f5f8fa;
+  --color-primary-100: #e2ebef;
+  --color-primary-200: #c5d7df;
+  --color-primary-300: #9fbcca;
+  --color-primary-400: #79a1b4;
+  --color-primary-500: #5c8da4;
+  --color-primary-600: #3f7994; /* brand accent — buttons, links, active tabs */
+  --color-primary-700: #326176; /* hover */
+  --color-primary-800: #264959;
+  --color-primary-900: #19303b;
+  --color-primary-950: #0d181e; /* darkest — dark-mode hover/drag bgs */
+
+  /* --- Grey palette --- */
+  /* Tailwind "neutral" palette — true greys with no blue undertone. Tailwind's
+     "gray" has a cool/blue tint that makes inputs / selects / dropdowns / dialogs
+     read as dark blue in dark mode; neutral reads as "dark grey, not blue". */
+  --color-grey-0: #ffffff;
+  --color-grey-50: #fafafa;
+  --color-grey-100: #f5f5f5;
+  --color-grey-150: #ededed; /* soft divider step (between 100 and 200) */
+  --color-grey-200: #e5e5e5;
+  --color-grey-300: #d4d4d4;
+  --color-grey-400: #a3a3a3;
+  --color-grey-500: #737373;
+  --color-grey-600: #525252;
+  --color-grey-700: #404040;
+  --color-grey-800: #262626;
+  --color-grey-850: #1f1f1f;
+  --color-grey-900: #171717;
+  --color-grey-950: #0a0a0a;
+
+  /* --- Error palette --- */
+  --color-error-50: #fef2f2;
+  --color-error-100: #fee2e2;
+  --color-error-300: #fca5a5;
+  --color-error-400: #f87171;
+  --color-error-500: #ef4444;
+  --color-error-600: #dc2626;
+  --color-error-700: #b91c1c;
+
+  /* --- Success palette --- */
+  --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-200: #bbf7d0;
+  --color-success-400: #4ade80;
+  --color-success-500: #22c55e;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+  --color-success-900: #14532d;
+
+  /* --- Warning palette (Tailwind yellow scale) --- */
+  --color-warning-50: #fefce8;
+  --color-warning-100: #fef9c3;
+  --color-warning-300: #fcd34d;
+  --color-warning-400: #facc15;
+  --color-warning-500: #eab308;
+  --color-warning-600: #ca8a04;
+  --color-warning-700: #a16207;
+  --color-warning-900: #78350f;
+
+  /* --- Purple palette (used by OBadge purple-outline for metrics stream type) --- */
+  --color-purple-50: #faf5ff;
+  --color-purple-100: #f3e8ff;
+  --color-purple-400: #c084fc;
+  --color-purple-500: #a855f7;
+  --color-purple-600: #9333ea;
+  --color-purple-700: #7e22ce;
+  --color-purple-900: #581c87;
+
+  /* --- Teal palette --- */
+  --color-teal-50: #f0fdfa;
+  --color-teal-300: #5eead4;
+  --color-teal-400: #2dd4bf;
+  --color-teal-500: #14b8a6;
+  --color-teal-600: #0d9488;
+  --color-teal-700: #0f766e;
+
+  /* --- Orange palette --- */
+  --color-orange-50: #fff7ed;
+  --color-orange-300: #fdba74;
+  --color-orange-400: #fb923c;
+  --color-orange-500: #f97316;
+  --color-orange-600: #ea580c;
+  --color-orange-700: #c2410c;
+  --color-orange-900: #7c2d12;
+
+  /* --- Lime palette --- */
+  --color-lime-50: #f7fee7;
+  --color-lime-300: #bef264;
+  --color-lime-400: #a3e635;
+  --color-lime-500: #84cc16;
+  --color-lime-600: #65a30d;
+  --color-lime-700: #4d7c0f;
+
+  /* --- Amber palette --- */
+  --color-amber-50: #fffbeb;
+  --color-amber-100: #fef3c7;
+  --color-amber-200: #fde68a;
+  --color-amber-300: #fcd34d;
+  --color-amber-400: #fbbf24;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+  --color-amber-700: #b45309;
+
+  /* --- Cyan palette --- */
+  --color-cyan-50: #ecfeff;
+  --color-cyan-300: #67e8f9;
+  --color-cyan-400: #22d3ee;
+  --color-cyan-500: #06b6d4;
+  --color-cyan-600: #0891b2;
+  --color-cyan-700: #0e7490;
+  --color-cyan-900: #164e63;
+
+  /* --- Blue palette --- */
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+
+  /* --- Indigo palette --- */
+  --color-indigo-50: #eef2ff;
+  --color-indigo-100: #e0e7ff;
+  --color-indigo-200: #c7d2fe;
+  --color-indigo-300: #a5b4fc;
+  --color-indigo-400: #818cf8;
+  --color-indigo-500: #6366f1;
+  --color-indigo-600: #4f46e5;
+  --color-indigo-700: #4338ca;
+  --color-indigo-800: #3730a3;
+  --color-indigo-900: #312e81;
+
+  /* --- Dashboard classic series palette — light values (dark overrides in dark.css).
+     Read by utils/dashboard/colorPalette.ts getColorPalette() via chartColor(), so the
+     light/dark swap lives in CSS instead of a `theme === "dark"` branch in JS. --- */
+  --color-chart-series-1: #5b8ef0;
+  --color-chart-series-2: #34d399;
+  --color-chart-series-3: #fb923c;
+  --color-chart-series-4: #f472b6;
+  --color-chart-series-5: #a78bfa;
+  --color-chart-series-6: #fbbf24;
+  --color-chart-series-7: #38bdf8;
+  --color-chart-series-8: #f87171;
+  --color-chart-series-9: #2dd4bf;
+  --color-chart-series-10: #4ade80;
+  --color-chart-series-11: #e879f9;
+  --color-chart-series-12: #facc15;
+
+  --color-chart-markline-shadow: rgba(255, 255, 255, 0.7);
+
+  /* --- Dashboard table row-highlight palette — light values (dark overrides in
+     dark.css). Read by colorPalette.ts getColorForTable() via chartColor(). --- */
+  --color-chart-table-1: #ffcdee;
+  --color-chart-table-2: #ffd2d3;
+  --color-chart-table-3: #c8fcfa;
+  --color-chart-table-4: #b2dafb;
+  --color-chart-table-5: #c0e9fc;
+  --color-chart-table-6: #ffcde5;
+  --color-chart-table-7: #c0eff5;
+  --color-chart-table-8: #fffdba;
+  --color-chart-table-9: #e6f3ff;
+  --color-chart-table-10: #f2b9b9;
+  --color-chart-table-11: #a6e8f0;
+  --color-chart-table-12: #c8e5fc;
+  --color-chart-table-13: #e8a3f4;
+  --color-chart-table-14: #c0e5e2;
+  --color-chart-table-15: #c9ffbd;
+  --color-chart-table-16: #f8b1c9;
+  --color-chart-table-17: #bddfff;
+  --color-chart-table-18: #d2b9ff;
+  --color-chart-table-19: #d2ebda;
+  --color-chart-table-20: #c0e3c2;
+  --color-chart-table-21: #f0f8e8;
+  --color-chart-table-22: #fff2cc;
+  --color-chart-table-23: #ffe6e6;
+  --color-chart-table-24: #e8f4fd;
+
+  /* --- Chart grid line (dashed split-line) — light value; dark in dark.css.
+     1.4.11 exempt (object required to understand content), raised for
+     perceptibility rather than to hit 3:1. --- */
+  --color-chart-gridline: rgba(0, 0, 0, 0.2);
+
+  /* --- Chart crosshair label chip is intentionally NOT declared here (light): it is
+     dark-only (#333 in dark.css). chartColor() returns "" in light, which is the
+     empty value ECharts reads as its own "auto" default — preserving today's look. --- */
+
+  /* --- Trace span palette (16 colors) — light values; dark overrides in dark.css.
+     Read by traceColors.ts getSpanColorHex()/getAllSpanColors() via chartColor().
+
+     RESERVED HUES: no value here may fall in OKLab hue 345°-115° (rose through
+     red, orange and amber to yellow). That band belongs to the span-event
+     markers, which draw from --color-status-* — error sits at hue 20°, warning
+     at 49°. Reserving it is what lets a red or amber tick mean "event" and never
+     "service": no colour clears 3:1 contrast against an arbitrary bar, so the
+     markers are identified by hue, not luminance. See
+     composables/traces/useSpanEvents.ts.
+
+     The palette shrank from 35 slots to 16 to honour that rule. It lost nothing
+     real: the 35 held only 23 distinct values, and because getOrSetServiceColor
+     hands out slots sequentially, the duplicates meant two services in one trace
+     already drew identical bars past ~11 services. Separation improved — min
+     pairwise OKLab ΔE is 0.051, up from 0.042, and min ΔE from a bar to a status
+     colour is 0.127, up from 0.039.
+
+     Ordered farthest-point, so consecutively allocated services differ as much
+     as the set allows (min adjacent ΔE 0.071). Keep both themes the same length:
+     SPAN_COLOR_COUNT is one number for both, derived from chartTheme's
+     FALLBACKS. --- */
+  --color-trace-span-1: #84cc16;
+  --color-trace-span-2: #7c3aed;
+  --color-trace-span-3: #0ea5e9;
+  --color-trace-span-4: #d946ef;
+  --color-trace-span-5: #a78bfa;
+  --color-trace-span-6: #10b981;
+  --color-trace-span-7: #22d3ee;
+  --color-trace-span-8: #0284c7;
+  --color-trace-span-9: #a855f7;
+  --color-trace-span-10: #6366f1;
+  --color-trace-span-11: #3b82f6;
+  --color-trace-span-12: #21cb60;
+  --color-trace-span-13: #06b6d4;
+  --color-trace-span-14: #14b8a6;
+  --color-trace-span-15: #818cf8;
+  --color-trace-span-16: #8b5cf6;
+
+  /* --- Chart metric-panel text default — contrast fallback when a panel has no
+     background; read via chartColor() by getContrastColor's callers. --- */
+  --color-chart-metric-text: #000000;
+
+  /* --- Chart NUMERIC tokens (not colours) — read via chartNumber(); light/dark
+     swap lives in dark.css, so chart JS branches on neither token nor theme. --- */
+  --chart-area-fill-top-opacity: 0.9;
+  --chart-area-fill-bottom-opacity: 0.4;
+  --chart-metric-contrast-threshold: 0.5;
+
+  /* --- White / Black --- */
+  --color-white: #ffffff;
+  --color-black: #000000;
+
+  /* --- Spacing scale --- */
+  /* eslint-disable-next-line local/no-hardcoded-px -- hairline: a 1-device-pixel rule must not scale with text or it smears at fractional zoom */
+  --spacing-px: 1px;
+  --spacing-3: 0.75rem; /* 12px */
+  --spacing-4: 1rem; /* 16px */
+  --spacing-5: 1.25rem; /* 20px */
+  --spacing-6: 1.5rem; /* 24px */
+  --spacing-8: 2rem; /* 32px */
+  --spacing-10: 2.5rem; /* 40px */
+
+  /* --- Radius scale --- */
+  /* Two real corner radii, one job each — no fake tiers:
+       --radius-default (6px)   tight interactive controls (buttons, inputs,
+                                chips, small icon buttons)
+       --radius-surface (12px)  large surfaces (dialogs, drawers, cards/panels,
+                                the app-shell content area)
+     plus --radius-full for pills/avatars/circles. Changing either knob retunes
+     its whole tier at once. The old sm/md/lg/xl scale was retired — it exposed
+     five names for what was one value; every former ref was repointed
+     (small→default, large→surface). Do NOT reintroduce sm/md/lg/xl. */
+  --radius-default: 0.375rem; /* 6px  — control tier */
+  --radius-surface: 0.75rem; /* 12px — surface tier (matches the historical dialog curve) */
+  /* eslint-disable-next-line local/no-hardcoded-px -- fully-rounded pill sentinel */
+  --radius-full: 9999px; /* pills / avatars / circles */
+  /* Checkboxes stay at the original 4px: the tick box is tiny (12–16px), and the
+     control tier's 6px reads as visibly round on a box that small. Pinned to its
+     own knob so it holds independent of --radius-default. */
+  --radius-checkbox: 0.25rem; /* 4px  — checkbox tick box only */
+
+  /* --- Shadow scale — hairline-border philosophy ---
+     Only sm/md/lg render real elevation (overlays: dialogs, menus). Cards use a
+     1px border, not a drop shadow — a flat surface needs NO shadow class. */
+  --shadow-xs-c: rgb(0 0 0 / 0.08);
+  --shadow-sm-c1: rgb(0 0 0 / 0.1);
+  --shadow-sm-c2: rgb(0 0 0 / 0.06);
+  --shadow-md-c1: rgb(0 0 0 / 0.08);
+  --shadow-md-c2: rgb(0 0 0 / 0.06);
+  --shadow-lg-c1: rgb(0 0 0 / 0.1);
+  --shadow-lg-c2: rgb(0 0 0 / 0.06);
+  --shadow-scroll-c: rgb(0 0 0 / 0.1);
+  --shadow-glow-c: rgb(0 0 0 / 0.6);
+}
+
+/* ============================================================
+   DOMAIN / DATA-VIZ / BRAND LITERAL TOKENS
+   Fixed categorical / brand values (label chips, trace DAG nodes, code
+   syntax, external-brand replicas, json / service-health / wildcard,
+   gradients, …) — raw values that belong with the palette, not the
+   semantic intent layer. Registered for utilities in semantic.css /
+   component.css @theme inline; dark overrides in dark.css.
+   ============================================================ */
+/* Label chips (field-value type chips). Dark overrides in dark.css;
+   component.css's @theme inline registers these for Tailwind. */
+:root {
+  --color-label-chip-ip-bg: #f2fcf3;
+  --color-label-chip-ip-text: #208a3c;
+  --color-label-chip-method-bg: #fff2f3;
+  --color-label-chip-method-text: #cc3645;
+  --color-label-chip-url-bg: #e4e9fe;
+  --color-label-chip-url-text: #575fc5;
+  --color-label-chip-num-bg: #fff4eb;
+  --color-label-chip-num-text: #a14916;
+  /* Amber highlight for pattern variables (inline masks) */
+  --color-pattern-var-bg: #f8d88a;
+  --color-pattern-var-text: #7a4d00;
+  --color-label-chip-float-bg: #fff4eb;
+  --color-label-chip-float-text: #a14916;
+  --color-label-chip-hex-bg: #fffaeb;
+  --color-label-chip-hex-text: #c27d04;
+  --color-label-chip-ts-bg: #faf5ff;
+  --color-label-chip-ts-text: #643cb8;
+  --color-label-chip-id-bg: #f2fcfc;
+  --color-label-chip-id-text: #077a7f;
+  --color-label-chip-email-bg: #fff7f7;
+  --color-label-chip-email-text: #e55765;
+  --color-label-chip-str-bg: #e8ecf0;
+  --color-label-chip-str-text: #5a5d6b;
+  --color-label-chip-default-bg: #e8ecf0;
+  --color-label-chip-default-text: #5a5d6b;
+  --color-label-chip-pattern-bg: #edf3ff;
+  --color-label-chip-pattern-text: #2e55a3;
+}
+
+/* Domain data-viz color tokens */
+:root {
+  --color-actions-column-shadow: rgba(0, 0, 0, 0.1);
+  --color-bg-gray: color-mix(in srgb, var(--color-theme-accent) 10%, rgb(237, 237, 237));
+  --color-card-glass-border: rgba(0, 0, 0, 0.12);
+  --color-cancel-query-bg: #f67a7a;
+  --color-highlight-bg: #e7e6e6; /* syntax-guide highlight chip (dark: #747474) */
+  --color-brand-indigo: #5960b2; /* brand indigo — loading bar, AI accents (theme-independent) */
+  --color-card-glass-bg: rgba(255, 255, 255, 0.8);
+  --color-card-glass-solid: rgba(255, 255, 255);
+  --color-dashboard-placeholder-bg: #b3bdf1;
+  --color-error-tag-bg: #f9d3d3;
+  --color-error-tag-text: #e74c3c;
+  --color-field-type-boolean-bg: #e74c3c;
+  --color-field-type-boolean-text: #fff;
+  --color-field-type-float-bg: oklch(94.6% 0.033 307.174);
+  --color-field-type-float-text: oklch(55.8% 0.288 302.321);
+  --color-field-type-number-bg: oklch(95.4% 0.038 75.164);
+  --color-field-type-number-text: oklch(64.6% 0.222 41.116);
+  --color-field-type-string-bg: oklch(95% 0.052 163.051);
+  --color-field-type-string-text: oklch(59.6% 0.145 163.225);
+  --color-field-type-timestamp-bg: oklch(93.2% 0.032 255.585);
+  --color-field-type-timestamp-text: oklch(54.6% 0.245 262.881);
+  --color-focus-ring: #282d5d;
+  --color-gray: #818594;
+  /* AI-assistant identity accents (welcome hero + prompt chips). Same values in
+     both themes — translucent bgs sit fine on light and dark surfaces. */
+  --color-ai-accent: #7b61ff;
+  /* SQL / query-editor violet accent (stream-name label, sql status bar). Theme-aware:
+     lighter in dark for legibility. */
+  --color-sql-accent: #7c3aed;
+  /* VRL-function blue accent, the sibling of --color-sql-accent: the two mark the
+     SQL vs function halves of an expanded search-history / scheduler row.
+     Theme-aware: lighter in dark for legibility. */
+  --color-function-accent: #0a7ebc;
+  --color-lang-sql-text: #7b61ff;
+  --color-lang-sql-bg: rgba(123, 97, 255, 0.1);
+  --color-lang-vrl-text: #f59e0b;
+  --color-lang-vrl-bg: rgba(245, 158, 11, 0.12);
+  --color-lang-promql-text: #10b981;
+  --color-lang-promql-bg: rgba(16, 185, 129, 0.12);
+  /* Trace DAG node-type palette (LLM span types). ONE base color per type;
+     at the call site border = base, bg = base@12% over surface, text = base
+     mixed toward the foreground. Dark values live in dark.css — the base flips,
+     so consumers need NO dark: variant. */
+  --color-dag-node-generation: #4caf50;
+  --color-dag-node-embedding: #2196f3;
+  --color-dag-node-agent: #9c27b0;
+  --color-dag-node-tool: #ff9800;
+  --color-dag-node-chain: #3f51b5;
+  --color-dag-node-retriever: #00bcd4;
+  --color-dag-node-task: #009688;
+  --color-dag-node-evaluator: #e91e63;
+  --color-dag-node-workflow: #673ab7;
+  --color-dag-node-rerank: #03a9f4;
+  --color-dag-node-guardrail: #f44336;
+  --color-dag-node-event: #ffc107;
+  --color-dag-node-default: #9e9e9e;
+  /* Code syntax highlighting (highlight.js) — GitHub light palette. Shared by
+     O2AIChat + OCodeBlock; dark values in dark.css so one rule covers both themes. */
+  --color-syntax-bg: #f6f8fa;
+  --color-syntax-text: #24292e;
+  --color-syntax-keyword: #d73a49;
+  --color-syntax-function: #6f42c1;
+  --color-syntax-number: #005cc5;
+  --color-syntax-string: #032f62;
+  --color-syntax-builtin: #e36209;
+  --color-syntax-comment: #6a737d;
+  --color-syntax-tag: #22863a;
+  --color-syntax-bullet: #735c0f;
+  --color-syntax-addition-fg: #22863a;
+  --color-syntax-addition-bg: #f0fff4;
+  --color-syntax-deletion-fg: #b31d28;
+  --color-syntax-deletion-bg: #ffeef0;
+  /* Brand gradients — theme-independent (same in light/dark) unless noted.
+     One AI gradient reused widely; -subtle/-faint are its idle washes
+     (dark alpha bumped in dark.css). */
+  --color-gradient-ai: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  --color-gradient-ai-subtle: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.15) 0%,
+    rgba(236, 72, 153, 0.15) 100%
+  );
+  --color-gradient-ai-faint: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.05) 0%,
+    rgba(236, 72, 153, 0.05) 100%
+  );
+  --color-gradient-brand-ribbon: linear-gradient(90deg, #f59e0b, #ec4899, #7b61ff);
+  --color-gradient-notification: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
+  --color-gradient-danger: linear-gradient(135deg, #f56565 0%, #e53e3e 100%);
+  --color-gradient-danger-hover: linear-gradient(135deg, #e53e3e 0%, #c53030 100%);
+  /* External brand colors (destination-preview CTAs, promo banner) — fixed,
+     theme-independent by design (replicate other products' brands). */
+  --color-brand-slack: #007a5a;
+  --color-brand-slack-hover: #005a42;
+  --color-brand-teams: #6264a7;
+  --color-brand-teams-hover: #464775;
+  --color-brand-email: #007bff;
+  --color-brand-email-hover: #0056b3;
+  --color-promo-webinar-link: #1e3a8a;
+  --color-promo-webinar-link-hover: #1e40af;
+  /* Home-banner accent (theme-independent, matches the amber header top-bar).
+     `-accent` is decorative only (gradient wash, border tint, blur blobs, badge
+     dot); `-accent-text` is the darker step the badge LABEL needs to stay legible
+     on the near-white banner. */
+  --color-promo-webinar-accent: var(--color-amber-400);
+  --color-promo-webinar-accent-text: var(--color-amber-700);
+  /* Body text + separator on the amber top-bar. Fixed (theme-independent) like
+     the rest of the promo art — the bar is always amber, so the text is always
+     the same near-black and the pipe the same muted slate. */
+  --color-promo-webinar-text: #1a1a1a;
+  --color-promo-webinar-sep: #374151;
+
+  /* Tool-call thread identity accent (traces LLM thread view). A distinct GREEN
+     that is deliberately NOT --color-dag-node-tool (orange) nor a status/success
+     green — collapsing it onto either would merge two visually-distinct roles.
+     `-accent` is the base the borders/fills derive from via color-mix; `-text`
+     is the readable label colour (flips lighter in dark, see dark.css). */
+  --color-tool-thread-accent: #4caf50;
+  --color-tool-thread-accent-text: #2f7a31;
+  /* Flame-graph tooltip (traces) — the tooltip is a FIXED dark glass
+     (rgba(30,41,59,.95), white text) in both themes, so its label/error colours
+     are deliberately theme-independent, like the brand replicas. */
+  --color-flame-tooltip-label: #cbd5e1;
+  --color-flame-tooltip-error: #f87171;
+  /* Global scrollbar treatment (consumed by styles/base-elements.css).
+     Dark steps in dark.css. */
+  --color-scrollbar-thumb: var(--color-grey-300);
+  --color-scrollbar-thumb-hover: var(--color-grey-400);
+  /* Secondary section-header accent bar. The alert/query editors mark most
+     sections with a --color-theme-accent bar and VRL-editor sections with a
+     deliberately DIFFERENT hue; this token carries that distinction. Dark step
+     in dark.css. */
+  --color-section-accent-secondary: var(--color-teal-600);
+  /* AI-chat message bubbles — subtle theme-aware gradient tints (dark in dark.css). */
+  --color-chat-bubble-user: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+  --color-chat-bubble-ai: linear-gradient(135deg, #f8f9ff 0%, #e8edff 100%);
+  /* Destination-preview brand replicas (Slack/Teams/Email message mockups) —
+     FIXED, theme-independent (must look like the real product in any app theme). */
+  --color-brand-msg-text: #4a5568;
+  --color-brand-msg-meta: #6c757d;
+  --color-brand-msg-border: #e9ecef;
+  --color-brand-teams-bg: #f3f2f1;
+  --color-brand-teams-text: #605e5c;
+  --color-brand-msg-text-strong: #495057;
+  --color-brand-teams-ink: #323130;
+  --color-brand-slack-text: #1d1c1d;
+  --color-brand-slack-meta: #616061;
+  --color-brand-msg-divider: #ddd;
+  --color-brand-slack-green: #06ac38;
+  --color-brand-msg-bg: #f8f9fa;
+  --color-brand-msg-error: #d63638;
+  --color-brand-email-ink: #172b4d;
+  --color-brand-msg-text-dark: #2d3748;
+  --color-brand-email-warning: #ffab00;
+  --color-brand-msg-border-2: #e1e5e9;
+  --color-brand-email-accent: #d13212;
+  --color-brand-slack-avatar: #81b5a1;
+  --color-brand-slack-aubergine: #4a154b;
+  --color-brand-slack-link: #1264a3;
+  --color-brand-email-ink-deep: #0f1c2e;
+  --color-hover-gray: color-mix(in srgb, var(--color-theme-accent) 2%, rgb(244, 244, 244));
+  --color-hover-shadow: #dddddd;
+  --color-icon-color: #808080;
+  --color-info: #4682fa;
+  --color-json-boolean: #6d28d9;
+  --color-json-key: #b71c1c;
+  --color-json-null: #6b7280;
+  --color-json-number: #2563eb;
+  --color-json-object: #4b5563;
+  --color-json-string: #047857;
+  --color-latency-p95: #0a4ce8;
+  --color-log-table-header-bg: #f1f3f7;
+  --color-log-table-row-bg: #ffffff;
+  --color-log-table-row-border: #e4e6ec;
+  --color-log-table-row-hover: #eff1fd;
+  --color-pivot-header-border: rgba(0, 0, 0, 0.15);
+  --color-section-header-bg: color-mix(in srgb, var(--color-theme-accent) 3%, rgb(247, 247, 247));
+  --color-service-health-critical: #f5222d;
+  --color-service-health-degraded: #faad14;
+  --color-service-health-healthy: #52c41a;
+  --color-service-health-warning: #fa8c16;
+  /* Darkened from #ef5350 to clear 4.5:1 on white — also drawn as literal chart
+     label text (SloBurndownChart.vue), not only as a fill/border/dot. */
+  --color-severity-error-color: #ea1a17;
+  /* Darkened from #fb8c00 to clear 4.5:1 on white — same chart-label-text case. */
+  --color-severity-warning-color: #b16300;
+  --color-status-info-bg: #edf3ff;
+  /* Darkened from #588cf3 (2.92:1 on its own -bg sibling) to clear 4.5:1 for
+     genuine text uses painted on --color-status-info-bg — filter chips
+     (AlertInsights.vue) and the HTTP-status legend (TraceTree.vue). */
+  --color-status-info-text: #2065ef;
+  --color-status-neutral-text: #6c707e;
+  --color-status-warning-bg: #fff4eb;
+  /* Darkened from #e56d17 to clear 4.5:1 on white for genuine text uses
+     (MonitorRuns.vue row text, chart label text). */
+  --color-status-warning-text: #be5a13;
+  --color-sticky-col-header-bg: #e0e0e0;
+  --color-tab-text-color: #19191e;
+  --color-trace-border: #e8ecf0;
+  --color-trace-hover: #f7f8fa;
+  --color-trace-selected: #f5f8fe;
+  --color-trace-surface: #ffffff;
+  --color-trace-text-primary: #19191e;
+  --color-trace-text-secondary: #5a5d6b;
+  --color-warning: #df9303;
+  --color-wildcard-bar-blue: #88adf7;
+  --color-wildcard-bar-green: #55a76a;
+  --color-wildcard-bar-orange: #e56d17;
+  --color-wildcard-bar-purple: #834df0;
+
+  /* Empty-state illustration palette — a fixed warm-earth decorative set for the
+     empty-state character/scene art. Theme-independent: the illustrations read the
+     same in light and dark. Consumed as SVG fill/stroke in
+     lib/core/EmptyState/illustrations/**; not registered as Tailwind utilities.
+     Ordered light → dark. */
+  --color-illustration-sand: #f0c29a;
+  --color-illustration-tan: #e8b48c;
+  --color-illustration-clay: #b5764a;
+  --color-illustration-bark: #8a6d4f;
+  --color-illustration-wood: #7a5e43;
+  --color-illustration-umber: #5b4a3a;
+  --color-illustration-cocoa: #4a3b2d;
+  --color-illustration-espresso: #3a2f25;
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   Z-index scale — the single source for every z-index in the app, in Tailwind's
+   `--z-index-*` theme namespace (same pattern as the color/radius/shadow tokens).
+   The numeric `z-<n>` utilities (z-10, z-1000, z-9999, …) are generated from
+   these and compile to `z-index: var(--z-index-<n>)`, backed by the :root custom
+   property emitted here — components only ever write the class (`z-9999`), never
+   var(). Change a value here and every matching class follows (verified:
+   --z-index-10 = 777 makes `.z-10` resolve to 777). Grouped by tier; values
+   preserve today's usage exactly (no stacking change). NOTE: Tailwind still
+   generates an *undefined* z-<n> on demand — this block is the sanctioned set by
+   convention, the source, not a hard gate. ── */
+@theme {
+  /* Local / intra-component — relative layering inside one stacking context */
+  --z-index-0: 0;
+  --z-index-1: 1;
+  --z-index-2: 2;
+  --z-index-3: 3;
+  --z-index-5: 5;
+  --z-index-8: 8;
+  --z-index-10: 10;
+  --z-index-11: 11;
+  --z-index-12: 12;
+  --z-index-15: 15;
+  --z-index-16: 16;
+  --z-index-20: 20;
+  --z-index-30: 30;
+  --z-index-50: 50;
+  --z-index-51: 51;
+  --z-index-60: 60;
+  /* Sticky / raised */
+  --z-index-99: 99;
+  --z-index-100: 100;
+  --z-index-200: 200;
+  /* Dropdowns, menus, popovers */
+  --z-index-999: 999;
+  --z-index-1000: 1000;
+  --z-index-1001: 1001;
+  --z-index-1999: 1999;
+  /* Drawers, side panels */
+  --z-index-5000: 5000;
+  --z-index-5100: 5100;
+  /* 6000 = drawer/dialog content AND page menu overlays (dropdown, context menu).
+     App stack for context: header 2000, drawer/dialog scrim 5999, content 6000
+     (+1000 per nesting level, computed in ODialog/ODrawer). A page-opened menu
+     must clear the header; a dialog-opened one is portaled after that dialog's
+     content, so equal z + later DOM order puts it on top. */
+  --z-index-6000: 6000;
+  /* Modal / dialog overlays */
+  --z-index-9998: 9998;
+  --z-index-9999: 9999;
+  /* Tooltips / toasts above modals */
+  --z-index-10001: 10001;
+  --z-index-10100: 10100;
+  /* Absolute top */
+  --z-index-100000: 100000;
+  --z-index-9999999: 9999999;
+}

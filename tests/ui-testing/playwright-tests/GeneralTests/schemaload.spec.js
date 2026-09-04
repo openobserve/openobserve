@@ -1,6 +1,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe.configure({ mode: 'parallel' });
 
@@ -15,13 +16,10 @@ test.describe("Schema Load testcases", () => {
     async function largePayloadIngestion(page, streamName, logData) {
         testLogger.debug('Starting large payload ingestion', { streamName, fieldCount: Object.keys(logData[0]).length });
         
-        const orgId = process.env["ORGNAME"];
-        const basicAuthCredentials = Buffer.from(
-            `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-        ).toString('base64');
+        const orgId = getOrgIdentifier();
 
         const headers = {
-            "Authorization": `Basic ${basicAuthCredentials}`,
+            ...getAuthHeaders(),
             "Content-Type": "application/json",
         };
         
@@ -99,7 +97,7 @@ test.describe("Schema Load testcases", () => {
         // Navigate to base URL with authentication
         await navigateToBase(page);
         pm = new PageManager(page);
-        await page.waitForLoadState('networkidle');
+        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
         
         // Generate and send large payload
         const logData = generateLogData();
@@ -108,11 +106,13 @@ test.describe("Schema Load testcases", () => {
         testLogger.info('Large payload ingestion completed successfully');
         
         // Wait for indexing to complete - crucial for large payloads
-        testLogger.debug('Waiting for indexing to complete after large payload ingestion');
-        await page.waitForTimeout(5000);
-        
+        // The schemaLoadPage workflow polls the streams list deterministically for the new
+        // stream cell (waitFor on `log-stream-name-cell-<name>`), which is the
+        // post-indexing signal. No blanket timeout needed.
+        testLogger.debug('Indexing will be polled by the streams-page verification step');
+
         // Navigate to logs page and verify data
-        const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${process.env["ORGNAME"]}`;
+        const logsUrl = `${process.env["ZO_BASE_URL"]}/web/logs?org_identifier=${getOrgIdentifier()}`;
         testLogger.navigation('Navigating to logs page', { url: logsUrl });
         await page.goto(logsUrl);
         await page.waitForLoadState('domcontentloaded');

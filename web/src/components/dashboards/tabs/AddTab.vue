@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,97 +15,57 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md tw:h-[64px]">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div
-            v-if="editMode"
-            class="text-body1 text-bold"
-            data-test="dashboard-tab-edit"
-          >
-            Edit Tab
-          </div>
-          <div
-            v-else
-            class="text-body1 text-bold"
-            data-test="dashboard-tab-add"
-          >
-            Add Tab
-          </div>
-        </div>
-        <div class="col-auto">
-          <q-btn
-            v-close-popup="true"
-            round
-            flat
-            icon="cancel"
-            data-test="dashboard-tab-cancel"
-          />
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section class="q-w-md">
-      <q-form ref="addTabForm" @submit.stop="onSubmit.execute">
-        <q-input
-          v-model="tabData.name"
-          label="Name*"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          borderless hide-bottom-space
-          dense
-          :rules="[(val: any) => !!val.trim() || t('dashboard.nameRequired')]"
-          :lazy-rules="true"
+  <ODialog
+    data-test="dashboard-tab-settings-add-tab-dialog"
+    :open="open"
+    size="sm"
+    :title="editMode ? t('dashboard.editTab') : t('dashboard.newTab')"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('dashboard.save')"
+    form-id="add-tab-form"
+    @update:open="$emit('update:open', $event)"
+    @click:secondary="$emit('update:open', false)"
+  >
+    <div>
+      <OForm
+        id="add-tab-form"
+        ref="addTabForm"
+        :schema="addTabSchema"
+        :default-values="addTabDefaults"
+        @submit="onSubmit"
+      >
+        <OFormInput
+          name="name"
+          :label="t('dashboard.name')"
+          required
           data-test="dashboard-add-tab-name"
         />
-
-        <div class="flex justify-start">
-          <q-btn
-            v-close-popup="true"
-            :label="t('dashboard.cancel')"
-            class="o2-secondary-button tw:h-[36px]"
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            flat
-            data-test="dashboard-add-cancel"
-          />
-          <q-btn
-            :disable="tabData.name.trim() === ''"
-            :loading="onSubmit.isLoading.value"
-            :label="t('dashboard.save')"
-            class="o2-primary-button tw:h-[36px] q-ml-md"
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            flat
-            borderless
-            type="submit"
-            data-test="dashboard-add-tab-submit"
-          />
-        </div>
-      </q-form>
-    </q-card-section>
-  </q-card>
+      </OForm>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed, watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useLoading } from "@/composables/useLoading";
 import { addTab, getDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
 import { editTab } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
-
-const defaultValue = () => {
-  return {
-    name: "",
-    panels: [],
-  };
-};
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { makeAddTabSchema, type AddTabForm } from "./AddTab.schema";
 
 export default defineComponent({
   name: "AddTab",
+  components: { ODialog, OForm, OFormInput },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     tabId: {
       validator: (value) => {
         return typeof value === "string" || value === null;
@@ -129,112 +89,123 @@ export default defineComponent({
       },
     },
   },
-  emits: ["refresh"],
+  emits: ["refresh", "update:open"],
   setup(props: any, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const store: any = useStore();
     const addTabForm: any = ref(null);
-    let dashboardData: any = ref({});
-    const isValidIdentifier: any = ref(true);
+    const addTabSchema = makeAddTabSchema(t);
     const {
       showPositiveNotification,
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
-    const tabData: any = ref(defaultValue());
 
+    // The tab record being edited. This is EXTERNAL data fetched from the
+    // store/API (it carries the non-form fields tabId/panels) — NOT a mirror of
+    // the form's `name` field. The OForm owns `name`; this only seeds it.
+    const editingTab: any = ref(null);
+
+    // OForm reads `defaultValues` once at mount, and ODialog remounts the body on
+    // open — so this computed seeds `name` each time the dialog opens (edit → the
+    // tab's name, create → blank). No local model / no manual reset needed.
+    const addTabDefaults = computed((): AddTabForm => ({
+      name: props.editMode ? (editingTab.value?.name ?? "") : "",
+    }));
+
+    // Edit data arrives ASYNC (getDashboard may hit the API) after the dialog has
+    // mounted, so `:default-values` has already been read. Per the playbook
+    // "Data arrives AFTER mount" rule, re-baseline the form via form.reset(values)
+    // once the record loads — watching the EXTERNAL source, not a local mirror.
     const loadDashboardData = async () => {
       if (props.editMode) {
-        dashboardData.value = await getDashboard(
+        const dashboardData: any = await getDashboard(
           store,
           props.dashboardId,
-          props.folderId ?? route.query.folder ?? "default"
+          props.folderId ?? route.query.folder ?? "default",
         );
-        tabData.value = JSON.parse(
-          JSON.stringify(
-            dashboardData?.value?.tabs?.find(
-              (tab: any) => tab.tabId === props.tabId
-            )
-          )
+        editingTab.value = JSON.parse(
+          JSON.stringify(dashboardData?.tabs?.find((tab: any) => tab.tabId === props.tabId)),
         );
+        addTabForm.value?.form.reset({ name: editingTab.value?.name ?? "" });
       }
     };
-    loadDashboardData();
+    watch(
+      () => props.open,
+      (v) => {
+        if (v) loadDashboardData();
+        else editingTab.value = null;
+      },
+    );
 
-    const onSubmit = useLoading(async () => {
-      await addTabForm.value.validate().then(async (valid: any) => {
-        if (!valid) {
-          return false;
+    const onSubmit = async (value: AddTabForm) => {
+      // The @submit payload is the source of truth for `name`; the loaded
+      // `editingTab` carries the rest (panels/tabId) in edit mode.
+      try {
+        //if edit mode
+        if (props.editMode) {
+          // only allowed to edit name
+          const updatedTab = await editTab(
+            store,
+            props.dashboardId,
+            props.folderId ?? route.query.folder ?? "default",
+            editingTab.value?.tabId,
+            { ...editingTab.value, name: value.name },
+          );
+
+          // emit refresh to rerender
+          emit("refresh", updatedTab);
+          emit("update:open", false);
+
+          showPositiveNotification(t("dashboard.addTab.tabUpdatedSuccessfully"));
         }
+        //else new tab
+        else {
+          const newTab = await addTab(
+            store,
+            props.dashboardId,
+            props.folderId ?? route.query.folder ?? "default",
+            { name: value.name, panels: [] },
+          );
 
-        try {
-          //if edit mode
-          if (props.editMode) {
-            // only allowed to edit name
-            const updatedTab = await editTab(
-              store,
-              props.dashboardId,
-              props.folderId ?? route.query.folder ?? "default",
-              tabData.value.tabId,
-              tabData.value
-            );
+          // emit refresh to rerender
+          emit("refresh", newTab);
+          emit("update:open", false);
 
-            // emit refresh to rerender
-            emit("refresh", updatedTab);
-
-            showPositiveNotification("Tab updated successfully", {
-              timeout: 2000,
-            });
-          }
-          //else new tab
-          else {
-            const newTab = await addTab(
-              store,
-              props.dashboardId,
-              props.folderId ?? route.query.folder ?? "default",
-              tabData.value
-            );
-
-            // emit refresh to rerender
-            emit("refresh", newTab);
-
-            showPositiveNotification("Tab added successfully", {
-              timeout: 2000,
-            });
-          }
-          tabData.value = {
-            name: "",
-            panels: [],
-          };
-          await addTabForm.value?.resetValidation();
-        } catch (error: any) {
-          if (error?.response?.status === 409) {
-            showConfictErrorNotificationWithRefreshBtn(
-              error?.response?.data?.message ??
-                error?.message ??
-                (props.editMode ? "Failed to update tab" : "Failed to add tab")
-            );
-          } else {
-            showErrorNotification(
+          showPositiveNotification(t("dashboard.addTab.tabAddedSuccessfully"));
+        }
+      } catch (error: any) {
+        if (error?.response?.status === 409) {
+          showConfictErrorNotificationWithRefreshBtn(
+            error?.response?.data?.message ??
               error?.message ??
-                (props.editMode ? "Failed to update tab" : "Failed to add tab"),
-              {
-                timeout: 2000,
-              }
-            );
-          }
-        } finally {
+              (props.editMode
+                ? t("dashboard.addTab.failedToUpdateTab")
+                : t("dashboard.addTab.failedToAddTab")),
+            t,
+          );
+        } else {
+          showErrorNotification(
+            error?.message ??
+              (props.editMode
+                ? t("dashboard.addTab.failedToUpdateTab")
+                : t("dashboard.addTab.failedToAddTab")),
+            {
+              timeout: 2000,
+            },
+          );
         }
-      });
-    });
+      }
+    };
 
     return {
       t,
-      tabData,
+      addTabSchema,
+      addTabDefaults,
+      editingTab,
       addTabForm,
       store,
-      isValidIdentifier,
       onSubmit,
     };
   },

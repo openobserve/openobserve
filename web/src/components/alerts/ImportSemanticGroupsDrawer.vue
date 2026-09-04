@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,392 +15,321 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="import-drawer-container tw:w-[45rem]">
-    <!-- Header -->
-    <div class="drawer-header q-pa-md">
-      <div class="row items-center">
-        <div class="col">
-          <div class="text-h6">Import Semantic Groups</div>
-          <div class="text-caption text-grey-7">
-            Upload JSON file to import semantic field groups
-          </div>
-        </div>
-        <div class="col-auto">
-          <q-btn
-            flat
-            round
-            dense
-            icon="close"
-            @click="handleClose"
-            data-test="import-drawer-close-btn"
-          />
-        </div>
-      </div>
-    </div>
-
-    <q-separator />
-
-    <!-- Content -->
-    <div class="drawer-content q-pa-md">
+  <ODrawer
+    data-test="semantic-field-groups-config-import-drawer"
+    v-model:open="internalOpen"
+    :width="40"
+    :title="t('correlation.importSemanticGroupsTitle')"
+    :sub-title="t('correlation.importSemanticGroupsSubtitle')"
+    :secondary-button-label="t('common.cancel')"
+    :primary-button-label="t('correlation.applyChanges')"
+    :primary-button-disabled="!hasSelectedChanges"
+    :primary-button-loading="isApplying"
+    @click:secondary="handleClose"
+    @click:primary="handleApply"
+    @update:open="handleOpenChange"
+  >
+    <div>
       <!-- File Upload -->
-      <div class="q-mb-md">
-        <q-file
+      <div class="mb-3">
+        <OFile
           v-model="jsonFile"
-          dense
-          filled
-          label="Select JSON file"
+          :label="t('correlation.selectJsonFile')"
           accept=".json"
           @update:model-value="loadFile"
           data-test="semantic-groups-import-file-drawer"
         >
           <template v-slot:prepend>
-            <q-icon name="cloud_upload" />
+            <OIcon name="cloud-upload" size="sm" />
           </template>
           <template v-slot:append>
-            <q-icon
+            <OIcon
               v-if="jsonFile"
               name="close"
+              size="sm"
               @click.stop="clearFile"
               class="cursor-pointer"
             />
           </template>
-        </q-file>
+        </OFile>
       </div>
 
       <!-- Loading State -->
-      <div v-if="isLoading" class="text-center q-pa-lg">
-        <q-spinner-dots size="50px" color="primary" />
-        <div class="text-body2 text-grey-7 q-mt-md">Analyzing file...</div>
+      <div v-if="isLoading" class="p-4 text-center">
+        <OSpinner variant="dots" size="lg" />
+        <div class="text-text-muted mt-3 text-sm">{{ t("correlation.analyzingFile") }}</div>
       </div>
 
       <!-- Diff Preview -->
       <div v-else-if="diffData" class="diff-preview">
         <!-- Summary -->
-        <div class="summary-bar q-mb-md">
-          <div class="row q-col-gutter-sm items-center">
+        <div class="summary-bar mb-3">
+          <div class="flex items-center gap-2">
             <div class="col-auto">
-              <q-chip dense color="positive" text-color="white">
+              <OTag type="diffCategory" value="new">
                 <strong>{{ diffData.additions.length }}</strong
-                >&nbsp;New
-              </q-chip>
+                >&nbsp;{{ t("correlation.new") }}
+              </OTag>
             </div>
             <div class="col-auto">
-              <q-chip dense color="warning" text-color="white">
+              <OTag type="diffCategory" value="modified">
                 <strong>{{ diffData.modifications.length }}</strong
-                >&nbsp;Modified
-              </q-chip>
+                >&nbsp;{{ t("correlation.modified") }}
+              </OTag>
             </div>
             <div class="col-auto">
-              <q-chip dense color="grey-6" text-color="white">
-                {{ diffData.unchanged.length }} Unchanged
-              </q-chip>
+              <OTag type="diffCategory" value="unchanged">
+                {{ diffData.unchanged.length }} {{ t("correlation.unchanged") }}
+              </OTag>
             </div>
           </div>
         </div>
 
         <!-- Selection Actions -->
-        <div class="selection-actions q-mb-md">
-          <q-btn-group flat>
-            <q-btn
-              flat
-              dense
-              label="Select All New"
-              @click="selectAllAdditions"
-              color="positive"
-              size="sm"
-            />
-            <q-btn
-              flat
-              dense
-              label="Select All Modified"
-              @click="selectAllModifications"
-              color="warning"
-              size="sm"
-            />
-            <q-btn
-              flat
-              dense
-              label="Clear All"
-              @click="deselectAll"
-              color="grey-7"
-              size="sm"
-            />
-          </q-btn-group>
+        <div class="selection-actions mb-3">
+          <OButtonGroup>
+            <OButton variant="ghost-primary" size="xs" @click="selectAllAdditions">{{
+              t("correlation.selectAllNew")
+            }}</OButton>
+            <OButton variant="ghost-warning" size="xs" @click="selectAllModifications">{{
+              t("correlation.selectAllModified")
+            }}</OButton>
+            <OButton variant="ghost-muted" size="xs" @click="deselectAll">{{
+              t("correlation.clearAll")
+            }}</OButton>
+          </OButtonGroup>
         </div>
 
         <!-- Groups List -->
-        <div class="groups-list">
+        <!-- eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+        <div class="max-h-[calc(100vh-400px)] overflow-y-auto">
           <!-- Additions -->
-          <div v-if="diffData.additions.length > 0" class="q-mb-md">
-            <div class="section-header text-positive q-pa-sm">
-              <q-icon name="add_circle" size="sm" />
-              New ({{ selectedAdditions.length }}/{{
+          <div v-if="diffData.additions.length > 0" class="mb-3">
+            <div class="border-separator text-status-positive border-b p-2 text-sm font-semibold">
+              <OIcon name="add-circle" size="sm" />
+              {{ t("correlation.new") }} ({{ selectedAdditions.length }}/{{
                 diffData.additions.length
               }})
             </div>
-            <q-list bordered separator>
-              <q-item
+            <ul class="divide-border rounded-default flex flex-col divide-y border">
+              <li
                 v-for="group in diffData.additions"
                 :key="group.id"
-                clickable
+                data-test="semantic-groups-drawer-addition-item"
+                class="hover:bg-muted/50 flex cursor-pointer items-center gap-2 px-3 py-2"
                 @click="toggleAddition(group.id)"
               >
-                <q-item-section side>
-                  <q-checkbox
+                <div class="flex shrink-0 items-center">
+                  <OCheckbox
                     :model-value="selectedAdditions.includes(group.id)"
                     @update:model-value="toggleAddition(group.id)"
-                    color="positive"
                   />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="text-weight-medium">{{
-                    group.display
-                  }}</q-item-label>
-                  <q-item-label caption>
-                    {{ group.id }} • {{ group.fields.length }} fields
-                  </q-item-label>
-                </q-item-section>
-                <q-item-section side>
-                  <q-btn
-                    flat
-                    dense
-                    round
-                    icon="visibility"
-                    size="sm"
-                    @click.stop="viewGroup(group)"
-                  />
-                </q-item-section>
-              </q-item>
-            </q-list>
+                </div>
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <span class="text-sm font-medium">{{ group.display }}</span>
+                  <span class="text-muted-foreground block text-xs">
+                    {{ group.id }} • {{ group.fields.length }} {{ t("correlation.fieldsCount") }}
+                  </span>
+                </div>
+                <div class="ms-auto flex shrink-0 items-center">
+                  <OButton variant="ghost" size="icon-circle-sm" @click.stop="viewGroup(group)">
+                    <OIcon name="visibility" size="sm" />
+                  </OButton>
+                </div>
+              </li>
+            </ul>
           </div>
 
           <!-- Modifications -->
-          <div v-if="diffData.modifications.length > 0" class="q-mb-md">
-            <div class="section-header text-warning q-pa-sm">
-              <q-icon name="edit" size="sm" />
-              Modified ({{ selectedModifications.length }}/{{
+          <div v-if="diffData.modifications.length > 0" class="mb-3">
+            <div
+              class="border-separator text-status-warning-text border-b p-2 text-sm font-semibold"
+            >
+              <OIcon name="edit" size="sm" />
+              {{ t("correlation.modified") }} ({{ selectedModifications.length }}/{{
                 diffData.modifications.length
               }})
             </div>
-            <q-list bordered separator>
-              <q-item
+            <ul class="divide-border rounded-default flex flex-col divide-y border">
+              <li
                 v-for="mod in diffData.modifications"
                 :key="mod.proposed.id"
-                clickable
+                data-test="semantic-groups-drawer-modification-item"
+                class="hover:bg-muted/50 flex cursor-pointer items-center gap-2 px-3 py-2"
                 @click="toggleModification(mod.proposed.id)"
               >
-                <q-item-section side>
-                  <q-checkbox
-                    :model-value="
-                      selectedModifications.includes(mod.proposed.id)
-                    "
+                <div class="flex shrink-0 items-center">
+                  <OCheckbox
+                    :model-value="selectedModifications.includes(mod.proposed.id)"
                     @update:model-value="toggleModification(mod.proposed.id)"
-                    color="warning"
                   />
-                </q-item-section>
-                <q-item-section>
-                  <q-item-label class="text-weight-medium">{{
-                    mod.proposed.display
-                  }}</q-item-label>
-                  <q-item-label caption>
+                </div>
+                <div class="flex min-w-0 flex-1 flex-col">
+                  <span class="text-sm font-medium">{{ mod.proposed.display }}</span>
+                  <span class="text-muted-foreground block text-xs">
                     {{ mod.proposed.id }} • {{ mod.current.fields.length }} →
-                    {{ mod.proposed.fields.length }} fields
-                  </q-item-label>
-                </q-item-section>
-                <q-item-section side>
-                  <q-btn
-                    flat
-                    dense
-                    round
-                    icon="compare"
-                    size="sm"
+                    {{ mod.proposed.fields.length }} {{ t("correlation.fieldsCount") }}
+                  </span>
+                </div>
+                <div class="ms-auto flex shrink-0 items-center">
+                  <OButton
+                    variant="ghost"
+                    size="icon-circle-sm"
                     @click.stop="viewModification(mod)"
-                  />
-                </q-item-section>
-              </q-item>
-            </q-list>
+                  >
+                    <OIcon name="compare" size="sm" />
+                  </OButton>
+                </div>
+              </li>
+            </ul>
           </div>
 
           <!-- Unchanged (Collapsed) -->
           <div v-if="diffData.unchanged.length > 0">
-            <q-expansion-item
-              :label="`Unchanged (${diffData.unchanged.length})`"
-              icon="check_circle"
-              header-class="text-grey-7"
+            <OCollapsible
+              v-model="unchangedOpen"
+              :label="t('common.unchangedCount', { count: diffData.unchanged.length })"
+              icon="check-circle"
             >
-              <q-list bordered separator>
-                <q-item v-for="group in diffData.unchanged" :key="group.id">
-                  <q-item-section>
-                    <q-item-label>{{ group.display }}</q-item-label>
-                    <q-item-label caption
-                      >{{ group.id }} •
-                      {{ group.fields.length }} fields</q-item-label
+              <ul class="divide-border rounded-default flex flex-col divide-y border">
+                <li
+                  v-for="group in diffData.unchanged"
+                  :key="group.id"
+                  class="flex items-center gap-2 px-3 py-2"
+                >
+                  <div class="flex min-w-0 flex-1 flex-col">
+                    <span class="text-sm">{{ group.display }}</span>
+                    <span class="text-muted-foreground block text-xs"
+                      >{{ group.id }} • {{ group.fields.length }}
+                      {{ t("correlation.fieldsCount") }}</span
                     >
-                  </q-item-section>
-                </q-item>
-              </q-list>
-            </q-expansion-item>
+                  </div>
+                </li>
+              </ul>
+            </OCollapsible>
           </div>
         </div>
       </div>
 
       <!-- Empty State -->
-      <div v-else class="empty-state text-center q-pa-lg">
-        <q-icon
-          name="cloud_upload"
-          size="64px"
-          color="grey-5"
-          class="q-mb-md"
-        />
-        <div class="text-h6 text-grey-7 q-mb-sm">Upload a JSON file</div>
-        <div class="text-body2 text-grey-6">
-          The system will analyze the file and show you what will change
+      <div v-else class="empty-state p-4 text-center">
+        <OIcon name="cloud-upload" class="mb-3 size-16!" />
+        <div class="text-text-muted mb-2 text-xl font-semibold">
+          {{ t("correlation.uploadAJsonFile") }}
+        </div>
+        <div class="text-text-secondary text-sm">
+          {{ t("correlation.analyzeFilePrompt") }}
         </div>
       </div>
     </div>
-
-    <!-- Footer Actions -->
-    <div class="drawer-footer q-pa-md">
-      <q-separator class="q-mb-md" />
-      <div class="row q-col-gutter-sm justify-end">
-        <div class="col-auto">
-          <q-btn
-            flat
-            label="Cancel"
-            @click="handleClose"
-            data-test="import-drawer-cancel-btn"
-          />
-        </div>
-        <div class="col-auto">
-          <q-btn
-            unelevated
-            color="primary"
-            label="Apply Changes"
-            @click="handleApply"
-            :disable="!hasSelectedChanges"
-            :loading="isApplying"
-            data-test="import-drawer-apply-btn"
-          />
-        </div>
-      </div>
-    </div>
-  </div>
+  </ODrawer>
 
   <!-- Group Details Dialog -->
-  <q-dialog v-model="showGroupDialog">
-    <q-card style="min-width: 500px">
-      <q-card-section>
-        <div class="text-h6">{{ selectedGroup?.display }}</div>
-        <div class="text-caption text-grey-7">ID: {{ selectedGroup?.id }}</div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section>
-        <div class="text-subtitle2 q-mb-sm">
-          Fields ({{ selectedGroup?.fields.length }})
-        </div>
-        <q-chip
-          v-for="field in selectedGroup?.fields"
-          :key="field"
-          color="primary"
-          text-color="white"
-          class="q-ma-xs"
-        >
-          {{ field }}
-        </q-chip>
-        <div class="q-mt-md">
-          <q-badge
-            v-if="selectedGroup?.normalize"
-            color="blue"
-            label="Normalized"
-          />
-          <q-badge v-else color="grey" label="Not Normalized" />
-        </div>
-      </q-card-section>
-
-      <q-card-actions align="right">
-        <q-btn flat label="Close" color="primary" v-close-popup />
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <ODialog
+    data-test="import-semantic-groups-drawer-group-dialog"
+    v-model:open="showGroupDialog"
+    size="md"
+    :title="raw(selectedGroup?.display)"
+    :sub-title="t('common.idPrefix', { id: selectedGroup?.id })"
+    :primary-button-label="t('common.close')"
+    @click:primary="showGroupDialog = false"
+  >
+    <div>
+      <div class="mb-2 text-sm font-medium">
+        {{ t("correlation.fieldsLabel") }} ({{ selectedGroup?.fields.length }})
+      </div>
+      <OTag
+        v-for="field in selectedGroup?.fields"
+        :key="field"
+        type="fieldNameChip"
+        value="highlight"
+        class="m-1"
+      >
+        {{ field }}
+      </OTag>
+    </div>
+  </ODialog>
 
   <!-- Modification Comparison Dialog -->
-  <q-dialog v-model="showModificationDialog">
-    <q-card style="min-width: 700px">
-      <q-card-section>
-        <div class="text-h6">{{ selectedModification?.proposed.display }}</div>
-        <div class="text-caption text-grey-7">Compare Changes</div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section>
-        <div class="row q-col-gutter-md">
-          <div class="col-6">
-            <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
-            <div class="text-caption q-mb-xs">
-              {{ selectedModification?.current.fields.length }} fields
-            </div>
-            <div class="field-chips-container">
-              <q-chip
-                v-for="field in selectedModification?.current.fields"
-                :key="`current-${field}`"
-                color="grey-4"
-                size="sm"
-                class="q-ma-xs"
-              >
-                {{ field }}
-              </q-chip>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="text-subtitle2 text-positive q-mb-sm">Proposed</div>
-            <div class="text-caption q-mb-xs">
-              {{ selectedModification?.proposed.fields.length }} fields
-            </div>
-            <div class="field-chips-container">
-              <q-chip
-                v-for="field in selectedModification?.proposed.fields"
-                :key="`proposed-${field}`"
-                :color="isNewField(field) ? 'positive' : 'grey-4'"
-                :text-color="isNewField(field) ? 'white' : 'black'"
-                size="sm"
-                class="q-ma-xs"
-              >
-                {{ field }}
-                <q-icon
-                  v-if="isNewField(field)"
-                  name="add"
-                  size="xs"
-                  class="q-ml-xs"
-                />
-              </q-chip>
-            </div>
-          </div>
+  <ODialog
+    data-test="import-semantic-groups-drawer-modification-dialog"
+    v-model:open="showModificationDialog"
+    size="lg"
+    :title="raw(selectedModification?.proposed.display)"
+    :sub-title="t('correlation.compareChanges')"
+    :primary-button-label="t('common.close')"
+    @click:primary="showModificationDialog = false"
+  >
+    <div class="flex gap-3">
+      <div class="w-1/2">
+        <div class="text-status-error-text mb-2 text-sm font-medium">
+          {{ t("correlation.current") }}
         </div>
-      </q-card-section>
-
-      <q-card-actions align="right">
-        <q-btn flat label="Close" color="primary" v-close-popup />
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+        <div class="mb-1 text-xs">
+          {{ selectedModification?.current.fields.length }} {{ t("correlation.fieldsCount") }}
+        </div>
+        <div class="bg-surface-subtle rounded-default max-h-62.5 overflow-y-auto p-2">
+          <OTag
+            v-for="field in selectedModification?.current.fields"
+            :key="`current-${field}`"
+            type="fieldNameChip"
+            value="muted"
+            class="m-1"
+          >
+            {{ field }}
+          </OTag>
+        </div>
+      </div>
+      <div class="w-1/2">
+        <div class="text-status-positive mb-2 text-sm font-medium">
+          {{ t("correlation.proposed") }}
+        </div>
+        <div class="mb-1 text-xs">
+          {{ selectedModification?.proposed.fields.length }} {{ t("correlation.fieldsCount") }}
+        </div>
+        <div class="bg-surface-subtle rounded-default max-h-62.5 overflow-y-auto p-2">
+          <OTag
+            v-for="field in selectedModification?.proposed.fields"
+            :key="`proposed-${field}`"
+            type="fieldDiffStatus"
+            :value="isNewField(field) ? 'new' : 'existing'"
+            class="m-1"
+          >
+            {{ field }}
+            <template #trailing>
+              <OIcon v-if="isNewField(field)" name="add" size="xs" class="ms-1" />
+            </template>
+          </OTag>
+        </div>
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from "vue";
-import { useQuasar } from "quasar";
+import { ref, computed, watch } from "vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
+import { type FileValue } from "@/lib/forms/File/OFile.types";
 import alertsService from "@/services/alerts";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 interface SemanticGroup {
   id: string;
   display: string;
   group?: string;
   fields: string[];
-  normalize: boolean;
-  is_stable?: boolean;
-  is_scope?: boolean;
 }
 
 interface SemanticGroupModification {
@@ -417,21 +346,35 @@ interface SemanticGroupDiff {
 interface Props {
   currentGroups: SemanticGroup[];
   orgId: string;
+  open?: boolean;
 }
 
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
-  (e: "close"): void;
+  (e: "update:open", value: boolean): void;
   (e: "apply", groups: SemanticGroup[]): void;
 }>();
 
-const q = useQuasar();
+const internalOpen = ref(props.open ?? false);
+
+watch(
+  () => props.open,
+  (v) => {
+    if (v !== undefined) internalOpen.value = v;
+  },
+);
+
+function handleOpenChange(v: boolean) {
+  internalOpen.value = v;
+  emit("update:open", v);
+}
 
 const jsonFile = ref<File | null>(null);
 const diffData = ref<SemanticGroupDiff | null>(null);
 const selectedAdditions = ref<string[]>([]);
 const selectedModifications = ref<string[]>([]);
+const unchangedOpen = ref(false);
 const isLoading = ref(false);
 const isApplying = ref(false);
 const showGroupDialog = ref(false);
@@ -440,12 +383,12 @@ const selectedGroup = ref<SemanticGroup | null>(null);
 const selectedModification = ref<SemanticGroupModification | null>(null);
 
 const hasSelectedChanges = computed(() => {
-  return (
-    selectedAdditions.value.length > 0 || selectedModifications.value.length > 0
-  );
+  return selectedAdditions.value.length > 0 || selectedModifications.value.length > 0;
 });
 
-const loadFile = async (file: File | null) => {
+const loadFile = async (value: FileValue) => {
+  // OFile single-mode emits File | null
+  const file = value as File | null;
   if (!file) return;
 
   isLoading.value = true;
@@ -457,17 +400,15 @@ const loadFile = async (file: File | null) => {
     // Validate groups
     for (const group of groups) {
       if (!group.id || !group.display || !Array.isArray(group.fields)) {
-        throw new Error("Invalid semantic group format");
+        throw new Error(t("alerts.import.invalidSemanticGroupFormat"));
       }
     }
 
     await previewDiff(groups);
   } catch (error: any) {
-    q.notify({
-      message: `Failed to parse JSON: ${error.message}`,
-      color: "negative",
-      position: "bottom",
-      timeout: 3000,
+    toast({
+      message: t("toastMessages.alerts.failedToParseJson", { error: error.message }),
+      variant: "error",
     });
     clearFile();
   } finally {
@@ -484,25 +425,20 @@ const clearFile = () => {
 
 const previewDiff = async (groups: SemanticGroup[]) => {
   try {
-    const response = await alertsService.previewSemanticGroupsDiff(
-      props.orgId,
-      groups,
-    );
+    const response = await alertsService.previewSemanticGroupsDiff(props.orgId, groups);
     diffData.value = response.data;
 
     // Auto-select all additions and modifications
-    selectedAdditions.value = response.data.additions.map(
-      (g: SemanticGroup) => g.id,
-    );
+    selectedAdditions.value = response.data.additions.map((g: SemanticGroup) => g.id);
     selectedModifications.value = response.data.modifications.map(
       (m: SemanticGroupModification) => m.proposed.id,
     );
   } catch (error: any) {
-    q.notify({
-      message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
-      color: "negative",
-      position: "bottom",
-      timeout: 3000,
+    toast({
+      message: t("toastMessages.alerts.failedToPreviewChanges", {
+        error: error.response?.data?.error || error.message,
+      }),
+      variant: "error",
     });
   }
 };
@@ -514,9 +450,7 @@ const selectAllAdditions = () => {
 
 const selectAllModifications = () => {
   if (!diffData.value) return;
-  selectedModifications.value = diffData.value.modifications.map(
-    (m) => m.proposed.id,
-  );
+  selectedModifications.value = diffData.value.modifications.map((m) => m.proposed.id);
 };
 
 const deselectAll = () => {
@@ -577,64 +511,25 @@ const handleApply = () => {
     .map((m) => m.proposed);
   mergedGroups.push(...selectedModificationGroups);
 
+  // Capture count before clearing state
+  const changeCount = selectedAdditions.value.length + selectedModifications.value.length;
+
   // Emit the merged groups to parent
   emit("apply", mergedGroups);
 
   // Reset and close
   clearFile();
   isApplying.value = false;
-  emit("close");
+  handleOpenChange(false);
 
-  q.notify({
-    message: `Applied ${selectedAdditions.value.length + selectedModifications.value.length} changes`,
-    color: "positive",
-    position: "bottom",
-    timeout: 2000,
+  toast({
+    message: t("toastMessages.alerts.appliedChanges", { count: changeCount }),
+    variant: "success",
   });
 };
 
 const handleClose = () => {
   clearFile();
-  emit("close");
+  handleOpenChange(false);
 };
 </script>
-
-<style lang="scss" scoped>
-.import-drawer-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-}
-
-.drawer-header {
-  flex-shrink: 0;
-}
-
-.drawer-content {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.drawer-footer {
-  flex-shrink: 0;
-}
-
-.section-header {
-  font-size: 14px;
-  font-weight: 600;
-  border-bottom: 1px solid var(--q-separator-color);
-}
-
-.groups-list {
-  max-height: calc(100vh - 400px);
-  overflow-y: auto;
-}
-
-.field-chips-container {
-  max-height: 250px;
-  overflow-y: auto;
-  padding: 8px;
-  background: var(--q-dark);
-  border-radius: 4px;
-}
-</style>

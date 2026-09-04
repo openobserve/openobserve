@@ -169,5 +169,43 @@
       "response_time_ms": 30000
     },
     "tags": ["production", "api", "error", "timeout"]
+  },
+  {
+    "kubernetes_container_name": "gateway",
+    "kubernetes_pod_name": "gw-pod-1",
+    "kubernetes_labels_app": "gateway-service",
+    "message": "Connection timeout: upstream service did not respond",
+    "level": "error",
+    "log": "level=error msg=\"Connection timeout: upstream service did not respond\"",
+    "metadata": {
+      "region": "us-east-1",
+      "datacenter": "dc-2",
+      "host": "host-301"
+    },
+    "metrics": {
+      "cpu_usage": 42.1,
+      "memory_mb": 512,
+      "response_time_ms": 15000
+    },
+    "tags": ["production", "gateway", "error", "timeout"]
+  },
+  {
+    "kubernetes_container_name": "cache",
+    "kubernetes_pod_name": "cache-pod-1",
+    "kubernetes_labels_app": "cache-service",
+    "message": "Read timeout: cache lookup exceeded threshold",
+    "level": "warn",
+    "log": "level=warn msg=\"Read timeout: cache lookup exceeded threshold\"",
+    "metadata": {
+      "region": "us-west-2",
+      "datacenter": "dc-3",
+      "host": "host-402"
+    },
+    "metrics": {
+      "cpu_usage": 38.5,
+      "memory_mb": 256,
+      "response_time_ms": 8000
+    },
+    "tags": ["production", "cache", "warn", "timeout"]
   }
 ] 

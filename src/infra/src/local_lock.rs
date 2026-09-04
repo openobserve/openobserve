@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,11 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use hashbrown::HashMap;
-use once_cell::sync::Lazy;
-use tokio::sync::{Mutex, MutexGuard, RwLock};
+use tokio::sync::{Mutex, MutexGuard, OwnedMutexGuard, RwLock};
 
 use super::errors::Result;
 
@@ -45,6 +44,17 @@ impl LockHolder {
     }
     pub async fn lock(&self) -> MutexGuard<'_, bool> {
         let guard = self.lock.lock().await;
+        log::debug!("local lock key: {} acquired", self.key);
+        guard
+    }
+
+    /// Acquire a guard that owns its lock allocation.
+    ///
+    /// Multi-step service operations (such as composite graph mutations) need
+    /// to move the guard through async helpers without building a
+    /// self-referential holder/borrow pair.
+    pub async fn lock_owned(&self) -> OwnedMutexGuard<bool> {
+        let guard = self.lock.clone().lock_owned().await;
         log::debug!("local lock key: {} acquired", self.key);
         guard
     }

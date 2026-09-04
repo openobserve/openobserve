@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -29,11 +29,7 @@ export interface CreateBackfillJobResponse {
 }
 
 export type DeletionStatus =
-  | "not_required"
-  | "pending"
-  | "in_progress"
-  | "completed"
-  | { failed: string };
+  "not_required" | "pending" | "in_progress" | "completed" | { failed: string };
 
 export interface BackfillJob {
   job_id: string;
@@ -82,11 +78,7 @@ const backfill = {
   /**
    * List all backfill jobs for an organization
    */
-  listBackfillJobs: async ({
-    org_id,
-  }: {
-    org_id: string;
-  }): Promise<BackfillJob[]> => {
+  listBackfillJobs: async ({ org_id }: { org_id: string }): Promise<BackfillJob[]> => {
     const url = `/api/${org_id}/pipelines/backfill`;
     const response = await http().get(url);
     return response.data;

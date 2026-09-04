@@ -1,0 +1,95 @@
+{
+  "resourceMetrics": [
+    {
+      "resource": {
+        "attributes": [
+          { "key": "service.name", "value": { "stringValue": "test-assist-ci-seed" } }
+        ]
+      },
+      "scopeMetrics": [
+        {
+          "scope": { "name": "test-assist-ci-seed" },
+          "metrics": [
+            {
+              "name": "http_requests_total",
+              "description": "Total HTTP requests",
+              "unit": "1",
+              "sum": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      { "key": "method", "value": { "stringValue": "GET" } },
+                      { "key": "status", "value": { "stringValue": "200" } }
+                    ],
+                    "startTimeUnixNano": "1720000000000000000",
+                    "timeUnixNano": "1720000060000000000",
+                    "asInt": "12480"
+                  },
+                  {
+                    "attributes": [
+                      { "key": "method", "value": { "stringValue": "POST" } },
+                      { "key": "status", "value": { "stringValue": "200" } }
+                    ],
+                    "startTimeUnixNano": "1720000000000000000",
+                    "timeUnixNano": "1720000060000000000",
+                    "asInt": "3210"
+                  },
+                  {
+                    "attributes": [
+                      { "key": "method", "value": { "stringValue": "GET" } },
+                      { "key": "status", "value": { "stringValue": "500" } }
+                    ],
+                    "startTimeUnixNano": "1720000000000000000",
+                    "timeUnixNano": "1720000060000000000",
+                    "asInt": "42"
+                  }
+                ],
+                "aggregationTemporality": 2,
+                "isMonotonic": true
+              }
+            },
+            {
+              "name": "http_request_duration_seconds",
+              "description": "HTTP request latency",
+              "unit": "s",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      { "key": "endpoint", "value": { "stringValue": "/api/orders" } }
+                    ],
+                    "timeUnixNano": "1720000060000000000",
+                    "asDouble": 0.128
+                  },
+                  {
+                    "attributes": [
+                      { "key": "endpoint", "value": { "stringValue": "/api/checkout" } }
+                    ],
+                    "timeUnixNano": "1720000060000000000",
+                    "asDouble": 0.412
+                  }
+                ]
+              }
+            },
+            {
+              "name": "memory_usage_bytes",
+              "description": "Memory used by process",
+              "unit": "By",
+              "gauge": {
+                "dataPoints": [
+                  {
+                    "attributes": [
+                      { "key": "pod", "value": { "stringValue": "frontend-0" } }
+                    ],
+                    "timeUnixNano": "1720000060000000000",
+                    "asDouble": 314572800
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

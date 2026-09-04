@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,347 +16,376 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="panelcontainer"
+    class="flex h-full flex-col overflow-hidden"
     @mouseover="() => (isCurrentlyHoveredPanel = true)"
     @mouseleave="() => (isCurrentlyHoveredPanel = false)"
     :data-test="`dashboard-panel-container`"
     :data-test-panel-id="props.data.id"
+    :data-test-panel-title="props.data.title"
   >
-    <div :class="{ 'drag-allow': !viewOnly && !simplifiedPanelView }">
-      <q-bar
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'transparent'"
-        dense
-        class="q-px-xs"
-        style="border-top-left-radius: 3px; border-top-right-radius: 3px"
+    <div
+      :class="{
+        'shrink-0': !viewOnly && !simplifiedPanelView,
+        'drag-allow': !viewOnly && !simplifiedPanelView,
+      }"
+    >
+      <PanelBar
+        class="w-full flex-nowrap"
+        :class="{ 'border-b-transparent': isPanelLoading }"
         data-test="dashboard-panel-bar"
       >
-        <q-icon
+        <OIcon
           v-if="!viewOnly && !simplifiedPanelView"
-          name="drag_indicator"
+          name="drag-indicator"
+          size="sm"
           data-test="dashboard-panel-drag"
         />
-        <div :title="props.data.title" class="panelHeader">
+        <!-- me-5 is a truncation MARGIN, not decoration. The spacer after this
+             collapses to nothing once the title fills the bar, so an ellipsised
+             title otherwise ends flush against the first control and reads as
+             running into it. The margin is outside the overflow box, so the
+             ellipsis always lands a gap short of the icons. A title that fits is
+             unaffected — the spacer just absorbs 1.25rem less. -->
+        <div
+          :title="props.data.title"
+          class="text-compact text-text-heading me-5 overflow-hidden font-medium tracking-[0.02em] text-ellipsis whitespace-nowrap"
+          data-test="dashboard-panel-header"
+        >
           {{ props.data.title }}
         </div>
-        <q-space />
-        <q-icon
+        <div class="flex-1" />
+
+        <!-- HOVER-REVEALED CONTROLS (this button through the fullscreen one).
+             They are hidden, never unmounted: dropping them from the layout on
+             mouseleave handed their width back to the title, which then
+             re-truncated at a different point every time the pointer entered or
+             left the panel. Reserving the space keeps ONE truncation point —
+             `invisible` also drops them from the tab order and the a11y tree, so
+             hidden controls stay unreachable. -->
+        <!-- Show Legends button (hidden when the chart has no data) -->
+        <OButton
+          :class="hoverRevealClass"
           v-if="
-            !viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel && props.data.description != ''
+            props.showLegendsButton &&
+            !PanleSchemaRendererRef?.noData &&
+            ![
+              'table',
+              'html',
+              'markdown',
+              'custom_chart',
+              'geomap',
+              'maps',
+              'heatmap',
+              'metric',
+              'gauge',
+            ].includes(props.data.type)
           "
-          name="info_outline"
-          style="cursor: pointer"
+          variant="ghost"
+          size="icon"
+          @click="showLegendsDialog = true"
+          icon-left="format-list-bulleted"
+          data-test="dashboard-show-legends-btn"
+        >
+          <OTooltip
+            :content="t('dashboard.panelContainer.showLegends')"
+            side="bottom"
+            align="end"
+          />
+        </OButton>
+
+        <!-- Add Annotations button -->
+        <OButton
+          :class="hoverRevealClass"
+          v-if="
+            !viewOnly &&
+            !simplifiedPanelView &&
+            [
+              'area',
+              'area-stacked',
+              'bar',
+              'h-bar',
+              'line',
+              'scatter',
+              'stacked',
+              'h-stacked',
+            ].includes(props.data.type) &&
+            PanleSchemaRendererRef?.checkIfPanelIsTimeSeries === true
+          "
+          variant="ghost"
+          size="icon"
+          @click="PanleSchemaRendererRef?.toggleAddAnnotationMode()"
+          data-test="panel-schema-renderer-annotation-button"
+        >
+          <OIcon
+            :name="PanleSchemaRendererRef?.isAddAnnotationMode ? 'cancel' : 'bookmark-add'"
+            size="sm"
+          />
+          <OTooltip
+            :content="
+              PanleSchemaRendererRef?.isAddAnnotationMode
+                ? t('dashboard.panelContainer.exitAnnotationsMode')
+                : t('dashboard.panelContainer.addAnnotations')
+            "
+            side="bottom"
+            align="end"
+          />
+        </OButton>
+
+        <OIcon
+          v-if="!viewOnly && !simplifiedPanelView && props.data.description != ''"
+          name="info-outline"
+          size="sm"
+          class="cursor-pointer"
+          :class="hoverRevealClass"
           data-test="dashboard-panel-description-info"
         >
-          <q-tooltip anchor="bottom right"
-self="top right" max-width="220px">
-            <div style="white-space: pre-wrap">
-              {{ props.data.description }}
-            </div>
-          </q-tooltip>
-        </q-icon>
-        <q-btn
-          v-if="!viewOnly && !simplifiedPanelView && isCurrentlyHoveredPanel"
-          icon="fullscreen"
-          flat
-          size="sm"
-          padding="1px"
+          <OTooltip side="bottom" align="end" max-width="13.75rem">
+            <template #content
+              ><div class="whitespace-pre-wrap">{{ props.data.description }}</div></template
+            >
+          </OTooltip>
+        </OIcon>
+        <OButton
+          :class="hoverRevealClass"
+          v-if="!viewOnly && !simplifiedPanelView"
+          variant="ghost"
+          size="icon"
           @click="onPanelModifyClick('ViewPanel')"
-          :title="t('panel.fullScreen')"
           data-test="dashboard-panel-fullscreen-btn"
-        />
-        <q-btn
+          icon-left="fullscreen"
+        >
+          <OTooltip side="bottom" :content="t('panel.fullScreen')" shortcut-id="panelView" />
+        </OButton>
+        <OButton
           v-if="dependentAdHocVariable"
-          :icon="outlinedWarning"
-          flat
-          size="xs"
-          padding="2px"
+          variant="ghost-warning"
+          size="icon"
           @click="showViewPanel = true"
           data-test="dashboard-panel-dependent-adhoc-variable-btn"
+          icon-left="warning"
         >
-          <q-tooltip anchor="bottom right"
-self="top right" max-width="220px">
-            Some dynamic variables are not applied because the field is not
-            present in the query's stream. Open Query Inspector to see all the
-            details of the variables and queries executed to render this panel
-          </q-tooltip>
-        </q-btn>
+          <OTooltip
+            side="bottom"
+            align="end"
+            max-width="13.75rem"
+            :content="t('dashboard.panelContainer.dependentAdhocVariableWarning')"
+          />
+        </OButton>
         <!-- show error here -->
         <PanelErrorButtons
           :error="errorData"
           :maxQueryRangeWarning="maxQueryRangeWarning"
           :limitNumberOfSeriesWarningMessage="limitNumberOfSeriesWarningMessage"
+          :sparklineWarning="sparklineWarning"
           :isCachedDataDifferWithCurrentTimeRange="isCachedDataDifferWithCurrentTimeRange"
           :isPartialData="isPartialData"
           :isPanelLoading="isPanelLoading"
           :lastTriggeredAt="lastTriggeredAt"
           :viewOnly="viewOnly"
         />
-        <q-btn
+        <OButton
           v-if="!viewOnly && !simplifiedPanelView"
-          icon="refresh"
-          flat
-          size="sm"
-          padding="1px"
+          :variant="variablesDataUpdated ? 'ghost-warning' : 'ghost'"
+          size="icon"
           @click="() => onRefreshPanel(false)"
           :title="t('panel.refreshPanel')"
           data-test="dashboard-panel-refresh-panel-btn"
-          :color="variablesDataUpdated ? 'warning' : ''"
-          :disable="isPanelLoading"
+          :disabled="isPanelLoading"
+          icon-left="refresh"
         >
-          <q-tooltip>
-            {{
-              variablesDataUpdated
-                ? t("panel.refreshToApplyVariables")
-                : t("panel.refresh")
-            }}
-          </q-tooltip>
-        </q-btn>
+          <OTooltip
+            :content="
+              variablesDataUpdated ? t('panel.refreshToApplyVariables') : t('panel.refresh')
+            "
+          />
+        </OButton>
         <!-- Direct delete icon (shown when simplifiedPanelView is true) -->
-        <q-btn
+        <OButton
           v-if="!viewOnly && simplifiedPanelView"
-          icon="close"
-          flat
-          dense
-          size="sm"
-          padding="xs"
+          variant="ghost"
+          size="icon"
           @click="onPanelModifyClick('DeletePanel')"
           :title="t('panel.deletePanel')"
           :data-test="`dashboard-delete-panel-${props.data.title}-btn`"
-        />
+          icon-left="close"
+        >
+        </OButton>
 
         <!-- Dropdown menu (shown when simplifiedPanelView is false) -->
-        <q-btn-dropdown
-          :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
-          dense
-          flat
-          label=""
-          no-caps
-          v-if="!viewOnly && !simplifiedPanelView"
-        >
-          <q-list dense>
-            <q-item
-              v-if="!simplifiedPanelView"
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('EditPanel')"
+        <ODropdown side="bottom" align="end" v-if="!viewOnly && !simplifiedPanelView">
+          <template #trigger>
+            <OButton
+              variant="ghost"
+              size="icon"
+              :data-test="`dashboard-edit-panel-${props.data.title}-dropdown`"
             >
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-edit-panel"
-                  class="q-pa-sm"
-                  >{{ t("panel.editPanel") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              v-if="!simplifiedPanelView"
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('EditLayout')"
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-edit-layout"
-                  class="q-pa-sm"
-                  >{{ t("panel.editLayout") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              v-if="!simplifiedPanelView"
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('DuplicatePanel')"
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-duplicate-panel"
-                  class="q-pa-sm"
-                  >{{ t("panel.duplicate") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('DeletePanel')"
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-delete-panel"
-                  class="q-pa-sm"
-                  >{{ t("panel.deletePanel") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-              v-close-popup="true"
-              @click="showViewPanel = true"
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-query-inspector-panel"
-                  class="q-pa-sm"
-                  >{{ t("panel.queryInspector") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-              v-close-popup="true"
-              @click="
-                PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)
-              "
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-panel-download-as-csv-btn"
-                  class="q-pa-sm"
-                  >{{ t("panel.downloadAsCSV") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-              v-close-popup="true"
-              @click="
-                PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)
-              "
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-panel-download-as-json-btn"
-                  class="q-pa-sm"
-                  >{{ t("panel.downloadAsJSON") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-              :disable="props.data.queryType != 'sql'"
-              v-close-popup="true"
-              @click="onLogPanel"
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-move-to-logs-module"
-                  class="q-pa-sm"
-                  >{{ t("panel.goToLogs") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              v-if="!simplifiedPanelView && config.isEnterprise === 'true'"
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('Refresh')"
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-refresh-without-cache"
-                  class="q-pa-sm"
-                  >Refresh Cache & Reload</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              v-if="!simplifiedPanelView"
-              clickable
-              v-close-popup="true"
-              @click="onPanelModifyClick('MovePanel')"
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-move-to-another-panel"
-                  class="q-pa-sm"
-                  >{{ t("panel.moveToAnotherTab") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-            <q-item
-              clickable
-              v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
-              v-close-popup="true"
-              @click="onPanelModifyClick('CreateAlert')"
-            >
-              <q-item-section>
-                <q-item-label
-                  data-test="dashboard-create-alert-from-panel"
-                  class="q-pa-sm"
-                  >{{ t("panel.createAlert") }}</q-item-label
-                >
-              </q-item-section>
-            </q-item>
-          </q-list>
-        </q-btn-dropdown>
-      </q-bar>
+              <OIcon name="more-vert" size="sm" />
+            </OButton>
+          </template>
+          <ODropdownItem
+            v-if="!simplifiedPanelView"
+            data-test="dashboard-edit-panel"
+            @select="onPanelModifyClick('EditPanel')"
+            shortcut-id="panelEdit"
+          >
+            <template #icon-left><OIcon name="edit" size="sm" /></template>
+            {{ t("panel.editPanel") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView"
+            data-test="dashboard-edit-layout"
+            @select="onPanelModifyClick('EditLayout')"
+          >
+            <template #icon-left><OIcon name="dashboard-customize" size="sm" /></template>
+            {{ t("panel.editLayout") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView"
+            data-test="dashboard-duplicate-panel"
+            @select="onPanelModifyClick('DuplicatePanel')"
+            shortcut-id="panelDuplicate"
+          >
+            <template #icon-left><OIcon name="content-copy" size="sm" /></template>
+            {{ t("panel.duplicate") }}
+          </ODropdownItem>
+          <ODropdownItem
+            data-test="dashboard-delete-panel"
+            @select="onPanelModifyClick('DeletePanel')"
+            shortcut-id="panelDelete"
+          >
+            <template #icon-left
+              ><OIcon name="delete-outline" size="sm" class="text-current!"
+            /></template>
+            {{ t("panel.deletePanel") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            data-test="dashboard-query-inspector-panel"
+            @select="showViewPanel = true"
+            shortcut-id="panelQueryInspector"
+          >
+            <template #icon-left><OIcon name="manage-search" size="sm" /></template>
+            {{ t("panel.queryInspector") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            data-test="dashboard-panel-download-as-csv-btn"
+            @select="PanleSchemaRendererRef?.downloadDataAsCSV(props.data.title)"
+          >
+            <template #icon-left><OIcon name="file-download" size="sm" /></template>
+            {{ t("panel.downloadAsCSV") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            data-test="dashboard-panel-download-as-json-btn"
+            @select="PanleSchemaRendererRef?.downloadDataAsJSON(props.data.title)"
+          >
+            <template #icon-left><OIcon name="data-object" size="sm" /></template>
+            {{ t("panel.downloadAsJSON") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            :disabled="props.data.queryType != 'sql'"
+            data-test="dashboard-move-to-logs-module"
+            @select="onLogPanel"
+            icon-left="search"
+          >
+            {{ t("panel.goToLogs") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView && config.isEnterprise === 'true'"
+            data-test="dashboard-refresh-without-cache"
+            @select="onPanelModifyClick('Refresh')"
+            icon-left="cached"
+          >
+            {{ t("dashboard.panelContainer.refreshCacheReload") }}
+          </ODropdownItem>
+          <ODropdownItem
+            v-if="!simplifiedPanelView"
+            data-test="dashboard-move-to-another-panel"
+            @select="onPanelModifyClick('MovePanel')"
+          >
+            <template #icon-left><OIcon name="drive-file-move" size="sm" /></template>
+            {{ t("panel.moveToAnotherTab") }}
+          </ODropdownItem>
+          <!-- Alert creation is shared platform machinery: this contributes the
+               panel's state through a pure adapter and the action owns the rest
+               (label, confirm dialog, transport). See CreateAlertAction.vue. -->
+          <CreateAlertAction
+            v-if="!simplifiedPanelView && metaData && metaData.queries?.length > 0"
+            variant="menu-item"
+            source="panel"
+            :build="buildPanelAlertPrefill"
+            :disabled-reason="alertDisabledReason"
+            data-test="dashboard-create-alert-from-panel"
+          />
+        </ODropdown>
+      </PanelBar>
     </div>
-    
+
     <!-- Panel-Level Variables (shown below drag-allow section) -->
-    <div class="panel-variables-wrapper">
+    <div class="shrink-0">
       <slot name="panel-variables"></slot>
     </div>
 
-    <div class="panel-chart-wrapper">
+    <div class="min-h-0 flex-1">
       <PanelSchemaRenderer
         :panelSchema="props.data"
         :selectedTimeObj="props.selectedTimeDate"
         :width="props.width"
         :height="props.height"
-      :variablesData="props.variablesData"
-      :currentVariablesData="props.currentVariablesData"
-      :forceLoad="props.forceLoad"
-      :searchType="searchType"
-      :dashboard-id="props.dashboardId"
-      :folder-id="props.folderId"
-      :report-id="props.reportId"
-      :runId="runId"
-      :tabId="props.tabId"
-      :tabName="props.tabName"
-      :dashboardName="props.dashboardName"
-      :folderName="props.folderName"
-      :viewOnly="viewOnly"
-      :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
-      @loading-state-change="handleLoadingStateChange"
-      @metadata-update="metaDataValue"
-      @limit-number-of-series-warning-message-update="
-        handleLimitNumberOfSeriesWarningMessageUpdate
-      "
-      @result-metadata-update="handleResultMetadataUpdate"
-      @last-triggered-at-update="handleLastTriggeredAtUpdate"
-      @is-cached-data-differ-with-current-time-range-update="
-        handleIsCachedDataDifferWithCurrentTimeRangeUpdate
-      "
-      @updated:data-zoom="$emit('updated:data-zoom', $event)"
-      @update:initial-variable-values="
-        (...args) => $emit('update:initial-variable-values', ...args)
-      "
-      @error="onError"
-      @is-partial-data-update="handleIsPartialDataUpdate"
-      @contextmenu="$emit('contextmenu', $event)"
-      ref="PanleSchemaRendererRef"
-      :allowAnnotationsAdd="true"
-      :allowAlertCreation="allowAlertCreation"
-      @show-legends="showLegendsDialog = true"
-      :showLegendsButton="props.showLegendsButton"
-    ></PanelSchemaRenderer>
+        :variablesData="props.variablesData"
+        :currentVariablesData="props.currentVariablesData"
+        :forceLoad="props.forceLoad"
+        :searchType="searchType"
+        :dashboard-id="props.dashboardId"
+        :folder-id="props.folderId"
+        :report-id="props.reportId"
+        :runId="runId"
+        :tabId="props.tabId"
+        :tabName="props.tabName"
+        :dashboardName="props.dashboardName"
+        :folderName="props.folderName"
+        :viewOnly="viewOnly"
+        :shouldRefreshWithoutCache="props.shouldRefreshWithoutCache"
+        @loading-state-change="handleLoadingStateChange"
+        @metadata-update="metaDataValue"
+        @limit-number-of-series-warning-message-update="
+          handleLimitNumberOfSeriesWarningMessageUpdate
+        "
+        @sparkline-warning-update="handleSparklineWarningUpdate"
+        @result-metadata-update="handleResultMetadataUpdate"
+        @last-triggered-at-update="handleLastTriggeredAtUpdate"
+        @is-cached-data-differ-with-current-time-range-update="
+          handleIsCachedDataDifferWithCurrentTimeRangeUpdate
+        "
+        @updated:data-zoom="$emit('updated:data-zoom', $event)"
+        @update:initial-variable-values="
+          (...args) => $emit('update:initial-variable-values', ...args)
+        "
+        @error="onError"
+        @is-partial-data-update="handleIsPartialDataUpdate"
+        @contextmenu="$emit('contextmenu', $event)"
+        ref="PanleSchemaRendererRef"
+        :allowAnnotationsAdd="true"
+        :allowAlertCreation="allowAlertCreation"
+        @show-legends="showLegendsDialog = true"
+        :showLegendsButton="props.showLegendsButton"
+      ></PanelSchemaRenderer>
     </div>
-    
-    <q-dialog v-model="showViewPanel">
-      <QueryInspector :metaData="metaData" :data="props.data"></QueryInspector>
-    </q-dialog>
 
-    <q-dialog v-model="showLegendsDialog">
-      <ShowLegendsPopup
-        :panelData="currentPanelData"
-        @close="showLegendsDialog = false"
-      />
-    </q-dialog>
+    <QueryInspector
+      v-model:open="showViewPanel"
+      :metaData="metaData"
+      :data="props.data"
+      data-test="query-inspector-dialog"
+    />
+
+    <ShowLegendsPopup
+      v-model:open="showLegendsDialog"
+      :panelData="currentPanelData"
+      data-test="panel-container-legends-dialog"
+    />
 
     <ConfirmDialog
       :title="t('panel.deletePanelTitle')"
@@ -386,30 +415,32 @@ import {
   defineAsyncComponent,
   watch,
   onBeforeUnmount,
+  onMounted,
 } from "vue";
+import { panelDownloadRegistry, panelCsvRegistry } from "@/utils/panelDownloadRegistry";
 import PanelSchemaRenderer from "./PanelSchemaRenderer.vue";
 import { useStore } from "vuex";
 import { useRoute, useRouter } from "vue-router";
 import { addPanel } from "@/utils/commons";
-import { useQuasar } from "quasar";
 import ConfirmDialog from "../ConfirmDialog.vue";
-import {
-  outlinedWarning,
-  outlinedRunningWithErrors,
-} from "@quasar/extras/material-icons-outlined";
-import {
-  symOutlinedClockLoader20,
-  symOutlinedDataInfoAlert,
-} from "@quasar/extras/material-symbols-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import PanelBar from "@/components/common/PanelBar.vue";
 import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vue";
-import RelativeTime from "@/components/common/RelativeTime.vue";
-import { getFunctionErrorMessage, getUUID, processQueryMetadataErrors } from "@/utils/zincutils";
+import { getUUID, processQueryMetadataErrors } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
+import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { isEqual } from "lodash-es";
 import { b64EncodeUnicode } from "@/utils/zincutils";
 import shortURL from "@/services/short_url";
 import config from "@/aws-exports";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { isInputFocused } from "@/utils/keyboardShortcuts";
+import CreateAlertAction from "@/components/alerts/CreateAlertAction.vue";
+import { buildPrefillFromPanel } from "@/utils/alerts/prefill/fromPanel";
 
 const QueryInspector = defineAsyncComponent(() => {
   return import("@/components/dashboards/QueryInspector.vue");
@@ -440,7 +471,6 @@ export default defineComponent({
     "height",
     "variablesData",
     "dashboardId",
-    "metaData",
     "forceLoad",
     "searchType",
     "folderId",
@@ -459,11 +489,17 @@ export default defineComponent({
   ],
   components: {
     PanelSchemaRenderer,
+    PanelBar,
     QueryInspector,
     ConfirmDialog,
     SinglePanelMove,
-    RelativeTime,
     PanelErrorButtons,
+    OButton,
+    OIcon,
+    ODropdown,
+    ODropdownItem,
+    OTooltip,
+    CreateAlertAction,
     ShowLegendsPopup: defineAsyncComponent(() => {
       return import("@/components/dashboards/addPanel/ShowLegendsPopup.vue");
     }),
@@ -472,8 +508,7 @@ export default defineComponent({
     const store = useStore();
     const router = useRouter();
     const route = useRoute();
-    const $q = useQuasar();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const metaData = ref();
     const showViewPanel = ref(false);
     const showLegendsDialog = ref(false);
@@ -493,10 +528,7 @@ export default defineComponent({
     const limitNumberOfSeriesWarningMessage = ref("");
 
     const handleResultMetadataUpdate = (metadata: any) => {
-      maxQueryRangeWarning.value = processQueryMetadataErrors(
-        metadata,
-        store.state.timezone,
-      );
+      maxQueryRangeWarning.value = processQueryMetadataErrors(metadata, store.state.timezone);
     };
 
     // to store and show when the panel was last loaded
@@ -507,14 +539,18 @@ export default defineComponent({
 
     // to store and show warning if the cached data is different with current time range
     const isCachedDataDifferWithCurrentTimeRange: any = ref(false);
-    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (
-      isDiffer: boolean,
-    ) => {
+    const handleIsCachedDataDifferWithCurrentTimeRangeUpdate = (isDiffer: boolean) => {
       isCachedDataDifferWithCurrentTimeRange.value = isDiffer;
     };
 
     const handleLimitNumberOfSeriesWarningMessageUpdate = (message: string) => {
       limitNumberOfSeriesWarningMessage.value = message;
+    };
+
+    // Sparkline unavailable for the query (e.g. JOIN) — non-blocking header warning.
+    const sparklineWarning = ref("");
+    const handleSparklineWarningUpdate = (message: string) => {
+      sparklineWarning.value = message;
     };
 
     const showText = ref(false);
@@ -535,9 +571,7 @@ export default defineComponent({
         ?.filter((it: any) => it?.operator && it?.name && it?.value);
 
       const metaDataDynamic = metaData.value?.queries?.every((it: any) => {
-        const vars = it?.variables?.filter(
-          (it: any) => it.type === "dynamicVariable",
-        );
+        const vars = it?.variables?.filter((it: any) => it.type === "dynamicVariable");
         return vars?.length == adhocVariables?.length;
       });
 
@@ -549,6 +583,14 @@ export default defineComponent({
 
     // for full screen button
     const isCurrentlyHoveredPanel: any = ref(false);
+
+    // Applied to every hover-revealed control in the panel bar. They stay in the
+    // layout while hidden so the title's truncation point never moves when the
+    // pointer enters or leaves; `invisible` (visibility:hidden) also takes them
+    // out of the tab order and the a11y tree, so nothing hidden is reachable.
+    const hoverRevealClass = computed(() =>
+      isCurrentlyHoveredPanel.value ? "" : "invisible pointer-events-none",
+    );
 
     //for edit panel
     const onEditPanel = (data: any) => {
@@ -581,19 +623,10 @@ export default defineComponent({
       vrlFunctionQueryEncoded: string,
     ) => {
       const logsUrl = new URL(currentUrl + "/logs");
-      logsUrl.searchParams.set(
-        "stream_type",
-        queryDetails.queries[0]?.fields?.stream_type,
-      );
+      logsUrl.searchParams.set("stream_type", queryDetails.queries[0]?.fields?.stream_type);
       logsUrl.searchParams.set("stream", streamName);
-      logsUrl.searchParams.set(
-        "from",
-        metaData.value.queries[0]?.startTime.toString(),
-      );
-      logsUrl.searchParams.set(
-        "to",
-        metaData.value.queries[0]?.endTime.toString(),
-      );
+      logsUrl.searchParams.set("from", metaData.value.queries[0]?.startTime.toString());
+      logsUrl.searchParams.set("to", metaData.value.queries[0]?.endTime.toString());
       logsUrl.searchParams.set("functionContent", vrlFunctionQueryEncoded);
       //this url paramater have been added to show the function editor in the logs page when the query has vrl function
       //otherwise it will be false and the function editor will not be shown
@@ -604,10 +637,7 @@ export default defineComponent({
       }
       logsUrl.searchParams.set("sql_mode", "true");
       logsUrl.searchParams.set("query", encodedQuery);
-      logsUrl.searchParams.set(
-        "org_identifier",
-        store.state.selectedOrganization.identifier,
-      );
+      logsUrl.searchParams.set("org_identifier", store.state.selectedOrganization.identifier);
       if (store.state.zoConfig.quick_mode_enabled) {
         logsUrl.searchParams.set("quick_mode", "true");
       } else {
@@ -619,18 +649,15 @@ export default defineComponent({
 
     const onLogPanel = async () => {
       const showNotification = showPositiveNotification(
-        "Redirecting to logs page",
-        {
-          color: "warning",
-        },
+        t("dashboard.panelContainer.redirectingToLogs"),
+        {},
       );
       const queryDetails = props.data;
       if (!queryDetails) {
         return;
       }
 
-      const { originalQuery, streamName } =
-        getOriginalQueryAndStream(queryDetails, metaData) || {};
+      const { originalQuery, streamName } = getOriginalQueryAndStream(queryDetails, metaData) || {};
       if (!originalQuery || !streamName) return;
 
       let modifiedQuery = originalQuery;
@@ -645,9 +672,7 @@ export default defineComponent({
       const pos = window.location.pathname.indexOf("/web/");
       const currentUrl =
         pos > -1
-          ? window.location.origin +
-            window.location.pathname.slice(0, pos) +
-            "/web"
+          ? window.location.origin + window.location.pathname.slice(0, pos) + "/web"
           : window.location.origin;
 
       const logsUrl = constructLogsUrl(
@@ -661,10 +686,7 @@ export default defineComponent({
       // Use short_url service to shorten the URL and redirect
       try {
         const org_identifier = store.state.selectedOrganization.identifier;
-        const response = await shortURL.create(
-          org_identifier,
-          logsUrl.toString(),
-        );
+        const response = await shortURL.create(org_identifier, logsUrl.toString());
         const shortUrl = response?.data?.short_url;
         if (shortUrl) {
           window.open(shortUrl, "_blank");
@@ -680,15 +702,14 @@ export default defineComponent({
     //create a duplicate panel
     const onDuplicatePanel = async (data: any): Promise<void> => {
       // Show a loading spinner notification.
-      const dismiss = $q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
+      const dismiss = toast({
+        variant: "loading",
+        message: t("dashboard.panelContainer.pleaseWait"),
+        timeout: 0,
       });
 
       // Generate a unique panel ID.
-      const panelId =
-        "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
+      const panelId = "Panel_ID" + Math.floor(Math.random() * (99999 - 10 + 1)) + 10;
 
       // Duplicate the panel data with the new ID.
       const panelData = JSON.parse(JSON.stringify(data));
@@ -724,21 +745,18 @@ export default defineComponent({
 
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
-            error?.response?.data?.message ??
-              error?.message ??
-              t("panel.panelDuplicationFailed"),
+            error?.response?.data?.message ?? error?.message ?? t("panel.panelDuplicationFailed"),
+            t,
           );
         } else {
-          showErrorNotification(
-            error?.message ?? t("panel.panelDuplicationFailed"),
-          );
+          showErrorNotification(error?.message ?? t("panel.panelDuplicationFailed"));
         }
       }
       // Hide the loading spinner notification.
       dismiss();
     };
 
-    const deletePanelDialog = async (data: any) => {
+    const deletePanelDialog = async () => {
       emit("onDeletePanel", props.data.id);
     };
 
@@ -773,7 +791,7 @@ export default defineComponent({
       return newRunId;
     };
 
-    const onRefreshPanel = async (shouldRefreshWithoutCache=false) => {
+    const onRefreshPanel = async (shouldRefreshWithoutCache = false) => {
       // Need to generate a new run id when refreshing the panel
       generateNewDashboardRunId();
 
@@ -788,7 +806,7 @@ export default defineComponent({
     };
     const createVariableRegex = (name: any) =>
       new RegExp(
-        `.*\\$\\{?${name}(?::(csv|pipe|doublequote|singlequote))?}?.*`,
+        `(?:\\$\\{?\\s*${name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}?)|(?:\\{\\{\\s*${name}\\s*(?::\\s*(?:csv|pipe|doublequote|singlequote)\\s*)?\\}\\})`,
       );
 
     const getDependentVariablesData = () =>
@@ -855,8 +873,31 @@ export default defineComponent({
       isPartialData.value = isPartial;
     };
 
+    // Register in the module-level download registry so that
+    // window.oo_logAllPanelsJSON() can print panel data from the console,
+    // and in panelCsvRegistry so window.oo_getAllPanelsCsv() can collect CSV data.
+    onMounted(() => {
+      const panelId = props.data?.id;
+      if (panelId) {
+        panelDownloadRegistry.set(panelId, () =>
+          PanleSchemaRendererRef.value?.logDataAsJSON(props.data?.title),
+        );
+        panelCsvRegistry.set(
+          panelId,
+          () => PanleSchemaRendererRef.value?.getPanelCsvData(props.data?.title) ?? null,
+        );
+      }
+    });
+
     // Add cleanup on component unmount
     onBeforeUnmount(() => {
+      // Unregister from download registry
+      const panelId = props.data?.id;
+      if (panelId) {
+        panelDownloadRegistry.delete(panelId);
+        panelCsvRegistry.delete(panelId);
+      }
+
       // Clear any pending timeouts or intervals
       // Reset refs to help with garbage collection
       metaData.value = null;
@@ -877,26 +918,56 @@ export default defineComponent({
       };
     });
 
+    // ── Panel hover keyboard shortcuts ────────────────────────────────────
+    // Direct keydown listener — avoids ShortcutManager conflicts when many
+    // panels are mounted at the same time. Only fires when this panel is hovered.
+    const handlePanelKeydown = (e: KeyboardEvent) => {
+      if (!isCurrentlyHoveredPanel.value) return;
+      if (isInputFocused()) return;
+      // These are single-letter shortcuts — never fire while a modifier is held.
+      // Otherwise combos like Alt+Left (panel-editor "Discard & go back") leaking
+      // a still-held Alt into the next keystroke would wrongly trigger edit/view.
+      if (e.ctrlKey || e.altKey || e.metaKey) return;
+      if (e.key === "v" || e.key === "V") {
+        e.preventDefault();
+        emit("onViewPanel", props.data.id);
+      } else if (e.key === "i" || e.key === "I") {
+        e.preventDefault();
+        showViewPanel.value = true;
+      } else if (e.key === "e" || e.key === "E") {
+        e.preventDefault();
+        onEditPanel(props.data);
+      } else if (e.key === "d" || e.key === "D") {
+        e.preventDefault();
+        onDuplicatePanel(props.data);
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        // Mac: physical Delete key fires Backspace; Fn+Delete fires Delete
+        e.preventDefault();
+        confirmDeletePanelDialog.value = true;
+      }
+    };
+
+    onMounted(() => window.addEventListener("keydown", handlePanelKeydown));
+    onBeforeUnmount(() => window.removeEventListener("keydown", handlePanelKeydown));
+
+    // Guards that used to fire as toasts AFTER the user clicked "Create alert".
+    // Stated up front as a disabled reason instead — a dead-end click is worse
+    // than a control that explains itself.
+    const alertDisabledReason = computed(() => {
+      if (!props.data?.queries?.length) return t("panel.noQueriesToCreateAlert");
+      if (!props.data.queries[0]?.fields?.stream) return t("panel.panelQueryMustHaveStream");
+      return null;
+    });
+
     return {
       props,
+      alertDisabledReason,
       onEditPanel,
       onLogPanel,
       onDuplicatePanel,
       deletePanelDialog,
       isCurrentlyHoveredPanel,
-      outlinedWarning,
-      symOutlinedClockLoader20,
-      symOutlinedDataInfoAlert,
-      outlinedRunningWithErrors,
-      store,
-      metaDataValue,
-      handleResultMetadataUpdate,
-      handleLastTriggeredAtUpdate,
-      isCachedDataDifferWithCurrentTimeRange,
-      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
-      lastTriggeredAt,
-      maxQueryRangeWarning,
-      metaData,
+      hoverRevealClass,
       showViewPanel,
       dependentAdHocVariable,
       confirmDeletePanelDialog,
@@ -912,12 +983,27 @@ export default defineComponent({
       handleLoadingStateChange,
       limitNumberOfSeriesWarningMessage,
       handleLimitNumberOfSeriesWarningMessageUpdate,
+      sparklineWarning,
+      handleSparklineWarningUpdate,
       isPartialData,
       handleIsPartialDataUpdate,
       config,
       t,
       showLegendsDialog,
       currentPanelData,
+      outlinedRunningWithErrors: "running-with-errors",
+      outlinedReportProblem: "report-problem",
+      outlinedDashboardCustomize: "dashboard-customize",
+      outlinedFileDownload: "file-download",
+      store,
+      metaDataValue,
+      handleResultMetadataUpdate,
+      handleLastTriggeredAtUpdate,
+      isCachedDataDifferWithCurrentTimeRange,
+      handleIsCachedDataDifferWithCurrentTimeRangeUpdate,
+      lastTriggeredAt,
+      maxQueryRangeWarning,
+      metaData,
     };
   },
   methods: {
@@ -934,95 +1020,25 @@ export default defineComponent({
         this.confirmMovePanelDialog = true;
       } else if (evt == "EditLayout") {
         this.$emit("onEditLayout", this.props.data.id);
-      } else if (evt == "CreateAlert") {
-        this.createAlertFromPanel();
       } else if (evt == "Refresh") {
         this.onRefreshPanel(true);
-      } else {
       }
     },
-    createAlertFromPanel() {
-      if (!this.props.data.queries || this.props.data.queries.length === 0) {
-        this.$q.notify({
-          type: "negative",
-          message: this.t("panel.noQueriesToCreateAlert"),
-          timeout: 2000,
-        });
-        return;
-      }
-
-      const query = this.props.data.queries[0];
-      if (!query.fields?.stream) {
-        this.$q.notify({
-          type: "negative",
-          message: this.t("panel.panelQueryMustHaveStream"),
-          timeout: 2000,
-        });
-        return;
-      }
-
-      const unsupportedTypes = ["markdown", "html", "geomap", "sankey"];
-      if (unsupportedTypes.includes(this.props.data.type)) {
-        this.$q.notify({
-          type: "warning",
-          message: this.t("panel.unsupportedPanelTypeAlert", {
-            type: this.props.data.type,
-          }),
-          timeout: 3000,
-        });
-      }
-
-      const panelData = {
+    /**
+     * The panel's contribution to alert creation: a pure snapshot in, an
+     * AlertPrefill out. Everything downstream — the confirm dialog, the
+     * transport, the form — is shared with every other surface.
+     */
+    buildPanelAlertPrefill() {
+      return buildPrefillFromPanel({
         panelTitle: this.props.data.title,
+        panelId: this.props.data.id,
         panelType: this.props.data.type,
         queries: this.props.data.queries || [],
         queryType: this.props.data.queryType,
-        metadata: this.metaData,
         timeRange: this.props.selectedTimeDate,
-      };
-
-      const encodedData = encodeURIComponent(JSON.stringify(panelData));
-      this.$router.push({
-        name: "addAlert",
-        query: {
-          org_identifier: this.store.state.selectedOrganization.identifier,
-          folder: "default",
-          fromPanel: "true",
-          panelData: encodedData,
-        },
       });
     },
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.panelcontainer {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.drag-allow {
-  flex-shrink: 0;
-}
-
-.panel-variables-wrapper {
-  flex-shrink: 0;
-}
-
-.panel-chart-wrapper {
-  flex: 1;
-  min-height: 0;
-}
-
-.panelHeader {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.warning {
-  color: var(--q-warning);
-}
-</style>

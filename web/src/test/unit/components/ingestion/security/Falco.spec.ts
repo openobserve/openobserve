@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,14 +16,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createStore } from "vuex";
-import { Quasar } from "quasar";
 import Falco from "@/components/ingestion/security/Falco.vue";
 
 // Mock useIngestion composable
 vi.mock("@/composables/useIngestion", () => ({
   default: vi.fn(() => ({
     endpoint: "https://api.example.com/ingest",
-    securityContent: "curl -X POST https://api.example.com/ingest -d '{\"stream\": \"[STREAM_NAME]\"}' ",
+    securityContent:
+      'curl -X POST https://api.example.com/ingest -d \'{"stream": "[STREAM_NAME]"}\' ',
     securityDocURLs: {
       falco: "https://docs.example.com/falco",
     },
@@ -46,7 +46,7 @@ describe("Falco.vue", () => {
   const mountComponent = () => {
     return mount(Falco, {
       global: {
-        plugins: [store, Quasar],
+        plugins: [store],
         stubs: {
           CopyContent: {
             template: '<div data-test="copy-content-stub">{{ content }}</div>',

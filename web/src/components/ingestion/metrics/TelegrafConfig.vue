@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,17 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pa-sm">
-    <CopyContent :content="content" />
-  </div>
+  <IngestionContent>
+    <CopyContent :content="raw(content)" />
+  </IngestionContent>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { raw } from "@/types/i18n";
+import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
+import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 
 export default defineComponent({
   name: "traces-otlp",
@@ -37,8 +39,8 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent },
-  setup(props) {
+  components: { CopyContent, IngestionContent },
+  setup() {
     const store = useStore();
     const endpoint: any = ref({
       url: "",
@@ -64,6 +66,7 @@ export default defineComponent({
 
     // Expose for testing
     return {
+      raw,
       store,
       config,
       endpoint,

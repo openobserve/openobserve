@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -84,5 +84,16 @@ mod tests {
     fn test_bytes_to_human_readable_decimal_precision() {
         assert_eq!(bytes_to_human_readable(1024.0 * 1.234), "1.23 KB");
         assert_eq!(bytes_to_human_readable(1024.0 * 1024.0 * 1.234), "1.23 MB");
+    }
+
+    #[test]
+    fn test_bytes_to_human_readable_exabytes() {
+        let eb = 1024.0f64.powi(6);
+        assert_eq!(bytes_to_human_readable(eb), "1.00 EB");
+    }
+
+    #[test]
+    fn test_bytes_to_human_readable_sub_byte() {
+        assert_eq!(bytes_to_human_readable(0.5), "0.50 B");
     }
 }

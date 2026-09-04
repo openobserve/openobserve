@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,236 +15,201 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div>
-    <div class="tw:px-[0.625rem] tw:py-[0.1rem]">
-      <div class="card-container tw:mb-[0.625rem]">
-        <!-- Header -->
-        <div
-          class="insights-header flex justify-between items-center"
-        >
-          <div class="flex items-center">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              icon="arrow_back_ios_new"
-              class="hideOnPrintMode el-border"
-              @click="goBack"
-              data-test="alert-insights-back-btn"
-            />
-            <div class="q-table__title tw:font-[600] q-ml-sm">{{ t("alerts.insights.title") }}</div>
-          </div>
+  <OPageLayout
+    :title="t('alerts.insights.title')"
+    :back="{ label: t('menu.alerts'), onClick: goBack, dataTest: 'alert-insights-back-btn' }"
+    tabs-below
+    bleed
+  >
+    <template #actions>
+      <date-time
+        ref="dateTimeRef"
+        auto-apply
+        :default-type="dateTimeType"
+        :default-absolute-time="{
+          startTime: timeRange.__global.start_time.getTime(),
+          endTime: timeRange.__global.end_time.getTime(),
+        }"
+        :default-relative-time="relativeTime"
+        @on:date-change="updateDateTime"
+        @on:timezone-change="updateTimezone"
+        data-test="alert-insights-datetime"
+      />
 
-          <div class="flex items-center">
-            <date-time
-              ref="dateTimeRef"
-              auto-apply
-              :default-type="dateTimeType"
-              :default-absolute-time="{
-                startTime: timeRange.__global.start_time.getTime(),
-                endTime: timeRange.__global.end_time.getTime(),
-              }"
-              :default-relative-time="relativeTime"
-              @on:date-change="updateDateTime"
-              @on:timezone-change="updateTimezone"
-              class="datetime-picker"
-              data-test="alert-insights-datetime"
-            />
+      <OButton
+        @click="refreshDashboard"
+        :loading="isLoading"
+        variant="ghost"
+        size="icon-sm"
+        data-test="alert-insights-refresh-btn"
+      >
+        <OIcon name="refresh" size="sm" />
+        <OTooltip :content="t('common.refresh')" />
+      </OButton>
+    </template>
 
-            <q-btn
-              icon="refresh"
-              @click="refreshDashboard"
-              :loading="isLoading"
-              class="q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border"
-              size="sm"
-              data-test="alert-insights-refresh-btn"
-            >
-              <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
-            </q-btn>
-          </div>
-        </div>
+    <template #header-tabs>
+      <OTabs v-model="currentTab" dense align="left" data-test="alert-insights-tabs">
+        <OTab
+          name="overview"
+          :label="t('alerts.insights.tabs.overview')"
+          data-test="tab-overview"
+        />
+        <OTab
+          v-if="isEnterprise"
+          name="frequency"
+          :label="t('alerts.insights.tabs.frequency')"
+          data-test="tab-frequency"
+        />
+        <OTab
+          v-if="isEnterprise"
+          name="correlation"
+          :label="t('alerts.insights.tabs.correlation')"
+          data-test="tab-correlation"
+        />
+        <OTab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
+      </OTabs>
+    </template>
 
-        <!-- Tabs -->
-        <q-tabs
-          v-model="currentTab"
-          dense
-          class="alert-insights-tabs q-ml-sm"
-          indicator-color="primary"
-          align="left"
-          data-test="alert-insights-tabs"
-        >
-          <q-tab name="overview" :label="t('alerts.insights.tabs.overview')" data-test="tab-overview" />
-          <q-tab
-            v-if="isEnterprise"
-            name="frequency"
-            :label="t('alerts.insights.tabs.frequency')"
-            data-test="tab-frequency"
-          />
-          <q-tab
-            v-if="isEnterprise"
-            name="correlation"
-            :label="t('alerts.insights.tabs.correlation')"
-            data-test="tab-correlation"
-          />
-          <q-tab name="quality" :label="t('alerts.insights.tabs.quality')" data-test="tab-quality" />
-        </q-tabs>
+    <!-- Filters Section -->
+    <div
+      v-if="show"
+      class="px-page-edge border-border-default flex shrink-0 flex-wrap items-center gap-2 border-b py-3"
+    >
+      <span class="relative top-1 text-sm font-semibold">{{ t("common.filters") }}:</span>
 
-        <!-- Filters Section -->
-        <div
-          v-if="show"
-          class="filters-section tw:flex tw:items-center tw:gap-2 tw:flex-wrap"
-        >
-          <span class="filter-label">{{ t("common.filters") }}:</span>
+      <!-- Failed Only Toggle -->
+      <OSwitch
+        v-model="showFailedOnly"
+        :label="t('alerts.insights.filters.failedOnly')"
+        class="o2-toggle-button-sm"
+        @update:model-value="onFilterChange"
+        data-test="failed-only-toggle"
+      >
+        <OTooltip :content="t('alerts.insights.filters.failedOnlyTooltip')"> </OTooltip>
+      </OSwitch>
 
-          <!-- Failed Only Toggle -->
-          <q-toggle
-            v-model="showFailedOnly"
-            :label="t('alerts.insights.filters.failedOnly')"
-            class="o2-toggle-button-sm"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
-            @update:model-value="onFilterChange"
-            data-test="failed-only-toggle"
-          >
-            <q-tooltip>{{ t("alerts.insights.filters.failedOnlyTooltip") }}</q-tooltip>
-          </q-toggle>
+      <!-- Silenced Only Toggle -->
+      <OSwitch
+        v-model="showSilencedOnly"
+        :label="t('alerts.insights.filters.silenced')"
+        class="o2-toggle-button-sm"
+        @update:model-value="onFilterChange"
+        data-test="silenced-only-toggle"
+      >
+        <OTooltip :content="t('alerts.insights.filters.silencedTooltip')"> </OTooltip>
+      </OSwitch>
 
-          <!-- Silenced Only Toggle -->
-          <q-toggle
-            v-model="showSilencedOnly"
-            :label="t('alerts.insights.filters.silenced')"
-            class="o2-toggle-button-sm"
-            :class="store.state.theme === 'dark' ? 'o2-toggle-button-sm-dark' : 'o2-toggle-button-sm-light'"
-            @update:model-value="onFilterChange"
-            data-test="silenced-only-toggle"
-          >
-            <q-tooltip>{{ t("alerts.insights.filters.silencedTooltip") }}</q-tooltip>
-          </q-toggle>
-
-          <!-- Range Filter Chips -->
-          <div
-            v-for="[panelId, filter] in rangeFilters"
-            :key="panelId"
-            class="filter-chip tw:rounded tw:flex tw:items-center"
-            :class="
-              store.state.theme === 'dark'
-                ? 'tw:bg-indigo-900 tw:text-indigo-100'
-                : 'tw:bg-blue-100 tw:text-blue-800'
-            "
-            data-test="range-filter-chip"
-          >
-            <span class="chip-label">
-              {{ filter.panelTitle }}
-              <span v-if="filter.start !== null && filter.end !== null">
-                {{ formatFilterValue(filter.start) }} -
-                {{ formatFilterValue(filter.end) }}
-              </span>
-              <span v-else-if="filter.start !== null">
-                >= {{ formatFilterValue(filter.start) }}
-              </span>
-              <span v-else-if="filter.end !== null">
-                <= {{ formatFilterValue(filter.end) }}
-              </span>
-            </span>
-            <q-icon
-              name="close"
-              class="chip-close-icon tw:cursor-pointer"
-              @click="removeRangeFilter(panelId)"
-            />
-          </div>
-
-          <!-- Clear All Filters -->
-          <q-btn
-            v-if="hasActiveFilters"
-            flat
-            dense
-            size="sm"
-            class="clear-filters-btn"
-            :label="t('alerts.insights.filters.clearAll')"
-            icon="clear"
-            @click="clearAllFilters"
-            data-test="clear-all-filters-btn"
-          />
-        </div>
+      <!-- Range Filter Chips -->
+      <div
+        v-for="[panelId, filter] in rangeFilters"
+        :key="panelId"
+        class="rounded-default bg-status-info-bg text-status-info-text inline-flex cursor-default items-center px-3 py-1 text-sm"
+        data-test="range-filter-chip"
+      >
+        <span class="chip-label">
+          {{ filter.panelTitle }}
+          <span v-if="filter.start !== null && filter.end !== null">
+            {{ formatFilterValue(filter.start) }} -
+            {{ formatFilterValue(filter.end) }}
+          </span>
+          <span v-else-if="filter.start !== null"> >= {{ formatFilterValue(filter.start) }} </span>
+          <span v-else-if="filter.end !== null"> &lt;= {{ formatFilterValue(filter.end) }} </span>
+        </span>
+        <OIcon
+          name="close"
+          size="sm"
+          class="ms-2 cursor-pointer text-sm opacity-70 transition-opacity duration-200 hover:opacity-100"
+          @click="removeRangeFilter(panelId)"
+        />
       </div>
+
+      <!-- Clear All Filters -->
+      <OButton
+        v-if="hasActiveFilters"
+        variant="ghost"
+        size="sm"
+        class="ms-2"
+        @click="clearAllFilters"
+        data-test="clear-all-filters-btn"
+        icon-left="close"
+      >
+        {{ t("alerts.insights.filters.clearAll") }}
+      </OButton>
     </div>
 
     <!-- Action Buttons Row -->
     <div
       v-if="selectedAlertForAction"
-      class="action-buttons-row tw:bg-primary tw:bg-opacity-10 tw:flex tw:items-center"
+      class="bg-primary bg-opacity-10 border-border-default flex shrink-0 items-center gap-3 border-b px-4 py-3"
       data-test="action-buttons-row"
     >
-      <q-icon name="campaign" color="primary" size="sm" />
-      <span class="tw:text-sm tw:font-medium"
-        >{{ t("alerts.insights.actions.actionsFor") }} <strong>{{ selectedAlertForAction }}</strong></span
+      <OIcon name="campaign" size="sm" />
+      <span class="text-sm font-medium"
+        >{{ t("alerts.insights.actions.actionsFor") }}
+        <strong>{{ selectedAlertForAction }}</strong></span
       >
 
-      <q-btn
-        flat
-        dense
-        color="primary"
-        icon="settings"
-        :label="t('alerts.insights.actions.configureDedup')"
+      <OButton
+        variant="ghost-primary"
+        size="sm"
         @click="openDedupConfig"
         data-test="configure-dedup-btn"
+        icon-left="settings"
       >
-        <q-tooltip>{{ t("alerts.insights.actions.configureDedupTooltip") }}</q-tooltip>
-      </q-btn>
+        {{ t("alerts.insights.actions.configureDedup") }}
+        <OTooltip :content="t('alerts.insights.actions.configureDedupTooltip')" />
+      </OButton>
 
-      <q-btn
-        flat
-        dense
-        color="primary"
-        icon="edit"
-        :label="t('alerts.insights.actions.editAlert')"
+      <OButton
+        variant="ghost-primary"
+        size="sm"
         @click="editAlert"
         data-test="edit-alert-btn"
+        icon-left="edit"
       >
-        <q-tooltip>{{ t("alerts.insights.actions.editAlertTooltip") }}</q-tooltip>
-      </q-btn>
+        {{ t("alerts.insights.actions.editAlert") }}
+        <OTooltip :content="t('alerts.insights.actions.editAlertTooltip')" />
+      </OButton>
 
-      <q-btn
-        flat
-        dense
-        color="primary"
-        icon="history"
-        :label="t('alerts.insights.actions.viewHistory')"
+      <OButton
+        variant="ghost-primary"
+        size="sm"
         @click="viewHistory"
         data-test="view-history-btn"
+        icon-left="history"
       >
-        <q-tooltip>{{ t("alerts.insights.actions.viewHistoryTooltip") }}</q-tooltip>
-      </q-btn>
+        {{ t("alerts.insights.actions.viewHistory") }}
+        <OTooltip :content="t('alerts.insights.actions.viewHistoryTooltip')" />
+      </OButton>
 
-      <q-space />
+      <div class="flex-1" />
 
-      <q-btn
-        flat
-        dense
-        round
-        icon="close"
+      <OButton
+        variant="ghost"
+        size="icon-circle-sm"
         @click="selectedAlertForAction = null"
         data-test="close-actions-btn"
       >
-        <q-tooltip>Close actions</q-tooltip>
-      </q-btn>
+        <OIcon name="close" size="sm" />
+        <OTooltip :content="t('alerts.insights.actions.closeActions')" />
+      </OButton>
     </div>
 
     <!-- Dashboard Content -->
-    <div class="tw:w-full tw:h-full tw:px-[0.625rem] tw:pb-[0.625rem]">
-      <div class="card-container tw:mb-[0.625rem] tw:h-[calc(100vh-208px)]">
-        <div
-          @contextmenu="handleNativeContextMenu"
-        >
-          <div v-show="isLoading" class="loading-container flex items-center justify-center">
-            <q-spinner-hourglass color="primary" size="40px" />
-            <div class="q-ml-md">Loading insights...</div>
+    <div class="min-h-0 flex-1 px-2.5 pb-2.5">
+      <div class="bg-card-glass-bg mb-2.5 h-[calc(100vh-13rem)]">
+        <div @contextmenu="handleNativeContextMenu">
+          <div v-show="isLoading" class="flex h-100 items-center justify-center">
+            <OSpinner size="md" />
+            <div class="ms-3">{{ t("alerts.insights.loading.insights") }}</div>
           </div>
 
-          <div :style="{ visibility: isLoading ? 'hidden' : 'visible' }">
-            <div v-if="!dashboardData" class="loading-message">
+          <div :class="isLoading ? 'invisible' : 'visible'">
+            <div v-if="!dashboardData" class="text-text-muted p-5 text-center">
               {{ t("alerts.insights.loading.dashboardConfig") }}
             </div>
-            <div v-else-if="!show" class="loading-message">
+            <div v-else-if="!show" class="text-text-muted p-5 text-center">
               {{ t("alerts.insights.loading.refreshing") }}
             </div>
             <RenderDashboardCharts
@@ -278,15 +243,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @edit-alert="handleEditAlert"
       @view-history="handleViewHistory"
     />
-  </div>
+  </OPageLayout>
 </template>
 
 <script setup lang="ts">
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
 import { ref, computed, onMounted, watch, nextTick, reactive, provide } from "vue";
 import { useRouter, useRoute } from "vue-router";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import dateTime from "@/components/DateTimePickerDashboard.vue";
 import AlertInsightsContextMenu from "./AlertInsightsContextMenu.vue";
@@ -295,12 +263,17 @@ import { convertDashboardSchemaVersion } from "@/utils/dashboard/convertDashboar
 import insightsConfig from "@/utils/alerts/insights-metrics.json";
 import config from "@/aws-exports";
 import alertsService from "@/services/alerts";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import type { ToastOptions } from "@/lib/feedback/Toast/OToast.types";
 
 const router = useRouter();
 const route = useRoute();
 const store = useStore();
-const $q = useQuasar();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Check if enterprise features are enabled
 const isEnterprise = config.isEnterprise === "true";
@@ -331,7 +304,14 @@ const alertsList = ref<any[]>([]); // Cache alerts list
 provide("selectedTabId", currentTab);
 
 // Context menu
-const contextMenu = reactive({
+const contextMenu = reactive<{
+  show: boolean;
+  x: number;
+  y: number;
+  value: number | string;
+  panelTitle: string;
+  panelId: string;
+}>({
   show: false,
   x: 0,
   y: 0,
@@ -370,9 +350,7 @@ const loadDashboard = () => {
   const org = store.state.selectedOrganization.identifier;
 
   // Find the current tab
-  const currentTabData = config.tabs?.find(
-    (tab: any) => tab.tabId === currentTab.value
-  );
+  const currentTabData = config.tabs?.find((tab: any) => tab.tabId === currentTab.value);
 
   if (!currentTabData) {
     dashboardData.value = config;
@@ -387,9 +365,7 @@ const loadDashboard = () => {
 
         // Build base filters that always apply
         // Note: module = 'alert' is now hardcoded in all queries in insights-metrics.json
-        const mandatoryFilters = [
-          `org = '${org}'`
-        ];
+        const mandatoryFilters = [`org = '${org}'`];
 
         // Combine with user filters
         const allFilters = [...mandatoryFilters, ...baseFilters];
@@ -436,29 +412,31 @@ const fetchAlerts = async () => {
       "name",
       false,
       "",
-      store.state.selectedOrganization.identifier,//store.state.selectedOrganization.identifier,
+      store.state.selectedOrganization.identifier, //store.state.selectedOrganization.identifier,
       "", // Empty folder to get all alerts
-      ""
+      "",
     );
     alertsList.value = res.data.list || [];
   } catch (error) {
-    $q.notify({
-      type: "negative",
-      message: "Failed to load alerts",
-      timeout: 2000,
+    toast({
+      variant: "error",
+      message: t("toastMessages.alerts.failedToLoadAlerts"),
     });
   }
 };
 
 const goBack = () => {
-  router.push({ name: "alertList", query: { org_identifier: store.state.selectedOrganization.identifier } });
+  router.push({
+    name: "alertList",
+    query: { org_identifier: store.state.selectedOrganization.identifier },
+  });
 };
 
 const updateDateTime = (value: any) => {
   timeRange.value = {
     __global: {
-      start_time: new Date(value.startTime ),
-      end_time: new Date(value.endTime ),
+      start_time: new Date(value.startTime),
+      end_time: new Date(value.endTime),
     },
   };
 
@@ -472,7 +450,7 @@ const updateDateTime = (value: any) => {
   refreshDashboard();
 };
 
-const updateTimezone = (value: any) => {
+const updateTimezone = () => {
   // Handle timezone changes if needed
   // Currently the date-time component manages timezone internally
   // This is here for compatibility with the logs date picker
@@ -503,7 +481,7 @@ const onDataZoom = (data: any) => {
 
   addRangeFilter({
     panelId,
-    panelTitle: "Alert Volume Over Time",
+    panelTitle: t("alerts.insights.alertVolumeOverTime"),
     start,
     end,
   });
@@ -513,14 +491,14 @@ const onDataZoom = (data: any) => {
 
 const handleNativeContextMenu = (event: MouseEvent) => {
   // Only handle context menu on Frequency & Dedup tab
-  if (currentTab.value !== 'frequency') {
+  if (currentTab.value !== "frequency") {
     return; // Let other handlers or default behavior work
   }
 
   const target = event.target as HTMLElement;
 
   // Find if we clicked on a table cell
-  const tableCell = target.closest('td');
+  const tableCell = target.closest("td");
   if (!tableCell) {
     return; // Not a table cell, let default behavior work
   }
@@ -530,7 +508,7 @@ const handleNativeContextMenu = (event: MouseEvent) => {
 
   // Extract alert name (remove the /unique_id part)
   // Format: alert_name/unique_id -> alert_name
-  const alertName = alertKey?.split('/')[0];
+  const alertName = alertKey?.split("/")[0];
 
   // Check if this is the "Alert Key" column (first column in Dedup table)
   const cellIndex = Array.from(tableCell.parentElement?.children || []).indexOf(tableCell);
@@ -543,16 +521,14 @@ const handleNativeContextMenu = (event: MouseEvent) => {
 
     // Find the panel title from dashboard data
     const currentTabData = dashboardData.value?.tabs?.[0];
-    const dedupPanel = currentTabData?.panels?.find((p: any) =>
-      p.title?.includes('Dedup')
-    );
+    const dedupPanel = currentTabData?.panels?.find((p: any) => p.title?.includes("Dedup"));
 
     contextMenu.show = true;
     contextMenu.x = event.clientX;
     contextMenu.y = event.clientY;
     contextMenu.value = alertName;
-    contextMenu.panelId = dedupPanel?.id || '';
-    contextMenu.panelTitle = dedupPanel?.title || 'Dedup Impact Analysis';
+    contextMenu.panelId = dedupPanel?.id || "";
+    contextMenu.panelTitle = dedupPanel?.title || raw("Dedup Impact Analysis");
   }
   // If not first column or no alert name, let default context menu show
 };
@@ -599,10 +575,12 @@ const handleConfigureDedup = async (alertName: string) => {
     const alert = alertsList.value.find((a: any) => a.name === alertName);
 
     if (!alert) {
-      $q.notify({
-        type: "negative",
-        message: `Alert "${alertName}" not found in ${alertsList.value.length} alerts`,
-        timeout: 3000,
+      toast({
+        variant: "error",
+        message: t("toastMessages.alerts.alertNotFoundInAlerts", {
+          name: alertName,
+          count: alertsList.value.length,
+        }),
       });
       return;
     }
@@ -620,10 +598,9 @@ const handleConfigureDedup = async (alertName: string) => {
       },
     });
   } catch (error) {
-    $q.notify({
-      type: "negative",
-      message: "Failed to navigate to alert",
-      timeout: 2000,
+    toast({
+      variant: "error",
+      message: t("toastMessages.alerts.failedToNavigateToAlert"),
     });
   }
 };
@@ -634,10 +611,9 @@ const handleEditAlert = async (alertName: string) => {
     const alert = alertsList.value.find((a: any) => a.name === alertName);
 
     if (!alert) {
-      $q.notify({
-        type: "negative",
-        message: "Alert not found",
-        timeout: 2000,
+      toast({
+        variant: "error",
+        message: t("toastMessages.alerts.alertNotFound"),
       });
       return;
     }
@@ -653,10 +629,9 @@ const handleEditAlert = async (alertName: string) => {
       },
     });
   } catch (error) {
-    $q.notify({
-      type: "negative",
-      message: "Failed to navigate to alert",
-      timeout: 2000,
+    toast({
+      variant: "error",
+      message: t("toastMessages.alerts.failedToNavigateToAlert"),
     });
   }
 };
@@ -680,11 +655,12 @@ const formatFilterValue = (value: number): string => {
 
 // Action button methods
 const openDedupConfig = () => {
-  $q.notify({
-    type: "info",
-    message: `Opening dedup configuration for: ${selectedAlertForAction.value}`,
+  // `caption` predates OToast and is not rendered; cast keeps the object untouched.
+  toast({
+    variant: "info",
+    message: t("toastMessages.alerts.openingDedupConfig", { name: selectedAlertForAction.value }),
     caption: "This would navigate to alert edit page with dedup section focused",
-  });
+  } as unknown as ToastOptions);
 
   // TODO: Navigate to alert edit page with dedup section
   // router.push({
@@ -695,11 +671,11 @@ const openDedupConfig = () => {
 };
 
 const editAlert = () => {
-  $q.notify({
-    type: "info",
-    message: `Editing alert: ${selectedAlertForAction.value}`,
+  toast({
+    variant: "info",
+    message: t("toastMessages.alerts.editingAlert", { name: selectedAlertForAction.value }),
     caption: "This would navigate to alert edit page",
-  });
+  } as unknown as ToastOptions);
 
   // TODO: Navigate to alert edit page
   // router.push({
@@ -707,7 +683,6 @@ const editAlert = () => {
   //   params: { alertName: selectedAlertForAction.value }
   // });
 };
-const org = 'default'
 const viewHistory = () => {
   // Navigate to alert history with filter
   router.push({
@@ -750,93 +725,3 @@ onMounted(async () => {
   isLoading.value = false;
 });
 </script>
-
-<style scoped lang="scss">
-.alert-insights-container {
-  height: calc(100vh - 65px);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.insights-header {
-  padding: 0.5rem 1rem;
-}
-
-.back-btn {
-  margin-right: 0.5rem;
-}
-
-.insights-title {
-  font-size: 1.25rem;
-  font-weight: 500;
-}
-
-.datetime-picker {
-  margin-right: 0.5rem;
-}
-
-.alert-insights-tabs {
-  :deep(.q-tab__label) {
-    text-transform: none !important;
-  }
-}
-
-.filters-section {
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid var(--q-border-color);
-}
-
-.filter-label {
-  font-size: 0.875rem;
-  font-weight: 600;
-  position: relative;
-  top: 4px;
-}
-
-.filter-chip {
-  display: inline-flex;
-  align-items: center;
-  padding: 0.25rem 0.75rem;
-  font-size: 0.875rem;
-  cursor: default;
-
-  .chip-close-icon {
-    font-size: 0.875rem;
-    margin-left: 0.5rem;
-    cursor: pointer;
-    opacity: 0.7;
-    transition: opacity 0.2s;
-
-    &:hover {
-      opacity: 1;
-    }
-  }
-}
-
-.clear-filters-btn {
-  margin-left: 0.5rem;
-}
-
-.action-buttons-row {
-  padding: 0.75rem 1rem;
-  gap: 0.75rem;
-  border-bottom: 1px solid var(--q-border-color);
-}
-
-.dashboard-content {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-.loading-container {
-  height: 25rem;
-}
-
-.loading-message {
-  padding: 1.25rem;
-  text-align: center;
-  color: #666;
-}
-</style>

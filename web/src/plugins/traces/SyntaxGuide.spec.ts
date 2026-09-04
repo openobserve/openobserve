@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+﻿// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,17 +13,11 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import SyntaxGuide from "@/plugins/traces/SyntaxGuide.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
@@ -51,32 +45,27 @@ describe("SyntaxGuide", () => {
 
   afterEach(() => {
     wrapper.unmount();
-    // Clean up any menus that might be attached to document body
-    const menus = document.querySelectorAll(".q-menu");
-    menus.forEach((menu) => menu.remove());
+    // Clean up any portaled ODropdown content attached to document body.
+    document.querySelectorAll('[data-test="syntax-guide-menu"]').forEach((menu) => menu.remove());
+    document
+      .querySelectorAll("[data-reka-popper-content-wrapper]")
+      .forEach((menu) => menu.remove());
   });
 
   describe("Component Rendering", () => {
     it("should render the syntax guide button", () => {
-      expect(wrapper.find('[data-cy="syntax-guide-button"]').exists()).toBe(
-        true,
-      );
-    });
-
-    it("should render button with help icon text", () => {
-      const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      // Button text comes from the icon name
-      expect(button.text()).toBe("help");
+      expect(wrapper.find('[data-cy="syntax-guide-button"]').exists()).toBe(true);
     });
 
     it("should render button with help icon", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.find(".q-icon").exists()).toBe(true);
+      // HelpCircle (lucide) renders as an SVG inside the button
+      expect(button.find("svg").exists()).toBe(true);
     });
 
     it("should have correct button classes", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      expect(button.classes()).toContain("syntax-guide-button");
+      // traces SyntaxGuide uses OButton with only mode class (no syntax-guide-button class)
       expect(button.classes()).toContain("normal-mode");
     });
   });
@@ -112,11 +101,16 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      // Menu is attached to document body, so we need to search in document
-      const menu = document.querySelector(".q-menu");
+      // ODropdown content is portaled to document.body; the migrated component
+      // wraps the panel in a div with data-test="syntax-guide-menu".
+      const menu = document.querySelector('[data-test="syntax-guide-menu"]');
       expect(menu).toBeTruthy();
 
-      const title = document.querySelector(".syntax-guide-title .label");
+      // The .syntax-guide-title hook was removed when the rule moved to template
+
+      // utilities; the title still renders as .label inside the menu panel.
+
+      const title = document.querySelector('[data-test="syntax-guide-menu"] .label');
       expect(title?.textContent).toBe("Syntax Guide");
     });
 
@@ -125,10 +119,12 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const guideList = document.querySelector(".guide-list");
+      // .guide-list hook removed with its rule; the list is the panel's own <ul>.
+
+      const guideList = document.querySelector('[data-test="syntax-guide-menu"] ul');
       expect(guideList).toBeTruthy();
 
-      const listItems = document.querySelectorAll(".guide-list li");
+      const listItems = document.querySelectorAll('[data-test="syntax-guide-menu"] ul li');
       expect(listItems.length).toBeGreaterThan(0);
 
       // Check for specific normal mode content
@@ -145,9 +141,7 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const link = document.querySelector(
-        'a[href="https://openobserve.ai/docs/example-queries/"]',
-      );
+      const link = document.querySelector('a[href="https://openobserve.ai/docs/example-queries/"]');
       expect(link).toBeTruthy();
       expect(link?.getAttribute("target")).toBe("_blank");
     });
@@ -164,7 +158,11 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const title = document.querySelector(".syntax-guide-title .label");
+      // The .syntax-guide-title hook was removed when the rule moved to template
+
+      // utilities; the title still renders as .label inside the menu panel.
+
+      const title = document.querySelector('[data-test="syntax-guide-menu"] .label');
       expect(title?.textContent).toBe("Syntax Guide: SQL Mode");
     });
 
@@ -173,23 +171,21 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const guideList = document.querySelector(".guide-list");
+      // .guide-list hook removed with its rule; the list is the panel's own <ul>.
+
+      const guideList = document.querySelector('[data-test="syntax-guide-menu"] ul');
       expect(guideList).toBeTruthy();
 
-      const listItems = document.querySelectorAll(".guide-list li");
+      const listItems = document.querySelectorAll('[data-test="syntax-guide-menu"] ul li');
       expect(listItems.length).toBeGreaterThan(0);
 
       // Check for specific SQL mode content
       const text = document.body.textContent || "";
       expect(text).toContain("SELECT * FROM stream WHERE match_all('error')");
-      expect(text).toContain(
-        "SELECT * FROM stream WHERE str_match(fieldname, 'error')",
-      );
+      expect(text).toContain("SELECT * FROM stream WHERE str_match(fieldname, 'error')");
       expect(text).toContain("SELECT * FROM stream WHERE code=200");
       expect(text).toContain("SELECT * FROM stream WHERE stream='stderr'");
-      expect(text).toContain(
-        "SELECT extract_ip(log) FROM stream WHERE code=200",
-      );
+      expect(text).toContain("SELECT extract_ip(log) FROM stream WHERE code=200");
     });
 
     it("should contain link to documentation in SQL mode", async () => {
@@ -197,9 +193,7 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const link = document.querySelector(
-        'a[href="https://openobserve.ai/docs/example-queries/"]',
-      );
+      const link = document.querySelector('a[href="https://openobserve.ai/docs/example-queries/"]');
       expect(link).toBeTruthy();
       expect(link?.getAttribute("target")).toBe("_blank");
     });
@@ -211,7 +205,9 @@ describe("SyntaxGuide", () => {
       await button.trigger("click");
       await flushPromises();
 
-      const menu = document.querySelector(".q-menu");
+      // ODropdown portals content to document.body; the wrapper div is tagged
+      // with data-test="syntax-guide-menu" in the migrated source.
+      const menu = document.querySelector('[data-test="syntax-guide-menu"]');
       expect(menu).toBeTruthy();
     });
   });
@@ -219,12 +215,9 @@ describe("SyntaxGuide", () => {
   describe("Styling and Classes", () => {
     it("should have correct button styling classes", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      // Button classes have been updated to use Tailwind CSS
-      // q-ml-xs has been removed, but q-pa-xs and syntax-guide-button remain
-      expect(button.classes()).toContain("q-pa-xs");
-      expect(button.classes()).toContain("syntax-guide-button");
-      // Verify Tailwind classes are present
-      expect(button.classes()).toContain("tw:cursor-pointer");
+      // OButton uses Tailwind CSS classes; mode class is applied via :class binding
+      expect(button.exists()).toBe(true);
+      expect(button.classes()).toContain("normal-mode");
     });
   });
 
@@ -236,8 +229,7 @@ describe("SyntaxGuide", () => {
 
     it("should have tooltip component for accessibility", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      // Check that QTooltip component is present as a child
-      const tooltipComponent = button.findComponent({ name: "QTooltip" });
+      const tooltipComponent = button.findComponent({ name: "OTooltip" });
       expect(tooltipComponent.exists()).toBe(true);
     });
   });
@@ -245,8 +237,7 @@ describe("SyntaxGuide", () => {
   describe("Component Integration", () => {
     it("should work with i18n translations", () => {
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
-      // Check that QTooltip component is present
-      const tooltipComponent = button.findComponent({ name: "QTooltip" });
+      const tooltipComponent = button.findComponent({ name: "OTooltip" });
       expect(tooltipComponent.exists()).toBe(true);
     });
 
@@ -275,6 +266,175 @@ describe("SyntaxGuide", () => {
 
       const button = wrapper.find('[data-cy="syntax-guide-button"]');
       expect(button.classes()).toContain("normal-mode");
+    });
+  });
+
+  // ─── New tests covering functionality added after Dec 29 2025 ───────────────
+
+  // Theming contract: `.dark` on <html> + --color-* tokens that flip
+  // automatically. The menu no longer carries a per-theme root class; it is
+  // styled solely by `.syntax-guide-menu` + tokens. These tests assert what the
+  // menu renders now AND guard that the legacy mechanism has not come back.
+  describe("Menu theme class", () => {
+    afterEach(() => {
+      store.state.theme = "dark"; // restore shared store default
+      document.querySelectorAll('[data-test="syntax-guide-menu"]').forEach((m) => m.remove());
+      document.querySelectorAll("[data-reka-popper-content-wrapper]").forEach((m) => m.remove());
+    });
+
+    it("should style the menu with tokens, not a theme-light class, when store theme is light", async () => {
+      store.state.theme = "light";
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const menu = document.querySelector('[data-test="syntax-guide-menu"]');
+      expect(menu).not.toBeNull();
+      expect(menu?.classList.contains("syntax-guide-menu")).toBe(true);
+      expect(menu?.classList.contains("theme-light")).toBe(false);
+      expect(menu?.classList.contains("light-mode")).toBe(false);
+    });
+
+    it("should style the menu with tokens, not a theme-dark class, when store theme is dark", async () => {
+      store.state.theme = "dark";
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const menu = document.querySelector('[data-test="syntax-guide-menu"]');
+      expect(menu).not.toBeNull();
+      expect(menu?.classList.contains("syntax-guide-menu")).toBe(true);
+      expect(menu?.classList.contains("theme-dark")).toBe(false);
+      expect(menu?.classList.contains("dark-mode")).toBe(false);
+    });
+
+    it("should render the same menu classes regardless of store theme", async () => {
+      // Theme is not a render input for the menu: its class list must be
+      // identical across themes, since the visual difference comes from
+      // --color-* token values resolved in CSS.
+      const classesForTheme = async (theme: string) => {
+        store.state.theme = theme;
+        const w = mount(SyntaxGuide, {
+          attachTo: "#app",
+          props: { sqlmode: false },
+          global: { provide: { store }, plugins: [i18n] },
+        });
+        await flushPromises();
+        await w.find('[data-cy="syntax-guide-button"]').trigger("click");
+        await flushPromises();
+        const menu = document.querySelector('[data-test="syntax-guide-menu"]');
+        const classes = [...(menu?.classList ?? [])].sort().join(" ");
+        w.unmount();
+        document.querySelectorAll('[data-test="syntax-guide-menu"]').forEach((m) => m.remove());
+        return classes;
+      };
+
+      const light = await classesForTheme("light");
+      const dark = await classesForTheme("dark");
+
+      expect(light).toContain("syntax-guide-menu");
+      expect(dark).toBe(light);
+    });
+  });
+
+  describe("str_match_ignore_case only in normal mode", () => {
+    it("should contain str_match_ignore_case example only in normal mode", async () => {
+      await wrapper.setProps({ sqlmode: false });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const text = document.body.textContent || "";
+      expect(text).toContain("str_match_ignore_case");
+    });
+
+    it("should NOT contain str_match_ignore_case in SQL mode", async () => {
+      await wrapper.setProps({ sqlmode: true });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const text = document.body.textContent || "";
+      expect(text).not.toContain("str_match_ignore_case");
+    });
+  });
+
+  describe("extract_ip query function example only in SQL mode", () => {
+    afterEach(() => {
+      document.querySelectorAll('[data-test="syntax-guide-menu"]').forEach((m) => m.remove());
+      document.querySelectorAll("[data-reka-popper-content-wrapper]").forEach((m) => m.remove());
+    });
+
+    it("should contain extract_ip example in SQL mode", async () => {
+      await wrapper.setProps({ sqlmode: true });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const text = document.body.textContent || "";
+      expect(text).toContain("extract_ip");
+    });
+
+    it("should NOT contain extract_ip example in normal mode", async () => {
+      await wrapper.setProps({ sqlmode: false });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const text = document.body.textContent || "";
+      expect(text).not.toContain("extract_ip");
+    });
+  });
+
+  describe("sqlmode prop toggle between modes", () => {
+    afterEach(() => {
+      document.querySelectorAll('[data-test="syntax-guide-menu"]').forEach((m) => m.remove());
+      document.querySelectorAll("[data-reka-popper-content-wrapper]").forEach((m) => m.remove());
+    });
+
+    it("should switch button class from normal-mode to sql-mode dynamically", async () => {
+      await wrapper.setProps({ sqlmode: false });
+      let button = wrapper.find('[data-cy="syntax-guide-button"]');
+      expect(button.classes()).toContain("normal-mode");
+
+      await wrapper.setProps({ sqlmode: true });
+      button = wrapper.find('[data-cy="syntax-guide-button"]');
+      expect(button.classes()).toContain("sql-mode");
+    });
+
+    it("should switch button class from sql-mode back to normal-mode dynamically", async () => {
+      await wrapper.setProps({ sqlmode: true });
+      await wrapper.setProps({ sqlmode: false });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      expect(button.classes()).toContain("normal-mode");
+      expect(button.classes()).not.toContain("sql-mode");
+    });
+  });
+
+  describe("Documentation link present in both modes", () => {
+    afterEach(() => {
+      document.querySelectorAll('[data-test="syntax-guide-menu"]').forEach((m) => m.remove());
+      document.querySelectorAll("[data-reka-popper-content-wrapper]").forEach((m) => m.remove());
+    });
+
+    it("normal mode: docs link opens in new tab", async () => {
+      await wrapper.setProps({ sqlmode: false });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const link = document.querySelector('a[href="https://openobserve.ai/docs/example-queries/"]');
+      expect(link?.getAttribute("target")).toBe("_blank");
+    });
+
+    it("sql mode: docs link opens in new tab", async () => {
+      await wrapper.setProps({ sqlmode: true });
+      const button = wrapper.find('[data-cy="syntax-guide-button"]');
+      await button.trigger("click");
+      await flushPromises();
+
+      const link = document.querySelector('a[href="https://openobserve.ai/docs/example-queries/"]');
+      expect(link?.getAttribute("target")).toBe("_blank");
     });
   });
 });

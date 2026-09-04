@@ -1,0 +1,549 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
+import { nextTick } from "vue";
+import store from "@/test/unit/helpers/store";
+import i18n from "@/locales";
+
+// ── Module mocks (hoisted) ───────────────────────────────────────────────────
+
+const mockSaveToHistory = vi.fn().mockResolvedValue(55);
+
+vi.mock("@/composables/useChatHistory", () => ({
+  useChatHistory: vi.fn(() => ({
+    saveToHistory: mockSaveToHistory,
+    loadHistory: vi.fn().mockResolvedValue([]),
+    loadChat: vi.fn().mockResolvedValue(null),
+    deleteChatById: vi.fn().mockResolvedValue(true),
+    clearAllHistory: vi.fn().mockResolvedValue(true),
+    updateChatTitle: vi.fn().mockResolvedValue(true),
+  })),
+}));
+
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    getImageURL: vi.fn((path: string) => `/mocked/${path}`),
+    getUUIDv7: vi.fn(() => "test-session-uuid"),
+    generateTraceContext: vi.fn(() => ({ traceId: "mock-trace" })),
+  };
+});
+
+vi.mock("@/aws-exports", () => ({
+  default: { isEnterprise: "true", isCloud: "false" },
+}));
+
+// Component import must come after all vi.mock() declarations.
+import QueryEditor from "./QueryEditor.vue";
+import config from "@/aws-exports";
+
+// ── CodeQueryEditor stub ─────────────────────────────────────────────────────
+
+const codeQueryEditorStub = {
+  template: '<div data-test="code-query-editor" />',
+  props: [
+    "query",
+    "language",
+    "nlpMode",
+    "readOnly",
+    "keywords",
+    "suggestions",
+    "debounceTime",
+    "showAutoComplete",
+    "editorId",
+  ],
+  emits: [
+    "update:query",
+    "run-query",
+    "focus",
+    "blur",
+    "nlpModeDetected",
+    "generation-start",
+    "generation-end",
+    "generation-success",
+  ],
+};
+
+// ── Mount factory ────────────────────────────────────────────────────────────
+
+function mountQueryEditor(props: Record<string, unknown> = {}) {
+  return mount(QueryEditor, {
+    global: {
+      plugins: [store, i18n],
+      stubs: {
+        CodeQueryEditor: codeQueryEditorStub,
+      },
+    },
+    props: {
+      query: "",
+      editorHeight: "200px",
+      hideNlToggle: false,
+      disableAi: false,
+      dataTestPrefix: "query-editor",
+      ...props,
+    },
+  });
+}
+
+// ── Tests ────────────────────────────────────────────────────────────────────
+
+describe("QueryEditor", () => {
+  let wrapper: VueWrapper;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    vi.clearAllMocks();
+  });
+
+  describe("initial render", () => {
+    it("should render without errors", () => {
+      wrapper = mountQueryEditor();
+      expect(wrapper.exists()).toBe(true);
+    });
+
+    it("should render the CodeQueryEditor stub", () => {
+      wrapper = mountQueryEditor();
+      expect(wrapper.find('[data-test="code-query-editor"]').exists()).toBe(true);
+    });
+
+    it("should hide the AI input bar when not in AI mode", () => {
+      wrapper = mountQueryEditor();
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
+    });
+  });
+
+  describe("isAIMode — internal control", () => {
+    it("should show AI input bar after ai-toggle-btn is clicked", async () => {
+      // Enable ai_enabled in store config so the toggle button renders
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        ai_enabled: true,
+      });
+
+      wrapper = mountQueryEditor({ hideNlToggle: false });
+      await nextTick();
+
+      const toggleBtn = wrapper.find('[data-test="query-editor-ai-toggle-btn"]');
+      expect(toggleBtn.exists()).toBe(true);
+
+      await toggleBtn.trigger("click");
+      await nextTick();
+
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(true);
+
+      // Restore config
+      store.commit("setConfig", {
+        ...store.state.zoConfig,
+        ai_enabled: false,
+      });
+    });
+
+    it("should NOT show AI bar on auto-detected NL when ai_enabled is false (OSS)", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false });
+
+      wrapper = mountQueryEditor({ hideNlToggle: true });
+      await nextTick();
+
+      wrapper.findComponent(codeQueryEditorStub).vm.$emit("nlpModeDetected", true);
+      await nextTick();
+
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
+    });
+
+    it("should NOT show AI bar on auto-detected NL on OSS builds (isEnterprise false) even when ai_enabled is true", async () => {
+      config.isEnterprise = "false";
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+
+      wrapper = mountQueryEditor({ hideNlToggle: true });
+      await nextTick();
+
+      wrapper.findComponent(codeQueryEditorStub).vm.$emit("nlpModeDetected", true);
+      await nextTick();
+
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
+
+      config.isEnterprise = "true";
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false });
+    });
+
+    it("should show AI bar on auto-detected NL when ai_enabled is true", async () => {
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: true });
+
+      wrapper = mountQueryEditor({ hideNlToggle: false });
+      await nextTick();
+
+      wrapper.findComponent(codeQueryEditorStub).vm.$emit("nlpModeDetected", true);
+      await nextTick();
+
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(true);
+
+      store.commit("setConfig", { ...store.state.zoConfig, ai_enabled: false });
+    });
+  });
+
+  describe("isAIMode — external control", () => {
+    it("should show AI input bar when nlpMode prop is true", async () => {
+      wrapper = mountQueryEditor({ nlpMode: true });
+      await nextTick();
+
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(true);
+    });
+
+    it("should hide AI input bar when nlpMode prop is false", async () => {
+      wrapper = mountQueryEditor({ nlpMode: false });
+      await nextTick();
+
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
+    });
+  });
+
+  describe("send button disabled state", () => {
+    beforeEach(async () => {
+      wrapper = mountQueryEditor({ nlpMode: true });
+      await nextTick();
+    });
+
+    it("should disable send button when aiInputText is empty", async () => {
+      (wrapper.vm as any).aiInputText = "";
+      await nextTick();
+
+      const sendBtn = wrapper.find('[data-test="query-editor-ai-send-btn"]');
+      expect(sendBtn.exists()).toBe(true);
+      // button renders the disable attribute when disabled
+      expect(sendBtn.attributes("disabled") !== undefined || sendBtn.classes("disabled")).toBe(
+        true,
+      );
+    });
+
+    it("should disable send button when disableAi prop is true", async () => {
+      await wrapper.setProps({ disableAi: true });
+      (wrapper.vm as any).aiInputText = "show me errors";
+      await nextTick();
+
+      const sendBtn = wrapper.find('[data-test="query-editor-ai-send-btn"]');
+      expect(sendBtn.exists()).toBe(true);
+      expect(sendBtn.attributes("disabled") !== undefined || sendBtn.classes("disabled")).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("dismissAIMode", () => {
+    it("should hide AI bar after dismissAIMode is called", async () => {
+      wrapper = mountQueryEditor({ nlpMode: undefined });
+      await nextTick();
+
+      // Enable internal NLP mode first
+      (wrapper.vm as any).internalNlpMode = true;
+      await nextTick();
+
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(true);
+
+      (wrapper.vm as any).dismissAIMode();
+      await nextTick();
+
+      expect(wrapper.find('[data-test="query-editor-ai-input-bar"]').exists()).toBe(false);
+    });
+
+    it("should clear aiInputText after dismissAIMode is called", async () => {
+      wrapper = mountQueryEditor();
+      (wrapper.vm as any).internalNlpMode = true;
+      (wrapper.vm as any).aiInputText = "some query text";
+      await nextTick();
+
+      (wrapper.vm as any).dismissAIMode();
+      await nextTick();
+
+      expect((wrapper.vm as any).aiInputText).toBe("");
+    });
+
+    it("should reset currentSessionId to null after dismissAIMode is called", async () => {
+      wrapper = mountQueryEditor();
+      (wrapper.vm as any).currentSessionId = "existing-session";
+      (wrapper.vm as any).dismissAIMode();
+      await nextTick();
+
+      expect((wrapper.vm as any).currentSessionId).toBeNull();
+    });
+  });
+
+  describe("cancelGeneration", () => {
+    it("should set isGenerating to false when cancelGeneration is called", async () => {
+      wrapper = mountQueryEditor();
+      (wrapper.vm as any).isGenerating = true;
+      (wrapper.vm as any).cancelGeneration();
+      await nextTick();
+
+      expect((wrapper.vm as any).isGenerating).toBe(false);
+    });
+
+    it("should abort currentAbortController and nullify it when cancelGeneration is called", async () => {
+      wrapper = mountQueryEditor();
+      const controller = new AbortController();
+      const abortSpy = vi.spyOn(controller, "abort");
+      (wrapper.vm as any).currentAbortController = controller;
+
+      (wrapper.vm as any).cancelGeneration();
+      await nextTick();
+
+      expect(abortSpy).toHaveBeenCalledTimes(1);
+      expect((wrapper.vm as any).currentAbortController).toBeNull();
+    });
+  });
+
+  describe("isExecutionIntent", () => {
+    beforeEach(() => {
+      wrapper = mountQueryEditor();
+    });
+
+    it("should return true for 'run'", () => {
+      expect((wrapper.vm as any).isExecutionIntent("run")).toBe(true);
+    });
+
+    it("should return true for 'execute'", () => {
+      expect((wrapper.vm as any).isExecutionIntent("execute")).toBe(true);
+    });
+
+    it("should return true for 'search'", () => {
+      expect((wrapper.vm as any).isExecutionIntent("search")).toBe(true);
+    });
+
+    it("should return true case-insensitively for 'RUN QUERY'", () => {
+      expect((wrapper.vm as any).isExecutionIntent("RUN QUERY")).toBe(true);
+    });
+
+    it("should return false for a regular natural language query", () => {
+      expect((wrapper.vm as any).isExecutionIntent("show me errors in the last hour")).toBe(false);
+    });
+
+    it("should return false for an empty string", () => {
+      expect((wrapper.vm as any).isExecutionIntent("")).toBe(false);
+    });
+  });
+
+  describe("rootStyle", () => {
+    it("should set height from editorHeight prop", () => {
+      wrapper = mountQueryEditor({ editorHeight: "350px" });
+      const rootStyle = (wrapper.vm as any).rootStyle;
+      expect(rootStyle).toEqual({ height: "350px" });
+    });
+
+    it("should return height 100% when editorHeight prop is '100%'", () => {
+      wrapper = mountQueryEditor({ editorHeight: "100%" });
+      const rootStyle = (wrapper.vm as any).rootStyle;
+      expect(rootStyle).toEqual({ height: "100%" });
+    });
+  });
+
+  describe("handleAIGenerate", () => {
+    it("should not proceed when aiInputText is empty", async () => {
+      wrapper = mountQueryEditor();
+      (wrapper.vm as any).aiInputText = "";
+
+      await (wrapper.vm as any).handleAIGenerate();
+      await flushPromises();
+
+      // saveToHistory should not be called for an empty input
+      expect(mockSaveToHistory).not.toHaveBeenCalled();
+    });
+
+    it("should emit run-query when execution intent is detected and a query exists", async () => {
+      wrapper = mountQueryEditor({ query: "SELECT * FROM logs" });
+
+      // Set up the editorRef mock to return the existing query
+      (wrapper.vm as any).editorRef = {
+        getValue: vi.fn(() => "SELECT * FROM logs"),
+        handleGenerateSQL: vi.fn().mockResolvedValue(undefined),
+      };
+
+      (wrapper.vm as any).aiInputText = "run";
+      await (wrapper.vm as any).handleAIGenerate();
+      await flushPromises();
+
+      expect(wrapper.emitted("run-query")).toBeTruthy();
+    });
+
+    it("should clear aiInputText after emitting run-query on execution intent", async () => {
+      wrapper = mountQueryEditor({ query: "SELECT * FROM logs" });
+      (wrapper.vm as any).editorRef = {
+        getValue: vi.fn(() => "SELECT * FROM logs"),
+        handleGenerateSQL: vi.fn().mockResolvedValue(undefined),
+      };
+
+      (wrapper.vm as any).aiInputText = "run";
+      await (wrapper.vm as any).handleAIGenerate();
+      await flushPromises();
+
+      expect((wrapper.vm as any).aiInputText).toBe("");
+    });
+  });
+
+  describe("dataTestPrefix prop", () => {
+    it("should apply custom dataTestPrefix to AI input field", async () => {
+      wrapper = mountQueryEditor({
+        dataTestPrefix: "logs-editor",
+        nlpMode: true,
+      });
+      await nextTick();
+
+      const input = wrapper.find('[data-test="logs-editor-ai-input-field"]');
+      expect(input.exists()).toBe(true);
+    });
+
+    it("should apply custom dataTestPrefix to AI send button", async () => {
+      wrapper = mountQueryEditor({
+        dataTestPrefix: "logs-editor",
+        nlpMode: true,
+      });
+      await nextTick();
+
+      const sendBtn = wrapper.find('[data-test="logs-editor-ai-send-btn"]');
+      expect(sendBtn.exists()).toBe(true);
+    });
+
+    it("should apply custom dataTestPrefix to AI close button", async () => {
+      wrapper = mountQueryEditor({
+        dataTestPrefix: "logs-editor",
+        nlpMode: true,
+      });
+      await nextTick();
+
+      const closeBtn = wrapper.find('[data-test="logs-editor-ai-close-btn"]');
+      expect(closeBtn.exists()).toBe(true);
+    });
+  });
+
+  describe("useChatHistory called with getter functions", () => {
+    it("should call saveToHistory after a successful generation", async () => {
+      wrapper = mountQueryEditor();
+      const mockHandleGenerateSQL = vi.fn().mockResolvedValue(undefined);
+      (wrapper.vm as any).editorRef = {
+        getValue: vi.fn(() => ""),
+        handleGenerateSQL: mockHandleGenerateSQL,
+      };
+
+      (wrapper.vm as any).aiInputText = "list all logs";
+      await (wrapper.vm as any).handleAIGenerate();
+      await flushPromises();
+
+      expect(mockSaveToHistory).toHaveBeenCalled();
+    });
+  });
+
+  describe("when query becomes null/undefined (PromQL -> SQL switch)", () => {
+    it("calls editorRef.setValue with empty string when query prop changes to null", async () => {
+      // Arrange — mount with a non-empty query and a mock editorRef that has
+      // getValue/setValue (simulating a mounted CodeQueryEditor child)
+      wrapper = mountQueryEditor({ query: "rate(http_requests_total[5m])" });
+      const mockSetValue = vi.fn();
+      const mockGetValue = vi.fn(() => "rate(http_requests_total[5m])");
+      (wrapper.vm as any).editorRef = {
+        getValue: mockGetValue,
+        setValue: mockSetValue,
+      };
+
+      // Act — simulate the PromQL → SQL mode switch where the parent clears the query
+      await wrapper.setProps({ query: null as any });
+      await nextTick();
+
+      // Assert — setValue must have been called with "" not null
+      expect(mockSetValue).toHaveBeenCalledOnce();
+      expect(mockSetValue).toHaveBeenCalledWith("");
+    });
+
+    it("calls editorRef.setValue with empty string when query prop changes to undefined", async () => {
+      // Arrange
+      wrapper = mountQueryEditor({ query: "rate(http_requests_total[5m])" });
+      const mockSetValue = vi.fn();
+      const mockGetValue = vi.fn(() => "rate(http_requests_total[5m])");
+      (wrapper.vm as any).editorRef = {
+        getValue: mockGetValue,
+        setValue: mockSetValue,
+      };
+
+      // Act
+      await wrapper.setProps({ query: undefined as any });
+      await nextTick();
+
+      // Assert — empty string coercion, not undefined
+      expect(mockSetValue).toHaveBeenCalledOnce();
+      expect(mockSetValue).toHaveBeenCalledWith("");
+    });
+
+    it("does NOT call editorRef.setValue when trimmed query value is unchanged", async () => {
+      // Arrange — editor current value matches the incoming prop (trimmed)
+      wrapper = mountQueryEditor({ query: "SELECT 1" });
+      const mockSetValue = vi.fn();
+      (wrapper.vm as any).editorRef = {
+        getValue: vi.fn(() => "SELECT 1"),
+        setValue: mockSetValue,
+      };
+
+      // Act — set identical value (guard should short-circuit before setValue)
+      await wrapper.setProps({ query: "SELECT 1" });
+      await nextTick();
+
+      // Assert — no unnecessary editor update
+      expect(mockSetValue).not.toHaveBeenCalled();
+    });
+
+    it("does NOT call editorRef.setValue when only trailing whitespace differs", async () => {
+      // Arrange — editor holds "SELECT 1  " (trailing spaces), prop becomes "SELECT 1"
+      wrapper = mountQueryEditor({ query: "SELECT 1" });
+      const mockSetValue = vi.fn();
+      (wrapper.vm as any).editorRef = {
+        getValue: vi.fn(() => "SELECT 1  "),
+        setValue: mockSetValue,
+      };
+
+      // Act — trimmed values match, so the watcher guard must fire
+      await wrapper.setProps({ query: "SELECT 1" });
+      await nextTick();
+
+      // Assert
+      expect(mockSetValue).not.toHaveBeenCalled();
+    });
+
+    it("does NOT throw and skips setValue when editorRef is not yet initialised", async () => {
+      // Arrange — editorRef is null (editor not mounted yet)
+      wrapper = mountQueryEditor({ query: "SELECT 1" });
+      (wrapper.vm as any).editorRef = null;
+
+      // Act & Assert — must not throw
+      await expect(wrapper.setProps({ query: null as any })).resolves.not.toThrow();
+    });
+
+    it("calls editorRef.setValue with the new non-null query when prop changes normally", async () => {
+      // Arrange
+      wrapper = mountQueryEditor({ query: "SELECT 1" });
+      const mockSetValue = vi.fn();
+      (wrapper.vm as any).editorRef = {
+        getValue: vi.fn(() => "SELECT 1"),
+        setValue: mockSetValue,
+      };
+
+      // Act — a genuine query change (different trimmed content)
+      await wrapper.setProps({ query: "SELECT 2" });
+      await nextTick();
+
+      // Assert — called with the actual new value
+      expect(mockSetValue).toHaveBeenCalledOnce();
+      expect(mockSetValue).toHaveBeenCalledWith("SELECT 2");
+    });
+  });
+});

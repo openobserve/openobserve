@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,19 +13,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::{fmt::Debug, ops::Range, sync::Arc};
+use std::{
+    fmt::Debug,
+    ops::Range,
+    sync::{Arc, LazyLock as Lazy},
+};
 
 use async_trait::async_trait;
 use bytes::{Bytes, buf::Buf};
-use config::{get_config, is_local_disk_storage, meta::stream::FileMeta, metrics};
+use config::{
+    get_config, is_local_disk_storage,
+    meta::stream::{FileKey, FileMeta},
+    metrics,
+};
 use datafusion::parquet::{data_type::AsBytes, file::metadata::ParquetMetaData};
 use futures::{StreamExt, TryStreamExt, stream::BoxStream};
 use hashbrown::HashMap;
 use object_store::{
-    GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, PutMultipartOptions,
-    PutOptions, PutPayload, PutResult, Result, WriteMultipart, path::Path,
+    Attribute, AttributeValue, Attributes, GetOptions, GetResult, ListResult, MultipartUpload,
+    ObjectMeta, ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result,
+    WriteMultipart, path::Path,
 };
-use once_cell::sync::Lazy;
 use parquet::file::metadata::{FooterTail, ParquetMetaDataReader};
 
 pub mod accounts;
@@ -39,10 +47,20 @@ pub const CONCURRENT_REQUESTS: usize = 1000;
 
 static MULTI_ACCOUNTS: Lazy<Box<dyn ObjectStoreExt>> = Lazy::new(accounts::default);
 
+/// Storage tier applied consistently to every object that belongs to one
+/// logical data file, including its metrics and Tantivy indexes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum StorageTier {
+    #[default]
+    Default,
+    InfrequentAccess,
+}
+
 // Create a wrapper trait that extends ObjectStore
 #[async_trait]
 pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
-    fn get_account(&self, file: &str) -> Option<String>;
+    fn get_account(&self, org_id: &str, file: &str) -> Option<String>;
+    async fn add_account(&self, key: String, acc: Box<dyn ObjectStore>);
     async fn put(&self, account: &str, location: &Path, payload: PutPayload) -> Result<PutResult>;
     async fn put_opts(
         &self,
@@ -78,11 +96,11 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
     ) -> Result<Vec<Bytes>>;
     async fn head(&self, account: &str, location: &Path) -> Result<ObjectMeta>;
     async fn delete(&self, account: &str, location: &Path) -> Result<()>;
-    fn delete_stream<'a>(
-        &'a self,
+    async fn delete_stream(
+        &self,
         account: &str,
-        locations: BoxStream<'a, Result<Path>>,
-    ) -> BoxStream<'a, Result<Path>>;
+        locations: BoxStream<'static, Result<Path>>,
+    ) -> Result<Vec<Path>>;
     fn list(&self, account: &str, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>>;
     fn list_with_offset(
         &self,
@@ -98,6 +116,10 @@ pub trait ObjectStoreExt: std::fmt::Display + Send + Sync + Debug + 'static {
     async fn rename_if_not_exists(&self, account: &str, from: &Path, to: &Path) -> Result<()>;
 }
 
+fn get_org_storage_key(org_id: &str) -> String {
+    format!("{org_id}:default")
+}
+
 pub async fn list(account: &str, prefix: &str) -> Result<Vec<String>> {
     let files = MULTI_ACCOUNTS
         .list(account, Some(&prefix.into()))
@@ -108,8 +130,31 @@ pub async fn list(account: &str, prefix: &str) -> Result<Vec<String>> {
     Ok(files)
 }
 
-pub fn get_account(file: &str) -> Option<String> {
-    MULTI_ACCOUNTS.get_account(file)
+/// List the immediate child "directories" (common prefixes) under `prefix`
+/// using a `/` delimiter, without recursing into them. This is cheap compared
+/// to [`list`] for large prefixes because it only returns directory names, not
+/// every object underneath.
+///
+/// Returned prefixes are full storage keys (they may carry the
+/// `ZO_S3_BUCKET_PREFIX`) and do not include a trailing slash.
+pub async fn list_dirs(account: &str, prefix: &str) -> Result<Vec<String>> {
+    let res = MULTI_ACCOUNTS
+        .list_with_delimiter(account, Some(&prefix.into()))
+        .await?;
+    Ok(res
+        .common_prefixes
+        .into_iter()
+        .map(|p| p.to_string())
+        .collect())
+}
+
+pub fn get_account(org_id: &str, file: &str) -> Option<String> {
+    MULTI_ACCOUNTS.get_account(org_id, file)
+}
+
+pub async fn add_account(org_id: &str, acc: Box<dyn ObjectStore>) {
+    let key = get_org_storage_key(org_id);
+    MULTI_ACCOUNTS.add_account(key, acc).await;
 }
 
 pub async fn get(account: &str, file: &str) -> Result<GetResult> {
@@ -124,6 +169,16 @@ pub async fn get_opts(account: &str, file: &str, options: GetOptions) -> Result<
 
 pub async fn get_range(account: &str, file: &str, range: Range<u64>) -> Result<bytes::Bytes> {
     MULTI_ACCOUNTS.get_range(account, &file.into(), range).await
+}
+
+pub async fn get_ranges(
+    account: &str,
+    file: &str,
+    ranges: &[Range<u64>],
+) -> Result<Vec<bytes::Bytes>> {
+    MULTI_ACCOUNTS
+        .get_ranges(account, &file.into(), ranges)
+        .await
 }
 
 pub async fn head(account: &str, file: &str) -> Result<ObjectMeta> {
@@ -156,9 +211,73 @@ pub async fn put(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
     Ok(())
 }
 
-pub async fn put_multipart(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
+pub async fn put_with_tier(
+    account: &str,
+    file: &str,
+    data: bytes::Bytes,
+    tier: StorageTier,
+) -> Result<()> {
+    match tier {
+        StorageTier::Default => put(account, file, data).await,
+        StorageTier::InfrequentAccess => put_infrequent_access(account, file, data).await,
+    }
+}
+
+async fn put_multipart(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
     let path = Path::from(file);
     let upload = MULTI_ACCOUNTS.put_multipart(account, &path).await?;
+    let mut write = WriteMultipart::new(upload);
+    write.write(data.as_bytes());
+    write.finish().await?;
+    Ok(())
+}
+
+async fn put_infrequent_access(account: &str, file: &str, data: bytes::Bytes) -> Result<()> {
+    let cfg = get_config();
+    let attrs = match cfg.s3.provider.as_str() {
+        "aws" | "s3" => Attributes::from_iter([(
+            Attribute::StorageClass,
+            AttributeValue::from("STANDARD_IA".to_string()),
+        )]),
+        "gcs" | "gcp" => Attributes::from_iter([(
+            Attribute::StorageClass,
+            AttributeValue::from("NEARLINE".to_string()),
+        )]),
+        "azure" => Attributes::from_iter([(
+            Attribute::StorageClass,
+            AttributeValue::from("Cool".to_string()),
+        )]),
+        _ => Attributes::new(),
+    };
+    let multi_part_upload_size = cfg.s3.multi_part_upload_size;
+    if multi_part_upload_size > 0 && multi_part_upload_size < bytes_size_in_mb(&data) as usize {
+        let opts = PutMultipartOptions {
+            attributes: attrs,
+            ..Default::default()
+        };
+        put_multipart_opts(account, file, data, opts).await?;
+    } else {
+        let opts = PutOptions {
+            attributes: attrs,
+            ..Default::default()
+        };
+        MULTI_ACCOUNTS
+            .put_opts(account, &file.into(), data.into(), opts)
+            .await?;
+    }
+    Ok(())
+}
+
+async fn put_multipart_opts(
+    account: &str,
+    file: &str,
+    data: bytes::Bytes,
+    opts: PutMultipartOptions,
+) -> Result<()> {
+    let path = Path::from(file);
+    let upload = MULTI_ACCOUNTS
+        .put_multipart_opts(account, &path, opts)
+        .await?;
     let mut write = WriteMultipart::new(upload);
     write.write(data.as_bytes());
     write.finish().await?;
@@ -176,25 +295,26 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
     let columns = files[0].1.split('/').collect::<Vec<&str>>();
 
     if !is_local_disk_storage() && get_config().s3.feature_bulk_delete {
-        // group the files by account
-        let mut file_groups = HashMap::new();
+        // group the files by account (convert to owned strings for 'static)
+        let mut file_groups: HashMap<String, Vec<String>> = HashMap::new();
         for (account, file) in files {
             file_groups
-                .entry(account)
+                .entry(account.to_string())
                 .or_insert_with(Vec::new)
-                .push(file);
+                .push(file.to_string());
         }
         for (account, files) in file_groups {
             let files = futures::stream::iter(files)
                 .map(|file| Ok(Path::from(file)))
                 .boxed();
-            match MULTI_ACCOUNTS
-                .delete_stream(account, files)
-                .try_collect::<Vec<Path>>()
-                .await
-            {
+            match MULTI_ACCOUNTS.delete_stream(&account, files).await {
                 Ok(files) => {
                     log::debug!("Deleted objects: {files:?}");
+                    if columns.len() > 2 && columns[0] == "files" {
+                        metrics::STORAGE_WRITE_REQUESTS
+                            .with_label_values(&[columns[1], columns[2], "remote"])
+                            .inc_by(files.len() as u64);
+                    }
                 }
                 Err(e) => {
                     log::error!("Failed to delete objects: {e}");
@@ -202,6 +322,11 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
             }
         }
     } else {
+        let storage_type = if is_local_disk_storage() {
+            "local"
+        } else {
+            "remote"
+        };
         let files = files
             .into_iter()
             .map(|(account, file)| (account, file.to_string()))
@@ -215,6 +340,12 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
                 {
                     Ok(_) => {
                         log::debug!("Deleted object: {file}");
+                        let columns = file.split('/').collect::<Vec<&str>>();
+                        if columns.len() > 2 && columns[0] == "files" {
+                            metrics::STORAGE_WRITE_REQUESTS
+                                .with_label_values(&[columns[1], columns[2], storage_type])
+                                .inc();
+                        }
                     }
                     Err(e) => {
                         // TODO: need a better solution for identifying the error
@@ -238,6 +369,18 @@ pub async fn del(files: Vec<(&str, &str)>) -> Result<()> {
     }
 
     Ok(())
+}
+
+pub async fn get_row_group_size(file: &FileKey) -> u32 {
+    if let Some(row_group_size) = file.row_group_size {
+        return row_group_size;
+    }
+    get_parquet_metadata(&file.account, &file.key)
+        .await
+        .ok()
+        .and_then(|(_, meta)| meta.row_groups().iter().map(|rg| rg.num_rows()).max())
+        .unwrap_or_default()
+        .max(config::PARQUET_MAX_ROW_GROUP_SIZE as i64) as u32
 }
 
 pub async fn get_file_meta(account: &str, file: &str) -> Result<FileMeta, anyhow::Error> {
@@ -297,6 +440,29 @@ pub fn format_key(key: &str, with_prefix: bool) -> String {
     }
 }
 
+pub async fn presign_url(
+    key: &str,
+    method: reqwest::Method,
+    expires: std::time::Duration,
+) -> anyhow::Result<url::Url> {
+    if is_local_disk_storage() {
+        return Err(anyhow::anyhow!(
+            "presigned URLs not supported in local disk mode"
+        ));
+    }
+    let (_, mut account_map) = accounts::parse_storage_config(&get_config().s3);
+    let storage_config = account_map
+        .remove("default")
+        .ok_or_else(|| anyhow::anyhow!("no default storage account configured"))?;
+    let signer =
+        remote::build_signer(storage_config).map_err(|e| anyhow::anyhow!("build signer: {e}"))?;
+    let path = format_key(key, true);
+    signer
+        .signed_url(method, &path.as_str().into(), expires)
+        .await
+        .map_err(|e| anyhow::anyhow!("presign: {e}"))
+}
+
 pub fn get_stream_from_file(file: &Path) -> Option<String> {
     // eg: files/default/logs/olympics/2023/08/21/08/a.parquet
     // eg: files/default/traces/default/2023/09/04/05/default/service_name=ingester/
@@ -339,5 +505,55 @@ impl From<Error> for object_store::Error {
                 source.to_string(),
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_error_display_out_of_range() {
+        let e = Error::OutOfRange("test".to_string());
+        assert_eq!(e.to_string(), "Out of range: test");
+    }
+
+    #[test]
+    fn test_error_display_bad_range() {
+        let e = Error::BadRange("invalid".to_string());
+        assert_eq!(e.to_string(), "Bad range: invalid");
+    }
+
+    #[test]
+    fn test_get_stream_from_file_valid() {
+        let path = Path::from("files/default/logs/olympics/2023/08/21/08/00/a.parquet");
+        let stream = get_stream_from_file(&path);
+        assert_eq!(stream, Some("olympics".to_string()));
+    }
+
+    #[test]
+    fn test_get_stream_from_file_too_short_returns_none() {
+        let path = Path::from("files/default/logs");
+        assert_eq!(get_stream_from_file(&path), None);
+    }
+
+    #[test]
+    fn test_get_stream_from_file_wrong_prefix_returns_none() {
+        let path = Path::from("notfiles/default/logs/olympics/2023/08/21/08/00/a.parquet");
+        assert_eq!(get_stream_from_file(&path), None);
+    }
+
+    #[test]
+    fn test_bytes_size_in_mb_empty() {
+        let b = bytes::Bytes::new();
+        assert_eq!(bytes_size_in_mb(&b), 0.0);
+    }
+
+    #[test]
+    fn test_bytes_size_in_mb_one_mb() {
+        let data = vec![0u8; 1024 * 1024];
+        let b = bytes::Bytes::from(data);
+        let result = bytes_size_in_mb(&b);
+        assert!((result - 1.0).abs() < 1e-9);
     }
 }

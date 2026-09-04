@@ -27,7 +27,7 @@ function flushQueue() {
         const [eventName, payload] = item.args;
         reoInstance.pushData({
           activity: eventName,
-          ...payload
+          ...payload,
         });
       } else if (item.type === "identify") {
         reoInstance.identify(...item.args);
@@ -68,6 +68,7 @@ export function useReo() {
     }
 
     reoInstance.identify(identity);
+    return undefined;
   };
 
   const track = (eventName: string, payload?: Record<string, any>) => {
@@ -83,10 +84,9 @@ export function useReo() {
 
     reoInstance.pushData({
       activity: eventName,
-      ...payload
+      ...payload,
     });
   };
-  
 
   return {
     reoInit,

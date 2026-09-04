@@ -31,3 +31,24 @@ impl Related<super::re_pattern_stream_map::Entity> for Entity {
 }
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "pat-1".to_string(),
+            org: "org".to_string(),
+            name: "my_pattern".to_string(),
+            description: "test pattern".to_string(),
+            created_by: "user1".to_string(),
+            created_at: 1000,
+            updated_at: 2000,
+            pattern: r"\d+".to_string(),
+        };
+        assert_eq!(m.org, "org");
+        assert_eq!(m.pattern, r"\d+");
+    }
+}

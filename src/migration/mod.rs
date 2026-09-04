@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,7 +21,7 @@
 //! - `migrate-file-list`: Migrate file_list related tables only
 
 use ::config::DB_SCHEMA_VERSION;
-use infra::db::{ORM_CLIENT, ORM_CLIENT_DDL, connect_to_orm, connect_to_orm_ddl};
+use infra::db::{get_orm_client_ddl, get_orm_client_ro, get_orm_client_rw};
 
 mod adapter;
 mod config;
@@ -32,17 +32,35 @@ pub use config::MigrationConfig;
 pub use migrator::{run_file_list, run_meta};
 
 pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
-    // we init client here to avoid deadlocks
-    ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let db_schema_version = match infra::get_db_schema_version().await {
-        Ok(v) => v,
-        Err(e) => {
-            log::warn!(
-                "error in getting db schema version {e}; assuming default of 0 and trying upgrade."
-            );
-            0
+    // warm both pools before the migration starts hitting them
+    get_orm_client_ro().await;
+    get_orm_client_rw().await;
+    // a missing version is Ok(0), so an error here means the db is
+    // unreachable or overloaded: never assume a fresh install, retry then abort
+    const MAX_RETRIES: usize = 5;
+    let mut db_schema_version = 0;
+    let mut last_err = None;
+    for attempt in 1..=MAX_RETRIES {
+        match infra::get_db_schema_version().await {
+            Ok(v) => {
+                db_schema_version = v;
+                last_err = None;
+                break;
+            }
+            Err(e) => {
+                log::warn!(
+                    "error in getting db schema version (attempt {attempt}/{MAX_RETRIES}): {e}, retrying..."
+                );
+                last_err = Some(e);
+                tokio::time::sleep(std::time::Duration::from_secs(attempt as u64 * 2)).await;
+            }
         }
-    };
+    }
+    if let Some(e) = last_err {
+        return Err(anyhow::anyhow!(
+            "failed to get db schema version after {MAX_RETRIES} attempts: {e}; refusing to assume a fresh install and run the db upgrade against an unhealthy database"
+        ));
+    }
     if db_schema_version == DB_SCHEMA_VERSION {
         // if version matches, we do not need to run update commands
         log::info!("DB_SCHEMA_VERSION match, skipping db upgrade");
@@ -53,17 +71,38 @@ pub async fn init_db() -> std::result::Result<(), anyhow::Error> {
         DB_SCHEMA_VERSION
     );
 
-    infra::db_init().await?;
+    // acquire lock for 1 hour for init or migration db
+    let lock = infra::dist_lock::lock("/database/init", 3600).await?;
+
+    if let Err(e) = infra::db_init().await {
+        infra::dist_lock::unlock(&lock).await?;
+        return Err(e);
+    }
+
     // we initialize both clients here to avoid potential deadlock afterwards
-    ORM_CLIENT_DDL.get_or_init(connect_to_orm_ddl).await;
+    get_orm_client_ddl().await;
 
     // migrate infra_sea_orm
-    infra::table::migrate().await?;
-    infra::set_db_schema_version().await?;
-
+    if let Err(e) = infra::table::migrate().await {
+        infra::dist_lock::unlock(&lock).await?;
+        return Err(e);
+    }
     // cloud-related migrations
     #[cfg(feature = "cloud")]
-    o2_enterprise::enterprise::cloud::migrate().await?;
+    if let Err(e) = o2_enterprise::enterprise::cloud::migrate().await {
+        infra::dist_lock::unlock(&lock).await?;
+        return Err(e);
+    }
+
+    if let Err(e) = infra::set_db_schema_version().await {
+        infra::dist_lock::unlock(&lock).await?;
+        return Err(e);
+    }
+
+    // release lock
+    infra::dist_lock::unlock(&lock).await?;
+
+    log::info!("DB upgrade completed to version {}", DB_SCHEMA_VERSION);
 
     Ok(())
 }

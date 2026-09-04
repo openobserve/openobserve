@@ -1,0 +1,58 @@
+<script setup lang="ts">
+// Copyright 2026 OpenObserve Inc.
+
+import { inject } from "vue";
+import OTime from "./OTime.vue";
+import { FORM_CONTEXT_KEY } from "../Form/OForm.types";
+import { firstFieldError } from "../Form/fieldError";
+import { raw } from "@/types/i18n";
+import type { FormTimeProps } from "./OFormTime.types";
+
+defineOptions({ inheritAttrs: false });
+
+const props = defineProps<FormTimeProps>();
+
+const form = inject(FORM_CONTEXT_KEY, null);
+
+if (import.meta.env.DEV && !form) {
+  console.warn("[OFormTime] must be rendered inside <OForm>. No form context found.");
+}
+</script>
+
+<template>
+  <component v-if="form" :is="form.Field" :name="props.name">
+    <template #default="{ field }">
+      <OTime
+        v-bind="$attrs"
+        :label="props.label"
+        :placeholder="props.placeholder"
+        :min="props.min"
+        :max="props.max"
+        :step="props.step"
+        :with-seconds="props.withSeconds"
+        :format24="props.format24"
+        :help-text="props.helpText"
+        :clearable="props.clearable"
+        :readonly="props.readonly"
+        :disabled="props.disabled"
+        :required="props.required"
+        :size="props.size"
+        :id="props.id"
+        :name="props.name"
+        :model-value="field.state.value"
+        :error="field.state.meta.errors.length > 0"
+        :error-message="
+          field.state.meta.errors.length > 0
+            ? raw(firstFieldError(field.state.meta.errors))
+            : undefined
+        "
+        @update:model-value="field.handleChange"
+        @blur="field.handleBlur"
+      >
+        <template v-if="$slots.label" #label>
+          <slot name="label" />
+        </template>
+      </OTime>
+    </template>
+  </component>
+</template>

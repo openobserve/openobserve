@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -32,12 +32,13 @@ pub async fn file_list(
     println!("strategy: {mode}");
     println!("group size: {group_size}gb");
 
-    let file_list = crate::service::file_list::query_for_merge(
+    let file_list = search_service::file_list::query_for_merge(
         org,
         stream_type.into(),
         stream_name,
         hour,
         hour,
+        infra::file_list::merge_max_original_size(),
     )
     .await?;
     println!("get files: {}", file_list.len());
@@ -144,9 +145,11 @@ mod tests {
                 compressed_size: size / 2,
                 index_size: size / 10,
                 flattened: false,
+                bloom_ver: 0,
             },
             deleted: false,
-            segment_ids: None,
+            selection: None,
+            row_group_size: None,
         }
     }
 

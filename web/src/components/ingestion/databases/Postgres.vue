@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,47 +15,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pa-sm">
-    <div class="tw:text-[16px]">
-      <CopyContent :content="content" />
-      <div class="tw:font-bold tw:pt-6 tw:pb-2">
-        Click <a :href="docURL" target="_blank" class="text-blue-500 hover:text-blue-600" style="text-decoration: underline">here</a> to check further documentation.
-      </div>
-    </div>
-  </div>
+  <DataSourceSetupCard slug="postgres" />
 </template>
 
-<script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
-import config from "../../../aws-exports";
-import { useStore } from "vuex";
-import { getImageURL } from "../../../utils/zincutils";
-import CopyContent from "@/components/CopyContent.vue";
-import useIngestion from "@/composables/useIngestion";
+<script setup lang="ts">
+import DataSourceSetupCard from "@/components/ingestion/setupCard/DataSourceSetupCard.vue";
 
-export default defineComponent({
-  name: "PostgresPage",
-  props: {
-    currOrgIdentifier: {
-      type: String,
-    },
-    currUserEmail: {
-      type: String,
-    },
-  },
-  components: { CopyContent },
-  setup(props) {
-    const name = "postgres";
-    const { endpoint, databaseContent, databaseDocURLs } = useIngestion();
-    const content = databaseContent.replace("[STREAM_NAME]", name.replace(" ", "_").toLowerCase());
-    const docURL = databaseDocURLs[name];
-    
-    return {
-      config,
-      docURL,
-      getImageURL,
-      content,
-    };
-  },
-});
+defineProps<{
+  currOrgIdentifier?: string;
+  currUserEmail?: string;
+}>();
 </script>

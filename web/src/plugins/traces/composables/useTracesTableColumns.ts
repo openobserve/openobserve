@@ -1,0 +1,227 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+/**
+ * useTracesTableColumns
+ *
+ * Provides a `columns` ref (ColumnDef[]) and a `buildColumns()` method.
+ * Call `buildColumns()` explicitly whenever the column list needs to be
+ * rebuilt — e.g. after loading selectedFields from localStorage, after a
+ * mode switch, or after the user adds/removes/reorders a column.
+ *
+ * Cell rendering is handled via scoped slots on <OTable>:
+ *   #cell-{columnId}="{ row, value, column }"
+ *
+ * Column order is fully driven by `selectedFields` (an ordered string[]).
+ * LLM columns (input_tokens, output_tokens, cost) are injected dynamically
+ * before `service_latency` in traces mode when `showLlmColumns` is true;
+ * they are NOT stored in `selectedFields`.
+ *
+ * Usage:
+ *   const { columns, buildColumns } = useTracesTableColumns()
+ *   buildColumns(showLlmColumns, searchMode, selectedFields)
+ */
+
+import { ref } from "vue";
+import { useStore } from "vuex";
+import { timestampToTimezoneDate } from "@/utils/zincutils";
+import { raw, useI18nTyped, type I18nKey, type TranslateFn } from "@/types/i18n";
+import { SPAN_KIND_MAP } from "@/utils/traces/constants";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+
+/** IDs of LLM columns injected at runtime — never stored in selectedFields. */
+export const LLM_COLUMN_IDS = new Set(["input_tokens", "output_tokens", "cost"]);
+
+/**
+ * Known column metadata. Any field name NOT in this map gets a generic
+ * prettified header and default width.
+ *
+ * `headerKey` stays an i18n key, not resolved text: this map is at module scope,
+ * so `t()` here would freeze the copy at the locale active on import.
+ */
+const KNOWN_COLUMN_META: Record<
+  string,
+  {
+    headerKey: I18nKey;
+    size: number;
+    meta: Record<string, unknown>;
+    accessorFn?: (row: any) => any;
+    sortable?: boolean;
+  }
+> = {
+  service_name: {
+    headerKey: "traces.tableColumns.service",
+    size: 160,
+    meta: { cellClass: "text-text-secondary" },
+  },
+  operation_name: {
+    headerKey: "traces.tableColumns.operationName",
+    size: 200,
+    meta: { cellClass: "text-text-secondary" },
+  },
+  duration: {
+    headerKey: "traces.tableColumns.duration",
+    size: 120,
+    meta: {
+      sortable: true,
+      cellClass: "text-text-heading!",
+    },
+  },
+  spans: {
+    headerKey: "traces.tableColumns.spans",
+    size: 100,
+    meta: {
+      align: "right",
+      cellClass: "text-text-secondary!",
+    },
+    accessorFn: (row: any) => row.spans,
+  },
+  span_kind: {
+    headerKey: "traces.tableColumns.spanKind",
+    size: 120,
+    meta: { align: "left", closable: true },
+    accessorFn: (row: any) => SPAN_KIND_MAP[row.span_kind] ?? row.span_kind ?? "",
+  },
+  span_status: {
+    headerKey: "traces.tableColumns.spanStatus",
+    size: 120,
+    meta: { align: "left", disableCellAction: true },
+  },
+  status: {
+    headerKey: "traces.tableColumns.status",
+    size: 120,
+    meta: { align: "left", disableCellAction: true },
+  },
+  service_latency: {
+    headerKey: "traces.tableColumns.serviceLatency",
+    size: 160,
+    meta: { disableCellAction: true },
+  },
+  input_tokens: {
+    headerKey: "traces.tableColumns.inputTokens",
+    size: 130,
+    meta: { align: "right" },
+  },
+  output_tokens: {
+    headerKey: "traces.tableColumns.outputTokens",
+    size: 130,
+    meta: { align: "right" },
+  },
+  cost: {
+    headerKey: "traces.tableColumns.cost",
+    size: 130,
+    meta: { align: "right" },
+  },
+};
+
+function toColumnDef(
+  fieldName: string,
+  t: TranslateFn,
+  searchMode?: "traces" | "spans",
+): OTableColumnDef<Record<string, any>> {
+  const known = KNOWN_COLUMN_META[fieldName];
+  // "status" is a traces-mode special column; in spans mode treat it as generic
+  if (known && !(fieldName === "status" && searchMode === "spans")) {
+    return {
+      id: fieldName,
+      header: t(known.headerKey),
+      size: known.size,
+      meta: { ...known.meta },
+      ...(known.accessorFn ? { accessorFn: known.accessorFn } : {}),
+      ...(known.sortable ? { sortable: known.sortable } : {}),
+    };
+  }
+  // Generic: prettify field name as header, default size
+  const header = fieldName.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+  return {
+    id: fieldName,
+    header: raw(header),
+    size: 160,
+    meta: { closable: true },
+    accessorFn: (row: any) => row[fieldName],
+  };
+}
+
+export function useTracesTableColumns() {
+  /**
+   * Rebuild the `columns` ref from the given parameters.
+   * Call this whenever selectedFields, searchMode, or showLlmColumns changes.
+   */
+  const columns = ref<OTableColumnDef<Record<string, any>>[]>([]);
+  const store = useStore();
+  const { t } = useI18nTyped();
+
+  const buildColumns = (
+    showLlmColumns: boolean,
+    searchMode: "traces" | "spans",
+    selectedFields: string[],
+  ): OTableColumnDef<Record<string, any>>[] => {
+    const cols: OTableColumnDef<Record<string, any>>[] = selectedFields.map((field) =>
+      toColumnDef(field, t, searchMode),
+    );
+
+    const timestampCol = store?.state?.zoConfig?.timestamp_column || "_timestamp";
+    if (!selectedFields.find((col) => col === timestampCol))
+      cols.unshift({
+        id: timestampCol,
+        header: raw(`${t("traces.timestamp")} (${store.state.timezone})`),
+        size: 210,
+        meta: { sortable: true, headerClass: "capitalize!" },
+        accessorFn: (row: any) =>
+          timestampToTimezoneDate(
+            (row[timestampCol] ?? row["zo_sql_timestamp"]) / 1000,
+            store.state.timezone,
+            "yyyy-MM-dd HH:mm:ss.SSS",
+          ),
+      });
+
+    // Inject LLM columns just before service_latency in traces mode.
+    // They are not stored in selectedFields — managed by the showLlmColumns flag.
+    if (searchMode === "traces" && showLlmColumns) {
+      const tailIdx = cols.findIndex((c) => c.id === "service_latency");
+      const llm: OTableColumnDef<Record<string, any>>[] = [];
+
+      if (!selectedFields.includes("input_tokens")) {
+        llm.push(toColumnDef("input_tokens", t, searchMode));
+      }
+      if (!selectedFields.includes("output_tokens")) {
+        llm.push(toColumnDef("output_tokens", t, searchMode));
+      }
+      if (!selectedFields.includes("cost")) {
+        llm.push(toColumnDef("cost", t, searchMode));
+      }
+
+      if (tailIdx !== -1) {
+        cols.splice(tailIdx, 0, ...llm);
+      } else {
+        cols.push(...llm);
+      }
+    }
+
+    // In spans mode, all columns support sort
+    if (searchMode === "spans") {
+      cols.forEach((col) => {
+        if (col.meta) {
+          (col.meta as Record<string, unknown>).sortable = true;
+        }
+      });
+    }
+
+    columns.value = cols;
+    return cols;
+  };
+
+  return { columns, buildColumns };
+}

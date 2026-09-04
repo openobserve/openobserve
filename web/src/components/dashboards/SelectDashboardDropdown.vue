@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,73 +15,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-center items-start">
+  <div class="flex items-end gap-2">
     <!-- select new dashboard -->
-    <q-select
+    <OSelect
       v-model="selectedDashboard"
       :label="t('dashboard.selectDashboardLabel')"
       :options="dashboardList"
       data-test="dashboard-dropdown-dashboard-selection"
-      input-debounce="0"
-      behavior="menu"
-      borderless
-      dense
-      class="q-mb-xs showLabelOnTop o2-custom-select-dashboard"
-      style="width: calc(100% - 44px)"
-      :loading="getDashboardList.isLoading.value"
-      hide-bottom-space
-    >
-      <template #no-option>
-        <q-item>
-          <q-item-section> {{ t("search.noResult") }}</q-item-section>
-        </q-item>
-      </template>
-    </q-select>
+      labelKey="label"
+      class="flex-1"
+    />
 
-    <q-btn
-      class="q-mb-md add-folder-btn q-ml-xs"
+    <OButton
       data-test="dashboard-dashboard-new-add"
-      style="width: 40px"
-      :style="computedStyle"
-      no-caps
-      dense
+      variant="outline"
+      size="icon-xs-sq"
+      class="h-8! w-8!"
       @click="
         () => {
           showAddDashboardDialog = true;
         }
       "
+      icon-left="add"
     >
-      <q-icon name="add" size="xs" />
-    </q-btn>
+    </OButton>
   </div>
   <!-- add dashboard -->
-  <q-dialog
-    v-model="showAddDashboardDialog"
-    position="right"
-    full-height
-    maximized
+  <ODialog
+    v-model:open="showAddDashboardDialog"
+    size="sm"
+    :title="t('dashboard.selectDashboardDropdown.newDashboard')"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('dashboard.save')"
+    form-id="add-dashboard-form"
     data-test="dashboard-dashboard-add-dialog"
+    @update:open="showAddDashboardDialog = $event"
+    @click:secondary="showAddDashboardDialog = false"
   >
     <AddDashboard
-      :active-folder-id="(folderId as any)"
+      ref="addDashboardRef"
+      :active-folder-id="folderId as any"
       @updated="updateDashboardList"
       :show-folder-selection="false"
     />
-  </q-dialog>
+  </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, onActivated, ref, watch } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AddDashboard from "@/components/dashboards/AddDashboard.vue";
-import { getAllDashboardsByFolderId, getDashboard } from "@/utils/commons";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { getAllDashboardsByFolderId } from "@/utils/commons";
 import { onMounted } from "vue";
 import { useLoading } from "@/composables/useLoading";
 
 export default defineComponent({
   name: "SelectDashboardDropdown",
-  components: { AddDashboard },
+  components: { AddDashboard, OButton, ODialog, OSelect },
   emits: ["dashboard-selected", "dashboard-list-updated"],
   props: {
     folderId: {
@@ -94,51 +88,34 @@ export default defineComponent({
   setup(props, { emit }) {
     const store: any = useStore();
     const showAddDashboardDialog: any = ref(false);
+    const addDashboardRef = ref<InstanceType<typeof AddDashboard> | null>(null);
     const dashboardList: any = ref([]);
 
-    const computedStyle = computed(() => {
-      return "height: 35px; margin-top: 13px";
-    });
-
-    //dropdown selected dashboard
-    const selectedDashboard: any = ref(null);
-    const { t } = useI18n();
+    //dropdown selected dashboard id (primitive string for OSelect)
+    const selectedDashboard = ref<string | null>(null);
+    const { t } = useI18nTyped();
 
     // on add dashboard, select added dashboard
-    const updateDashboardList = async (dashboardId: any, folderId: any) => {
+    const updateDashboardList = async (dashboardId: any) => {
       showAddDashboardDialog.value = false;
       await getDashboardList.execute();
-
-      const dashboardData = await getDashboard(store, dashboardId, folderId);
-
-      selectedDashboard.value = {
-        label: dashboardData?.title,
-        value: dashboardData?.dashboardId,
-      };
+      selectedDashboard.value = dashboardId ?? null;
     };
 
     // get all dashboards based on selected folderId
     const getDashboardList = useLoading(async () => {
       if (!props.folderId) return;
 
-      const allDashboardDataByFolderId = await getAllDashboardsByFolderId(
-        store,
-        props.folderId,
-      );
+      const allDashboardDataByFolderId = await getAllDashboardsByFolderId(store, props.folderId);
 
-      dashboardList.value = allDashboardDataByFolderId?.map(
-        (dashboard: any) => ({
-          label: dashboard.title,
-          value: dashboard.dashboardId,
-        }),
-      );
+      dashboardList.value = allDashboardDataByFolderId?.map((dashboard: any) => ({
+        label: dashboard.title,
+        value: dashboard.dashboardId,
+      }));
 
       // select first dashboard
       if (dashboardList.value.length > 0) {
-        selectedDashboard.value = {
-          label: dashboardList?.value[0]?.label,
-          value: dashboardList?.value[0]?.value,
-        };
+        selectedDashboard.value = dashboardList?.value[0]?.value ?? null;
       } else {
         selectedDashboard.value = null;
       }
@@ -164,8 +141,13 @@ export default defineComponent({
 
     watch(
       () => selectedDashboard.value,
-      () => {
-        emit("dashboard-selected", selectedDashboard.value);
+      (dashboardId) => {
+        const dashboard = dashboardList.value.find((d: any) => d.value === dashboardId);
+        // emit {label, value} for backward compatibility with parents
+        emit(
+          "dashboard-selected",
+          dashboard ?? (dashboardId ? { label: dashboardId, value: dashboardId } : null),
+        );
       },
     );
 
@@ -175,9 +157,9 @@ export default defineComponent({
       selectedDashboard,
       updateDashboardList,
       showAddDashboardDialog,
+      addDashboardRef,
       dashboardList,
       getDashboardList,
-      computedStyle,
     };
   },
 });

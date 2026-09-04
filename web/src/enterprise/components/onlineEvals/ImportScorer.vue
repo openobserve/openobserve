@@ -1,0 +1,444 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version. -->
+
+<template>
+  <BaseImport
+    ref="baseImportRef"
+    :title="t('onlineEvals.scorer.import.title')"
+    test-prefix="scorer"
+    :is-importing="isImporting"
+    container-style="height: calc(100vh - var(--navbar-height));"
+    :editor-heights="editorHeights"
+    @back="goBack"
+    @cancel="goBack"
+    @import="importJson"
+  >
+    <template #output-content>
+      <div class="flex h-full w-full min-w-[23.75rem] flex-col">
+        <div
+          v-if="errors.length"
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
+          data-test="scorer-import-errors-title"
+        >
+          {{ t("onlineEvals.scorer.import.errors.title") }}
+        </div>
+        <div
+          v-else
+          class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
+          data-test="scorer-import-output-title"
+        >
+          {{ t("onlineEvals.scorer.import.outputMessages") }}
+        </div>
+        <OSeparator class="mt-1 shrink-0" />
+
+        <div class="min-h-0 flex-1 overflow-auto">
+          <div v-if="errors.length" class="mb-2.5 p-2.5">
+            <div class="error-list">
+              <div
+                v-for="(err, errIdx) in errors"
+                :key="`${err.itemIndex}-${err.field}-${errIdx}`"
+                class="px-0 py-1.25 text-sm"
+                :data-test="`scorer-import-error-${err.itemIndex}-${err.field}`"
+              >
+                <span
+                  v-if="err.field === 'name'"
+                  class="text-error-600"
+                  data-test="scorer-import-name-error"
+                >
+                  {{ err.message }}
+                  <div class="mt-1 w-80">
+                    <OInput
+                      :data-test="`scorer-import-name-input-${err.itemIndex}`"
+                      v-model="nameFixers[err.itemIndex]"
+                      :label="t('onlineEvals.importNameRequired')"
+                      @update:model-value="updateName(err.itemIndex, $event)"
+                    />
+                  </div>
+                </span>
+
+                <span
+                  v-else-if="err.field === 'nameConflict'"
+                  class="text-error-600"
+                  data-test="scorer-import-name-conflict-error"
+                >
+                  {{ err.message }}
+                  <div class="mt-1 w-80">
+                    <OInput
+                      :data-test="`scorer-import-rename-input-${err.itemIndex}`"
+                      v-model="nameFixers[err.itemIndex]"
+                      :label="t('onlineEvals.importNewNameRequired')"
+                      @update:model-value="updateName(err.itemIndex, $event)"
+                    />
+                  </div>
+                </span>
+
+                <span
+                  v-else-if="err.field === 'type'"
+                  class="text-error-600"
+                  data-test="scorer-import-type-error"
+                >
+                  {{ err.message }}
+                  <div class="mt-1 w-80">
+                    <OSelect
+                      :data-test="`scorer-import-type-select-${err.itemIndex}`"
+                      v-model="typeFixers[err.itemIndex]"
+                      :options="typeOptions"
+                      :label="t('onlineEvals.importTypeRequired')"
+                      @update:model-value="updateType(err.itemIndex, $event)"
+                    />
+                  </div>
+                </span>
+
+                <span
+                  v-else-if="err.field === 'scoreConfigRef'"
+                  class="text-error-600"
+                  data-test="scorer-import-score-config-ref-error"
+                >
+                  {{ err.message }}
+                  <div class="mt-1 w-80">
+                    <OSelect
+                      :data-test="`scorer-import-score-config-select-${err.itemIndex}`"
+                      v-model="scoreConfigFixers[err.itemIndex]"
+                      :options="scoreConfigOptions"
+                      :label="t('onlineEvals.importScoreConfigRequired')"
+                      @update:model-value="updateScoreConfigRef(err.itemIndex, $event)"
+                    />
+                  </div>
+                </span>
+
+                <span
+                  v-else-if="err.field === 'providerRef'"
+                  class="text-error-600"
+                  data-test="scorer-import-provider-ref-error"
+                >
+                  {{ err.message }}
+                  <div class="mt-1 w-80">
+                    <OSelect
+                      :data-test="`scorer-import-provider-select-${err.itemIndex}`"
+                      v-model="providerFixers[err.itemIndex]"
+                      :options="providerOptions"
+                      :label="t('onlineEvals.importProviderRequired')"
+                      @update:model-value="updateProviderRef(err.itemIndex, $event)"
+                    />
+                  </div>
+                </span>
+
+                <span v-else class="text-error-600">{{ err.message }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="creators.length" class="mb-2.5 p-2.5">
+            <div
+              class="section-title text-text-heading mb-2.5 text-base uppercase"
+              data-test="scorer-import-creation-title"
+            >
+              {{ t("onlineEvals.scorer.import.creation") }}
+            </div>
+            <div
+              v-for="(c, i) in creators"
+              :key="`${i}-${c.name}`"
+              class="error-list"
+              :data-test="`scorer-import-creation-${i}`"
+            >
+              <div
+                :class="{
+                  'px-0 py-1.25 text-sm font-bold': true,
+                  'text-status-success-text': c.status === 'success',
+                  'text-error-600': c.status === 'error',
+                  'text-text-secondary': c.status === 'exists',
+                }"
+                :data-test="`scorer-import-creation-${i}-message`"
+              >
+                <pre class="m-0 font-[inherit] whitespace-pre-wrap">{{ c.message }}</pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+  </BaseImport>
+</template>
+
+<script setup lang="ts">
+import { computed, reactive, ref, toRef } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
+
+import BaseImport from "@/components/common/BaseImport.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+
+import onlineEvalsService, {
+  type Provider,
+  type ScoreConfig,
+  type Scorer,
+  type ScorerType,
+} from "@/services/online-evals.service";
+import {
+  prepareScorerImport,
+  type ScorerImportError,
+  type ScorerPayload,
+} from "./utils/importScorer";
+
+const props = defineProps<{
+  orgId: string;
+  existingScorers: Scorer[];
+  scoreConfigs: ScoreConfig[];
+  providers: Provider[];
+}>();
+
+const emit = defineEmits<{
+  (e: "cancel"): void;
+  (e: "saved"): void;
+}>();
+
+const { t } = useI18nTyped();
+
+const baseImportRef = ref<any>(null);
+const isImporting = ref(false);
+const existingScorers = toRef(props, "existingScorers");
+const scoreConfigs = toRef(props, "scoreConfigs");
+const providers = toRef(props, "providers");
+
+const errors = ref<ScorerImportError[]>([]);
+const creators = ref<
+  Array<{ name: string; status: "success" | "error" | "exists"; message: string }>
+>([]);
+
+// Inline-fixer state, indexed by itemIndex in the imported batch.
+const nameFixers = reactive<Record<number, string>>({});
+const typeFixers = reactive<Record<number, ScorerType>>({});
+const scoreConfigFixers = reactive<Record<number, string>>({});
+const providerFixers = reactive<Record<number, string>>({});
+
+const typeOptions = [
+  { label: t("onlineEvals.scorer.detail.typeLlmJudge"), value: "llm_judge" },
+  { label: t("onlineEvals.scorer.detail.typeRemote"), value: "remote" },
+];
+
+const scoreConfigOptions = computed(() =>
+  scoreConfigs.value.map((sc) => ({
+    label: raw(sc.name),
+    value: String((sc as any).entityId ?? (sc as any).entity_id ?? sc.id),
+  })),
+);
+
+const providerOptions = computed(() =>
+  providers.value.map((p) => ({ label: raw(p.name), value: String(p.id) })),
+);
+
+const editorHeights = computed(() => ({
+  // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
+  urlEditor: "calc(100vh - 266px)",
+  // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
+  fileEditor: "calc(100vh - 296px)",
+  // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
+  outputContainer: "calc(100vh - 130px)",
+  // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
+  errorReport: "calc(100vh - 192px)",
+}));
+
+const orgId = computed(() => props.orgId);
+
+function goBack() {
+  emit("cancel");
+}
+
+function resetBaseImportFlag() {
+  if (baseImportRef.value) baseImportRef.value.isImportingLocal = false;
+}
+
+function syncEditor(items: any[]) {
+  if (baseImportRef.value?.updateJsonArray) {
+    baseImportRef.value.updateJsonArray(items, true);
+  }
+}
+
+function getBatch(): any[] | null {
+  const arr = baseImportRef.value?.jsonArrayOfObj;
+  if (Array.isArray(arr) && arr.length > 0) return arr;
+  const str = baseImportRef.value?.jsonStr;
+  if (!str) return null;
+  try {
+    const parsed = JSON.parse(str);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return null;
+  }
+}
+
+function ensureScorerEnvelope(item: any): Record<string, any> {
+  if (!item.scorer || typeof item.scorer !== "object") item.scorer = {};
+  if (!item.scorer.params || typeof item.scorer.params !== "object") item.scorer.params = {};
+  return item.scorer;
+}
+
+function updateName(itemIndex: number, value: string | number) {
+  const arr = getBatch();
+  if (!arr || !arr[itemIndex]) return;
+  arr[itemIndex].name = value;
+  syncEditor(arr);
+}
+
+function updateType(itemIndex: number, value: SelectModelValue) {
+  const arr = getBatch();
+  if (!arr || !arr[itemIndex]) return;
+  const scorer = ensureScorerEnvelope(arr[itemIndex]);
+  scorer.type = value;
+  syncEditor(arr);
+}
+
+function updateScoreConfigRef(itemIndex: number, value: SelectModelValue) {
+  const arr = getBatch();
+  if (!arr || !arr[itemIndex]) return;
+  const scorer = ensureScorerEnvelope(arr[itemIndex]);
+  scorer.producesScoreConfigId = value;
+  // Also embed the name so the JSON stays self-describing for future re-imports.
+  const sc = scoreConfigs.value.find(
+    (c) => String((c as any).entityId ?? (c as any).entity_id ?? c.id) === value,
+  );
+  if (sc) scorer.producesScoreConfigName = sc.name;
+  syncEditor(arr);
+}
+
+function updateProviderRef(itemIndex: number, value: SelectModelValue) {
+  const arr = getBatch();
+  if (!arr || !arr[itemIndex]) return;
+  const scorer = ensureScorerEnvelope(arr[itemIndex]);
+  scorer.params.provider_id = value;
+  const prov = providers.value.find((p) => String(p.id) === value);
+  if (prov) scorer.params.providerName = prov.name;
+  syncEditor(arr);
+}
+
+async function importJson({ jsonStr, jsonArray }: { jsonStr: string; jsonArray: any[] }) {
+  errors.value = [];
+  creators.value = [];
+
+  let rawItems: any[];
+  if (Array.isArray(jsonArray) && jsonArray.length > 0) {
+    rawItems = jsonArray;
+  } else {
+    try {
+      if (!jsonStr || !jsonStr.trim()) throw new Error(t("onlineEvals.jsonIsEmpty"));
+      const parsed = JSON.parse(jsonStr);
+      rawItems = Array.isArray(parsed) ? parsed : [parsed];
+    } catch (e: any) {
+      toast({ message: e.message || t("onlineEvals.invalidJsonFormat"), variant: "error" });
+      resetBaseImportFlag();
+      return;
+    }
+  }
+
+  const prepared = prepareScorerImport(rawItems, {
+    existingScorerNames: existingScorers.value,
+    scoreConfigs: scoreConfigs.value,
+    providers: providers.value,
+    t,
+  });
+
+  // Seed inline fixers from the current raw values.
+  for (const item of prepared.items) {
+    for (const e of item.errors) {
+      const raw: any = rawItems[e.itemIndex] ?? {};
+      const scorer = raw.scorer ?? raw;
+
+      if (
+        (e.field === "name" || e.field === "nameConflict") &&
+        nameFixers[e.itemIndex] === undefined
+      ) {
+        nameFixers[e.itemIndex] = typeof raw.name === "string" ? raw.name : "";
+      }
+      if (e.field === "type" && typeFixers[e.itemIndex] === undefined) {
+        const current = scorer?.type ?? scorer?.scorerType ?? scorer?.scorer_type;
+        typeFixers[e.itemIndex] = (current as ScorerType) ?? "llm_judge";
+      }
+      if (e.field === "scoreConfigRef" && scoreConfigFixers[e.itemIndex] === undefined) {
+        scoreConfigFixers[e.itemIndex] = "";
+      }
+      if (e.field === "providerRef" && providerFixers[e.itemIndex] === undefined) {
+        providerFixers[e.itemIndex] = "";
+      }
+    }
+  }
+
+  if (prepared.hasErrors) {
+    errors.value = prepared.errors;
+    resetBaseImportFlag();
+    return;
+  }
+
+  isImporting.value = true;
+  const payloads = prepared.items
+    .map((i) => i.payload)
+    .filter((p): p is ScorerPayload => p !== null);
+
+  const results = await Promise.allSettled(
+    payloads.map((payload) =>
+      onlineEvalsService.scorers.create(orgId.value, payload as any).then(
+        () => ({ status: "success" as const, name: payload.name }),
+        (err: any) => {
+          if (err?.response?.status === 409) {
+            return { status: "exists" as const, name: payload.name };
+          }
+          const msg = err?.response?.data?.message || err?.message || t("onlineEvals.unknownError");
+          return { status: "error" as const, name: payload.name, message: msg };
+        },
+      ),
+    ),
+  );
+
+  let successCount = 0;
+  for (const r of results) {
+    if (r.status !== "fulfilled") continue;
+    const v = r.value;
+    if (v.status === "success") {
+      successCount++;
+      creators.value.push({
+        name: v.name,
+        status: "success",
+        message: t("onlineEvals.import.createdSuccessfully", { name: v.name }),
+      });
+    } else if (v.status === "exists") {
+      creators.value.push({
+        name: v.name,
+        status: "exists",
+        message: t("onlineEvals.import.alreadyExistsSkipped", { name: v.name }),
+      });
+    } else {
+      creators.value.push({
+        name: v.name,
+        status: "error",
+        message: t("onlineEvals.import.failedWithReason", { name: v.name, reason: v.message }),
+      });
+    }
+  }
+
+  isImporting.value = false;
+  resetBaseImportFlag();
+
+  if (successCount === payloads.length) {
+    toast({
+      message: t("toastMessages.onlineEvals.successfullyImportedScorers", { count: successCount }),
+      variant: "success",
+    });
+    setTimeout(() => emit("saved"), 500);
+  } else if (successCount > 0) {
+    toast({
+      message: t("toastMessages.onlineEvals.importedOfScorers", {
+        imported: successCount,
+        count: payloads.length,
+      }),
+      variant: "warning",
+    });
+    emit("saved");
+  }
+}
+</script>

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,10 +14,8 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <div style="height: 100%; width: 100%">
-    <ChartRenderer
-      :data="{ options: options ?? { backgroundColor: 'transparent' } }"
-    />
+  <div class="h-full w-full" data-test="dashboard-variables-dependencies-graph-container">
+    <ChartRenderer :data="{ options: options ?? { backgroundColor: 'transparent' } }" />
   </div>
 </template>
 
@@ -30,15 +28,13 @@ import { ref } from "vue";
 export default defineComponent({
   name: "VariablesDependenciesGraph",
   components: {
-    ChartRenderer: defineAsyncComponent(
-      () => import("../panels/ChartRenderer.vue")
-    ),
+    ChartRenderer: defineAsyncComponent(() => import("../panels/ChartRenderer.vue")),
   },
   props: {
     // we have list of variables
     variablesList: {
       type: Array,
-      default: [],
+      default: () => [],
       required: true,
     },
   },
@@ -49,9 +45,7 @@ export default defineComponent({
 
     onMounted(() => {
       // make dependency graph
-      variablesDependencyGraph = buildVariablesDependencyGraph(
-        props.variablesList
-      );
+      variablesDependencyGraph = buildVariablesDependencyGraph(props.variablesList);
       let edges = [];
 
       // loop on all variables

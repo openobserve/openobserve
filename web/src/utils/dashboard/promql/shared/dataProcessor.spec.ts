@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,16 +23,9 @@ import {
 import type { PromQLResponse } from "./types";
 
 // Mock the legendBuilder module
-vi.mock("./legendBuilder", () => ({
-  getPromqlLegendName: vi.fn((metric, template) => {
-    if (template) {
-      return template.replace(/\{\{(\w+)\}\}/g, (_, key) => metric[key] || "");
-    }
-    return Object.entries(metric)
-      .map(([k, v]) => `${k}="${v}"`)
-      .join(",");
-  }),
-}));
+// The REAL namer, so this path cannot drift from the one the line/bar charts
+// use — the two disagreeing is exactly the bug this spec now guards.
+vi.unmock("./legendBuilder");
 
 describe("dataProcessor", () => {
   describe("processPromQLData", () => {
@@ -53,7 +46,7 @@ describe("dataProcessor", () => {
         queries: [
           {
             config: {
-              promql_legend: "{{job}}",
+              promql_legend: "{job}",
             },
           },
         ],
@@ -79,11 +72,7 @@ describe("dataProcessor", () => {
         },
       ];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result).toHaveLength(1);
       expect(result[0].series).toHaveLength(1);
@@ -91,6 +80,27 @@ describe("dataProcessor", () => {
       expect(result[0].series[0].values).toHaveLength(2);
       expect(result[0].timestamps).toHaveLength(2);
       expect(result[0].queryIndex).toBe(0);
+    });
+
+    // Line/bar go through convertPromQLData; pie, table, heatmap and the rest come
+    // here. Naming them differently means flipping a panel's type silently
+    // rewrites its legend, its tooltip and its per-series colour keys.
+    it("names series the same way the line and bar path does", async () => {
+      const searchQueryData: PromQLResponse[] = [
+        {
+          status: "success",
+          resultType: "matrix",
+          result: [
+            { metric: { __name__: "up", pod: "api-1", job: "k8s" }, values: [[1609459200, "1"]] },
+            { metric: { __name__: "up", pod: "api-2", job: "k8s" }, values: [[1609459200, "1"]] },
+          ],
+        },
+      ] as any;
+      const noTemplate = { ...mockPanelSchema, queries: [{ config: {} }] };
+
+      const result = await processPromQLData(searchQueryData, noTemplate, mockStore);
+
+      expect(result[0].series.map((entry: any) => entry.name)).toEqual(["api-1", "api-2"]);
     });
 
     it("should process OpenObserve format (direct result)", async () => {
@@ -107,11 +117,7 @@ describe("dataProcessor", () => {
         },
       ];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result).toHaveLength(1);
       expect(result[0].series).toHaveLength(1);
@@ -146,11 +152,7 @@ describe("dataProcessor", () => {
         config: { promql_legend: "{{job}}" },
       });
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result).toHaveLength(2);
       expect(result[0].queryIndex).toBe(0);
@@ -179,11 +181,7 @@ describe("dataProcessor", () => {
         config: { promql_legend: "{{job}}" },
       });
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result).toHaveLength(1);
       expect(result[0].queryIndex).toBe(1);
@@ -206,11 +204,7 @@ describe("dataProcessor", () => {
 
       mockPanelSchema.config.promql_series_limit = 50;
 
-      const processedResult = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const processedResult = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(processedResult[0].series).toHaveLength(50);
     });
@@ -232,11 +226,7 @@ describe("dataProcessor", () => {
 
       delete mockPanelSchema.config.promql_series_limit;
 
-      const processedResult = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const processedResult = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(processedResult[0].series).toHaveLength(100);
     });
@@ -266,16 +256,10 @@ describe("dataProcessor", () => {
         },
       ];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].timestamps).toHaveLength(3);
-      expect(result[0].timestamps.map(([ts]) => ts)).toEqual([
-        1609459200, 1609459260, 1609459320,
-      ]);
+      expect(result[0].timestamps.map(([ts]) => ts)).toEqual([1609459200, 1609459260, 1609459320]);
     });
 
     it("should format timestamps with UTC timezone", async () => {
@@ -295,11 +279,7 @@ describe("dataProcessor", () => {
 
       mockStore.state.timezone = "UTC";
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].timestamps[0][0]).toBe(1609459200);
       expect(typeof result[0].timestamps[0][1]).toBe("string");
@@ -322,11 +302,7 @@ describe("dataProcessor", () => {
 
       mockStore.state.timezone = "America/New_York";
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].timestamps[0][0]).toBe(1609459200);
       expect(result[0].timestamps[0][1]).toBeInstanceOf(Date);
@@ -350,11 +326,7 @@ describe("dataProcessor", () => {
         },
       ];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].series[0].data).toEqual({
         1609459200: "100",
@@ -379,11 +351,7 @@ describe("dataProcessor", () => {
 
       mockPanelSchema.queries = [];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].queryConfig).toEqual({});
     });
@@ -400,11 +368,7 @@ describe("dataProcessor", () => {
         },
       ];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].series[0].values).toEqual([[1609459200, "42"]]);
     });
@@ -424,11 +388,7 @@ describe("dataProcessor", () => {
         },
       ];
 
-      const result = await processPromQLData(
-        searchQueryData,
-        mockPanelSchema,
-        mockStore,
-      );
+      const result = await processPromQLData(searchQueryData, mockPanelSchema, mockStore);
 
       expect(result[0].series[0].values).toEqual([]);
       expect(result[0].series[0].data).toEqual({});

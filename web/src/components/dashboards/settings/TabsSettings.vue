@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -18,139 +18,111 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 
 <template>
-  <div class="column full-height" data-test="dashboard-tab-settings">
+  <div class="flex h-full flex-col" data-test="dashboard-tab-settings">
     <DashboardHeader :title="t('dashboard.tabSettingsTitle')">
       <template #right>
-        <q-btn
-          class="text-bold no-border q-ml-md o2-primary-button"
-          no-caps
-          no-outline
-          rounded
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-primary-button-dark'
-              : 'o2-primary-button-light'
-          "
-          :label="t(`dashboard.newTab`)"
+        <OButton
+          variant="primary"
+          size="sm"
           @click.stop="addNewItem"
           data-test="dashboard-tab-settings-add-tab"
-        />
+          >{{ t("dashboard.newTab") }}</OButton
+        >
       </template>
     </DashboardHeader>
-    <div class="table-header flex justify-between text-bold">
-      <div class="header-content">
-        <div class="spacer"></div>
-        <div class="name-column" data-test="dashboard-tab-settings-name">
-          {{ t("dashboard.name") }}
-        </div>
-        <div class="actions-column" data-test="dashboard-tab-settings-actions">
-          {{ t("dashboard.actions") }}
-        </div>
-      </div>
-    </div>
-    <div class="table-content">
-      <draggable
-        v-model="currentDashboardData.data.tabs"
-        :options="dragOptions"
-        @end.stop="handleDragEnd"
-        @mousedown.stop="() => {}"
-        data-test="dashboard-tab-settings-drag"
+    <div ref="tableWrapper" data-test="dashboard-tab-settings-drag">
+      <OTable
+        data-test="dashboard-tabs-table"
+        :data="currentDashboardData.data.tabs ?? []"
+        :columns="columns"
+        row-key="tabId"
+        :frame="false"
+        pagination="none"
+        sorting="none"
+        selection="none"
+        :default-columns="false"
+        :show-global-filter="false"
       >
-        <div
-          v-for="(tab, index) in currentDashboardData.data.tabs"
-          :key="index"
-          class="draggable-row"
-          data-test="dashboard-tab-settings-draggable-row"
-        >
-          <div class="draggable-handle">
-            <q-icon
-              name="drag_indicator"
-              color="grey-13"
-              class="'q-mr-xs"
-              data-test="dashboard-tab-settings-drag-handle"
+        <template #cell-drag>
+          <div
+            class="tab-drag-handle flex cursor-move items-center justify-center"
+            data-test="dashboard-tab-settings-drag-handle"
+          >
+            <OIcon name="drag-indicator" size="sm" />
+          </div>
+        </template>
+
+        <template #cell-name="{ row }">
+          <span
+            v-if="row.tabId !== editTabId"
+            class="block overflow-hidden text-ellipsis whitespace-nowrap"
+            data-test="dashboard-tab-settings-tab-name"
+            :data-test-tab-name="row.name"
+            >{{ row.name }}</span
+          >
+          <div v-else class="flex items-center gap-1">
+            <input
+              v-model="editTabObj.data.name"
+              class="border-theme-accent rounded-default focus:border-section-accent-secondary bg-input-bg min-w-0 flex-1 border p-1 outline-none"
+              data-test="dashboard-tab-settings-tab-name-edit"
             />
-          </div>
-          <div class="draggable-content">
-            <span
-              v-if="tab.tabId !== editTabId"
-              class="tab-name"
-              data-test="dashboard-tab-settings-tab-name"
-              >{{ tab.name }}</span
+            <OButton
+              variant="ghost"
+              size="icon"
+              :title="t('dashboard.save')"
+              @click.stop="saveEdit"
+              :disabled="!editTabObj.data.name.trim()"
+              data-test="dashboard-tab-settings-tab-name-edit-save"
+              icon-left="check"
             >
-            <div v-else class="edit-container">
-              <input
-                :class="store.state.theme === 'dark' ? 'bg-grey-10' : ''"
-                v-model="editTabObj.data.name"
-                class="edit-input"
-                data-test="dashboard-tab-settings-tab-name-edit"
-              />
-              <q-btn
-                icon="check"
-                unelevated
-                size="sm"
-                round
-                flat
-                :title="t('dashboard.save')"
-                @click.stop="saveEdit"
-                :disable="!editTabObj.data.name.trim()"
-                data-test="dashboard-tab-settings-tab-name-edit-save"
-              ></q-btn>
-              <q-btn
-                icon="close"
-                unelevated
-                size="sm"
-                round
-                flat
-                :title="t('dashboard.cancel')"
-                @click.stop="cancelEdit"
-                data-test="dashboard-tab-settings-tab-name-edit-cancel"
-              ></q-btn>
-            </div>
-            <div class="actions">
-              <q-btn
-                icon="edit"
-                padding="4px"
-                unelevated
-                size="sm"
-                round
-                flat
-                :disabled="tab.tabId === editTabId"
-                :title="t('dashboard.edit')"
-                @click.stop="editItem(tab.tabId)"
-                data-test="dashboard-tab-settings-tab-edit-btn"
-              />
-              <q-btn
-                v-if="currentDashboardData.data.tabs.length !== 1"
-                :icon="outlinedDelete"
-                :title="t('dashboard.delete')"
-                padding="4px"
-                unelevated
-                size="sm"
-                round
-                flat
-                @click.stop="deleteItem(tab.tabId)"
-                data-test="dashboard-tab-settings-tab-delete-btn"
-              />
-            </div>
+            </OButton>
+            <OButton
+              variant="ghost"
+              size="icon"
+              :title="t('dashboard.cancel')"
+              @click.stop="cancelEdit"
+              data-test="dashboard-tab-settings-tab-name-edit-cancel"
+              icon-left="close"
+            >
+            </OButton>
           </div>
-        </div>
-      </draggable>
+        </template>
+
+        <template #cell-actions="{ row }">
+          <div class="flex justify-center gap-1">
+            <OButton
+              variant="ghost"
+              size="icon"
+              :disabled="row.tabId === editTabId"
+              :title="t('dashboard.edit')"
+              @click.stop="editItem(row.tabId)"
+              data-test="dashboard-tab-settings-tab-edit-btn"
+              icon-left="edit"
+            >
+            </OButton>
+            <OButton
+              v-if="currentDashboardData.data.tabs.length !== 1"
+              variant="ghost"
+              size="icon"
+              :title="t('dashboard.delete')"
+              @click.stop="deleteItem(row.tabId)"
+              data-test="dashboard-tab-settings-tab-delete-btn"
+            >
+              <template #icon-left><OIcon name="delete" size="sm" /></template>
+            </OButton>
+          </div>
+        </template>
+      </OTable>
     </div>
 
-    <q-dialog
-      v-model="showAddTabDialog"
-      position="right"
-      full-height
-      maximized
+    <AddTab
+      v-model:open="showAddTabDialog"
+      :edit-mode="isTabEditMode"
+      :tabId="selectedTabIdToEdit"
+      :dashboard-id="currentDashboardData.data.dashboardId"
       data-test="dashboard-tab-settings-add-tab-dialog"
-    >
-      <AddTab
-        :edit-mode="isTabEditMode"
-        :tabId="selectedTabIdToEdit"
-        :dashboard-id="currentDashboardData.data.dashboardId"
-        @refresh="refreshRequired"
-      />
-    </q-dialog>
+      @refresh="refreshRequired"
+    />
     <!-- delete tab dialog -->
     <TabsDeletePopUp
       v-model="deletePopupVisible"
@@ -165,29 +137,33 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, nextTick, ref } from "vue";
-import { VueDraggableNext } from "vue-draggable-next";
-import { useI18n } from "vue-i18n";
+import Sortable from "sortablejs";
+import { raw, useI18nTyped } from "@/types/i18n";
 import DashboardHeader from "./common/DashboardHeader.vue";
 import { useStore } from "vuex";
-import { deleteTab, editTab, getDashboard } from "@/utils/commons";
+import { deleteTab, editTab, getDashboard, updateDashboard } from "@/utils/commons";
 import { useRoute } from "vue-router";
-import { outlinedDelete } from "@quasar/extras/material-icons-outlined";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTable from "@/lib/core/Table/OTable.vue";
+import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
+import { COL } from "@/lib/core/Table/OTable.types";
 import { reactive } from "vue";
-import { onMounted } from "vue";
+import { onMounted, onActivated, onBeforeUnmount } from "vue";
 import AddTab from "@/components/dashboards/tabs/AddTab.vue";
 import TabsDeletePopUp from "./TabsDeletePopUp.vue";
-import { updateDashboard } from "../../../utils/commons";
 import useNotifications from "@/composables/useNotifications";
 
 export default defineComponent({
   name: "TabsSettings",
   components: {
-    draggable: VueDraggableNext as any,
     DashboardHeader,
     AddTab,
     TabsDeletePopUp,
+    OButton,
+    OIcon,
+    OTable,
   },
-  emits: ["refresh"],
   setup(props, { emit }) {
     const store = useStore();
     const route = useRoute();
@@ -215,14 +191,90 @@ export default defineComponent({
       showErrorNotification,
       showConfictErrorNotificationWithRefreshBtn,
     } = useNotifications();
+    // Attach SortableJS to OTable's rendered <tbody> so rows can be dragged
+    // to reorder. Re-runnable: tears down any prior instance first.
+    const initSortable = async () => {
+      await nextTick();
+      const tbody = tableWrapper.value?.querySelector(
+        'tbody[data-test="o2-table-body"]',
+      ) as HTMLElement | null;
+      if (!tbody) return;
+
+      sortableInstance?.destroy();
+      sortableInstance = Sortable.create(tbody, {
+        animation: 200,
+        handle: ".tab-drag-handle",
+        onEnd: (evt: Sortable.SortableEvent) => {
+          const { oldIndex, newIndex } = evt;
+          if (oldIndex == null || newIndex == null || oldIndex === newIndex) {
+            return;
+          }
+
+          // Revert Sortable's DOM mutation so Vue stays the single source of
+          // truth, then reorder the reactive data and let Vue re-render.
+          const parent = evt.from;
+          if (newIndex > oldIndex) {
+            parent.insertBefore(evt.item, parent.children[oldIndex]);
+          } else {
+            parent.insertBefore(evt.item, parent.children[oldIndex + 1] ?? null);
+          }
+
+          const list = [...currentDashboardData.data.tabs];
+          const [moved] = list.splice(oldIndex, 1);
+          list.splice(newIndex, 0, moved);
+          currentDashboardData.data.tabs = list;
+
+          handleDragEnd();
+        },
+      });
+    };
+
     onMounted(async () => {
       await getDashboardData();
+      await initSortable();
     });
 
-    const { t } = useI18n();
-    const dragOptions = ref({
-      animation: 200,
+    onActivated(async () => {
+      await initSortable();
     });
+
+    onBeforeUnmount(() => {
+      sortableInstance?.destroy();
+      sortableInstance = null;
+    });
+
+    const { t } = useI18nTyped();
+
+    // Wrapper around the global OTable; used to reach its rendered <tbody>
+    // so SortableJS can provide row drag-and-drop (OTable has no native row
+    // reorder — we layer it on without modifying OTable).
+    const tableWrapper = ref<HTMLElement | null>(null);
+    let sortableInstance: Sortable | null = null;
+
+    const columns: OTableColumnDef[] = [
+      {
+        id: "drag",
+        header: raw(""),
+        size: 32,
+        minSize: 32,
+        maxSize: 32,
+        meta: { align: "center" },
+      },
+      {
+        id: "name",
+        header: t("dashboard.name"),
+        accessorKey: "name",
+        size: COL.name,
+        meta: { align: "left", isName: true, autoWidth: true },
+      },
+      {
+        id: "actions",
+        header: t("dashboard.actions"),
+        isAction: true,
+        size: 120,
+        meta: { align: "center", actionCount: 2 },
+      },
+    ];
 
     const editTabId = ref(null);
     const editTabObj: any = reactive({
@@ -239,23 +291,20 @@ export default defineComponent({
           route.query.folder ?? "default",
         );
 
-        // emit refresh to rerender
         emit("refresh");
 
-        showPositiveNotification("Dashboard updated successfully.", {
-          timeout: 2000,
-        });
+        showPositiveNotification(t("dashboard.tabsSettings.dashboardUpdated"));
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab reorder failed",
+              t("dashboard.tabsSettings.tabReorderFailed"),
+            t,
           );
         } else {
-          showErrorNotification(error?.message ?? "Tab reorder failed");
+          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabReorderFailed"));
         }
-        // emit refresh to rerender
         emit("refresh");
         await getDashboardData();
       }
@@ -264,11 +313,7 @@ export default defineComponent({
     const editItem = (tabId: any) => {
       editTabId.value = tabId;
       editTabObj.data = JSON.parse(
-        JSON.stringify(
-          currentDashboardData.data.tabs.find(
-            (tab: any) => tab.tabId === tabId,
-          ),
-        ),
+        JSON.stringify(currentDashboardData.data.tabs.find((tab: any) => tab.tabId === tabId)),
       );
     };
 
@@ -284,13 +329,10 @@ export default defineComponent({
             editTabObj.data,
           );
 
-          // emit refresh to rerender
           emit("refresh");
           await getDashboardData();
 
-          showPositiveNotification("Tab updated successfully", {
-            timeout: 2000,
-          });
+          showPositiveNotification(t("dashboard.tabsSettings.tabUpdated"));
           // reset edit mode
           editTabId.value = null;
           editTabObj.data = {};
@@ -300,20 +342,19 @@ export default defineComponent({
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab updation failed",
+              t("dashboard.tabsSettings.tabUpdationFailed"),
+            t,
           );
         } else {
-          showErrorNotification(error?.message ?? "Tab updation failed");
+          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabUpdationFailed"));
         }
 
-        // emit refresh to rerender
         emit("refresh");
         await getDashboardData();
       }
     };
 
     const cancelEdit = () => {
-      // reset edit mode
       editTabId.value = null;
       editTabObj.data = {};
     };
@@ -326,7 +367,6 @@ export default defineComponent({
     const deleteItem = async (tabId: any) => {
       tabIdToBeDeleted.value = tabId;
       await nextTick();
-      // call cancelEdit to reset edit mode
       cancelEdit();
       deletePopupVisible.value = true;
     };
@@ -342,24 +382,22 @@ export default defineComponent({
         );
         await getDashboardData();
 
-        // emit event
         emit("refresh");
 
         tabIdToBeDeleted.value = null;
         deletePopupVisible.value = false;
 
-        showPositiveNotification("Tab deleted successfully", {
-          timeout: 2000,
-        });
+        showPositiveNotification(t("dashboard.tabsSettings.tabDeleted"));
       } catch (error: any) {
         if (error?.response?.status === 409) {
           showConfictErrorNotificationWithRefreshBtn(
             error?.response?.data?.message ??
               error?.message ??
-              "Tab deletion failed",
+              t("dashboard.tabsSettings.tabDeletionFailed"),
+            t,
           );
         } else {
-          showErrorNotification(error?.message ?? "Tab deletion failed", {
+          showErrorNotification(error?.message ?? t("dashboard.tabsSettings.tabDeletionFailed"), {
             timeout: 2000,
           });
         }
@@ -374,8 +412,9 @@ export default defineComponent({
     };
 
     return {
-      dragOptions,
       t,
+      columns,
+      tableWrapper,
       editTabId,
       editTabObj,
       editItem,
@@ -386,7 +425,6 @@ export default defineComponent({
       deletePopupVisible,
       tabIdToBeDeleted,
       handleDragEnd,
-      outlinedDelete,
       addNewItem,
       showAddTabDialog,
       isTabEditMode,
@@ -398,95 +436,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.table-header {
-  padding: 8px 16px;
-  border-bottom: 1px solid var(--o2-border-color);
-  background-color: var(--o2-table-header-bg);
-}
-
-.header-content {
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) 80px;
-  width: 100%;
-  align-items: center;
-}
-
-.name-column {
-  padding-left: 8px;
-}
-
-.actions-column {
-  justify-self: flex-end;
-}
-
-.table-content {
-  .draggable-row {
-    display: grid;
-    grid-template-columns: 40px minmax(0, 1fr);
-    align-items: center;
-    border-bottom: 1px solid var(--o2-border-color);
-    min-height: 40px;
-
-    &:hover {
-      background-color: var(--o2-hover-accent);
-    }
-  }
-}
-
-.draggable-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  cursor: move;
-}
-
-.draggable-content {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 80px;
-  align-items: center;
-  padding-right: 8px;
-}
-
-.tab-name {
-  padding: 8px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.edit-container {
-  display: flex;
-  align-items: center;
-  padding: 4px 8px;
-  gap: 4px;
-}
-
-.edit-input {
-  flex: 1;
-  border: 1px solid var(--q-primary);
-  border-radius: 4px;
-  padding: 4px;
-  outline: none;
-  min-width: 0;
-
-  &:focus {
-    border-color: var(--q-secondary);
-  }
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 4px;
-}
-.q-btn {
-  transition: background-color 0.2s ease;
-
-  &:hover {
-    background-color: var(--o2-hover-accent) !important;
-  }
-}
-</style>

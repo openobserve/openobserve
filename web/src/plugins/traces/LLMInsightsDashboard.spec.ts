@@ -1,0 +1,509 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// @vitest-environment jsdom
+//
+// Focused tests for `LLMInsightsDashboard.vue` — covers the dashboard's
+// single fetch entry point (`loadInsights`), the wrapper exposed for
+// the parent (`refresh`), and the stream-change handler. The pure
+// helpers (`computeTrend`, `splitNumberWithUnit`, etc.) are tested in
+// `llmInsightsDashboard.utils.spec.ts`; the composable's fetch flow is
+// tested in `composables/useLLMInsights.spec.ts`. This file pins the
+// thin glue that lives in the SFC.
+
+// ---------------------------------------------------------------------------
+// vi.mock() calls — hoisted above imports.
+// ---------------------------------------------------------------------------
+
+const mockFetchAll = vi.fn(async () => {});
+const mockCancelAll = vi.fn();
+const mockGetStreams = vi.fn().mockResolvedValue({
+  list: [
+    { name: "default", settings: { is_llm_stream: true } },
+    { name: "other", settings: { is_llm_stream: false } },
+  ],
+});
+const mockRouterPush = vi.fn();
+
+import { ref } from "vue";
+
+// Reactive refs the composable mock returns — tests can read these
+// after asserting on fetch behaviour.
+const mockKpi = ref({
+  requestCount: 0,
+  traceCount: 0,
+  errorCount: 0,
+  totalTokens: 0,
+  totalCost: 0,
+  p95DurationMicros: 0,
+});
+const mockSparklines = ref({
+  cost: [],
+  tokens: [],
+  traces: [],
+  p95Micros: [],
+  errorRate: [],
+});
+const mockLoading = ref(false);
+const mockP95Loading = ref(false);
+const mockError = ref<string | null>(null);
+const mockHasLoadedOnce = ref(false);
+const mockAvailableStreams = ref<string[]>([]);
+const mockStreamsLoaded = ref(false);
+
+vi.mock("./composables/useLLMInsights", () => ({
+  useLLMInsights: () => ({
+    kpi: mockKpi,
+    sparklines: mockSparklines,
+    loading: mockLoading,
+    p95Loading: mockP95Loading,
+    error: mockError,
+    hasLoadedOnce: mockHasLoadedOnce,
+    availableStreams: mockAvailableStreams,
+    streamsLoaded: mockStreamsLoaded,
+    fetchAll: mockFetchAll,
+    cancelAll: mockCancelAll,
+  }),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({
+    getStreams: mockGetStreams,
+  }),
+}));
+
+vi.mock("vue-i18n", () => ({
+  useI18n: vi.fn(() => ({
+    t: (key: string, params?: Record<string, any>) => (params ? key + JSON.stringify(params) : key),
+  })),
+}));
+
+vi.mock("vue-router", () => ({
+  useRouter: () => ({ push: mockRouterPush, replace: vi.fn(() => Promise.resolve()) }),
+  // This suite exercises the stream-mode paths. The dashboard now defaults to
+  // Agent scope and only `?type=stream` (NOT a saved preference) opts into
+  // Stream mode, so drive stream mode through the URL the way the component reads it.
+  useRoute: () => ({ query: { type: "stream" } }),
+}));
+
+// Partial-mock vuex so `createStore` (used by `src/stores/index.ts`)
+// stays intact while we override `useStore` for the component under test.
+vi.mock("vuex", async (importOriginal) => {
+  const actual = (await importOriginal()) as any;
+  return {
+    ...actual,
+    useStore: () => ({
+      state: {
+        selectedOrganization: { identifier: "test-org" },
+      },
+    }),
+  };
+});
+
+// ---------------------------------------------------------------------------
+
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mount, flushPromises } from "@vue/test-utils";
+import LLMInsightsDashboard from "./LLMInsightsDashboard.vue";
+// The KPI cache is a module singleton (survives remounts in the app); clear it
+// between tests so a warmed entry from one mount doesn't suppress the fetch in
+// the next.
+import { kpiCache } from "./llmInsightsCache";
+
+const STREAM_LS_KEY = "llmInsights_streamFilter";
+
+/** Mount the dashboard with default props that satisfy the loadInsights guard. */
+function mountDashboard(
+  propsOverrides: Partial<{ streamName: string; startTime: number; endTime: number }> = {},
+) {
+  return mount(LLMInsightsDashboard, {
+    props: {
+      streamName: "default",
+      startTime: 1_700_000_000_000_000,
+      endTime: 1_700_001_000_000_000,
+      ...propsOverrides,
+    },
+    global: {
+      stubs: {
+        // Children — all stubbed so we don't try to render echarts /
+        // sparkline math during dashboard-level tests.
+        LLMSchemaPanel: { template: '<div data-test="llm-schema-panel" />' },
+        LLMErrorTable: { template: '<div data-test="llm-error-table" />' },
+        KpiSparkline: { template: '<div data-test="kpi-sparkline" />' },
+        LLMInsightsSkeleton: { template: '<div data-test="llm-insights-skeleton" />' },
+        OButton: {
+          template: "<button @click=\"$emit('click')\"><slot /></button>",
+          emits: ["click"],
+        },
+      },
+    },
+  });
+}
+
+beforeEach(() => {
+  // Fresh mock state for every test.
+  vi.clearAllMocks();
+  kpiCache.clear();
+  mockKpi.value = {
+    requestCount: 0,
+    traceCount: 0,
+    errorCount: 0,
+    totalTokens: 0,
+    totalCost: 0,
+    p95DurationMicros: 0,
+  };
+  mockSparklines.value = {
+    cost: [],
+    tokens: [],
+    traces: [],
+    p95Micros: [],
+    errorRate: [],
+  };
+  mockLoading.value = false;
+  mockP95Loading.value = false;
+  mockError.value = null;
+  mockHasLoadedOnce.value = false;
+  mockAvailableStreams.value = [];
+  mockStreamsLoaded.value = false;
+  // Reset localStorage between tests so the dashboard's stream
+  // initialisation doesn't bleed across cases.
+  localStorage.clear();
+  // Stream mode is opted into via `?type=stream` in the useRoute mock above
+  // (the dashboard no longer reads a saved mode preference on init).
+  // Default streams response.
+  mockGetStreams.mockResolvedValue({
+    list: [
+      { name: "default", settings: { is_llm_stream: true } },
+      { name: "other", settings: { is_llm_stream: false } },
+    ],
+  });
+});
+
+afterEach(() => {
+  localStorage.clear();
+});
+
+// ===========================================================================
+// loadInsights — the dashboard's single fetch entry point
+// ===========================================================================
+
+describe("LLMInsightsDashboard — loadInsights guards", () => {
+  // Bails when stream selector is empty — otherwise we'd hit the server
+  // with `FROM ""` which is a parse error. The guard also covers the
+  // race during initial mount before loadTraceStreams resolves.
+  it("does not call fetchAll when activeStream is empty", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    // Manually clear activeStream (loadTraceStreams may have set it).
+    (wrapper.vm as any).activeStream = "";
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).loadInsights();
+    expect(mockFetchAll).not.toHaveBeenCalled();
+  });
+
+  // The dashboard accepts startTime / endTime as props. Parent passes
+  // them as part of its time-range computation. When either is 0 the
+  // dashboard is in a "bootstrap" state — bail without firing SQL.
+  it("does not call fetchAll when start is missing", async () => {
+    const wrapper = mountDashboard({ startTime: 0 });
+    await flushPromises();
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).loadInsights();
+    expect(mockFetchAll).not.toHaveBeenCalled();
+  });
+
+  it("does not call fetchAll when end is missing", async () => {
+    const wrapper = mountDashboard({ endTime: 0 });
+    await flushPromises();
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).loadInsights();
+    expect(mockFetchAll).not.toHaveBeenCalled();
+  });
+
+  // Explicit args override prop defaults — that's the path the parent
+  // uses on Refresh to side-step Vue's next-tick prop propagation lag.
+  it("accepts explicit start/end args overriding props", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).loadInsights(123, 456);
+    // 4th arg is the selected agent (null = All Agents).
+    expect(mockFetchAll).toHaveBeenCalledWith("default", 123, 456, null);
+  });
+
+  // Default path — no args means use props. `force` bypasses the in-memory KPI
+  // cache that onMounted already warmed for this window (a same-window reload is
+  // otherwise served from the snapshot — see the caching tests).
+  it("falls back to props when no args passed", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).loadInsights(undefined, undefined, { force: true });
+    expect(mockFetchAll).toHaveBeenCalledWith(
+      "default",
+      1_700_000_000_000_000,
+      1_700_001_000_000_000,
+      null,
+    );
+  });
+
+  // Persists the user's stream choice so reopening the dashboard later
+  // restores it. The localStorage write happens BEFORE fetchAll —
+  // verify both ordering and content. (`force` to bypass the warm KPI cache.)
+  it("writes the active stream to localStorage before fetching", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    localStorage.clear();
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).loadInsights(undefined, undefined, { force: true });
+    expect(localStorage.getItem(STREAM_LS_KEY)).toBe("default");
+    expect(mockFetchAll).toHaveBeenCalled();
+  });
+
+  // The KPI cache: a same-window reload of the same selection is served from the
+  // snapshot (no refetch); `force` and a new window both bypass it.
+  it("restores KPI from cache on a same-window reload (no refetch)", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    // The insights fetch is parent-driven — trigger the first fetch via the
+    // exposed refresh(), which populates the KPI cache for this window.
+    await (wrapper.vm as any).refresh();
+    await flushPromises();
+    expect(mockFetchAll).toHaveBeenCalledTimes(1);
+    mockFetchAll.mockClear();
+    // Same window + selection, non-forced → served from the cache snapshot.
+    await (wrapper.vm as any).loadInsights();
+    expect(mockFetchAll).not.toHaveBeenCalled();
+  });
+
+  it("refetches KPI after the time window changes", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).loadInsights(2_000_000_000_000_000, 2_000_001_000_000_000);
+    expect(mockFetchAll).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ===========================================================================
+// refresh — the parent-facing entry exposed via defineExpose
+// ===========================================================================
+
+describe("LLMInsightsDashboard — refresh (parent entry point)", () => {
+  // The parent passes the freshly computed start/end because Vue's
+  // prop propagation lags by a tick — without explicit args we'd
+  // fetch with the previous window. Verify the args reach fetchAll.
+  it("forwards explicit start/end through to fetchAll", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).refresh(999, 1999);
+    expect(mockFetchAll).toHaveBeenCalledWith("default", 999, 1999, null);
+  });
+
+  // No args → behaves like a normal loadInsights (falls back to props).
+  it("falls back to props when called with no args", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockFetchAll.mockClear();
+    await (wrapper.vm as any).refresh();
+    expect(mockFetchAll).toHaveBeenCalledWith(
+      "default",
+      1_700_000_000_000_000,
+      1_700_001_000_000_000,
+      null,
+    );
+  });
+});
+
+// ===========================================================================
+// onStreamChange — the OSelect v-model handler
+// ===========================================================================
+
+describe("LLMInsightsDashboard — onStreamChange", () => {
+  // Stream-selector change → fetch with the new stream + current props.
+  // Persists to localStorage as a side-effect of loadInsights.
+  it("fetches with the new active stream", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockFetchAll.mockClear();
+    (wrapper.vm as any).activeStream = "other";
+    (wrapper.vm as any).onStreamChange();
+    await flushPromises();
+    expect(mockFetchAll).toHaveBeenCalledWith(
+      "other",
+      1_700_000_000_000_000,
+      1_700_001_000_000_000,
+      null,
+    );
+    expect(localStorage.getItem(STREAM_LS_KEY)).toBe("other");
+  });
+
+  // Stream is an identity dimension: the compare A/B pair belongs to the OLD
+  // stream's agents, so switching stream must exit compare mode (otherwise the
+  // comparison lingers on agents that may not exist in the new stream).
+  it("exits compare mode when the active stream changes (stream mode)", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    // Stream mode: effectiveStream follows the page stream picker (activeStream).
+    // (In agent mode effectiveStream follows the agent's source_stream, which the
+    // selectedAgentName watcher already covers.)
+    (wrapper.vm as any).filterMode = "stream";
+    (wrapper.vm as any).activeStream = "start-stream";
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+    // Enter compare AFTER the mode/stream have settled, so the identity watcher
+    // isn't fired by the setup itself.
+    (wrapper.vm as any).compareMode = true;
+    await wrapper.vm.$nextTick();
+    expect((wrapper.vm as any).compareMode).toBe(true);
+
+    // Now the real action: switch stream → compare mode must exit.
+    (wrapper.vm as any).activeStream = "another-stream";
+    await wrapper.vm.$nextTick();
+    await flushPromises();
+
+    expect((wrapper.vm as any).compareMode).toBe(false);
+  });
+});
+
+// ===========================================================================
+// onMounted — the initial-load flow
+// ===========================================================================
+
+describe("LLMInsightsDashboard — onMounted", () => {
+  // First-time visit: onMounted loads the stream list ONLY — the insights
+  // fetch is owned by the parent (via the exposed refresh()), so we don't
+  // double-fetch on load. Mount discovers streams; the parent's refresh()
+  // is what fires fetchAll.
+  it("loads streams on mount but leaves the insights fetch to the parent", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    expect(mockGetStreams).toHaveBeenCalled();
+    // Mount alone must NOT fetch — that's the parent's job.
+    expect(mockFetchAll).not.toHaveBeenCalled();
+    // Parent-driven fetch.
+    await (wrapper.vm as any).refresh();
+    await flushPromises();
+    expect(mockFetchAll).toHaveBeenCalled();
+  });
+
+  // Filters out streams with `is_llm_stream === false` explicitly.
+  // Streams without the flag (legacy) are kept — see
+  // `loadTraceStreams` policy comment.
+  it("excludes streams with is_llm_stream === false", async () => {
+    mockGetStreams.mockResolvedValue({
+      list: [
+        { name: "a", settings: { is_llm_stream: true } },
+        { name: "b", settings: { is_llm_stream: false } },
+        { name: "c", settings: {} }, // no flag → kept (legacy)
+      ],
+    });
+    const wrapper = mountDashboard();
+    await flushPromises();
+    expect((wrapper.vm as any).availableStreams).toEqual(["a", "c"]);
+  });
+
+  // localStorage value is honoured on mount when it's still a valid
+  // option after the streams list resolves.
+  it("uses localStorage stream when it's in the available list", async () => {
+    localStorage.setItem(STREAM_LS_KEY, "default");
+    mockGetStreams.mockResolvedValue({
+      list: [{ name: "default", settings: { is_llm_stream: true } }],
+    });
+    const wrapper = mountDashboard();
+    await flushPromises();
+    expect((wrapper.vm as any).activeStream).toBe("default");
+  });
+
+  // Stale localStorage value (stream no longer exists) → clamp to the
+  // first available option. Prevents the dashboard from rendering a
+  // broken empty state for an unselectable stream.
+  it("clamps to the first available stream when localStorage value is stale", async () => {
+    localStorage.setItem(STREAM_LS_KEY, "deleted-stream");
+    mockGetStreams.mockResolvedValue({
+      list: [{ name: "alive", settings: { is_llm_stream: true } }],
+    });
+    const wrapper = mountDashboard();
+    await flushPromises();
+    expect((wrapper.vm as any).activeStream).toBe("alive");
+  });
+
+  // Cleanly handles a getStreams failure — empty list, no crash.
+  it("falls back to empty stream list when getStreams rejects", async () => {
+    mockGetStreams.mockRejectedValueOnce(new Error("boom"));
+    const wrapper = mountDashboard();
+    await flushPromises();
+    expect((wrapper.vm as any).availableStreams).toEqual([]);
+    expect((wrapper.vm as any).activeStream).toBe("");
+    // No fetchAll because no active stream.
+    expect(mockFetchAll).not.toHaveBeenCalled();
+  });
+});
+
+// ===========================================================================
+// onUnmounted — cancellation on tab/page navigation away
+// ===========================================================================
+
+describe("LLMInsightsDashboard — onUnmounted", () => {
+  // The dashboard wires cancellation through onUnmounted so in-flight server
+  // queries are cancelled when the user navigates away. Without this the server
+  // keeps streaming results to a component that's no longer rendered. Unmount
+  // cancels the dashboard's own queries plus the version-compare arms (armA +
+  // armB), which share the mocked stream-query — three cancelAll calls total.
+  it("calls cancelAll on unmount", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockCancelAll.mockClear();
+    wrapper.unmount();
+    expect(mockCancelAll).toHaveBeenCalledTimes(3);
+  });
+});
+
+// ===========================================================================
+// onViewTrace — router push when user clicks "View" in recent-errors
+// ===========================================================================
+
+describe("LLMInsightsDashboard — onViewTrace", () => {
+  // The recent-errors panel emits view-trace with a trace_id. The
+  // dashboard pushes to traceDetails with the current window so the
+  // detail page shows the same time range as the dashboard.
+  it("routes to traceDetails with the current window", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockRouterPush.mockClear();
+    (wrapper.vm as any).onViewTrace("trace-123");
+    expect(mockRouterPush).toHaveBeenCalledWith({
+      name: "traceDetails",
+      query: expect.objectContaining({
+        stream: "default",
+        trace_id: "trace-123",
+        from: 1_700_000_000_000_000,
+        to: 1_700_001_000_000_000,
+        org_identifier: "test-org",
+      }),
+    });
+  });
+
+  // Empty / missing trace_id is a no-op — defensive against the
+  // "view-link" column receiving a row without a trace_id field.
+  it("does nothing when traceId is empty", async () => {
+    const wrapper = mountDashboard();
+    await flushPromises();
+    mockRouterPush.mockClear();
+    (wrapper.vm as any).onViewTrace("");
+    expect(mockRouterPush).not.toHaveBeenCalled();
+  });
+});

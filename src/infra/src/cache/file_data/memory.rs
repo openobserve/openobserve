@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,6 +16,7 @@
 use std::{
     cmp::{max, min},
     ops::Range,
+    sync::LazyLock as Lazy,
 };
 
 use bytes::Bytes;
@@ -28,7 +29,6 @@ use config::{
 };
 use futures::StreamExt;
 use object_store::{GetOptions, GetResult, GetResultPayload, ObjectMeta};
-use once_cell::sync::Lazy;
 use tokio::sync::RwLock;
 
 use super::CacheStrategy;
@@ -297,6 +297,28 @@ pub async fn get_size(file: &str) -> Option<usize> {
     let idx = get_bucket_idx(file);
     let files = FILES[idx].read().await;
     files.get_size(file).await
+}
+
+/// Slice the cached in-memory `Bytes` once for each requested range.
+/// Returns `None` if the file isn't in the memory cache or any range is
+/// out of bounds — callers should fall through to disk / remote.
+///
+/// This is the batched counterpart to [`get_opts`] used by the search
+/// hot path: one cache lookup yields N small slices with zero IO.
+pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> Option<Vec<Bytes>> {
+    if !get_config().memory_cache.enabled || ranges.is_empty() {
+        return None;
+    }
+    let data = get(file, None).await?;
+    let len = data.len() as u64;
+    let mut out = Vec::with_capacity(ranges.len());
+    for r in ranges {
+        if r.start > r.end || r.end > len {
+            return None;
+        }
+        out.push(data.slice(r.start as usize..r.end as usize));
+    }
+    Some(out)
 }
 
 #[inline]
@@ -634,5 +656,36 @@ mod tests {
             small_key.len() + small_content.len() + large_key.len() + large_content.len();
         assert!(after_used >= initial_used + min_expected_increase);
         assert!(after_len >= initial_len + 2); // Added 2 items
+    }
+
+    #[test]
+    fn test_get_bucket_idx_valid_range() {
+        let idx = get_bucket_idx("some/file/path.parquet");
+        let cfg = config::get_config();
+        let max = cfg.memory_cache.bucket_num.max(1);
+        assert!(idx < max);
+    }
+
+    #[test]
+    fn test_get_bucket_idx_empty_string() {
+        let idx = get_bucket_idx("");
+        let cfg = config::get_config();
+        let max = cfg.memory_cache.bucket_num.max(1);
+        assert!(idx < max);
+    }
+
+    #[test]
+    fn test_file_data_new_is_empty() {
+        let fd = FileData::with_cache_strategy("lru");
+        assert!(fd.is_empty());
+        assert_eq!(fd.len(), 0);
+        assert_eq!(fd.size(), 0);
+    }
+
+    #[test]
+    fn test_file_data_default_is_empty() {
+        let fd = FileData::default();
+        assert!(fd.is_empty());
+        assert_eq!(fd.size(), 0);
     }
 }

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -303,7 +303,6 @@ describe("PromQL Chunk Processor", () => {
     });
 
     let result = null;
-    let totalMetricsSent = 0;
 
     // Simulate streaming: send metrics in chunks
     const chunkSize = 2500;
@@ -311,7 +310,6 @@ describe("PromQL Chunk Processor", () => {
       const count = Math.min(chunkSize, 9832 - start);
       const chunk = createConsistentChunk(start, count);
       result = processor.processChunk(result, chunk);
-      totalMetricsSent += count;
     }
 
     const limitedNewWay = result.result;

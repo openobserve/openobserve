@@ -30,9 +30,24 @@ use crate::{
     },
 };
 
+pub mod aggregation_level;
 pub mod alert;
+pub mod composite;
+pub mod content_spec;
 pub mod deduplication;
+pub mod dispatch;
+pub mod grouping;
 pub mod incidents;
+pub mod level;
+pub mod priority;
+pub mod state;
+pub mod state_level;
+pub mod tags;
+
+/// Minimum silence applied to a realtime alert after each notification, even
+/// when the alert's own silence is 0 — without a floor, every matching
+/// ingestion request sends a notification and its db writes.
+const REALTIME_MIN_SILENCE_SECS: i64 = 30;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, PartialEq, Default)]
 #[serde(default)]
@@ -42,7 +57,19 @@ pub struct TriggerCondition {
     #[serde(default)]
     pub operator: Operator, // >=
     #[serde(default)]
-    pub threshold: i64, // 3 times
+    pub threshold: i64, // 3 times = CRITICAL level
+    /// Warning threshold, sharing `operator` with `threshold` — one operator
+    /// for both levels, no mixed directions (T-2). `None` = single-level
+    /// alert, i.e. exactly the legacy behaviour.
+    /// Validated by `level::validate_thresholds` — "less severe" is
+    /// direction-dependent, so this is NOT simply `< threshold`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub warning_threshold: Option<i64>,
+    /// Whether a Warning-level match delivers a notification (D11).
+    /// `None` = true — warnings notify unless explicitly opted out.
+    /// Persisted in `trigger_thresholds`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notify_on_warning: Option<bool>,
     /// (seconds)
     #[serde(default)]
     pub frequency: i64, // 1 minute
@@ -319,6 +346,64 @@ impl TriggerCondition {
             )
         }
     }
+
+    /// Effective realtime-alert silence in microseconds: the alert's own
+    /// silence (minutes) floored by [`REALTIME_MIN_SILENCE_SECS`].
+    pub fn effective_silence_micros(&self) -> i64 {
+        self.silence
+            .saturating_mul(60)
+            .max(REALTIME_MIN_SILENCE_SECS)
+            .saturating_mul(1_000_000)
+    }
+}
+
+impl TriggerCondition {
+    /// How long a group of this alert may go unobserved before M-7 resolves it,
+    /// in microseconds, measured from `last_seen`.
+    ///
+    /// Two schedule shapes, and they cannot share an implementation. A fixed
+    /// frequency is a constant, so `K × frequency` is the whole answer. A cron
+    /// alert's numeric `frequency` is **not** the cadence it runs at, and the
+    /// gap between consecutive fires is not even constant (weekday-only,
+    /// monthly, DST), so its deadline has to be read off the schedule itself —
+    /// anchored to this row's `last_seen` so it cannot drift between sweeps.
+    pub fn group_resolve_threshold_micros(&self, last_seen: i64, k: i64) -> i64 {
+        use crate::meta::alerts::grouping::{
+            cron_resolve_threshold_micros, resolve_threshold_micros,
+        };
+
+        if self.frequency_type != FrequencyType::Cron {
+            return resolve_threshold_micros(self.frequency, k);
+        }
+
+        // An unparseable expression or an out-of-range timestamp must never
+        // resolve a live group: saturating high leaves the row alone until the
+        // schedule can be read, while any finite fallback would resolve groups
+        // on a cadence nobody configured.
+        let (Ok(schedule), Some(anchor)) = (
+            Schedule::from_str(&self.cron),
+            chrono::DateTime::from_timestamp_micros(last_seen),
+        ) else {
+            return i64::MAX;
+        };
+
+        // Same DST-aware offset resolution as `get_next_trigger_time_*`, so the
+        // sweep and the scheduler agree on when this alert actually fires.
+        let offset_minutes = match get_timezone_from_string(self.timezone.as_deref(), 0) {
+            Ok(tz) => get_offset_minutes_from_tz(&tz, anchor),
+            Err(_) => 0,
+        };
+        let Some(tz_offset) = FixedOffset::east_opt(offset_minutes * 60) else {
+            return i64::MAX;
+        };
+
+        let anchored = anchor.with_timezone(&tz_offset);
+        let occurrences = schedule
+            .after(&anchored)
+            .take(k.max(0) as usize)
+            .map(|d| d.timestamp_micros());
+        cron_resolve_threshold_micros(last_seen, occurrences, k)
+    }
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -326,6 +411,44 @@ pub struct TriggerEvalResults {
     pub data: Option<Vec<Map<String, Value>>>,
     pub end_time: i64,
     pub query_took: Option<i64>,
+    /// Severity of the matched threshold (`alerts_2.md` Feature 1).
+    /// `None` when nothing matched, or for evaluations with no level axis.
+    /// Always `Some` when `data` is `Some` for a condition-bearing module.
+    pub level: Option<level::AlertLevel>,
+    /// The value that was compared — row count, or the aggregate for
+    /// aggregation alerts. Recorded on the trigger record (T-9) so history can
+    /// show "112 vs 100". For count alerts this is a LOWER BOUND once the
+    /// search cap is reached (`alerts_2.md` §7.5).
+    pub actual_value: Option<f64>,
+    /// Which group/series produced `actual_value` ("host=b,region=eu"), for
+    /// grouped aggregation and PromQL alerts (T-9). `None` for count alerts —
+    /// a row count has no group identity.
+    pub group_label: Option<String>,
+    /// True when `actual_value` is a LOWER BOUND, not exact: the legacy
+    /// SingleQuery count path fetched exactly its cap, so the true count may
+    /// be higher (§7.5). History renders a `≥` prefix. Hybrid evaluations are
+    /// always exact.
+    pub value_is_lower_bound: bool,
+    /// Per-group view of this evaluation — `Some` only for an alert that opted
+    /// in to multi-alerts (M-9). `None` puts state persistence on exactly the
+    /// path it took before this feature existed.
+    ///
+    /// Classification happens during evaluation rather than at persist time
+    /// because that is where the aggregation's own thresholds are in scope:
+    /// `TriggerCondition.threshold` is the group-COUNT gate for an aggregation
+    /// alert, so classifying against it there would compare aggregates to a
+    /// count.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub group_classification: Option<grouping::GroupClassification>,
+    /// The evaluation completed but **observed nothing** — an SLO alert whose
+    /// every window was frozen (stale watermark, coverage under the floor,
+    /// superseded generation; `alerts_2.md` §7.6). Categorically different
+    /// from "evaluated and nothing matched": a frozen run must not be recorded
+    /// as `Ok`, or a measurement outage reads as a recovery for every
+    /// burn-rate alert in the org (D34). Only `Slo` evaluations set this, and
+    /// only with `data: None` and `level: None`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub frozen: bool,
 }
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, ToSchema, PartialEq)]
@@ -359,6 +482,44 @@ pub struct QueryCondition {
     pub sql: Option<String>,
     pub promql: Option<String>,              // (cpu usage / cpu total)
     pub promql_condition: Option<Condition>, // value >= 80
+    /// WARNING value for the PromQL condition (alerts_2.md Feature 1).
+    ///
+    /// A sibling field rather than a member of `Condition`, which is shared by
+    /// every filter in the product and must not grow alert-specific knobs.
+    /// Shares `promql_condition.operator` with critical. `None` = single-level.
+    ///
+    /// Lenient deserialization: this arrives through
+    /// `CreateAlertRequestBody`'s `#[serde(flatten)]`, which buffers via
+    /// `Value`, where `arbitrary_precision` makes a number a map (D61).
+    /// Without it a FRACTIONAL warning is rejected while an integer one works
+    /// — found by end-to-end testing.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::meta::slo::lenient_f64::deserialize_opt"
+    )]
+    pub promql_warning_value: Option<f64>,
+    /// Per-group alerting for a PromQL alert (M-9), where a "group" is one
+    /// returned SERIES.
+    ///
+    /// A sibling of `promql_condition` rather than a member of
+    /// [`Aggregation::multi_alert`], because a PromQL alert has no
+    /// `aggregation` at all — its grouping is expressed in the PromQL itself
+    /// (`sum by (pod) (…)`), not in a `group_by` column list.
+    ///
+    /// The group key is the series' FULL label set. That is what a series'
+    /// identity already is in Prometheus, and it means the expression stays
+    /// the single place grouping is decided — a separate label picker could
+    /// only ever disagree with the `by (…)` clause beside it.
+    ///
+    /// `#[serde(default)]` carries the same backward-compatibility guarantee
+    /// as its aggregation counterpart: an alert stored before this field
+    /// existed deserializes to `false` and keeps its collapsed evaluation
+    /// byte-for-byte. Nothing is inferred from the query returning several
+    /// series — that would change paging cadence for every existing PromQL
+    /// alert that happens to be unaggregated.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub promql_multi_alert: bool,
     pub aggregation: Option<Aggregation>,
     #[serde(default)]
     pub vrl_function: Option<String>,
@@ -366,6 +527,46 @@ pub struct QueryCondition {
     pub search_event_type: Option<SearchEventType>,
     #[serde(default)]
     pub multi_time_range: Option<Vec<CompareHistoricData>>,
+    /// Feature 5 (D42): the SLO condition, when `query_type` is `Slo`.
+    ///
+    /// Persisted in its own `alerts.query_slo_condition` column following the
+    /// `query_aggregation` precedent — deliberately not `trigger_thresholds`,
+    /// whose documented scope is threshold and level configuration only (D1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub slo_condition: Option<crate::meta::slo::condition::SloCondition>,
+}
+
+impl QueryCondition {
+    /// Whether this alert evaluates and pages per group.
+    ///
+    /// The aggregation and PromQL families store the opt-in in different places
+    /// because they define a group differently — an aggregation alert by its
+    /// `group_by` columns, a PromQL alert by each returned series' labels.
+    /// Every caller downstream of evaluation cares only about the answer, so
+    /// asking through one accessor is what keeps a family from being silently
+    /// honoured by only half the dispatch path.
+    ///
+    /// **SLO alerts answer `false`, and that is correct — do not "fix" it.**
+    /// `SloCondition.multi_alert` exists (SA-13) and `slo::evaluate` does read
+    /// every group when it is set, but only to pick the WORST one:
+    /// `evaluate_slo_alert` collapses the results into a single `level` +
+    /// `group_label` and never populates `group_classification`. Per-group
+    /// state rows are written only when a classification exists
+    /// (`persist_alert_run_state`), so an SLO alert has none, and SA-13's
+    /// "reuses Feature 3 verbatim" is not yet implemented.
+    ///
+    /// Returning `true` here would therefore switch OFF the alert-level
+    /// delivery decision — silence windows, the escalation baseline,
+    /// `notify_on_warning` — with nothing per-group to replace it, because no
+    /// per-group dispatch runs. That is a regression, not a fix. When SA-13
+    /// lands, this arm changes at the same time as the dispatch that justifies
+    /// it. Pinned by `test_slo_alerts_deliberately_answer_false`.
+    pub fn multi_alert_enabled(&self) -> bool {
+        match self.query_type {
+            QueryType::PromQL => self.promql_multi_alert,
+            _ => self.aggregation.as_ref().is_some_and(|a| a.multi_alert),
+        }
+    }
 }
 
 impl MemorySize for QueryCondition {
@@ -528,7 +729,36 @@ impl IntoIterator for ConditionList {
 pub struct Aggregation {
     pub group_by: Option<Vec<String>>,
     pub function: AggFunction,
+    /// CRITICAL threshold. `having.value` is untyped (`serde_json::Value`) and
+    /// may be an int, a float, or a numeric string.
     pub having: Condition,
+    /// WARNING threshold, sharing `having.operator` and `having.column` with
+    /// critical (alerts_2.md §4.4). `None` = single-level aggregation alert,
+    /// i.e. exactly the legacy behaviour. Stored as f64 because aggregate
+    /// values (averages, percentiles) are not integers.
+    /// Same lenient deserialization as `promql_warning_value`, for the same
+    /// reason (D61) — aggregate warnings are the field most likely to be
+    /// fractional.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        deserialize_with = "crate::meta::slo::lenient_f64::deserialize_opt"
+    )]
+    pub warning_value: Option<f64>,
+    /// Opt-in to per-group evaluation — multi-alerts, `alerts_2.md` M-9/D26.
+    ///
+    /// `#[serde(default)]` is the whole backward-compatibility guarantee: an
+    /// aggregation stored before this field existed cannot contain it, so it
+    /// deserializes to `false` and the alert keeps its legacy collapsed
+    /// evaluation byte-for-byte. Nothing is inferred from `group_by` being
+    /// present — that would silently change paging cadence and reset silence
+    /// fingerprints for every existing grouped alert.
+    ///
+    /// Validated by [`grouping::validate_multi_alert`] (M-10): requires a
+    /// non-empty `group_by`, an orderable `having.operator`, and "any group"
+    /// count gates.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub multi_alert: bool,
 }
 
 impl MemorySize for Aggregation {
@@ -613,6 +843,12 @@ pub enum QueryType {
     SQL,
     #[serde(rename = "promql")]
     PromQL,
+    /// Feature 5 (D28). An SLO alert is an ordinary `alerts` row whose
+    /// condition reads precomputed SLO status rather than running a query —
+    /// which is what lets five alerts on one SLO cost five cheap status reads
+    /// and ZERO extra raw-data scans.
+    #[serde(rename = "slo")]
+    Slo,
 }
 
 impl std::fmt::Display for QueryType {
@@ -621,6 +857,7 @@ impl std::fmt::Display for QueryType {
             QueryType::Custom => write!(f, "custom"),
             QueryType::SQL => write!(f, "sql"),
             QueryType::PromQL => write!(f, "promql"),
+            QueryType::Slo => write!(f, "slo"),
         }
     }
 }
@@ -631,6 +868,7 @@ impl From<&str> for QueryType {
             "custom" => QueryType::Custom,
             "sql" => QueryType::SQL,
             "promql" => QueryType::PromQL,
+            "slo" => QueryType::Slo,
             _ => QueryType::Custom,
         }
     }
@@ -675,6 +913,18 @@ pub enum Operator {
     #[serde(rename = "not_contains")]
     #[serde(alias = "NotContains")]
     NotContains,
+    #[serde(rename = "is_null")]
+    #[serde(alias = "IsNull")]
+    IsNull,
+    #[serde(rename = "is_not_null")]
+    #[serde(alias = "IsNotNull")]
+    IsNotNull,
+    #[serde(rename = "is_empty")]
+    #[serde(alias = "IsEmpty")]
+    IsEmpty,
+    #[serde(rename = "is_not_empty")]
+    #[serde(alias = "IsNotEmpty")]
+    IsNotEmpty,
 }
 
 impl std::fmt::Display for Operator {
@@ -688,6 +938,10 @@ impl std::fmt::Display for Operator {
             Operator::LessThanEquals => write!(f, "<="),
             Operator::Contains => write!(f, "contains"),
             Operator::NotContains => write!(f, "not contains"),
+            Operator::IsNull => write!(f, "is null"),
+            Operator::IsNotNull => write!(f, "is not null"),
+            Operator::IsEmpty => write!(f, "is empty"),
+            Operator::IsNotEmpty => write!(f, "is not empty"),
         }
     }
 }
@@ -1877,7 +2131,7 @@ mod test {
         // New York is west of UTC (negative offset)
         assert!(ny_offset < 0);
         // London is close to UTC (0 or +60 during BST)
-        assert!(london_offset >= 0 && london_offset <= 60);
+        assert!((0..=60).contains(&london_offset));
     }
 
     #[test]
@@ -2140,5 +2394,595 @@ mod test {
             "User payload deserialization failed: {:?}",
             result.err()
         );
+    }
+
+    #[test]
+    fn test_default_align_time() {
+        assert!(default_align_time());
+    }
+
+    #[test]
+    fn test_agg_function_display() {
+        assert_eq!(AggFunction::Avg.to_string(), "avg");
+        assert_eq!(AggFunction::Min.to_string(), "min");
+        assert_eq!(AggFunction::Max.to_string(), "max");
+        assert_eq!(AggFunction::Sum.to_string(), "sum");
+        assert_eq!(AggFunction::Count.to_string(), "count");
+        assert_eq!(AggFunction::Median.to_string(), "median");
+        assert_eq!(AggFunction::P50.to_string(), "p50");
+        assert_eq!(AggFunction::P75.to_string(), "p75");
+        assert_eq!(AggFunction::P90.to_string(), "p90");
+        assert_eq!(AggFunction::P95.to_string(), "p95");
+        assert_eq!(AggFunction::P99.to_string(), "p99");
+    }
+
+    #[test]
+    fn test_agg_function_try_from_str() {
+        assert_eq!(AggFunction::try_from("avg").unwrap(), AggFunction::Avg);
+        assert_eq!(AggFunction::try_from("AVG").unwrap(), AggFunction::Avg);
+        assert_eq!(AggFunction::try_from("min").unwrap(), AggFunction::Min);
+        assert_eq!(AggFunction::try_from("max").unwrap(), AggFunction::Max);
+        assert_eq!(AggFunction::try_from("sum").unwrap(), AggFunction::Sum);
+        assert_eq!(AggFunction::try_from("count").unwrap(), AggFunction::Count);
+        assert_eq!(
+            AggFunction::try_from("median").unwrap(),
+            AggFunction::Median
+        );
+        assert_eq!(AggFunction::try_from("p50").unwrap(), AggFunction::P50);
+        assert_eq!(AggFunction::try_from("p75").unwrap(), AggFunction::P75);
+        assert_eq!(AggFunction::try_from("p90").unwrap(), AggFunction::P90);
+        assert_eq!(AggFunction::try_from("p95").unwrap(), AggFunction::P95);
+        assert_eq!(AggFunction::try_from("p99").unwrap(), AggFunction::P99);
+        assert!(AggFunction::try_from("unknown").is_err());
+    }
+
+    // ── multi_alert_enabled: one question, two storage locations ────────────
+
+    fn agg_with_multi(multi: bool) -> Aggregation {
+        Aggregation {
+            group_by: Some(vec!["host".to_string()]),
+            function: AggFunction::Avg,
+            having: Condition {
+                column: "alert_agg_value".to_string(),
+                operator: Operator::GreaterThan,
+                value: serde_json::json!(90),
+                ignore_case: false,
+            },
+            warning_value: None,
+            multi_alert: multi,
+        }
+    }
+
+    #[test]
+    fn test_multi_alert_enabled_reads_the_aggregation_for_sql_alerts() {
+        let q = QueryCondition {
+            query_type: QueryType::SQL,
+            aggregation: Some(agg_with_multi(true)),
+            ..Default::default()
+        };
+        assert!(q.multi_alert_enabled());
+    }
+
+    #[test]
+    fn test_multi_alert_enabled_reads_the_promql_flag_for_promql_alerts() {
+        let q = QueryCondition {
+            query_type: QueryType::PromQL,
+            promql_multi_alert: true,
+            ..Default::default()
+        };
+        assert!(q.multi_alert_enabled());
+    }
+
+    /// The cross-family trap. A PromQL alert carrying a stray aggregation must
+    /// NOT be treated as per-group: its rows have no `group_by` columns, so the
+    /// aggregation extractor would hand every series the same empty label set
+    /// and collapse them into one group.
+    #[test]
+    fn test_a_promql_alert_ignores_an_aggregation_multi_alert_flag() {
+        let q = QueryCondition {
+            query_type: QueryType::PromQL,
+            promql_multi_alert: false,
+            aggregation: Some(agg_with_multi(true)),
+            ..Default::default()
+        };
+        assert!(!q.multi_alert_enabled());
+    }
+
+    /// And the mirror: a SQL alert must not be switched on by the PromQL flag,
+    /// which nothing in its evaluation path would honour.
+    #[test]
+    fn test_a_sql_alert_ignores_the_promql_multi_alert_flag() {
+        let q = QueryCondition {
+            query_type: QueryType::SQL,
+            promql_multi_alert: true,
+            aggregation: Some(agg_with_multi(false)),
+            ..Default::default()
+        };
+        assert!(!q.multi_alert_enabled());
+    }
+
+    /// SLO alerts must answer `false` until SA-13 actually lands.
+    ///
+    /// `slo_condition.multi_alert` reads every group, but only so
+    /// `evaluate_slo_alert` can pick the worst; it never builds a
+    /// `GroupClassification`, and group state rows are written only when one
+    /// exists. So there is no per-group dispatch for an SLO alert — and
+    /// answering `true` would switch off the ALERT-level delivery decision
+    /// (silence, escalation baseline, notify_on_warning) with nothing to
+    /// replace it. This test is the tripwire for anyone who reads
+    /// `SloCondition.multi_alert` and assumes the accessor is missing a case.
+    #[test]
+    fn test_slo_alerts_deliberately_answer_false() {
+        let q = QueryCondition {
+            query_type: QueryType::Slo,
+            aggregation: None,
+            ..Default::default()
+        };
+        assert!(
+            !q.multi_alert_enabled(),
+            "turning this true silences SLO alerts: it disables alert-level \
+             delivery gating, and no per-group dispatch runs for QueryType::Slo. \
+             Land SA-13's dispatch first, in the same change."
+        );
+    }
+
+    #[test]
+    fn test_multi_alert_enabled_is_false_by_default_for_every_query_type() {
+        for qt in [
+            QueryType::Custom,
+            QueryType::SQL,
+            QueryType::PromQL,
+            QueryType::Slo,
+        ] {
+            let q = QueryCondition {
+                query_type: qt.clone(),
+                ..Default::default()
+            };
+            assert!(!q.multi_alert_enabled(), "{qt} defaulted to enabled");
+        }
+    }
+
+    // ── Upgrade safety for the new flag ─────────────────────────────────────
+
+    /// THE guarantee (M-9/D26): every PromQL alert already stored was
+    /// serialized without this field. If it read back as anything but `false`,
+    /// all of them would switch to per-series evaluation on deploy — different
+    /// paging cadence, and every in-flight silence fingerprint invalidated.
+    #[test]
+    fn test_promql_multi_alert_defaults_to_false_when_absent_from_stored_json() {
+        let stored = serde_json::json!({
+            "type": "promql",
+            "promql": "up == 0",
+        });
+        let parsed: QueryCondition = serde_json::from_value(stored).expect("deserializable");
+        assert!(!parsed.promql_multi_alert);
+        assert!(!parsed.multi_alert_enabled());
+    }
+
+    /// `skip_serializing_if` keeps the field out of the payload when off, so
+    /// turning the feature on never rewrites rows that are not using it.
+    #[test]
+    fn test_promql_multi_alert_is_omitted_from_json_when_off() {
+        let q = QueryCondition {
+            query_type: QueryType::PromQL,
+            promql_multi_alert: false,
+            ..Default::default()
+        };
+        let v = serde_json::to_value(&q).expect("serializable");
+        assert!(v.get("promql_multi_alert").is_none(), "{v}");
+    }
+
+    #[test]
+    fn test_promql_multi_alert_round_trips_when_on() {
+        let q = QueryCondition {
+            query_type: QueryType::PromQL,
+            promql_multi_alert: true,
+            ..Default::default()
+        };
+        let v = serde_json::to_value(&q).expect("serializable");
+        assert_eq!(v.get("promql_multi_alert"), Some(&serde_json::json!(true)));
+        let back: QueryCondition = serde_json::from_value(v).expect("deserializable");
+        assert!(back.promql_multi_alert);
+    }
+
+    #[test]
+    fn test_query_type_display() {
+        assert_eq!(QueryType::Custom.to_string(), "custom");
+        assert_eq!(QueryType::SQL.to_string(), "sql");
+        assert_eq!(QueryType::PromQL.to_string(), "promql");
+    }
+
+    #[test]
+    fn test_query_type_from_str() {
+        assert_eq!(QueryType::from("custom"), QueryType::Custom);
+        assert_eq!(QueryType::from("sql"), QueryType::SQL);
+        assert_eq!(QueryType::from("SQL"), QueryType::SQL);
+        assert_eq!(QueryType::from("promql"), QueryType::PromQL);
+        assert_eq!(QueryType::from("unknown"), QueryType::Custom);
+    }
+
+    #[test]
+    fn test_operator_display() {
+        assert_eq!(Operator::EqualTo.to_string(), "=");
+        assert_eq!(Operator::NotEqualTo.to_string(), "!=");
+        assert_eq!(Operator::GreaterThan.to_string(), ">");
+        assert_eq!(Operator::GreaterThanEquals.to_string(), ">=");
+        assert_eq!(Operator::LessThan.to_string(), "<");
+        assert_eq!(Operator::LessThanEquals.to_string(), "<=");
+        assert_eq!(Operator::Contains.to_string(), "contains");
+        assert_eq!(Operator::NotContains.to_string(), "not contains");
+    }
+
+    #[test]
+    fn test_condition_group_has_conditions_empty() {
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![],
+        };
+        assert!(!group.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_group_has_conditions_non_empty() {
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "level".to_string(),
+                operator: Operator::EqualTo,
+                value: serde_json::Value::String("error".to_string()),
+                ignore_case: Some(false),
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+        assert!(group.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_group_validate_empty() {
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![],
+        };
+        // Empty group is invalid
+        assert!(group.validate().is_err());
+    }
+
+    #[test]
+    fn test_condition_group_validate_wrong_filter_type() {
+        let group = ConditionGroup {
+            filter_type: "condition".to_string(), // wrong — must be "group"
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "level".to_string(),
+                operator: Operator::EqualTo,
+                value: serde_json::Value::String("error".to_string()),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+        assert!(group.validate().is_err());
+    }
+
+    #[test]
+    fn test_condition_group_validate_non_empty() {
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![ConditionItem::Condition(ConditionItemCondition {
+                column: "status".to_string(),
+                operator: Operator::GreaterThan,
+                value: serde_json::Value::Number(serde_json::Number::from(400)),
+                ignore_case: None,
+                logical_operator: LogicalOperator::And,
+            })],
+        };
+        assert!(group.validate().is_ok());
+    }
+
+    #[test]
+    fn test_alert_condition_params_unsupported_version_returns_error() {
+        // version 3 → _ => Err branch in Deserialize
+        let json = r#"{"version": 3, "conditions": {}}"#;
+        let result: Result<AlertConditionParams, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("Unsupported version"), "unexpected: {msg}");
+    }
+
+    #[test]
+    fn test_alert_condition_params_v2_missing_conditions_returns_error() {
+        // version 2 without "conditions" field → error
+        let json = r#"{"version": 2}"#;
+        let result: Result<AlertConditionParams, _> = serde_json::from_str(json);
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(
+            msg.contains("conditions field missing"),
+            "unexpected: {msg}"
+        );
+    }
+
+    #[test]
+    fn test_alert_condition_params_v1_serialize_roundtrip() {
+        // V1 serialize → delegates to ConditionList::serialize
+        let conditions = ConditionList::AndNode {
+            and: vec![ConditionList::EndCondition(Condition {
+                column: "level".to_string(),
+                operator: Operator::EqualTo,
+                value: serde_json::Value::String("error".to_string()),
+                ignore_case: false,
+            })],
+        };
+        let params = AlertConditionParams::V1(conditions);
+        let serialized = serde_json::to_string(&params).unwrap();
+        assert!(
+            serialized.contains("\"and\""),
+            "V1 should serialize as ConditionList"
+        );
+        assert!(
+            !serialized.contains("\"version\""),
+            "V1 should have no version field"
+        );
+    }
+
+    #[test]
+    fn test_alert_condition_params_v2_serialize_includes_version() {
+        // V2 serialize → includes version:2 field
+        let group = ConditionGroup {
+            filter_type: "group".to_string(),
+            logical_operator: LogicalOperator::And,
+            conditions: vec![],
+        };
+        let params = AlertConditionParams::V2(group);
+        let serialized = serde_json::to_string(&params).unwrap();
+        assert!(
+            serialized.contains("\"version\":2"),
+            "V2 should include version:2"
+        );
+        assert!(
+            serialized.contains("\"conditions\""),
+            "V2 should include conditions field"
+        );
+    }
+
+    #[test]
+    fn test_frequency_type_serde() {
+        let cron = serde_json::to_string(&FrequencyType::Cron).unwrap();
+        assert_eq!(cron, "\"cron\"");
+        let minutes = serde_json::to_string(&FrequencyType::Minutes).unwrap();
+        assert_eq!(minutes, "\"minutes\"");
+        let back: FrequencyType = serde_json::from_str(&cron).unwrap();
+        assert_eq!(back, FrequencyType::Cron);
+        let back2: FrequencyType = serde_json::from_str(&minutes).unwrap();
+        assert_eq!(back2, FrequencyType::Minutes);
+        // default = Minutes
+        let d: FrequencyType = Default::default();
+        assert_eq!(d, FrequencyType::Minutes);
+    }
+
+    #[test]
+    fn test_logical_operator_serde_uppercase() {
+        let and = serde_json::to_string(&LogicalOperator::And).unwrap();
+        assert_eq!(and, "\"AND\"");
+        let or = serde_json::to_string(&LogicalOperator::Or).unwrap();
+        assert_eq!(or, "\"OR\"");
+        let back_and: LogicalOperator = serde_json::from_str(&and).unwrap();
+        assert_eq!(back_and, LogicalOperator::And);
+        let back_or: LogicalOperator = serde_json::from_str(&or).unwrap();
+        assert_eq!(back_or, LogicalOperator::Or);
+    }
+
+    #[test]
+    fn test_operator_serde_roundtrip() {
+        let cases = [
+            (Operator::EqualTo, "\"=\""),
+            (Operator::NotEqualTo, "\"!=\""),
+            (Operator::GreaterThan, "\">\""),
+            (Operator::GreaterThanEquals, "\">=\""),
+            (Operator::LessThan, "\"<\""),
+            (Operator::LessThanEquals, "\"<=\""),
+            (Operator::Contains, "\"contains\""),
+            (Operator::NotContains, "\"not_contains\""),
+        ];
+        for (variant, expected) in cases {
+            let s = serde_json::to_string(&variant).unwrap();
+            assert_eq!(s, expected);
+            let back: Operator = serde_json::from_str(&s).unwrap();
+            assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_trigger_condition_timezone_none_absent_from_json() {
+        let tc = TriggerCondition {
+            timezone: None,
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&tc).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("timezone"));
+    }
+
+    #[test]
+    fn test_trigger_condition_timezone_some_present_in_json() {
+        let tc = TriggerCondition {
+            timezone: Some("America/New_York".to_string()),
+            ..Default::default()
+        };
+        let json = serde_json::to_value(&tc).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("timezone"));
+        assert_eq!(obj["timezone"], serde_json::json!("America/New_York"));
+    }
+
+    #[test]
+    fn test_condition_item_condition_ignore_case_none_absent_from_json() {
+        let cic = ConditionItemCondition {
+            column: "level".to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::json!("error"),
+            ignore_case: None,
+            logical_operator: LogicalOperator::And,
+        };
+        let json = serde_json::to_value(&cic).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("ignore_case"));
+    }
+
+    #[test]
+    fn test_condition_item_condition_ignore_case_some_present_in_json() {
+        let cic = ConditionItemCondition {
+            column: "level".to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::json!("error"),
+            ignore_case: Some(true),
+            logical_operator: LogicalOperator::Or,
+        };
+        let json = serde_json::to_value(&cic).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("ignore_case"));
+        assert_eq!(obj["ignore_case"], serde_json::json!(true));
+    }
+
+    fn make_end_condition() -> ConditionList {
+        ConditionList::EndCondition(Condition {
+            column: "field".to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::json!("value"),
+            ignore_case: false,
+        })
+    }
+
+    #[test]
+    fn test_condition_list_depth_end_condition() {
+        assert_eq!(make_end_condition().depth(), 1);
+    }
+
+    #[test]
+    fn test_condition_list_depth_legacy_conditions() {
+        let cond = ConditionList::LegacyConditions(vec![Condition {
+            column: "c".to_string(),
+            operator: Operator::EqualTo,
+            value: serde_json::json!(1),
+            ignore_case: false,
+        }]);
+        assert_eq!(cond.depth(), 1);
+    }
+
+    #[test]
+    fn test_condition_list_depth_and_node() {
+        let node = ConditionList::AndNode {
+            and: vec![make_end_condition(), make_end_condition()],
+        };
+        assert_eq!(node.depth(), 2);
+    }
+
+    #[test]
+    fn test_condition_list_depth_or_node() {
+        let node = ConditionList::OrNode {
+            or: vec![make_end_condition()],
+        };
+        assert_eq!(node.depth(), 2);
+    }
+
+    #[test]
+    fn test_condition_list_depth_not_node() {
+        let node = ConditionList::NotNode {
+            not: Box::new(make_end_condition()),
+        };
+        assert_eq!(node.depth(), 2);
+    }
+
+    #[test]
+    fn test_condition_list_depth_nested() {
+        let inner = ConditionList::AndNode {
+            and: vec![make_end_condition()],
+        };
+        let outer = ConditionList::OrNode { or: vec![inner] };
+        // outer (depth 1) → inner AndNode (depth 2) → EndCondition (depth 1): total 3
+        assert_eq!(outer.depth(), 3);
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_end_condition() {
+        assert!(make_end_condition().has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_not_node() {
+        let node = ConditionList::NotNode {
+            not: Box::new(make_end_condition()),
+        };
+        assert!(node.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_and_node_empty() {
+        let node = ConditionList::AndNode { and: vec![] };
+        assert!(!node.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_or_node_non_empty() {
+        let node = ConditionList::OrNode {
+            or: vec![make_end_condition()],
+        };
+        assert!(node.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_has_conditions_legacy_empty() {
+        let node = ConditionList::LegacyConditions(vec![]);
+        assert!(!node.has_conditions());
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_and_node() {
+        let node = ConditionList::AndNode {
+            and: vec![make_end_condition(), make_end_condition()],
+        };
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 2);
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_or_node() {
+        let node = ConditionList::OrNode {
+            or: vec![make_end_condition()],
+        };
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 1);
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_not_node() {
+        let node = ConditionList::NotNode {
+            not: Box::new(make_end_condition()),
+        };
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 1);
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_end_condition() {
+        let node = make_end_condition();
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 1);
+        assert!(matches!(items[0], ConditionList::EndCondition(_)));
+    }
+
+    #[test]
+    fn test_condition_list_into_iter_legacy_conditions() {
+        let cond = Condition {
+            column: "x".to_string(),
+            operator: Operator::GreaterThan,
+            value: serde_json::json!(5),
+            ignore_case: false,
+        };
+        let node = ConditionList::LegacyConditions(vec![cond]);
+        let items: Vec<_> = node.into_iter().collect();
+        assert_eq!(items.len(), 1);
+        assert!(matches!(items[0], ConditionList::EndCondition(_)));
     }
 }

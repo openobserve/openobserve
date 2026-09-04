@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,79 +15,84 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="row items-center">
+  <div class="flex items-center" data-test="dashboard-table-pagination-controls">
     <!-- Records per page dropdown: only when pagination is enabled -->
-    <div v-if="showPagination" class="row items-center q-gutter-sm">
-      <span class="text-caption">{{ t("dashboard.rowsPerPage") }}
-</span>
-      <q-select
+    <div v-if="showPagination" class="flex flex-row items-center gap-2">
+      <span class="text-xs" data-test="dashboard-table-rows-per-page-label"
+        >{{ t("dashboard.rowsPerPage") }}
+      </span>
+      <OSelect
         :model-value="pagination.rowsPerPage"
-        @update:model-value="(val: number) => $emit('update:rowsPerPage', val)"
-        :options="paginationOptions"
-        :option-label="(opt: any) => (opt === 0 ? 'All' : opt)"
-        borderless
-        dense
-        options-dense
-        class="q-table__select"
+        @update:model-value="(val: SelectModelValue) => $emit('update:rowsPerPage', Number(val))"
+        :options="formattedPaginationOptions"
+        size="sm"
+        :searchable="false"
+        class="w-fit!"
+        data-test="dashboard-table-rows-per-page-select"
       />
     </div>
 
     <!-- Count display -->
-    <span class="text-caption q-pa-sm">
+    <span class="px-2 text-xs" data-test="dashboard-table-row-count">
       {{ countDisplay }}
     </span>
 
     <!-- Navigation arrows: only when pagination is enabled -->
     <template v-if="showPagination">
-      <q-btn
+      <OButton
         v-if="pagesNumber > 1"
-        icon="first_page"
-        color="grey-8"
-        round
-        dense
-        flat
-        :disable="isFirstPage"
+        variant="ghost"
+        size="icon"
+        :disabled="isFirstPage"
         @click="$emit('firstPage')"
-      />
-      <q-btn
+        icon-left="first-page"
+        data-test="dashboard-table-pagination-first-page"
+      >
+      </OButton>
+      <OButton
         v-if="pagesNumber > 1"
-        icon="chevron_left"
-        color="grey-8"
-        round
-        dense
-        flat
-        :disable="isFirstPage"
+        variant="ghost"
+        size="icon"
+        :disabled="isFirstPage"
         @click="$emit('prevPage')"
-      />
-      <q-btn
+        icon-left="chevron-left"
+        data-test="dashboard-table-pagination-prev-page"
+      >
+      </OButton>
+      <OButton
         v-if="pagesNumber > 1"
-        icon="chevron_right"
-        color="grey-8"
-        round
-        dense
-        flat
-        :disable="isLastPage"
+        variant="ghost"
+        size="icon"
+        :disabled="isLastPage"
         @click="$emit('nextPage')"
-      />
-      <q-btn
+        icon-left="chevron-right"
+        data-test="dashboard-table-pagination-next-page"
+      >
+      </OButton>
+      <OButton
         v-if="pagesNumber > 1"
-        icon="last_page"
-        color="grey-8"
-        round
-        dense
-        flat
-        :disable="isLastPage"
+        variant="ghost"
+        size="icon"
+        :disabled="isLastPage"
         @click="$emit('lastPage')"
-      />
+        icon-left="last-page"
+        data-test="dashboard-table-pagination-last-page"
+      >
+      </OButton>
     </template>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only as a param type in a template inline handler, which eslint-plugin-vue cannot see; vue-tsc keeps it honest
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 export default defineComponent({
   name: "TablePaginationControls",
+  components: { OButton, OSelect },
   props: {
     showPagination: {
       type: Boolean,
@@ -120,29 +125,45 @@ export default defineComponent({
       default: true,
     },
   },
-  emits: [
-    "update:rowsPerPage",
-    "firstPage",
-    "prevPage",
-    "nextPage",
-    "lastPage",
-  ],
+  emits: ["update:rowsPerPage", "firstPage", "prevPage", "nextPage", "lastPage"],
   setup(props) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const countDisplay = computed(() => {
       const { showPagination, pagination, totalRows } = props;
-      if (totalRows === 0) return "0 of 0";
+      if (totalRows === 0) return t("dashboard.dashboards.paginationEmpty");
       if (!showPagination || pagination.rowsPerPage === 0) {
-        return `1-${totalRows} of ${totalRows}`;
+        return t("dashboard.dashboards.paginationRange", {
+          start: 1,
+          end: totalRows,
+          total: totalRows,
+        });
       }
 
       const start = (pagination.page - 1) * pagination.rowsPerPage + 1;
       const end = Math.min(pagination.page * pagination.rowsPerPage, totalRows);
-      return `${start}-${end} of ${totalRows}`;
+      return t("dashboard.dashboards.paginationRange", { start, end, total: totalRows });
+    });
+
+    const formattedPaginationOptions = computed(() => {
+      const opts = [...props.paginationOptions];
+      // Include a custom "Records per page" that isn't one of the presets, so the
+      // dropdown reflects it instead of rendering blank.
+      const current = props.pagination?.rowsPerPage;
+      if (current != null && current > 0 && !opts.includes(current)) {
+        const idx = opts.findIndex((o) => o !== 0 && o > current);
+        if (idx === -1) opts.push(current);
+        else opts.splice(idx, 0, current);
+      }
+      return opts.map((opt) => ({
+        label: opt === 0 ? t("common.all") : raw(String(opt)),
+        value: opt,
+      }));
     });
 
     return {
+      raw,
       countDisplay,
+      formattedPaginationOptions,
       t,
     };
   },

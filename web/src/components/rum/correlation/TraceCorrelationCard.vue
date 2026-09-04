@@ -15,98 +15,99 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="trace-correlation-card q-mt-md">
-    <div class="tags-title text-bold q-ml-xs q-mb-sm">Distributed Trace</div>
+  <div class="border-card-glass-border rounded-default mt-3 border border-solid">
+    <div class="text-text-heading ms-1 mb-2 text-base font-bold">
+      {{ t("traces.correlation.distributedTrace") }}
+    </div>
 
     <template v-if="isLoading">
-      <div class="q-pa-md text-center">
-        <q-spinner-hourglass color="primary" size="1.5rem" />
-        <div class="q-mt-sm text-grey-7">Loading trace data...</div>
+      <div class="p-3 text-center">
+        <OSpinner size="sm" />
+        <div class="text-text-muted mt-2">{{ t("traces.correlation.loadingTraceData") }}</div>
       </div>
     </template>
 
     <template v-else-if="!traceId">
-      <div class="q-pa-md text-center text-grey-7">
-        <q-icon name="info" size="1.5rem" class="q-mb-sm" />
-        <div>No trace information available for this event</div>
+      <div class="text-text-muted p-3 text-center">
+        <OIcon name="info" size="md" class="mb-2" />
+        <div>{{ t("traces.correlation.noTraceInfoAvailable") }}</div>
       </div>
     </template>
 
     <template v-else>
       <!-- Trace ID Section -->
-      <div class="trace-info-section q-pa-md">
-        <div class="row items-center q-mb-md">
-          <div class="col-3 text-grey-7">Trace ID:</div>
-          <div class="col-9 row items-center no-wrap">
-            <code class="trace-id-text">{{ formatTraceId(traceId) }}</code>
-            <q-btn
-              flat
-              dense
-              size="sm"
-              icon="content_copy"
-              class="q-ml-xs hover:tw:text-[var(--o2-primary-btn-bg)]"
+      <div class="bg-card-glass-bg p-3">
+        <div class="mb-3 flex items-center">
+          <div class="text-text-label w-1/4">{{ t("traces.correlation.traceIdLabel") }}</div>
+          <div class="flex w-3/4 flex-nowrap items-center">
+            <code
+              data-test="trace-correlation-card-trace-id-text"
+              class="bg-surface-accent rounded-default text-text-body px-2 py-1 font-mono text-sm"
+              >{{ formatTraceId(traceId) }}</code
+            >
+            <OButton
+              icon-left="content-copy"
+              variant="ghost"
+              size="icon-sm"
+              class="ms-1"
               @click="copyTraceId"
             >
-              <q-tooltip>Copy Trace ID</q-tooltip>
-            </q-btn>
+              <OTooltip :content="t('traces.correlation.copyTraceId')" />
+            </OButton>
           </div>
         </div>
 
-        <div class="row items-center q-mb-md" v-if="spanId">
-          <div class="col-3 text-grey-7">Span ID:</div>
-          <div class="col-9">
-            <code class="span-id-text">{{ formatSpanId(spanId) }}</code>
+        <div class="mb-3 flex items-center" v-if="spanId">
+          <div class="text-text-label w-1/4">{{ t("traces.correlation.spanIdLabel") }}</div>
+          <div class="w-3/4">
+            <code
+              data-test="trace-correlation-card-span-id-text"
+              class="bg-surface-accent rounded-default text-text-body px-2 py-1 font-mono text-sm"
+              >{{ formatSpanId(spanId) }}</code
+            >
           </div>
         </div>
 
         <!-- Span Hierarchy -->
-        <div v-if="hasBackendTrace" class="q-mb-md">
-          <div class="text-grey-7 q-mb-xs">Span Hierarchy:</div>
-          <div class="span-hierarchy q-ml-md">
-            <div class="span-item">
-              <q-icon name="circle" size="xs" color="blue-6" class="q-mr-xs" />
-              <span class="text-grey-8">Application Span</span>
+        <div v-if="hasBackendTrace" class="mb-3">
+          <div class="text-text-label mb-1">{{ t("traces.correlation.spanHierarchy") }}</div>
+          <div class="ms-3">
+            <div class="flex items-center py-1 text-sm">
+              <OIcon name="circle" size="xs" class="me-1" />
+              <span class="text-text-secondary">{{ t("traces.correlation.applicationSpan") }}</span>
             </div>
-            <div class="span-item q-ml-md">
-              <q-icon name="arrow_right" size="sm" class="q-mr-xs" />
-              <q-icon name="circle" size="xs" color="green-6" class="q-mr-xs" />
-              <span class="text-grey-8"
-                >Browser SDK Span ({{ formatSpanId(spanId) }})</span
+            <div class="ms-3 flex items-center py-1 text-sm">
+              <OIcon name="arrow-right" size="sm" class="me-1" />
+              <OIcon name="circle" size="xs" class="me-1" />
+              <span class="text-text-secondary"
+                >{{ t("traces.correlation.browserSdkSpanPrefix") }}{{ formatSpanId(spanId)
+                }}{{ t("traces.correlation.closingParen") }}</span
               >
             </div>
-            <div class="span-item q-ml-lg" v-if="backendSpanCount > 0">
-              <q-icon name="arrow_right" size="sm" class="q-mr-xs" />
-              <q-icon
-                name="circle"
-                size="xs"
-                color="orange-6"
-                class="q-mr-xs"
-              />
-              <span class="text-grey-8"
-                >Backend Spans ({{ backendSpanCount }})</span
+            <div class="ms-4 flex items-center py-1 text-sm" v-if="backendSpanCount > 0">
+              <OIcon name="arrow-right" size="sm" class="me-1" />
+              <OIcon name="circle" size="xs" class="me-1" />
+              <span class="text-text-secondary"
+                >{{ t("traces.correlation.backendSpansPrefix") }}{{ backendSpanCount
+                }}{{ t("traces.correlation.closingParen") }}</span
               >
             </div>
           </div>
         </div>
 
         <!-- Performance Breakdown -->
-        <div v-if="performanceData" class="q-mb-md">
-          <div class="text-grey-7 q-mb-xs">Performance Breakdown:</div>
-          <div class="performance-breakdown">
-            <div class="row items-center q-mb-xs">
-              <div class="col-5 text-grey-8">Total Duration:</div>
-              <div class="col-7 text-bold">
-                {{ performanceData.total_duration_ms }}ms
-              </div>
+        <div v-if="performanceData" class="mb-3">
+          <div class="text-text-label mb-1">{{ t("traces.correlation.performanceBreakdown") }}</div>
+          <div class="bg-surface-accent rounded-default p-2 text-sm">
+            <div class="mb-1 flex items-center">
+              <div class="text-text-label w-5/12">{{ t("traces.correlation.totalDuration") }}</div>
+              <div class="w-7/12 font-bold">{{ performanceData.total_duration_ms }}ms</div>
             </div>
-            <div
-              class="row items-center q-mb-xs"
-              v-if="performanceData.browser_duration_ms"
-            >
-              <div class="col-5 text-grey-8">Browser:</div>
-              <div class="col-7">
+            <div class="mb-1 flex items-center" v-if="performanceData.browser_duration_ms">
+              <div class="text-text-label w-5/12">{{ t("traces.correlation.browserLabel") }}</div>
+              <div class="w-7/12">
                 {{ performanceData.browser_duration_ms }}ms
-                <span class="text-grey-6"
+                <span class="text-text-secondary"
                   >({{
                     calculatePercentage(
                       performanceData.browser_duration_ms,
@@ -116,14 +117,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </div>
             </div>
-            <div
-              class="row items-center q-mb-xs"
-              v-if="performanceData.network_latency_ms"
-            >
-              <div class="col-5 text-grey-8">Network:</div>
-              <div class="col-7">
+            <div class="mb-1 flex items-center" v-if="performanceData.network_latency_ms">
+              <div class="text-text-label w-5/12">{{ t("traces.correlation.networkLabel") }}</div>
+              <div class="w-7/12">
                 {{ performanceData.network_latency_ms }}ms
-                <span class="text-grey-6"
+                <span class="text-text-secondary"
                   >({{
                     calculatePercentage(
                       performanceData.network_latency_ms,
@@ -133,14 +131,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
               </div>
             </div>
-            <div
-              class="row items-center q-mb-xs"
-              v-if="performanceData.backend_duration_ms"
-            >
-              <div class="col-5 text-grey-8">Backend:</div>
-              <div class="col-7">
+            <div class="mb-1 flex items-center" v-if="performanceData.backend_duration_ms">
+              <div class="text-text-label w-5/12">{{ t("traces.correlation.backendLabel") }}</div>
+              <div class="w-7/12">
                 {{ performanceData.backend_duration_ms }}ms
-                <span class="text-grey-6"
+                <span class="text-text-secondary"
                   >({{
                     calculatePercentage(
                       performanceData.backend_duration_ms,
@@ -153,46 +148,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <q-separator class="q-my-md" />
+        <OSeparator class="my-4" />
 
         <!-- Action Buttons -->
-        <div class="row q-gutter-sm">
-          <q-btn
-            outline
-            no-caps
-            color="primary"
-            label="View Trace Details"
-            icon="timeline"
-            :disable="!hasBackendTrace"
+        <div class="flex gap-2">
+          <OButton
+            variant="outline"
+            size="sm-action"
+            :disabled="!hasBackendTrace"
             @click="viewTraceDetails"
-            class="col tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!"
           >
-            <q-tooltip v-if="!hasBackendTrace">
-              Backend trace data not yet available. Trace data may take up to 30
-              seconds to be ingested.
-            </q-tooltip>
-          </q-btn>
-          <q-btn
-            flat
-            no-caps
-            color="primary"
-            label="Refresh"
-            icon="refresh"
-            @click="refreshTraceData"
-            class="tw:border! tw:border-solid! tw:border-[var(--o2-border-color)]! hover:tw:bg-[var(--o2-hover-accent)]!"
-          />
+            <OIcon name="git-branch" size="sm" class="me-1" />
+            {{ t("traces.correlation.viewTraceDetails") }}
+            <OTooltip
+              v-if="!hasBackendTrace"
+              :content="t('traces.correlation.backendTraceNotAvailable')"
+            />
+          </OButton>
+          <OButton icon-left="refresh" variant="ghost" size="sm-action" @click="refreshTraceData">
+            {{ t("common.refresh") }}
+          </OButton>
         </div>
 
         <!-- Missing trace notice -->
-        <div
-          v-if="!hasBackendTrace && traceId"
-          class="q-mt-md q-pa-sm tw:bg-[var(--o2-hover-accent)] tw:rounded"
-        >
-          <div class="row items-center">
-            <q-icon name="info" color="info" size="sm" class="q-mr-sm" />
-            <div class="text-grey-8 text-caption">
-              Backend trace data not yet available. Trace data may take up to 30
-              seconds to be ingested.
+        <div v-if="!hasBackendTrace && traceId" class="bg-surface-accent rounded-default mt-3 p-2">
+          <div class="flex items-center">
+            <OIcon name="info" size="sm" class="me-2" />
+            <div class="text-text-secondary text-xs">
+              {{ t("traces.correlation.backendTraceNotAvailable") }}
             </div>
           </div>
         </div>
@@ -202,10 +185,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, watch } from "vue";
-import { useQuasar, copyToClipboard } from "quasar";
-import { useRouter } from "vue-router";
+import { computed, onMounted, onUnmounted, watch } from "vue";
+import { copyToClipboard } from "@/utils/clipboard";
 import useTraceCorrelation from "@/composables/rum/useTraceCorrelation";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { useI18nTyped } from "@/types/i18n";
+
+const { t } = useI18nTyped();
 
 const props = defineProps({
   traceId: {
@@ -224,19 +215,39 @@ const props = defineProps({
     type: Number,
     default: 0,
   },
+  /** µs timestamp of the correlated event; scopes the trace lookup to a
+   * ±30 min window around it instead of the trailing hour. */
+  timestamp: {
+    type: Number,
+    default: 0,
+  },
 });
 
-const q = useQuasar();
-const router = useRouter();
+const HALF_HOUR_US = 1800000000;
+
+const correlationRange = computed(() =>
+  props.timestamp
+    ? {
+        startTime: props.timestamp - HALF_HOUR_US,
+        endTime: props.timestamp + HALF_HOUR_US,
+      }
+    : null,
+);
 
 const {
-  correlationData,
   isLoading,
   hasBackendTrace,
   fetchCorrelation,
   backendSpanCount,
   performanceData,
-} = useTraceCorrelation(computed(() => props.traceId));
+  cancelTracesStream,
+} = useTraceCorrelation(
+  computed(() => props.traceId),
+  t,
+  correlationRange,
+);
+
+onUnmounted(() => cancelTracesStream());
 
 onMounted(() => {
   if (props.traceId) {
@@ -255,16 +266,12 @@ watch(
 
 const formatTraceId = (id: string) => {
   if (!id) return "";
-  return id.length > 16
-    ? `${id.substring(0, 8)}...${id.substring(id.length - 8)}`
-    : id;
+  return id.length > 16 ? `${id.substring(0, 8)}...${id.substring(id.length - 8)}` : id;
 };
 
 const formatSpanId = (id: string) => {
   if (!id) return "";
-  return id.length > 12
-    ? `${id.substring(0, 6)}...${id.substring(id.length - 6)}`
-    : id;
+  return id.length > 12 ? `${id.substring(0, 6)}...${id.substring(id.length - 6)}` : id;
 };
 
 const calculatePercentage = (value: number, total: number) => {
@@ -273,10 +280,8 @@ const calculatePercentage = (value: number, total: number) => {
 };
 
 const copyTraceId = () => {
-  copyToClipboard(props.traceId);
-  q.notify({
-    type: "positive",
-    message: "Trace ID copied to clipboard",
+  copyToClipboard(props.traceId, t, {
+    successMessage: t("traces.traceDetails.traceIdCopied"),
     timeout: 1500,
   });
 };
@@ -284,61 +289,18 @@ const copyTraceId = () => {
 const viewTraceDetails = () => {
   // TODO: Navigate to trace detail view
   // This will be implemented once we know the trace viewer route
-  q.notify({
-    type: "info",
-    message: "Trace detail view coming soon",
-    timeout: 2000,
+  toast({
+    variant: "info",
+    message: t("toastMessages.correlation.traceDetailViewComingSoon"),
   });
 };
 
 const refreshTraceData = () => {
   fetchCorrelation();
-  q.notify({
-    type: "info",
-    message: "Refreshing trace data...",
+  toast({
+    variant: "info",
+    message: t("toastMessages.correlation.refreshingTraceData"),
     timeout: 1000,
   });
 };
 </script>
-
-<style lang="scss" scoped>
-.trace-correlation-card {
-  border: 1px solid var(--o2-border-color);
-  border-radius: 4px;
-}
-
-.trace-info-section {
-  background-color: var(--o2-card-bg);
-}
-
-.trace-id-text,
-.span-id-text {
-  font-family: monospace;
-  font-size: 0.875rem;
-  padding: 0.25rem 0.5rem;
-  background-color: var(--o2-hover-accent);
-  border-radius: 4px;
-  color: var(--o2-text-color);
-}
-
-.span-hierarchy {
-  .span-item {
-    display: flex;
-    align-items: center;
-    padding: 0.25rem 0;
-    font-size: 0.875rem;
-  }
-}
-
-.performance-breakdown {
-  padding: 0.5rem;
-  background-color: var(--o2-hover-accent);
-  border-radius: 4px;
-  font-size: 0.875rem;
-}
-
-.tags-title {
-  font-size: 1rem;
-  color: var(--o2-text-color);
-}
-</style>

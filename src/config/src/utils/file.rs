@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -133,9 +133,8 @@ pub async fn scan_files_with_channel(
     let mut files = Vec::with_capacity(std::cmp::max(16, limit));
     let dir = std::fs::read_dir(root).map_err(|e| {
         std::io::Error::other(format!(
-            "Error reading directory: {}, err: {}",
+            "Error reading directory: {}, err: {e}",
             root.display(),
-            e
         ))
     })?;
     for entry in dir {
@@ -179,6 +178,24 @@ pub fn set_permission<P: AsRef<std::path::Path>>(
     _mode: u32,
 ) -> Result<(), std::io::Error> {
     std::fs::create_dir_all(path.as_ref())
+}
+
+/// Returns the total size (in bytes) of all files under `dir`, recursively.
+/// Returns 0 if the directory does not exist or cannot be read.
+pub fn get_dir_size(dir: &str) -> usize {
+    let mut total: usize = 0;
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return 0;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            total += get_dir_size(path.to_str().unwrap_or(""));
+        } else if let Ok(meta) = entry.metadata() {
+            total += meta.len() as usize;
+        }
+    }
+    total
 }
 
 #[cfg(test)]
@@ -414,7 +431,9 @@ mod tests {
         assert!(result.is_err());
 
         // Test range where start > end (this should not cause overflow)
-        let result = get_file_contents(file_path.to_str().unwrap(), Some(5..3));
+        let start = 5;
+        let end = 3;
+        let result = get_file_contents(file_path.to_str().unwrap(), Some(start..end));
         assert!(result.is_err());
     }
 

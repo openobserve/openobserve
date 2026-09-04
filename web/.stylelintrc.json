@@ -1,0 +1,51 @@
+{
+  "overrides": [
+    {
+      "comment": "base.css owns the @font-face blocks, which must name real families. It is the ONE file allowed to write a literal font-family; the --font-sans/--font-mono tokens it defines are what everything else consumes.",
+      "files": ["src/lib/styles/tokens/base.css"],
+      "rules": {
+        "declaration-property-value-disallowed-list": [
+          {
+            "/.*/": ["/var\\(\\s*--o2-/", "/var\\(\\s*--color-text-(primary|caption)\\b/"]
+          },
+          {
+            "message": "Banned token. --o2-* is legacy; --color-text-primary/-caption were retired (Tier 1) — use --color-text-heading / --color-text-secondary.",
+            "severity": "error"
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/*.vue"],
+      "customSyntax": "postcss-html",
+      "rules": {
+        "color-no-hex": [
+          true,
+          {
+            "message": "Hardcoded hex is banned in .vue styles. Use a --color-* token (§3.G).",
+            "severity": "error"
+          }
+        ],
+        "selector-disallowed-list": [
+          ["/\\.body--(dark|light)/", "/\\.(light|dark)-mode/"],
+          {
+            "message": "Dark mode CSS uses .dark only (Tailwind dark: variant or :where(.dark) &). §3.R",
+            "severity": "error"
+          }
+        ]
+      }
+    }
+  ],
+  "rules": {
+    "declaration-property-value-disallowed-list": [
+      {
+        "/.*/": ["/var\\(\\s*--o2-/", "/var\\(\\s*--color-text-(primary|caption)\\b/"],
+        "font-family": ["/^(?!.*(var\\(--font-(sans|mono)\\)|inherit)).*$/"]
+      },
+      {
+        "message": "Banned value. --o2-* is legacy; --color-text-primary/-caption were retired (Tier 1) — use --color-text-heading / --color-text-secondary. font-family must be var(--font-sans) or var(--font-mono) — no literal font stacks (FONT_AUDIT.md).",
+        "severity": "error"
+      }
+    ]
+  }
+}

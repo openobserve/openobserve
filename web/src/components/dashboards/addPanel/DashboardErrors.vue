@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,36 +16,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div v-if="props.errors.errors.length" :data-test="`dashboard-error`">
-    <q-separator />
+    <OSeparator />
     <div>
-      <q-bar class="row q-pa-sm expand-bar">
-        <div style="flex: 1" @click="onDropDownClick">
-          <q-icon
-            flat
-            :name="!showErrors ? 'arrow_right' : 'arrow_drop_down'"
-            text-color="black"
-            class="q-mr-sm"
-          />
-          <span class="text-subtitle2 text-weight-bold" style="color: red"
-            >Errors ({{ props.errors.errors.length }})</span
-          >
-          <q-space />
-        </div>
-      </q-bar>
+      <div
+        data-test="dashboard-errors-expand-bar"
+        class="bg-section-header-bg hover:bg-surface-subtle-hover flex cursor-pointer items-center gap-2 overflow-hidden px-2 py-2"
+        @click="onDropDownClick"
+      >
+        <OIcon :name="!showErrors ? 'arrow-right' : 'arrow-drop-down'" size="sm" class="me-1" />
+        <span class="text-status-error-text text-sm font-semibold">
+          {{ t("dashboard.dashboardErrors.errorsCount", { count: props.errors.errors.length }) }}
+        </span>
+      </div>
     </div>
-    <div
-      class="row"
-      :style="!showErrors ? 'height: 0px;' : 'height: auto;'"
-      style="overflow: hidden"
-    >
-      <div class="col">
+    <div class="flex overflow-hidden" :style="!showErrors ? 'height: 0;' : 'height: auto;'">
+      <div class="flex flex-col">
         <div data-test="dashboard-error">
-          <ul class="tw:list-disc tw:list-inside tw:px-3">
+          <ul data-test="dashboard-errors-list" class="list-inside list-disc px-3">
             <li
               v-for="(item, index) in props.errors.errors"
               :key="index"
-              style="color: red"
-              class="tw:py-1"
+              class="text-status-error-text py-1"
+              data-test="dashboard-errors-list-item"
             >
               {{ item }}
             </li>
@@ -58,15 +50,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 import { defineComponent, ref, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
 export default defineComponent({
   name: "DashboardErrorsComponent",
+  components: {
+    OSeparator,
+    OIcon,
+  },
   props: ["errors"],
 
-  setup(props, { emit }) {
+  setup(props) {
     const showErrors = ref(false);
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const onDropDownClick = () => {
       showErrors.value = !showErrors.value;
@@ -95,14 +93,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.expand-bar {
-  overflow: hidden;
-  cursor: pointer;
-
-  &:hover {
-    background-color: #eaeaeaa5;
-  }
-}
-</style>

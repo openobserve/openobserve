@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,88 +15,72 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog>
-    <q-card
-      data-test="dialog-box"
-      :class="warningMessage && warningMessage.length > 0 ? 'tw:w-[500px]' : 'tw:w-[240px]'"
-    >
-      <q-card-section class="confirmBody">
-        <div class="head">{{ title }}</div>
-        <div class="para">{{ message }}</div>
-        <div v-if="warningMessage && warningMessage.length > 0" class="tw:mt-4">
-          <q-banner :class="[
-            'tw:border-l-4 tw:p-4 tw:rounded',
-            store.state.theme === 'dark' 
-              ? 'tw:bg-gray-800/60 tw:border-yellow-600/70' 
-              : 'tw:bg-orange-50 tw:border-orange-400'
-          ]">
-            <template v-slot:avatar>
-              <q-icon 
-                name="warning" 
-                :class="store.state.theme === 'dark' ? 'tw:text-yellow-500/80' : 'tw:text-orange-500'" 
-                size="24px" 
-              />
-            </template>
-            <div :class="[
-              'tw:font-medium tw:text-sm tw:leading-relaxed tw:text-left',
-              store.state.theme === 'dark' ? 'tw:text-gray-300' : 'tw:text-orange-800'
-            ]">
-              {{ warningMessage }}
-            </div>
-          </q-banner>
-        </div>
-      </q-card-section>
-
-      <q-card-actions class="confirmActions">
-        <q-btn
-          v-close-popup
-          unelevated
-          no-caps
-          class="q-mr-sm o2-secondary-button"
-          @click="onCancel"
-          data-test="cancel-button"
-        >
-          {{ t("confirmDialog.cancel") }}
-        </q-btn>
-        <q-btn
-          v-close-popup
-          unelevated
-          no-caps
-          class="o2-primary-button"
-          @click="onConfirm"
-          data-test="confirm-button"
-        >
-          {{ t("confirmDialog.ok") }}
-        </q-btn>
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <ODialog
+    v-model:open="open"
+    data-test="confirm-dialog"
+    :size="warningMessage?.length ? 'md' : 'sm'"
+    :title="title"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="okLabelComputed"
+    :primary-button-color="okColor"
+    @click:secondary="onCancel"
+    @click:primary="onConfirm"
+  >
+    <div data-test="dialog-box" class="text-left">
+      <div class="para">{{ message }}</div>
+      <div v-if="warningMessage && warningMessage.length > 0" class="mt-4 text-left">
+        <OBanner variant="warning" icon="warning" :content="warningMessage" />
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
-// @ts-nocheck
-import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
-import { useStore } from "vuex";
+import { defineComponent, computed, type PropType } from "vue";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 export default defineComponent({
   name: "ConfirmDialog",
-  emits: ["update:ok", "update:cancel"],
-  props: ["title", "message", "warningMessage"],
+  components: { ODialog, OBanner },
+  emits: ["update:ok", "update:cancel", "update:modelValue"],
+  props: {
+    title: { type: String as unknown as PropType<I18nText> },
+    message: { type: String as unknown as PropType<I18nText> },
+    warningMessage: { type: String as unknown as PropType<I18nText> },
+    modelValue: { type: Boolean, default: false },
+    // No `default: ""` — an empty-string default would need a cast to I18nText,
+    // and `okLabelComputed` already falls back when the prop is absent.
+    okLabel: { type: String as unknown as PropType<I18nText> },
+    okColor: { type: String, default: "primary" },
+  },
   setup(props, { emit }) {
-    const { t } = useI18n();
-    const store = useStore();
+    const { t } = useI18nTyped();
+
+    const open = computed({
+      get: () => props.modelValue ?? false,
+      set: (v: boolean) => emit("update:modelValue", v),
+    });
+
+    const okLabelComputed = computed(() => {
+      return props.okLabel || t("confirmDialog.ok");
+    });
 
     const onCancel = () => {
+      open.value = false;
       emit("update:cancel");
     };
 
     const onConfirm = () => {
+      open.value = false;
       emit("update:ok");
     };
+
     return {
       t,
-      store,
+      open,
+      okLabelComputed,
       onCancel,
       onConfirm,
     };

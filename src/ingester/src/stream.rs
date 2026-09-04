@@ -22,6 +22,7 @@ use crate::{
     ReadRecordBatchEntry,
     entry::{Entry, PersistStat, RecordBatchEntry},
     errors::*,
+    pack::PackWriter,
     partition::Partition,
 };
 
@@ -75,12 +76,20 @@ impl Stream {
         org_id: &str,
         stream_type: &str,
         stream_name: &str,
+        mut pack: Option<&mut PackWriter>,
     ) -> Result<(usize, Vec<(PathBuf, PersistStat)>)> {
         let mut schema_size = 0;
         let mut paths = Vec::new();
-        for (_, partition) in self.partitions.iter() {
+        for partition in self.partitions.values() {
             let (part_schema_size, partitions) = partition
-                .persist(id, idx, org_id, stream_type, stream_name)
+                .persist(
+                    id,
+                    idx,
+                    org_id,
+                    stream_type,
+                    stream_name,
+                    pack.as_deref_mut(),
+                )
                 .await?;
             schema_size += part_schema_size;
             paths.extend(partitions);
@@ -92,5 +101,22 @@ impl Stream {
 impl MemorySize for Stream {
     fn mem_size(&self) -> usize {
         std::mem::size_of::<Stream>() + self.partitions.mem_size()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_stream_new_has_empty_partitions() {
+        let s = Stream::new();
+        assert!(s.partitions.is_empty());
+    }
+
+    #[test]
+    fn test_stream_mem_size_empty() {
+        let s = Stream::new();
+        assert!(s.mem_size() >= std::mem::size_of::<Stream>());
     }
 }

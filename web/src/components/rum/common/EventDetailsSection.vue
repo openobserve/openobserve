@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:mb-3" :data-test="dataTest">
-    <div class="tw:font-bold tw:mb-1 tw:text-sm">{{ title }}</div>
+  <div class="mb-3" :data-test="dataTest">
+    <div class="mb-1 text-sm font-bold">{{ title }}</div>
     <div>
       <KeyValueRow
         v-for="(field, index) in visibleFields"
@@ -36,12 +36,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
+import type { I18nText } from "@/types/i18n";
 import { computed } from "vue";
 import KeyValueRow from "./KeyValueRow.vue";
 
 interface Field {
   key: string;
-  label: string;
+  label: I18nText;
   value: any;
   valueClass?: string;
   slot?: boolean;
@@ -49,7 +50,7 @@ interface Field {
 }
 
 interface Props {
-  title: string;
+  title: I18nText;
   fields: Field[];
   dataTest?: string;
 }

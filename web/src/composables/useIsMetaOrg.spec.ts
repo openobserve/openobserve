@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,12 +18,12 @@ import { describe, expect, it, vi } from "vitest";
 // Mock Vuex store
 const mockStore = {
   state: {
-    selectedOrganization: { 
-      label: "regular-org", 
-      identifier: "regular-org-id" 
+    selectedOrganization: {
+      label: "regular-org",
+      identifier: "regular-org-id",
     },
-    zoConfig: { 
-      meta_org: "meta-organization" 
+    zoConfig: {
+      meta_org: "meta-organization",
     },
   },
 };

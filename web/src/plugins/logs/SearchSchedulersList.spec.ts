@@ -1,12 +1,9 @@
-import { mount } from "@vue/test-utils";
+import { mount, flushPromises } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import SearchSchedulersList from "@/plugins/logs/SearchSchedulersList.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
-import { nextTick, ref } from "vue";
-
-installQuasar();
+import { nextTick } from "vue";
 
 // Mock services
 vi.mock("@/services/search", () => ({
@@ -14,27 +11,26 @@ vi.mock("@/services/search", () => ({
     get_scheduled_search_list: vi.fn(),
     cancel_scheduled_search: vi.fn(),
     retry_scheduled_search: vi.fn(),
-    delete_scheduled_search: vi.fn()
-  }
+    delete_scheduled_search: vi.fn(),
+  },
 }));
 
 vi.mock("@/aws-exports", () => ({
   default: {
     isEnterprise: "true",
-    API_ENDPOINT: "http://localhost:5080"
-  }
+    API_ENDPOINT: "http://localhost:5080",
+  },
 }));
 
-vi.mock("@/composables/useLogs", () => ({
-  default: () => ({
+vi.mock("@/composables/useLogs/searchState", () => ({
+  searchState: () => ({
     searchObj: {
       meta: { jobId: null },
       data: {
-        datetime: { type: 'relative' }
-      }
+        datetime: { type: "relative" },
+      },
     },
-    extractTimestamps: vi.fn().mockReturnValue({ from: 1000, to: 2000 })
-  })
+  }),
 }));
 
 // Mock vue-router
@@ -43,10 +39,10 @@ const mockRouter = {
     value: {
       query: { org_identifier: "test-org" },
       params: {},
-      path: '/search-schedulers'
-    }
+      path: "/search-schedulers",
+    },
   },
-  push: vi.fn()
+  push: vi.fn(),
 };
 
 vi.mock("vue-router", () => ({
@@ -54,26 +50,26 @@ vi.mock("vue-router", () => ({
   useRoute: () => ({
     query: { org_identifier: "test-org" },
     params: {},
-    path: '/search-schedulers'
-  })
+    path: "/search-schedulers",
+  }),
 }));
 
-// Mock Quasar
-const mockQuasar = {
-  notify: vi.fn(),
-  dialog: vi.fn()
-};
-
-vi.mock("quasar", async (importOriginal) => {
-  const actual = await importOriginal();
-  return {
-    ...actual,
-    useQuasar: () => mockQuasar,
-    date: {
-      formatDate: vi.fn((date, format) => "2024-01-01T10:00:00Z")
-    }
-  };
+// Mock Toast — vi.hoisted runs before hoisted vi.mock factories, avoiding TDZ errors
+const { mockToast } = vi.hoisted(() => {
+  const mockToast = vi.fn();
+  return { mockToast };
 });
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+}));
+
+// Mock date utils
+vi.mock("@/utils/date", () => ({
+  formatDate: vi.fn(() => "2024-01-01T10:00:00Z"),
+  // The component imports this now instead of re-declaring it; the shared
+  // implementation is tested in date.spec.ts, so here we only assert the wiring.
+  convertUnixToDateFormat: vi.fn((us: any) => (us ? "2024-01-01T10:00:00Z" : "")),
+}));
 
 // Mock utils
 vi.mock("@/utils/zincutils", () => ({
@@ -87,8 +83,8 @@ vi.mock("@/utils/zincutils", () => ({
 // Mock navigator.clipboard
 Object.assign(navigator, {
   clipboard: {
-    writeText: vi.fn(() => Promise.resolve())
-  }
+    writeText: vi.fn(() => Promise.resolve()),
+  },
 });
 
 describe("SearchSchedulersList Component", () => {
@@ -98,18 +94,18 @@ describe("SearchSchedulersList Component", () => {
   beforeEach(async () => {
     // Reset mocks
     vi.clearAllMocks();
-    
+
     // Setup search service mock
     const { default: searchServiceMock } = await import("@/services/search");
     searchService = searchServiceMock;
 
     searchService.get_scheduled_search_list.mockResolvedValue({
-      data: []
+      data: [],
     });
 
     wrapper = mount(SearchSchedulersList, {
       props: {
-        isClicked: false
+        isClicked: false,
       },
       global: {
         plugins: [i18n],
@@ -117,37 +113,24 @@ describe("SearchSchedulersList Component", () => {
           store,
         },
         stubs: {
-          'q-page': true,
-          'q-table': true,
-          'q-tr': true,
-          'q-td': true,
-          'q-btn': true,
-          'q-icon': true,
-          'q-toggle': true,
-          'q-spinner-hourglass': true,
-          'q-tabs': true,
-          'q-tab': true,
-          'q-tab-panels': true,
-          'q-tab-panel': true,
-          'q-select': true,
-          'DateTime': {
+          OIcon: true,
+          DateTime: {
             template: '<div class="mock-datetime"></div>',
             methods: {
-              setAbsoluteTime: vi.fn()
-            }
+              setAbsoluteTime: vi.fn(),
+            },
           },
-          'AppTabs': true,
-          'QueryEditor': true,
-          'ConfirmDialog': true,
-          'NoData': true,
-          'TenstackTable': true,
-          'QTablePagination': true,
-          'JsonPreview': true
+          AppTabs: true,
+          QueryEditor: true,
+          ConfirmDialog: true,
+          NoData: true,
+          TenstackTable: true,
+          Pagination: true,
+          JsonPreview: true,
         },
         mocks: {
-          $q: mockQuasar,
-          $router: mockRouter
-        }
+          $router: mockRouter,
+        },
       },
     });
 
@@ -169,14 +152,12 @@ describe("SearchSchedulersList Component", () => {
       expect(wrapper.vm.$options.name).toBe("SearchSchedulersList");
     });
 
-    it("should initialize with correct default props", () => {
-      expect(wrapper.props('isClicked')).toBe(false);
-    });
-
-    it("should initialize with correct default data", () => {
+    it("should initialize with correct default data", async () => {
+      await flushPromises();
       expect(wrapper.vm.dataToBeLoaded).toEqual([]);
-      expect(wrapper.vm.columnsToBeRendered).toEqual([]);
-      expect(wrapper.vm.expandedRow).toEqual([]);
+      // Columns are a fixed schema, generated up front (for the loading skeleton).
+      expect(wrapper.vm.columnsToBeRendered.length).toBeGreaterThan(0);
+      expect(wrapper.vm.expandedIds).toEqual([]);
       expect(wrapper.vm.isLoading).toBe(false);
       expect(wrapper.vm.showSearchResults).toBe(false);
       expect(wrapper.vm.confirmDelete).toBe(false);
@@ -184,116 +165,96 @@ describe("SearchSchedulersList Component", () => {
       expect(wrapper.vm.activeTab).toBe("query");
     });
 
-    it("should initialize pagination correctly", () => {
-      expect(wrapper.vm.pagination.page).toBe(1);
-      expect(wrapper.vm.pagination.rowsPerPage).toBe(100);
-      expect(wrapper.vm.selectedPerPage).toBe(100);
+    it("should initialize pageSize correctly", () => {
+      expect(wrapper.vm.pageSize).toBe(100);
     });
 
-    it("should initialize perPageOptions correctly", () => {
-      expect(wrapper.vm.perPageOptions).toEqual([
-        { label: "5", value: 5 },
-        { label: "10", value: 10 },
-        { label: "20", value: 20 },
-        { label: "50", value: 50 },
-        { label: "100", value: 100 },
-        { label: "All", value: 0 }
-      ]);
+    it("should initialize pageSizeOptions correctly", () => {
+      expect(wrapper.vm.pageSizeOptions).toEqual([5, 10, 20, 50, 100]);
     });
 
     it("should initialize tabs correctly", () => {
-      expect(wrapper.vm.tabs).toEqual([
-        { label: "Query / Function", value: "query" },
-        { label: "More Details", value: "more_details" }
-      ]);
-    });
-
-    it("should initialize dateTimeToBeSent correctly", () => {
-      expect(wrapper.vm.dateTimeToBeSent).toEqual({
-        valueType: "relative",
-        relativeTimePeriod: "15m",
-        startTime: 0,
-        endTime: 0
-      });
+      expect(wrapper.vm.tabs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ label: "Query / Function", value: "query" }),
+          expect.objectContaining({ label: "More Details", value: "more_details" }),
+        ]),
+      );
     });
   });
 
-  describe("Props and Emits", () => {
-    it("should emit closeSearchHistory", async () => {
+  describe("Navigation", () => {
+    it("should navigate back to logs on closeSearchHistory", async () => {
+      // Standalone route: close navigates to the Logs route (no history to pop in
+      // jsdom) instead of emitting to a parent overlay.
       wrapper.vm.closeSearchHistory();
       await nextTick();
-      expect(wrapper.emitted().closeSearchHistory).toBeTruthy();
+      expect(mockRouter.push).toHaveBeenCalledWith({ name: "logs" });
     });
 
-    it("should have correct prop types", () => {
-      expect(typeof wrapper.props('isClicked')).toBe('boolean');
-    });
-
-    it("should initialize with correct isLoading state", () => {
+    it("should initialize with correct isLoading state", async () => {
+      await flushPromises();
       expect(wrapper.vm.isLoading).toBe(false);
     });
   });
 
   describe("Column Generation", () => {
-    it("should return empty array for empty data", () => {
-      const columns = wrapper.vm.generateColumns([]);
-      expect(columns).toEqual([]);
+    it("should generate the fixed column schema", () => {
+      // Columns are static (no longer derived from data), so they're non-empty.
+      const columns = wrapper.vm.generateColumns();
+      expect(columns.length).toBeGreaterThan(0);
     });
 
     it("should generate correct columns for data", () => {
       const mockData = [{ id: "1", user_id: "test" }];
       const columns = wrapper.vm.generateColumns(mockData);
-      
-      expect(columns).toHaveLength(7);
+
+      expect(columns).toHaveLength(6);
       expect(columns[0]).toMatchObject({
-        name: "#",
-        label: "#",
-        align: "left",
-        sortable: false
+        id: "user_id",
+        accessorKey: "user_id",
+        sortable: true,
+        size: 220,
       });
     });
 
     it("should set correct alignment for different columns", () => {
-      const mockData = [{ 
-        user_id: "test", 
-        Actions: "delete", 
-        duration: "1s",
-        status: "finished",
-        "#": "1"
-      }];
+      const mockData = [
+        {
+          user_id: "test",
+          duration: "1s",
+          status: "finished",
+        },
+      ];
       const columns = wrapper.vm.generateColumns(mockData);
-      
-      const userIdColumn = columns.find(col => col.name === "user_id");
-      const actionsColumn = columns.find(col => col.name === "Actions");
-      const durationColumn = columns.find(col => col.name === "duration");
-      const statusColumn = columns.find(col => col.name === "status");
-      const indexColumn = columns.find(col => col.name === "#");
-      
-      expect(userIdColumn.align).toBe("center");
-      expect(actionsColumn.align).toBe("left");
-      expect(durationColumn.align).toBe("left");
-      expect(statusColumn.align).toBe("left");
-      expect(indexColumn.align).toBe("left");
+
+      const userIdColumn = columns.find((col) => col.id === "user_id");
+      const actionsColumn = columns.find((col) => col.id === "actions");
+      const durationColumn = columns.find((col) => col.id === "duration");
+      const statusColumn = columns.find((col) => col.id === "status");
+
+      expect(userIdColumn.meta.align).toBe("left");
+      expect(actionsColumn.meta.align).toBe("center");
+      expect(durationColumn.meta.align).toBe("left");
+      expect(statusColumn.meta.align).toBe("left");
     });
 
     it("should set sortable correctly for different columns", () => {
-      const mockData = [{ 
-        user_id: "test", 
-        Actions: "delete", 
-        status: "finished",
-        "#": "1"
-      }];
+      const mockData = [
+        {
+          user_id: "test",
+          status: "finished",
+        },
+      ];
       const columns = wrapper.vm.generateColumns(mockData);
-      
-      const userIdColumn = columns.find(col => col.name === "user_id");
-      const actionsColumn = columns.find(col => col.name === "Actions");
-      const statusColumn = columns.find(col => col.name === "status");
-      const indexColumn = columns.find(col => col.name === "#");
-      
+
+      const userIdColumn = columns.find((col) => col.id === "user_id");
+      const actionsColumn = columns.find((col) => col.id === "actions");
+      const statusColumn = columns.find((col) => col.id === "status");
+
       expect(userIdColumn.sortable).toBe(true);
-      expect(actionsColumn.sortable).toBe(false);
+      expect(actionsColumn.sortable).toBeUndefined();
       expect(statusColumn.sortable).toBe(false);
-      expect(indexColumn.sortable).toBe(false);
     });
   });
 
@@ -305,30 +266,30 @@ describe("SearchSchedulersList Component", () => {
         end_time: 2000000,
         started_at: 1000500,
         ended_at: 2000500,
-        other_field: "ignored"
+        other_field: "ignored",
       };
-      
+
       const filtered = wrapper.vm.filterRow(mockRow);
-      
+
       expect(filtered).toEqual({
         trace_id: "abc123",
         start_time: 1000000,
         end_time: 2000000,
         started_at: 1000500,
-        ended_at: 2000500
+        ended_at: 2000500,
       });
     });
 
     it("should handle missing fields gracefully", () => {
       const mockRow = {
         trace_id: "abc123",
-        other_field: "ignored"
+        other_field: "ignored",
       };
-      
+
       const filtered = wrapper.vm.filterRow(mockRow);
-      
+
       expect(filtered).toEqual({
-        trace_id: "abc123"
+        trace_id: "abc123",
       });
     });
 
@@ -348,9 +309,9 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should return correct status icons", () => {
-      expect(wrapper.vm.getStatusIcon(0)).toBe("hourglass_empty");
-      expect(wrapper.vm.getStatusIcon(1)).toBe("pause_circle");
-      expect(wrapper.vm.getStatusIcon(2)).toBe("check_circle");
+      expect(wrapper.vm.getStatusIcon(0)).toBe("hourglass-empty");
+      expect(wrapper.vm.getStatusIcon(1)).toBe("pause");
+      expect(wrapper.vm.getStatusIcon(2)).toBe("check-circle");
       expect(wrapper.vm.getStatusIcon(3)).toBe("cancel");
       expect(wrapper.vm.getStatusIcon(999)).toBe("help");
     });
@@ -442,100 +403,49 @@ describe("SearchSchedulersList Component", () => {
     });
   });
 
-  describe("Unix to Quasar Format Conversion", () => {
-    it("should convert unix timestamp to quasar format", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat(1609459200000000);
+  describe("Unix to Date Format Conversion", () => {
+    it("should convert unix timestamp to date format", () => {
+      const result = wrapper.vm.convertUnixToDateFormat(1609459200000000);
       expect(result).toBe("2024-01-01T10:00:00Z");
     });
 
     it("should handle zero timestamp", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat(0);
+      const result = wrapper.vm.convertUnixToDateFormat(0);
       expect(result).toBe("");
     });
 
     it("should handle undefined timestamp", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat(undefined);
+      const result = wrapper.vm.convertUnixToDateFormat(undefined);
       expect(result).toBe("");
     });
 
     it("should handle null timestamp", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat(null);
+      const result = wrapper.vm.convertUnixToDateFormat(null);
       expect(result).toBe("");
     });
 
     it("should handle string timestamp", () => {
-      const result = wrapper.vm.convertUnixToQuasarFormat("1609459200000000");
+      const result = wrapper.vm.convertUnixToDateFormat("1609459200000000");
       expect(result).toBe("2024-01-01T10:00:00Z");
     });
   });
 
-  describe("Sorting Methods", () => {
-    const mockRows = [
-      { user_id: "alice", rawDuration: 10, toBeStoredStartTime: 2000, toBeCreatedAt: 3000 },
-      { user_id: "bob", rawDuration: 5, toBeStoredStartTime: 1000, toBeCreatedAt: 2000 },
-      { user_id: "charlie", rawDuration: 15, toBeStoredStartTime: 3000, toBeCreatedAt: 1000 }
-    ];
+  describe("Sorting Configuration", () => {
+    it("should mark user_id, created_at, and start_time columns as sortable", () => {
+      const mockData = [{ id: "1", user_id: "test" }];
+      const columns = wrapper.vm.generateColumns(mockData);
 
-    it("should sort by user_id ascending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "user_id", false);
-      expect(result[0].user_id).toBe("alice");
-      expect(result[1].user_id).toBe("bob");
-      expect(result[2].user_id).toBe("charlie");
+      const sortableColumns = columns.filter((col) => col.sortable === true);
+      const sortableIds = sortableColumns.map((col) => col.id);
+      expect(sortableIds).toEqual(["user_id", "created_at", "start_time"]);
     });
 
-    it("should sort by user_id descending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "user_id", true);
-      expect(result[0].user_id).toBe("charlie");
-      expect(result[1].user_id).toBe("bob");
-      expect(result[2].user_id).toBe("alice");
-    });
+    it("should mark duration, status, and actions as non-sortable", () => {
+      const mockData = [{ id: "1", user_id: "test" }];
+      const columns = wrapper.vm.generateColumns(mockData);
 
-    it("should sort by duration ascending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "duration", false);
-      expect(result[0].rawDuration).toBe(5);
-      expect(result[1].rawDuration).toBe(10);
-      expect(result[2].rawDuration).toBe(15);
-    });
-
-    it("should sort by duration descending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "duration", true);
-      expect(result[0].rawDuration).toBe(15);
-      expect(result[1].rawDuration).toBe(10);
-      expect(result[2].rawDuration).toBe(5);
-    });
-
-    it("should sort by start_time ascending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "start_time", false);
-      expect(result[0].toBeStoredStartTime).toBe(1000);
-      expect(result[1].toBeStoredStartTime).toBe(2000);
-      expect(result[2].toBeStoredStartTime).toBe(3000);
-    });
-
-    it("should sort by start_time descending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "start_time", true);
-      expect(result[0].toBeStoredStartTime).toBe(3000);
-      expect(result[1].toBeStoredStartTime).toBe(2000);
-      expect(result[2].toBeStoredStartTime).toBe(1000);
-    });
-
-    it("should sort by created_at ascending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "created_at", false);
-      expect(result[0].toBeCreatedAt).toBe(1000);
-      expect(result[1].toBeCreatedAt).toBe(2000);
-      expect(result[2].toBeCreatedAt).toBe(3000);
-    });
-
-    it("should sort by created_at descending", () => {
-      const result = wrapper.vm.sortMethod(mockRows, "created_at", true);
-      expect(result[0].toBeCreatedAt).toBe(3000);
-      expect(result[1].toBeCreatedAt).toBe(2000);
-      expect(result[2].toBeCreatedAt).toBe(1000);
-    });
-
-    it("should not modify original array", () => {
-      const originalLength = mockRows.length;
-      wrapper.vm.sortMethod(mockRows, "user_id", false);
-      expect(mockRows.length).toBe(originalLength);
+      const nonSortableIds = columns.filter((col) => col.sortable !== true).map((col) => col.id);
+      expect(nonSortableIds).toEqual(expect.arrayContaining(["duration", "status", "actions"]));
     });
   });
 
@@ -545,93 +455,93 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should copy text to clipboard successfully", async () => {
-      await wrapper.vm.copyToClipboard("test text", "Query");
-      
+      await wrapper.vm.copyToClipboard("test text", i18n.global.t, {
+        successMessage: "Query Copied Successfully!",
+        timeout: 5000,
+      });
+
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith("test text");
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        type: "positive",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Query Copied Successfully!",
-        timeout: 5000
+        timeout: 5000,
       });
     });
 
     it("should handle clipboard error", async () => {
       navigator.clipboard.writeText.mockRejectedValueOnce(new Error("Failed"));
-      
-      try {
-        await wrapper.vm.copyToClipboard("test text", "Query");
-      } catch (error) {
-        // Handle the error if the function doesn't catch it internally
-      }
-      
-      // Wait for async operations
-      await new Promise(resolve => setTimeout(resolve, 0));
-      
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        type: "negative",
-        message: "Error while copy content.",
-        timeout: 5000
+
+      await wrapper.vm.copyToClipboard("test text", i18n.global.t);
+
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
+        message: "Failed to copy to clipboard",
+        timeout: 2000,
       });
     });
 
     it("should handle different content types", async () => {
-      await wrapper.vm.copyToClipboard("function code", "Function");
-      
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        type: "positive",
+      await wrapper.vm.copyToClipboard("function code", i18n.global.t, {
+        successMessage: "Function Copied Successfully!",
+        timeout: 5000,
+      });
+
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Function Copied Successfully!",
-        timeout: 5000
+        timeout: 5000,
       });
     });
   });
 
   describe("Expand/Collapse Functionality", () => {
-    it("should expand row when clicked", () => {
-      const mockProps = {
-        row: {
+    it("should expand row and set query when onExpandedIdsChange is called", () => {
+      wrapper.vm.dataToBeLoaded = [
+        {
           trace_id: "test-uuid",
           start_time: 1000,
-          end_time: 2000
-        }
-      };
-      
-      wrapper.vm.triggerExpand(mockProps);
-      
-      expect(wrapper.vm.expandedRow).toBe("test-uuid");
+          end_time: 2000,
+          started_at: 1500,
+          ended_at: 2500,
+        },
+      ];
+
+      wrapper.vm.onExpandedIdsChange(["test-uuid"]);
+
+      expect(wrapper.vm.expandedIds).toEqual(["test-uuid"]);
       expect(wrapper.vm.query).toContain("test-uuid");
     });
 
-    it("should collapse row when same row clicked again", () => {
-      const mockProps = {
-        row: {
+    it("should collapse row and clear query when onExpandedIdsChange is called with empty array", () => {
+      wrapper.vm.dataToBeLoaded = [
+        {
           trace_id: "test-uuid",
           start_time: 1000,
-          end_time: 2000
-        }
-      };
-      
-      // First expand
-      wrapper.vm.triggerExpand(mockProps);
-      expect(wrapper.vm.expandedRow).toBe("test-uuid");
-      
-      // Then collapse
-      wrapper.vm.triggerExpand(mockProps);
-      expect(wrapper.vm.expandedRow).toBe(null);
+          end_time: 2000,
+        },
+      ];
+
+      wrapper.vm.onExpandedIdsChange(["test-uuid"]);
+      expect(wrapper.vm.expandedIds).toEqual(["test-uuid"]);
+
+      wrapper.vm.onExpandedIdsChange([]);
+      expect(wrapper.vm.expandedIds).toEqual([]);
+      expect(wrapper.vm.query).toBe("");
     });
 
-    it("should expand different row and collapse previous", () => {
-      const mockProps1 = {
-        row: { trace_id: "uuid-1", start_time: 1000, end_time: 2000 }
-      };
-      const mockProps2 = {
-        row: { trace_id: "uuid-2", start_time: 1000, end_time: 2000 }
-      };
-      
-      wrapper.vm.triggerExpand(mockProps1);
-      expect(wrapper.vm.expandedRow).toBe("uuid-1");
-      
-      wrapper.vm.triggerExpand(mockProps2);
-      expect(wrapper.vm.expandedRow).toBe("uuid-2");
+    it("should expand different row and update query", () => {
+      wrapper.vm.dataToBeLoaded = [
+        { trace_id: "uuid-1", start_time: 1000, end_time: 2000, started_at: 1500, ended_at: 2500 },
+        { trace_id: "uuid-2", start_time: 3000, end_time: 4000, started_at: 3500, ended_at: 4500 },
+      ];
+
+      wrapper.vm.onExpandedIdsChange(["uuid-1"]);
+      expect(wrapper.vm.expandedIds).toEqual(["uuid-1"]);
+      expect(wrapper.vm.query).toContain("uuid-1");
+
+      wrapper.vm.onExpandedIdsChange(["uuid-2"]);
+      expect(wrapper.vm.expandedIds).toEqual(["uuid-2"]);
+      expect(wrapper.vm.query).toContain("uuid-2");
     });
   });
 
@@ -640,7 +550,7 @@ describe("SearchSchedulersList Component", () => {
       id: "job-123",
       user_id: "test@example.com",
       status: 1,
-      sql: "SELECT * FROM logs"
+      sql: "SELECT * FROM logs",
     };
 
     beforeEach(() => {
@@ -649,14 +559,14 @@ describe("SearchSchedulersList Component", () => {
 
     it("should set up delete confirmation", () => {
       wrapper.vm.confirmDeleteJob(mockJob);
-      
+
       expect(wrapper.vm.confirmDelete).toBe(true);
       expect(wrapper.vm.toBeDeletedJob).toEqual(mockJob);
     });
 
     it("should set up cancel confirmation", () => {
       wrapper.vm.confirmCancelJob(mockJob);
-      
+
       expect(wrapper.vm.confirmCancel).toBe(true);
       expect(wrapper.vm.toBeCancelled).toEqual(mockJob);
     });
@@ -672,72 +582,39 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should have delete, cancel and retry functions", () => {
-      expect(typeof wrapper.vm.deleteSearchJob).toBe('function');
-      expect(typeof wrapper.vm.cancelSearchJob).toBe('function');
-      expect(typeof wrapper.vm.retrySearchJob).toBe('function');
-    });
-  });
-
-
-  describe("DateTime Management", () => {
-    it("should update datetime correctly", async () => {
-      const mockDateTime = {
-        valueType: "absolute",
-        startTime: 1000000,
-        endTime: 2000000
-      };
-      
-      wrapper.vm.searchDateTimeRef = { setAbsoluteTime: vi.fn() };
-      
-      await wrapper.vm.updateDateTime(mockDateTime);
-      
-      expect(wrapper.vm.dateTimeToBeSent).toEqual(mockDateTime);
-      expect(wrapper.vm.searchDateTimeRef.setAbsoluteTime).toHaveBeenCalledWith(1000000, 2000000);
-    });
-
-    it("should handle datetime with different valueType", async () => {
-      const mockDateTime = {
-        valueType: "relative",
-        relativeTimePeriod: "1h",
-        startTime: 0,
-        endTime: 0
-      };
-      
-      wrapper.vm.searchDateTimeRef = { setAbsoluteTime: vi.fn() };
-      
-      await wrapper.vm.updateDateTime(mockDateTime);
-      
-      expect(wrapper.vm.dateTimeToBeSent).toEqual(mockDateTime);
+      expect(typeof wrapper.vm.deleteSearchJob).toBe("function");
+      expect(typeof wrapper.vm.cancelSearchJob).toBe("function");
+      expect(typeof wrapper.vm.retrySearchJob).toBe("function");
     });
   });
 
   describe("Computed Properties", () => {
     it("should calculate delay message for seconds", () => {
       store.state.zoConfig.usage_publish_interval = 30;
-      
+
       const delayMsg = wrapper.vm.delayMessage;
       expect(delayMsg).toBe("60 seconds");
     });
 
     it("should calculate delay message for minutes", () => {
       store.state.zoConfig.usage_publish_interval = 180;
-      
+
       const delayMsg = wrapper.vm.delayMessage;
-      expect(delayMsg).toBe("3 minute(s)");
+      expect(delayMsg).toBe("3 minutes");
     });
 
     it("should handle exactly 60 seconds", () => {
       store.state.zoConfig.usage_publish_interval = 60;
-      
+
       const delayMsg = wrapper.vm.delayMessage;
       expect(delayMsg).toBe("60 seconds");
     });
 
     it("should handle large intervals", () => {
       store.state.zoConfig.usage_publish_interval = 7200;
-      
+
       const delayMsg = wrapper.vm.delayMessage;
-      expect(delayMsg).toBe("120 minute(s)");
+      expect(delayMsg).toBe("120 minutes");
     });
   });
 
@@ -750,11 +627,11 @@ describe("SearchSchedulersList Component", () => {
         org_id: "test-org",
         toBeStoredStartTime: 1000000,
         toBeStoredEndTime: 2000000,
-        duration: "1 second"
+        duration: "1 second",
       };
 
       await wrapper.vm.goToLogs(mockRow);
-      
+
       expect(mockRouter.push).toHaveBeenCalledWith({
         path: "/logs",
         query: expect.objectContaining({
@@ -764,13 +641,12 @@ describe("SearchSchedulersList Component", () => {
           type: "search_scheduler",
           org_identifier: "test-org",
           from: 1000000,
-          to: 2000000
-        })
+          to: 2000000,
+        }),
       });
-      expect(mockQuasar.notify).toHaveBeenCalledWith({
-        type: "positive",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Search Job have been applied successfully",
-        timeout: 2000
       });
     });
 
@@ -782,11 +658,11 @@ describe("SearchSchedulersList Component", () => {
         org_id: "test-org",
         toBeStoredStartTime: 1000000,
         toBeStoredEndTime: 2000000,
-        duration: "1 second"
+        duration: "1 second",
       };
 
       await wrapper.vm.goToLogs(mockRow);
-      
+
       const callArgs = mockRouter.push.mock.calls[0][0];
       expect(callArgs.query.stream).toBe("stream1,stream2");
     });
@@ -800,17 +676,72 @@ describe("SearchSchedulersList Component", () => {
         toBeStoredStartTime: 1000000,
         toBeStoredEndTime: 2000000,
         duration: "1 second",
-        function: "test function content"
+        function: "test function content",
       };
 
       await wrapper.vm.goToLogs(mockRow);
-      
+
       const callArgs = mockRouter.push.mock.calls[0][0];
       expect(callArgs.query.functionContent).toBeDefined();
     });
 
+    it("should set fn_editor=true when row has function content", async () => {
+      const mockRow = {
+        sql: "SELECT * FROM logs",
+        stream_names: '["test-stream"]',
+        stream_type: "logs",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000000,
+        toBeStoredEndTime: 2000000,
+        duration: "1 second",
+        function: "function transform(row) { return row; }",
+      };
+
+      await wrapper.vm.goToLogs(mockRow);
+
+      const callArgs = mockRouter.push.mock.calls[0][0];
+      expect(callArgs.query.fn_editor).toBe("true");
+      expect(callArgs.query.functionContent).toBeDefined();
+    });
+
+    it("should set fn_editor=false when row has no function", async () => {
+      const mockRow = {
+        sql: "SELECT * FROM logs",
+        stream_names: '["test-stream"]',
+        stream_type: "logs",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000000,
+        toBeStoredEndTime: 2000000,
+        duration: "1 second",
+      };
+
+      await wrapper.vm.goToLogs(mockRow);
+
+      const callArgs = mockRouter.push.mock.calls[0][0];
+      expect(callArgs.query.fn_editor).toBe("false");
+      expect(callArgs.query.functionContent).toBeUndefined();
+    });
+
+    it("should set fn_editor=false when row has empty function string", async () => {
+      const mockRow = {
+        sql: "SELECT * FROM logs",
+        stream_names: '["test-stream"]',
+        stream_type: "logs",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000000,
+        toBeStoredEndTime: 2000000,
+        duration: "1 second",
+        function: "",
+      };
+
+      await wrapper.vm.goToLogs(mockRow);
+
+      const callArgs = mockRouter.push.mock.calls[0][0];
+      expect(callArgs.query.fn_editor).toBe("false");
+    });
+
     it("should set job ID correctly in fetchSearchResults", () => {
-      const mockRow = { 
+      const mockRow = {
         id: "job-123",
         duration: "1 second",
         sql: "SELECT * FROM logs",
@@ -818,14 +749,14 @@ describe("SearchSchedulersList Component", () => {
         stream_type: "logs",
         org_id: "test-org",
         toBeStoredStartTime: 1000000,
-        toBeStoredEndTime: 2000000
+        toBeStoredEndTime: 2000000,
       };
-      
+
       // Mock the goToLogs function to avoid navigation issues
       wrapper.vm.goToLogs = vi.fn();
-      
+
       wrapper.vm.fetchSearchResults(mockRow);
-      
+
       expect(wrapper.vm.searchObj.meta.jobId).toBe("job-123");
     });
   });
@@ -835,17 +766,24 @@ describe("SearchSchedulersList Component", () => {
       // Mock config to be non-enterprise
       const configMock = await import("@/aws-exports");
       configMock.default.isEnterprise = "false";
-      
-      const result = await wrapper.vm.fetchSearchHistory();
-      
-      expect(result).toBeUndefined();
-      expect(searchService.get_scheduled_search_list).not.toHaveBeenCalled();
+      // The component fetches on mount (when enterprise was still true); ignore that
+      // call and assert only that the direct fetch below short-circuits.
+      searchService.get_scheduled_search_list.mockClear();
+
+      try {
+        const result = await wrapper.vm.fetchSearchHistory();
+
+        expect(result).toBeUndefined();
+        expect(searchService.get_scheduled_search_list).not.toHaveBeenCalled();
+      } finally {
+        configMock.default.isEnterprise = "true";
+      }
     });
   });
 
   describe("Data Processing Functions", () => {
     it("should have fetchSearchHistory function", () => {
-      expect(typeof wrapper.vm.fetchSearchHistory).toBe('function');
+      expect(typeof wrapper.vm.fetchSearchHistory).toBe("function");
     });
 
     it("should have correct data structure for processing", () => {
@@ -854,12 +792,12 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should have generateColumns function", () => {
-      expect(typeof wrapper.vm.generateColumns).toBe('function');
+      expect(typeof wrapper.vm.generateColumns).toBe("function");
     });
 
     it("should have data processing utilities", () => {
-      expect(typeof wrapper.vm.calculateDuration).toBe('function');
-      expect(typeof wrapper.vm.convertUnixToQuasarFormat).toBe('function');
+      expect(typeof wrapper.vm.calculateDuration).toBe("function");
+      expect(typeof wrapper.vm.convertUnixToDateFormat).toBe("function");
     });
   });
 
@@ -883,22 +821,21 @@ describe("SearchSchedulersList Component", () => {
     });
 
     it("should have utility functions available", () => {
-      expect(typeof wrapper.vm.copyToClipboard).toBe('function');
-      expect(typeof wrapper.vm.updateDateTime).toBe('function');
-      expect(typeof wrapper.vm.triggerExpand).toBe('function');
+      expect(typeof wrapper.vm.copyToClipboard).toBe("function");
+      expect(typeof wrapper.vm.onExpandedIdsChange).toBe("function");
     });
 
     it("should have loading and result tracking", () => {
-      expect(typeof wrapper.vm.isLoading).toBe('boolean');
-      expect(typeof wrapper.vm.resultTotal).toBe('number');
-      expect(typeof wrapper.vm.showSearchResults).toBe('boolean');
+      expect(typeof wrapper.vm.isLoading).toBe("boolean");
+      expect(typeof wrapper.vm.resultTotal).toBe("number");
+      expect(typeof wrapper.vm.showSearchResults).toBe("boolean");
     });
 
     it("should have confirmation state management", () => {
-      expect(typeof wrapper.vm.confirmDelete).toBe('boolean');
-      expect(typeof wrapper.vm.confirmCancel).toBe('boolean');
-      expect(typeof wrapper.vm.toBeDeletedJob).toBe('object');
-      expect(typeof wrapper.vm.toBeCancelled).toBe('object');
+      expect(typeof wrapper.vm.confirmDelete).toBe("boolean");
+      expect(typeof wrapper.vm.confirmCancel).toBe("boolean");
+      expect(typeof wrapper.vm.toBeDeletedJob).toBe("object");
+      expect(typeof wrapper.vm.toBeCancelled).toBe("object");
     });
   });
 });

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -40,7 +40,7 @@ const awsMarketplace = {
    */
   linkSubscription: (
     org_identifier: string,
-    token: string
+    token: string,
   ): Promise<{ data: LinkSubscriptionResponse }> => {
     return http().post(`/api/${org_identifier}/aws-marketplace/link-subscription`, {
       token,
@@ -53,10 +53,10 @@ const awsMarketplace = {
    */
   getActivationStatus: (
     org_identifier: string,
-    customer_id: string
+    customer_id: string,
   ): Promise<{ data: ActivationStatusResponse }> => {
     return http().get(
-      `/api/${org_identifier}/aws-marketplace/activation-status?customer_id=${customer_id}`
+      `/api/${org_identifier}/aws-marketplace/activation-status?customer_id=${customer_id}`,
     );
   },
 };

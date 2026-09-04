@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ use datafusion::arrow::datatypes::Schema;
 use crate::{
     db::{
         IndexStatement,
-        postgres::{CLIENT, CLIENT_DDL, create_index},
+        postgres::{CLIENT_DDL, CLIENT_RW, create_index},
     },
     errors::{Error, Result},
 };
@@ -58,7 +58,7 @@ impl super::SchemaHistory for PostgresSchemaHistory {
         schema: Schema,
     ) -> Result<()> {
         let value = json::to_string(&schema)?;
-        let pool = CLIENT.clone();
+        let pool = CLIENT_RW.clone();
         DB_QUERY_NUMS
             .with_label_values(&["insert", "schema_history"])
             .inc();
@@ -138,4 +138,19 @@ pub async fn create_table_index() -> Result<()> {
     .await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_postgres_schema_history_new() {
+        let _history = PostgresSchemaHistory::new();
+    }
+
+    #[test]
+    fn test_postgres_schema_history_default() {
+        let _history = PostgresSchemaHistory::default();
+    }
 }

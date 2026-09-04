@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,194 +15,173 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-dialog v-model="showDialog" @hide="onClose" maximized>
-    <q-card class="query-plan-dialog full-height">
-      <q-card-section class="row items-center q-pb-sm q-pt-sm">
-        <div class="text-h6">{{ t("search.queryPlan") }}</div>
-        <q-space />
-        <q-btn icon="close" flat round dense @click="onClose">
-          <q-tooltip>Close (ESC)</q-tooltip>
-        </q-btn>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section class="query-plan-content full-height q-pa-none">
-        <q-splitter v-model="splitterPosition" class="full-height">
-          <!-- Left Pane: SQL Query -->
-          <template #before>
-            <div class="sql-query-pane full-height">
-              <div
-                class="pane-header q-pa-sm tw:px-[1rem] row items-center"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'pane-header-dark'
-                    : 'pane-header-light'
-                "
-              >
-                <q-icon name="code" size="20px" class="q-mr-sm" />
-                <div class="text-subtitle1 text-weight-medium">SQL Query</div>
+  <ODialog
+    v-model:open="showDialog"
+    data-test="query-plan-dialog"
+    size="full"
+    :title="t('search.queryPlan')"
+    @update:open="(v) => !v && onClose()"
+  >
+    <div class="h-full overflow-hidden p-0">
+      <OSplitter
+        v-model="splitterPosition"
+        :horizontal="false"
+        separator-class="relative before:content-[''] before:absolute before:left-1/2 before:inset-y-0 before:w-px before:bg-card-glass-border before:-translate-x-1/2 before:transition-[background-color,width] before:duration-200 hover:before:bg-accent hover:before:w-0.5"
+        class="h-full"
+      >
+        <!-- Left Pane: SQL Query -->
+        <template #before>
+          <section class="bg-surface-base flex h-full flex-col overflow-hidden">
+            <header
+              class="bg-card-glass-bg border-card-glass-border flex h-11 shrink-0 items-center gap-2 border-b border-solid px-4"
+            >
+              <div class="flex items-center gap-2">
+                <OIcon name="code" size="sm" class="text-text-secondary" />
+                <h3
+                  class="text-text-heading m-0 text-(length:--text-sm) font-(--font-semibold) tracking-[0.01em]"
+                >
+                  {{ t("search.sqlQuery") }}
+                </h3>
               </div>
-              <q-separator />
-              <div
-                class="sql-query-content q-pa-md"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'sql-query-content-dark'
-                    : 'sql-query-content-light'
-                "
+            </header>
+            <div class="flex-1 overflow-y-auto p-4">
+              <pre
+                class="sql-query-text text-compact bg-code-bg border-card-glass-border rounded-default text-text-code m-0 box-border min-h-full border border-solid px-4 py-3.5 [font-family:var(--font-mono)] leading-[1.6] wrap-break-word whitespace-pre-wrap"
+              ><code class="[font-family:inherit] text-inherit bg-transparent p-0">{{ sqlQuery }}</code></pre>
+            </div>
+          </section>
+        </template>
+
+        <!-- Right Pane: Explain/Analyze Results -->
+        <template #after>
+          <section class="bg-surface-base flex h-full flex-col overflow-hidden">
+            <header
+              class="bg-card-glass-bg border-card-glass-border flex h-11 shrink-0 items-center gap-2 border-b border-solid px-4"
+            >
+              <h3
+                class="text-text-heading m-0 text-(length:--text-sm) font-(--font-semibold) tracking-[0.01em]"
               >
-                <div class="sql-query-wrapper">
-                  <pre class="sql-query-text">{{ sqlQuery }}</pre>
+                {{ showAnalyzeResults ? t("search.analyzeResults") : t("search.explainResults") }}
+              </h3>
+              <div class="flex-1" />
+              <OButton
+                v-if="!isAnalyzing && !showAnalyzeResults"
+                variant="primary"
+                size="sm"
+                :loading="loading"
+                @click="runAnalyze"
+              >
+                {{ t("search.analyze") }}
+                <OTooltip :content="t('search.analyzeTooltip')" />
+              </OButton>
+            </header>
+
+            <div v-if="loading" class="flex flex-1 items-center justify-center p-6">
+              <div class="text-center">
+                <OSpinner variant="dots" size="lg" />
+                <div class="text-text-secondary mt-3 text-(length:--text-sm)">
+                  {{ isAnalyzing ? t("search.runningAnalyze") : t("search.loadingPlan") }}
                 </div>
               </div>
             </div>
-          </template>
 
-          <!-- Right Pane: Explain/Analyze Results -->
-          <template #after>
-            <div class="explain-results-pane full-height">
+            <div v-else-if="error" class="p-4">
+              <OBanner variant="error" icon="error" :content="raw(error)" />
+            </div>
+
+            <!-- EXPLAIN ANALYZE view -->
+            <div
+              v-else-if="showAnalyzeResults"
+              class="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
+            >
+              <MetricsSummaryCard v-if="summaryMetrics" :metrics="summaryMetrics" class="mb-3" />
+
               <div
-                class="pane-header q-pa-sm tw:px-[1rem] row items-center"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'pane-header-dark'
-                    : 'pane-header-light'
-                "
+                class="plan-surface bg-card-glass-bg border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border border-solid"
               >
-                <div class="text-subtitle1 text-weight-medium">
-                  {{
-                    showAnalyzeResults
-                      ? t("search.analyzeResults")
-                      : t("search.explainResults")
-                  }}
-                </div>
-                <q-space />
-                <q-btn
-                  v-if="!isAnalyzing && !showAnalyzeResults"
-                  color="primary"
-                  :label="t('search.analyze')"
-                  no-caps
-                  size="sm"
-                  @click="runAnalyze"
-                  :loading="loading"
+                <div
+                  class="border-card-glass-border bg-surface-base border-b border-solid px-4 py-2.5"
                 >
-                  <q-tooltip>{{ t("search.analyzeTooltip") }}</q-tooltip>
-                </q-btn>
-              </div>
-              <q-separator />
-
-              <div v-if="loading" class="flex flex-center q-pa-xl full-height">
-                <div class="text-center">
-                  <q-spinner-dots color="primary" size="50px" />
-                  <div class="q-mt-md">
-                    {{
-                      isAnalyzing
-                        ? t("search.runningAnalyze")
-                        : t("search.loadingPlan")
-                    }}
+                  <span
+                    class="text-text-label text-(length:--text-xs) font-(--font-semibold) tracking-[0.06em] uppercase"
+                    >{{ t("search.executionPlan") }}</span
+                  >
+                </div>
+                <div class="flex-1 overflow-y-auto px-4 py-3">
+                  <QueryPlanTree v-if="planTree" :tree="planTree" :is-analyze="true" />
+                  <div v-else class="text-text-muted px-4 py-6 text-center text-(length:--text-sm)">
+                    {{ t("search.noAnalyzePlanFound") }}
                   </div>
                 </div>
               </div>
+            </div>
 
-              <div v-else-if="error" class="q-pa-md">
-                <q-banner class="bg-negative text-white">
-                  <template v-slot:avatar>
-                    <q-icon name="error" />
-                  </template>
-                  {{ error }}
-                </q-banner>
-              </div>
-
-              <!-- EXPLAIN ANALYZE view -->
+            <!-- EXPLAIN view (tabs for logical/physical) -->
+            <div v-else class="flex flex-1 flex-col gap-3 overflow-y-auto p-4">
               <div
-                v-else-if="showAnalyzeResults"
-                class="plan-container q-pa-md"
+                class="plan-surface bg-card-glass-bg border-card-glass-border rounded-default flex flex-1 flex-col overflow-hidden border border-solid"
               >
-                <!-- Metrics Summary Card -->
-                <MetricsSummaryCard
-                  v-if="summaryMetrics"
-                  :metrics="summaryMetrics"
-                  class="q-mb-md"
-                />
+                <div class="border-card-glass-border border-b border-solid px-2">
+                  <OTabs v-model="activeTab" dense align="left">
+                    <OTab name="logical" :label="t('search.logicalPlan')" />
+                    <OTab name="physical" :label="t('search.physicalPlan')" />
+                  </OTabs>
+                </div>
 
-                <!-- Execution Plan Tree -->
-                <q-card flat bordered class="plan-card">
-                  <q-card-section class="q-pa-none">
-                    <div class="plan-scroll-area">
+                <OTabPanels v-model="activeTab" animated>
+                  <OTabPanel name="logical">
+                    <div class="flex-1 overflow-y-auto px-4 py-3">
                       <QueryPlanTree
-                        v-if="planTree"
-                        :tree="planTree"
-                        :is-analyze="true"
+                        v-if="logicalPlanTree"
+                        :tree="logicalPlanTree"
+                        :is-analyze="false"
                       />
-                      <div v-else class="q-pa-md text-grey-6">
-                        {{ t("search.noAnalyzePlanFound") }}
+                      <div
+                        v-else
+                        class="text-text-muted px-4 py-6 text-center text-(length:--text-sm)"
+                      >
+                        {{ t("search.noLogicalPlan") }}
                       </div>
                     </div>
-                  </q-card-section>
-                </q-card>
-              </div>
+                  </OTabPanel>
 
-              <!-- EXPLAIN view (tabs for logical/physical) -->
-              <div v-else class="plan-container q-pa-md">
-                <q-card flat bordered class="plan-card">
-                  <q-tabs
-                    v-model="activeTab"
-                    dense
-                    class="text-grey"
-                    active-color="primary"
-                    indicator-color="primary"
-                    align="left"
-                    no-caps
-                  >
-                    <q-tab name="logical" :label="t('search.logicalPlan')" />
-                    <q-tab name="physical" :label="t('search.physicalPlan')" />
-                  </q-tabs>
-
-                  <q-separator />
-
-                  <q-tab-panels v-model="activeTab" animated>
-                    <q-tab-panel name="logical" class="q-pa-none">
-                      <div class="plan-scroll-area">
-                        <QueryPlanTree
-                          v-if="logicalPlanTree"
-                          :tree="logicalPlanTree"
-                          :is-analyze="false"
-                        />
-                        <div v-else class="q-pa-md text-grey-6">
-                          {{ t("search.noLogicalPlan") }}
-                        </div>
+                  <OTabPanel name="physical">
+                    <div class="flex-1 overflow-y-auto px-4 py-3">
+                      <QueryPlanTree
+                        v-if="physicalPlanTree"
+                        :tree="physicalPlanTree"
+                        :is-analyze="false"
+                      />
+                      <div
+                        v-else
+                        class="text-text-muted px-4 py-6 text-center text-(length:--text-sm)"
+                      >
+                        {{ t("search.noPhysicalPlan") }}
                       </div>
-                    </q-tab-panel>
-
-                    <q-tab-panel name="physical" class="q-pa-none">
-                      <div class="plan-scroll-area">
-                        <QueryPlanTree
-                          v-if="physicalPlanTree"
-                          :tree="physicalPlanTree"
-                          :is-analyze="false"
-                        />
-                        <div v-else class="q-pa-md text-grey-6">
-                          {{ t("search.noPhysicalPlan") }}
-                        </div>
-                      </div>
-                    </q-tab-panel>
-                  </q-tab-panels>
-                </q-card>
+                    </div>
+                  </OTabPanel>
+                </OTabPanels>
               </div>
             </div>
-          </template>
-        </q-splitter>
-      </q-card-section>
-    </q-card>
-  </q-dialog>
+          </section>
+        </template>
+      </OSplitter>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch } from "vue";
-import { useI18n } from "vue-i18n";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
+import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import { defineComponent, ref, computed, watch, onUnmounted } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import streamingSearch from "@/services/streaming_search";
 import { useSearchStream } from "@/composables/useLogs/useSearchStream";
 import { generateTraceContext } from "@/utils/zincutils";
@@ -216,12 +195,26 @@ import {
 import MetricsSummaryCard from "@/components/query-plan/MetricsSummaryCard.vue";
 import QueryPlanTree from "@/components/query-plan/QueryPlanTree.vue";
 import { searchState } from "@/composables/useLogs/searchState";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 
 export default defineComponent({
   name: "QueryPlanDialog",
   components: {
+    OSplitter,
+    OTabs,
+    OTab,
+    OTabPanels,
+    OTabPanel,
     MetricsSummaryCard,
     QueryPlanTree,
+    OButton,
+    ODialog,
+    OSpinner,
+    OIcon,
+    OTooltip,
+    OBanner,
   },
   props: {
     modelValue: {
@@ -235,10 +228,9 @@ export default defineComponent({
   },
   emits: ["update:modelValue"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const $q = useQuasar();
-    const { getSearchQueryPayload } = useSearchStream();
+    const { getSearchQueryPayload } = useSearchStream(t);
 
     const loading = ref(false);
     const error = ref("");
@@ -249,7 +241,7 @@ export default defineComponent({
     const activeTab = ref("logical");
     const isAnalyzing = ref(false);
     const showAnalyzeResults = ref(false);
-    const splitterPosition = ref(50); // Split at 50%
+    const splitterPosition = ref(50);
 
     let { searchObj } = searchState();
 
@@ -258,7 +250,6 @@ export default defineComponent({
       set: (val) => emit("update:modelValue", val),
     });
 
-    // Get SQL query from searchObj
     const sqlQuery = computed(() => {
       return props.searchObj?.data?.query || "";
     });
@@ -310,12 +301,8 @@ export default defineComponent({
         // We need to nest Phase 1+ plans as children of Phase 0 RemoteExec
 
         // Separate phases
-        const phase0Hits = responseData.hits.filter(
-          (hit: any) => hit.phase === 0,
-        );
-        const phase1Hits = responseData.hits.filter(
-          (hit: any) => hit.phase === 1,
-        );
+        const phase0Hits = responseData.hits.filter((hit: any) => hit.phase === 0);
+        const phase1Hits = responseData.hits.filter((hit: any) => hit.phase === 1);
 
         if (phase0Hits.length > 0 && phase1Hits.length > 0) {
           // Parse phase 0
@@ -383,19 +370,13 @@ export default defineComponent({
         });
 
         // Fallback: if no plan_type, try to parse from combined text
-        if (
-          !logicalPlan.value &&
-          !physicalPlan.value &&
-          responseData.hits.length > 0
-        ) {
+        if (!logicalPlan.value && !physicalPlan.value && responseData.hits.length > 0) {
           const combined = responseData.hits
             .map((h: any) => h.plan || JSON.stringify(h))
             .join("\n");
 
           // Try to split by plan_type markers
-          const logicalMatch = combined.match(
-            /logical_plan[:\s]+(.+?)(?=physical_plan|$)/is,
-          );
+          const logicalMatch = combined.match(/logical_plan[:\s]+(.+?)(?=physical_plan|$)/is);
           const physicalMatch = combined.match(/physical_plan[:\s]+(.+?)$/is);
 
           if (logicalMatch) {
@@ -432,10 +413,7 @@ export default defineComponent({
             try {
               const parsed = JSON.parse(dataContent);
               // Look for actual search results with hits
-              if (
-                parsed &&
-                (parsed.hits !== undefined || parsed.total !== undefined)
-              ) {
+              if (parsed && (parsed.hits !== undefined || parsed.total !== undefined)) {
                 result = parsed;
               }
             } catch (e) {
@@ -505,10 +483,7 @@ export default defineComponent({
         }
       } catch (err: any) {
         console.error("Error fetching explain plan:", err);
-        error.value =
-          err.response?.data?.message ||
-          err.message ||
-          t("search.errorFetchingPlan");
+        error.value = err.response?.data?.message || err.message || t("search.errorFetchingPlan");
       } finally {
         loading.value = false;
       }
@@ -545,7 +520,7 @@ export default defineComponent({
         const response = await streamingSearch.search({
           org_identifier: store.state.selectedOrganization.identifier,
           query: analyzeQueryPayload,
-          page_type: "logs",
+          page_type: searchObj.data.stream.streamType || "logs",
           search_type: "ui",
           traceId,
         });
@@ -568,10 +543,7 @@ export default defineComponent({
         }
       } catch (err: any) {
         console.error("Error running analyze:", err);
-        error.value =
-          err.response?.data?.message ||
-          err.message ||
-          t("search.errorRunningAnalyze");
+        error.value = err.response?.data?.message || err.message || t("search.errorRunningAnalyze");
       } finally {
         loading.value = false;
         isAnalyzing.value = false;
@@ -623,9 +595,13 @@ export default defineComponent({
       },
     );
 
+    onUnmounted(() => {
+      document.removeEventListener("keydown", handleEscKey);
+    });
+
     return {
+      raw,
       t,
-      store,
       showDialog,
       loading,
       error,
@@ -645,137 +621,20 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss" scoped>
-.query-plan-dialog {
-  display: flex;
-  flex-direction: column;
-
-  .query-plan-content {
-    flex: 1;
-    overflow: hidden;
-
-    .sql-query-pane,
-    .explain-results-pane {
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-
-      .pane-header {
-        flex-shrink: 0;
-      }
-
-      .pane-header-light {
-        background-color: #f5f5f5;
-      }
-
-      .pane-header-dark {
-        background-color: #181a1b;
-      }
-
-      .sql-query-content {
-        flex: 1;
-        overflow-y: auto;
-
-        .sql-query-wrapper {
-          border-radius: 4px;
-          padding: 12px;
-          min-height: 100%;
-        }
-
-        .sql-query-text {
-          font-family: monospace;
-          font-size: 12px;
-          line-height: 1.6;
-          margin: 0;
-          white-space: pre-wrap;
-          word-break: break-word;
-        }
-      }
-
-      .sql-query-content-light {
-        background-color: #f8f9fa;
-        color: #1d1d1d;
-
-        .sql-query-wrapper {
-          background-color: #ffffff;
-          border: 1px solid #e0e0e0;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-        }
-      }
-
-      .sql-query-content-dark {
-        background-color: #121212;
-        color: #e0e0e0;
-
-        .sql-query-wrapper {
-          background-color: #1e1e1e;
-          border: 1px solid #3d3d3d;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-        }
-      }
-    }
-
-    .explain-results-pane {
-      .plan-container {
-        flex: 1;
-        overflow-y: auto;
-        display: flex;
-        flex-direction: column;
-      }
-
-      .plan-card {
-        flex: 1;
-        overflow: hidden;
-        display: flex;
-        flex-direction: column;
-
-        .q-tabs {
-          flex-shrink: 0;
-        }
-
-        .q-tab-panels {
-          flex: 1;
-          overflow: hidden;
-        }
-      }
-
-      .plan-scroll-area {
-        max-height: calc(100vh - 250px);
-        overflow-y: auto;
-      }
-    }
-  }
-}
-
-// Verbose output styling
-.verbose-output-container {
+<style scoped>
+/* keep(lib-override): stretch OTabPanels/OTabPanel library-internal DOM to fill the plan surface height */
+.plan-surface :deep(.o-tab-panels) {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-.verbose-output {
-  font-family: monospace;
-  font-size: 12px;
-  line-height: 1.6;
-  margin: 0;
-  padding: 12px;
-  white-space: pre-wrap;
-  word-break: break-word;
-  overflow-x: auto;
-  border-radius: 4px;
-
-  // Light mode
-  background-color: #f5f5f5;
-  color: #1d1d1d;
-  border: 1px solid #e0e0e0;
-}
-
-// Dark mode for verbose output
-body.body--dark {
-  .verbose-output {
-    background-color: #1e1e1e;
-    color: #e0e0e0;
-    border-color: #3d3d3d;
-  }
+.plan-surface :deep(.o-tab-panel) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 </style>

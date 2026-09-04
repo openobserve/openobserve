@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,539 +15,392 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="promql-chart-config">
+  <div class="flex flex-col gap-2" data-test="dashboard-promql-chart-config">
     <!-- Aggregation Function Selector -->
-    <q-select
+    <OSelect
       v-if="showAggregationConfig"
       v-model="aggregationValue"
       :options="aggregationOptions"
       :label="t('dashboard.aggregationFunction')"
-      borderless
-      dense
-      class="q-py-md showLabelOnTop"
-      stack-label
-      emit-value
-      map-options
       data-test="dashboard-config-aggregation"
     >
-      <template v-slot:label>
-        <div class="row items-center all-pointer-events">
-          {{ t("dashboard.aggregationFunction") }}
-          <q-icon class="q-ml-xs" size="20px" name="info" />
-          <q-tooltip class="bg-grey-8" max-width="300px">
-            <b>Aggregation Function - </b>
-            Determines how time-series data is converted to a single value.
+      <template #tooltip>
+        <OTooltip max-width="18.75rem">
+          <template #content>
+            <b>{{ t("dashboard.promQLChartConfig.aggTooltipTitle") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggTooltipDesc") }}
             <br /><br />
-            <b>Last:</b> Most recent value (default)
+            <b>{{ t("dashboard.promQLChartConfig.aggLastLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggLastDesc") }}
             <br />
-            <b>First:</b> Oldest value
+            <b>{{ t("dashboard.promQLChartConfig.aggFirstLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggFirstDesc") }}
             <br />
-            <b>Min/Max:</b> Minimum/Maximum value
+            <b>{{ t("dashboard.promQLChartConfig.aggMinMaxLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggMinMaxDesc") }}
             <br />
-            <b>Avg:</b> Average of all values
+            <b>{{ t("dashboard.promQLChartConfig.aggAvgLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggAvgDesc") }}
             <br />
-            <b>Sum:</b> Total of all values
+            <b>{{ t("dashboard.promQLChartConfig.aggSumLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggSumDesc") }}
             <br />
-            <b>Count:</b> Number of data points
+            <b>{{ t("dashboard.promQLChartConfig.aggCountLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggCountDesc") }}
             <br />
-            <b>Range:</b> Difference between max and min
+            <b>{{ t("dashboard.promQLChartConfig.aggRangeLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggRangeDesc") }}
             <br />
-            <b>Diff:</b> Difference between last and first
-          </q-tooltip>
-        </div>
+            <b>{{ t("dashboard.promQLChartConfig.aggDiffLabel") }}</b>
+            {{ t("dashboard.promQLChartConfig.aggDiffDesc") }}
+          </template>
+        </OTooltip>
       </template>
-    </q-select>
+    </OSelect>
 
     <!-- GeoMap Label Configuration -->
-    <div v-if="chartType === 'geomap'" class="geomap-config">
-      <q-input
+    <div v-if="chartType === 'geomap'" class="flex flex-col gap-2">
+      <OInput
         v-model="geoLatLabel"
         :label="t('dashboard.geoLatLabel')"
-        placeholder="latitude or lat"
-        borderless
-        dense
-        class="tw:mb-3 showLabelOnTop"
-        stack-label
+        :placeholder="raw('latitude or lat')"
         data-test="dashboard-config-geo-lat-label"
       >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events tw:mb-[-5px]">
-            {{ t("dashboard.geoLatLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Name of the metric label containing latitude values. Default:
-              "latitude" or "lat"
-            </q-tooltip>
-          </div>
+        <template #tooltip>
+          <OTooltip max-width="18.75rem">
+            <template #content>
+              {{ t("dashboard.promQLChartConfig.geoLatTooltip") }}
+            </template>
+          </OTooltip>
         </template>
-      </q-input>
+      </OInput>
 
-      <q-input
+      <OInput
         v-model="geoLonLabel"
         :label="t('dashboard.geoLonLabel')"
-        placeholder="longitude or lon"
-        borderless
-        dense
-        class="tw:mb-3 showLabelOnTop"
-        stack-label
+        :placeholder="raw('longitude or lon')"
         data-test="dashboard-config-geo-lon-label"
       >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events tw:mb-[-5px]">
-            {{ t("dashboard.geoLonLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Name of the metric label containing longitude values. Default:
-              "longitude" or "lon"
-            </q-tooltip>
-          </div>
+        <template #tooltip>
+          <OTooltip max-width="18.75rem">
+            <template #content>
+              {{ t("dashboard.promQLChartConfig.geoLonTooltip") }}
+            </template>
+          </OTooltip>
         </template>
-      </q-input>
+      </OInput>
 
-      <q-input
+      <OInput
         v-model="geoWeightLabel"
         :label="t('dashboard.geoWeightLabel')"
-        placeholder="weight"
-        borderless
-        dense
-        class="tw:mb-3 showLabelOnTop"
-        stack-label
+        :placeholder="raw('weight')"
         data-test="dashboard-config-geo-weight-label"
       >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events tw:mb-[-5px]">
-            {{ t("dashboard.geoWeightLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Name of the metric label containing weight values. Default:
-              "weight"
-            </q-tooltip>
-          </div>
+        <template #tooltip>
+          <OTooltip max-width="18.75rem">
+            <template #content>
+              {{ t("dashboard.promQLChartConfig.geoWeightTooltip") }}
+            </template>
+          </OTooltip>
         </template>
-      </q-input>
+      </OInput>
     </div>
 
     <!-- Maps Label Configuration -->
-    <div v-if="chartType === 'maps'" class="maps-config">
-      <q-input
+    <div v-if="chartType === 'maps'" class="flex flex-col gap-2">
+      <OInput
         v-model="mapsNameLabel"
         :label="t('dashboard.mapsNameLabel')"
-        placeholder="country or location"
-        borderless
-        dense
-        class="q-py-sm showLabelOnTop"
-        stack-label
+        :placeholder="raw('country or location')"
         data-test="dashboard-config-maps-name-label"
       >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events tw:mb-[-5px]">
-            {{ t("dashboard.mapsNameLabel") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="300px">
-              Name of the metric label containing location names (e.g., country,
-              region). Default: "name"
-            </q-tooltip>
-          </div>
+        <template #tooltip>
+          <OTooltip max-width="18.75rem">
+            <template #content>
+              {{ t("dashboard.promQLChartConfig.mapsNameTooltip") }}
+            </template>
+          </OTooltip>
         </template>
-      </q-input>
-
-      <q-select
-        v-model="mapsMapType"
-        :options="['world']"
-        :label="t('dashboard.mapsMapType')"
-        borderless
-        dense
-        class="q-py-sm showLabelOnTop"
-        stack-label
-        data-test="dashboard-config-maps-type"
-      >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events tw:mb-[-5px]">
-            {{ t("dashboard.mapsMapType") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="250px">
-              Map type to display. Default: "world"
-            </q-tooltip>
-          </div>
-        </template>
-      </q-select>
+      </OInput>
     </div>
 
     <!-- Table Configuration -->
-    <div v-if="chartType === 'table'" class="table-config">
+    <div v-if="chartType === 'table'" class="flex flex-col gap-2">
       <!-- PromQL Table Mode -->
-      <q-select
+      <OSelect
+        v-show="isConfigOptionVisible('promqlTable', 'promql-table-mode')"
         v-model="promqlTableMode"
         :options="promqlTableModeOptions"
         :label="t('dashboard.promqlTableMode')"
-        borderless
-        dense
-        class="q-py-md showLabelOnTop"
-        stack-label
-        emit-value
-        map-options
         data-test="dashboard-config-promql-table-mode"
       >
-        <template v-slot:label>
-          <div class="row items-center all-pointer-events">
-            {{ t("dashboard.promqlTableMode") }}
-            <q-icon class="q-ml-xs" size="20px" name="info" />
-            <q-tooltip class="bg-grey-8" max-width="400px">
-              <b>PromQL Table Mode - </b>
-              Controls how time-series data is displayed in the table.
+        <template #tooltip>
+          <OTooltip max-width="18.75rem">
+            <template #content>
+              <b>{{ t("dashboard.promQLChartConfig.promqlTableModeTooltipTitle") }}</b>
+              {{ t("dashboard.promQLChartConfig.promqlTableModeTooltipDesc") }}
               <br /><br />
-              <b>Time Series:</b> Shows timestamp and value columns for selected
-              series with legend dropdown. <br /><br />
-              <b>Time Series with Metadata:</b> Shows timestamp, value, and all
-              metric labels (job, instance, etc.) for selected series with
-              legend dropdown. <br /><br />
-              <b>Aggregate:</b> Shows aggregated values across all series
-              without timestamps (no legend dropdown). <br /><br />
-              <b>Note:</b> The legend dropdown only appears in time series modes
-              when multiple series are present.
-            </q-tooltip>
-          </div>
+              <b>{{ t("dashboard.promQLChartConfig.tableModeTimeSeriesLabel") }}</b>
+              {{ t("dashboard.promQLChartConfig.tableModeTimeSeriesDesc") }} <br /><br />
+              <b>{{ t("dashboard.promQLChartConfig.tableModeTimeSeriesMetaLabel") }}</b>
+              {{ t("dashboard.promQLChartConfig.tableModeTimeSeriesMetaDesc") }} <br /><br />
+              <b>{{ t("dashboard.promQLChartConfig.tableModeAggregateLabel") }}</b>
+              {{ t("dashboard.promQLChartConfig.tableModeAggregateDesc") }} <br /><br />
+              <b>{{ t("dashboard.promQLChartConfig.noteLabel") }}</b>
+              {{ t("dashboard.promQLChartConfig.promqlTableModeNoteDesc") }}
+            </template>
+          </OTooltip>
         </template>
-      </q-select>
+      </OSelect>
       <template v-if="promqlTableMode === 'all'">
-        <q-select
+        <OSelect
+          v-show="isConfigOptionVisible('promqlTable', 'table-aggregations')"
           v-model="tableAggregations"
           :options="aggregationOptions"
           :label="t('dashboard.tableAggregations')"
           multiple
-          borderless
-          dense
           class="showLabelOnTop"
-          stack-label
-          emit-value
-          map-options
           data-test="dashboard-config-table-aggregations"
-          :display-value="getTableAggregationsDisplay"
         >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events">
-              {{ t("dashboard.tableAggregations") }}
-              <q-icon class="q-ml-xs" size="20px" name="info" />
-              <q-tooltip class="bg-grey-8" max-width="350px">
-                <b>Table Aggregations - </b>
-                Select multiple aggregation functions to display as columns.
+          <template #tooltip>
+            <OTooltip max-width="21.875rem">
+              <template #content>
+                <b>{{ t("dashboard.promQLChartConfig.tableAggTooltipTitle") }}</b>
+                {{ t("dashboard.promQLChartConfig.tableAggTooltipDesc") }}
                 <br /><br />
-                Single aggregation: creates a "value" column
+                {{ t("dashboard.promQLChartConfig.tableAggSingle") }}
                 <br />
-                Multiple aggregations: creates "value_last", "value_sum", etc.
+                {{ t("dashboard.promQLChartConfig.tableAggMultiple") }}
                 <br /><br />
-                Example: Selecting "last", "sum", "avg" will create three value
-                columns.
-              </q-tooltip>
-            </div>
+                {{ t("dashboard.promQLChartConfig.tableAggExample") }}
+              </template>
+            </OTooltip>
           </template>
-          <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item v-bind="itemProps" dense style="padding: 0px 4px">
-              <q-item-section side class="q-pa-none">
-                <q-checkbox
-                  :model-value="selected"
-                  @update:model-value="toggleOption(opt)"
-                />
-              </q-item-section>
-              <q-item-section class="q-pa-none">
-                <q-item-label>{{ opt.label }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        </OSelect>
       </template>
 
       <!-- Column Filters -->
-      <template
-        v-if="
-          promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
-        "
-      >
-        <div class="q-mb-sm text-subtitle2 q-mt-md">Column Filters</div>
+      <template v-if="promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'">
+        <div
+          v-show="
+            isConfigOptionVisible('promqlTable', 'visible-columns') ||
+            isConfigOptionVisible('promqlTable', 'hidden-columns')
+          "
+          class="mt-3 mb-2 text-sm font-medium"
+        >
+          {{ t("dashboard.promQLChartConfig.columnFilters") }}
+        </div>
 
-        <q-select
+        <OSelect
+          v-show="isConfigOptionVisible('promqlTable', 'visible-columns')"
           v-model="visibleColumns"
-          :options="visibleColumnsFilteredOptions"
+          :options="availableColumnOptions"
           :label="t('dashboard.visibleColumns')"
           multiple
-          use-input
-          input-debounce="0"
-          new-value-mode="add-unique"
-          @filter="filterVisibleColumns"
-          @new-value="createColumnValue"
-          borderless
-          dense
+          creatable
           class="showLabelOnTop"
-          stack-label
           data-test="dashboard-config-visible-columns"
-          :display-value="getVisibleColumnsDisplay"
+          @create="addToVisibleColumns"
         >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events tw:mb-[-5px]">
-              {{ t("dashboard.visibleColumns") }}
-              <q-icon class="q-ml-xs" size="18px" name="info">
-                <q-tooltip class="bg-grey-8" max-width="400px">
-                  <b>Visible Columns</b>
-                  <br /><br />
-                  Specify which metric label columns to show in the table.
-                  <br /><br />
-                  <b>How to use:</b><br />
-                  • Select from dropdown (loaded from stream fields)<br />
-                  • Type custom column names and press Enter<br />
-                  • Leave empty to show all columns
-                  <br /><br />
-                  <b>Note:</b> This takes precedence over "Hidden Columns" if
-                  both are set.
-                </q-tooltip>
-              </q-icon>
-            </div>
+          <template #tooltip>
+            <OTooltip max-width="25rem">
+              <template #content>
+                <b>{{ t("dashboard.promQLChartConfig.visibleColumnsTitle") }}</b>
+                <br /><br />
+                {{ t("dashboard.promQLChartConfig.visibleColumnsDesc") }}
+                <br /><br />
+                <b>{{ t("dashboard.promQLChartConfig.howToUse") }}</b
+                ><br />
+                {{ t("dashboard.promQLChartConfig.bulletSelectFromDropdown") }}<br />
+                {{ t("dashboard.promQLChartConfig.bulletTypeCustom") }}<br />
+                {{ t("dashboard.promQLChartConfig.bulletLeaveEmpty") }}
+                <br /><br />
+                <b>{{ t("dashboard.promQLChartConfig.noteLabel") }}</b>
+                {{ t("dashboard.promQLChartConfig.visibleColumnsNote") }}
+              </template>
+            </OTooltip>
           </template>
-          <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item
-              v-bind="itemProps"
-              dense
-              style="min-height: auto; padding: 0px 4px"
-            >
-              <q-item-section side class="q-pa-none">
-                <q-checkbox
-                  :model-value="selected"
-                  @update:model-value="toggleOption(opt)"
-                />
-              </q-item-section>
-              <q-item-section class="q-pa-none">
-                <q-item-label>{{ opt }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        </OSelect>
 
-        <q-select
+        <OSelect
+          v-show="isConfigOptionVisible('promqlTable', 'hidden-columns')"
           v-model="hiddenColumns"
-          :options="hiddenColumnsFilteredOptions"
+          :options="availableColumnOptions"
           :label="t('dashboard.hiddenColumns')"
           multiple
-          use-input
-          input-debounce="0"
-          new-value-mode="add-unique"
-          @filter="filterHiddenColumns"
-          @new-value="createColumnValue"
-          borderless
-          dense
+          creatable
           class="showLabelOnTop"
-          stack-label
           data-test="dashboard-config-hidden-columns"
-          :display-value="getHiddenColumnsDisplay"
+          @create="addToHiddenColumns"
         >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events tw:mb-[-5px]">
-              {{ t("dashboard.hiddenColumns") }}
-              <q-icon class="q-ml-xs" size="18px" name="info">
-                <q-tooltip class="bg-grey-8" max-width="400px">
-                  <b>Hidden Columns</b>
-                  <br /><br />
-                  Specify which metric label columns to hide from the table.
-                  <br /><br />
-                  <b>How to use:</b><br />
-                  • Select from dropdown (loaded from stream fields)<br />
-                  • Type custom column names and press Enter<br />
-                  • All other columns will be shown
-                  <br /><br />
-                  <b>Tip:</b> Useful for hiding internal labels like __name__,
-                  le (histogram buckets), quantile, etc.
-                </q-tooltip>
-              </q-icon>
-            </div>
+          <template #tooltip>
+            <OTooltip max-width="25rem">
+              <template #content>
+                <b>{{ t("dashboard.promQLChartConfig.hiddenColumnsTitle") }}</b>
+                <br /><br />
+                {{ t("dashboard.promQLChartConfig.hiddenColumnsDesc") }}
+                <br /><br />
+                <b>{{ t("dashboard.promQLChartConfig.howToUse") }}</b
+                ><br />
+                {{ t("dashboard.promQLChartConfig.bulletSelectFromDropdown") }}<br />
+                {{ t("dashboard.promQLChartConfig.bulletTypeCustom") }}<br />
+                {{ t("dashboard.promQLChartConfig.bulletAllOtherShown") }}
+                <br /><br />
+                <b>{{ t("dashboard.promQLChartConfig.tipLabel") }}</b>
+                {{ t("dashboard.promQLChartConfig.hiddenColumnsTip") }}
+              </template>
+            </OTooltip>
           </template>
-          <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item
-              v-bind="itemProps"
-              dense
-              style="min-height: auto; padding: 0px 4px"
-            >
-              <q-item-section side class="q-pa-none">
-                <q-checkbox
-                  :model-value="selected"
-                  @update:model-value="toggleOption(opt)"
-                />
-              </q-item-section>
-              <q-item-section class="q-pa-none">
-                <q-item-label>{{ opt }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        </OSelect>
       </template>
 
       <!-- Sticky Columns -->
-      <template
-        v-if="
-          promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
-        "
-      >
-        <div class="q-mb-sm text-subtitle2 q-mt-md">Sticky Columns</div>
+      <template v-if="promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'">
+        <div
+          v-show="
+            isConfigOptionVisible('promqlTable', 'sticky-first-column') ||
+            isConfigOptionVisible('promqlTable', 'sticky-columns')
+          "
+          class="mt-3 mb-2 text-sm font-medium"
+        >
+          {{ t("dashboard.promQLChartConfig.stickyColumns") }}
+        </div>
 
-        <q-toggle
+        <OSwitch
+          v-show="isConfigOptionVisible('promqlTable', 'sticky-first-column')"
           v-model="stickyFirstColumn"
+          :label="t('dashboard.promQLChartConfig.stickyFirstColumnLabel')"
           data-test="dashboard-config-sticky-first-column"
-          class="tw:h-[36px] -tw:ml-2 o2-toggle-button-lg"
           size="lg"
         >
-          <template v-slot:default>
-            <div
-              class="row items-center all-pointer-events tw:mb-[-5px] tw:ml-2"
-            >
-              {{ t("dashboard.stickyFirstColumn") }}
-              <q-icon class="q-ml-xs" size="20px" name="info" />
-              <q-tooltip class="bg-grey-8" max-width="300px">
-                <b>Sticky First Column - </b>
-                Makes the first column stay fixed when scrolling horizontally.
+          <template #tooltip>
+            <OTooltip max-width="18.75rem">
+              <template #content>
+                <b>{{ t("dashboard.promQLChartConfig.stickyFirstColumnTooltipTitle") }}</b>
+                {{ t("dashboard.promQLChartConfig.stickyFirstColumnTooltipDesc") }}
                 <br /><br />
-                Useful for keeping the primary identifier visible (e.g., job,
-                instance).
-              </q-tooltip>
-            </div>
+                {{ t("dashboard.promQLChartConfig.stickyFirstColumnTooltipNote") }}
+              </template>
+            </OTooltip>
           </template>
-        </q-toggle>
+        </OSwitch>
 
-        <q-select
+        <OSelect
+          v-show="isConfigOptionVisible('promqlTable', 'sticky-columns')"
           v-model="stickyColumns"
-          :options="stickyColumnsFilteredOptions"
+          :options="availableColumnOptions"
           :label="t('dashboard.stickyColumns')"
           multiple
-          use-input
-          input-debounce="0"
-          new-value-mode="add-unique"
-          @filter="filterStickyColumns"
-          @new-value="createColumnValue"
-          borderless
-          dense
+          creatable
           class="showLabelOnTop"
-          stack-label
           data-test="dashboard-config-sticky-columns"
-          :disable="stickyFirstColumn"
-          :display-value="getStickyColumnsDisplay"
+          :disabled="stickyFirstColumn"
+          @create="addToStickyColumns"
         >
-          <template v-slot:label>
-            <div class="row items-center all-pointer-events">
-              {{ t("dashboard.stickyColumns") }}
-              <q-icon class="q-ml-xs" size="18px" name="info">
-                <q-tooltip class="bg-grey-8" max-width="400px">
-                  <b>Sticky Columns</b>
-                  <br /><br />
-                  Specify which columns should remain fixed when scrolling
-                  horizontally.
-                  <br /><br />
-                  <b>How to use:</b><br />
-                  • Select from dropdown (loaded from stream fields)<br />
-                  • Type custom column names and press Enter<br />
-                  • Columns will stay visible during horizontal scroll
-                  <br /><br />
-                  <b>Note:</b> Disabled when "Sticky First Column" is enabled.
-                </q-tooltip>
-              </q-icon>
-            </div>
+          <template #tooltip>
+            <OTooltip max-width="25rem">
+              <template #content>
+                <b>{{ t("dashboard.promQLChartConfig.stickyColumns") }}</b>
+                <br /><br />
+                {{ t("dashboard.promQLChartConfig.stickyColumnsDesc") }}
+                <br /><br />
+                <b>{{ t("dashboard.promQLChartConfig.howToUse") }}</b
+                ><br />
+                {{ t("dashboard.promQLChartConfig.bulletSelectFromDropdown") }}<br />
+                {{ t("dashboard.promQLChartConfig.bulletTypeCustom") }}<br />
+                {{ t("dashboard.promQLChartConfig.bulletStickyScroll") }}
+                <br /><br />
+                <b>{{ t("dashboard.promQLChartConfig.noteLabel") }}</b>
+                {{ t("dashboard.promQLChartConfig.stickyColumnsNote") }}
+              </template>
+            </OTooltip>
           </template>
-          <template v-slot:option="{ itemProps, opt, selected, toggleOption }">
-            <q-item
-              v-bind="itemProps"
-              dense
-              style="min-height: auto; padding: 0px 4px"
-            >
-              <q-item-section side class="q-pa-none">
-                <q-checkbox
-                  :model-value="selected"
-                  @update:model-value="toggleOption(opt)"
-                />
-              </q-item-section>
-              <q-item-section class="q-pa-none">
-                <q-item-label>{{ opt }}</q-item-label>
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
+        </OSelect>
       </template>
 
       <!-- Column Order Configuration -->
-      <template
-        v-if="
-          promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'
-        "
-      >
-        <div class="q-mb-sm q-mt-md" style="font-weight: 600">
-        </div>
-        <q-btn
+      <template v-if="promqlTableMode === 'all' || promqlTableMode === 'expanded_timeseries'">
+        <div
+          v-show="isConfigOptionVisible('promqlTable', 'configure-column-order')"
+          class="font-semibold"
+        ></div>
+        <OButton
+          v-show="isConfigOptionVisible('promqlTable', 'configure-column-order')"
+          variant="outline"
+          size="sm"
           @click="openColumnOrderPopup"
-          style="cursor: pointer; padding: 0px 5px"
-          :label="t(`dashboard.configureColumnOrder`)"
-          no-caps
-          icon="reorder"
           data-test="dashboard-config-column-order-button"
-          class="el-border"
-        />
+          icon-left="reorder"
+        >
+          {{ t(`dashboard.configureColumnOrder`) }}
+        </OButton>
 
         <!-- Column Order Popup Dialog -->
-        <q-dialog
-          v-model="showColumnOrderPopup"
-          data-test="column-order-dialog"
-        >
-          <ColumnOrderPopUp
-            :column-order="columnOrder"
-            :available-columns="filteredAvailableColumns"
-            @cancel="closeColumnOrderPopup"
-            @save="saveColumnOrder"
-          />
-        </q-dialog>
+        <ColumnOrderPopUp
+          :open="showColumnOrderPopup"
+          :column-order="columnOrder"
+          :available-columns="filteredAvailableColumns"
+          @cancel="closeColumnOrderPopup"
+          @save="saveColumnOrder"
+        />
       </template>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, computed, ref, inject, watch } from "vue";
-import { useI18n } from "vue-i18n";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
+import { defineComponent, computed, ref, inject } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import ColumnOrderPopUp from "./ColumnOrderPopUp.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 export default defineComponent({
   name: "PromQLChartConfig",
   components: {
     ColumnOrderPopUp,
+    OButton,
+    OSelect,
+    OInput,
+    OSwitch,
+    OTooltip,
   },
   props: {
     chartType: {
       type: String,
       required: true,
     },
+    isConfigOptionVisible: {
+      type: Function,
+      default: () => true,
+    },
   },
   setup(props) {
-    const { t } = useI18n();
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const { t } = useI18nTyped();
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     // Aggregation function options
     const aggregationOptions = [
-      { label: "Last (most recent value)", value: "last" },
-      { label: "First (oldest value)", value: "first" },
-      { label: "Min (minimum value)", value: "min" },
-      { label: "Max (maximum value)", value: "max" },
-      { label: "Avg (average)", value: "avg" },
-      { label: "Sum (total)", value: "sum" },
-      { label: "Count (number of data points)", value: "count" },
-      { label: "Range (max - min)", value: "range" },
-      { label: "Diff (last - first)", value: "diff" },
+      { label: t("dashboard.promQLChartConfig.aggOptionLast"), value: "last" },
+      { label: t("dashboard.promQLChartConfig.aggOptionFirst"), value: "first" },
+      { label: t("dashboard.promQLChartConfig.aggOptionMin"), value: "min" },
+      { label: t("dashboard.promQLChartConfig.aggOptionMax"), value: "max" },
+      { label: t("dashboard.promQLChartConfig.aggOptionAvg"), value: "avg" },
+      { label: t("dashboard.promQLChartConfig.aggOptionSum"), value: "sum" },
+      { label: t("dashboard.promQLChartConfig.aggOptionCount"), value: "count" },
+      { label: t("dashboard.promQLChartConfig.aggOptionRange"), value: "range" },
+      { label: t("dashboard.promQLChartConfig.aggOptionDiff"), value: "diff" },
     ];
 
     // Chart types that support aggregation
     const chartsWithAggregation = ["pie", "donut", "geomap", "maps"];
 
-    const showAggregationConfig = computed(() =>
-      chartsWithAggregation.includes(props.chartType),
-    );
+    const showAggregationConfig = computed(() => chartsWithAggregation.includes(props.chartType));
 
     // Aggregation value
     const aggregationValue = computed({
@@ -659,9 +512,12 @@ export default defineComponent({
 
     // Options for PromQL table mode
     const promqlTableModeOptions = [
-      { label: "Time series", value: "single" },
-      { label: "Expanded Time series", value: "expanded_timeseries" },
-      { label: "Aggregate", value: "all" },
+      { label: t("dashboard.promQLChartConfig.tableModeOptionSingle"), value: "single" },
+      {
+        label: t("dashboard.promQLChartConfig.tableModeOptionExpanded"),
+        value: "expanded_timeseries",
+      },
+      { label: t("dashboard.promQLChartConfig.tableModeOptionAggregate"), value: "all" },
     ];
 
     // Get available column options from stream fields across ALL queries
@@ -675,7 +531,7 @@ export default defineComponent({
       }
 
       // Iterate through ALL queries and collect unique field names
-      queries.forEach((query: any, index: number) => {
+      queries.forEach((query: any) => {
         const streamName = query?.fields?.stream;
 
         if (!streamName) {
@@ -683,16 +539,13 @@ export default defineComponent({
         }
 
         // Find the stream in groupedFields
-        const streamFields =
-          dashboardPanelData.meta.streamFields.groupedFields.find(
-            (group: any) => group.name === streamName,
-          );
+        const streamFields = dashboardPanelData.meta.streamFields.groupedFields.find(
+          (group: any) => group.name === streamName,
+        );
 
         if (streamFields?.schema) {
           // Extract field names from schema and add to set (automatically removes duplicates)
-          const fieldNames = streamFields.schema
-            .map((field: any) => field.name)
-            .filter(Boolean);
+          const fieldNames = streamFields.schema.map((field: any) => field.name).filter(Boolean);
 
           fieldNames.forEach((name: string) => allFieldNames.add(name));
         }
@@ -704,72 +557,20 @@ export default defineComponent({
       return result;
     });
 
-    // Filtered options for each multiselect (for search/autocomplete)
-    const visibleColumnsFilteredOptions = ref<string[]>([]);
-    const hiddenColumnsFilteredOptions = ref<string[]>([]);
-    const stickyColumnsFilteredOptions = ref<string[]>([]);
-
-    // Filter function for visible columns autocomplete
-    const filterVisibleColumns = (
-      val: string,
-      update: (fn: () => void) => void,
-    ) => {
-      update(() => {
-        const options = availableColumnOptions.value;
-        if (val === "") {
-          visibleColumnsFilteredOptions.value = options;
-        } else {
-          const needle = val.toLowerCase();
-          visibleColumnsFilteredOptions.value = options.filter((v) =>
-            v.toLowerCase().includes(needle),
-          );
-        }
-      });
+    // Handlers for adding user-typed custom column names (OSelect @create event)
+    const addToVisibleColumns = (val: string) => {
+      const current = [...(visibleColumns.value as string[])];
+      if (!current.includes(val)) visibleColumns.value = [...current, val];
     };
 
-    // Filter function for hidden columns autocomplete
-    const filterHiddenColumns = (
-      val: string,
-      update: (fn: () => void) => void,
-    ) => {
-      update(() => {
-        const options = availableColumnOptions.value;
-        if (val === "") {
-          hiddenColumnsFilteredOptions.value = options;
-        } else {
-          const needle = val.toLowerCase();
-          hiddenColumnsFilteredOptions.value = options.filter((v) =>
-            v.toLowerCase().includes(needle),
-          );
-        }
-      });
+    const addToHiddenColumns = (val: string) => {
+      const current = [...(hiddenColumns.value as string[])];
+      if (!current.includes(val)) hiddenColumns.value = [...current, val];
     };
 
-    // Filter function for sticky columns autocomplete
-    const filterStickyColumns = (
-      val: string,
-      update: (fn: () => void) => void,
-    ) => {
-      update(() => {
-        const options = availableColumnOptions.value;
-        if (val === "") {
-          stickyColumnsFilteredOptions.value = options;
-        } else {
-          const needle = val.toLowerCase();
-          stickyColumnsFilteredOptions.value = options.filter((v) =>
-            v.toLowerCase().includes(needle),
-          );
-        }
-      });
-    };
-
-    // Handler for creating new column values
-    const createColumnValue = (val: string, done: (value: string) => void) => {
-      // Trim and validate the value
-      const trimmedVal = val.trim();
-      if (trimmedVal.length > 0) {
-        done(trimmedVal);
-      }
+    const addToStickyColumns = (val: string) => {
+      const current = [...(stickyColumns.value as string[])];
+      if (!current.includes(val)) stickyColumns.value = [...current, val];
     };
 
     // Table column filters - visible columns
@@ -823,47 +624,6 @@ export default defineComponent({
       },
     });
 
-    // Display value for table aggregations (compact format: first item + count)
-    const getTableAggregationsDisplay = computed(() => {
-      const selected = tableAggregations.value || [];
-      if (selected.length === 0) return "";
-
-      // Map the selected values to their labels
-      const labels = selected
-        .map((val: string) => {
-          const option = aggregationOptions.find((opt) => opt.value === val);
-          return option ? option.value : val;
-        })
-        .filter(Boolean);
-
-      if (labels.length === 1) return labels[0];
-      return `${labels[0]} (+${labels.length - 1} more)`;
-    });
-
-    // Display value for visible columns (compact format: first item + count)
-    const getVisibleColumnsDisplay = computed(() => {
-      const selected = visibleColumns.value || [];
-      if (selected.length === 0) return "";
-      if (selected.length === 1) return selected[0];
-      return `${selected[0]} (+${selected.length - 1} more)`;
-    });
-
-    // Display value for hidden columns (compact format: first item + count)
-    const getHiddenColumnsDisplay = computed(() => {
-      const selected = hiddenColumns.value || [];
-      if (selected.length === 0) return "";
-      if (selected.length === 1) return selected[0];
-      return `${selected[0]} (+${selected.length - 1} more)`;
-    });
-
-    // Display value for sticky columns (compact format: first item + count)
-    const getStickyColumnsDisplay = computed(() => {
-      const selected = stickyColumns.value || [];
-      if (selected.length === 0) return "";
-      if (selected.length === 1) return selected[0];
-      return `${selected[0]} (+${selected.length - 1} more)`;
-    });
-
     // Column order configuration
     const columnOrder = computed({
       get: () => dashboardPanelData.data.config?.column_order || [],
@@ -871,8 +631,7 @@ export default defineComponent({
         if (!dashboardPanelData.data.config) {
           dashboardPanelData.data.config = {};
         }
-        dashboardPanelData.data.config.column_order =
-          value && value.length > 0 ? value : undefined;
+        dashboardPanelData.data.config.column_order = value && value.length > 0 ? value : undefined;
       },
     });
 
@@ -915,6 +674,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       aggregationOptions,
       showAggregationConfig,
       aggregationValue,
@@ -928,21 +688,14 @@ export default defineComponent({
       tableAggregations,
       promqlTableMode,
       promqlTableModeOptions,
-      getTableAggregationsDisplay,
-      visibleColumnsFilteredOptions,
-      hiddenColumnsFilteredOptions,
-      stickyColumnsFilteredOptions,
-      filterVisibleColumns,
-      filterHiddenColumns,
-      filterStickyColumns,
-      createColumnValue,
+      addToVisibleColumns,
+      addToHiddenColumns,
+      addToStickyColumns,
       visibleColumns,
       hiddenColumns,
-      getVisibleColumnsDisplay,
-      getHiddenColumnsDisplay,
       stickyFirstColumn,
       stickyColumns,
-      getStickyColumnsDisplay,
+      availableColumnOptions,
       columnOrder,
       showColumnOrderPopup,
       filteredAvailableColumns,
@@ -953,25 +706,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.promql-chart-config {
-  .geomap-config,
-  .maps-config,
-  .table-config {
-    padding: 0px 0;
-    // border: 1px solid rgba(0, 0, 0, 0.12);
-  }
-
-  // Fix icon cropping in labels
-  :deep(.q-field__label) {
-    padding-top: 4px;
-    padding-bottom: 4px;
-  }
-
-  // Prevent capitalization for column filter fields
-  :deep(.q-field__native > :first-child) {
-    text-transform: none !important;
-  }
-}
-</style>

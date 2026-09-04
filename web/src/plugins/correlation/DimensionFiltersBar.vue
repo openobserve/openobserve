@@ -15,79 +15,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div
-    class="tw:py-2 tw:px-4 tw:border-b tw:border-solid tw:border-[var(--o2-border-color)]"
-  >
-    <div class="tw:flex tw:items-center tw:gap-3 tw:flex-wrap">
-      <span class="tw:text-xs tw:font-semibold tw:opacity-70">
-        {{ filterLabelComputed }}:
-      </span>
-      <div
-        v-for="(value, key) in dimensions"
-        :key="key"
-        class="tw:flex tw:items-center tw:gap-2"
-      >
+  <div class="border-card-glass-border border-b border-solid px-4 py-2">
+    <div class="flex flex-wrap items-center gap-3">
+      <span class="text-xs font-semibold opacity-70"> {{ filterLabelComputed }}: </span>
+      <div v-for="(value, key) in dimensions" :key="key" class="flex items-center gap-2">
         <span
-          class="tw:text-xs tw:font-semibold"
-          :class="
-            unstableDimensionKeys.has(key) ? 'tw:opacity-60' : 'tw:opacity-100'
-          "
+          class="text-xs font-semibold"
+          :class="unstableDimensionKeys.has(key) ? 'opacity-60' : 'opacity-100'"
         >
           {{ key }}:
         </span>
-        <q-select
+        <OSelect
           :model-value="value"
           :options="getDimensionOptions(key, value)"
-          dense
-          outlined
-          emit-value
-          map-options
-          @update:model-value="
-            (newValue) => handleDimensionChange(key, newValue)
-          "
+          labelKey="label"
+          valueKey="value"
+          @update:model-value="(newValue) => handleDimensionChange(key, newValue as string)"
           class="dimension-dropdown"
-          borderless
-          style="min-width: 120px"
+          style="min-width: 7.5rem"
           :data-test="`dimension-filter-${key}`"
         />
-        <q-tooltip v-if="unstableDimensionKeys.has(key)">
-          {{ unstableDimensionTooltipComputed }}
-        </q-tooltip>
+        <OTooltip
+          v-if="unstableDimensionKeys.has(key)"
+          :content="unstableDimensionTooltipComputed"
+          side="top"
+        />
       </div>
       <!-- Apply Button -->
-      <q-btn
+      <OButton
         v-if="showApplyButton"
-        flat
-        dense
-        no-caps
-        text-color="light-text"
-        :label="applyLabelComputed"
-        :disable="!hasPendingChanges"
+        variant="outline"
+        size="sm-action"
+        :disabled="!hasPendingChanges"
         @click="handleApply"
-        class="o2-secondary-button tw:ml-2"
+        class="ms-2"
         data-test="apply-dimension-filters"
-        style="line-height: 2.2rem !important"
-      />
+      >
+        {{ applyLabelComputed }}
+      </OButton>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped, type I18nText } from "@/types/i18n";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 
 interface Props {
   dimensions: Record<string, string>;
   unstableDimensionKeys: Set<string>;
-  getDimensionOptions: (
-    key: string,
-    value: string,
-  ) => Array<{ label: string; value: string }>;
+  getDimensionOptions: (key: string, value: string) => Array<{ label: I18nText; value: string }>;
   hasPendingChanges?: boolean;
   showApplyButton?: boolean;
-  filterLabel?: string;
+  filterLabel?: I18nText;
   applyLabel?: string;
-  unstableDimensionTooltip?: string;
+  unstableDimensionTooltip?: I18nText;
 }
 
 // Props
@@ -106,18 +91,13 @@ const emit = defineEmits<{
 }>();
 
 // Composables
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 // Computed labels with fallbacks
-const filterLabelComputed = computed(
-  () => props.filterLabel || t("correlation.filters"),
-);
-const applyLabelComputed = computed(
-  () => props.applyLabel || t("common.apply"),
-);
+const filterLabelComputed = computed(() => props.filterLabel || t("correlation.filters"));
+const applyLabelComputed = computed(() => props.applyLabel || t("common.apply"));
 const unstableDimensionTooltipComputed = computed(
-  () =>
-    props.unstableDimensionTooltip || t("correlation.unstableDimensionTooltip"),
+  () => props.unstableDimensionTooltip || t("correlation.unstableDimensionTooltip"),
 );
 
 /**
@@ -134,22 +114,3 @@ const handleApply = () => {
   emit("apply");
 };
 </script>
-
-<style lang="scss" scoped>
-// Dimension dropdown styling
-.dimension-dropdown {
-  :deep(.q-field__control) {
-    min-height: 2rem;
-    padding: 0 0.5rem;
-  }
-
-  :deep(.q-field__native) {
-    font-size: 0.875rem;
-    padding: 0.25rem 0;
-  }
-
-  :deep(.q-field__append) {
-    padding-left: 0.25rem;
-  }
-}
-</style>

@@ -1,0 +1,15 @@
+<svg width="320" height="128" viewBox="0 0 320 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="320" height="128" rx="12" fill="#6D7EDC"/>
+  <text
+    x="24"
+    y="76"
+    fill="#EEF2FF"
+    font-family="Inter, Arial, sans-serif"
+    font-size="40"
+    font-weight="700"
+    letter-spacing="0"
+  >
+    LoongCollector
+  </text>
+</svg>
+

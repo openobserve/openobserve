@@ -1,0 +1,147 @@
+name: Test-Assist Caller (openobserve)
+
+# Thin caller: on an org member's `/verify-bug` comment on an OSS ISSUE (or manual dispatch),
+# DISPATCH the Test-Assist engine that lives in the PRIVATE o2-enterprise repo, authenticated
+# with the org-admin PAT. Mirrors docgen-caller.yml / e2e-council-caller.yml.
+#
+# Differs from docgen/e2e callers: this one operates on ISSUES, not PRs. The `.issue.pull_request`
+# filter is intentionally absent — `/verify-bug` is a comment on a bug issue (a PR is not a bug).
+#
+# WHY DISPATCH (not `workflow_call`/`uses:`): cross-repo reusable-workflow calls require the
+# private repo to grant an Actions access policy. A PAT with `Actions: R/W` on o2-enterprise can
+# trigger its `workflow_dispatch` with no such org/repo setting. The engine then runs IN
+# o2-enterprise CI (boots OpenObserve, runs the bug-verification agent) and posts results back
+# to the OSS issue using the same PAT.
+#
+# This caller only: (1) gates the command to org members, (2) resolves issue/fixture-mode/actor,
+# (3) dispatches the engine via the PAT, (4) posts an immediate ack on the OSS issue.
+#
+# REQUIRED — secrets.ORG_ADMIN_TOKEN (fine-grained PAT) permissions:
+#   o2-enterprise:  Actions: R/W (dispatch) + Issues/Pull requests: R/W (engine comments)
+#   openobserve:    Issues/Pull requests: R/W (engine comments back on the source issue)
+#   This PAT also posts THIS caller's own "started" ack as the human (not github-actions[bot]).
+# KILL SWITCH: the engine honors the TEST_ASSIST_DISABLED variable.
+
+on:
+  issue_comment:
+    types: [created]
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: "OSS issue number to verify (default 90001 = fixture #1)"
+        required: true
+        default: "90001"
+      fixture_mode:
+        description: "Read fixture issues from tests/test-data/ instead of GitHub"
+        type: boolean
+        required: true
+        default: true
+      write_mode:
+        description: "Allow the engine to post labels/comments to real issues (otherwise dry-run)"
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+  issues: write   # post the ack comment on the OSS issue (this run is in OSS context)
+
+# No caller-level concurrency: issue_comment fires the caller for EVERY comment on an issue (the
+# /verify-bug filter is only in the job `if:`), and a run enters the concurrency group BEFORE its
+# `if:` is evaluated — cancel-in-progress would let an unrelated comment cancel an in-flight
+# /verify-bug DISPATCH. The ENGINE's concurrency (keyed on source_repo+issue) owns dedup.
+
+jobs:
+  dispatch-test-assist:
+    # Two doors:
+    #   - workflow_dispatch (manual): GitHub already restricts dispatch to users with repo write.
+    #   - issue_comment: exact `/verify-bug` on an ISSUE (NOT a PR) by an org member/collaborator.
+    #     The `.issue.pull_request == null` filter excludes /verify-bug typed on a PR — test-assist
+    #     verifies bug ISSUES, and a PR number would confuse the engine downstream. The
+    #     org-member gate is the trust boundary for the PAT — a stranger's comment fails this
+    #     `if:`, so the dispatch step (and therefore the PAT) never runs.
+    # The `!github.event.issue.pull_request` check excludes PR comments (the field is set on
+    # PRs, undefined on regular issues). We intentionally use the truthy-negation pattern —
+    # the earlier `== null` comparison silently evaluated to false for undefined fields in
+    # GHA expression context, causing every legitimate /verify-bug comment on an issue to be
+    # gated out (caller job showed `skipped` with an empty steps array; see the "why not the
+    # equals-null" note below). This mirrors the truthy pattern e2e-council-caller.yml uses
+    # in the opposite direction (that caller REQUIRES a PR).
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issue_comment' &&
+       !github.event.issue.pull_request &&
+       github.event.comment.body == '/verify-bug' &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.comment.author_association))
+    runs-on: ubuntu-latest
+    timeout-minutes: 10   # dispatch is a quick API call; bound it as defense-in-depth
+    steps:
+      - name: Resolve context (untrusted event data via env, never spliced into commands)
+        id: ctx
+        env:
+          IN_ISSUE: ${{ inputs.issue_number || github.event.issue.number }}
+          IS_DISPATCH: ${{ github.event_name == 'workflow_dispatch' }}
+          DISPATCH_FIXTURE: ${{ inputs.fixture_mode }}
+          DISPATCH_WRITE: ${{ inputs.write_mode }}
+          COMMENT_LOGIN: ${{ github.event.comment.user.login }}
+          DISPATCH_ACTOR: ${{ github.actor }}
+        run: |
+          ISSUE="$IN_ISSUE"
+          [[ "$ISSUE" =~ ^[0-9]+$ ]] || { echo "::error::invalid issue number: $ISSUE"; exit 1; }
+          if [ "$IS_DISPATCH" = "true" ]; then
+            FIXTURE="$DISPATCH_FIXTURE"; WRITE="$DISPATCH_WRITE"; ACTOR="$DISPATCH_ACTOR"
+          else
+            # Comment door defaults: fixture OFF (use the real issue), write OFF (dry-run).
+            # WRITE flip happens via manual dispatch until we trust verdict accuracy.
+            FIXTURE="false"; WRITE="false"; ACTOR="$COMMENT_LOGIN"
+          fi
+          ACTOR=$(printf '%s' "$ACTOR" | tr -cd 'A-Za-z0-9-')   # GitHub login charset; defensive
+          { echo "issue=$ISSUE"; echo "fixture=$FIXTURE"; echo "write=$WRITE"; echo "actor=$ACTOR"; } >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch the Test-Assist engine (o2-enterprise) via the org-admin PAT
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+          ISSUE: ${{ steps.ctx.outputs.issue }}
+          FIXTURE: ${{ steps.ctx.outputs.fixture }}
+          WRITE: ${{ steps.ctx.outputs.write }}
+          ACTOR: ${{ steps.ctx.outputs.actor }}
+        run: |
+          gh workflow run test-assist.yml --repo openobserve/o2-enterprise \
+            -f source_repo=openobserve \
+            -f issue_number="$ISSUE" \
+            -f fixture_mode="$FIXTURE" \
+            -f write_mode="$WRITE" \
+            -f actor="$ACTOR"
+          echo "Dispatched Test-Assist engine for openobserve issue #$ISSUE (fixture=$FIXTURE, write=$WRITE, by @$ACTOR)."
+
+      - name: Acknowledge on the source issue
+        # success() => only ack if the dispatch actually succeeded (don't mislead the commenter if
+        # the dispatch 403'd on a missing PAT permission, etc.). Only on a human /verify-bug comment.
+        if: github.event_name == 'issue_comment' && success()
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}   # PAT only — post as the human, NEVER github-actions[bot]
+          ISSUE: ${{ steps.ctx.outputs.issue }}
+        run: |
+          gh issue comment "$ISSUE" --repo openobserve/openobserve --body \
+          "### 🤖 Test-Assist — started
+
+          Running bug verification in o2-enterprise CI now — I'll post the verdict back here when ready. ([engine runs](https://github.com/openobserve/o2-enterprise/actions/workflows/test-assist.yml))"
+
+      - name: Notify dispatch failure on the source issue
+        # If the dispatch itself failed (expired/insufficient PAT, missing engine workflow, network),
+        # the /verify-bug commenter would otherwise get NO feedback. Fall back to the run token so a
+        # broken PAT can't silence the error — same pattern as e2e-council-caller's failure notice.
+        if: github.event_name == 'issue_comment' && failure()
+        env:
+          PAT: ${{ secrets.ORG_ADMIN_TOKEN }}
+          BOT: ${{ github.token }}
+          ISSUE: ${{ steps.ctx.outputs.issue }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          [ -n "$ISSUE" ] || exit 0
+          BODY="### ❌ Test-Assist — could not start
+
+          Dispatching the Test-Assist engine failed (likely an expired/insufficient \`ORG_ADMIN_TOKEN\`, a missing engine workflow on o2-enterprise main, or a transient error). See the [caller run logs]($RUN_URL) and retry \`/verify-bug\` once resolved."
+          GH_TOKEN="$PAT" gh issue comment "$ISSUE" --repo openobserve/openobserve --body "$BODY" \
+            || GH_TOKEN="$BOT" gh issue comment "$ISSUE" --repo openobserve/openobserve --body "$BODY" \
+            || true

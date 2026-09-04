@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,7 @@ use std::{
 };
 
 use parking_lot::Mutex;
-use rand::Rng;
+use rand::RngExt;
 use svix_ksuid::{Ksuid, KsuidLike};
 use uuid::Uuid;
 
@@ -447,11 +447,11 @@ mod tests {
 
         // Allow for some tolerance (within last hour and next hour)
         assert!(
-            timestamp >= now - 3600_000_000,
+            timestamp >= now - 3_600_000_000,
             "Timestamp should not be too far in past"
         );
         assert!(
-            timestamp <= now + 3600_000_000,
+            timestamp <= now + 3_600_000_000,
             "Timestamp should not be too far in future"
         );
 
@@ -465,8 +465,8 @@ mod tests {
 
         // Verify both formats give reasonable timestamps
         let standard_timestamp = standard_result.unwrap();
-        assert!(standard_timestamp >= now - 3600_000_000);
-        assert!(standard_timestamp <= now + 3600_000_000);
+        assert!(standard_timestamp >= now - 3_600_000_000);
+        assert!(standard_timestamp <= now + 3_600_000_000);
     }
 
     #[test]
@@ -582,7 +582,7 @@ mod tests {
         ];
         for (id, ts) in data {
             let id_ts = to_timestamp_millis(id);
-            let t = chrono::Utc.timestamp_nanos(id_ts * 1000_000);
+            let t = chrono::Utc.timestamp_nanos(id_ts * 1_000_000);
             let td = t.format("%Y-%m-%d").to_string();
             assert_eq!(td, ts.to_string());
         }
@@ -671,6 +671,51 @@ mod tests {
         let id1 = bucket.get_id();
         let id2 = bucket.get_id();
         assert_ne!(id1, id2, "IDs from bucket should be unique");
+    }
+
+    #[test]
+    fn test_generate_file_name() {
+        let name1 = generate_file_name();
+        let name2 = generate_file_name();
+        assert_ne!(name1, name2);
+        // last 4 chars are hex digits
+        assert_eq!(name1.len(), name1.len());
+        let suffix = &name1[name1.len() - 4..];
+        assert!(suffix.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn test_snowflake_generator_generate_method() {
+        let mut snowflake = SnowflakeIdGenerator::new(0);
+        let id1 = snowflake.generate();
+        let id2 = snowflake.generate();
+        assert_ne!(id1, id2);
+        assert!(id1 > 0);
+    }
+
+    #[test]
+    fn test_snowflake_generator_lazy_generate() {
+        let mut snowflake = SnowflakeIdGenerator::new(0);
+        let id1 = snowflake.lazy_generate();
+        let id2 = snowflake.lazy_generate();
+        assert_ne!(id1, id2);
+        assert!(id1 > 0);
+    }
+
+    #[test]
+    fn test_snowflake_generator_mem_size() {
+        use crate::stats::MemorySize;
+        let snowflake = SnowflakeIdGenerator::new(1);
+        assert_eq!(
+            snowflake.mem_size(),
+            std::mem::size_of::<SnowflakeIdGenerator>()
+        );
+    }
+
+    #[test]
+    fn test_get_time_millis_is_positive() {
+        let t = get_time_millis(std::time::UNIX_EPOCH);
+        assert!(t > 0);
     }
 
     #[test]

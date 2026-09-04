@@ -1,6 +1,6 @@
 // logsPageEP.js
 import { expect } from '@playwright/test';
-const { chromium } = require('playwright');
+const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 export class LogsPageEP {
   constructor(page) {
@@ -13,7 +13,7 @@ export class LogsPageEP {
 
 
 async selectStreamDropDown() {
-  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.locator('[data-test="logs-search-index-list"]').click();
   await this.page.waitForTimeout(3000);
 }
 
@@ -30,130 +30,115 @@ async searchSchedulerCreate() {
 }
 
 async searchSchedulerSubmit() {
-  // Wait for the input field to be visible
-  await this.page.waitForSelector('[data-test="search-scheuduler-max-number-of-records-input"]');
+  // OInput: outer wrapper has data-test="search-scheuduler-max-number-of-records-input";
+  // inner native <input> has data-test="search-scheuduler-max-number-of-records-input-field".
+  // fill() requires the native input, not the wrapper div.
+  const inputField = this.page.locator('[data-test="search-scheuduler-max-number-of-records-input-field"]');
+  await inputField.waitFor({ state: 'attached', timeout: 10000 });
+  await inputField.fill('1000', { force: true });
 
-  // Click and fill the input field
-  const inputField = this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]');
-  await inputField.click();
-  await inputField.fill('1000');
-  await inputField.press('Enter');
+  const submitBtn = '[data-test="search-bar-search-scheduler-job-dialog"] [data-test="o-dialog-primary-btn"]';
+  await this.page.waitForSelector(submitBtn);
 
-  // Wait for the submit button to be visible and click it
-  await this.page.waitForSelector('[data-test="search-scheduler-max-records-submit-btn"]');
-  const submitButton = this.page.locator('[data-test="search-scheduler-max-records-submit-btn"]');
-  await submitButton.click();
+  // Intercept the POST response BEFORE clicking to capture the created job ID
+  const jobResponsePromise = this.page.waitForResponse(
+    resp => resp.url().includes('/search_jobs') && resp.request().method() === 'POST',
+    { timeout: 15000 }
+  );
+  await this.page.locator(submitBtn).click();
 
-  // Wait for the "Go To Job Scheduler" button to be visible and enabled
-  const goToJobSchedulerButtonSelector = { name: 'Go To Job Scheduler' };
-  const maxRetries = 500;
-  let attempts = 0;
-
-  while (attempts < maxRetries) {
-      const goToJobSchedulerButton = this.page.getByRole('button', goToJobSchedulerButtonSelector);
-
-      // Wait for the button to be visible
-      await this.page.waitForTimeout(100); // Small delay before checking
-      const isVisible = await goToJobSchedulerButton.isVisible();
-      const isEnabled = await goToJobSchedulerButton.isEnabled();
-
-      if (isVisible && isEnabled) {
-          await goToJobSchedulerButton.click();
-          return; // Exit the function if the button is clicked successfully
-      } else {
-          console.warn(`"Go To Job Scheduler" button is not visible or enabled. Retrying...`);
-          attempts++;
-          await this.page.waitForTimeout(100); // Wait before retrying
-      }
-  }
-
-  throw new Error(`"Go To Job Scheduler" button remained invisible or disabled after ${maxRetries} attempts.`);
+  const jobResponse = await jobResponsePromise;
+  const body = await jobResponse.json();
+  const match = body.message?.match(/\[Job_Id: (.+?)\]/);
+  return match ? match[1] : null;
 }
 
+async validateAddJob(jobId) {
+  // The "Job added successfully" toast fires on POST success, but searchSchedulerSubmit
+  // already awaited that POST response (it returned the jobId), so by the time we get
+  // here the transient toast may have already auto-dismissed — a plain visibility
+  // assertion then fails purely on timing even though creation succeeded. Job creation
+  // is already confirmed by the returned jobId AND the scheduler-list lookup below, so
+  // treat the toast as a best-effort signal rather than a hard gate.
+  await this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Job added successfully' }).first()
+    .waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
+  // Navigate to the scheduler list
+  await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click();
+  await this.page.locator('[data-test="search-scheduler-list-btn"]').click();
 
-async validateAddJob() {
-  await expect(this.page.locator('#q-notify')).toContainText('Job Added Succesfully');
+  // OTable rows are indexed as [data-test="o2-table-row-{index}"] (positional integer).
+  // trace_id is the row-key but is NOT a visible column, so filter({ hasText }) won't match.
+  // Instead: intercept the GET response from clicking "Get Jobs" to find the job's row index.
+  const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
+  const orgId = getOrgIdentifier();
+  // The scheduler list renders under v-show="showSearchScheduler", which the logs page
+  // resets whenever the URL query loses the action=search_scheduler param — leaving the
+  // Get-Jobs button in the DOM but display:none. If that happened, re-open the scheduler
+  // list from the toolbar to restore the view before clicking (graceful workaround for
+  // origin/fix/search-scheduler-job-issue).
+  const getJobsBtn = this.page.locator('[data-test="search-scheduler-get-jobs-btn"]');
+  let jobsBtnVisible = await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 })
+    .then(() => true).catch(() => false);
+  for (let attempt = 0; attempt < 2 && !jobsBtnVisible; attempt++) {
+    await this.page.locator('[data-test="logs-search-bar-more-options-btn"]').click().catch(() => {});
+    await this.page.locator('[data-test="search-scheduler-list-btn"]').click().catch(() => {});
+    jobsBtnVisible = await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 })
+      .then(() => true).catch(() => false);
+  }
+  await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 });
+  const responsePromise = this.page.waitForResponse(
+    resp => resp.url().includes('/search_jobs') && resp.request().method() === 'GET',
+    { timeout: 15000 }
+  );
+  await getJobsBtn.click();
+  const listResponse = await responsePromise;
+  const jobs = await listResponse.json();
+  const rowIndex = jobs.findIndex(j => j.id === jobId);
+  if (rowIndex === -1) throw new Error(`Job with id "${jobId}" not found in scheduler list`);
+  await expect(
+    this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`).first()
+  ).toBeVisible({ timeout: 15000 });
 }
 
 async queryJobSearch() {
-  const queryEditor = this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox');
-  // Fill with the new query
-  await queryEditor.fill('SELECT * FROM "e2e_automate"');
-  // Optional: Wait for any processing or loading after filling the query
-  await this.page.waitForTimeout(5000); // Adjust the timeout as needed
+  const queryEditorLocator = this.page.locator('[data-test="logs-search-bar-query-editor"]');
+  await queryEditorLocator.waitFor({ state: 'visible', timeout: 10000 });
+  await this.page.waitForTimeout(1000);
+  await queryEditorLocator.click();
+  await this.page.waitForTimeout(500);
+  await this.page.keyboard.press(process.platform === "darwin" ? "Meta+A" : "Control+A");
+  await this.page.waitForTimeout(300);
+  const inputArea = queryEditorLocator.locator('.inputarea');
+  await inputArea.waitFor({ state: 'visible', timeout: 5000 });
+  await inputArea.fill('SELECT * FROM "e2e_automate"');
+  await this.page.waitForTimeout(2000);
 }
 
 
-
-async clickJobID () {
-  const orgId = process.env["ORGNAME"];
-  const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-  
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  }
-
-  // Intercept the network request and capture the response
-  await this.page.route(
-    `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`,
-    async (route) => {
-      const response = await route.continue();
-      const responseBody = await response.body();
-      const jsonResponse = JSON.parse(responseBody.toString());
-
-      // Assuming the ID is in the response JSON
-      const idJob = jsonResponse.trace_id; // Adjust this according to your response structure
-      console.log("Job ID Created", idJob);
-
-      // Use the ID to construct the selector
-      const rowSelector = `tr[data-test="search-scheduler-table-${idJob}-row"]`;
-      const cancelBtnSelector = `${rowSelector} [data-test="search-scheduler-cancel-btn"]`;
-      const restartBtnSelector = `${rowSelector} [data-test="search-scheduler-restart-btn"]`;
-
-      // Wait for the row to be visible before clicking
-      await this.page.waitForSelector(rowSelector);
-      
-      // Click the cancel button
-      await this.page.locator(cancelBtnSelector).click();
-      await this.page.waitForTimeout(2000);
-      // Click the confirm button
-      await this.page.locator('[data-test="confirm-button"]').click();
-      await this.page.waitForTimeout(2000);
-      // Click the restart button
-      await this.page.locator(restartBtnSelector).click();
-      await this.page.waitForTimeout(2000);
-      // Continue with your automation steps...
-    }
-  )
-
-}
-
-
-
- 
 
 
 async searchSchedulerInvalid() {
-  await this.page.waitForSelector('[data-test="search-scheuduler-max-number-of-records-input"]');
-  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').click();
-  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').fill('100000000');
-  await this.page.locator('[data-test="search-scheuduler-max-number-of-records-input"]').press('Enter');
-  await this.page.waitForSelector('[data-test="search-scheduler-max-records-submit-btn"]');
-  await this.page.locator('[data-test="search-scheduler-max-records-submit-btn"]').click();
+  // OInput: use the inner native input (-field suffix) for fill/press operations
+  const inputField = this.page.locator('[data-test="search-scheuduler-max-number-of-records-input-field"]');
+  await inputField.waitFor({ state: 'attached', timeout: 10000 });
+  await inputField.fill('100000000', { force: true });
+  await inputField.press('Enter');
+  const submitBtn = '[data-test="search-bar-search-scheduler-job-dialog"] [data-test="o-dialog-primary-btn"]';
+  await this.page.waitForSelector(submitBtn);
+  await this.page.locator(submitBtn).click();
 }
 
 
 async validateInvalidData() {
-  await expect(this.page.locator('#q-notify')).toContainText('Job Scheduler should be between 1 and 100000');
-  
-  
+  await expect(
+    this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Job Scheduler should be between 1 and 100000' }).first()
+  ).toBeVisible({ timeout: 10000 });
 }
 
 
 async selectIndexStreamDefault() {
-  await this.page.locator('[data-test="logs-search-index-list"]').getByText('arrow_drop_down').click();
+  await this.page.locator('[data-test="logs-search-index-list"]').click();
   await this.page.waitForTimeout(3000);
   await this.page.locator('[data-test="log-search-index-list-stream-toggle-default"] div').first().click();
   await this.page.waitForTimeout(3000);
@@ -165,14 +150,14 @@ async decryptLogSQL(cipherName) {
 
   try {
     // Wait for the locator to be visible and enabled
-    const editorLocator = this.page.locator('[data-test="logs-search-bar-query-editor"]').getByRole('textbox');
+    const editorLocator = this.page.locator('[data-test="logs-search-bar-query-editor-input"]');
     await editorLocator.waitFor({ state: 'visible', timeout: 10000 });
-    console.log("SQL Query", sqlQuery);
+    testLogger.info(`SQL Query: ${sqlQuery}`);
     // Fill the query editor with the constructed SQL query
     await editorLocator.fill(sqlQuery);
     await this.page.waitForTimeout(5000);
   } catch (error) {
-    console.error('Error during SQL decryption process:', error);
+    testLogger.error(`Error during SQL decryption process: ${error}`);
     throw error; // Re-throw the error if needed for further handling
   }
 }
@@ -184,7 +169,7 @@ async validateDecryResult(cipherName) {
   
   await this.page.waitForTimeout(10000);
   
-  const expandMenuLocator = this.page.locator('[data-test="log-table-column-0-_timestamp"] [data-test="table-row-expand-menu"]');
+  const expandMenuLocator = this.page.locator('[data-test="o2-table-expand-0"]');
   await expect(expandMenuLocator).toBeVisible();
   await expandMenuLocator.click();
   

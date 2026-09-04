@@ -1,117 +1,98 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify, useQuasar } from "quasar";
-import { installQuasar } from "@/test/unit/helpers";
-import store from "@/test/unit/helpers/store";
 import i18n from "@/locales";
 import SearchHistory from "./SearchHistory.vue";
 import searchService from "@/services/search";
-import useLogs from "@/composables/useLogs";
 import { useRouter, useRoute } from "vue-router";
 
-// Mock Quasar
-vi.mock('quasar', async () => {
-  const actual = await vi.importActual('quasar');
-  return {
-    ...actual,
-    useQuasar: vi.fn(() => ({
-      notify: vi.fn()
-    }))
-  };
-});
+// Mock Toast
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: vi.fn(),
+}));
 
 // Mock the search service
 vi.mock("@/services/search", () => ({
   default: {
     get_history: vi.fn().mockResolvedValue({
       data: {
-        hits: []
-      }
-    })
-  }
+        hits: [],
+      },
+    }),
+  },
 }));
 
 // Mock useLogs composable
 vi.mock("@/composables/useLogs", () => ({
   default: () => {
-    const { ref } = require('vue');
+    const { ref } = require("vue");
     return {
       searchObj: ref({
         data: {
           datetime: {
-            type: 'relative'
-          }
-        }
+            type: "relative",
+          },
+        },
       }),
-      extractTimestamps: vi.fn().mockReturnValue({ from: 1000, to: 2000 })
+      extractTimestamps: vi.fn().mockReturnValue({ from: 1000, to: 2000 }),
     };
-  }
+  },
 }));
 
 // Mock vue-router
-vi.mock('vue-router', () => ({
+vi.mock("vue-router", () => ({
   useRouter: vi.fn(() => ({
     push: vi.fn(),
     currentRoute: {
       value: {
         query: {
-          org_identifier: 'test-org'
-        }
-      }
-    }
+          org_identifier: "test-org",
+        },
+      },
+    },
   })),
   useRoute: vi.fn(() => ({
     query: {
-      org_identifier: 'test-org'
+      org_identifier: "test-org",
     },
     params: {},
-    path: '/search-history'
-  }))
+    path: "/search-history",
+  })),
 }));
 
 // Mock vue-i18n
-vi.mock('vue-i18n', async (importOriginal) => {
+vi.mock("vue-i18n", async (importOriginal) => {
   const actual = await importOriginal();
   return {
     ...actual,
+    // Delegate to the real message catalogue instead of echoing the key, so
+    // assertions on rendered copy (e.g. formatTime -> "1500.00 sec") stay real.
     useI18n: () => ({
-      t: (key) => key
-    })
+      t: (...args) => i18n.global.t(...args),
+    }),
   };
 });
 
 describe("SearchHistory Component", () => {
   let wrapper;
   let mockStore;
-  let notifyMock;
   let routerPushMock;
 
   beforeEach(() => {
-    // Install Quasar for this test instance
-    installQuasar({
-      plugins: [Dialog, Notify],
-    });
     // Setup mock store
     mockStore = {
       state: {
         selectedOrganization: {
-          identifier: "test-org"
+          identifier: "test-org",
         },
         userInfo: {
-          email: "test@example.com"
+          email: "test@example.com",
         },
         zoConfig: {
           usage_publish_interval: 60,
-          timestamp_column: "_timestamp"
+          timestamp_column: "_timestamp",
         },
-        timezone: "UTC"
-      }
-    };
-
-    // Setup notify mock
-    notifyMock = vi.fn();
-    const $q = {
-      notify: notifyMock
+        timezone: "UTC",
+      },
     };
 
     // Setup router mock
@@ -121,10 +102,10 @@ describe("SearchHistory Component", () => {
       currentRoute: {
         value: {
           query: {
-            org_identifier: 'test-org'
-          }
-        }
-      }
+            org_identifier: "test-org",
+          },
+        },
+      },
     }));
 
     // Mount component with default props
@@ -135,43 +116,40 @@ describe("SearchHistory Component", () => {
           store: mockStore,
         },
         stubs: {
-          QPage: true,
-          QTable: true,
-          QTr: true,
-          QTd: true,
-          QBtn: true,
-          QIcon: true,
-          QToggle: true,
+          OButton: true,
+          OIcon: true,
+          OTag: true,
+          OSwitch: true,
+          OTable: true,
+          OSpinner: true,
           DateTime: {
             template: '<div class="mock-datetime"></div>',
             methods: {
-              setAbsoluteTime: vi.fn()
-            }
+              setAbsoluteTime: vi.fn(),
+            },
           },
           AppTabs: true,
           QueryEditor: true,
-          QSpinnerHourglass: {
-            template: '<div class="q-spinner-hourglass"></div>'
-          }
+          TenstackTable: true,
+          NoData: true,
         },
         mocks: {
-          $q,
-          $router: { push: routerPushMock }
-        }
+          $router: { push: routerPushMock },
+        },
       },
       props: {
-        isClicked: false
-      }
+        isClicked: false,
+      },
     });
 
     // Initialize required data
     wrapper.vm.columnsToBeRendered = [];
     wrapper.vm.dataToBeLoaded = [];
     wrapper.vm.dateTimeToBeSent = {
-      valueType: 'relative',
-      relativeTimePeriod: '15m',
+      valueType: "relative",
+      relativeTimePeriod: "15m",
       startTime: 0,
-      endTime: 0
+      endTime: 0,
     };
   });
 
@@ -189,75 +167,57 @@ describe("SearchHistory Component", () => {
       expect(wrapper.vm.wrapText).toBe(true);
       expect(wrapper.vm.dataToBeLoaded).toEqual([]);
       expect(wrapper.vm.isLoading).toBe(false);
-      expect(wrapper.vm.expandedRow).toEqual([]);
+      expect(wrapper.vm.expandedIds).toEqual([]);
     });
 
-    it("has correct default pagination settings", () => {
-      expect(wrapper.vm.pagination).toEqual({
-        page: 1,
-        rowsPerPage: 100
-      });
+    it("has correct page size options", () => {
+      expect(wrapper.vm.pageSize).toBeDefined();
+      expect(wrapper.vm.pageSizeOptions).toBeDefined();
     });
 
     it("has correct table columns", () => {
-      const data = [{ some: 'data' }]; // Pass non-empty array to trigger column generation
+      const data = [{ some: "data" }]; // Pass non-empty array to trigger column generation
       const columns = wrapper.vm.generateColumns(data);
 
-      expect(columns).toEqual([
-        {
-          name: "#",
-          label: "#",
-          field: "#",
-          align: "left",
-          sortable: true
-        },
-        {
-          name: "executed_time",
-          label: "search_history.executed_at",
-          field: "executed_time",
-          align: "left",
-          sortable: true
-        },
-        {
-          name: "sql",
-          label: "search_history.sql_query",
-          field: "sql",
-          align: "left",
-          sortable: true
-        }
-      ]);
-    });
-
-    it("initializes with correct default props", () => {
-      expect(wrapper.props("isClicked")).toBe(false);
+      expect(columns).toHaveLength(2);
+      expect(columns[0].id).toBe("executed_time");
+      expect(columns[0].accessorKey).toBe("executed_time");
+      expect(columns[0].sortable).toBe(true);
+      expect(columns[1].id).toBe("sql");
+      expect(columns[1].accessorKey).toBe("sql");
     });
 
     it("sets up correct initial data structure", () => {
       expect(wrapper.vm.dateTimeToBeSent).toEqual({
-        valueType: 'relative',
-        relativeTimePeriod: '15m',
+        valueType: "relative",
+        relativeTimePeriod: "15m",
         startTime: 0,
-        endTime: 0
+        endTime: 0,
       });
     });
   });
 
   describe("Data Fetching", () => {
     it("sets loading state correctly during fetch", async () => {
-      searchService.get_history.mockImplementation(() => 
-        new Promise(resolve => 
-          setTimeout(() => resolve({
-            data: {
-              hits: []
-            }
-          }), 100)
-        )
+      searchService.get_history.mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () =>
+                resolve({
+                  data: {
+                    hits: [],
+                  },
+                }),
+              100,
+            ),
+          ),
       );
-      
+
       await wrapper.setProps({ isClicked: true });
-      
+
       await flushPromises();
-      await new Promise(resolve => setTimeout(resolve, 150)); // Wait for async operations
+      await new Promise((resolve) => setTimeout(resolve, 150)); // Wait for async operations
       expect(wrapper.vm.isLoading).toBe(false);
     });
   });
@@ -267,12 +227,12 @@ describe("SearchHistory Component", () => {
       const mockWriteText = vi.fn().mockResolvedValue(undefined);
       Object.assign(navigator, {
         clipboard: {
-          writeText: mockWriteText
-        }
+          writeText: mockWriteText,
+        },
       });
 
       const testSQL = "SELECT * FROM logs";
-      await wrapper.vm.copyToClipboard(testSQL, "SQL Query");
+      await wrapper.vm.copyToClipboard(testSQL, wrapper.vm.t);
       await flushPromises();
 
       expect(mockWriteText).toHaveBeenCalledWith(testSQL);
@@ -283,7 +243,6 @@ describe("SearchHistory Component", () => {
       expect(wrapper.vm.formatTime(60000)).toBe("60000.00 sec");
       expect(wrapper.vm.formatTime(3600000)).toBe("3600000.00 sec");
     });
-
   });
 
   describe("Navigation and Routing", () => {
@@ -294,11 +253,11 @@ describe("SearchHistory Component", () => {
         org_id: "test-org",
         toBeStoredStartTime: 1000,
         toBeStoredEndTime: 2000,
-        duration: "1 second"
+        duration: "1 second",
       };
 
       await wrapper.vm.goToLogs(mockRow);
-      
+
       expect(routerPushMock).toHaveBeenCalledWith(
         expect.objectContaining({
           path: "/logs",
@@ -306,9 +265,186 @@ describe("SearchHistory Component", () => {
             stream_type: "logs",
             stream: "test-stream",
             sql_mode: "true",
-            type: "search_history_re_apply"
-          })
-        })
+            type: "search_history_re_apply",
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("Stream-type aware history (Traces/Metrics support)", () => {
+    // Search History must scope both the fetched data and the page's
+    // subtitle indicator to whichever telemetry type/stream the user was on
+    // when they opened it (route query set by Index.vue's showSearchHistoryfn),
+    // not always "logs".
+    const mountWithRouteQuery = (query) => {
+      vi.mocked(useRoute).mockReturnValue({
+        query,
+        params: {},
+        path: "/search-history",
+      });
+
+      return mount(SearchHistory, {
+        global: {
+          plugins: [i18n],
+          provide: { store: mockStore },
+          stubs: {
+            OButton: true,
+            OIcon: true,
+            OTag: true,
+            OSwitch: true,
+            OTable: true,
+            OSpinner: true,
+            DateTime: {
+              template: '<div class="mock-datetime"></div>',
+              methods: { setAbsoluteTime: vi.fn() },
+            },
+            AppTabs: true,
+            QueryEditor: true,
+            TenstackTable: true,
+            NoData: true,
+          },
+          mocks: { $router: { push: routerPushMock } },
+        },
+        props: { isClicked: false },
+      });
+    };
+
+    it("requests history for the active traces stream from the route query", async () => {
+      const tracesWrapper = mountWithRouteQuery({
+        org_identifier: "test-org",
+        stream_type: "traces",
+        stream: "my-trace-stream",
+      });
+      tracesWrapper.vm.dateTimeToBeSent = {
+        valueType: "relative",
+        relativeTimePeriod: "15m",
+        startTime: 0,
+        endTime: 0,
+      };
+
+      await tracesWrapper.vm.fetchSearchHistory();
+      await flushPromises();
+
+      expect(searchService.get_history).toHaveBeenCalledWith(
+        "test-org",
+        expect.any(Number),
+        expect.any(Number),
+        "traces",
+        "my-trace-stream",
+      );
+
+      tracesWrapper.unmount();
+    });
+
+    it("requests history for the active metrics stream from the route query", async () => {
+      const metricsWrapper = mountWithRouteQuery({
+        org_identifier: "test-org",
+        stream_type: "metrics",
+        stream: "my-metric-stream",
+      });
+      metricsWrapper.vm.dateTimeToBeSent = {
+        valueType: "relative",
+        relativeTimePeriod: "15m",
+        startTime: 0,
+        endTime: 0,
+      };
+
+      await metricsWrapper.vm.fetchSearchHistory();
+      await flushPromises();
+
+      expect(searchService.get_history).toHaveBeenCalledWith(
+        "test-org",
+        expect.any(Number),
+        expect.any(Number),
+        "metrics",
+        "my-metric-stream",
+      );
+
+      metricsWrapper.unmount();
+    });
+
+    it("falls back to logs when the route query carries no stream_type", async () => {
+      const logsWrapper = mountWithRouteQuery({ org_identifier: "test-org" });
+      logsWrapper.vm.dateTimeToBeSent = {
+        valueType: "relative",
+        relativeTimePeriod: "15m",
+        startTime: 0,
+        endTime: 0,
+      };
+
+      await logsWrapper.vm.fetchSearchHistory();
+      await flushPromises();
+
+      expect(searchService.get_history).toHaveBeenCalledWith(
+        "test-org",
+        expect.any(Number),
+        expect.any(Number),
+        "logs",
+        "",
+      );
+
+      logsWrapper.unmount();
+    });
+
+    it("exposes the active stream type/name for the page's subtitle indicator", () => {
+      const tracesWrapper = mountWithRouteQuery({
+        org_identifier: "test-org",
+        stream_type: "traces",
+        stream: "my-trace-stream",
+      });
+
+      expect(tracesWrapper.vm.activeStreamType).toBe("traces");
+      expect(tracesWrapper.vm.activeStreamName).toBe("my-trace-stream");
+
+      tracesWrapper.unmount();
+    });
+  });
+
+  describe("Navigation - goToLogs preserves the row's own stream type", () => {
+    it("routes back to the traces stream when the history row is a traces search", async () => {
+      const mockTracesRow = {
+        sql: "SELECT * FROM my-trace-stream",
+        stream_name: "my-trace-stream",
+        stream_type: "traces",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000,
+        toBeStoredEndTime: 2000,
+        duration: "1 second",
+      };
+
+      await wrapper.vm.goToLogs(mockTracesRow);
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/logs",
+          query: expect.objectContaining({
+            stream_type: "traces",
+            stream: "my-trace-stream",
+          }),
+        }),
+      );
+    });
+
+    it("routes back to metrics when the history row is a metrics search", async () => {
+      const mockMetricsRow = {
+        sql: "SELECT * FROM my-metric-stream",
+        stream_name: "my-metric-stream",
+        stream_type: "metrics",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000,
+        toBeStoredEndTime: 2000,
+        duration: "1 second",
+      };
+
+      await wrapper.vm.goToLogs(mockMetricsRow);
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            stream_type: "metrics",
+          }),
+        }),
       );
     });
   });
@@ -318,28 +454,31 @@ describe("SearchHistory Component", () => {
       const newDateTime = {
         valueType: "absolute",
         startTime: 1000,
-        endTime: 2000
+        endTime: 2000,
       };
 
       wrapper.vm.dateTimeToBeSent = newDateTime;
       wrapper.vm.searchDateTimeRef = {
-        setAbsoluteTime: vi.fn()
+        setAbsoluteTime: vi.fn(),
       };
 
       await wrapper.vm.updateDateTime(newDateTime);
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.dateTimeToBeSent).toEqual(newDateTime);
       expect(wrapper.vm.searchDateTimeRef.setAbsoluteTime).toHaveBeenCalledWith(
         newDateTime.startTime,
-        newDateTime.endTime
+        newDateTime.endTime,
       );
     });
 
     it("handles relative time periods correctly", async () => {
       const relativeDateTime = {
         valueType: "relative",
-        relativeTimePeriod: "15m"
+        relativeTimePeriod: "15m",
+      };
+      wrapper.vm.searchDateTimeRef = {
+        setAbsoluteTime: vi.fn(),
       };
 
       await wrapper.vm.updateDateTime(relativeDateTime);
@@ -349,26 +488,118 @@ describe("SearchHistory Component", () => {
 
   describe("UI Elements", () => {
     it("shows expanded row details correctly", async () => {
-      const testRow = {
-        uuid: "test-uuid",
-        sql: "SELECT * FROM logs"
-      };
-      
-      await wrapper.vm.triggerExpand({ row: testRow });
-      expect(wrapper.vm.expandedRow).toBe(testRow.uuid);
+      wrapper.vm.onExpandedIdsChange(["test-uuid"]);
+      expect(wrapper.vm.expandedIds).toEqual(["test-uuid"]);
     });
   });
 
   describe("Error Handling", () => {
-
-
     it("handles empty search history response", async () => {
       searchService.get_history.mockResolvedValue({ data: { hits: [] } });
-      
+
       await wrapper.setProps({ isClicked: true });
       await flushPromises();
 
       expect(wrapper.vm.dataToBeLoaded).toHaveLength(0);
+    });
+  });
+
+  describe("Navigation - goToLogs with function row", () => {
+    it("adds functionContent and fn_editor=true when row has function property", async () => {
+      const mockRowWithFunction = {
+        sql: "SELECT * FROM logs",
+        stream_name: "test-stream",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000,
+        toBeStoredEndTime: 2000,
+        duration: "1 second",
+        function: "function transformLog(row) { return row; }",
+      };
+
+      await wrapper.vm.goToLogs(mockRowWithFunction);
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          path: "/logs",
+          query: expect.objectContaining({
+            fn_editor: "true",
+            functionContent: expect.any(String),
+          }),
+        }),
+      );
+    });
+
+    it("sets fn_editor=false when row has no function property", async () => {
+      const mockRowWithoutFunction = {
+        sql: "SELECT * FROM logs",
+        stream_name: "test-stream",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000,
+        toBeStoredEndTime: 2000,
+        duration: "1 second",
+      };
+
+      await wrapper.vm.goToLogs(mockRowWithoutFunction);
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.objectContaining({
+            fn_editor: "false",
+          }),
+        }),
+      );
+    });
+
+    it("does not add functionContent when row function is falsy", async () => {
+      const mockRowWithEmptyFunction = {
+        sql: "SELECT * FROM logs",
+        stream_name: "test-stream",
+        org_id: "test-org",
+        toBeStoredStartTime: 1000,
+        toBeStoredEndTime: 2000,
+        duration: "1 second",
+        function: "",
+      };
+
+      await wrapper.vm.goToLogs(mockRowWithEmptyFunction);
+
+      expect(routerPushMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.not.objectContaining({
+            functionContent: expect.any(String),
+          }),
+        }),
+      );
+    });
+  });
+
+  describe("Tab State", () => {
+    it("has activeTab initialized", () => {
+      expect(wrapper.vm.activeTab).toBeDefined();
+    });
+
+    it("has tabs array defined", () => {
+      expect(Array.isArray(wrapper.vm.tabs)).toBe(true);
+    });
+  });
+
+  describe("Text Wrapping", () => {
+    it("has wrapText initialized to true", () => {
+      expect(wrapper.vm.wrapText).toBe(true);
+    });
+
+    it("can toggle wrapText", async () => {
+      wrapper.vm.wrapText = false;
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.wrapText).toBe(false);
+    });
+  });
+
+  describe("Sorting", () => {
+    it("has columns with sortable property", () => {
+      const columns = wrapper.vm.generateColumns([{ some: "data" }]);
+      expect(columns.length).toBeGreaterThan(0);
+      expect(columns[0].sortable).toBeDefined();
     });
   });
 });

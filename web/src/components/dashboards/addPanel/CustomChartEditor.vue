@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,42 +16,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="markdown-editor card-container"
-    style="width: 100%; height: 100%; overflow: hidden; display: flex; flex-direction: column;"
+    data-test="dashboard-custom-chart-editor-container"
+    class="bg-card-glass-bg flex h-full w-full flex-col overflow-hidden"
   >
-    <div style="width: 100%; height: 100%; display: flex; flex-direction: column;">
-          <div class="col" style="height: 100%; display: flex; flex-direction: column;">
-            <QueryEditor
-              v-model:query="javascriptCodeContent"
-              :debounceTime="500"
-              @update:query="onEditorValueChange"
-              data-test="dashboard-markdown-editor-query-editor"
-              language="javascript"
-              class="javascript-query-editor "
-              style="padding-left: 20px; height: 100%; flex: 1;"
-              :style="{
-                backgroundColor:
-                  store.state.theme == 'dark'
-                    ? '#1e1e1e'
-                    : '#fafafa',
-              }"
-
-            />
-          </div>
+    <div class="flex h-full w-full flex-col" data-test="dashboard-custom-chart-editor-inner">
+      <div data-test="dashboard-custom-chart-editor-flex-col" class="flex h-full flex-col">
+        <QueryEditor
+          v-model:query="javascriptCodeContent"
+          :debounceTime="500"
+          @update:query="onEditorValueChange"
+          data-test="dashboard-markdown-editor-query-editor"
+          language="javascript"
+          class="javascript-query-editor bg-code-block-bg h-full flex-1 ps-5"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts">
-import {
-  defineComponent,
-  ref,
-  watch,
-} from "vue";
+import { defineComponent, ref, watch } from "vue";
 import { defineAsyncComponent } from "vue";
 const QueryEditor = defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue"));
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 
 export default defineComponent({
   components: {
@@ -61,7 +50,7 @@ export default defineComponent({
   props: {
     modelValue: {
       type: String,
-      default: `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// The data variable is accessible and holds the response data from the search result, which is formatted as an array.\noption = {  \n \n};
+      default: ` // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// The data variable is accessible and holds the response data from the search result, which is formatted as an array.\noption = {  \n \n};
   `,
     },
   },
@@ -70,14 +59,18 @@ export default defineComponent({
     const splitterModel = ref(50);
     const dataToBeRendered = ref({});
     const store = useStore();
-    const { dashboardPanelData } = useDashboardPanelData("dashboard");
+    const { t } = useI18nTyped();
+    const { dashboardPanelData } = useDashboardPanelData("dashboard", t);
 
     // Watch for prop changes and update the editor content
-    watch(() => props.modelValue, (newValue) => {
-      if (newValue !== javascriptCodeContent.value) {
-        javascriptCodeContent.value = newValue;
-      }
-    });
+    watch(
+      () => props.modelValue,
+      (newValue) => {
+        if (newValue !== javascriptCodeContent.value) {
+          javascriptCodeContent.value = newValue;
+        }
+      },
+    );
 
     const layoutSplitterUpdated = () => {
       window.dispatchEvent(new Event("resize"));
@@ -104,34 +97,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-.markdown-editor {
-  display: flex;
-  height: 100%;
-}
-
-.splitter {
-  height: 4px;
-  width: 100%;
-}
-.splitter-vertical {
-  width: 4px;
-  height: 100%;
-}
-.splitter-enabled {
-  background-color: #ffffff00;
-  transition: 0.3s;
-  transition-delay: 0.2s;
-}
-
-.splitter-enabled:hover {
-  background-color: orange;
-}
-
-:deep(.query-editor-splitter .q-splitter__separator) {
-  background-color: transparent !important;
-}
-.javascript-query-editor {
-}
-</style>

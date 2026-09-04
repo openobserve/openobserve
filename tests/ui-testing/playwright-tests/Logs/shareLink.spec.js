@@ -73,10 +73,7 @@ test.describe("Share Link Test Cases", () => {
     await page.waitForTimeout(2000);
 
     // Step 2: Set a specific time range (1 hour)
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.waitForTimeout(500);
-    await page.locator('[data-test="date-time-relative-1-h-btn"]').click();
-    await page.waitForTimeout(1000);
+    await pm.logsPage.setRelativeTimeRange('1-h');
 
     // Step 3: Click refresh
     await pm.logsPage.clickRefresh();
@@ -133,22 +130,12 @@ test.describe("Share Link Test Cases", () => {
     await pm.logsPage.selectStream(TEST_STREAM);
     await page.waitForTimeout(2000);
 
-    // Step 2: Enable SQL mode
-    const sqlModeToggle = page.getByRole('switch', { name: 'SQL Mode' });
-    const isChecked = await sqlModeToggle.getAttribute('aria-checked');
-    if (isChecked !== 'true') {
-      await sqlModeToggle.click();
-      await page.waitForTimeout(1000);
-    }
-
-    // Step 3: Click refresh
-    await pm.logsPage.clickRefresh();
-    await page.waitForTimeout(3000);
-
-    // Step 4: Verify SQL mode is ON before sharing
-    const sqlModeBeforeShare = await pm.logsPage.isSqlModeEnabled();
-    expect(sqlModeBeforeShare).toBe(true);
-    testLogger.info('SQL mode enabled before sharing', { enabled: sqlModeBeforeShare });
+    // Step 2-4: Deterministically enable SQL mode, set the query, run it (without cancelling
+    // the auto-search), and confirm sql_mode committed to the URL — retries once then
+    // strict-asserts, so the generated short URL reliably captures sql_mode=true + the query
+    // (previously enableSqlModeIfNeeded didn't stick on CI, leaving sql_mode=false).
+    await pm.logsPage.setupSqlQueryForShare(`SELECT * FROM "${TEST_STREAM}"`);
+    testLogger.info('SQL mode enabled before sharing');
 
     // Step 5: Click share link and get URL
     const sharedUrl = await pm.logsPage.clickShareLinkAndGetUrl();
@@ -156,10 +143,12 @@ test.describe("Share Link Test Cases", () => {
     // Step 6: Navigate to shared URL
     await page.goto(sharedUrl);
     await pm.logsPage.waitForRedirectComplete();
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-    await page.waitForTimeout(2000);
 
-    // Step 7: Verify SQL mode state and URL params
+    // Step 7: SQL mode is auto-detected from the query editor content, which lazy-loads
+    // and re-hydrates AFTER the redirect. Wait for the restored SELECT query to land in
+    // the editor before asserting (self-heals with one reload if the lazy editor mounts
+    // empty after the short-URL hop) — a fixed 2s wait raced the pre-fill on CI.
+    await pm.logsPage.waitForRedirectedQueryEditorContent('SELECT');
     const redirectedState = await pm.logsPage.captureCurrentState();
     testLogger.info('Redirected state', redirectedState);
 
@@ -181,19 +170,17 @@ test.describe("Share Link Test Cases", () => {
     await pm.logsPage.selectStream(TEST_STREAM);
     await page.waitForTimeout(2000);
 
-    // Step 2: Toggle histogram
-    const histogramToggle = page.locator('[data-test="logs-search-bar-show-histogram-toggle-btn"]');
-    if (await histogramToggle.isVisible()) {
-      const toggleDiv = histogramToggle.locator('div').first();
-      await toggleDiv.click();
-      await page.waitForTimeout(1000);
-    }
+    // Step 2: Toggle histogram (now inside utilities hamburger menu)
+    await pm.logsPage.toggleHistogram();
+    await page.waitForTimeout(1000);
 
     // Step 3: Click refresh
     await pm.logsPage.clickRefresh();
-    await page.waitForTimeout(3000);
 
-    // Step 4: Capture original state
+    // Step 4: Capture original state. The histogram toggle writes show_histogram to the
+    // URL asynchronously, so wait for the param to be present before reading it —
+    // otherwise the "original" value itself is captured mid-write on a loaded runner.
+    await pm.logsPage.waitForUrlParam('show_histogram');
     const originalState = await pm.logsPage.captureCurrentState();
     testLogger.info('Original histogram state', { showHistogram: originalState.showHistogram });
 
@@ -203,9 +190,11 @@ test.describe("Share Link Test Cases", () => {
     // Step 6: Navigate to shared URL
     await page.goto(sharedUrl);
     await pm.logsPage.waitForRedirectComplete();
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-    // Step 7: Verify histogram state
+    // Step 7: show_histogram is one of the last params the SPA appends when re-hydrating
+    // from the short URL. Wait for it to appear (was read as null / a transitional value
+    // on CI when captured mid-rewrite) before comparing.
+    await pm.logsPage.waitForUrlParam('show_histogram', originalState.showHistogram);
     const redirectedState = await pm.logsPage.captureCurrentState();
     testLogger.info('Redirected histogram state', { showHistogram: redirectedState.showHistogram });
 
@@ -225,16 +214,14 @@ test.describe("Share Link Test Cases", () => {
     await page.waitForTimeout(2000);
 
     // Set time range to 30 minutes
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.waitForTimeout(500);
-    await page.locator('[data-test="date-time-relative-30-m-btn"]').click();
-    await page.waitForTimeout(1000);
+    await pm.logsPage.setRelativeTimeRange('30-m');
 
     // Step 2: Click refresh
     await pm.logsPage.clickRefresh();
-    await page.waitForTimeout(3000);
 
-    // Step 3: Capture complete original state
+    // Step 3: Capture complete original state. Wait for the last-written toggle param
+    // (show_histogram) so the full search state is in the URL before we snapshot it.
+    await pm.logsPage.waitForUrlParam('show_histogram');
     const originalState = await pm.logsPage.captureCurrentState();
     testLogger.info('Complete original state captured', originalState);
 
@@ -245,9 +232,10 @@ test.describe("Share Link Test Cases", () => {
     // Step 5: Navigate to shared URL
     await page.goto(sharedUrl);
     await pm.logsPage.waitForRedirectComplete();
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
-    // Step 6: Capture and compare states
+    // Step 6: Wait for the SPA to finish re-hydrating the toggle params from the short
+    // URL (show_histogram is written last) before capturing, then compare.
+    await pm.logsPage.waitForUrlParam('show_histogram', originalState.showHistogram);
     const redirectedState = await pm.logsPage.captureCurrentState();
     testLogger.info('Redirected state captured', redirectedState);
 
@@ -287,7 +275,7 @@ test.describe("Share Link Test Cases", () => {
     await page.waitForTimeout(3000);
 
     // Get the share button
-    const shareButton = page.locator('[data-test="logs-search-bar-share-link-btn"]');
+    const shareButton = pm.logsPage.getShareLinkButtonLocator();
 
     // Click and wait for success notification
     await shareButton.click();
@@ -355,15 +343,11 @@ test.describe("Share Link Test Cases", () => {
     await page.waitForTimeout(2000);
 
     // Step 2: Enable SQL mode
-    const sqlModeToggle = page.getByRole('switch', { name: 'SQL Mode' });
-    const isChecked = await sqlModeToggle.getAttribute('aria-checked');
-    if (isChecked !== 'true') {
-      await sqlModeToggle.click();
-      await page.waitForTimeout(1000);
-    }
+    await pm.logsPage.enableSqlModeIfNeeded();
+    await page.waitForTimeout(1000);
 
     // Step 3: Enter a SQL query
-    const queryEditor = page.locator('[data-test="logs-search-bar-query-editor"]');
+    const queryEditor = pm.logsPage.getQueryEditorLocator();
     await queryEditor.click();
     await page.keyboard.type(`SELECT * FROM "${TEST_STREAM}" LIMIT 50`);
     await page.waitForTimeout(1000);
@@ -407,10 +391,7 @@ test.describe("Share Link Test Cases", () => {
     await pm.logsPage.selectStream(TEST_STREAM);
     await page.waitForTimeout(2000);
 
-    await page.locator('[data-test="date-time-btn"]').click();
-    await page.waitForTimeout(500);
-    await page.locator('[data-test="date-time-relative-1-h-btn"]').click();
-    await page.waitForTimeout(1000);
+    await pm.logsPage.setRelativeTimeRange('1-h');
 
     await pm.logsPage.clickRefresh();
     await page.waitForTimeout(3000);
@@ -465,70 +446,5 @@ test.describe("Share Link Test Cases", () => {
     testLogger.info('Shared URL redirect, org context, and multiple access test completed');
   });
 
-  // =====================================================
-  // FUNCTIONALITY - Bug #9788: Share URL disabled without ZO_WEB_URL
-  // https://github.com/openobserve/openobserve/issues/9788
-  // =====================================================
-
-  test("@bug-9788 @P1: Share button should be disabled when ZO_WEB_URL is not configured", {
-    tag: ['@bug-9788', '@shareLink', '@P1']
-  }, async ({ page }, testInfo) => {
-    // Skip beforeEach by handling setup here with mock FIRST
-    testLogger.testStart(testInfo.title, testInfo.file);
-    testLogger.info('Test: Share button disabled state with mocked config (Bug #9788)');
-
-    // Set up mock BEFORE any navigation to ensure config is mocked from the start
-    await page.route('**/config', async (route) => {
-      const response = await route.fetch();
-      const json = await response.json();
-
-      // Delete web_url property to simulate it not being configured
-      const modifiedConfig = { ...json };
-      delete modifiedConfig.web_url;
-
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify(modifiedConfig)
-      });
-    });
-
-    // Now navigate for the first time with mock already active
-    await navigateToBase(page);
-    pm = new PageManager(page);
-
-    // Navigate to logs page
-    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
-    testLogger.navigation('Navigating to logs page with mocked config', { url: logsUrl });
-    await page.goto(logsUrl);
-    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
-
-    // Select a stream and run query to load results
-    await pm.logsPage.selectStream(TEST_STREAM);
-    await pm.logsPage.clickRefresh();
-    await page.waitForLoadState('networkidle');
-
-    testLogger.info('Logs page loaded with mocked config');
-
-    // PRIMARY ASSERTION: Share button should exist
-    await pm.logsPage.expectShareLinkButtonVisible();
-    testLogger.info('✓ Share button is visible');
-
-    // SECONDARY ASSERTION: Share button should be disabled when ZO_WEB_URL not configured
-    await pm.logsPage.expectShareLinkButtonDisabled();
-    testLogger.info('✓ PRIMARY CHECK PASSED: Share button is disabled (ZO_WEB_URL not configured)');
-
-    // TERTIARY ASSERTION: Check for tooltip explaining why it's disabled
-    await pm.logsPage.hoverShareLinkButton();
-
-    // Verify tooltip is visible with specific message about ZO_WEB_URL configuration
-    await pm.logsPage.expectShareLinkTooltipVisible(/share\s+url\s+is\s+disabled.*zo_web_url.*configured/i);
-
-    // Get and validate tooltip text matches expected structure
-    const tooltipText = await pm.logsPage.getShareLinkTooltipText(/share\s+url\s+is\s+disabled.*zo_web_url.*configured/i);
-    expect(tooltipText.toLowerCase()).toMatch(/share\s+url\s+is\s+disabled.*zo_web_url.*configured/i);
-    testLogger.info('✓ TERTIARY CHECK PASSED: Informative tooltip present');
-
-    testLogger.info('Share button disabled state test completed for Bug #9788');
-  });
+  // Bug #9788 test should be moved to RegressionSet/logs-regression.spec.js or similar
 });

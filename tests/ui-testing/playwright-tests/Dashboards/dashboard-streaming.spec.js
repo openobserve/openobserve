@@ -57,11 +57,7 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardCreate.createDashboard(
       randomDashboardName + "_streaming"
     );
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     await pm.dashboardSetting.openSetting();
     await pm.dashboardVariables.addDashboardVariable(
       "variablename",
@@ -95,25 +91,22 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardPanelActions.waitForChartToRender();
 
 
-    const variableInput = page.getByLabel("variablename", {
-      exact: true,
-    });
-    await variableInput.waitFor({ state: "visible", timeout: 10000 });
+    const variableWrapper = pm.dashboardVariables.variableWrapper('variablename');
+    await variableWrapper.waitFor({ state: "visible", timeout: 10000 });
 
-    // Wait for the _values API call when clicking on the variable input
+    // Wait for the _values API call when clicking on the variable trigger
     const valuesApiPromise = page.waitForResponse(
       response => response.url().includes('_values') || response.url().includes('/values'),
       { timeout: 15000 }
     );
 
-    await variableInput.click();
+    await pm.dashboardVariables.clickVariableTrigger('variablename');
 
     // Wait for the API response to complete
     try {
       await valuesApiPromise;
-      await page.waitForTimeout(500); // Additional wait for dropdown to render
     } catch (e) {
-      console.log("Warning: _values API response not detected, continuing...");
+      testLogger.warn("_values API response not detected, continuing", { error: e?.message });
     }
 
     // Type partial search terms to trigger multiple _values API calls with streaming enabled
@@ -125,20 +118,17 @@ test.describe("dashboard streaming testcases", () => {
         { timeout: 15000 }
       );
 
-      await variableInput.fill(term);
+      await pm.dashboardVariables.fillVariableSearch('variablename', term);
 
       // Wait for the API response to complete
       try {
         await valuesApiResponse;
-        await page.waitForTimeout(300); // Wait for dropdown to update with new results
       } catch (e) {
-        console.log(`Warning: _values API response not detected for term "${term}", continuing...`);
+        testLogger.warn("_values API response not detected for term, continuing", { term, error: e?.message });
       }
     }
     // Select the final value
-    const option = page.getByRole("option", { name: "ziox" });
-    await option.waitFor({ state: "visible", timeout: 10000 });
-    await option.click();
+    await pm.dashboardVariables.selectVariableOption('variablename', 'ziox');
 
     // Wait for any remaining network activity to settle
     // await page.waitForLoadState("networkidle");
@@ -218,11 +208,7 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardCreate.createDashboard(
       randomDashboardName + "_filter"
     );
-    await page
-      .locator('[data-test="dashboard-if-no-panel-add-panel-btn"]')
-      .waitFor({
-        state: "visible",
-      });
+    await pm.dashboardCreate.waitForAddPanelIfEmptyVisible();
     await pm.dashboardSetting.openSetting();
 
     // Add first variable without filter (existing behavior)
@@ -301,13 +287,13 @@ test.describe("dashboard streaming testcases", () => {
     await pm.dashboardPanelActions.savePanel();
 
     //wait for variable to be visible.
-    const namespaceVariable = page.getByLabel("variablename", { exact: true });
-    await namespaceVariable.waitFor({ state: 'visible', timeout: 10000 });
-    await expect(namespaceVariable).toBeVisible();
+    const namespaceVariableTrigger = pm.dashboardVariables.variableTrigger('variablename');
+    await namespaceVariableTrigger.waitFor({ state: 'visible', timeout: 10000 });
+    await expect(namespaceVariableTrigger).toBeVisible();
 
     // Wait for all initial network activity to settle completely
     // await page.waitForLoadState("networkidle");
-    await page.waitForTimeout(2000);
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Now capture the baseline count after everything has settled
     const noOfPreviousCalls = valuesResponses.length;

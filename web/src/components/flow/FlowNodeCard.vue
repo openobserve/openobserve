@@ -1,0 +1,157 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<!--
+  Shared node card for the flow canvases (Pipelines + Workflows). PRESENTATIONAL
+  only — no composable/singleton coupling. It renders the card frame
+  (icon | separator | body) and the input/output handles; everything
+  interaction-specific (click, hover actions, hover-`+`, per-type body content)
+  is supplied by the wrapping module via native events + slots.
+
+    icon          — glyph: an OIcon `icon` name, or an "img:<url>" string
+                    (OIcon renders both, so a URL renders as an image)
+    ioType        — input | default | output (drives handle colour class)
+    hasInput / hasOutput — whether to render the target / source handle
+    inputPosition / outputPosition — handle sides (default top / bottom)
+    outputHandles — optional list of source handles ({ id }), in render order,
+                    for fan-out nodes (workflow Branch: true/false, N-way
+                    Switch). Omitted/empty keeps the single id="output" handle.
+
+  Slots: #body (the node's label/content), #actions (hover buttons), #footer
+  (extra affordances under the card). The shared node typography (15px / bold /
+  left) lives on the body container, so wrappers supply content — not styling —
+  and both canvases render identically.
+  Native @click / @mouseenter / @mouseleave fall through to the root element.
+
+  Emits: outputClick — the source handle was clicked, with the handle's id
+  (Pipelines uses it to open the "add next step" picker; see the
+  connect-on-click note in PipelineFlow).
+
+  Card background/border colour comes from the VueFlow node wrapper
+  (`.vue-flow__node-<ioType>`) styled by each flow, and the handle look from the
+  flow's `.node_handle_custom` / `.handle_*` rules — so this component only
+  applies the agreed class names.
+-->
+<template>
+  <!-- `flow-node` / `flow-node__container` are identifiers only — styling is
+       utilities, so there is no style block. py-[0.3125rem] = the old 5px,
+       mirroring the pipeline node's inner padding so the two match exactly. -->
+  <div class="flow-node flex w-fit cursor-pointer items-center border-none py-[0.3125rem]">
+    <Handle
+      v-if="hasInput"
+      id="input"
+      type="target"
+      :position="inputPosition"
+      :class="handleClass"
+      :data-test="inputHandleTest"
+    />
+
+    <div class="flow-node__icon flex items-center">
+      <!-- `icon` may be a glyph name or an "img:<url>" string; OIcon renders both
+           (same as the pipeline node), so canvas icons match exactly. -->
+      <OIcon :name="icon || 'help'" size="md" class="my-2 me-2" />
+    </div>
+
+    <OSeparator vertical class="me-2" />
+
+    <!-- Shared node typography (0.9375rem = the old 15px / bold / left) lives
+         here so every #body slot inherits it — wrappers supply content, not
+         styling. Changing it here changes every node type at once. -->
+    <div class="flow-node__container min-w-0 text-left text-sm! leading-[1.4]! font-bold!">
+      <slot name="body" />
+    </div>
+
+    <!-- Clicking the source dot is the "add next step" affordance (Pipelines).
+         Emitted rather than handled here so this stays presentational; a canvas
+         that does not listen keeps the plain handle.
+         VueFlow pins every handle of one side at the same 50% offset, so a fan-out
+         node's arms would render on top of each other and only the last would be
+         hittable — `--fnc-handle-offset` (the dynamic-CSS-var pattern) moves each
+         one along the card's edge. -->
+    <Handle
+      v-for="(h, i) in sourceHandles"
+      :id="h.id"
+      :key="h.id"
+      type="source"
+      :position="outputPosition"
+      :class="[handleClass, spread ? spreadClass : '']"
+      :style="spread ? { '--fnc-handle-offset': handleOffset(i) } : undefined"
+      :data-test="outputHandleTest"
+      @click.stop="emit('outputClick', $event, h.id)"
+    />
+
+    <!-- hover actions (delete, etc.) supplied by the wrapper -->
+    <slot name="actions" />
+    <!-- hover-`+` / add-next affordance supplied by the wrapper -->
+    <slot name="footer" />
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed } from "vue";
+import { Handle, Position } from "@vue-flow/core";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+
+const props = withDefaults(
+  defineProps<{
+    icon?: string;
+    ioType?: string;
+    hasInput?: boolean;
+    hasOutput?: boolean;
+    outputHandles?: { id: string }[];
+    inputPosition?: Position;
+    outputPosition?: Position;
+    inputHandleTest?: string;
+    outputHandleTest?: string;
+  }>(),
+  {
+    icon: "help",
+    ioType: "default",
+    hasInput: true,
+    hasOutput: true,
+    outputHandles: undefined,
+    inputPosition: Position.Top,
+    outputPosition: Position.Bottom,
+    inputHandleTest: undefined,
+    outputHandleTest: undefined,
+  },
+);
+
+// Click on the source (output) handle — the wrapper decides what it means. The
+// event travels with it so the wrapper can anchor a popover at the click.
+const emit = defineEmits<{ (e: "outputClick", event: MouseEvent, handleId: string): void }>();
+
+// Pipelines (and every single-output workflow node) pass no `outputHandles`, and
+// must keep the one id="output" handle they have always rendered.
+const sourceHandles = computed(() =>
+  props.hasOutput ? (props.outputHandles?.length ? props.outputHandles : [{ id: "output" }]) : [],
+);
+
+const handleClass = computed(() => `node_handle_custom handle_${props.ioType || "default"}`);
+
+// Single-output nodes (every pipeline node) keep VueFlow's centred handle untouched.
+const spread = computed(() => sourceHandles.value.length > 1);
+// Which edge the offset runs along: a left/right handle column spreads vertically.
+const spreadClass = computed(() =>
+  props.outputPosition === Position.Left || props.outputPosition === Position.Right
+    ? "top-[var(--fnc-handle-offset,50%)]!"
+    : "left-[var(--fnc-handle-offset,50%)]!",
+);
+// (i+1)/(n+1) keeps every arm strictly inside the card, so more paths narrow the gap rather than overflow.
+const handleOffset = (index: number) =>
+  `${((index + 1) * 100) / (sourceHandles.value.length + 1)}%`;
+</script>

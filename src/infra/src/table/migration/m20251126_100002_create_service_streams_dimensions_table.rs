@@ -83,6 +83,26 @@ fn create_service_streams_dimensions_org_dimension_value_hash_idx_stmnt() -> Ind
         .to_owned()
 }
 
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_dimensions_table_contains_name() {
+        let sql = create_service_streams_dimensions_table_statement().build(SqliteQueryBuilder);
+        assert!(sql.contains("service_streams_dimensions"));
+    }
+
+    #[test]
+    fn test_org_dimension_value_hash_idx_name() {
+        let sql = create_service_streams_dimensions_org_dimension_value_hash_idx_stmnt()
+            .build(SqliteQueryBuilder);
+        assert!(sql.contains(SERVICE_STREAMS_DIMENSIONS_ORG_DIMENSION_VALUE_HASH_IDX));
+    }
+}
+
 #[derive(DeriveIden)]
 enum ServiceStreamsDimensions {
     Table,

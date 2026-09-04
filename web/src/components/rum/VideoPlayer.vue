@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,41 +15,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="player-container full-height q-pa-sm">
+  <div class="player-container flex h-full flex-col p-2">
     <div
       v-if="isLoading"
-      class="q-pb-lg flex items-center justify-center text-center full-width tw:h-[calc(100vh-12.5rem)]"
+      class="flex min-h-0 w-full flex-1 items-center justify-center pb-4 text-center"
     >
       <div>
-        <q-spinner-hourglass
-          color="primary"
-          size="2.5rem"
-          class="tw:mx-auto tw:block"
-        />
-        <div class="text-center full-width">
+        <OSpinner size="md" class="mx-auto block" data-test="video-player-loading-indicator" />
+        <div class="w-full text-center">
           {{ t("rum.loadingSessions") }}
         </div>
       </div>
     </div>
-    <div
-      ref="playerContainerRef"
-      class="flex items-center justify-center tw:h-[calc(100vh-12.375rem)]"
-    >
+    <div ref="playerContainerRef" class="flex min-h-0 flex-1 items-center justify-center">
       <div
         ref="playerRef"
         id="player"
-        class="player flex items-center cursor-pointer"
+        class="player flex h-full cursor-pointer items-center"
         @click="togglePlay"
       />
     </div>
-    <div class="full-width q-pa-sm q-pt-md controls-container">
+    <div class="controls-container w-full p-2 pt-3">
       <div
         ref="playbackBarRef"
-        class="playback_bar q-mt-sm q-mb-md relative-position cursor-pointer"
+        data-test="video-player-playback-bar"
+        class="bg-surface-subtle relative mt-2 mb-3 h-[0.3125rem] w-full cursor-pointer"
         @click="handlePlaybackBarClick"
       >
         <div
-          class="progressTime bg-primary absolute"
+          class="bg-button-primary! absolute"
           :style="{
             width: playerState.progressWidth + 'px',
             left: 0,
@@ -59,9 +53,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           }"
         />
         <div
-          class="progressTime bg-primary absolute"
+          class="bg-button-primary! absolute"
           :style="{
-            width: '2px',
+            width: '0.125rem',
             left: playerState.progressWidth - 2 + 'px',
             bottom: '-0.3125rem',
             height: '0.9375rem',
@@ -72,16 +66,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div
           v-for="event in events as any[]"
           :key="event.id"
-          class="progressTime absolute cursor-pointer"
+          data-test="video-player-event-marker"
+          class="absolute cursor-pointer"
           :class="getEventMarkerClass(event)"
           :style="{
             width:
               event.frustration_types && event.frustration_types.length > 0
-                ? '3px'
-                : '2px',
-            left:
-              (event.relativeTime / playerState.totalTime) * playerState.width +
-              'px',
+                ? '0.1875rem'
+                : '0.125rem',
+            left: (event.relativeTime / playerState.totalTime) * playerState.width + 'px',
             bottom: '-0.3125rem',
             height:
               event.frustration_types && event.frustration_types.length > 0
@@ -91,57 +84,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title="getEventTooltip(event)"
         />
       </div>
-      <div class="controls flex justify-between items-center">
+      <div class="controls flex items-center justify-between">
         <div class="flex items-center">
           <div>
-            <q-icon
-              name="replay_10"
-              size="1.5rem"
-              class="q-mr-sm cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+            <OIcon
+              name="replay-10"
+              size="md"
+              class="text-icon-color hover:text-button-primary me-2 cursor-pointer"
               @click="skipTo('backward')"
             />
-            <q-icon
-              :name="
-                playerState.isPlaying
-                  ? 'pause_circle_filled'
-                  : 'play_circle_filled'
-              "
-              size="2rem"
-              class="cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+            <OIcon
+              :name="playerState.isPlaying ? 'pause-circle-filled' : 'play-circle-filled'"
+              size="lg"
+              class="text-icon-color hover:text-button-primary cursor-pointer"
               @click="togglePlay"
             />
-            <q-icon
-              name="forward_10"
-              size="1.5rem"
-              class="q-ml-sm cursor-pointer tw:text-[var(--o2-icon-color-dark)] hover:tw:text-[var(--o2-primary-btn-bg)]"
+            <OIcon
+              name="forward-10"
+              size="md"
+              class="text-icon-color hover:text-button-primary ms-2 cursor-pointer"
               @click="skipTo('forward')"
             />
           </div>
-          <div class="flex q-ml-lg items-center">
+          <div class="ms-4 flex items-center">
             <div>{{ playerState.time }}</div>
-            <div class="q-px-xs">/</div>
+            <div class="px-1">/</div>
             <div>{{ playerState.duration }}</div>
           </div>
         </div>
         <div class="flex items-center">
-          <q-toggle
-            class="o2-toggle-button-xs q-mr-md"
+          <OSwitch
+            class="me-3 whitespace-nowrap"
             v-model="playerState.skipInactivity"
             :label="t('rum.skipInactivity')"
-            size="xs"
             @update:model-value="toggleSkipInactive"
           />
-          <q-select
-            class="speed-selector"
+          <OSelect
             v-model="playerState.speed"
             :options="speedOptions"
-            color="input-border"
-            bg-color="input-bg"
-            stack-label
-            outlined
-            filled
-            dense
-            size="xs"
+            :searchable="false"
             @update:model-value="setSpeed"
           />
         </div>
@@ -160,10 +141,17 @@ import {
   onBeforeUnmount,
   onMounted,
   onBeforeMount,
+  onActivated,
+  onDeactivated,
 } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
-
+import { raw, useI18nTyped } from "@/types/i18n";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSwitch from "@/lib/forms/Switch/OSwitch.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
+import { createRecordConverter } from "@/utils/rum/sessionReplayChangeFormat";
 const props = defineProps({
   events: {
     type: Array,
@@ -179,7 +167,7 @@ const props = defineProps({
   },
 });
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
 const store = useStore();
 
@@ -199,29 +187,33 @@ const worker: Ref<Worker | null> = ref(null);
 
 const workerProcessId = ref(0);
 
+const sessionWidth = ref(0);
+const sessionHeight = ref(0);
+const resizeObserver = ref<ResizeObserver | null>(null);
+
 const speedOptions = [
   {
-    label: "0.5x",
+    label: raw("0.5x"),
     value: 0.5,
   },
   {
-    label: "1x",
+    label: raw("1x"),
     value: 1,
   },
   {
-    label: "1.5x",
+    label: raw("1.5x"),
     value: 1.5,
   },
   {
-    label: "2x",
+    label: raw("2x"),
     value: 2,
   },
   {
-    label: "3x",
+    label: raw("3x"),
     value: 3,
   },
   {
-    label: "4x",
+    label: raw("4x"),
     value: 4,
   },
 ];
@@ -230,10 +222,7 @@ const playerState = ref({
   isPlaying: false,
   time: "00.00",
   duration: "00.00", // in ms
-  speed: {
-    label: "4x",
-    value: 4,
-  },
+  speed: 4,
   progressWidth: 0,
   playBackEvents: {
     views: true,
@@ -250,17 +239,27 @@ const playerState = ref({
   actualTime: 0,
 });
 
-watch(
-  () => props.segments,
-  (value) => {
-    if (value.length) setupSession();
-  },
-  { deep: true, immediate: true },
-);
-
 onBeforeMount(async () => {
   await importVideoPlayer();
   initializeWorker();
+});
+
+onMounted(() => {
+  attachResizeObserver();
+});
+
+onActivated(() => {
+  attachResizeObserver();
+  if (player.value) {
+    const { width, height } = calculatePlayerDimensions();
+    if (playerRef.value) playerRef.value.style.width = `${width}px`;
+    player.value.$set({ width, height });
+    updatePlayerState();
+  }
+});
+
+onDeactivated(() => {
+  detachResizeObserver();
 });
 
 const importVideoPlayer = async () => {
@@ -272,19 +271,80 @@ const importVideoPlayer = async () => {
 };
 
 onBeforeUnmount(() => {
+  detachResizeObserver();
   if (worker.value) {
     worker.value.terminate();
   }
+  // $destroy frees the replayer's events, canvas/iframe, timers, and listeners.
+  if (player.value) {
+    try {
+      player.value.pause?.();
+      player.value.$destroy?.();
+    } catch {
+      // teardown race — the instance is already gone
+    }
+    player.value = null;
+  }
   rrwebPlayer = null;
 });
+
+function attachResizeObserver() {
+  if (!playerContainerRef.value) return;
+  resizeObserver.value = new ResizeObserver(() => {
+    if (!player.value) return;
+    const { width, height } = calculatePlayerDimensions();
+    if (playerRef.value) playerRef.value.style.width = `${width}px`;
+    player.value.$set({ width, height });
+    updatePlayerState();
+  });
+  resizeObserver.value.observe(playerContainerRef.value);
+}
+
+function detachResizeObserver() {
+  resizeObserver.value?.disconnect();
+  resizeObserver.value = null;
+}
+
+function calculatePlayerDimensions(): { width: number; height: number } {
+  if (!playerContainerRef.value) return { width: 0, height: 0 };
+
+  let playerWidth = playerContainerRef.value.clientWidth || 0;
+  let playerHeight = sessionHeight.value
+    ? (sessionHeight.value / sessionWidth.value) * playerWidth
+    : playerWidth * 0.5625;
+
+  if (
+    playerContainerRef.value.clientHeight &&
+    playerHeight > playerContainerRef.value.clientHeight - 90
+  ) {
+    playerHeight = playerContainerRef.value.clientHeight - 90 || 0;
+    playerWidth =
+      sessionWidth.value && sessionHeight.value
+        ? (sessionWidth.value / sessionHeight.value) * playerHeight
+        : playerWidth;
+  }
+
+  return { width: playerWidth, height: playerHeight };
+}
 
 const setupSession = async () => {
   session.value = [];
   if (!props.segments.length) return;
 
+  // The SDK v7 serialization emits session-replay snapshots in the compact "Change"
+  // format (FullSnapshot type 2 with format:1 and data:Change[], plus Change records of
+  // type 12). @openobserve/rrweb-player only understands the classic rrweb format, so we
+  // convert here. A single converter instance threads node-id / string-table state across
+  // all records in order (it resets itself on each full snapshot, mirroring the SDK).
+  const recordConverter = createRecordConverter();
+
   props.segments.forEach((segment: any) => {
+    const convertedRecords: any[] = [];
     segment.records.forEach((record: any) => {
-      let segCopy = cloneDeep(record);
+      convertedRecords.push(...recordConverter.convert(cloneDeep(record)));
+    });
+    convertedRecords.forEach((record: any) => {
+      let segCopy = record;
       if (segCopy.type === 8) {
         const seg = {
           ...segCopy,
@@ -314,12 +374,11 @@ const setupSession = async () => {
                       __child.attributes._cssText
                     ) {
                       workerProcessId.value++;
-                      processCss(
-                        __child.attributes._cssText,
-                        workerProcessId.value,
-                      ).then((res: any) => {
-                        __child.attributes._cssText = res.updatedCssString;
-                      });
+                      processCss(__child.attributes._cssText, workerProcessId.value).then(
+                        (res: any) => {
+                          __child.attributes._cssText = res.updatedCssString;
+                        },
+                      );
                     }
                   });
                 }
@@ -349,32 +408,16 @@ const setupSession = async () => {
   //   lastEventTime = currentTime;
   // });
 
-  let sessionWidth: number = 0;
-  let sessionHeight: number = 0;
-
   session.value.every((segment: any) => {
     if (segment.data.height && segment.data.width) {
-      sessionWidth = segment.data.width;
-      sessionHeight = segment.data.height;
+      sessionWidth.value = segment.data.width;
+      sessionHeight.value = segment.data.height;
       return false;
     }
     return true;
   });
 
-  let playerWidth = playerContainerRef.value?.clientWidth || 0;
-  let playerHeight = (sessionHeight / sessionWidth) * playerWidth;
-
-  if (!sessionHeight) {
-    playerHeight = playerWidth * 0.5625;
-  }
-
-  if (
-    playerContainerRef.value?.clientHeight &&
-    playerHeight > playerContainerRef.value?.clientHeight - 90
-  ) {
-    playerHeight = playerContainerRef.value?.clientHeight - 90 || 0;
-    playerWidth = (sessionWidth / sessionHeight) * playerHeight;
-  }
+  const { width: playerWidth, height: playerHeight } = calculatePlayerDimensions();
 
   if (playerRef.value) {
     playerRef.value.style.width = `${playerWidth}px`;
@@ -394,7 +437,7 @@ const setupSession = async () => {
       width: playerWidth,
       height: playerHeight,
       mutateChildNodes: true,
-      speed: playerState.value.speed.value,
+      speed: playerState.value.speed,
       skipInactive: playerState.value.skipInactivity,
     },
   });
@@ -424,13 +467,14 @@ const setupSession = async () => {
 };
 
 const updatePlayerState = () => {
+  if (!player?.value) return;
   const playerMeta = player.value?.getMetaData();
-  playerState.value.startTime = playerMeta.startTime;
-  playerState.value.endTime = playerMeta.endTime;
-  playerState.value.totalTime = playerMeta.totalTime;
-  playerState.value.duration = formatTimeDifference(
-    playerState.value.totalTime,
-  );
+
+  if (!playerMeta) return;
+  playerState.value.startTime = playerMeta?.startTime;
+  playerState.value.endTime = playerMeta?.endTime;
+  playerState.value.totalTime = playerMeta?.totalTime;
+  playerState.value.duration = formatTimeDifference(playerState.value.totalTime);
 
   const playbackBarWidth = playbackBarRef.value?.clientWidth || 0;
   // calculate width of progress bar
@@ -440,27 +484,24 @@ const updatePlayerState = () => {
 
 const getEventMarkerClass = (event: any) => {
   if (event.frustration_types && event.frustration_types.length > 0) {
-    return "bg-frustration-marker";
+    return "bg-badge-orange-solid-bg! shadow-glow shadow-badge-orange-solid-bg/60";
   }
   if (event.type === "error") {
-    return "bg-red-5";
+    return "bg-badge-error-solid-bg!";
   }
-  return "bg-secondary";
+  return "bg-badge-teal-solid-bg!";
 };
 
 const getEventTooltip = (event: any) => {
-  const eventName =
-    event.name.length > 100 ? event.name.slice(0, 100) + "..." : event.name;
+  const eventName = event.name.length > 100 ? event.name.slice(0, 100) + "..." : event.name;
 
   if (event.frustration_types && event.frustration_types.length > 0) {
     const frustrationLabels = event.frustration_types
       .map((type: string) => {
-        return type
-          .replace(/_/g, " ")
-          .replace(/\b\w/g, (l: string) => l.toUpperCase());
+        return type.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase());
       })
       .join(", ");
-    return `⚠️ FRUSTRATION: ${frustrationLabels}\n${eventName}`;
+    return t("rum.frustrationEventTooltip", { types: frustrationLabels, name: eventName });
   }
 
   return eventName;
@@ -469,12 +510,8 @@ const getEventTooltip = (event: any) => {
 function formatTimeDifference(milliSeconds: number) {
   // Calculate hours, minutes, and seconds
   let hours: string | number = Math.floor(milliSeconds / (1000 * 60 * 60));
-  let minutes: string | number = Math.floor(
-    (milliSeconds % (1000 * 60 * 60)) / (1000 * 60),
-  );
-  let seconds: string | number = Math.floor(
-    (milliSeconds % (1000 * 60)) / 1000,
-  );
+  let minutes: string | number = Math.floor((milliSeconds % (1000 * 60 * 60)) / (1000 * 60));
+  let seconds: string | number = Math.floor((milliSeconds % (1000 * 60)) / 1000);
 
   // Add leading zeros if needed
   hours = hours < 10 ? "0" + hours : hours;
@@ -504,8 +541,7 @@ const handlePlaybackBarClick = (event: any) => {
   const playbackBarEl = playbackBarRef.value.getBoundingClientRect();
 
   let time =
-    ((event.clientX - playbackBarEl.left) / playerState.value.width) *
-    playerState.value.totalTime;
+    ((event.clientX - playbackBarEl.left) / playerState.value.width) * playerState.value.totalTime;
 
   goto(time, playerState.value.isPlaying);
 };
@@ -529,8 +565,9 @@ const pause = () => {
   player.value?.pause();
 };
 
-const setSpeed = (speed: { label: string; value: number }) => {
-  player.value?.setSpeed(speed.value);
+const setSpeed = (speed: SelectModelValue) => {
+  // speedOptions are numeric; ignore any non-numeric emission.
+  if (typeof speed === "number") player.value?.setSpeed(speed);
 };
 const toggleSkipInactive = () => {
   player.value?.toggleSkipInactive();
@@ -543,18 +580,24 @@ const goto = (timeOffset: number, play: boolean = false) => {
 
 const skipTo = (skipTo: string) => {
   const seconds = 10;
-  if (skipTo === "forward")
-    goto(playerState.value.actualTime + seconds * 1000, false);
-  else goto(playerState.value.actualTime - seconds * 1000, false);
+  if (skipTo === "forward") {
+    const newTime = Math.min(
+      playerState.value.actualTime + seconds * 1000,
+      playerState.value.totalTime,
+    );
+    goto(newTime, false);
+  } else {
+    const newTime = Math.max(playerState.value.actualTime - seconds * 1000, 0);
+    goto(newTime, false);
+  }
 };
 
 const initializeWorker = () => {
   if (window.Worker) {
     // Creating the Web Worker
-    worker.value = new Worker(
-      new URL("../../workers/rumcssworker.js", import.meta.url),
-      { type: "module" },
-    );
+    worker.value = new Worker(new URL("../../workers/rumcssworker.js", import.meta.url), {
+      type: "module",
+    });
   } else {
     console.error("Web Workers are not supported in this browser.");
   }
@@ -565,8 +608,7 @@ const processCss = (cssString: string, id: string | number) => {
     if (worker.value) {
       const handleWorkerMessage = (event: any) => {
         if (event.data.id === id) {
-          if (worker.value)
-            worker.value.removeEventListener("message", handleWorkerMessage);
+          if (worker.value) worker.value.removeEventListener("message", handleWorkerMessage);
           resolve(event.data);
         }
       };
@@ -582,6 +624,14 @@ const processCss = (cssString: string, id: string | number) => {
   });
 };
 
+watch(
+  () => props.segments,
+  (value) => {
+    if (value.length) setupSession();
+  },
+  { deep: true, immediate: true },
+);
+
 defineExpose({
   goto,
   play,
@@ -593,35 +643,3 @@ defineExpose({
   updatePlayerState,
 });
 </script>
-
-<style scoped lang="scss">
-.player {
-  height: 100%;
-}
-
-.playback_bar {
-  width: 100%;
-  height: 0.3125rem;
-  background-color: #ebebeb;
-}
-
-.bg-frustration-marker {
-  background-color: #fb923c !important;
-  box-shadow: 0 0 4px rgba(251, 146, 60, 0.6);
-}
-</style>
-
-<style lang="scss">
-.speed-selector {
-  .q-field__control {
-    padding: 0 0.5rem !important;
-  }
-
-  .q-field__marginal,
-  .q-field__native,
-  .q-field__control {
-    min-height: 1.875rem !important;
-    height: 1.875rem !important;
-  }
-}
-</style>

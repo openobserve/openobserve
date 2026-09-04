@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,21 +15,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page data-test="alerts-page" class="q-pa-none" style="min-height: inherit">
+  <div class="rounded-default p-0" data-test="alerts-page" style="min-height: inherit">
     <RouterView
       :templates="templates"
       :destinations="destinations"
       @get:destinations="getDestinations"
       @get:templates="getTemplates"
     />
-  </q-page>
+  </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeMount, watch } from "vue";
+import { defineComponent, ref } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import templateService from "@/services/alert_templates";
 import destinationService from "@/services/alert_destination";
 
@@ -37,8 +36,7 @@ export default defineComponent({
   name: "AppAlerts",
   setup() {
     const store = useStore();
-    const { t } = useI18n();
-    const router = useRouter();
+    const { t } = useI18nTyped();
     const activeTab: any = ref("destinations");
     const templates = ref([]);
     const destinations = ref([]);
@@ -77,39 +75,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-.alerts-tabs {
-  .q-tabs {
-    &--vertical {
-      margin: 16px 8px 0 8px;
-      .q-tab {
-        justify-content: flex-start;
-        padding: 0 1rem 0 1.25rem;
-        border-radius: 0.5rem;
-        margin-bottom: 0.5rem;
-        text-transform: capitalize;
-        min-height: 40px !important;
-        &__content.tab_content {
-          .q-tab {
-            &__icon + &__label {
-              padding-left: 0.875rem;
-              font-weight: 600;
-            }
-          }
-        }
-        &--active {
-          background-color: $accent;
-          color: black;
-        }
-      }
-    }
-  }
-}
-</style>

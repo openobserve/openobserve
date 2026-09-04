@@ -1,15 +1,19 @@
 name: Database Validation Tests
 
 on:
+  # Kept as the Rust cache writer on main: caches saved from merge-queue refs are never restored by PRs.
   push:
     branches:
       - "main"
   pull_request:
     branches:
-      - "*"
+      - "**"
+    # labeled/unlabeled so adding or removing 'ready-for-ci' starts or resets CI; drafts never run paid CI.
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+  merge_group:
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.merge_group.head_ref || github.ref }}
   cancel-in-progress: true
 
 env:
@@ -23,9 +27,45 @@ env:
   ZO_FILE_PUSH_INTERVAL: 1
 
 jobs:
+  check_changes:
+    # Paid CI runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests on the merged code.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
+    name: check_changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+    steps:
+      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      - if: github.event_name == 'pull_request'
+        run: sleep 60
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      # One shared classification for every suite (see .github/actions/classify-changes); a change to
+      # this workflow file re-tests itself on top of it.
+      - uses: ./.github/actions/classify-changes
+        id: classify
+      - id: check
+        env:
+          HAS_CHANGES: ${{ steps.classify.outputs.run_db }}
+          CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
+        run: |
+          if [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' db-testing.yml '; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
   db_validation_tests:
     name: db_validation_tests
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubicloud-standard-8
+    env:
+      CARGO_PROFILE_DEV_DEBUG: "0"
     permissions:
       contents: read
 
@@ -51,16 +91,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: nightly-2025-11-11
+          toolchain: nightly-2026-05-20
 
       - name: Setup Rust Cache
         uses: Swatinem/rust-cache@v2
         with:
-          cache-on-failure: true
-          prefix-key: db-testing
+          # This successful main-branch build is the single writer for the
+          # canonical dev(debug=0)+mimalloc cache consumed by API and DB PRs.
+          shared-key: backend-debug0-mimalloc-deps-v1
+          add-job-id-key: false
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
       - name: Install Protoc
         run: |
@@ -70,7 +114,8 @@ jobs:
         run: cargo build --features mimalloc
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
+        id: setup-python
         with:
           python-version: "3.11.6"
 
@@ -112,6 +157,9 @@ jobs:
 
       - name: Setup rye
         uses: eifinger/setup-rye@v4
+        env:
+          # Reuse setup-python's interpreter so `rye self install` skips the flaky toolchain download.
+          RYE_TOOLCHAIN: ${{ steps.setup-python.outputs.python-path }}
         with:
           enable-cache: false
           working-directory: "tests/db-testing/"
@@ -184,11 +232,15 @@ jobs:
   db_tests_summary:
     runs-on: ubuntu-latest
     permissions: {}
-    needs: [db_validation_tests]
-    if: always()
+    needs: [check_changes, db_validation_tests]
+    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
         run: |
+          if [ "${{ needs.check_changes.result }}" != "success" ]; then
+            echo "check_changes job did not succeed: ${{ needs.check_changes.result }}"
+            exit 1
+          fi
           if [ "${{ needs.db_validation_tests.result }}" == "success" ] || [ "${{ needs.db_validation_tests.result }}" == "skipped" ]; then
             echo "DB validation tests passed or skipped"
             exit 0

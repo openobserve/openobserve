@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,119 +16,292 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    class="tw:flex tw:items-center tw:border-b tw:cursor-pointer hover:tw:bg-[var(--o2-hover-gray)] table-row-hover"
+    class="border-border-default hover:bg-hover-gray relative flex cursor-pointer gap-3 border-b py-1.5 transition-colors duration-150 ease-in-out"
+    :class="wrap ? 'items-start' : 'items-center'"
     @click="$emit('click', pattern, index)"
     :data-test="`pattern-card-${index}`"
   >
-    <!-- Pattern Column -->
-    <div class="tw:flex-1 tw:min-w-0 tw:px-2">
+    <!-- Status level left border (colored via currentColor from the severity class) -->
+    <div class="absolute inset-y-0 left-0 z-10 w-1 bg-current" :class="severityClass" />
+
+    <!-- Count + share bar -->
+    <div class="w-28 flex-shrink-0 ps-3 pe-1">
       <div
-        class="tw:truncate pattern-template-text"
-        :class="store.state.theme === 'dark' ? 'text-grey-4' : 'text-grey-8'"
-        :data-test="`pattern-card-${index}-template`"
-        :title="pattern.template"
+        class="text-text-body text-sm font-bold tabular-nums"
+        :data-test="`pattern-card-${index}-frequency`"
+        :title="
+          volumeCount !== null
+            ? t('logs.patternList.exactCountTooltip', { count: volumeCount.toLocaleString() })
+            : undefined
+        "
       >
-        {{ pattern.template }}
+        {{ countLabel }}
       </div>
-      <span
-        v-if="pattern.is_anomaly"
-        class="text-negative text-weight-bold tw:text-[0.625rem]"
-        :data-test="`pattern-card-${index}-anomaly-badge`"
-        >⚠️ {{ t("search.anomalyLabel") }}</span
+      <div
+        class="text-2xs text-text-secondary tabular-nums"
+        :data-test="`pattern-card-${index}-percentage`"
       >
+        {{ percentageLabel }}
+      </div>
+      <div class="bg-card-glass-border mt-1 h-1 overflow-hidden rounded-full">
+        <div
+          class="h-full rounded-full bg-current opacity-60"
+          :class="[severityClass, shareWidthClass]"
+        />
+      </div>
     </div>
 
-    <!-- Occurrence Column -->
-    <div class="tw:w-16 tw:flex-shrink-0 tw:px-2 tw:text-right">
+    <!-- Volume sparkline -->
+    <div class="flex w-44 flex-shrink-0 items-center">
+      <PatternVolumeCell :pattern="pattern" :color-class="severityClass" @volume="onVolume" />
+    </div>
+
+    <!-- Status -->
+    <div class="flex w-20 flex-shrink-0 items-center gap-1.5">
+      <span class="h-2 w-2 shrink-0 rounded-full bg-current" :class="severityClass" />
       <span
-        class="text-weight-bold text-primary"
-        :data-test="`pattern-card-${index}-frequency`"
+        class="truncate text-xs font-medium"
+        :class="severityClass"
+        :data-test="`pattern-card-${index}-status`"
       >
-        {{ pattern.frequency.toLocaleString() }}
+        {{ statusLabel }}
       </span>
     </div>
 
-    <!-- Percentage Column -->
-    <div class="tw:w-14 tw:flex-shrink-0 tw:px-2 tw:text-right">
-      <span
-        class="text-weight-bold text-primary"
-        :data-test="`pattern-card-${index}-percentage`"
-        >{{ pattern.percentage.toFixed(2) }}%</span
-      >
+    <!-- Service -->
+    <div
+      class="flex w-32 min-w-0 flex-shrink-0 items-center gap-1"
+      :data-test="`pattern-card-${index}-service`"
+    >
+      <template v-if="pattern.service">
+        <span class="text-text-secondary truncate text-xs">{{ pattern.service }}</span>
+        <span
+          v-if="pattern.service_other_count > 0"
+          class="text-2xs text-text-secondary bg-card-glass-solid border-border-default rounded-default shrink-0 border border-solid px-1"
+        >
+          +{{ pattern.service_other_count }}
+          <OTooltip
+            :content="t('logs.patternList.serviceOthers', { count: pattern.service_other_count })"
+          />
+        </span>
+      </template>
+      <span v-else class="text-2xs text-text-muted">—</span>
     </div>
 
-    <!-- Actions Column -->
-    <div class="tw:w-20 tw:flex-shrink-0 tw:px-2 tw:flex tw:items-center">
-      <q-btn
-        size="6px"
-        @click.stop="$emit('include', pattern)"
-        :title="t('search.includePatternInSearch')"
-        round
-        :data-test="`pattern-card-${index}-include-btn`"
+    <!-- Message: badges row + tokenized template -->
+    <div class="min-w-0 flex-1" :class="wrap ? '' : 'overflow-hidden'">
+      <!-- Trend / rarity / anomaly badges -->
+      <div
+        v-if="badges.length || pattern.is_anomaly"
+        class="mb-1 flex flex-wrap items-center gap-1"
       >
-        <q-icon style="height: 8px; width: 8px">
-          <EqualIcon></EqualIcon>
-        </q-icon>
-      </q-btn>
-      <q-btn
-        size="6px"
-        @click.stop="$emit('exclude', pattern)"
-        :title="t('search.excludePatternFromSearch')"
-        round
-        :data-test="`pattern-card-${index}-exclude-btn`"
+        <span
+          v-for="badge in badges"
+          :key="badge.key"
+          class="rounded-default text-2xs inline-flex cursor-help items-center px-1 font-bold tracking-wide uppercase"
+          :class="badge.class"
+          :data-test="`pattern-card-${index}-badge-${badge.key}`"
+        >
+          {{ badge.label }}
+          <OTooltip :content="raw(badge.desc)" />
+        </span>
+        <span
+          v-if="pattern.is_anomaly"
+          class="rounded-default text-2xs text-status-error-text bg-status-error-bg inline-flex cursor-help items-center px-1 font-bold tracking-wide uppercase"
+          :data-test="`pattern-card-${index}-anomaly-badge`"
+        >
+          {{ t("search.anomalyLabel") }}
+          <OTooltip :content="raw(anomalyExplanationText)" max-width="22rem" />
+        </span>
+      </div>
+
+      <!-- Continuous message line with variable segments highlighted inline
+           (amber), no pill; constant text stays plain. -->
+      <div
+        class="text-text-secondary w-full font-mono text-xs"
+        :class="
+          wrap ? 'break-all whitespace-pre-wrap' : 'overflow-hidden text-ellipsis whitespace-pre'
+        "
+        :data-test="`pattern-card-${index}-template`"
       >
-        <q-icon style="height: 8px; width: 8px">
-          <NotEqualIcon></NotEqualIcon>
-        </q-icon>
-      </q-btn>
-      <q-btn
-        size="6px"
-        class="cursor-pointer"
-        round
-        :data-test="`pattern-card-${index}-details-icon`"
-        @click.stop="$emit('click', pattern, index)"
-      >
-        <q-icon name="info" style="height: 8px; width: 8px">
-          <q-tooltip>{{
-            t("search.showPatternDetails", {
-              variables: pattern.examples?.[0]?.variables
-                ? Object.keys(pattern.examples[0].variables).length
-                : 0,
-              examples: pattern.examples?.length || 0,
-            })
-          }}</q-tooltip>
-        </q-icon>
-      </q-btn>
+        <template v-for="(tok, i) in templateTokens" :key="i">
+          <span v-if="tok.kind === 'text'">
+            <template v-for="(seg, si) in highlightLevels(tok.value)" :key="si">
+              <span v-if="seg.colorClass" :class="seg.colorClass" class="font-bold">{{
+                seg.text
+              }}</span>
+              <span v-else>{{ seg.text }}</span>
+            </template>
+          </span>
+          <span
+            v-else
+            class="rounded-default bg-pattern-var-bg text-pattern-var-text px-0.5"
+            data-test="pattern-card-wildcard-chip"
+            @mouseenter="onMouseEnter(tok.value, tok.sampleValues, $event)"
+            @mouseleave="onMouseLeave"
+            >{{ tok.mask ?? wildcardLabel(tok.value, tok.sampleValues) }}</span
+          >
+        </template>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
-import EqualIcon from "@/components/icons/EqualIcon.vue";
-import NotEqualIcon from "@/components/icons/NotEqualIcon.vue";
+import { computed, ref } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import PatternVolumeCell from "./PatternVolumeCell.vue";
+import {
+  tokenizeTemplate,
+  wildcardLabel,
+  anomalyExplanation,
+} from "@/composables/useLogs/useTemplateTokenizer";
+import {
+  patternSeverityKeyForPattern,
+  severityTextClass,
+  patternTrendBadge,
+  levelColorClass,
+  compactCount,
+  LEVEL_KEYWORD_PATTERN,
+  PATTERN_BADGES,
+  type PatternSeverityKey,
+} from "./patternUtils";
+import useWildcardHover from "./useWildcardHover";
 
-defineProps<{
+const props = defineProps<{
   pattern: any;
   index: number;
+  wrap?: boolean;
+  /** Highest display count across the (filtered) pattern set — scales the share bar. */
+  maxFrequency?: number;
 }>();
 
 defineEmits<{
   (e: "click", pattern: any, index: number): void;
-  (e: "include", pattern: any): void;
-  (e: "exclude", pattern: any): void;
 }>();
 
-const store = useStore();
-const { t } = useI18n();
-</script>
+const { t } = useI18nTyped();
+const { onMouseEnter, onMouseLeave } = useWildcardHover();
 
-<style scoped lang="scss">
-@import "@/styles/logs/search-result.scss";
+const templateTokens = computed(() =>
+  tokenizeTemplate(props.pattern.template ?? "", props.pattern.wildcard_values ?? []),
+);
 
-.pattern-template-text {
-  font-family: monospace;
-  font-size: 12px;
+const anomalyExplanationText = computed(() => anomalyExplanation(props.pattern, t));
+
+// Window-wide occurrences for this pattern, reported by the volume cell once
+// its lazy query resolves. Until then we show the extraction sample's count.
+//
+// Marked `~` because it counts logs matching the template's constant text via
+// match_all(), which is a superset of the pattern's own logs — a real magnitude
+// for THIS pattern, but not a slice of a partition, so it is never summed.
+const volumeCount = ref<number | null>(null);
+const volumeBuckets = ref<number[] | null>(null);
+// null clears both — on a re-run the cell reports null before the new volume
+// arrives, so the row falls back to the sample count and drops its trend badge
+// instead of displaying figures from the previous query window.
+const onVolume = (volume: { total: number; buckets: number[] } | null) => {
+  volumeCount.value = volume?.total ?? null;
+  volumeBuckets.value = volume?.buckets ?? null;
+};
+
+const countLabel = computed(() =>
+  volumeCount.value !== null
+    ? `~${compactCount(volumeCount.value)}`
+    : (props.pattern.frequency ?? 0).toLocaleString(),
+);
+
+// Share of the analyzed sample — a clean partition (every analyzed log belongs
+// to exactly one pattern), so these percentages sum to ~100%.
+const percentageLabel = computed(() => `${(props.pattern.percentage ?? 0).toFixed(2)}%`);
+
+const severityKey = computed<PatternSeverityKey>(() => patternSeverityKeyForPattern(props.pattern));
+const severityClass = computed(() => severityTextClass(severityKey.value));
+
+const STATUS_LABEL_KEY: Record<PatternSeverityKey, string> = {
+  error: "logs.patternList.statusError",
+  warning: "logs.patternList.statusWarning",
+  info: "logs.patternList.statusInfo",
+  debug: "logs.patternList.statusDebug",
+  uncategorized: "logs.patternList.statusUncategorized",
+};
+const statusLabel = computed(() => t(STATUS_LABEL_KEY[severityKey.value]));
+
+// Share bar width: snap the frequency-vs-max ratio to twelfths (rem-free,
+// no inline style). Zero when there's no max to compare against.
+const SHARE_WIDTHS = [
+  "w-1/12",
+  "w-2/12",
+  "w-3/12",
+  "w-4/12",
+  "w-5/12",
+  "w-6/12",
+  "w-7/12",
+  "w-8/12",
+  "w-9/12",
+  "w-10/12",
+  "w-11/12",
+];
+const shareWidthClass = computed(() => {
+  const max = props.maxFrequency ?? 0;
+  const freq = props.pattern.frequency ?? 0;
+  if (max <= 0 || freq <= 0) return "w-0";
+  const twelfths = Math.min(12, Math.max(1, Math.round((freq / max) * 12)));
+  return twelfths >= 12 ? "w-full" : SHARE_WIDTHS[twelfths - 1];
+});
+
+// Trend + rarity badges, sourced from the shared PATTERN_BADGES definitions.
+// Each carries a `desc` shown as a hover tooltip (replacing the standalone
+// legend), so the meaning is available in-context on every instance.
+const badges = computed(() => {
+  const out: { key: string; label: string; class: string; desc: string }[] = [];
+  const pushBadge = (key: string) => {
+    const def = PATTERN_BADGES[key];
+    out.push({ key, label: t(def.labelKey), class: def.class, desc: t(def.descKey) });
+  };
+  // Trend comes from the fetched histogram — TRUE volume over the window — not
+  // from `pattern.time_buckets`. Those are the extraction sample, and the
+  // sampler deliberately gives every time slice a roughly equal row quota, so a
+  // real traffic spike flattens out and quiet slices are over-weighted. Reading
+  // them as volume made 78 of 115 patterns claim "drop" on the same data.
+  // No badge until the volume lands: silence beats a confident wrong signal.
+  const trend = patternTrendBadge(volumeBuckets.value);
+  if (trend) {
+    pushBadge(trend);
+  }
+  if ((props.pattern.percentage ?? 100) < 1) {
+    pushBadge("rare");
+  }
+  return out;
+});
+
+interface HighlightSegment {
+  text: string;
+  colorClass: string | null;
 }
-</style>
+
+// Color level keywords inside constant text. Both the keyword list and the
+// color mapping come from patternUtils, so they can't drift from the status
+// column / severity chips (a fresh regex per call keeps lastIndex clean).
+function highlightLevels(text: string): HighlightSegment[] {
+  const segments: HighlightSegment[] = [];
+  let lastIndex = 0;
+  const re = new RegExp(`\\b(${LEVEL_KEYWORD_PATTERN})\\b`, "gi");
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(text)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({ text: text.slice(lastIndex, match.index), colorClass: null });
+    }
+    segments.push({
+      text: match[0],
+      colorClass: levelColorClass(match[0]),
+    });
+    lastIndex = match.index + match[0].length;
+  }
+  if (lastIndex < text.length) {
+    segments.push({ text: text.slice(lastIndex), colorClass: null });
+  }
+  return segments;
+}
+</script>

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,6 +21,12 @@ vi.mock("@/aws-exports", () => ({
   },
 }));
 
+// Mock toast
+const mockToast = vi.fn();
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: (...args: any[]) => mockToast(...args),
+}));
+
 // Mock incidents service
 vi.mock("@/services/incidents", () => ({
   default: {
@@ -28,32 +34,43 @@ vi.mock("@/services/incidents", () => ({
     updateStatus: vi.fn(),
     triggerRca: vi.fn(),
     getCorrelatedStreams: vi.fn(),
+    getEvents: vi.fn(),
+    updateIncident: vi.fn(),
   },
+}));
+
+// Mock service streams API
+vi.mock("@/services/service_streams", () => ({
+  default: {
+    getSemanticGroups: vi.fn(),
+  },
+  buildChipDimensionsFromFilters: vi.fn(() => ({})),
 }));
 
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import IncidentDetailDrawer from "./IncidentDetailDrawer.vue";
-import incidentsService, { Incident, IncidentWithAlerts, IncidentAlert } from "@/services/incidents";
+import { resolveBadge } from "@/lib/core/Badge/badgeGroups";
+import incidentsService, {
+  Incident,
+  IncidentWithAlerts,
+  IncidentAlert,
+} from "@/services/incidents";
+import serviceStreamsApi, { buildChipDimensionsFromFilters } from "@/services/service_streams";
 import { nextTick } from "vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
-// Install Quasar globally
-installQuasar({ plugins: [Dialog, Notify] });
-
 // Test data factory
 const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   id: overrides.id || "incident-1",
   org_id: overrides.org_id || "org-1",
-  correlation_key: overrides.correlation_key || "key-1",
+  key_type: overrides.key_type || "key-1",
   status: overrides.status || "open",
   severity: overrides.severity || "P1",
   title: overrides.title || "Test Incident",
-  stable_dimensions: overrides.stable_dimensions || { service: "test-service" },
+  group_values: overrides.group_values || { service: "test-service" },
   alert_count: overrides.alert_count !== undefined ? overrides.alert_count : 5,
   first_alert_at: overrides.first_alert_at || 1700000000000000,
   last_alert_at: overrides.last_alert_at || 1700000000000000,
@@ -63,7 +80,9 @@ const createIncident = (overrides: Partial<Incident> = {}): Incident => ({
   topology_context: overrides.topology_context,
 });
 
-const createIncidentWithAlerts = (overrides: Partial<IncidentWithAlerts> = {}): IncidentWithAlerts => ({
+const createIncidentWithAlerts = (
+  overrides: Partial<IncidentWithAlerts> = {},
+): IncidentWithAlerts => ({
   ...createIncident(overrides),
   alerts: overrides.alerts || [],
   triggers: overrides.triggers || [],
@@ -104,20 +123,45 @@ describe("IncidentDetailDrawer.vue", () => {
       global: {
         plugins: [i18n, store, router],
         stubs: {
-          QPage: true,
           IncidentServiceGraph: true,
           SREChat: true,
           // Use custom stubs that accept props so we can test them
           TelemetryCorrelationDashboard: {
-            name: 'TelemetryCorrelationDashboard',
+            name: "TelemetryCorrelationDashboard",
             template: '<div class="telemetry-stub"></div>',
-            props: ['mode', 'externalActiveTab', 'serviceName', 'matchedDimensions', 'additionalDimensions', 'logStreams', 'metricStreams', 'traceStreams', 'timeRange', 'hideDimensionFilters']
+            props: [
+              "mode",
+              "externalActiveTab",
+              "serviceName",
+              "matchedDimensions",
+              "additionalDimensions",
+              "matchedSetId",
+              "chipDimensions",
+              "logStreams",
+              "metricStreams",
+              "traceStreams",
+              "timeRange",
+              "hideDimensionFilters",
+            ],
           },
           CorrelatedLogsTable: {
-            name: 'CorrelatedLogsTable',
+            name: "CorrelatedLogsTable",
             template: '<div class="logs-stub"></div>',
-            props: ['serviceName', 'sourceStream', 'sourceType', 'hideViewRelatedButton', 'hideDimensionFilters', 'matchedDimensions', 'availableDimensions', 'additionalDimensions', 'logStreams', 'ftsFields', 'timeRange', 'hideSearchTermActions'],
-            emits: ['sendToAiChat']
+            props: [
+              "serviceName",
+              "sourceStream",
+              "sourceType",
+              "hideViewRelatedButton",
+              "hideDimensionFilters",
+              "matchedDimensions",
+              "availableDimensions",
+              "additionalDimensions",
+              "logStreams",
+              "ftsFields",
+              "timeRange",
+              "hideSearchTermActions",
+            ],
+            emits: ["sendToAiChat"],
           },
         },
       },
@@ -157,6 +201,19 @@ describe("IncidentDetailDrawer.vue", () => {
     (incidentsService.triggerRca as any).mockResolvedValue({
       data: { rca_content: "## Root Cause Analysis\n\nThe issue is related to high CPU usage." },
     });
+
+    (incidentsService.getEvents as any).mockResolvedValue({
+      data: { events: [] },
+    });
+
+    (incidentsService.updateIncident as any).mockResolvedValue({
+      data: { severity: "P2" },
+    });
+
+    // Mock service streams API
+    (serviceStreamsApi.getSemanticGroups as any).mockResolvedValue({
+      data: [],
+    });
   });
 
   afterEach(() => {
@@ -195,13 +252,16 @@ describe("IncidentDetailDrawer.vue", () => {
   describe("URL-based Incident Loading", () => {
     it("should emit close when drawer closes", async () => {
       wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.close();
       await nextTick();
 
       // Should navigate back to incident list instead of emitting
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "incidentList",
+        query: { org_identifier: "default" },
+      });
     });
 
     it("should load details when incident_id is in URL", async () => {
@@ -236,14 +296,27 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should set loading state during fetch", async () => {
+      // Create a pending promise that we can control
+      let resolvePromise: (value: any) => void;
+      const pendingPromise = new Promise((resolve) => {
+        resolvePromise = resolve;
+      });
+
+      (incidentsService.get as any).mockReturnValue(pendingPromise);
+
       wrapper = await createWrapper({}, {}, "test-123");
 
       await nextTick();
 
-      // Loading should be true during fetch
-      // But may complete quickly, so just verify it was called
-      await flushPromises();
+      // Now loading should be true since the promise is pending
+      expect(wrapper.vm.loading).toBe(true);
 
+      // Resolve the promise
+      resolvePromise!({ data: createIncidentWithAlerts({ id: "test-123" }) });
+      await flushPromises();
+      await nextTick(); // Give Vue time to update reactive state
+
+      // Now loading should be false
       expect(incidentsService.get).toHaveBeenCalled();
       expect(wrapper.vm.loading).toBe(false);
     });
@@ -302,21 +375,13 @@ describe("IncidentDetailDrawer.vue", () => {
     it("should acknowledge incident", async () => {
       await wrapper.vm.acknowledgeIncident();
 
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "default",
-        "1",
-        "acknowledged"
-      );
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "acknowledged");
     });
 
     it("should resolve incident", async () => {
       await wrapper.vm.resolveIncident();
 
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "default",
-        "1",
-        "resolved"
-      );
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "resolved");
     });
 
     it("should reopen incident", async () => {
@@ -325,11 +390,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
       await wrapper.vm.reopenIncident();
 
-      expect(incidentsService.updateStatus).toHaveBeenCalledWith(
-        "default",
-        "1",
-        "open"
-      );
+      expect(incidentsService.updateStatus).toHaveBeenCalledWith("default", "1", "open");
     });
 
     it("should set updating state during status update", async () => {
@@ -343,13 +404,13 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should show success notification on status update", async () => {
-      const mockNotify = vi.fn();
-      wrapper.vm.$q.notify = mockNotify;
+      mockToast.mockClear();
 
       await wrapper.vm.acknowledgeIncident();
 
-      expect(mockNotify).toHaveBeenCalled();
-      expect(mockNotify.mock.calls[0][0].type).toBe("positive");
+      expect(mockToast).toHaveBeenCalled();
+      const call = mockToast.mock.calls[0][0];
+      expect(call.variant).toBe("success");
     });
 
     it("should not emit status-updated event (removed)", async () => {
@@ -362,15 +423,14 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should handle status update error", async () => {
-      const mockNotify = vi.fn();
+      mockToast.mockClear();
       (incidentsService.updateStatus as any).mockRejectedValue(new Error("Update failed"));
-
-      wrapper.vm.$q.notify = mockNotify;
 
       await wrapper.vm.acknowledgeIncident();
 
-      expect(mockNotify).toHaveBeenCalled();
-      expect(mockNotify.mock.calls[0][0].type).toBe("negative");
+      expect(mockToast).toHaveBeenCalled();
+      const call = mockToast.mock.calls[0][0];
+      expect(call.variant).toBe("error");
     });
 
     it("should update local incident state on success", async () => {
@@ -378,7 +438,6 @@ describe("IncidentDetailDrawer.vue", () => {
         data: { status: "acknowledged", updated_at: 1700000001000000 },
       });
 
-      const originalStatus = wrapper.vm.incidentDetails.status;
       await wrapper.vm.acknowledgeIncident();
 
       expect(wrapper.vm.incidentDetails.status).toBe("acknowledged");
@@ -425,7 +484,12 @@ describe("IncidentDetailDrawer.vue", () => {
     it("should trigger RCA analysis", async () => {
       await wrapper.vm.triggerRca();
 
-      expect(incidentsService.triggerRca).toHaveBeenCalledWith("default", "1");
+      expect(incidentsService.triggerRca).toHaveBeenCalledWith(
+        "default",
+        "1",
+        { build_on_previous: false },
+        expect.objectContaining({ signal: expect.anything() }),
+      );
     });
 
     it("should set loading state during RCA", async () => {
@@ -445,13 +509,13 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should show success notification after RCA", async () => {
-      const mockNotify = vi.fn();
-      wrapper.vm.$q.notify = mockNotify;
+      mockToast.mockClear();
 
       await wrapper.vm.triggerRca();
 
-      expect(mockNotify).toHaveBeenCalled();
-      expect(mockNotify.mock.calls[0][0].type).toBe("positive");
+      expect(mockToast).toHaveBeenCalled();
+      const successCall = mockToast.mock.calls.find((c: any[]) => c[0].variant === "success");
+      expect(successCall).toBeTruthy();
     });
 
     it("should reload incident details after RCA", async () => {
@@ -464,15 +528,14 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should handle RCA error", async () => {
-      const mockNotify = vi.fn();
+      mockToast.mockClear();
       (incidentsService.triggerRca as any).mockRejectedValue(new Error("RCA failed"));
-
-      wrapper.vm.$q.notify = mockNotify;
 
       await wrapper.vm.triggerRca();
 
-      expect(mockNotify).toHaveBeenCalled();
-      expect(mockNotify.mock.calls[0][0].type).toBe("negative");
+      expect(mockToast).toHaveBeenCalled();
+      const errCall = mockToast.mock.calls.find((c: any[]) => c[0].variant === "error");
+      expect(errCall).toBeTruthy();
     });
 
     it("should clear RCA content on error", async () => {
@@ -520,7 +583,7 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(contextData).toHaveProperty("alert_count");
       expect(contextData).toHaveProperty("first_alert_at");
       expect(contextData).toHaveProperty("last_alert_at");
-      expect(contextData).toHaveProperty("stable_dimensions");
+      expect(contextData).toHaveProperty("group_values");
       expect(contextData).toHaveProperty("topology_context");
       expect(contextData).toHaveProperty("triggers");
       expect(contextData).toHaveProperty("rca_analysis");
@@ -558,25 +621,24 @@ describe("IncidentDetailDrawer.vue", () => {
     });
   });
 
-  describe("Utility Functions - Status Colors", () => {
-    beforeEach(async () => {
-      wrapper = await createWrapper();
+  describe("Utility Functions - Status Variants (registry incidentStatus)", () => {
+    it("open → error-soft", () => {
+      expect(resolveBadge("incidentStatus", "open").variant).toBe("error-soft");
     });
-
-    it("should return correct color for open status", () => {
-      expect(wrapper.vm.getStatusColor("open")).toBe("negative");
+    it("acknowledged → warning-soft", () => {
+      expect(resolveBadge("incidentStatus", "acknowledged").variant).toBe("warning-soft");
     });
-
-    it("should return correct color for acknowledged status", () => {
-      expect(wrapper.vm.getStatusColor("acknowledged")).toBe("orange");
+    it("resolved → success-soft", () => {
+      expect(resolveBadge("incidentStatus", "resolved").variant).toBe("success-soft");
     });
-
-    it("should return correct color for resolved status", () => {
-      expect(wrapper.vm.getStatusColor("resolved")).toBe("positive");
+    it("unknown → default-soft (fallback)", () => {
+      expect(resolveBadge("incidentStatus", "unknown").variant).toBe("default-soft");
     });
-
-    it("should return grey for unknown status", () => {
-      expect(wrapper.vm.getStatusColor("unknown")).toBe("grey");
+    it("severity P1–P4 → error/orange/amber/blue-soft", () => {
+      expect(resolveBadge("severity", "P1").variant).toBe("error-soft");
+      expect(resolveBadge("severity", "P2").variant).toBe("orange-soft");
+      expect(resolveBadge("severity", "P3").variant).toBe("amber-soft");
+      expect(resolveBadge("severity", "P4").variant).toBe("blue-soft");
     });
   });
 
@@ -655,23 +717,26 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "This is **bold** text";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw:font-semibold">bold</strong>');
+      expect(formatted).toContain('<strong class="font-semibold">bold</strong>');
     });
 
     it("should format h2 headers", () => {
       const content = "## Header 2";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw:font-bold");
-      expect(formatted).toContain("tw:text-lg");
-      expect(formatted).toContain("tw:text-blue-600");
+      expect(formatted).toContain("font-bold");
+      expect(formatted).toContain("text-lg");
+      // Colour comes from the `:deep(.rca-report-content) .rca-h2` rule in
+      // IncidentRCAAnalysis.vue (unlayered, so it beat the old text-blue-600
+      // utility anyway) — the hook class is what this renderer must emit.
+      expect(formatted).toContain("rca-h2");
     });
 
     it("should format h3 headers", () => {
       const content = "### Header 3";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain("tw:font-semibold");
+      expect(formatted).toContain("font-semibold");
     });
 
     it("should format unordered lists", () => {
@@ -695,8 +760,8 @@ describe("IncidentDetailDrawer.vue", () => {
       const content = "## Root Cause\n\n**Issue**: High CPU\n\n- Check process\n- Review logs";
       const formatted = wrapper.vm.formatRcaContent(content);
 
-      expect(formatted).toContain('<strong class="tw:font-semibold">Issue</strong>');
-      expect(formatted).toContain("tw:font-bold");
+      expect(formatted).toContain('<strong class="font-semibold">Issue</strong>');
+      expect(formatted).toContain("font-bold");
       expect(formatted).toContain("rca-ul");
     });
   });
@@ -769,7 +834,9 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should display topology edges", () => {
       expect(wrapper.vm.incidentDetails.topology_context.edges).toHaveLength(1);
-      expect(wrapper.vm.incidentDetails.topology_context.edges[0].edge_type).toBe("service_dependency");
+      expect(wrapper.vm.incidentDetails.topology_context.edges[0].edge_type).toBe(
+        "service_dependency",
+      );
     });
   });
 
@@ -816,7 +883,7 @@ describe("IncidentDetailDrawer.vue", () => {
 
     it("should handle empty dimensions", async () => {
       (incidentsService.get as any).mockResolvedValue({
-        data: createIncidentWithAlerts({ id: "test-123", stable_dimensions: {} }),
+        data: createIncidentWithAlerts({ id: "test-123", group_values: {} }),
       });
 
       wrapper = await createWrapper({}, {}, "test-123");
@@ -824,7 +891,7 @@ describe("IncidentDetailDrawer.vue", () => {
       await nextTick();
       await flushPromises();
 
-      expect(wrapper.vm.incidentDetails.stable_dimensions).toEqual({});
+      expect(wrapper.vm.incidentDetails.group_values).toEqual({});
     });
 
     it("should handle resolved incident with timestamp", async () => {
@@ -848,24 +915,30 @@ describe("IncidentDetailDrawer.vue", () => {
   describe("Close Functionality", () => {
     it("should close drawer", async () => {
       wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.close();
       await nextTick();
 
       // Should navigate back to incident list
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "incidentList",
+        query: { org_identifier: "default" },
+      });
     });
 
     it("should navigate back to incident list on close", async () => {
       wrapper = await createWrapper();
-      const pushSpy = vi.spyOn(router, 'push');
+      const pushSpy = vi.spyOn(router, "push");
 
       wrapper.vm.close();
       await nextTick();
 
       // Verify navigation to incident list
-      expect(pushSpy).toHaveBeenCalledWith({ name: "incidentList", query: { org_identifier: "default" } });
+      expect(pushSpy).toHaveBeenCalledWith({
+        name: "incidentList",
+        query: { org_identifier: "default" },
+      });
     });
   });
 
@@ -874,7 +947,7 @@ describe("IncidentDetailDrawer.vue", () => {
       wrapper = await createWrapper(
         {},
         { selectedOrganization: { identifier: "custom-org" } },
-        "test-123"
+        "test-123",
       );
 
       await nextTick();
@@ -886,11 +959,7 @@ describe("IncidentDetailDrawer.vue", () => {
     it("should use organization in status updates", async () => {
       (incidentsService.updateStatus as any).mockResolvedValue({});
 
-      wrapper = await createWrapper(
-        {},
-        { selectedOrganization: { identifier: "org-123" } },
-        "1"
-      );
+      wrapper = await createWrapper({}, { selectedOrganization: { identifier: "org-123" } }, "1");
 
       await nextTick();
       await flushPromises();
@@ -900,16 +969,12 @@ describe("IncidentDetailDrawer.vue", () => {
       expect(incidentsService.updateStatus).toHaveBeenCalledWith(
         "org-123",
         expect.any(String),
-        "acknowledged"
+        "acknowledged",
       );
     });
 
     it("should use organization in RCA trigger", async () => {
-      wrapper = await createWrapper(
-        {},
-        { selectedOrganization: { identifier: "org-456" } },
-        "1"
-      );
+      wrapper = await createWrapper({}, { selectedOrganization: { identifier: "org-456" } }, "1");
 
       await nextTick();
       await flushPromises();
@@ -918,7 +983,9 @@ describe("IncidentDetailDrawer.vue", () => {
 
       expect(incidentsService.triggerRca).toHaveBeenCalledWith(
         "org-456",
-        expect.any(String)
+        expect.any(String),
+        { build_on_previous: false },
+        expect.objectContaining({ signal: expect.anything() }),
       );
     });
   });
@@ -1020,9 +1087,9 @@ describe("IncidentDetailDrawer.vue", () => {
       // This test verifies the fix: uniqueness should be by alert_id, not alert_name
       const triggers = [
         createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-2", alert_name: "High CPU" }),  // Same name, different ID
+        createAlert({ alert_id: "alert-2", alert_name: "High CPU" }), // Same name, different ID
         createAlert({ alert_id: "alert-1", alert_name: "High CPU" }),
-        createAlert({ alert_id: "alert-3", alert_name: "High CPU" }),  // Same name, different ID
+        createAlert({ alert_id: "alert-3", alert_name: "High CPU" }), // Same name, different ID
       ];
 
       (incidentsService.get as any).mockResolvedValue({
@@ -1112,9 +1179,7 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should derive alerts from triggers instead of API alerts array", async () => {
-      const triggers = [
-        createAlert({ alert_id: "trigger-alert-1", alert_name: "From Triggers" }),
-      ];
+      const triggers = [createAlert({ alert_id: "trigger-alert-1", alert_name: "From Triggers" })];
 
       (incidentsService.get as any).mockResolvedValue({
         data: {
@@ -1168,8 +1233,9 @@ describe("IncidentDetailDrawer.vue", () => {
     });
 
     it("should have translation for fired times with parameter", () => {
-      const translation = wrapper.vm.t("alerts.incidents.firedTimes", { count: 5 });
-      expect(translation).toBe("Fired 5 time(s)");
+      // Pipe plural: `count` in the named bag selects the branch AND fills {count}.
+      expect(wrapper.vm.t("alerts.incidents.firedTimes", { count: 5 })).toBe("Fired 5 times");
+      expect(wrapper.vm.t("alerts.incidents.firedTimes", { count: 1 })).toBe("Fired 1 time");
     });
 
     it("should have translation for refresh correlated data", () => {
@@ -1199,8 +1265,245 @@ describe("IncidentDetailDrawer.vue", () => {
   // Testing child component prop bindings through complex conditional rendering is problematic
   // These should be tested through computed properties and direct prop assertions
 
+  describe("subject tabs (View by) — matchedSetId / chipDimensions", () => {
+    // Regression: the embedded TelemetryCorrelationDashboard never received
+    // matchedSetId/chipDimensions, so its "View by" subject toggle never rendered.
+    const correlatedStreamsWithSet = () => ({
+      serviceName: "checkout",
+      matchedDimensions: { "k8s-pod-name": "pod-abc" },
+      additionalDimensions: {},
+      logStreams: [],
+      metricStreams: [
+        {
+          stream_name: "k8s_metrics",
+          stream_type: "Metrics",
+          filters: { k8s_pod_name: "pod-abc" },
+        },
+      ],
+      traceStreams: [],
+      correlationData: {
+        service_name: "checkout",
+        matched_dimensions: { "k8s-pod-name": "pod-abc" },
+        additional_dimensions: {},
+        related_streams: {
+          logs: [],
+          metrics: [
+            {
+              stream_name: "k8s_metrics",
+              stream_type: "Metrics",
+              filters: { k8s_pod_name: "pod-abc" },
+            },
+          ],
+          traces: [],
+        },
+        matched_set_id: "kubernetes",
+      },
+    });
+
+    beforeEach(async () => {
+      (buildChipDimensionsFromFilters as any).mockReturnValue({ k8s_pod_name: "pod-abc" });
+      wrapper = await createWrapper({}, {}, "1");
+      await nextTick();
+      await flushPromises();
+    });
+
+    it("should expose matched_set_id as correlationMatchedSetId after correlation loads", async () => {
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(correlatedStreamsWithSet());
+
+      await wrapper.vm.refreshCorrelation();
+      await flushPromises();
+
+      expect(wrapper.vm.correlationMatchedSetId).toBe("kubernetes");
+    });
+
+    it("should build chipDimensions from the correlation response and semantic groups", async () => {
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(correlatedStreamsWithSet());
+
+      await wrapper.vm.refreshCorrelation();
+      await flushPromises();
+
+      // Access the (lazy) computed first so it evaluates and invokes the helper.
+      expect(wrapper.vm.correlationChipDimensions).toEqual({ k8s_pod_name: "pod-abc" });
+
+      const resp = correlatedStreamsWithSet().correlationData;
+      expect(buildChipDimensionsFromFilters).toHaveBeenCalledWith(
+        expect.objectContaining({ matched_set_id: resp.matched_set_id }),
+        expect.any(Array),
+      );
+    });
+
+    it("should yield undefined matchedSetId and empty chipDimensions when no correlation data", () => {
+      expect(wrapper.vm.correlationData).toBeNull();
+      expect(wrapper.vm.correlationMatchedSetId).toBeUndefined();
+      expect(wrapper.vm.correlationChipDimensions).toEqual({});
+    });
+
+    it("should pass matchedSetId/chipDimensions to the metrics TelemetryCorrelationDashboard", async () => {
+      (incidentsService.getCorrelatedStreams as any).mockResolvedValue(correlatedStreamsWithSet());
+
+      await wrapper.vm.refreshCorrelation();
+      // activeTab is the tabs v-model; set it directly since reaching the
+      // metrics panel via DOM tab clicks depends on brittle conditional markup.
+      wrapper.vm.activeTab = "metrics";
+      await nextTick();
+      await flushPromises();
+
+      const dashboard = wrapper
+        .findAllComponents({ name: "TelemetryCorrelationDashboard" })
+        .find((c) => c.props("externalActiveTab") === "metrics");
+      expect(dashboard?.exists()).toBe(true);
+      expect(dashboard?.props("matchedSetId")).toBe("kubernetes");
+      expect(dashboard?.props("chipDimensions")).toEqual({ k8s_pod_name: "pod-abc" });
+    });
+  });
+
   // Note: Loading State Centering tests removed
   // Testing loading state UI presentation is better handled through visual regression tests
   // Component logic tests should focus on loading state management, not CSS/layout
-});
 
+  describe("analysisInFlight - checkAnalysisInFlight", () => {
+    beforeEach(async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await nextTick();
+      await flushPromises();
+    });
+
+    it("should initialize analysisInFlight as false", () => {
+      expect(wrapper.vm.analysisInFlight).toBe(false);
+    });
+
+    it("sets analysisInFlight true when lastBegin > lastComplete", async () => {
+      (incidentsService.getEvents as any).mockResolvedValue({
+        data: {
+          events: [
+            { type: "ai_analysis_begin", timestamp: 200 },
+            { type: "ai_analysis_complete", timestamp: 100 },
+          ],
+        },
+      });
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+      expect(wrapper.vm.analysisInFlight).toBe(true);
+    });
+
+    it("sets analysisInFlight false when lastComplete >= lastBegin", async () => {
+      (incidentsService.getEvents as any).mockResolvedValue({
+        data: {
+          events: [
+            { type: "ai_analysis_begin", timestamp: 100 },
+            { type: "ai_analysis_complete", timestamp: 200 },
+          ],
+        },
+      });
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+      expect(wrapper.vm.analysisInFlight).toBe(false);
+    });
+
+    it("sets analysisInFlight false when ai_analysis_failed after ai_analysis_begin", async () => {
+      (incidentsService.getEvents as any).mockResolvedValue({
+        data: {
+          events: [
+            { type: "ai_analysis_begin", timestamp: 100 },
+            {
+              type: "ai_analysis_failed",
+              timestamp: 200,
+              data: { reason: "timeout", error_details: "Query timed out" },
+            },
+          ],
+        },
+      });
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+      expect(wrapper.vm.analysisInFlight).toBe(false);
+    });
+
+    it("sets analysisInFlight false when events are empty", async () => {
+      (incidentsService.getEvents as any).mockResolvedValue({ data: { events: [] } });
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+      expect(wrapper.vm.analysisInFlight).toBe(false);
+    });
+
+    it("handles API error gracefully and preserves last known analysisInFlight state", async () => {
+      (incidentsService.getEvents as any).mockRejectedValue(new Error("fetch failed"));
+      wrapper.vm.analysisInFlight = true; // set to true first
+      await wrapper.vm.checkAnalysisInFlight("1");
+      await flushPromises();
+      // A failed events fetch says nothing about the run — the last known in-flight
+      // state is preserved rather than being cleared to a phantom "not running".
+      expect(wrapper.vm.analysisInFlight).toBe(true);
+    });
+
+    it("calls getEvents with correct org and incidentId", async () => {
+      await wrapper.vm.checkAnalysisInFlight("incident-xyz");
+      await flushPromises();
+      expect(incidentsService.getEvents).toHaveBeenCalledWith("default", "incident-xyz");
+    });
+  });
+
+  describe("updateSeverity - reanalysis prompt", () => {
+    beforeEach(async () => {
+      wrapper = await createWrapper({}, {}, "1");
+      await nextTick();
+      await flushPromises();
+    });
+
+    it("calls updateIncident with correct org, id and severity", async () => {
+      await wrapper.vm.updateSeverity("P3");
+      await flushPromises();
+      expect(incidentsService.updateIncident).toHaveBeenCalledWith("default", "1", {
+        severity: "P3",
+      });
+    });
+
+    it("updates local severity after successful save", async () => {
+      (incidentsService.updateIncident as any).mockResolvedValue({ data: { severity: "P3" } });
+      await wrapper.vm.updateSeverity("P3");
+      await flushPromises();
+      expect(wrapper.vm.incidentDetails.severity).toBe("P3");
+      expect(wrapper.vm.editableSeverity).toBe("P3");
+    });
+
+    it("shows info notification when analysis_in_flight=true in response", async () => {
+      mockToast.mockClear();
+      (incidentsService.updateIncident as any).mockResolvedValue({
+        data: { severity: "P2", analysis_in_flight: true },
+      });
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+      const infoCall = mockToast.mock.calls.find((c: any[]) => c[0].variant === "info");
+      expect(infoCall).toBeTruthy();
+      expect(infoCall[0].message).toContain("already running");
+    });
+
+    it("sets analysisInFlight=true when response has analysis_in_flight=true", async () => {
+      (incidentsService.updateIncident as any).mockResolvedValue({
+        data: { severity: "P2", analysis_in_flight: true },
+      });
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+      expect(wrapper.vm.analysisInFlight).toBe(true);
+    });
+
+    it("does not call updateIncident when no incidentDetails", async () => {
+      wrapper.vm.incidentDetails = null;
+      await wrapper.vm.updateSeverity("P3");
+      expect(incidentsService.updateIncident).not.toHaveBeenCalled();
+    });
+
+    it("sets updating=false after completion", async () => {
+      await wrapper.vm.updateSeverity("P2");
+      await flushPromises();
+      expect(wrapper.vm.updating).toBe(false);
+    });
+
+    it("handles API error and sets updating=false", async () => {
+      mockToast.mockClear();
+      (incidentsService.updateIncident as any).mockRejectedValue(new Error("API error"));
+      await wrapper.vm.updateSeverity("P3");
+      await flushPromises();
+      expect(wrapper.vm.updating).toBe(false);
+    });
+  });
+});

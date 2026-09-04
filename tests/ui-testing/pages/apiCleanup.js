@@ -1,13 +1,70 @@
+const http = require('http');
+const https = require('https');
 const fetch = require('node-fetch');
 const testLogger = require('../playwright-tests/utils/test-logger.js');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../playwright-tests/utils/cloud-auth.js');
+
+// node-fetch v2 keep-alive pooling + gzip decompression is the root cause of
+// "Premature close" / ECONNRESET flakiness in CI.
+// Pick the agent by protocol so both local (http://localhost) and cloud/alpha
+// (https://) URLs work — an http.Agent rejects https:// URLs.
+const noKeepAliveHttpAgent = new http.Agent({ keepAlive: false });
+const noKeepAliveHttpsAgent = new https.Agent({ keepAlive: false });
+const selectAgent = (parsedURL) =>
+    parsedURL.protocol === 'https:' ? noKeepAliveHttpsAgent : noKeepAliveHttpAgent;
 
 class APICleanup {
-    constructor() {
+    constructor(page = null) {
+        this._page = page;
         this.baseUrl = process.env.ZO_BASE_URL;
-        this.org = process.env.ORGNAME;
-        this.email = process.env.ZO_ROOT_USER_EMAIL;
-        this.password = process.env.ZO_ROOT_USER_PASSWORD;
-        this.authHeader = 'Basic ' + Buffer.from(`${this.email}:${this.password}`).toString('base64');
+        this.org = getOrgIdentifier();
+        this.email = process.env.ZO_ROOT_USER_EMAIL || process.env.ALPHA1_USER_EMAIL;
+        this.password = process.env.ZO_ROOT_USER_PASSWORD || process.env.ALPHA1_USER_PASSWORD;
+        // Use centralized auth headers (cloud: email:passcode, self-hosted: email:password)
+        const headers = getAuthHeaders();
+        this.authHeader = headers['Authorization'] || '';
+    }
+
+    /**
+     * Fetch wrapper: on cloud uses page.evaluate (browser cookies for OIDC auth),
+     * on self-hosted uses node-fetch with Basic Auth.
+     * Falls back to node-fetch if page is unavailable.
+     */
+    async _fetch(url, options = {}) {
+        if (this._page && isCloudEnvironment()) {
+            // Ensure page is on the same origin so session cookies are sent with fetch
+            if (!this._pageNavigated) {
+                try {
+                    await this._page.goto(`${this.baseUrl}/web/`, { waitUntil: 'domcontentloaded' });
+                    this._pageNavigated = true;
+                } catch (e) {
+                    testLogger.warn('Failed to navigate page to baseUrl for cookie auth', { error: e.message });
+                }
+            }
+            try {
+                // Strip empty Authorization header so browser relies on session cookies (OIDC cloud auth)
+                const browserOpts = { ...options, headers: Object.fromEntries(Object.entries(options.headers || {}).filter(([k, v]) => !(k.toLowerCase() === 'authorization' && !v))) };
+                const result = await this._page.evaluate(async ({ url, options }) => {
+                    const r = await fetch(url, options);
+                    const text = await r.text();
+                    const contentType = r.headers.get('content-type') || '';
+                    return { ok: r.ok, status: r.status, text, contentType };
+                }, { url, options: browserOpts });
+
+                return {
+                    ok: result.ok,
+                    status: result.status,
+                    headers: {
+                        get: (name) => name.toLowerCase() === 'content-type' ? result.contentType : null
+                    },
+                    json: async () => JSON.parse(result.text),
+                    text: async () => result.text,
+                };
+            } catch (e) {
+                testLogger.warn('page.evaluate fetch failed, falling back to node-fetch', { url: url.substring(0, 80), error: e.message });
+            }
+        }
+        return fetch(url, { ...options, compress: false, agent: selectAgent });
     }
 
     /**
@@ -16,7 +73,7 @@ class APICleanup {
      */
     async fetchDestinationsWithTemplateMapping() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations?page_num=1&page_size=100000&sort_by=name&desc=false&module=alert`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations?page_num=1&page_size=100000&sort_by=name&desc=false&module=alert`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -55,7 +112,7 @@ class APICleanup {
      */
     async fetchAlertFolders() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/v2/${this.org}/folders/alerts`, {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/folders/alerts`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -83,7 +140,7 @@ class APICleanup {
      */
     async fetchAlertsInFolder(folderId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/v2/${this.org}/alerts?sort_by=name&desc=false&name=&folder=${folderId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/alerts?sort_by=name&desc=false&name=&folder=${folderId}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -112,7 +169,7 @@ class APICleanup {
      */
     async deleteAlert(alertId, folderId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/v2/${this.org}/alerts/${alertId}?folder=${folderId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/alerts/${alertId}?folder=${folderId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -135,7 +192,7 @@ class APICleanup {
      */
     async deleteFolder(folderId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/v2/${this.org}/folders/alerts/${folderId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/folders/alerts/${folderId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -170,7 +227,7 @@ class APICleanup {
      */
     async fetchDashboardFolders() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/folders`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/folders`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -198,7 +255,7 @@ class APICleanup {
      */
     async fetchDashboardsInFolder(folderName = 'default') {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/dashboards?page_num=0&page_size=1000&sort_by=name&desc=false&name=&folder=${folderName}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/dashboards?page_num=0&page_size=1000&sort_by=name&desc=false&name=&folder=${folderName}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -220,6 +277,37 @@ class APICleanup {
     }
 
     /**
+     * Create a minimal dashboard for use as a report dependency.
+     * Returns { dashboardId, folderId } or throws on failure.
+     */
+    async createMinimalDashboard(title = 'E2E Setup Dashboard', folderId = 'default') {
+        const payload = {
+            title,
+            description: '',
+            role: '',
+            owner: this.email,
+            tabs: [{ tabId: 'default', name: 'Default', panels: [] }],
+            variables: {}
+        };
+        const response = await this._fetch(
+            `${this.baseUrl}/api/${this.org}/dashboards?folder=${encodeURIComponent(folderId)}`,
+            {
+                method: 'POST',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            }
+        );
+        if (!response.ok) {
+            const body = await response.text();
+            throw new Error(`createMinimalDashboard: HTTP ${response.status} — ${body}`);
+        }
+        const result = await response.json();
+        const dashboardId = result.dashboard_id || result.dashboardId || result.id;
+        testLogger.info('Created minimal dashboard', { dashboardId, folderId });
+        return { dashboardId, folderId };
+    }
+
+    /**
      * Delete a single dashboard
      * @param {string} dashboardId - The dashboard ID
      * @param {string} folderId - The folder ID
@@ -227,7 +315,7 @@ class APICleanup {
      */
     async deleteDashboard(dashboardId, folderId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/dashboards/${dashboardId}?folder=${folderId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/dashboards/${dashboardId}?folder=${folderId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -254,7 +342,7 @@ class APICleanup {
      */
     async fetchReports() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/reports`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/reports`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -282,7 +370,7 @@ class APICleanup {
      */
     async deleteReport(reportName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/reports/${reportName}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/reports/${reportName}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -304,12 +392,49 @@ class APICleanup {
     }
 
     /**
+     * Delete a single report by its id (v2, folder-aware).
+     *
+     * Prefer this over deleteReport() whenever a report may live outside the
+     * default folder: the v1 `DELETE /api/{org}/reports/{name}` route resolves
+     * names within the default folder only and returns 404 for a report saved
+     * in a custom report folder, which then blocks deleting that folder.
+     *
+     * @param {string} reportId - The report id (`report_id` from fetchReports)
+     * @param {string} reportName - Optional, for logging only
+     * @returns {Promise<Object>} { code, message }
+     */
+    async deleteReportById(reportId, reportName = '') {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/reports/${reportId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const text = await response.text();
+
+            if (!response.ok) {
+                testLogger.error('Failed to delete report by id', { reportId, reportName, status: response.status, body: text });
+                return { code: response.status, message: text };
+            }
+
+            return { code: 200, message: text };
+        } catch (error) {
+            testLogger.error('Failed to delete report by id', { reportId, reportName, error: error.message });
+            return { code: 500, message: error.message, error: error.message };
+        }
+    }
+
+
+    /**
      * Fetch all pipelines
      * @returns {Promise<Array>} Array of pipeline objects
      */
     async fetchPipelines() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/pipelines`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/pipelines`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -337,7 +462,7 @@ class APICleanup {
      */
     async deletePipeline(pipelineId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/pipelines/${pipelineId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/pipelines/${pipelineId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -365,7 +490,7 @@ class APICleanup {
      */
     async fetchFunctionsInOrg(org = 'default') {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${org}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${org}/functions?page_num=1&page_size=100000&sort_by=name&desc=false&name=`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -394,7 +519,7 @@ class APICleanup {
      */
     async deleteFunctionInOrg(org, functionName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${org}/functions/${functionName}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${org}/functions/${functionName}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -467,7 +592,7 @@ class APICleanup {
      */
     async fetchEnrichmentTables() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams?type=enrichment_tables`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams?type=enrichment_tables`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -495,7 +620,7 @@ class APICleanup {
      */
     async deleteEnrichmentTable(tableName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${tableName}?type=enrichment_tables&delete_all=true`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams/${tableName}?type=enrichment_tables&delete_all=true`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -573,7 +698,7 @@ class APICleanup {
      */
     async fetchUrlEnrichmentTables() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/enrichment_tables/status`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/enrichment_tables/status`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -787,6 +912,109 @@ class APICleanup {
     }
 
     /**
+     * Fetch all report folders (type=reports)
+     * @returns {Promise<Array>} Array of folder objects with folderId and name
+     */
+    async fetchReportFolders() {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/folders/reports`, {
+                method: 'GET',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (!response.ok) {
+                testLogger.error('Failed to fetch report folders', { status: response.status });
+                return [];
+            }
+
+            const data = await response.json();
+            return data.list || [];
+        } catch (error) {
+            testLogger.error('Failed to fetch report folders', { error: error.message });
+            return [];
+        }
+    }
+
+    /**
+     * Delete a report folder by ID
+     * @param {string} folderId - The folder ID to delete
+     * @returns {Promise<Object>} Deletion result
+     */
+    async deleteReportFolder(folderId) {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/v2/${this.org}/folders/reports/${folderId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': this.authHeader,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const text = await response.text();
+
+            try {
+                const jsonResult = JSON.parse(text);
+                return { code: response.ok ? 200 : response.status, message: jsonResult.message || text };
+            } catch {
+                return { code: response.status, message: text };
+            }
+        } catch (error) {
+            testLogger.error('Failed to delete report folder', { folderId, error: error.message });
+            return { code: 500, message: error.message, error: error.message };
+        }
+    }
+
+    /**
+     * Clean up report folders matching specified name prefixes
+     * @param {Array<string>} namePrefixes - Array of folder name prefixes to match (e.g., ['test_folder_', 'test_special_'])
+     */
+    async cleanupReportFolders(namePrefixes = []) {
+        testLogger.info('Starting report folders cleanup', { prefixes: namePrefixes });
+
+        try {
+            const folders = await this.fetchReportFolders();
+            testLogger.info('Fetched report folders', { total: folders.length });
+
+            const matchingFolders = folders.filter(f =>
+                namePrefixes.some(prefix => f.name.startsWith(prefix))
+            );
+            testLogger.info('Found report folders matching prefixes', { count: matchingFolders.length });
+
+            if (matchingFolders.length === 0) {
+                testLogger.info('No report folders to clean up');
+                return;
+            }
+
+            let deletedCount = 0;
+            let failedCount = 0;
+
+            for (const folder of matchingFolders) {
+                const result = await this.deleteReportFolder(folder.folderId);
+
+                if (result.code === 200) {
+                    deletedCount++;
+                    testLogger.info('Deleted report folder', { name: folder.name, folderId: folder.folderId });
+                } else {
+                    failedCount++;
+                    testLogger.warn('Failed to delete report folder', { name: folder.name, folderId: folder.folderId, result });
+                }
+            }
+
+            testLogger.info('Report folders cleanup completed', { deletedCount, failedCount });
+
+            if (failedCount > 0) {
+                throw new Error(`Failed to delete ${failedCount} report folder(s)`);
+            }
+        } catch (error) {
+            testLogger.error('Report folders cleanup failed', { error: error.message });
+            throw error;
+        }
+    }
+
+    /**
      * Clean up all dashboards owned by the automation test user
      * Deletes dashboards from the 'default' folder where owner matches ZO_ROOT_USER_EMAIL
      */
@@ -842,12 +1070,13 @@ class APICleanup {
     }
 
     /**
-     * Fetch all log streams
+     * Fetch all streams of the given type
+     * @param {string} [streamType='logs'] - Stream type to list (e.g. 'logs', 'traces', 'metrics')
      * @returns {Promise<Array>} Array of stream objects
      */
-    async fetchStreams() {
+    async fetchStreams(streamType = 'logs') {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams?type=logs`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams?type=${streamType}`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -871,11 +1100,12 @@ class APICleanup {
     /**
      * Delete a single stream
      * @param {string} streamName - The stream name
+     * @param {string} [streamType='logs'] - Stream type to delete (e.g. 'logs', 'traces', 'metrics')
      * @returns {Promise<Object>} Deletion result
      */
-    async deleteStream(streamName) {
+    async deleteStream(streamName, streamType = 'logs') {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=logs&delete_all=true`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=${streamType}&delete_all=true`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -902,13 +1132,14 @@ class APICleanup {
      * 1. GET stream settings - checks if schema exists
      * 2. If schema gone, PUT settings to check if deletion marker is still active
      * @param {string} streamName - The stream name to check
+     * @param {string} [streamType='logs'] - Stream type to check (e.g. 'logs', 'traces', 'metrics')
      * @returns {Promise<boolean>} True if stream still exists or is being deleted
      */
-    async isStreamStillDeleting(streamName) {
+    async isStreamStillDeleting(streamName, streamType = 'logs') {
         try {
             // Phase 1: Check if stream schema exists via GET
-            const getResponse = await fetch(
-                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
+            const getResponse = await this._fetch(
+                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=${streamType}`,
                 {
                     method: 'GET',
                     headers: {
@@ -933,8 +1164,8 @@ class APICleanup {
 
             // Phase 2: Schema is gone (404), but deletion marker might still be active
             // Try PUT settings - this triggers is_deleting_stream check without creating data
-            const putResponse = await fetch(
-                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=logs`,
+            const putResponse = await this._fetch(
+                `${this.baseUrl}/api/${this.org}/streams/${streamName}/settings?type=${streamType}`,
                 {
                     method: 'PUT',
                     headers: {
@@ -968,15 +1199,16 @@ class APICleanup {
      * @param {string} streamName - The stream name to wait for
      * @param {number} maxWaitMs - Maximum time to wait in milliseconds (default: 120000 = 2 minutes)
      * @param {number} pollIntervalMs - Polling interval in milliseconds (default: 3000 = 3 seconds)
+     * @param {string} [streamType='logs'] - Stream type to poll (e.g. 'logs', 'traces', 'metrics')
      * @returns {Promise<boolean>} True if deletion completed, false if timed out
      */
-    async waitForStreamDeletion(streamName, maxWaitMs = 120000, pollIntervalMs = 3000) {
+    async waitForStreamDeletion(streamName, maxWaitMs = 120000, pollIntervalMs = 3000, streamType = 'logs') {
         const startTime = Date.now();
         let attempts = 0;
 
         while (Date.now() - startTime < maxWaitMs) {
             attempts++;
-            const stillDeleting = await this.isStreamStillDeleting(streamName);
+            const stillDeleting = await this.isStreamStillDeleting(streamName, streamType);
 
             if (!stillDeleting) {
                 testLogger.debug('Stream deletion confirmed complete', {
@@ -1061,7 +1293,7 @@ class APICleanup {
      */
     async fetchMetricsStreams() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams?type=metrics`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams?type=metrics`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1089,7 +1321,7 @@ class APICleanup {
      */
     async deleteMetricsStream(streamName) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=metrics&delete_all=true`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=metrics&delete_all=true`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1179,19 +1411,21 @@ class APICleanup {
      * @param {Object} options - Optional configuration
      * @param {boolean} options.waitForDeletion - Whether to wait for deletions to complete (default: true)
      * @param {number} options.maxWaitPerStreamMs - Max wait time per stream in ms (default: 120000)
+     * @param {string} [options.streamType='logs'] - Stream type to sweep (e.g. 'logs', 'traces', 'metrics')
      */
     async cleanupStreams(patterns = [], protectedStreams = [], options = {}) {
-        const { waitForDeletion = true, maxWaitPerStreamMs = 120000 } = options;
+        const { waitForDeletion = true, maxWaitPerStreamMs = 120000, streamType = 'logs' } = options;
 
         testLogger.info('Starting streams cleanup', {
             patterns: patterns.map(p => p.source),
             protectedStreams,
-            waitForDeletion
+            waitForDeletion,
+            streamType
         });
 
         try {
-            // Fetch all log streams
-            const streams = await this.fetchStreams();
+            // Fetch all streams of the requested type (logs by default; e.g. traces for SDR trace streams)
+            const streams = await this.fetchStreams(streamType);
             testLogger.info('Fetched streams', { total: streams.length });
 
             // Filter streams matching patterns but excluding protected streams
@@ -1212,7 +1446,7 @@ class APICleanup {
             const streamsToWaitFor = [];
 
             for (const stream of matchingStreams) {
-                const result = await this.deleteStream(stream.name);
+                const result = await this.deleteStream(stream.name, streamType);
 
                 if (result.code === 200) {
                     deletedCount++;
@@ -1245,7 +1479,7 @@ class APICleanup {
                 for (let i = 0; i < streamsToWaitFor.length; i += batchSize) {
                     const batch = streamsToWaitFor.slice(i, i + batchSize);
                     const results = await Promise.all(
-                        batch.map(streamName => this.waitForStreamDeletion(streamName, maxWaitPerStreamMs))
+                        batch.map(streamName => this.waitForStreamDeletion(streamName, maxWaitPerStreamMs, 3000, streamType))
                     );
 
                     results.forEach((completed, index) => {
@@ -1287,7 +1521,7 @@ class APICleanup {
      */
     async fetchPipelineDestinations() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations?page_num=1&page_size=100000&sort_by=name&desc=false&module=pipeline`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations?page_num=1&page_size=100000&sort_by=name&desc=false&module=pipeline`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1315,7 +1549,7 @@ class APICleanup {
      */
     async deletePipelineDestination(name) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${name}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${name}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1387,7 +1621,7 @@ class APICleanup {
      */
     async fetchServiceAccounts() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/service_accounts`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/service_accounts`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1415,7 +1649,7 @@ class APICleanup {
      */
     async deleteServiceAccount(email) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/service_accounts/${email}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/service_accounts/${email}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1437,8 +1671,11 @@ class APICleanup {
     }
 
     /**
-     * Clean up all service accounts matching pattern "email*@gmail.com"
-     * Deletes service accounts with emails starting with "email" and ending with "@gmail.com"
+     * Clean up all test-created service accounts:
+     * - legacy pattern "email*@gmail.com" (old email-based creation flow)
+     * - current pattern "sa<digits>x<digits>.*@sa.internal" (name-based flow:
+     *   uniqueSaName() in serviceAccount.spec.js + the synthesized
+     *   `<name>.<org>@sa.internal` identifier)
      */
     async cleanupServiceAccounts() {
         testLogger.info('Starting service accounts cleanup');
@@ -1448,8 +1685,7 @@ class APICleanup {
             const serviceAccounts = await this.fetchServiceAccounts();
             testLogger.info('Fetched service accounts', { total: serviceAccounts.length });
 
-            // Filter service accounts matching pattern: starts with "email" and ends with "@gmail.com"
-            const pattern = /^email.*@gmail\.com$/;
+            const pattern = /^email.*@gmail\.com$|^sa\d+x\d+\..*@sa\.internal$/;
             const matchingAccounts = serviceAccounts.filter(sa => pattern.test(sa.email));
             testLogger.info('Found service accounts matching cleanup pattern', { count: matchingAccounts.length });
 
@@ -1491,7 +1727,7 @@ class APICleanup {
      */
     async fetchUsers() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/users`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/users`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1519,7 +1755,7 @@ class APICleanup {
      */
     async deleteUser(email) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/users/${email}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/users/${email}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1603,7 +1839,7 @@ class APICleanup {
 
         try {
             // Fetch all regex patterns
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1661,7 +1897,8 @@ class APICleanup {
                 'email_format_',        // SDR tests
                 'us_phone_',            // SDR tests
                 'credit_card_',         // SDR tests
-                'ssn_'                  // SDR tests
+                'ssn_',                 // SDR tests
+                'traces_'               // Traces SDR tests (traces_<field>_<action>_<runId> patterns)
             ];
 
             // Filter patterns that match test data names (using prefix matching to catch patterns with unique suffixes)
@@ -1683,7 +1920,7 @@ class APICleanup {
 
             for (const pattern of matchingPatterns) {
                 try {
-                    const deleteResponse = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${pattern.id}`, {
+                    const deleteResponse = await this._fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${pattern.id}`, {
                         method: 'DELETE',
                         headers: {
                             'Authorization': this.authHeader,
@@ -1731,7 +1968,7 @@ class APICleanup {
         testLogger.info('Starting logo cleanup');
 
         try {
-            const response = await fetch(`${this.baseUrl}/api/_meta/settings/logo`, {
+            const response = await this._fetch(`${this.baseUrl}/api/_meta/settings/logo`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1765,7 +2002,7 @@ class APICleanup {
      */
     async fetchSearchJobs() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/search_jobs?type=logs`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/search_jobs?type=logs`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1793,7 +2030,7 @@ class APICleanup {
      */
     async deleteSearchJob(jobId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/search_jobs/${jobId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/search_jobs/${jobId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1864,7 +2101,7 @@ class APICleanup {
      */
     async fetchSavedViews() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/savedviews`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/savedviews`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1892,7 +2129,7 @@ class APICleanup {
      */
     async deleteSavedView(viewId) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/savedviews/${viewId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/savedviews/${viewId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -1964,14 +2201,89 @@ class APICleanup {
         }
     }
 
+    // ============================================================
+    // WORKFLOWS (v1) cleanup — Enterprise "Workflows" feature.
+    // A workflow linked to an alert is delete-protected, so callers must delete
+    // the linked test alerts FIRST (completeCascadeCleanup does this in STEP 1),
+    // then call cleanupWorkflows() to remove the now-unlinked workflows.
+    // ============================================================
+
+    /** Fetch all workflows in the current org. Returns an array (list endpoint returns a bare array). */
+    async fetchWorkflows() {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/workflows`, {
+                method: 'GET',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+            });
+            if (!response.ok) {
+                testLogger.error('Failed to fetch workflows', { status: response.status });
+                return [];
+            }
+            const data = await response.json();
+            return Array.isArray(data) ? data : (data.list || data.data || []);
+        } catch (error) {
+            testLogger.error('Failed to fetch workflows', { error: error.message });
+            return [];
+        }
+    }
+
+    /** Delete a single workflow by id. */
+    async deleteWorkflow(workflowId) {
+        try {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/workflows/${workflowId}`, {
+                method: 'DELETE',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' }
+            });
+            const result = await response.json().catch(() => ({}));
+            return { code: response.status, ...result };
+        } catch (error) {
+            testLogger.error('Failed to delete workflow', { workflowId, error: error.message });
+            return { code: 500, error: error.message };
+        }
+    }
+
+    /**
+     * Delete all workflows whose name matches any of the given prefixes/regexes.
+     * Safe to call as a standalone sweep; linked workflows will report an error
+     * (delete the referencing alerts first — see completeCascadeCleanup STEP 1).
+     * @param {Array<string|RegExp>} patterns
+     */
+    async cleanupWorkflows(patterns = []) {
+        if (!patterns.length) return;
+        testLogger.info('Starting workflows cleanup', { patterns: patterns.map(p => p.source || p) });
+        try {
+            const workflows = await this.fetchWorkflows();
+            const matching = workflows.filter(w =>
+                patterns.some(p => (p instanceof RegExp) ? p.test(w.name) : String(w.name).startsWith(p))
+            );
+            testLogger.info('Workflows matching cleanup patterns', { total: workflows.length, matching: matching.length });
+
+            let deleted = 0, failed = 0;
+            for (const w of matching) {
+                const res = await this.deleteWorkflow(w.id);
+                if (res.code === 200) {
+                    deleted++;
+                    testLogger.debug('Deleted workflow', { id: w.id, name: w.name });
+                } else {
+                    failed++;
+                    testLogger.warn('Failed to delete workflow (still linked to an alert?)', { id: w.id, name: w.name, res });
+                }
+            }
+            testLogger.info('Workflows cleanup completed', { deleted, failed });
+        } catch (error) {
+            testLogger.error('Failed to cleanup workflows', { error: error.message });
+        }
+    }
+
     /**
      * Complete cascade cleanup: Alerts -> Folders -> Destinations -> Templates
      * Deletes resources in correct dependency order to avoid conflicts
      * @param {Array<string|RegExp>} destinationPrefixes - Array of destination name prefixes or regex patterns to match (e.g., ['auto_', /^destination\d{1,3}$/])
      * @param {Array<string>} templatePrefixes - Array of template name prefixes to match (e.g., ['auto_email_template_', 'auto_webhook_template_'])
      * @param {Array<string>} folderPrefixes - Array of folder name prefixes to match (e.g., ['auto_'])
+     * @param {Array<string|RegExp>} workflowPrefixes - Array of workflow name prefixes/regexes to match (deleted AFTER alerts are unlinked)
      */
-    async completeCascadeCleanup(destinationPrefixes = [], templatePrefixes = [], folderPrefixes = []) {
+    async completeCascadeCleanup(destinationPrefixes = [], templatePrefixes = [], folderPrefixes = [], workflowPrefixes = ['wf_auto_']) {
         testLogger.info('Starting complete cascade cleanup (Alerts -> Folders -> Destinations -> Templates)', {
             destinationPrefixes,
             templatePrefixes,
@@ -1985,12 +2297,14 @@ class APICleanup {
             'Automation_',
             'sanity',
             'rbac_',
+            'wf_auto_',                // Workflows v1 test alerts (unlink workflows before deleting them)
             'user_delete_test_',      // RBAC user delete test alerts (orphaned)
             'user_update_test_',      // RBAC user update test alerts (orphaned)
             'viewer_delete_test_',    // RBAC viewer delete test alerts (orphaned)
             'viewer_update_test_',    // RBAC viewer update test alerts (orphaned)
             'editor_create_test_',    // RBAC editor create test alerts (orphaned)
-            'editor_delete_test_'     // RBAC editor delete test alerts (orphaned)
+            'editor_delete_test_',    // RBAC editor delete test alerts (orphaned)
+            'pw_lib_'                 // alert-library.spec.js (Alert Library e2e installed alerts)
         ];
 
         try {
@@ -2104,7 +2418,7 @@ class APICleanup {
                 testLogger.info('Found destinations matching prefixes/patterns', { total: matchingDestinations.length });
 
                 for (const destination of matchingDestinations) {
-                    const deleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${destination.name}`, {
+                    const deleteResult = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/destinations/${destination.name}`, {
                         method: 'DELETE',
                         headers: {
                             'Authorization': this.authHeader,
@@ -2143,7 +2457,7 @@ class APICleanup {
             if (templatePrefixes.length > 0) {
                 testLogger.info('Step 4: Deleting templates matching prefixes', { prefixes: templatePrefixes });
 
-                const allTemplatesResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates?page_num=1&page_size=100000&sort_by=name&desc=false`, {
+                const allTemplatesResponse = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/templates?page_num=1&page_size=100000&sort_by=name&desc=false`, {
                     method: 'GET',
                     headers: {
                         'Authorization': this.authHeader,
@@ -2159,7 +2473,7 @@ class APICleanup {
                     testLogger.info('Found templates matching prefixes', { total: matchingTemplates.length });
 
                     for (const template of matchingTemplates) {
-                        const templateDeleteResult = await fetch(`${this.baseUrl}/api/${this.org}/alerts/templates/${template.name}`, {
+                        const templateDeleteResult = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/templates/${template.name}`, {
                             method: 'DELETE',
                             headers: {
                                 'Authorization': this.authHeader,
@@ -2188,6 +2502,14 @@ class APICleanup {
             }
 
             testLogger.info('Step 4 complete: Templates deleted', { deletedTemplates });
+
+            // STEP 5: Delete WORKFLOWS (alerts were unlinked in STEP 1, so these are now deletable)
+            if (workflowPrefixes && workflowPrefixes.length) {
+                testLogger.info('Step 5: Deleting workflows matching prefixes', {
+                    workflowPrefixes: workflowPrefixes.map(p => p.source || p)
+                });
+                await this.cleanupWorkflows(workflowPrefixes);
+            }
 
             testLogger.info('Complete cascade cleanup finished', {
                 deletedAlerts,
@@ -2250,7 +2572,7 @@ class APICleanup {
         testLogger.info('Creating stream via API', { streamName, streamType });
 
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=${streamType}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/streams/${streamName}?type=${streamType}`, {
                 method: 'POST',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2380,7 +2702,7 @@ class APICleanup {
         testLogger.info('Pipeline payload', { payload: JSON.stringify(pipelinePayload, null, 2) });
 
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/pipelines`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/pipelines`, {
                 method: 'POST',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2430,7 +2752,7 @@ class APICleanup {
             const record = data[i];
 
             try {
-                const response = await fetch(`${process.env.INGESTION_URL}/api/${this.org}/${streamName}/_json`, {
+                const response = await this._fetch(`${process.env.INGESTION_URL}/api/${this.org}/${streamName}/_json`, {
                     method: 'POST',
                     headers: {
                         'Authorization': this.authHeader,
@@ -2491,7 +2813,7 @@ class APICleanup {
         };
 
         try {
-            const response = await fetch(`${process.env.INGESTION_URL}/api/${this.org}/_search?type=logs`, {
+            const response = await this._fetch(`${process.env.INGESTION_URL}/api/${this.org}/_search?type=logs`, {
                 method: 'POST',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2530,7 +2852,7 @@ class APICleanup {
      */
     async fetchRegexPatterns() {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/re_patterns`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2563,7 +2885,7 @@ class APICleanup {
      */
     async deleteRegexPatternById(patternId, patternName = '') {
         try {
-            const response = await fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${patternId}`, {
+            const response = await this._fetch(`${this.baseUrl}/api/${this.org}/re_patterns/${patternId}`, {
                 method: 'DELETE',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2716,7 +3038,7 @@ class APICleanup {
 
         try {
             // First, fetch the current deduplication config
-            const getResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
+            const getResponse = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2766,7 +3088,7 @@ class APICleanup {
                     .filter(id => !groupIds.includes(id))
             };
 
-            const updateResponse = await fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
+            const updateResponse = await this._fetch(`${this.baseUrl}/api/${this.org}/alerts/deduplication/config`, {
                 method: 'POST',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2793,7 +3115,7 @@ class APICleanup {
      */
     async verifyStreamExists(streamName) {
         try {
-            const response = await fetch(`${process.env.INGESTION_URL}/api/${this.org}/streams`, {
+            const response = await this._fetch(`${process.env.INGESTION_URL}/api/${this.org}/streams`, {
                 method: 'GET',
                 headers: {
                     'Authorization': this.authHeader,
@@ -2814,6 +3136,93 @@ class APICleanup {
         } catch (error) {
             testLogger.error('Error checking stream existence', { streamName, error: error.message });
             return false;
+        }
+    }
+
+    /**
+     * Clean up test screenshots matching given prefixes from the screenshots directory.
+     * @param {string[]} prefixes - File name prefixes to match for deletion
+     * @param {string} screenshotDir - Absolute path to the screenshots directory
+     */
+    async cleanupScreenshots(prefixes = [], screenshotDir) {
+        const fs = require('fs/promises');
+        const path = require('path');
+
+        try {
+            await fs.access(screenshotDir);
+        } catch {
+            return;
+        }
+
+        const allFiles = await fs.readdir(screenshotDir);
+        const files = allFiles.filter(f =>
+            prefixes.some(prefix => f.startsWith(prefix))
+        );
+
+        for (const file of files) {
+            await fs.unlink(path.join(screenshotDir, file));
+        }
+
+        if (files.length > 0) {
+            testLogger.info(`Cleaned up ${files.length} screenshot(s)`, { prefixes });
+        }
+    }
+
+    /**
+     * Delete model-pricing records whose names match any of the provided patterns.
+     * Patterns may be RegExp objects or plain strings (treated as prefix match).
+     * Handles 404/disabled gracefully so it's safe on OSS instances without the feature.
+     *
+     * @param {Array<RegExp|string>} patterns
+     */
+    async cleanupModelPricingModels(patterns = []) {
+        testLogger.info('Starting model pricing cleanup', { patternCount: patterns.length });
+
+        const apiBase = `${this.baseUrl}/api/${this.org}/llm/models`;
+        try {
+            const listRes = await this._fetch(apiBase, {
+                method: 'GET',
+                headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+            });
+
+            if (!listRes.ok) {
+                if (listRes.status === 404) {
+                    testLogger.info('Model pricing endpoint not available — skipping cleanup');
+                } else {
+                    testLogger.warn('Failed to list model pricing records', { status: listRes.status });
+                }
+                return;
+            }
+
+            const data = await listRes.json();
+            const models = data.list || data || [];
+
+            const matches = models.filter(m => {
+                if (!m.name) return false;
+                return patterns.some(p =>
+                    p instanceof RegExp ? p.test(m.name) : m.name.startsWith(p)
+                );
+            });
+
+            if (matches.length === 0) {
+                testLogger.info('No model pricing records matched cleanup patterns');
+                return;
+            }
+
+            testLogger.info(`Deleting ${matches.length} model pricing record(s)`, {
+                names: matches.map(m => m.name),
+            });
+
+            await Promise.all(matches.map(m =>
+                this._fetch(`${apiBase}/${m.id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': this.authHeader, 'Content-Type': 'application/json' },
+                }).catch(err => testLogger.warn('Failed to delete model pricing record', { id: m.id, error: err.message }))
+            ));
+
+            testLogger.info('Model pricing cleanup completed');
+        } catch (err) {
+            testLogger.warn('Model pricing cleanup failed (non-fatal)', { error: err.message });
         }
     }
 }

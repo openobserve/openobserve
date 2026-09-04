@@ -5,6 +5,7 @@
 
 const crypto = require('crypto');
 const testLogger = require('./test-logger.js');
+const { getAuthHeaders, getOrgIdentifier } = require('./cloud-auth.js');
 
 /**
  * Generate a random hex string of specified byte length
@@ -26,9 +27,15 @@ function getTimestampNs() {
 /**
  * Generate a single distributed trace
  * @param {number} iteration - Trace iteration number
+ * @param {Object} [options]
+ * @param {'error'|'success'} [options.forceScenario] - Deterministically pick an
+ *   error (spanStatus=2) or success (spanStatus=1) scenario instead of a random
+ *   one. Used by tests that must guarantee error traces exist (e.g. the traces
+ *   error-only toggle), removing the data-dependent flake where a random draw
+ *   produced no error spans.
  * @returns {Object} OTLP trace data
  */
-function generateTrace(iteration) {
+function generateTrace(iteration, options = {}) {
   // Generate IDs
   const traceId = generateHexId(16);
   const rootSpanId = generateHexId(8);
@@ -91,7 +98,19 @@ function generateTrace(iteration) {
     }
   ];
 
-  const selected = scenarios[Math.floor(Math.random() * scenarios.length)];
+  // Scenario selection. `forceScenario` makes the error/success mix deterministic
+  // (round-robin within the matching subset) so callers can guarantee at least one
+  // error span; without it we keep the original random draw.
+  let selected;
+  if (options.forceScenario === 'error') {
+    const errorScenarios = scenarios.filter((s) => s.spanStatus === 2);
+    selected = errorScenarios[iteration % errorScenarios.length];
+  } else if (options.forceScenario === 'success') {
+    const successScenarios = scenarios.filter((s) => s.spanStatus === 1);
+    selected = successScenarios[iteration % successScenarios.length];
+  } else {
+    selected = scenarios[Math.floor(Math.random() * scenarios.length)];
+  }
 
   // Calculate timestamps for distributed trace spans
   const clientStart = Number(startTime) + 1000000;
@@ -233,65 +252,40 @@ function generateTrace(iteration) {
  * @param {number} traceCount - Number of traces to generate and ingest
  * @returns {Promise<Object>} Ingestion result
  */
-async function ingestTraces(page, traceCount = 10) {
-  testLogger.info(`Starting trace ingestion`, { traceCount });
+async function ingestTraces(page, traceCount = 10, options = {}) {
+  testLogger.info(`Starting trace ingestion`, { traceCount, forceScenario: options.forceScenario });
 
-  const orgId = process.env["ORGNAME"] || "default";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
+  const orgId = getOrgIdentifier() || "default";
+  const headers = getAuthHeaders();
+  const baseUrl = (process.env.ZO_BASE_URL || process.env.INGESTION_URL).replace(/\/$/, '');
 
   const results = [];
   const traceIds = [];
 
   for (let i = 1; i <= traceCount; i++) {
-    const traceData = generateTrace(i);
+    const traceData = generateTrace(i, options);
     traceIds.push(traceData.resourceSpans[0].scopeSpans[0].spans[0].traceId);
 
     try {
-      const response = await page.evaluate(async ({ url, headers, orgId, traceData }) => {
-        const baseUrl = url.endsWith('/') ? url.slice(0, -1) : url;
-        const fetchResponse = await fetch(`${baseUrl}/api/${orgId}/v1/traces`, {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify(traceData)
-        });
-
-        let data = null;
-        const contentType = fetchResponse.headers.get('content-type');
-        if (contentType && contentType.includes('application/json')) {
-          try {
-            const text = await fetchResponse.text();
-            data = text ? JSON.parse(text) : null;
-          } catch (e) {
-            data = { error: 'Failed to parse JSON response', text: await fetchResponse.text() };
-          }
-        } else {
-          data = { text: await fetchResponse.text() };
-        }
-
-        return {
-          status: fetchResponse.status,
-          data: data
-        };
-      }, {
-        url: process.env.ZO_BASE_URL || process.env.INGESTION_URL,
-        headers: headers,
-        orgId: orgId,
-        traceData: traceData
+      const response = await page.request.post(`${baseUrl}/api/${orgId}/v1/traces`, {
+        headers,
+        data: traceData
       });
 
-      results.push(response);
+      const status = response.status();
+      let data = null;
+      try {
+        data = await response.json();
+      } catch {
+        data = { text: await response.text().catch(() => '') };
+      }
 
-      if (response.status !== 200) {
+      results.push({ status, data });
+
+      if (status !== 200) {
         testLogger.warn(`Trace ${i} ingestion returned non-200 status`, {
-          status: response.status,
-          response: response.data
+          status,
+          response: data
         });
       }
     } catch (error) {
@@ -300,7 +294,7 @@ async function ingestTraces(page, traceCount = 10) {
     }
 
     // Small delay between traces
-    await page.waitForTimeout(100);
+    await new Promise(resolve => setTimeout(resolve, 100));
   }
 
   const successCount = results.filter(r => r.status === 200).length;

@@ -1,0 +1,578 @@
+<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU Affero General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.
+-->
+
+<template>
+  <div>
+    <div class="setup-card mx-auto max-w-225">
+      <!-- Header -->
+      <div class="rounded-default mb-6 p-4" :class="quickInstallBgClass">
+        <div class="flex items-start gap-3">
+          <OIcon name="rocket-launch" size="xl" class="text-text-link" />
+          <div>
+            <h6 class="m-0 mb-2! text-xl! font-bold">
+              {{ t("ingestion.completeAwsIntegration") }}
+            </h6>
+            <p class="mt-0 mb-0 text-sm" :class="descriptionClass">
+              {{ t("ingestion.deployAwsServicesOneClick") }}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Deployment Mode Toggle -->
+      <div class="mb-6">
+        <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
+          {{ t("ingestion.deploymentMode") }}
+        </div>
+        <OToggleGroup v-model="deploymentMode" data-test="aws-deployment-mode-toggle">
+          <OToggleGroupItem value="single">{{ t("ingestion.singleRegion") }}</OToggleGroupItem>
+          <OToggleGroupItem value="stackset">{{
+            t("ingestion.multiRegionStackSets")
+          }}</OToggleGroupItem>
+        </OToggleGroup>
+        <div class="mt-2 text-xs" :class="hintTextClass">
+          <span v-if="deploymentMode === 'single'">
+            {{ t("ingestion.singleRegionDeployHint") }}
+          </span>
+          <span v-else>
+            {{ t("ingestion.stackSetDeployHint") }}
+          </span>
+        </div>
+      </div>
+
+      <!-- Step: Services -->
+      <div class="mb-6">
+        <div
+          class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2"
+          :class="collapsibleHeaderClass"
+          @click="showServices = !showServices"
+        >
+          <div class="flex items-center gap-2">
+            <OIcon :name="showServices ? 'expand-less' : 'expand-more'" size="sm" color="primary" />
+            <div class="text-sm font-semibold" :class="stepLabelClass">
+              {{ t("ingestion.selectServicesToMonitor") }}
+            </div>
+            <OTag type="countChip" value="accent">
+              {{ enabledServices.length }} / {{ QUICK_SETUP_SERVICES.length }}
+              {{ t("ingestion.selected") }}
+            </OTag>
+          </div>
+          <div class="flex gap-2" @click.stop>
+            <OButton variant="ghost-primary" size="xs" @click="selectAll">{{
+              t("ingestion.selectAll")
+            }}</OButton>
+            <OButton variant="ghost-primary" size="xs" @click="deselectAll">{{
+              t("ingestion.deselectAll")
+            }}</OButton>
+          </div>
+        </div>
+
+        <div
+          class="grid transition-[grid-template-rows] duration-300 ease-in-out"
+          :class="showServices ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+        >
+          <div class="min-h-0 overflow-hidden">
+            <div class="mt-3">
+              <div class="grid grid-cols-4 gap-x-4 gap-y-2">
+                <div v-for="service in QUICK_SETUP_SERVICES" :key="service.flag">
+                  <OCheckbox
+                    v-model="enabledServices"
+                    :value="service.flag"
+                    :label="raw(service.label)"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Single Region: region picker -->
+      <div v-if="deploymentMode === 'single'" class="mb-6">
+        <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
+          {{ t("ingestion.deploymentRegion") }}
+        </div>
+        <OSelect
+          v-model="selectedRegion"
+          :options="regionOptions"
+          valueKey="value"
+          labelKey="label"
+          class="max-w-xs"
+          data-test="aws-region-select"
+        />
+      </div>
+
+      <!-- StackSets: admin + target regions -->
+      <template v-else>
+        <div class="mb-6">
+          <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
+            {{ t("ingestion.adminRegion") }}
+            <span class="text-text-muted text-xs font-normal">{{
+              t("ingestion.whereStackSetIsManaged")
+            }}</span>
+          </div>
+          <OSelect
+            v-model="selectedRegion"
+            :options="regionOptions"
+            valueKey="value"
+            labelKey="label"
+            class="max-w-xs"
+            data-test="aws-admin-region-select"
+          />
+        </div>
+
+        <div class="mb-6">
+          <div
+            class="rounded-default flex cursor-pointer items-center justify-between px-3 py-2"
+            :class="collapsibleHeaderClass"
+            @click="showTargetRegions = !showTargetRegions"
+          >
+            <div class="flex items-center gap-2">
+              <OIcon
+                :name="showTargetRegions ? 'expand-less' : 'expand-more'"
+                size="sm"
+                color="primary"
+              />
+              <div class="text-sm font-semibold" :class="stepLabelClass">
+                {{ t("ingestion.targetRegions") }}
+                <span class="text-text-muted text-xs font-normal">{{
+                  t("ingestion.whereStacksWillBeDeployed")
+                }}</span>
+              </div>
+              <OTag v-if="targetRegions.length > 0" type="countChip" value="accent"
+                >{{ targetRegions.length }} {{ t("ingestion.selected") }}</OTag
+              >
+            </div>
+            <div class="flex gap-2" @click.stop>
+              <OButton variant="ghost-primary" size="xs" @click="selectAllRegions">{{
+                t("ingestion.selectAll")
+              }}</OButton>
+              <OButton variant="ghost-primary" size="xs" @click="targetRegions = []">{{
+                t("ingestion.clear")
+              }}</OButton>
+            </div>
+          </div>
+
+          <div
+            class="grid transition-[grid-template-rows] duration-300 ease-in-out"
+            :class="showTargetRegions ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'"
+          >
+            <div class="min-h-0 overflow-hidden">
+              <div class="mt-3">
+                <div class="grid grid-cols-3 gap-x-4 gap-y-2">
+                  <div v-for="region in AWS_REGIONS" :key="region.value">
+                    <OCheckbox
+                      v-model="targetRegions"
+                      :value="region.value"
+                      :label="raw(`${region.label} (${region.value})`)"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="mb-6">
+          <div class="mb-3 text-sm font-semibold" :class="stepLabelClass">
+            {{ t("ingestion.deploymentModel") }}
+          </div>
+          <OToggleGroup v-model="stackSetModel" data-test="aws-stackset-model-toggle">
+            <OToggleGroupItem value="self">{{ t("ingestion.selfManaged") }}</OToggleGroupItem>
+            <OToggleGroupItem value="service">{{
+              t("ingestion.serviceManagedAwsOrganizations")
+            }}</OToggleGroupItem>
+          </OToggleGroup>
+          <div class="mt-2 text-xs" :class="hintTextClass">
+            <span v-if="stackSetModel === 'self'">
+              {{ t("ingestion.requires") }}
+              <code>{{ raw("AWSCloudFormationStackSetAdministrationRole") }}</code>
+              {{ t("ingestion.and") }}
+              <code>{{ raw("AWSCloudFormationStackSetExecutionRole") }}</code>
+              {{ t("ingestion.iamRolesInYourAccount") }}
+            </span>
+            <span v-else>
+              {{ t("ingestion.usesAwsOrganizationsHint") }}
+            </span>
+          </div>
+        </div>
+      </template>
+
+      <!-- Launch -->
+      <div class="mb-6 flex items-center gap-3">
+        <OButton
+          variant="primary"
+          size="sm"
+          :disabled="
+            enabledServices.length === 0 ||
+            (deploymentMode === 'stackset' && targetRegions.length === 0)
+          "
+          @click="handleLaunch"
+          :data-test="
+            deploymentMode === 'single' ? 'aws-quick-setup-deploy-btn' : 'aws-stackset-launch-btn'
+          "
+        >
+          <template #icon-left><OIcon name="cloud-upload" size="sm" /></template>
+          {{
+            deploymentMode === "single"
+              ? t("ingestion.launchCloudFormationStack")
+              : t("ingestion.openStackSetsConsole")
+          }}
+        </OButton>
+        <span v-if="enabledServices.length === 0" class="text-status-error-text text-sm">
+          {{ t("ingestion.selectAtLeastOneService") }}
+        </span>
+        <span
+          v-else-if="deploymentMode === 'stackset' && targetRegions.length === 0"
+          class="text-status-error-text text-sm"
+        >
+          {{ t("ingestion.selectAtLeastOneTargetRegion") }}
+        </span>
+        <span v-else class="text-sm" :class="hintTextClass">
+          {{ t("ingestion.service", { count: enabledServices.length }, enabledServices.length) }}
+          {{ t("ingestion.selected") }}
+          <template v-if="deploymentMode === 'stackset'">
+            ·
+            {{
+              t("ingestion.region", { count: targetRegions.length }, targetRegions.length)
+            }}</template
+          >
+        </span>
+      </div>
+
+      <!-- StackSets Parameter Helper -->
+      <div
+        class="grid transition-[grid-template-rows] duration-300 ease-in-out"
+        :class="
+          showParamHelper && deploymentMode === 'stackset' ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
+        "
+      >
+        <div class="min-h-0 overflow-hidden">
+          <div>
+            <OSeparator class="mb-4" />
+            <div class="rounded-default p-4" :class="paramHelperClass">
+              <div class="mb-3 flex items-center justify-between">
+                <div class="text-sm font-semibold" :class="stepLabelClass">
+                  {{ t("ingestion.parametersToEnterInAwsWizard") }}
+                </div>
+                <OButton variant="ghost" size="icon-circle-sm" @click="showParamHelper = false">
+                  <OIcon name="close" size="sm" />
+                </OButton>
+              </div>
+              <p class="mb-3 text-xs" :class="hintTextClass">
+                {{ t("ingestion.stackSetsNoPrefillHint") }}
+              </p>
+              <div class="flex flex-col gap-1.5">
+                <div
+                  v-for="param in stackSetParams"
+                  :key="param.key"
+                  class="rounded-default text-compact flex items-center gap-3 px-2.5 py-1.5 font-mono"
+                  :class="paramRowClass"
+                >
+                  <div class="min-w-60 shrink-0 font-semibold" :class="paramKeyClass">
+                    {{ param.key }}
+                  </div>
+                  <div class="flex flex-1 items-center gap-1 overflow-hidden">
+                    <span
+                      class="flex-1 overflow-hidden text-ellipsis whitespace-nowrap"
+                      :class="paramValTextClass"
+                      >{{ param.value }}</span
+                    >
+                    <OButton variant="ghost" size="icon-xs-circle" @click="copyParam(param.value)">
+                      <OIcon name="content-copy" size="sm" />
+                      <OTooltip :content="t('common.copy')" />
+                    </OButton>
+                  </div>
+                </div>
+              </div>
+              <div class="mt-3">
+                <div class="mb-1 text-xs font-semibold" :class="stepLabelClass">
+                  {{ t("ingestion.targetRegionsToEnterInDeploymentTargets") }}
+                </div>
+                <div class="mt-1 flex flex-wrap gap-1">
+                  <OTag v-for="r in targetRegions" :key="r" type="fieldTag" value="primarysm">{{
+                    r
+                  }}</OTag>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script lang="ts">
+import { defineComponent, ref, computed } from "vue";
+import { useStore } from "vuex";
+import { raw, useI18nTyped } from "@/types/i18n";
+import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
+import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
+import { getEndPoint, getIngestionURL } from "@/utils/zincutils";
+import {
+  generateCloudFormationURL,
+  AWS_REGIONS,
+  QUICK_SETUP_SERVICES,
+} from "@/utils/awsIntegrations";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import segment from "@/services/segment_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { copyToClipboard } from "@/utils/clipboard";
+
+const COMPLETE_TEMPLATE_URL =
+  "https://openobserve-datasources-bucket.s3.us-east-2.amazonaws.com/datasource/cloud/aws/aws_complete.yaml";
+
+export default defineComponent({
+  name: "AWSQuickSetup",
+  components: {
+    OSeparator,
+    OToggleGroup,
+    OToggleGroupItem,
+    OButton,
+    OSelect,
+    OTooltip,
+    OCheckbox,
+    OIcon,
+    OTag,
+  },
+  setup() {
+    const store = useStore();
+    const { t } = useI18nTyped();
+
+    const deploymentMode = ref<"single" | "stackset">("single");
+    const stackSetModel = ref<"self" | "service">("self");
+    const selectedRegion = ref("us-east-1");
+    const targetRegions = ref<string[]>(["us-east-1"]);
+    const enabledServices = ref<string[]>(QUICK_SETUP_SERVICES.map((s) => s.flag));
+    const showParamHelper = ref(false);
+    const showTargetRegions = ref(false);
+    const showServices = ref(false);
+
+    // AWS region names are AWS's own proper nouns, so they are never translated.
+    const regionOptions = AWS_REGIONS.map((region) => ({
+      value: region.value,
+      label: raw(region.label),
+    }));
+
+    // Colors resolve via theme-aware design tokens, so these class strings are
+    // theme-independent (dark handled automatically by dark.css).
+    const quickInstallBgClass = "bg-banner-info-bg border border-banner-info-border";
+    const descriptionClass = "text-text-secondary";
+    const stepLabelClass = "text-text-body";
+    const hintTextClass = "text-text-secondary";
+    const collapsibleHeaderClass =
+      "bg-surface-subtle border border-border-default hover:bg-surface-subtle-hover";
+    const paramHelperClass = "bg-surface-subtle";
+    const paramRowClass = "bg-surface-base border border-border-default";
+    const paramKeyClass = "text-text-body";
+    const paramValTextClass = "text-text-secondary";
+
+    let endpoint: any = null;
+    try {
+      endpoint = getEndPoint(getIngestionURL());
+    } catch (e) {
+      console.error("Error getting endpoint:", e);
+    }
+
+    const getCredentials = () => {
+      const organizationId = store.state?.selectedOrganization?.identifier;
+      const email = store.state?.userInfo?.email;
+      const passcode = store.state?.organizationData?.organizationPasscode;
+      return { organizationId, email, passcode };
+    };
+
+    const selectAll = () => {
+      enabledServices.value = QUICK_SETUP_SERVICES.map((s) => s.flag);
+    };
+    const deselectAll = () => {
+      enabledServices.value = [];
+    };
+    const selectAllRegions = () => {
+      targetRegions.value = AWS_REGIONS.map((r) => r.value);
+    };
+
+    const buildServiceFlags = () => {
+      const flags: Record<string, string> = {};
+      QUICK_SETUP_SERVICES.forEach(({ flag }) => {
+        flags[flag] = enabledServices.value.includes(flag) ? "true" : "false";
+      });
+      return flags;
+    };
+
+    // Parameters the user will need to copy-paste in the StackSets wizard
+    const stackSetParams = computed(() => {
+      const { organizationId, email, passcode } = getCredentials();
+      if (!organizationId || !email || !passcode || !endpoint?.url) return [];
+
+      const accessKey = btoa(`${email}:${passcode}`);
+      const endpointUrl = `${endpoint.url}/aws/${organizationId}/default/_kinesis_firehose`;
+      const serviceFlags = buildServiceFlags();
+
+      const params = [
+        { key: raw("Amazon S3 URL (template)"), value: COMPLETE_TEMPLATE_URL },
+        { key: "TemplateS3Bucket", value: "openobserve-datasources-bucket" },
+        { key: "TemplateS3Prefix", value: "datasource/cloud/aws" },
+        { key: "OpenObserveEndpoint", value: endpointUrl },
+        { key: "OpenObserveAccessKey", value: accessKey },
+        ...QUICK_SETUP_SERVICES.map(({ flag }) => ({
+          key: flag,
+          value: serviceFlags[flag],
+        })),
+      ];
+      return params;
+    });
+
+    const copyParam = (value: string) => {
+      copyToClipboard(value, t, {
+        timeout: 1500,
+      });
+    };
+
+    const handleLaunch = () => {
+      if (!endpoint?.url) {
+        toast({
+          variant: "error",
+          message: t("toastMessages.recommended.invalidIngestionEndpointPleaseCheckConfiguration"),
+        });
+        return;
+      }
+
+      const { organizationId, email, passcode } = getCredentials();
+      if (!organizationId || !email || !passcode) {
+        toast({
+          variant: "error",
+          message: t("toastMessages.recommended.missingOrganizationCredentialsPleaseRefreshThe"),
+        });
+        return;
+      }
+
+      if (deploymentMode.value === "single") {
+        launchSingleRegion(organizationId, email, passcode);
+      } else {
+        if (targetRegions.value.length === 0) {
+          toast({
+            variant: "warning",
+            message: t("toastMessages.recommended.selectAtLeastOneTargetRegion"),
+          });
+          return;
+        }
+        launchStackSet(organizationId);
+      }
+    };
+
+    const launchSingleRegion = (organizationId: string, email: string, passcode: string) => {
+      const accessKey = btoa(`${email}:${passcode}`);
+
+      const url = generateCloudFormationURL(
+        {
+          id: "aws-complete",
+          name: "AWS-Complete",
+          displayName: "AWS Complete Integration",
+          cloudFormationTemplate: COMPLETE_TEMPLATE_URL,
+          comingSoon: false,
+        } as any,
+        organizationId,
+        `${endpoint.url}/aws/${organizationId}/default/_kinesis_firehose`,
+        accessKey,
+        selectedRegion.value,
+        {
+          TemplateS3Bucket: "openobserve-datasources-bucket",
+          TemplateS3Prefix: "datasource/cloud/aws",
+          ...buildServiceFlags(),
+        },
+      );
+
+      if (!url) {
+        toast({
+          variant: "warning",
+          message: t("toastMessages.recommended.cloudformationTemplateNotAvailableYet"),
+        });
+        return;
+      }
+
+      window.open(url, "_blank", "noopener,noreferrer");
+      segment.track("AWS Complete Integration Started", {
+        mode: "single",
+        region: selectedRegion.value,
+        services: enabledServices.value,
+      });
+      toast({
+        variant: "info",
+        message: t("toastMessages.recommended.openingAwsConsoleToDeployComplete"),
+      });
+    };
+
+    const launchStackSet = (_organizationId?: string) => {
+      // StackSets console doesn't support URL pre-fill — open the console and show param helper
+      const consoleUrl = `https://console.aws.amazon.com/cloudformation/home?region=${selectedRegion.value}#/stacksets/create`;
+      window.open(consoleUrl, "_blank", "noopener,noreferrer");
+      showParamHelper.value = true;
+
+      segment.track("AWS StackSet Integration Started", {
+        mode: "stackset",
+        model: stackSetModel.value,
+        admin_region: selectedRegion.value,
+        target_regions: targetRegions.value,
+        services: enabledServices.value,
+      });
+
+      toast({
+        variant: "info",
+        message: t("toastMessages.recommended.awsStacksetsConsoleOpenedUseThe"),
+        timeout: 5000,
+      });
+    };
+
+    return {
+      raw,
+      t,
+      quickInstallBgClass,
+      descriptionClass,
+      stepLabelClass,
+      hintTextClass,
+      collapsibleHeaderClass,
+      paramHelperClass,
+      paramRowClass,
+      paramKeyClass,
+      paramValTextClass,
+      deploymentMode,
+      stackSetModel,
+      selectedRegion,
+      targetRegions,
+      enabledServices,
+      showParamHelper,
+      showTargetRegions,
+      showServices,
+      stackSetParams,
+      AWS_REGIONS,
+      regionOptions,
+      QUICK_SETUP_SERVICES,
+      selectAll,
+      deselectAll,
+      selectAllRegions,
+      copyParam,
+      handleLaunch,
+    };
+  },
+});
+</script>

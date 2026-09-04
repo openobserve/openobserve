@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,6 +14,11 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { computed, reactive } from "vue";
+
+/** Panels whose x-axis is time, so a zoom range means a `_timestamp` window.
+ *  IDs come from utils/alerts/insights-metrics.json and are stable — unlike the
+ *  panel titles, which are translated. */
+const TIME_AXIS_PANEL_IDS = ["Panel_Alert_Volume", "Panel_Success_Rate_Timeline"];
 
 interface RangeFilter {
   panelId: string;
@@ -90,16 +95,15 @@ export function useAlertInsights() {
 
     // Range filters
     rangeFilters.value.forEach((filter) => {
-      if (filter.panelTitle === "Alert Volume Over Time") {
+      // Branch on the panel ID, never on panelTitle: that title is display copy
+      // built with t(), so comparing it to an English literal silently failed in
+      // every non-English locale and fell through to the metric_value branch.
+      if (TIME_AXIS_PANEL_IDS.includes(filter.panelId)) {
         // Time-based filter from zoom
         if (filter.start !== null && filter.end !== null) {
-          filters.push(
-            `_timestamp >= ${filter.start} AND _timestamp <= ${filter.end}`
-          );
+          filters.push(`_timestamp >= ${filter.start} AND _timestamp <= ${filter.end}`);
         }
-      } else if (
-        filter.panelTitle === "Alert Frequency (Dedup Candidates)"
-      ) {
+      } else if (filter.panelId === "Panel_Alert_Frequency") {
         // Frequency threshold filter
         if (filter.start !== null) {
           // This creates a subquery to filter alerts by frequency
@@ -114,9 +118,7 @@ export function useAlertInsights() {
       } else if (filter.start !== null || filter.end !== null) {
         // Generic numeric filter for other panels
         if (filter.start !== null && filter.end !== null) {
-          filters.push(
-            `metric_value >= ${filter.start} AND metric_value <= ${filter.end}`
-          );
+          filters.push(`metric_value >= ${filter.start} AND metric_value <= ${filter.end}`);
         } else if (filter.start !== null) {
           filters.push(`metric_value >= ${filter.start}`);
         } else if (filter.end !== null) {

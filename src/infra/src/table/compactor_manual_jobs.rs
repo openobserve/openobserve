@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,12 +16,12 @@
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, Set, TransactionTrait};
 use serde::{Deserialize, Serialize};
 
-use super::{get_lock, migration::Expr};
+use super::migration::Expr;
 pub use crate::table::entity::compactor_manual_jobs::{
     ActiveModel, Column, Entity, Model, Relation,
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors, orm_err,
 };
 
@@ -91,10 +91,7 @@ pub struct CompactorManualJobStatusRes {
 }
 
 pub async fn get(ksuid: &str) -> Result<CompactorManualJob, errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = Entity::find()
         .filter(Column::Id.eq(ksuid))
         .one(client)
@@ -110,7 +107,7 @@ pub async fn get_by_key(
     key: &str,
     status: Option<Status>,
 ) -> Result<CompactorManualJob, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res;
     if let Some(status) = status {
         res = Entity::find()
@@ -129,7 +126,7 @@ pub async fn get_by_key(
 }
 
 pub async fn list_by_key(key: &str) -> Result<Vec<CompactorManualJob>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let res = Entity::find().filter(Column::Key.eq(key)).all(client).await;
     match res {
         Ok(models) => Ok(models.into_iter().map(|model| model.into()).collect()),
@@ -146,10 +143,7 @@ pub async fn add(job: CompactorManualJob) -> Result<(), errors::Error> {
         status: Set(job.status as i64),
     };
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     Entity::insert(active).exec(client).await.map_err(|e| {
         log::error!("[COMPACTOR] add job error: {e}");
         e
@@ -159,7 +153,7 @@ pub async fn add(job: CompactorManualJob) -> Result<(), errors::Error> {
 }
 
 pub async fn update(ksuid: &str, ended_at: i64, status: Status) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let res = Entity::update_many()
         .col_expr(Column::EndedAt, Expr::value(ended_at))
         .col_expr(Column::Status, Expr::value(status as i64))
@@ -174,7 +168,7 @@ pub async fn update(ksuid: &str, ended_at: i64, status: Status) -> Result<(), er
 }
 
 pub async fn bulk_update(jobs: Vec<CompactorManualJob>) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let tx = client.begin().await?;
 
     for job in jobs {
@@ -188,4 +182,125 @@ pub async fn bulk_update(jobs: Vec<CompactorManualJob>) -> Result<(), errors::Er
 
     tx.commit().await?;
     Ok(())
+}
+
+/// Delete all compactor manual jobs whose key starts with `{org_id}/`.
+/// The key format is `{org_id}/{stream_type}/{stream_name}/...`.
+pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+    let prefix = format!("{org_id}/%");
+    let res = Entity::delete_many()
+        .filter(Column::Key.like(&prefix))
+        .exec(client)
+        .await;
+
+    match res {
+        Ok(_) => Ok(()),
+        Err(e) => orm_err!(format!("delete_by_org error: {e}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_job() -> CompactorManualJob {
+        CompactorManualJob {
+            id: "id1".to_string(),
+            key: "key1".to_string(),
+            created_at: 0,
+            ended_at: 0,
+            status: Status::Pending,
+        }
+    }
+
+    #[test]
+    fn test_compactor_job_res_entry_strings_absent_when_empty() {
+        let entry = CompactorManualJobResEntry {
+            cluster: String::new(),
+            region: String::new(),
+            job: make_job(),
+        };
+        let json = serde_json::to_value(&entry).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(!obj.contains_key("cluster"));
+        assert!(!obj.contains_key("region"));
+    }
+
+    #[test]
+    fn test_compactor_job_res_entry_strings_present_when_nonempty() {
+        let entry = CompactorManualJobResEntry {
+            cluster: "c1".to_string(),
+            region: "us-east".to_string(),
+            job: make_job(),
+        };
+        let json = serde_json::to_value(&entry).unwrap();
+        let obj = json.as_object().unwrap();
+        assert!(obj.contains_key("cluster"));
+        assert!(obj.contains_key("region"));
+    }
+
+    #[test]
+    fn test_compactor_job_status_res_errors_absent_when_empty() {
+        let res = CompactorManualJobStatusRes {
+            id: "i1".to_string(),
+            status: Status::Completed,
+            metadata: vec![],
+            errors: vec![],
+        };
+        let json = serde_json::to_value(&res).unwrap();
+        assert!(!json.as_object().unwrap().contains_key("errors"));
+    }
+
+    #[test]
+    fn test_compactor_job_status_res_errors_present_when_nonempty() {
+        let res = CompactorManualJobStatusRes {
+            id: "i1".to_string(),
+            status: Status::Running,
+            metadata: vec![],
+            errors: vec![serde_json::json!({"msg": "fail"})],
+        };
+        let json = serde_json::to_value(&res).unwrap();
+        assert!(json.as_object().unwrap().contains_key("errors"));
+    }
+
+    #[test]
+    fn test_status_from_i64_all_variants() {
+        assert!(matches!(Status::from(0i64), Status::Pending));
+        assert!(matches!(Status::from(1i64), Status::Running));
+        assert!(matches!(Status::from(2i64), Status::Completed));
+    }
+
+    #[test]
+    fn test_try_from_job_to_string_roundtrip() {
+        let job = make_job();
+        let s = String::try_from(job.clone()).unwrap();
+        assert!(s.contains("id1"));
+        assert!(s.contains("key1"));
+    }
+
+    #[test]
+    fn test_from_model_to_compactor_manual_job() {
+        use crate::table::entity::compactor_manual_jobs::Model;
+        let model = Model {
+            id: "model-id".to_string(),
+            key: "model-key".to_string(),
+            created_at: 1000,
+            ended_at: 2000,
+            status: 1,
+        };
+        let job = CompactorManualJob::from(model);
+        assert_eq!(job.id, "model-id");
+        assert_eq!(job.key, "model-key");
+        assert_eq!(job.created_at, 1000);
+        assert_eq!(job.ended_at, 2000);
+        assert!(matches!(job.status, Status::Running));
+    }
+
+    #[test]
+    fn test_status_equality() {
+        assert!(Status::Pending == Status::Pending);
+        assert!(Status::Pending != Status::Running);
+        assert!(Status::Running != Status::Completed);
+    }
 }

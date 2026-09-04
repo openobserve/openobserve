@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,15 +13,19 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+import { gt } from "@/types/i18n";
+
 import { PromQLChartConverter, ProcessedPromQLData } from "./shared/types";
 import { applyAggregation } from "./shared/dataProcessor";
-import {
-  getUnitValue,
-  formatUnitValue,
-  formatDate,
-  findFirstValidMappedValue,
-} from "../convertDataIntoUnitValue";
+import { getUnitValue, formatUnitValue } from "../convertDataIntoUnitValue";
+import { formatDate } from "../dateTimeUtils";
 import { toZonedTime } from "date-fns-tz";
+import {
+  parseOverrideConfigs,
+  applyColumnOverrides,
+  buildValueMappingCache,
+  lookupValueMapping,
+} from "../tableConfigUtils";
 
 /**
  * Converter for table charts
@@ -30,13 +34,7 @@ import { toZonedTime } from "date-fns-tz";
 export class TableConverter implements PromQLChartConverter {
   supportedTypes = ["table"];
 
-  convert(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-    store: any,
-    extras: any,
-    chartPanelRef?: any,
-  ) {
+  convert(processedData: ProcessedPromQLData[], panelSchema: any, store: any) {
     // Build columns from metric labels + value
     const columns = this.buildColumns(processedData, panelSchema);
 
@@ -44,7 +42,7 @@ export class TableConverter implements PromQLChartConverter {
     const rows = this.buildRows(processedData, panelSchema, store);
 
     // Return the same structure as SQL tables (convertTableData)
-    // TableRenderer component (q-table) handles pagination, sorting, filtering automatically
+    // TableRenderer component (table) handles pagination, sorting, filtering automatically
     const result = {
       rows,
       columns,
@@ -60,22 +58,15 @@ export class TableConverter implements PromQLChartConverter {
    * Note: Sticky columns remain in their ordered position (they don't move to front)
    * Sticky is just a CSS property for horizontal scrolling
    */
-  private applyColumnOrdering(
-    labelKeys: string[],
-    config: any,
-  ): string[] {
-    const columnOrder = config.column_order || [];
+  private applyColumnOrdering(labelKeys: string[], config: any): string[] {
+    const columnOrder: string[] = config.column_order || [];
 
     // Apply custom ordering if specified
     if (columnOrder.length > 0) {
       // First: columns in column_order (in that order)
-      const orderedKeys = columnOrder.filter((key) =>
-        labelKeys.includes(key),
-      );
+      const orderedKeys = columnOrder.filter((key) => labelKeys.includes(key));
       // Then: columns not in column_order (alphabetically)
-      const unorderedKeys = labelKeys
-        .filter((key) => !columnOrder.includes(key))
-        .sort();
+      const unorderedKeys = labelKeys.filter((key) => !columnOrder.includes(key)).sort();
       return [...orderedKeys, ...unorderedKeys];
     } else {
       // Default: alphabetical sort
@@ -90,85 +81,78 @@ export class TableConverter implements PromQLChartConverter {
    * Supports sticky columns: mark columns as sticky to keep them visible while scrolling
    * Supports column ordering: custom order for visible, non-sticky columns via config
    */
-  private buildColumns(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-  ): any[] {
+  private buildColumns(processedData: ProcessedPromQLData[], panelSchema: any): any[] {
     const config = panelSchema.config || {};
     const tableMode = config.promql_table_mode || "single";
 
-    // Build override maps (color/unit) to mimic SQL table behavior
-    const overrideConfigs = panelSchema.config?.override_config || [];
-    const colorConfigMap: Record<string, any> = {};
-    const unitConfigMap: Record<string, any> = {};
+    // fieldType isn't applied here — PromQL column types are fixed.
+    const maps = parseOverrideConfigs(panelSchema.config?.override_config);
+    const { unitConfigMap } = maps;
 
-    overrideConfigs.forEach((o: any) => {
-      const alias = o?.field?.value;
-      const cfg = o?.config?.[0];
-      if (alias && cfg) {
-        const aliasLower = alias.toLowerCase();
-        if (cfg.type === "unique_value_color") {
-          colorConfigMap[aliasLower] = { autoColor: cfg.autoColor };
-        } else if (cfg.type === "unit") {
-          unitConfigMap[aliasLower] = {
-            unit: cfg.value?.unit,
-            customUnit: cfg.value?.customUnit,
-          };
-        }
-      }
+    // Value text-replacement mappings.
+    const mappings = panelSchema.config?.mappings || [];
+    const valueMappingCache = buildValueMappingCache(mappings);
+
+    // ── Shared column factories (one definition per column kind) ──────────────
+    const baseColumn = (name: string, label: string, defaultAlign: string): any => {
+      const col: any = { name, field: name, label, sortable: true };
+      applyColumnOverrides(col, name.toLowerCase(), maps, defaultAlign);
+      return col;
+    };
+
+    const textFormat = (val: any) => {
+      const mapped = lookupValueMapping(val, valueMappingCache);
+      return mapped != null ? mapped : val;
+    };
+
+    const valueFormat = (colNameLower: string) => (val: any) => {
+      const mapped = lookupValueMapping(val, valueMappingCache);
+      if (mapped != null) return mapped;
+      const unitToUse = unitConfigMap[colNameLower]?.unit || config?.unit;
+      const customUnitToUse = unitConfigMap[colNameLower]?.customUnit || config?.unit_custom;
+      return formatUnitValue(getUnitValue(val, unitToUse, customUnitToUse, config?.decimals));
+    };
+
+    // `mono` on the timestamp and value columns matches the rule the SQL table
+    // converters already apply (`isNumber || isTimestamp`) and the monospace
+    // cells in logs and traces, so digits line up column-to-column. Label
+    // columns hold free text and stay in the sans face.
+    const makeTimestampColumn = (sticky = false): any => ({
+      ...baseColumn("timestamp", gt("dashboard.utils.promqlTableTimestampColumn"), "left"),
+      mono: true,
+      ...(sticky ? { sticky, headerClasses: "sticky-column", classes: "sticky-column" } : {}),
     });
 
-    // Mappings for value text replacements
-    const mappings = panelSchema.config?.mappings || [];
+    const makeLabelColumn = (key: string, sticky = false): any => ({
+      ...baseColumn(key, key, "left"),
+      sticky,
+      headerClasses: sticky ? "sticky-column" : undefined,
+      classes: sticky ? "sticky-column" : undefined,
+      format: textFormat,
+    });
+
+    const makeValueColumn = (name: string, label: string): any => ({
+      ...baseColumn(name, label, "right"),
+      mono: true,
+      format: valueFormat(name.toLowerCase()),
+    });
+
+    const filterLabelKeys = (keys: string[]): string[] => {
+      if (Array.isArray(config.visible_columns) && config.visible_columns.length > 0) {
+        return keys.filter((k) => config.visible_columns.includes(k));
+      }
+      if (Array.isArray(config.hidden_columns) && config.hidden_columns.length > 0) {
+        return keys.filter((k) => !config.hidden_columns.includes(k));
+      }
+      return keys;
+    };
 
     // Get selected aggregations (default: ['last'])
-    const aggregations = config.table_aggregations || [
-      config.aggregation || "last",
-    ];
+    const aggregations = config.table_aggregations || [config.aggregation || "last"];
 
     // In "single" (Timestamp) mode, show timestamp + value columns
     if (tableMode === "single") {
-      return [
-        {
-          name: "timestamp",
-          field: "timestamp",
-          label: "Timestamp",
-          align: "left",
-          sortable: true,
-          // support override configs for coloring
-          colorMode: colorConfigMap["timestamp"]?.autoColor
-            ? "auto"
-            : undefined,
-        },
-        {
-          name: "value",
-          field: "value",
-          label: "Value",
-          align: "right",
-          sortable: true,
-          format: (val: any) => {
-            // Apply configured value mappings first
-            const mapped = findFirstValidMappedValue(val, mappings, "text");
-            if (mapped && mapped.text) return mapped.text;
-
-            // Allow per-field unit override via override_config
-            const aliasLower = "value";
-            const unitToUse = unitConfigMap[aliasLower]?.unit || config?.unit;
-            const customUnitToUse =
-              unitConfigMap[aliasLower]?.customUnit || config?.unit_custom;
-
-            const unitValue = getUnitValue(
-              val,
-              unitToUse,
-              customUnitToUse,
-              config?.decimals,
-            );
-            return formatUnitValue(unitValue);
-          },
-          // support override configs for coloring
-          colorMode: colorConfigMap["value"]?.autoColor ? "auto" : undefined,
-        },
-      ];
+      return [makeTimestampColumn(), makeValueColumn("value", gt("common.value"))];
     }
 
     // In "expanded_timeseries" mode, show timestamp + all metric labels + value
@@ -183,219 +167,47 @@ export class TableConverter implements PromQLChartConverter {
         });
       });
 
-      // Apply column filter if configured
-      let filteredLabelKeys = Array.from(labelKeys);
-
-      if (
-        config.visible_columns &&
-        Array.isArray(config.visible_columns) &&
-        config.visible_columns.length > 0
-      ) {
-        // If visible_columns is specified, only show those columns
-        filteredLabelKeys = filteredLabelKeys.filter((key) =>
-          config.visible_columns.includes(key),
-        );
-      } else if (
-        config.hidden_columns &&
-        Array.isArray(config.hidden_columns) &&
-        config.hidden_columns.length > 0
-      ) {
-        // If hidden_columns is specified, hide those columns
-        filteredLabelKeys = filteredLabelKeys.filter(
-          (key) => !config.hidden_columns.includes(key),
-        );
-      }
-
-      // Handle sticky columns configuration
+      const filteredLabelKeys = filterLabelKeys(Array.from(labelKeys));
       const stickyColumns = config.sticky_columns || [];
       const makeFirstSticky = config.sticky_first_column || false;
 
-      const columns: any[] = [
-        {
-          name: "timestamp",
-          field: "timestamp",
-          label: "Timestamp",
-          align: "left",
-          sortable: true,
-          sticky: makeFirstSticky, // Make timestamp sticky if first column should be sticky
-          headerClasses: makeFirstSticky ? "sticky-column" : undefined,
-          classes: makeFirstSticky ? "sticky-column" : undefined,
-          // support override configs for coloring
-          colorMode: colorConfigMap["timestamp"]?.autoColor
-            ? "auto"
-            : undefined,
-        },
-      ];
+      const columns: any[] = [makeTimestampColumn(makeFirstSticky)];
 
-      // Add columns for each label with custom ordering
       const sortedLabelKeys = this.applyColumnOrdering(filteredLabelKeys, config);
       sortedLabelKeys.forEach((key) => {
-        const isSticky = stickyColumns.includes(key);
-        // Note: Don't apply makeFirstSticky here because timestamp is already the first column
-
-        columns.push({
-          name: key,
-          field: key,
-          label: key,
-          align: "left",
-          sortable: true,
-          sticky: isSticky, // Make sticky only if explicitly in sticky_columns list
-          headerClasses: isSticky ? "sticky-column" : undefined,
-          classes: isSticky ? "sticky-column" : undefined,
-          // apply value mapping for label columns
-          format: (val: any) => {
-            const mapped = findFirstValidMappedValue(val, mappings, "text");
-            return mapped && mapped.text ? mapped.text : val;
-          },
-          // support override configs for coloring
-          colorMode: colorConfigMap[key.toLowerCase()]?.autoColor
-            ? "auto"
-            : undefined,
-        });
+        columns.push(makeLabelColumn(key, stickyColumns.includes(key)));
       });
 
-      // Add value column at the end
-      columns.push({
-        name: "value",
-        field: "value",
-        label: "Value",
-        align: "right",
-        sortable: true,
-        format: (val: any) => {
-          // Apply configured value mappings first
-          const mapped = findFirstValidMappedValue(val, mappings, "text");
-          if (mapped && mapped.text) return mapped.text;
-
-          // Unit override support
-          const aliasLower = "value";
-          const unitToUse = unitConfigMap[aliasLower]?.unit || config?.unit;
-          const customUnitToUse =
-            unitConfigMap[aliasLower]?.customUnit || config?.unit_custom;
-
-          const unitValue = getUnitValue(
-            val,
-            unitToUse,
-            customUnitToUse,
-            config?.decimals,
-          );
-          return formatUnitValue(unitValue);
-        },
-        // support override configs for coloring
-        colorMode: colorConfigMap["value"]?.autoColor ? "auto" : undefined,
-      });
+      columns.push(makeValueColumn("value", gt("common.value")));
 
       return columns;
     }
 
     // In "all" (Aggregate) mode, collect all unique label keys across all series
     const labelKeys = new Set<string>();
-
-    processedData.forEach((queryData, qIndex) => {
-      queryData.series.forEach((seriesData, sIndex) => {
-        Object.keys(seriesData.metric).forEach((key) => {
-          labelKeys.add(key);
-        });
+    processedData.forEach((queryData) => {
+      queryData.series.forEach((seriesData) => {
+        Object.keys(seriesData.metric).forEach((key) => labelKeys.add(key));
       });
     });
 
-    // Apply column filter if configured
-    // config.visible_columns: array of column names to show (if not set, show all)
-    // config.hidden_columns: array of column names to hide (if not set, hide none)
-    let filteredLabelKeys = Array.from(labelKeys);
-
-    if (
-      config.visible_columns &&
-      Array.isArray(config.visible_columns) &&
-      config.visible_columns.length > 0
-    ) {
-      // If visible_columns is specified, only show those columns
-      filteredLabelKeys = filteredLabelKeys.filter((key) =>
-        config.visible_columns.includes(key),
-      );
-    } else if (
-      config.hidden_columns &&
-      Array.isArray(config.hidden_columns) &&
-      config.hidden_columns.length > 0
-    ) {
-      // If hidden_columns is specified, hide those columns
-      filteredLabelKeys = filteredLabelKeys.filter(
-        (key) => !config.hidden_columns.includes(key),
-      );
-    }
-
-    // Get sticky columns configuration
-    // config.sticky_columns: array of column names to make sticky (or "first" to make first column sticky)
+    const filteredLabelKeys = filterLabelKeys(Array.from(labelKeys));
     const stickyColumns = config.sticky_columns || [];
     const makeFirstSticky = config.sticky_first_column || false;
-
-    // Apply custom column ordering
     const sortedLabelKeys = this.applyColumnOrdering(filteredLabelKeys, config);
 
-    // Create columns for each label
-    const columns = sortedLabelKeys.map((key, index) => {
-      const isSticky =
-        stickyColumns.includes(key) || (makeFirstSticky && index === 0);
+    const columns: any[] = sortedLabelKeys.map((key, index) =>
+      makeLabelColumn(key, stickyColumns.includes(key) || (makeFirstSticky && index === 0)),
+    );
 
-      return {
-        name: key,
-        field: key,
-        label: key,
-        align: "left",
-        sortable: true,
-        // Mark column as sticky for CSS styling
-        sticky: isSticky,
-        headerClasses: isSticky ? "sticky-column" : undefined,
-        classes: isSticky ? "sticky-column" : undefined,
-        // value mapping for text replacement
-        format: (val: any) => {
-          const mapped = findFirstValidMappedValue(val, mappings, "text");
-          return mapped && mapped.text ? mapped.text : val;
-        },
-        // optional override-config based automatic color
-        colorMode: colorConfigMap[key.toLowerCase()]?.autoColor
-          ? "auto"
-          : undefined,
-      };
-    });
-
-    // Add value columns for each selected aggregation
     aggregations.forEach((agg: string) => {
       const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
       const columnLabel =
-        aggregations.length === 1 ? "Value" : `Value (${agg})`;
-
-      columns.push({
-        name: columnName,
-        field: columnName,
-        label: columnLabel,
-        align: "right",
-        sortable: true,
-        // Apply value mapping and per-column unit overrides
-        format: (val: any) => {
-          const mapped = findFirstValidMappedValue(val, mappings, "text");
-          if (mapped && mapped.text) return mapped.text;
-
-          const aliasLower = columnName.toLowerCase();
-          const unitToUse = unitConfigMap[aliasLower]?.unit || config?.unit;
-          const customUnitToUse =
-            unitConfigMap[aliasLower]?.customUnit || config?.unit_custom;
-
-          const unitValue = getUnitValue(
-            val,
-            unitToUse,
-            customUnitToUse,
-            config?.decimals,
-          );
-          return formatUnitValue(unitValue);
-        },
-        // support override configs for coloring
-        colorMode: colorConfigMap[columnName.toLowerCase()]?.autoColor
-          ? "auto"
-          : undefined,
-      } as any);
+        aggregations.length === 1
+          ? gt("common.value")
+          : gt("dashboard.utils.promqlTableValueColumn", { aggregation: agg });
+      columns.push(makeValueColumn(columnName, columnLabel));
     });
-
-    // Timestamp column removed as per user request
 
     return columns;
   }
@@ -404,26 +216,20 @@ export class TableConverter implements PromQLChartConverter {
    * Build table rows from processed data
    * Supports multi-aggregation: calculates all selected aggregations for each series
    */
-  private buildRows(
-    processedData: ProcessedPromQLData[],
-    panelSchema: any,
-    store: any,
-  ): any[] {
+  private buildRows(processedData: ProcessedPromQLData[], panelSchema: any, store: any): any[] {
     const config = panelSchema.config || {};
     const tableMode = config.promql_table_mode || "single";
     const rows: any[] = [];
 
     // Get selected aggregations (default: ['last'])
-    const aggregations = config.table_aggregations || [
-      config.aggregation || "last",
-    ];
+    const aggregations = config.table_aggregations || [config.aggregation || "last"];
 
     // In "single" (Timestamp) mode, create rows with timestamp + value for ALL series
     if (tableMode === "single") {
       const timezone = store.state.timezone;
 
-      processedData.forEach((queryData, qIndex) => {
-        queryData.series.forEach((seriesData, sIndex) => {
+      processedData.forEach((queryData) => {
+        queryData.series.forEach((seriesData) => {
           // Create a row for each data point
           seriesData.values.forEach(([timestamp, value]) => {
             rows.push({
@@ -447,8 +253,8 @@ export class TableConverter implements PromQLChartConverter {
     if (tableMode === "expanded_timeseries") {
       const timezone = store.state.timezone;
 
-      processedData.forEach((queryData, qIndex) => {
-        queryData.series.forEach((seriesData, sIndex) => {
+      processedData.forEach((queryData) => {
+        queryData.series.forEach((seriesData) => {
           // Create a row for each data point with all metadata
           seriesData.values.forEach(([timestamp, value]) => {
             const row: any = {
@@ -471,8 +277,8 @@ export class TableConverter implements PromQLChartConverter {
     }
 
     // In "all" (Aggregate) mode, create rows with metric labels and aggregated values
-    processedData.forEach((queryData, qIndex) => {
-      queryData.series.forEach((seriesData, sIndex) => {
+    processedData.forEach((queryData) => {
+      queryData.series.forEach((seriesData) => {
         // Create row with metric labels
         const row: any = {
           ...seriesData.metric,
@@ -482,8 +288,7 @@ export class TableConverter implements PromQLChartConverter {
 
         // Calculate each aggregation for the series
         aggregations.forEach((agg: string) => {
-          const columnName =
-            aggregations.length === 1 ? "value" : `value_${agg}`;
+          const columnName = aggregations.length === 1 ? "value" : `value_${agg}`;
           row[columnName] = applyAggregation(seriesData.values, agg);
         });
 

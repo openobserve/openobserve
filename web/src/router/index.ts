@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,6 +15,7 @@
 
 import { createRouter, createWebHistory } from "vue-router";
 import { getDecodedUserInfo, getPath, mergeRoutes } from "@/utils/zincutils";
+import { gt } from "@/types/i18n";
 import segment from "@/services/segment_analytics";
 import config from "@/aws-exports";
 
@@ -26,7 +27,7 @@ export default function (store: any) {
   let { parentRoutes, homeChildRoutes } = userRoutes();
 
   let envRoutes: any;
-  if (config.isCloud == "true") {
+  if (config.isCloud == "true" || config.isEnterprise == "true") {
     envRoutes = userCloudRoutes();
   } else {
     envRoutes = useOSRoutes();
@@ -36,13 +37,31 @@ export default function (store: any) {
   // homeChildRoutes = homeChildRoutes.concat(envRoutes.homeChildRoutes);
   parentRoutes = mergeRoutes(parentRoutes, envRoutes.parentRoutes);
   homeChildRoutes = mergeRoutes(homeChildRoutes, envRoutes.homeChildRoutes);
+
+  // Merge enterprise pipeline children (eval templates, etc.) as direct children of pipeline
+  if (envRoutes.pipelineChildren) {
+    const pipelineRoute = homeChildRoutes.find((r: any) => r.path === "pipeline");
+    if (pipelineRoute) {
+      pipelineRoute.children = mergeRoutes(
+        pipelineRoute.children || [],
+        envRoutes.pipelineChildren,
+      );
+    }
+  }
+
+  // Filter out catchall route from homeChildRoutes
+  const catchAllRoute = homeChildRoutes.find((r: any) => r.path === "/:catchAll(.*)*");
+  const nonCatchAllRoutes = homeChildRoutes.filter((r: any) => r.path !== "/:catchAll(.*)*");
+
   const routes = [
     ...parentRoutes,
     {
       path: "/",
       component: () => import("@/layouts/MainLayout.vue"),
-      children: [...homeChildRoutes],
+      children: [...nonCatchAllRoutes],
     },
+    // Add catchall at the end to match any unmatched routes
+    ...(catchAllRoute ? [catchAllRoute] : []),
   ];
 
   interface RouterMap {
@@ -58,16 +77,29 @@ export default function (store: any) {
   const router = createRouter(routerMap);
 
   router.beforeEach((to: any, from: any, next: any) => {
-    // Set page title with OpenObserve prefix
-    if (to.meta && to.meta.title) {
-      document.title = `OpenObserve - ${to.meta.title}`;
+    // Set page title with OpenObserve prefix.
+    //
+    // Routes carry an i18n KEY (`meta.titleKey`), not the text: the route tables
+    // are module-scope, so translating where a route is declared would freeze the
+    // tab title at whatever locale happened to be active at import time. Resolving
+    // here — per navigation — keeps it in the current locale. `gt` (not `t`)
+    // because a navigation guard runs outside any component setup.
+    if (to.meta && to.meta.titleKey) {
+      // The brand prefix is a product noun, never translated; the page name is.
+      document.title = `OpenObserve - ${gt(to.meta.titleKey)}`;
     } else {
-      document.title = 'OpenObserve';
+      document.title = "OpenObserve";
     }
 
     const isAuthenticated = store.state.loggedIn;
 
-    if (!isAuthenticated && (to.path == "/cb" || to.path == "/web/cb")) {
+    if (
+      !isAuthenticated &&
+      (to.path === "/cb" ||
+        to.path === "/web/cb" ||
+        to.path === "/slack/oauth/callback" ||
+        to.path === "/web/slack/oauth/callback")
+    ) {
       next();
     } else if (!isAuthenticated) {
       const sessionUserInfo = getDecodedUserInfo();
@@ -78,15 +110,10 @@ export default function (store: any) {
         to.path != "/web/cb" &&
         sessionUserInfo === null
       ) {
-        if (
-          to.path !== "/logout" &&
-          to.path !== "/cb" &&
-          to.path != "/web/cb"
-        ) {
-          // if query params contains redirect_url, store that URL in session storage
-          // else store the current URL in session storage
-          // this conditions added specifically for short URL feature where user will be redirected to backend API endpoint
-          // if user is not logged in, then user will be redirected to login page and after successful login, user will be redirected to the short URL
+        if (to.path !== "/logout" && to.path !== "/cb" && to.path != "/web/cb") {
+          // If query params contain short_url, store that URL; else store the
+          // current URL. Needed for the short URL feature: after login the user
+          // is redirected to the stored short URL.
           if (Object.hasOwn(to.query, "short_url")) {
             window.sessionStorage.setItem("redirectURI", to.query.short_url);
           } else {
@@ -105,8 +132,7 @@ export default function (store: any) {
         next();
       }
     } else {
-      const sessionUserInfo = getDecodedUserInfo();
-      const userID = JSON.parse(String(sessionUserInfo)).email;
+      getDecodedUserInfo();
 
       segment.track("page view", {
         path: to.path,

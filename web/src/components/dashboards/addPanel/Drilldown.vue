@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
@@ -10,115 +10,78 @@
  distributed under the License is distributed on an "AS IS" BASIS,
  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  See the License for the specific language governing permissions and
- limitations under the License. 
+ limitations under the License.
 -->
 
 <!-- eslint-disable vue/no-unused-components -->
 <template>
   <div>
-    <div class="q-mb-sm" style="font-weight: 600">
-      <span>{{ t("dashboard.drilldown") }}</span>
-      <q-btn
-        no-caps
-        padding="xs"
-        class=""
-        size="sm"
-        flat
-        icon="info_outline"
-        data-test="dashboard-addpanel-config-drilldown-info"
-      >
-        <q-tooltip
-          class="bg-grey-8"
-          anchor="bottom middle"
-          self="top middle"
-          max-width="250px"
-        >
-          {{ t("dashboard.drilldownTooltip") }}
-        </q-tooltip>
-      </q-btn>
-    </div>
     <div
       v-for="(data, index) in dashboardPanelData.data.config.drilldown"
       :key="JSON.stringify(data) + index"
     >
-      <div
-        style="
-          display: flex;
-          justify-content: space-between;
-          margin-bottom: 5px;
-        "
-      >
+      <div class="mb-1.25 flex justify-between">
         <div
           @click="onDrilldownClick(index)"
-          style="
-            cursor: pointer;
-            padding-left: 10px;
-            width: 250px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-          "
+          class="w-62.5 cursor-pointer truncate ps-2.5"
           :data-test="`dashboard-addpanel-config-drilldown-name-${index}`"
         >
-          {{ index + 1 }}. {{ data.name }}
+          {{ Number(index) + 1 }}. {{ data.name }}
         </div>
-        <q-icon
-          class="q-mr-xs"
-          size="15px"
+        <OIcon
+          class="me-1 cursor-pointer"
+          size="sm"
           name="close"
-          style="cursor: pointer"
           @click="removeDrilldownByIndex(index)"
           :data-test="`dashboard-addpanel-config-drilldown-remove-${index}`"
         />
       </div>
     </div>
-    <q-btn
+    <OButton
+      variant="outline"
+      size="sm"
       @click="addNewDrilldown"
-      style="cursor: pointer; padding: 0px 5px"
-      label="+ Add"
-      class="el-border"
-      no-caps
       data-test="dashboard-addpanel-config-drilldown-add-btn"
+    >
+      + {{ t("common.add") }}
+    </OButton>
+    <DrilldownPopUp
+      :key="drilldownPopUpKey"
+      :open="showDrilldownPopUp"
+      :drilldown-data-index="selectedDrilldownIndexToEdit"
+      :is-edit-mode="isDrilldownEditMode"
+      :variables-data="variablesData"
+      @close="saveDrilldownData"
     />
-    <app-dialog v-model="showDrilldownPopUp">
-      <drilldown-pop-up
-        :drilldown-data-index="selectedDrilldownIndexToEdit"
-        :is-edit-mode="isDrilldownEditMode"
-        :variables-data="variablesData"
-        @close="saveDrilldownData"
-        :class="store.state.theme == 'dark' ? 'dark-mode' : 'bg-white'"
-      />
-    </app-dialog>
   </div>
 </template>
 
 <script lang="ts">
 import { defineComponent, inject, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import DrilldownPopUp from "./DrilldownPopUp.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import { useStore } from "vuex";
-import useDashboardPanelData from "../../../composables/useDashboardPanel";
-import AppDialog from "../../common/AppDialog.vue";
+import useDashboardPanelData from "../../../composables/dashboard/useDashboardPanel";
 import { onBeforeMount } from "vue";
 
 export default defineComponent({
   name: "Drilldown",
-  components: { DrilldownPopUp, AppDialog },
+  components: { DrilldownPopUp, OButton, OIcon },
   props: ["variablesData"],
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const showDrilldownPopUp = ref(false);
     const isDrilldownEditMode = ref(false);
     const selectedDrilldownIndexToEdit: any = ref(null);
+    // Bumped on every open so the popup remounts fresh each time, ensuring the
+    // saved folder/dashboard/tab are loaded into the form on the first edit.
+    const drilldownPopUpKey = ref(0);
 
-    const dashboardPanelDataPageKey = inject(
-      "dashboardPanelDataPageKey",
-      "dashboard",
-    );
-    const { dashboardPanelData } = useDashboardPanelData(
-      dashboardPanelDataPageKey,
-    );
+    const dashboardPanelDataPageKey = inject("dashboardPanelDataPageKey", "dashboard");
+    const { dashboardPanelData } = useDashboardPanelData(dashboardPanelDataPageKey, t);
 
     onBeforeMount(() => {
       // Ensure that the drilldown object is initialized in config
@@ -130,12 +93,14 @@ export default defineComponent({
     const onDrilldownClick = (index: any) => {
       selectedDrilldownIndexToEdit.value = index;
       isDrilldownEditMode.value = true;
+      drilldownPopUpKey.value++;
       showDrilldownPopUp.value = true;
     };
 
     const addNewDrilldown = () => {
       isDrilldownEditMode.value = false;
       selectedDrilldownIndexToEdit.value = null;
+      drilldownPopUpKey.value++;
       showDrilldownPopUp.value = true;
     };
 
@@ -160,9 +125,8 @@ export default defineComponent({
       saveDrilldownData,
       addNewDrilldown,
       isDrilldownEditMode,
+      drilldownPopUpKey,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped></style>

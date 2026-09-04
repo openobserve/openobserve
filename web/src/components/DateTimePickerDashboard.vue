@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,7 +14,7 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <date-time
+  <DateTime
     ref="dateTimePicker"
     :auto-apply="autoApplyDashboard"
     :default-type="modelValue.valueType"
@@ -26,15 +26,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     @on:date-change="updateDateTime"
     :initialTimezone="initialTimezone"
     :disable="disable"
+    :hide-relative-timezone="hideRelativeTimezone"
+    :menu-align="menuAlign"
+    :variant="variant"
     @hide="onHide"
     @show="onShow"
   >
-  </date-time>
+  </DateTime>
 </template>
 
 <script lang="ts">
-import { ref, defineComponent, reactive, watch, computed, onUnmounted } from "vue";
+import { ref, defineComponent, onUnmounted, type PropType } from "vue";
 import DateTime from "@/components/DateTime.vue";
+import type { ButtonVariant } from "@/lib/core/Button/OButton.types";
 
 export default defineComponent({
   name: "DateTimePickerDashboard",
@@ -62,6 +66,21 @@ export default defineComponent({
     autoApplyDashboard: {
       required: false,
       default: false,
+    },
+    hideRelativeTimezone: {
+      required: false,
+      default: false,
+      type: Boolean,
+    },
+    menuAlign: {
+      required: false,
+      default: "end",
+      type: String as PropType<"center" | "start" | "end">,
+    },
+    variant: {
+      required: false,
+      default: "outline",
+      type: String as PropType<ButtonVariant>,
     },
   },
   emits: ["update:modelValue", "hide", "show"],
@@ -126,5 +145,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped></style>

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,9 +15,10 @@
 
 import type {
   ServiceMetadata,
-  SemanticFieldGroup,
+  FieldAlias,
   CorrelationResponse,
   StreamInfo,
+  ServiceIdentityConfig,
 } from "@/services/service_streams";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
 
@@ -65,31 +66,23 @@ export interface CorrelationResult {
  */
 export function extractSemanticDimensions(
   context: TelemetryContext,
-  semanticGroups: SemanticFieldGroup[],
-  stableOnly: boolean = false
+  semanticGroups: FieldAlias[],
+  stableOnly: boolean = false,
 ): Record<string, string> {
   const dimensions: Record<string, string> = {};
 
-  // Build reverse lookup: field name -> { dimensionId, isStable }
-  const fieldToDimension = new Map<string, { id: string; isStable: boolean }>();
+  // Iterate groups and their fields in definition order (same as backend processor.rs).
+  // First field found in context.fields wins — deterministic, matches ingestion behaviour.
   for (const group of semanticGroups) {
-    for (const field of group.fields) {
-      fieldToDimension.set(field, {
-        id: group.id,
-        isStable: group.is_stable ?? false
-      });
+    if (stableOnly && !(group.is_stable ?? false)) {
+      continue;
     }
-  }
-
-  // Extract dimensions from context fields
-  for (const [fieldName, value] of Object.entries(context.fields)) {
-    const dimInfo = fieldToDimension.get(fieldName);
-    if (dimInfo && value !== null && value !== undefined) {
-      // Skip unstable dimensions if stableOnly is true
-      if (stableOnly && !dimInfo.isStable) {
-        continue;
+    for (const field of group.fields) {
+      const value = context.fields[field];
+      if (value !== null && value !== undefined) {
+        dimensions[group.id] = String(value);
+        break; // first match by group definition order wins
       }
-      dimensions[dimInfo.id] = String(value);
     }
   }
 
@@ -97,28 +90,227 @@ export function extractSemanticDimensions(
 }
 
 /**
- * Translate dimensions to field names for a specific telemetry type
+ * Build a reverse mapping from field name (lowercase) to schematic group ID.
+ * Uses definition-order priority: first FieldAlias that includes the field wins.
+ * This is the inverse of extractSemanticDimensions.
  *
- * Uses semantic groups to map dimension IDs to actual field names
+ * Use this to deduplicate fields by their semantic group when building queries
+ * from multiple correlated streams that may use different field names for the
+ * same conceptual dimension.
  */
-function translateDimensionsToFields(
-  dimensions: Record<string, string>,
-  semanticGroups: SemanticFieldGroup[]
-): Array<{ dimensionId: string; possibleFields: string[]; value: string }> {
-  const translations: Array<{ dimensionId: string; possibleFields: string[]; value: string }> = [];
+export function buildFieldToGroupIdMap(semanticGroups: FieldAlias[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const group of semanticGroups) {
+    for (const field of group.fields) {
+      const lower = field.toLowerCase();
+      if (!map.has(lower)) {
+        map.set(lower, group.id);
+      }
+    }
+  }
+  return map;
+}
 
-  for (const [dimensionId, value] of Object.entries(dimensions)) {
-    const group = semanticGroups.find((g) => g.id === dimensionId);
-    if (group) {
-      translations.push({
-        dimensionId,
-        possibleFields: group.fields,
-        value,
-      });
+/**
+ * Overlay user filter edits onto ONE stream's base filters (F35).
+ *
+ * Chip keys are raw field names harvested from a single stream, but every
+ * correlated stream carries its own alias for the same semantic group (e.g.
+ * a log stream's `k8s_namespace_name` vs a trace stream's
+ * `service_k8s_namespace_name`). Requiring literal key identity silently drops
+ * the user's edit for every stream that spells the field differently, so the
+ * override is resolved through the semantic group when the exact key is absent.
+ *
+ * Precedence: an exact key match always wins; only then do we fall back to the
+ * group. Overrides that match neither are dropped — adding them would emit a
+ * WHERE condition on a column the stream does not have.
+ *
+ * @param baseFilters - the stream's own filters, keyed by its raw field names
+ * @param overrides - user-edited values, keyed by whichever stream's field names the chips came from
+ * @param fieldToGroupId - lowercased field name -> semantic group ID (see buildFieldToGroupIdMap)
+ */
+export function applyFilterOverlay(
+  baseFilters: Record<string, string>,
+  overrides: Record<string, string>,
+  fieldToGroupId: Map<string, string>,
+): Record<string, string> {
+  const effective: Record<string, string> = { ...baseFilters };
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (key in baseFilters) {
+      effective[key] = value;
+      continue;
+    }
+
+    const groupId = fieldToGroupId.get(key.toLowerCase());
+    if (!groupId) continue;
+
+    const target = Object.keys(baseFilters).find(
+      (baseKey) => fieldToGroupId.get(baseKey.toLowerCase()) === groupId,
+    );
+    if (target) effective[target] = value;
+  }
+
+  return effective;
+}
+
+/**
+ * Apply dimension-bar edits to ONE stream's filters (F36).
+ *
+ * `activeDimensions` is raw-field-keyed when the bar was seeded from stream
+ * filters (SearchResult / TraceDetailsSidebar dialog path) and
+ * semantic-ID-keyed when seeded from `matched_dimensions`
+ * (IncidentDetailDrawer path) — the component cannot tell which, so look up
+ * BOTH key spaces, raw field first.
+ *
+ * Only existing filter keys are updated: adding a key would emit a WHERE
+ * condition on a column the stream does not have.
+ *
+ * @param filters - the stream's own filters, keyed by its raw field names
+ * @param activeDimensions - edited values, keyed by raw field name OR semantic group ID
+ * @param fieldToDimensionId - lowercased field name -> semantic group ID (see buildFieldToGroupIdMap)
+ */
+export function applyDimensionEditsToFilters(
+  filters: Record<string, string>,
+  activeDimensions: Record<string, string>,
+  fieldToDimensionId: Map<string, string>,
+): Record<string, string> {
+  const updated: Record<string, string> = { ...filters };
+
+  for (const filterKey of Object.keys(filters)) {
+    const dimensionId = fieldToDimensionId.get(filterKey.toLowerCase());
+
+    // Raw-field key wins over the semantic-ID key. When the bar was seeded from
+    // a different stream's alias, fall back to any edit whose key resolves to
+    // the same semantic group.
+    let newValue = activeDimensions[filterKey];
+    if (newValue === undefined && dimensionId !== undefined) {
+      newValue = activeDimensions[dimensionId];
+    }
+    if (newValue === undefined && dimensionId !== undefined) {
+      const aliasKey = Object.keys(activeDimensions).find(
+        (key) => fieldToDimensionId.get(key.toLowerCase()) === dimensionId,
+      );
+      if (aliasKey !== undefined) newValue = activeDimensions[aliasKey];
+    }
+
+    if (newValue !== undefined) {
+      updated[filterKey] = newValue;
     }
   }
 
-  return translations;
+  return updated;
+}
+
+/**
+ * Merge schema-verified subject overrides into ONE stream's filters (F31).
+ *
+ * The backend resolves a stream's filters using its own alias for a semantic
+ * group; the subject override is resolved against the stream schema and may
+ * land on a different alias of the SAME group. A plain spread therefore UNIONS
+ * the two aliases into `WHERE old_alias = 'prod' AND new_alias = 'staging'`,
+ * which matches nothing. Replace the same-group key instead of adding to it.
+ *
+ * An override whose group has no counterpart in `filters` is added — it was
+ * resolved against the stream schema, so the column is known to exist.
+ *
+ * @param filters - the stream's own filters, keyed by its raw field names
+ * @param overrides - schema-verified field name -> value
+ * @param fieldToGroupId - lowercased field name -> semantic group ID (see buildFieldToGroupIdMap)
+ */
+export function mergeSubjectOverrides(
+  filters: Record<string, string>,
+  overrides: Record<string, string>,
+  fieldToGroupId: Map<string, string>,
+): Record<string, string> {
+  const effective: Record<string, string> = { ...filters };
+
+  for (const [hit, value] of Object.entries(overrides)) {
+    const groupId = fieldToGroupId.get(hit.toLowerCase());
+    const existingKey = Object.keys(effective).find(
+      (key) =>
+        key === hit || (groupId !== undefined && fieldToGroupId.get(key.toLowerCase()) === groupId),
+    );
+    if (existingKey !== undefined && existingKey !== hit) {
+      delete effective[existingKey];
+    }
+    effective[hit] = value;
+  }
+
+  return effective;
+}
+
+/**
+ * Filter dimensions to only include fields that are actually used for disambiguation
+ *
+ * This implements the same logic as the backend to determine which dimensions are relevant
+ * for service matching. This reduces the amount of data sent to the _correlate API and
+ * ensures we only send dimensions that the backend will actually use.
+ *
+ * Logic matches backend processor.rs:
+ * 1. Use distinguish_by fields from all identity sets (union), OR
+ * 2. Use tracked_alias_ids as fallback
+ * 3. Always include "service" dimension if present
+ *
+ * @param allDimensions - All extracted semantic dimensions
+ * @param identityConfig - Service identity configuration
+ * @returns Filtered dimensions containing only disambiguation fields
+ */
+export function filterDimensionsForCorrelation(
+  allDimensions: Record<string, string>,
+  identityConfig: ServiceIdentityConfig,
+): Record<string, string> {
+  // Determine selected fields (same logic as backend)
+  let selectedFields: string[] = [];
+
+  if (identityConfig.sets && identityConfig.sets.length > 0) {
+    // Use distinguish_by fields from ALL identity sets (union of all sets)
+    const allDistinguishByFields = new Set<string>();
+    for (const set of identityConfig.sets) {
+      if (set.distinguish_by) {
+        set.distinguish_by.forEach((field) => allDistinguishByFields.add(field));
+      }
+    }
+    selectedFields = Array.from(allDistinguishByFields);
+  } else if (identityConfig.tracked_alias_ids && identityConfig.tracked_alias_ids.length > 0) {
+    // Fallback to tracked_alias_ids
+    selectedFields = identityConfig.tracked_alias_ids;
+  } else {
+    // No config available, return all dimensions
+    return allDimensions;
+  }
+
+  // Include selected fields. Add "service" only when not in service_optional mode —
+  // including it would make the backend take the service-name fast path and ignore the
+  // service_optional toggle (which only triggers when `service` is absent from input).
+  const fieldsToKeep = new Set<string>(selectedFields);
+  if (!identityConfig.service_optional) {
+    fieldsToKeep.add("service");
+  }
+
+  // Filter dimensions to only include fields we need
+  const filtered = Object.fromEntries(
+    Object.entries(allDimensions).filter(([key]) => fieldsToKeep.has(key)),
+  );
+
+  return filtered;
+}
+
+/**
+ * SQL escaping for correlation query builders. Values originate from
+ * telemetry labels (user-controlled data) — every builder MUST route
+ * field/value interpolation through these helpers (F2).
+ */
+export function quoteSqlIdentifier(field: string): string {
+  return `"${String(field).replace(/"/g, '""')}"`;
+}
+
+export function quoteSqlLiteral(value: string): string {
+  return `'${String(value).replace(/'/g, "''")}'`;
+}
+
+export function buildSqlCondition(field: string, value: string): string {
+  return `${quoteSqlIdentifier(field)} = ${quoteSqlLiteral(value)}`;
 }
 
 /**
@@ -127,9 +319,7 @@ function translateDimensionsToFields(
  * Uses the exact field names returned by the _correlate API instead of semantic variations.
  * Skips filters with SELECT_ALL_VALUE (wildcard - means match all values).
  */
-function buildExactDimensionConditions(
-  filters: Record<string, string>
-): string[] {
+function buildExactDimensionConditions(filters: Record<string, string>): string[] {
   const conditions: string[] = [];
 
   for (const [fieldName, value] of Object.entries(filters)) {
@@ -137,9 +327,7 @@ function buildExactDimensionConditions(
     if (value === SELECT_ALL_VALUE) {
       continue;
     }
-    // Escape single quotes in value
-    const escapedValue = value.replace(/'/g, "''");
-    conditions.push(`${fieldName} = '${escapedValue}'`);
+    conditions.push(buildSqlCondition(fieldName, value));
   }
 
   return conditions;
@@ -155,13 +343,12 @@ function buildExactDimensionConditions(
 export function buildTraceQuery(
   streamInfo: StreamInfo,
   context: TelemetryContext,
-  timeWindowMinutes: number = 5
+  timeWindowMinutes: number = 5,
+  matchedDimensions: Record<string, string> = {},
 ): CorrelationQuery {
   const conditions: string[] = [];
 
-  // Add dimension conditions using exact field names from StreamInfo.filters
-  // This includes service_name if present in the trace stream
-  const dimensionConditions = buildExactDimensionConditions(streamInfo.filters);
+  const dimensionConditions = buildExactDimensionConditions(matchedDimensions);
   conditions.push(...dimensionConditions);
 
   // Build SQL WITHOUT timestamp (timestamp passed separately as from/to)
@@ -180,7 +367,7 @@ export function buildTraceQuery(
     type: "traces",
     stream: streamInfo.stream_name,
     sql,
-    filters: streamInfo.filters,
+    filters: matchedDimensions,
     timeRange: {
       start: startTime,
       end: endTime,
@@ -198,13 +385,12 @@ export function buildTraceQuery(
 export function buildMetricQuery(
   streamInfo: StreamInfo,
   context: TelemetryContext,
-  timeWindowMinutes: number = 5
+  timeWindowMinutes: number = 5,
+  matchedDimensions: Record<string, string> = {},
 ): CorrelationQuery {
   const conditions: string[] = [];
 
-  // Add dimension conditions using exact field names from StreamInfo.filters
-  // These filters contain ONLY the labels that actually exist in this metric stream
-  const dimensionConditions = buildExactDimensionConditions(streamInfo.filters);
+  const dimensionConditions = buildExactDimensionConditions(matchedDimensions);
   conditions.push(...dimensionConditions);
 
   // Build SQL WITHOUT timestamp (timestamp passed separately as from/to)
@@ -223,7 +409,7 @@ export function buildMetricQuery(
     type: "metrics",
     stream: streamInfo.stream_name,
     sql,
-    filters: streamInfo.filters,
+    filters: matchedDimensions,
     timeRange: {
       start: startTime,
       end: endTime,
@@ -238,12 +424,12 @@ export function buildMetricQuery(
 export function buildLogQuery(
   streamInfo: StreamInfo,
   context: TelemetryContext,
-  timeWindowMinutes: number = 5
+  timeWindowMinutes: number = 5,
+  matchedDimensions: Record<string, string> = {},
 ): CorrelationQuery {
   const conditions: string[] = [];
 
-  // Add dimension conditions using exact field names from StreamInfo.filters
-  const dimensionConditions = buildExactDimensionConditions(streamInfo.filters);
+  const dimensionConditions = buildExactDimensionConditions(matchedDimensions);
   conditions.push(...dimensionConditions);
 
   // Build SQL WITHOUT timestamp (timestamp passed separately as from/to)
@@ -262,7 +448,7 @@ export function buildLogQuery(
     type: "logs",
     stream: streamInfo.stream_name,
     sql,
-    filters: streamInfo.filters,
+    filters: matchedDimensions,
     timeRange: {
       start: startTime,
       end: endTime,
@@ -280,32 +466,31 @@ export function generateCorrelationQueries(
   service: ServiceMetadata,
   context: TelemetryContext,
   sourceType: TelemetryType,
-  semanticGroups: SemanticFieldGroup[],
+  semanticGroups: FieldAlias[],
   timeWindowMinutes: number = 5,
-  correlationData?: CorrelationResponse
+  correlationData?: CorrelationResponse,
 ): CorrelationQuery[] {
   const queries: CorrelationQuery[] = [];
 
-  // If we have correlation data from the API, use the exact StreamInfo with field names
+  // If we have correlation data from the API, use matched_dimensions for WHERE clauses
   if (correlationData) {
-    // Generate queries for each target type (excluding source type)
+    const dims = correlationData.matched_dimensions ?? {};
+
     if (sourceType !== "traces") {
       for (const streamInfo of correlationData.related_streams.traces) {
-        // Use filters from StreamInfo directly (same as logs/metrics)
-        // service_name is already in filters if present
-        queries.push(buildTraceQuery(streamInfo, context, timeWindowMinutes));
+        queries.push(buildTraceQuery(streamInfo, context, timeWindowMinutes, dims));
       }
     }
 
     if (sourceType !== "metrics") {
       for (const streamInfo of correlationData.related_streams.metrics) {
-        queries.push(buildMetricQuery(streamInfo, context, timeWindowMinutes));
+        queries.push(buildMetricQuery(streamInfo, context, timeWindowMinutes, dims));
       }
     }
 
     if (sourceType !== "logs") {
       for (const streamInfo of correlationData.related_streams.logs) {
-        queries.push(buildLogQuery(streamInfo, context, timeWindowMinutes));
+        queries.push(buildLogQuery(streamInfo, context, timeWindowMinutes, dims));
       }
     }
   }
@@ -320,7 +505,7 @@ export function generateCorrelationQueries(
  */
 export function findMatchingService(
   services: ServiceMetadata[],
-  dimensions: Record<string, string>
+  dimensions: Record<string, string>,
 ): ServiceMetadata | null {
   // Find service with most matching dimensions
   let bestMatch: ServiceMetadata | null = null;

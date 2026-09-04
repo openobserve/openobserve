@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,8 +15,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="card-container tw:w-[100vw] tw:h-[100vh]">
-    <div style="max-width: 400px; padding-top: 100px" class="q-mx-auto q-pa-md">
+  <div class="bg-card-glass-bg h-[100vh] w-[100vw]">
+    <div style="max-width: 25rem; padding-top: 6.25rem" class="mx-auto p-3">
       <div
         class="flex justify-center text-center"
         v-if="
@@ -33,46 +33,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             store.state.zoConfig.hasOwnProperty('custom_logo_text') &&
             store.state.zoConfig?.custom_logo_text != ''
           "
-          class="text-h6 text-bold q-pa-none cursor-pointer q-mr-sm full-width"
+          class="me-2 w-full cursor-pointer p-0 text-xl font-bold font-semibold"
           >{{ store.state.zoConfig.custom_logo_text }}</span
         >
-        <span class="full-width flex justify-center">
+        <span class="flex w-full justify-center">
           <img
             v-if="
               store.state.zoConfig.hasOwnProperty('custom_logo_img') &&
               store.state.zoConfig?.custom_logo_img != null
             "
             :src="`data:image; base64, ` + store.state.zoConfig?.custom_logo_img"
-            style="max-width: 150px; max-height: 31px"
+            style="max-width: 9.375rem; max-height: 1.9375rem"
           />
         </span>
         <img
           v-if="store.state.zoConfig.custom_hide_self_logo == false"
-          class="appLogo"
-          style="height: auto"
+          class="appLogo h-auto"
           :style="
-            store.state.zoConfig.custom_logo_text != ''
-              ? 'width: 150px;'
-              : 'width: 250px;'
+            store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
           "
           :src="
-            store.state.theme == 'dark'
+            isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
               : getImageURL('images/common/openobserve_latest_light_2.svg')
           "
         />
       </div>
-      <div class="flex justify-center q-mb-lg" v-else>
+      <div class="mb-4 flex justify-center" v-else>
         <img
-          class="appLogo"
-          style="height: auto"
+          class="appLogo h-auto"
           :style="
-            store.state.zoConfig.custom_logo_text != ''
-              ? 'width: 150px;'
-              : 'width: 250px;'
+            store.state.zoConfig.custom_logo_text != '' ? 'width: 9.375rem;' : 'width: 15.625rem;'
           "
           :src="
-            store.state.theme == 'dark'
+            isDark
               ? getImageURL('images/common/openobserve_latest_dark_2.svg')
               : getImageURL('images/common/openobserve_latest_light_2.svg')
           "
@@ -81,97 +75,90 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <div v-if="autoRedirectDexLogin">
         <p>
-          Redirecting to SSO login page. If you are not redirected, please
-          <a href="#" @click="loginWithSSo" class="cursor-pointer tw:underline">click here</a>.
+          {{ t("login.redirectingToSsoMessage") }}
+          <a href="#" @click="loginWithSSo" class="cursor-pointer underline">{{
+            t("login.clickHere")
+          }}</a
+          >.
         </p>
       </div>
 
       <div v-else>
-        <div style="font-size: 22px" class="full-width text-center q-pb-md">
-          Login
+        <div style="font-size: var(--text-xl)" class="w-full pb-3 text-center">
+          {{ t("login.login") }}
         </div>
 
         <div v-if="showSSO" class="flex justify-center">
-          <q-btn
+          <OButton
             data-test="sso-login-btn"
-            class="text-bold no-border"
-            padding="sm lg"
-            color="primary"
-            no-caps
-            style="width: 400px"
+            variant="primary"
+            size="sm-action"
+            style="width: 25rem"
             @click="loginWithSSo"
           >
-            <div
-              class="flex items-center justify-center full-width text-center relative"
-            >
+            <div class="relative flex w-full items-center justify-center text-center">
               <img
                 class="absolute"
-                style="width: 30px; left: 16px"
+                style="width: 1.875rem; left: 1rem"
                 :src="getImageURL('images/common/sso.svg')"
               />
-              <span class="text-center"> Login with SSO</span>
+              <span class="text-center"> {{ t("login.loginWithSso") }}</span>
             </div>
-          </q-btn>
+          </OButton>
         </div>
 
-        <div v-if="showSSO && showInternalLogin" class="q-py-md text-center">
+        <div v-if="showSSO && showInternalLogin" class="py-3 text-center">
           <a
-            class="cursor-pointer login-internal-link q-py-md"
+            class="hover:text-text-secondary cursor-pointer py-3"
             style="text-decoration: underline"
+            data-test="login-as-internal-user"
             @click="loginAsInternalUser = !loginAsInternalUser"
-            >Login as internal user</a
+            >{{ t("login.loginAsInternalUser") }}</a
           >
         </div>
 
         <div
           v-if="!showSSO || (showSSO && loginAsInternalUser && showInternalLogin)"
-          class="o2-input login-inputs"
+          class="login-inputs"
         >
-          <q-form ref="loginform"
-  class="q-gutter-md" @submit.prevent="">
-            <q-input
-              v-model="name"
+          <OForm
+            :schema="loginSchema"
+            :default-values="loginDefaults"
+            @submit="onSignIn"
+            class="flex flex-col gap-3"
+          >
+            <OFormInput
+              name="name"
               data-cy="login-user-id"
               data-test="login-user-id"
-              outlined
-              :label="`${t('login.userEmail')} *`"
-              placeholder="Email"
-              class="showLabelOnTop no-case"
+              :label="t('login.userEmail')"
+              :placeholder="t('login.email')"
               type="email"
-              dense
-              stack-label
-              filled
+              required
             />
 
-            <q-input
-              v-model="password"
+            <OFormInput
+              name="password"
               data-cy="login-password"
               data-test="login-password"
-              outlined
-              :label="`${t('login.password')} *`"
-              placeholder="Password"
-              class="showLabelOnTop no-case"
+              :label="t('login.password')"
+              :placeholder="t('login.password')"
               type="password"
-              dense
-              stack-label
-              filled
+              required
             />
 
-            <div class="q-mt-lg q-mb-xl">
-              <q-btn
-                data-cy="login-sign-in"
-                unelevated
-                class="full-width text-bold no-border"
-                color="primary"
-                type="submit"
-                padding="sm lg"
-                :label="t('login.login')"
-                :loading="submitting"
-                no-caps
-                @click="onSignIn()"
-              />
-            </div>
-          </q-form>
+            <OButton
+              data-cy="login-sign-in"
+              data-test="login-sign-in"
+              variant="primary"
+              size="sm-action"
+              block
+              type="submit"
+              :loading="submitting"
+            >
+              {{ t("login.login") }}
+            </OButton>
+          </OForm>
         </div>
       </div>
     </div>
@@ -179,12 +166,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref, onBeforeMount } from "vue";
+import { defineComponent, ref, onBeforeMount } from "vue";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
 import { useRouter } from "vue-router";
 
-import { useI18n } from "vue-i18n";
+import { useI18nTyped } from "@/types/i18n";
 import authService from "@/services/auth";
 import organizationsService from "@/services/organizations";
 import {
@@ -197,38 +183,46 @@ import {
 } from "@/utils/zincutils";
 import { redirectUser } from "@/utils/common";
 import { computed } from "vue";
+import { useTheme } from "@/composables/useTheme";
 import config from "@/aws-exports";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import { openobserveRum } from "@openobserve/browser-rum";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { makeLoginSchema, loginDefaults, type LoginForm } from "./Login.schema";
 
 export default defineComponent({
   name: "PageLogin",
+  components: { OButton, OForm, OFormInput },
 
   setup() {
     const store = useStore();
     const router = useRouter();
-    const $q = useQuasar();
-    const { t } = useI18n();
+    const { isDark } = useTheme();
+    const { t } = useI18nTyped();
     const name = ref("");
     const password = ref("");
     const confirmpassword = ref("");
     const email = ref("");
-    const loginform = ref();
     const selectedOrg = ref({});
     const autoRedirectDexLogin = ref(false);
     let orgOptions = ref([{ label: Number, value: String }]);
-    const { identify } = useReo();
+    useReo();
 
     const submitting = ref(false);
 
     const loginAsInternalUser = ref(false);
 
-    onBeforeMount(() => {
+    // Zod schema for the internal-user login form (email + required password).
+    // Built via the i18n factory and RETURNED from setup() so `:schema` resolves
+    // in the Options-API template (a module-scope import is out of the template's
+    // scope, which would silently disable validation).
+    const loginSchema = makeLoginSchema(t);
 
-      if (
-        config.isCloud == "true" &&
-        router.currentRoute.value.path != "/cb"
-      ) {
+    onBeforeMount(() => {
+      if (config.isCloud == "true" && router.currentRoute.value.path != "/cb") {
         autoRedirectDexLogin.value = true;
         loginWithSSo();
       }
@@ -259,14 +253,17 @@ export default defineComponent({
       }
     };
 
-    const onSignIn = () => {
-      if (name.value == "" || password.value == "") {
-        $q.notify({
-          position: "top",
-          color: "warning",
-          textColor: "white",
-          icon: "warning",
-          message: "Please input valid username or password.",
+    // Called by OForm's @submit with the schema-validated values. Still accepts
+    // no argument (falls back to the name/password refs) so it can be invoked
+    // directly — the empty-field guard below stays as defense in depth even
+    // though the schema now blocks empty/invalid submits before we get here.
+    const onSignIn = (values?: LoginForm) => {
+      const nameValue = values?.name ?? name.value;
+      const passwordValue = values?.password ?? password.value;
+      if (nameValue == "" || passwordValue == "") {
+        toast({
+          variant: "warning",
+          message: t("toastMessages.login.pleaseInputValidUsernameOrPassword"),
         });
       } else {
         submitting.value = true;
@@ -274,28 +271,24 @@ export default defineComponent({
           //authorize user using username and password
           authService
             .sign_in_user({
-              name: name.value,
-              password: password.value,
+              name: nameValue,
+              password: passwordValue,
             })
             .then(async (res: any) => {
               //if user is authorized, get user info
               if (res.data.status == true) {
                 //get user info from backend and extract auth token and set it into localstorage
-                const authToken = getBasicAuth(name.value, password.value);
+                getBasicAuth(name.value, password.value);
                 const userInfo = {
-                  given_name: name.value,
+                  given_name: nameValue,
                   auth_time: Math.floor(Date.now() / 1000),
-                  name: name.value,
-                  exp: Math.floor(
-                    (new Date().getTime() + 1000 * 60 * 60 * 24 * 30) / 1000,
-                  ),
+                  name: nameValue,
+                  exp: Math.floor((new Date().getTime() + 1000 * 60 * 60 * 24 * 30) / 1000),
                   family_name: "",
-                  email: name.value,
+                  email: nameValue,
                   role: res.data.role,
                 };
-                const encodedUserInfo: any = b64EncodeStandard(
-                  JSON.stringify(userInfo),
-                );
+                const encodedUserInfo: any = b64EncodeStandard(JSON.stringify(userInfo));
                 //set user info into localstorage & store
                 useLocalUserInfo(encodedUserInfo);
                 store.dispatch("setUserInfo", encodedUserInfo);
@@ -303,7 +296,7 @@ export default defineComponent({
                 useLocalCurrentUser(JSON.stringify(userInfo));
                 store.dispatch("setCurrentUser", userInfo);
 
-                if(store.state.zoConfig?.rum?.enabled) {
+                if (store.state.zoConfig?.rum?.enabled) {
                   // Set user information first
                   openobserveRum.setUser({
                     name: userInfo.given_name + " " + userInfo.family_name,
@@ -314,8 +307,7 @@ export default defineComponent({
                 }
 
                 //check for redirect URI and redirect user to that page
-                const redirectURI =
-                  window.sessionStorage.getItem("redirectURI");
+                const redirectURI = window.sessionStorage.getItem("redirectURI");
                 window.sessionStorage.removeItem("redirectURI");
 
                 //check organization information stored in localstorage along with email
@@ -361,13 +353,14 @@ export default defineComponent({
                             user_email: store.state.userInfo.email,
                             ingest_threshold: data.ingest_threshold,
                             search_threshold: data.search_threshold,
-                            subscription_type: data.hasOwnProperty(
+                            subscription_type: Object.prototype.hasOwnProperty.call(
+                              data,
                               "CustomerBillingObj",
                             )
                               ? data.CustomerBillingObj.subscription_type
                               : "",
                             status: data.status,
-                            note: data.hasOwnProperty("CustomerBillingObj")
+                            note: Object.prototype.hasOwnProperty.call(data, "CustomerBillingObj")
                               ? data.CustomerBillingObj.note
                               : "",
                           };
@@ -375,19 +368,13 @@ export default defineComponent({
                           if (
                             (Object.keys(selectedOrg.value).length == 0 &&
                               (data.type == "default" || data.id == "1") &&
-                              store.state.userInfo.email ==
-                                data.UserObj.email) ||
+                              store.state.userInfo.email == data.UserObj.email) ||
                             res.data.data.length == 1
                           ) {
                             localOrgFlag = true;
-                            selectedOrg.value = localOrg.value
-                              ? localOrg.value
-                              : optiondata;
+                            selectedOrg.value = localOrg.value ? localOrg.value : optiondata;
                             useLocalOrganization(selectedOrg.value);
-                            store.dispatch(
-                              "setSelectedOrganization",
-                              selectedOrg.value,
-                            );
+                            store.dispatch("setSelectedOrganization", selectedOrg.value);
                           }
 
                           if (data.type == "default") {
@@ -401,43 +388,34 @@ export default defineComponent({
                       if (localOrgFlag == false) {
                         selectedOrg.value = tempDefaultOrg;
                         useLocalOrganization(tempDefaultOrg);
-                        store.dispatch(
-                          "setSelectedOrganization",
-                          tempDefaultOrg,
-                        );
+                        store.dispatch("setSelectedOrganization", tempDefaultOrg);
                       }
                     });
                 }
-                  redirectUser(redirectURI);
+                redirectUser(redirectURI);
               } else {
                 //if user is not authorized, show error message and reset form.
                 submitting.value = false;
-                loginform.value.resetValidation();
-                $q.notify({
-                  color: "negative",
+                toast({
+                  variant: "error",
                   message: res.data.message,
                 });
               }
             })
-            .catch((e: Error) => {
+            .catch(() => {
               //if any error occurs, show error message and reset form.
               submitting.value = false;
-              loginform.value.resetValidation();
-              $q.notify({
-                color: "negative",
-                message: "Invalid username or password",
-                timeout: 4000,
+              toast({
+                variant: "error",
+                message: t("toastMessages.login.invalidUsernameOrPassword"),
               });
-              console.log(e);
             });
         } catch (e) {
           submitting.value = false;
-          loginform.value.resetValidation();
-          $q.notify({
-            color: "negative",
-            message: "Please fill all the fields and try again.",
+          toast({
+            variant: "warning",
+            message: t("toastMessages.login.pleaseFillAllTheFieldsAnd"),
           });
-          console.log(e);
         }
       }
     };
@@ -448,9 +426,10 @@ export default defineComponent({
       password,
       confirmpassword,
       email,
-      loginform,
       submitting,
       onSignIn,
+      loginSchema,
+      loginDefaults,
       tab: ref("signin"),
       innerTab: ref("signup"),
       store,
@@ -461,35 +440,15 @@ export default defineComponent({
       loginWithSSo,
       config,
       autoRedirectDexLogin,
+      isDark,
     };
   },
   methods: {
     selected(item: any) {
-      this.$q.notify(`Selected suggestion "${item.label}"`);
+      toast({
+        message: this.t("toastMessages.login.selectedSuggestion", { suggestion: item.label }),
+      });
     },
   },
 });
 </script>
-
-<style lang="scss">
-.login-internal-link {
-  &:hover {
-    color: #595959;
-  }
-}
-
-.my-card {
-  width: 400px;
-}
-</style>
-
-<style lang="scss">
-.login-inputs {
-  .q-field__label {
-    font-weight: normal !important;
-    font-size: 12px;
-    transform: translate(-0.75rem, -155%);
-    color: #3a3a3a;
-  }
-}
-</style>

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,55 +15,178 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-page class="q-px-lg q-pt-md" style="min-height: inherit; overflow: auto">
-    <div class="row justify-between items-center">
-      <div>
-        <span class="o2-page-title">{{ t("billing.title") }}</span
-        ><br />
-        <span class="o2-page-subtitle">{{ t("billing.subtitle") }}</span>
-      </div>
-    </div>
-    <trial-period class="q-mb-md" currentPage="billing"></trial-period>
+  <div class="rounded-default overflow-auto px-4 pt-3" style="min-height: inherit">
+    <!-- Page title is supplied by the parent Billing.vue OPageHeader; no local title here. -->
+    <!-- Managed billing empty state for child orgs -->
+    <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
     <div
-      v-if="
-        store.state.selectedOrganization.hasOwnProperty('note') &&
-        store.state.selectedOrganization.note
-      "
-      class="row justify-start warning-message text-negative text-h6 q-pl-xl q-pb-lg"
+      v-if="isChildOrg"
+      class="flex min-h-[calc(100vh-var(--navbar-height)-200px)] flex-col items-center justify-center px-6 py-12 text-center"
+      data-test="plans-managed-billing-panel"
     >
-      <q-icon name="warning" class="q-pt-sm"></q-icon
-      >{{ store.state.selectedOrganization.note }}
+      <!-- eslint-enable local/no-hardcoded-px -->
+      <div
+        class="border-accent/30 mb-7 flex h-25 w-25 items-center justify-center rounded-full border border-dashed"
+      >
+        <div
+          class="border-accent/24 bg-accent/10 flex h-17 w-17 items-center justify-center rounded-full border border-solid"
+        >
+          <OIcon name="account-balance" size="lg" class="text-accent opacity-85" />
+        </div>
+      </div>
+
+      <div class="mb-2.5 text-xl font-bold tracking-[-0.0125rem]">
+        {{ t("billing.billingGroup.plansManagedTitle") }}
+      </div>
+      <div class="mb-6 max-w-110 text-sm leading-[1.65] opacity-65">
+        {{
+          t("billing.billingGroup.plansManagedDescription", {
+            name: membership?.payer_org_name,
+            id: membership?.payer_org_id,
+          })
+        }}
+      </div>
+
+      <div class="mb-8 flex flex-wrap items-center justify-center gap-2">
+        <span
+          class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+        >
+          <OIcon name="receipt-long" size="xs" />
+          {{ t("billing.billingGroup.chipConsolidatedBill") }}
+        </span>
+        <span
+          class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+        >
+          <OIcon name="lock" size="xs" />
+          {{ t("billing.billingGroup.chipPlanManaged") }}
+        </span>
+        <span
+          class="border-card-glass-border inline-flex items-center gap-1.25 rounded-full border bg-[color-mix(in_srgb,currentColor_6%,transparent)] px-3 py-1 text-xs font-medium opacity-85"
+        >
+          <OIcon name="description" size="xs" />
+          {{ t("billing.billingGroup.chipNoInvoices") }}
+        </span>
+      </div>
+
+      <OButton
+        variant="primary"
+        class="h-10 px-6 py-0 font-semibold"
+        data-test="plans-view-org-group-btn"
+        @click="goToOrgGroup"
+      >
+        {{ t("billing.billingGroup.viewOrgGroup") }}
+        <template #icon-right>
+          <OIcon name="arrow-forward" size="sm" class="ms-1" />
+        </template>
+      </OButton>
     </div>
-    <div v-if="loading">
-      <q-spinner-dots
-        color="primary"
-        size="40px"
-        style="margin: 0 auto; display: block"
-      />
-    </div>
-    <div v-else class="row q-gutter-md justify-center">
-      <pro-plan
-        :planType="planType"
-        :billingProvider="billingProvider"
-        @update:proSubscription="onLoadSubscription(config.paidPlan)"
-        @update:cancelSubscription="onUnsubscribe"
-      ></pro-plan>
-      <enterprise-plan></enterprise-plan>
-    </div>
-  </q-page>
+    <template v-else>
+      <TrialPeriod class="mb-3" currentPage="billing"></TrialPeriod>
+      <!-- AI Credits card -->
+      <div v-if="aiUsage" class="mb-4 grid w-full grid-cols-1 gap-4">
+        <div
+          class="bg-card-glass-bg border-card-glass-border rounded-default dark:bg-surface-base dark:border-border-default border p-4 shadow-none transition-shadow duration-200 hover:shadow-sm"
+        >
+          <div
+            class="rounded-default flex min-h-full flex-col justify-between text-center transition-all duration-300 ease-[cubic-bezier(0.4,0,0.2,1)]"
+          >
+            <div class="flex flex-col justify-between">
+              <div class="flex items-center justify-between">
+                <div class="text-text-heading text-left text-base leading-5 font-medium">
+                  {{ t("billing.aiCredits") }}
+                </div>
+                <div class="opacity-80">
+                  <img :src="aiIcon" />
+                </div>
+              </div>
+              <OTag type="aiMode" :value="aiUsage.mode" class="mt-2" style="width: fit-content" />
+            </div>
+            <div class="mt-3 mb-2">
+              <OProgressBar
+                :value="aiUsageRatio"
+                size="sm"
+                :variant="
+                  aiUsageRatio >= 1 ? 'danger' : aiUsageRatio >= 0.9 ? 'warning' : 'default'
+                "
+              />
+            </div>
+            <div class="text-text-body flex items-end text-left text-2xl leading-7 font-semibold">
+              {{ aiUsage.credits_used }} / {{ aiUsage.credits_limit }}
+              {{ t("billing.creditsUsedLabel") }}
+            </div>
+            <div
+              v-if="aiUsage.mode === 'exhausted'"
+              class="text-status-error-text mt-2"
+              style="font-size: var(--text-compact)"
+            >
+              {{
+                t(
+                  aiUsage.requires_additional_credits
+                    ? "billing.aiContractExhaustedMessage"
+                    : "billing.aiExhaustedMessage",
+                )
+              }}
+            </div>
+            <div
+              v-else-if="aiUsage.mode === 'pay_as_you_go'"
+              class="text-info mt-2"
+              style="font-size: var(--text-compact)"
+            >
+              {{ t("billing.aiPaygMessage") }}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div
+        v-if="
+          store.state.selectedOrganization.hasOwnProperty('note') &&
+          store.state.selectedOrganization.note
+        "
+        class="text-status-error-text flex items-center justify-start gap-2 ps-6 pb-4 text-xl font-semibold"
+      >
+        <OIcon name="warning" size="sm" class="pt-2" />
+        >{{ store.state.selectedOrganization.note }}
+      </div>
+      <div v-if="loading" class="text-center text-xl font-medium font-semibold">
+        <OSpinner size="md" class="mx-auto mt-3 block text-center" />
+      </div>
+      <div v-else class="mt-3 grid grid-cols-2 gap-3">
+        <ProPlan
+          :planType="planType"
+          :billingProvider="billingProvider"
+          :subscriptionType="subscriptionType"
+          :features="proPlanFeatures"
+          :pricingError="pricingError"
+          @update:proSubscription="onLoadSubscription(config.paidPlan)"
+          @update:cancelSubscription="onUnsubscribe"
+        ></ProPlan>
+        <EnterprisePlan
+          :features="enterprisePlanFeatures"
+          :pricingError="pricingError"
+        ></EnterprisePlan>
+      </div>
+    </template>
+  </div>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import EnterprisePlan from "./enterprisePlan.vue";
 import ProPlan from "./proPlan.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import BillingService from "@/services/billings";
 import { useStore } from "vuex";
-import { useQuasar, date } from "quasar";
-import { useLocalOrganization, convertToTitleCase } from "@/utils/zincutils";
+import useTheme from "@/composables/useTheme";
+import { useLocalOrganization, getImageURL } from "@/utils/zincutils";
 import config from "@/aws-exports";
 import TrialPeriod from "@/enterprise/components/billings/TrialPeriod.vue";
+import { siteURL } from "@/constants/config";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "plans",
@@ -71,41 +194,111 @@ export default defineComponent({
     EnterprisePlan,
     ProPlan,
     TrialPeriod,
+    OSpinner,
+    OProgressBar,
+    OIcon,
+    OTag,
+    OButton,
   },
+
   emits: ["update:proSubscription"],
   async mounted() {
     this.loading = true;
-    await this.loadSubscription();
+    this.fetchMembership();
+    await Promise.all([this.loadSubscription(), this.fetchPricingData()]);
+    this.fetchAiUsage();
   },
   methods: {
+    goToOrgGroup() {
+      this.$router.push({
+        name: "billing_group",
+        query: {
+          org_identifier: this.store.state.selectedOrganization.identifier,
+        },
+      });
+    },
+    fetchMembership() {
+      if (config.isCloud !== "true") return;
+      BillingService.get_billing_group_membership(this.store.state.selectedOrganization.identifier)
+        .then((res: any) => {
+          this.membership = res.data?.membership ?? null;
+        })
+        .catch(() => {
+          // membership not available
+        });
+    },
+    fetchAiUsage() {
+      BillingService.get_ai_usage(this.store.state.selectedOrganization.identifier)
+        .then((res: any) => {
+          this.aiUsage = res.data;
+        })
+        .catch(() => {
+          // AI usage not available
+        });
+    },
+    async fetchPricingData() {
+      try {
+        const response = await fetch(siteURL.pricingJsonUrl);
+        const json = await response.json();
+        const cloudPlans = json?.data?.[0]?.cloud ?? [];
+        const mapFeatures = (jsonFeatures: any[]) =>
+          jsonFeatures.map((f: any) => ({
+            name: f.title,
+            price: f.price ?? "",
+            is_parent: !f.isSubItem,
+          }));
+        const payAsYouGo =
+          cloudPlans.find((p: any) => p.title?.toLowerCase().includes("pay as you go")) ??
+          cloudPlans[0];
+        const enterprise =
+          cloudPlans.find((p: any) => p.title?.toLowerCase().includes("enterprise")) ??
+          cloudPlans[1];
+
+        const proFeatures = payAsYouGo?.features ? mapFeatures(payAsYouGo.features) : [];
+        const entFeatures = enterprise?.features ? mapFeatures(enterprise.features) : [];
+
+        const diff = proFeatures.length - entFeatures.length + 3;
+        const paddedEntFeatures =
+          diff > 0
+            ? [
+                ...entFeatures,
+                ...Array.from({ length: diff }, () => ({
+                  name: "",
+                  price: "",
+                  is_parent: false,
+                })),
+              ]
+            : entFeatures;
+
+        this.proPlanFeatures = proFeatures;
+        this.enterprisePlanFeatures = paddedEntFeatures;
+      } catch {
+        this.pricingError = true;
+      }
+    },
     onLoadSubscription(planType: string) {
       this.proLoading = true;
       if (this.listSubscriptionResponse.card != undefined) {
-        BillingService.resume_subscription(
-          this.store.state.selectedOrganization.identifier,
-        )
-          .then(async (res) => {
-            await this.loadSubscription(true);
+        BillingService.resume_subscription(this.store.state.selectedOrganization.identifier)
+          .then(async () => {
+            await this.loadSubscription();
           })
           .catch((e) => {
             this.proLoading = false;
-            this.$q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: e.message,
               timeout: 5000,
             });
           });
       } else {
-        BillingService.get_hosted_url(
-          this.store.state.selectedOrganization.identifier,
-          planType,
-        )
+        BillingService.get_hosted_url(this.store.state.selectedOrganization.identifier, planType)
           .then((res) => {
             window.location.href = res.data.url;
           })
           .catch((e) => {
-            this.$q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: e.message,
               timeout: 5000,
             });
@@ -116,10 +309,7 @@ export default defineComponent({
       this.onChangePaymentDetail(this.currentPlanDetail.customer_id);
     },
     onChangePaymentDetail(customer_id: string) {
-      BillingService.get_session_url(
-        this.store.state.selectedOrganization.identifier,
-        customer_id,
-      )
+      BillingService.get_session_url(this.store.state.selectedOrganization.identifier, customer_id)
         .then((res) => {
           // this.updatePaymentResponse = res.data.data.url;
           // setInterval(this.retrieveHostedPage, 5000);
@@ -128,20 +318,21 @@ export default defineComponent({
           }
         })
         .catch((e) => {
-          this.$q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: e.message,
             timeout: 5000,
           });
         });
     },
-    async loadSubscription(fromPro = false) {
+    async loadSubscription() {
       try {
         const res = await BillingService.list_subscription(
           this.store.state.selectedOrganization.identifier,
         );
         this.currentPlanDetail = res.data;
         this.billingProvider = res.data.provider || "";
+        this.subscriptionType = res.data.subscription_type || "";
 
         if (res.data.subscription_type !== "") {
           if (res.data.subscription_type == config.paidPlan) {
@@ -157,14 +348,11 @@ export default defineComponent({
             useLocalOrganization(localOrg.value);
             this.store.dispatch("setSelectedOrganization", localOrg.value);
           }
-        } else if (
-          this.billingProvider === "" ||
-          this.billingProvider === "stripe"
-        ) {
+        } else if (this.billingProvider === "" || this.billingProvider === "stripe") {
           // Only show subscribe prompt for Stripe orgs without subscription
-          this.$q.notify({
-            type: "warning",
-            message: "Please subscribe to one of the plan.",
+          toast({
+            variant: "warning",
+            message: this.t("toastMessages.billings.pleaseSubscribeToOneOfThe"),
             timeout: 5000,
           });
 
@@ -183,8 +371,8 @@ export default defineComponent({
         this.loading = false;
         this.proLoading = false;
 
-        this.$q.notify({
-          type: "negative",
+        toast({
+          variant: "error",
           message: e.message,
           timeout: 5000,
         });
@@ -192,9 +380,9 @@ export default defineComponent({
     },
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const $q = useQuasar();
+    const { isDark } = useTheme();
     const frmPayment = ref();
     const planType = ref("");
     const isActiveSubscription = ref(false);
@@ -206,6 +394,22 @@ export default defineComponent({
     const proLoading: any = ref(false);
     const currentPlanDetail = ref();
     const billingProvider = ref("");
+    const subscriptionType = ref("");
+    const aiUsage = ref<any>(null);
+    const aiIcon = computed(() =>
+      isDark.value
+        ? getImageURL("images/common/ai_icon_dark.svg")
+        : getImageURL("images/common/ai_icon_gradient.svg"),
+    );
+    const aiUsageRatio = computed(() => {
+      if (!aiUsage.value || !aiUsage.value.credits_limit) return 0;
+      return Math.min(aiUsage.value.credits_used / aiUsage.value.credits_limit, 1);
+    });
+    const proPlanFeatures: any = ref([]);
+    const enterprisePlanFeatures: any = ref([]);
+    const pricingError = ref(false);
+    const membership = ref<any>(null);
+    const isChildOrg = computed(() => membership.value != null);
 
     const retrieveHostedPage = () => {
       BillingService.retrieve_hosted_page(
@@ -235,12 +439,16 @@ export default defineComponent({
       proLoading,
       currentPlanDetail,
       billingProvider,
+      subscriptionType,
+      aiUsage,
+      aiIcon,
+      aiUsageRatio,
+      proPlanFeatures,
+      enterprisePlanFeatures,
+      pricingError,
+      membership,
+      isChildOrg,
     };
   },
 });
 </script>
-<style lang="scss" scoped>
-.subtitle {
-  color: $primary;
-}
-</style>

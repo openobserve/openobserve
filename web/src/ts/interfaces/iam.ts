@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,12 +20,7 @@ export interface Group {
 }
 
 export type PermissionType =
-  | "AllowAll"
-  | "AllowDelete"
-  | "AllowGet"
-  | "AllowList"
-  | "AllowPost"
-  | "AllowPut";
+  "AllowAll" | "AllowDelete" | "AllowGet" | "AllowList" | "AllowPost" | "AllowPut";
 
 export interface Permission {
   object: string; // stream:geo or stream:org_id

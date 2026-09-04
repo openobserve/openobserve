@@ -1,0 +1,127 @@
+/**
+ * Shared filter utilities for the Traces feature.
+ * Canonical source — imported by SearchBar.vue and useTraces.ts.
+ */
+
+/**
+ * Extracts the field name from a filter expression such as
+ * `field='val'`, `field!='val'`, `(field='x' OR field='y')`, etc.
+ */
+export const getFieldFromExpression = (expression: string): string | null => {
+  const cleaned = expression.trim().replace(/^\(\s*/, "");
+  const match =
+    cleaned.match(/^"[^"]+"\."?(\w+)"?\s*(?:=|!=|is)/i) ||
+    cleaned.match(/^(\w+)\s*(?:=|!=|>=|<=|>|<|is)/i);
+  return match ? match[1] : null;
+};
+
+/**
+ * Tries to replace an existing condition for `fieldName` in `queryStr` with
+ * `newExpression`. Returns the modified string, or the original if not found.
+ * Handles both parenthesized multi-value groups and single conditions.
+ */
+export const replaceExistingFieldCondition = (
+  queryStr: string,
+  fieldName: string,
+  newExpression: string,
+): string | null => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const valPat = `(?:'[^']*'|null|\\d+(?:\\.\\d+)?|true|false)`;
+  const opPat = `(?:=|!=|>=|<=|>|<|is(?:\\s+not)?)`;
+  const condPat = `(?:"[^"]+"\\.)?${esc}\\s*${opPat}\\s*${valPat}`;
+
+  // Try parenthesized multi-value group first: (field = 'x' OR/AND field = 'y')
+  const multiRegex = new RegExp(`\\(\\s*${condPat}(?:\\s+(?:OR|AND)\\s+${condPat})*\\s*\\)`, "gi");
+  if (multiRegex.test(queryStr)) {
+    return queryStr.replace(multiRegex, newExpression);
+  }
+
+  // Try range condition: field >= val AND field <= val (e.g. duration filters)
+  const rangeRegex = new RegExp(`${condPat}\\s+(?:and|AND)\\s+${condPat}`, "gi");
+  if (rangeRegex.test(queryStr)) {
+    return queryStr.replace(rangeRegex, newExpression);
+  }
+
+  // Try single condition
+  const singleRegex = new RegExp(condPat, "gi");
+  if (singleRegex.test(queryStr)) {
+    return queryStr.replace(singleRegex, newExpression);
+  }
+
+  return null;
+};
+
+/**
+ * Removes all conditions for `fieldName` from `queryStr`.
+ * The whole string is treated as the WHERE clause. Cleans up dangling AND
+ * connectors after removal.
+ */
+export const removeFieldCondition = (queryStr: string, fieldName: string): string => {
+  const esc = fieldName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // Operators: comparison (= != > < >= <=) or `IS` (covers IS NULL / IS NOT
+  // NULL produced for null-value filters). Without `is`, null conditions were
+  // never matched and stayed in the query after the value was unchecked.
+  const op = `(?:[=!<>]|is\\b)`;
+  const fieldPattern = new RegExp(`^"?${esc}"?\\s*${op}`, "i");
+  const multiPattern = new RegExp(`^\\(\\s*"?${esc}"?\\s*${op}`, "i");
+
+  const removeFromClause = (clause: string): string => {
+    const remaining = clause
+      .trim()
+      .split(/\s+AND\s+/i)
+      .filter((cond) => {
+        const trimmed = cond.trim();
+        return !fieldPattern.test(trimmed) && !multiPattern.test(trimmed);
+      });
+    return remaining.join(" AND ");
+  };
+
+  // The whole string is the where clause. Do not split on "|": the legacy
+  // "function | where" syntax is gone, and the split is quote-unaware, so a pipe
+  // inside a term such as match_all('text | error') would hide the conditions
+  // before the pipe from removal and corrupt the term on rejoin.
+  return removeFromClause(queryStr);
+};
+
+/**
+ * Applies a single filter term to a base editor value using replace-or-append logic.
+ * Returns the new editor value.
+ */
+export const applyFilterTerm = (filterTerm: string, baseValue: string): string => {
+  let filter = filterTerm;
+
+  const isFilterValueNull = filter.split(/=|!=/)[1] === "'null'";
+  if (isFilterValueNull) {
+    filter = filter
+      .replace(/=|!=/, (match) => {
+        return match === "=" ? " is " : " is not ";
+      })
+      .replace(/'null'/, "null");
+  }
+
+  // The whole base value is the where clause — never split it on "|". The split
+  // is quote-unaware, so a pipe inside a term such as match_all('text | error')
+  // would be rejoined as "| " and silently alter the search term.
+  const fieldName = getFieldFromExpression(filter);
+  const replaced = fieldName ? replaceExistingFieldCondition(baseValue, fieldName, filter) : null;
+
+  if (replaced !== null) return replaced;
+
+  return baseValue !== "" ? baseValue + " and " + filter : filter;
+};
+
+/**
+ * Builds a SQL filter term from a field, value, and operator.
+ * Handles null values and escapes single quotes.
+ */
+export const buildFilterTerm = (
+  field: string,
+  value: string,
+  operator: "=" | "!=" = "=",
+): string => {
+  if (value === null || value === "null") {
+    return operator === "=" ? `${field} is null` : `${field} is not null`;
+  }
+  const escaped = String(value).replace(/'/g, "''");
+  return `${field} ${operator} '${escaped}'`;
+};

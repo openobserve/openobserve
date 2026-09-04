@@ -335,3 +335,58 @@ enum AlertIncidentAlerts {
     CorrelationReason,
     CreatedAt,
 }
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_incidents_org_status_idx_name() {
+        let sql = create_incidents_org_status_idx().build(SqliteQueryBuilder);
+        assert!(sql.contains(INCIDENTS_ORG_STATUS_IDX));
+    }
+
+    #[test]
+    fn test_incidents_org_correlation_idx_name() {
+        let sql = create_incidents_org_correlation_idx().build(SqliteQueryBuilder);
+        assert!(sql.contains(INCIDENTS_ORG_CORRELATION_IDX));
+    }
+
+    #[test]
+    fn test_incidents_first_alert_idx_name() {
+        let sql = create_incidents_first_alert_idx().build(SqliteQueryBuilder);
+        assert!(sql.contains(INCIDENTS_FIRST_ALERT_IDX));
+    }
+
+    #[test]
+    fn test_incidents_last_alert_idx_name() {
+        let sql = create_incidents_last_alert_idx().build(SqliteQueryBuilder);
+        assert!(sql.contains(INCIDENTS_LAST_ALERT_IDX));
+    }
+
+    #[test]
+    fn test_incident_alerts_alert_idx_name() {
+        let sql = create_incident_alerts_alert_idx().build(SqliteQueryBuilder);
+        assert!(sql.contains(INCIDENT_ALERTS_ALERT_IDX));
+    }
+
+    #[test]
+    fn test_incident_alerts_fired_idx_name() {
+        let sql = create_incident_alerts_fired_idx().build(SqliteQueryBuilder);
+        assert!(sql.contains(INCIDENT_ALERTS_FIRED_IDX));
+    }
+
+    #[test]
+    fn test_incidents_table_contains_table_name() {
+        let sql = create_incidents_table_statement().build(SqliteQueryBuilder);
+        assert!(sql.contains("alert_incidents"));
+    }
+
+    #[test]
+    fn test_incident_alerts_table_contains_table_name() {
+        let sql = create_incident_alerts_table_statement().build(SqliteQueryBuilder);
+        assert!(sql.contains("alert_incident_alerts"));
+    }
+}

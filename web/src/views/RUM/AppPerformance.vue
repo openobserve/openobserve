@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,68 +17,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div :key="store.state.selectedOrganization.identifier">
-    <div class="tw:pb-[0.625rem] tw:px-[0.625rem]">
-      <div class="card-container">
-        <div class="flex justify-between items-center q-py-sm q-px-md">
-          <div class="performance_title">
-            {{ t("rum.performanceSummaryLabel") }}
-          </div>
-          <div class="flex items-center">
-            <DateTimePickerDashboard
-              class="q-ml-sm rum-date-time-picker"
-              ref="dateTimePicker"
-              v-model="selectedDate"
-            />
-            <AutoRefreshInterval
-              v-model="refreshInterval"
-              :min-refresh-interval="
-                store.state?.zoConfig?.min_auto_refresh_interval || 5
-              "
-              trigger
-              class="app-performance-auto-refresh-interval tw:ml-[0.5rem]! tw:pl-0! tw:overflow-hidden!"
-              @trigger="refreshData"
-            />
-            <q-btn
-              :outline="isVariablesChanged ? false : true"
-              class="q-ml-sm tw:border! tw:border-solid! tw:h-[2rem] tw:px-[0.325rem]!"
-              :class="
-                !isVariablesChanged
-                  ? 'hover:tw:bg-[var(--o2-hover-accent)]!'
-                  : ''
-              "
-              data-test="rum-performance-refresh"
-              padding="xs"
-              no-caps
-              icon="refresh"
-              @click="refreshData"
-              :color="isVariablesChanged ? 'warning' : ''"
-              :text-color="store.state.theme == 'dark' ? 'white' : 'dark'"
-            >
-              <q-tooltip>
-                {{
-                  isVariablesChanged
-                    ? t("dashboard.refreshToApplyVariableChanges")
-                    : t("dashboard.refresh")
-                }}
-              </q-tooltip>
-            </q-btn>
-          </div>
-        </div>
-        <AppTabs
-          class="q-px-md"
-          :tabs="tabs"
-          v-model:active-tab="activePerformanceTab"
+  <OPageLayout
+    :key="store.state.selectedOrganization.identifier"
+    data-test="rum-performance-page"
+    :title="t('rum.performanceSummaryLabel')"
+    :subtitle="t('rum.performanceSummarySubtitle', { product: raw('Core Web Vitals') })"
+    title-data-test="rum-performance-title"
+    icon="speed"
+    bleed
+  >
+    <template #actions>
+      <DateTimePickerDashboard
+        class="rum-date-time-picker"
+        ref="dateTimePicker"
+        v-model="selectedDate"
+        menu-align="end"
+      />
+      <AutoRefreshInterval
+        v-model="refreshInterval"
+        :min-refresh-interval="store.state?.zoConfig?.min_auto_refresh_interval || 5"
+        trigger
+        class="app-performance-auto-refresh-interval"
+        @trigger="refreshData"
+      />
+      <OButton
+        icon-left="refresh"
+        :variant="isVariablesChanged ? 'ghost-warning' : 'outline'"
+        size="icon-toolbar"
+        data-test="rum-performance-refresh"
+        @click="refreshData"
+      >
+        <OTooltip
+          :content="
+            isVariablesChanged
+              ? t('dashboard.refreshToApplyVariableChanges')
+              : t('dashboard.refresh')
+          "
         />
-      </div>
-    </div>
+      </OButton>
+      <ShareButton
+        data-test="rum-performance-share-link-btn"
+        :url="shareUrl"
+        variant="outline"
+        size="icon-toolbar"
+      />
+    </template>
+    <OTabs
+      class="px-page-edge border-border-default shrink-0 border-b"
+      v-model="activePerformanceTab"
+      align="left"
+      dense
+    >
+      <OTab v-for="tab in tabs" :key="tab.value" :name="tab.value" :label="tab.label" />
+    </OTabs>
 
     <router-view v-slot="{ Component }">
       <keep-alive>
-        <div class="tw:pb-[0.375rem] tw:px-[0.625rem] tw:h-[calc(100%-101px)]!">
-          <div
-            class="card-container tw:py-[0.625rem] tw:h-full tw:overflow-hidden"
-          >
+        <div class="min-h-0 flex-1">
+          <div class="bg-card-glass-bg h-full overflow-hidden">
             <component
               :is="Component"
               :date-time="currentTimeObj"
@@ -91,48 +87,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </keep-alive>
     </router-view>
-  </div>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import {
-  defineComponent,
-  ref,
-  watch,
-  onMounted,
-  nextTick,
-  computed,
-  onActivated,
-} from "vue";
+import { defineComponent, ref, watch, onMounted, nextTick, computed, onActivated } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
-import { getConsumableDateTime, getDashboard } from "@/utils/commons.ts";
+import { getDashboard } from "@/utils/commons.ts";
 import { parseDuration, generateDurationLabel } from "@/utils/date";
 import { reactive } from "vue";
 import { useRoute } from "vue-router";
 import AutoRefreshInterval from "@/components/AutoRefreshInterval.vue";
 import overviewDashboard from "@/utils/rum/overview.json";
-import AppTabs from "@/components/common/AppTabs.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import DateTimePickerDashboard from "@/components/DateTimePickerDashboard.vue";
 import usePerformance from "@/composables/rum/usePerformance";
 import useRum from "@/composables/rum/useRum";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import ShareButton from "@/components/common/ShareButton.vue";
 
 export default defineComponent({
   name: "AppPerformance",
   components: {
     AutoRefreshInterval,
-    AppTabs,
+    OTabs,
+    OTab,
     DateTimePickerDashboard,
+    OButton,
+    OTooltip,
+    OPageLayout,
+    ShareButton,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
 
     const activePerformanceTab = ref("overview");
     const activePerformanceComponent = ref(null);
     const { performanceState } = usePerformance();
-    const { rumState } = useRum();
+    const { shareUrl } = useRum();
 
     // Variables manager will be initialized by RenderDashboardCharts in child components
     const variablesManager = ref(null);
@@ -163,42 +161,12 @@ export default defineComponent({
     });
 
     const tabs = [
-      {
-        label: t("rum.overview"),
-        value: "overview",
-        style: {
-          width: "fit-content",
-          padding: "0.5rem 0.75rem",
-          margin: "0 0.25rem",
-        },
-      },
-      {
-        label: t("rum.webVitals"),
-        value: "web_vitals",
-        style: {
-          width: "fit-content",
-          padding: "0.5rem 0.75rem",
-          margin: "0 0.25rem",
-        },
-      },
-      {
-        label: t("rum.errors"),
-        value: "errors",
-        style: {
-          width: "fit-content",
-          padding: "0.5rem 0.75rem",
-          margin: "0 0.25rem",
-        },
-      },
-      {
-        label: t("rum.api"),
-        value: "api",
-        style: {
-          width: "fit-content",
-          padding: "0.5rem 0.75rem",
-          margin: "0 0.25rem",
-        },
-      },
+      { label: t("rum.overview"), value: "overview" },
+      // Adaptive Vitals tab: browser Web Vitals or (Phase 2) Mobile Vitals, chosen by the
+      // platform whose data the stream holds. See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
+      { label: t("rum.vitals"), value: "web_vitals" },
+      { label: t("rum.errors"), value: "errors" },
+      { label: t("rum.api"), value: "api" },
     ];
 
     const routeName = computed(() => router.currentRoute.value.name);
@@ -215,8 +183,7 @@ export default defineComponent({
       };
 
       if (routeNameMapping[router.currentRoute.value.name]) {
-        activePerformanceTab.value =
-          routeNameMapping[router.currentRoute.value.name];
+        activePerformanceTab.value = routeNameMapping[router.currentRoute.value.name];
       } else {
         activePerformanceTab.value = "overview";
       }
@@ -232,12 +199,9 @@ export default defineComponent({
       currentDashboardData.data = overviewDashboard;
 
       // if variables data is null, set it to empty list
-      if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
-      ) {
+      if (!(
+        currentDashboardData.data?.variables && currentDashboardData.data?.variables?.list.length
+      )) {
         variablesData.isVariablesLoading = false;
         variablesData.values = [];
       }
@@ -290,10 +254,7 @@ export default defineComponent({
         rumPerformanceApis: "api",
       };
 
-      const tab =
-        routeNameMapping[
-          router.currentRoute.value.name?.toString() || "placeholder"
-        ];
+      const tab = routeNameMapping[router.currentRoute.value.name?.toString() || "placeholder"];
       if (tab !== activePerformanceTab.value && tab !== undefined) {
         activePerformanceTab.value = tab;
       }
@@ -317,11 +278,7 @@ export default defineComponent({
      * Retrieves the selected date from the query parameters.
      */
     const getSelectedDateFromQueryParams = (params) => ({
-      valueType: params.period
-        ? "relative"
-        : params.from && params.to
-          ? "absolute"
-          : "relative",
+      valueType: params.period ? "relative" : params.from && params.to ? "absolute" : "relative",
       startTime: params.from ? params.from : null,
       endTime: params.to ? params.to : null,
       relativeTimePeriod: params.period ? params.period : null,
@@ -429,18 +386,14 @@ export default defineComponent({
     });
 
     const onDeletePanel = async (panelId: any) => {
-      await deletePanel(
-        store,
-        route.query.dashboard,
-        panelId,
-        route.query.folder ?? "default",
-      );
+      await deletePanel(store, route.query.dashboard, panelId, route.query.folder ?? "default");
       await loadDashboard();
     };
 
     return {
       currentDashboardData,
       t,
+      raw,
       getDashboard,
       store,
       // date variables
@@ -461,56 +414,8 @@ export default defineComponent({
       activePerformanceTab,
       activePerformanceComponent,
       isVariablesChanged,
+      shareUrl,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.performance_title {
-  font-size: 1.5rem;
-}
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-
-.performance-dashboard {
-  :deep(.card-container) {
-    box-shadow: none !important;
-    &:first-child {
-      padding: 0 !important;
-    }
-  }
-}
-
-:deep(.app-performance-auto-refresh-interval) {
-  .q-btn {
-    height: 1.9rem !important;
-    min-height: 1.9rem !important;
-    border-radius: 0.375rem !important;
-    padding: 0.125rem 0.25rem !important;
-
-    &:hover {
-      background-color: var(--o2-hover-accent);
-    }
-  }
-}
-</style>
-
-<style lang="scss">
-.performance-dashboard {
-  min-height: auto !important;
-  max-height: calc(100vh - 12.5rem);
-  overflow-y: auto;
-
-  .card-container {
-    box-shadow: none !important;
-    &:only-child {
-      padding: 0 !important;
-    }
-  }
-}
-</style>

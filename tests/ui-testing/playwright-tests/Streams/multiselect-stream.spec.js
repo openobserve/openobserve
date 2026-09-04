@@ -116,9 +116,10 @@ test.describe("Stream multiselect testcases", () => {
     }
 
     await page.goto(`${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`);
-    await pm.logsPage.selectStream("e2e_automate"); 
+    await pm.logsPage.selectStream("e2e_automate");
     await applyQueryButton(page);
-    await pm.logsPage.clickQuickModeToggle();
+    // Ensure quick mode is ON (idempotent) so the All Fields toggle is visible
+    await pm.logsPage.enableQuickModeIfDisabled();
     await pm.logsPage.clickAllFieldsButton();
   });
 
@@ -142,14 +143,15 @@ async function multistreamselect(page) {
     await pageManager.logsPage.selectRunQuery();
     await page.waitForTimeout(3000);
 
-    // Verify Common Group Fields are present using POM
-    const cell = await pageManager.logsPage.getCellByName(/Common Group Fields/);
+    // Verify common fields group header is present.
+    // When applyFieldGrouping is active (semantic grouping), the header renders as
+    // "Common" or "Common (N)"; legacy path renders "Common Group Fields".
+    const cell = await pageManager.logsPage.getCellByName(/^Common/);
     const cellText = await cell.textContent();
-    expect(cellText).toContain('Common Group Fields');
+    expect(cellText).toMatch(/Common/);
 
-    // Select both streams using POM
-    await pageManager.logsPage.clickCellByName(/E2e_automate/);
-    await pageManager.logsPage.clickCellByName(/E2e_stream1/);
+    // Verify both streams are selected in the index list
+    await pageManager.logsPage.expectLogsSearchIndexListContainsText('e2e_automate, e2e_stream1');
 
     // Execute query and navigate time picker using POM
     await pageManager.logsPage.selectRunQuery();
@@ -174,41 +176,6 @@ async function multistreamselect(page) {
     await pageManager.logsPage.selectRunQuery();
   });
 
-  // test("should click on live mode on button and select 5 sec, switch off, and then click run query", async ({
-    
-  //   page,
-  // }) => {
-  //   await multistreamselect(page);
-  //   await page.route("**/logData.ValueQuery", (route) => route.continue());
-  //   await page.locator('[data-test="date-time-btn"]').click({ force: true });
-
-  //   await page
-  //     .locator('[data-test="date-time-relative-6-w-btn"] > .q-btn__content')
-  //     .click({
-  //       force: true,
-  //     });
-  //   await page
-  //     .locator('[data-test="logs-search-bar-refresh-interval-btn-dropdown"]')
-  //     .click({ force: true });
-  //   await page.locator('[data-test="logs-search-bar-refresh-time-5"]').click({
-  //     force: true,
-  //   });
-  //   await page.waitForTimeout(1000);
-  //   await expect(page.locator(".q-notification__message")).toContainText(
-  //     "Live mode is enabled"
-  //   );
-  //   await page.waitForTimeout(5000);
-  //   await page
-  //     .locator(".q-pl-sm > .q-btn > .q-btn__content")
-  //     .click({ force: true });
-  //   await page
-  //     .locator(
-  //       '[data-test="logs-search-off-refresh-interval"] > .q-btn__content'
-  //     )
-  //     .click({ force: true });
-  //   await applyQueryButton(page);
-  // });
-
   test("should redirect to logs after clicking on stream explorer via stream page", {
     tag: ['@navigation', '@streamExplorer', '@multistream', '@all']
   }, async ({ page }) => {
@@ -226,21 +193,24 @@ async function multistreamselect(page) {
     await expect(page.url()).toContain("logs");
   });
 
-  // Note: This test can be flaky due to non-deterministic record ordering across streams
-  test.skip("should click on interesting fields icon and display query in editor", {
-    tag: ['@interestingFields', '@multistream', '@flaky']
+  test("should click on interesting fields icon and display query in editor", {
+    tag: ['@interestingFields', '@multistream']
   }, async ({ page }) => {
     const pageManager = new PageManager(page);
     testLogger.info('Testing interesting fields with multistream selection');
 
     await multistreamselect(page);
 
+    // The interesting-field (ⓘ) button only renders when quick mode is on
+    // (FieldExpansion.vue v-if="showQuickMode"), and surfaces on row hover.
+    await pageManager.logsPage.ensureQuickModeState(true);
+
     // Search for job field using POM
     await pageManager.logsPage.searchFieldByName('job');
     await page.waitForTimeout(2000);
 
-    // Click interesting field button
-    await page.locator('[data-test="log-search-index-list-interesting-job-field-btn"]').last().click({ force: true });
+    // Hover the field row so its action buttons render, then click ⓘ
+    await pageManager.logsPage.hoverAndClickInterestingFieldLast('job');
 
     // Enable SQL mode using POM
     await pageManager.logsPage.enableSQLMode();
@@ -250,7 +220,7 @@ async function multistreamselect(page) {
     await pageManager.logsPage.clickSearchBarRefreshButton();
 
     // Click on first result
-    await page.locator('[data-test="log-table-column-0-source"]').click({ force: true });
+    await pageManager.logsPage.clickLogTableColumnSource();
 
     // Verify table is visible
     await pageManager.logsPage.expectLogsTableVisible();
@@ -288,8 +258,9 @@ async function multistreamselect(page) {
     await pageManager.logsPage.toggleStreamSelection("e2e_stream1");
     await page.waitForTimeout(4000);
     
-    // Click All Fields and enable function editor using POM
-    await pageManager.logsPage.clickQuickModeToggle();
+    // Ensure quick mode is ON so the All Fields toggle is visible
+    // (quickMode default depends on whether localStorage has saved streams from prior navigation)
+    await pageManager.logsPage.enableQuickModeIfDisabled();
     await pageManager.logsPage.clickAllFieldsButton();
     await pageManager.logsPage.toggleQueryModeEditor();
     await pageManager.logsPage.clickMonacoEditor();
@@ -415,8 +386,9 @@ async function multistreamselect(page) {
     
     // Wait for success message with timeout constant
     try {
-      await page.waitForSelector('.q-notification__message:has-text("View created successfully")', { 
-        timeout: MULTISTREAM_CONFIG.TIMEOUTS.DATA_INDEXING 
+      await pageManager.logsPage.getSuccessToastLocator().waitFor({
+        state: 'visible',
+        timeout: MULTISTREAM_CONFIG.TIMEOUTS.DATA_INDEXING
       });
       testLogger.info('Success toast validated: Multistream view created successfully');
     } catch (error) {

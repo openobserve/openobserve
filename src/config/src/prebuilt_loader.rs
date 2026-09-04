@@ -20,12 +20,16 @@ use serde::{Deserialize, Serialize};
 
 use crate::meta::destinations::{
     Destination, DestinationType, Email, Endpoint, HTTPOutputFormat, HTTPType, Module, Template,
-    TemplateType,
+    TemplateKind, TemplateType,
 };
 
 /// Configuration structure for prebuilt destinations loaded from JSON
 #[derive(Debug, Deserialize, Serialize)]
 pub struct PrebuiltDestinationsConfig {
+    /// Monotonic revision of the shipped prebuilt definitions. Bumped whenever a
+    /// shipped body/type is corrected; gates the startup reseed (design §6.3).
+    #[serde(default)]
+    pub revision: u32,
     pub destinations: Vec<PrebuiltDestinationConfig>,
 }
 
@@ -108,6 +112,27 @@ fn load_prebuilt_config() -> PrebuiltDestinationsConfig {
     load_builtin_config()
 }
 
+/// Prefix that marks system-managed template names. The full reserved set is
+/// `prebuilt_<type>` where `<type>` is one of the registered prebuilt
+/// destination types — see `is_prebuilt_template_name` below.
+pub const PREBUILT_TEMPLATE_PREFIX: &str = "prebuilt_";
+
+/// True only for template names the system actually manages: the name must be
+/// `prebuilt_<type>` where `<type>` is a registered prebuilt destination type
+/// (slack, opsgenie, servicenow, ...).
+///
+/// Lives next to `get_prebuilt_template` so the API models
+/// (`openobserve_api_management::models`), the service-layer guards
+/// (`openobserve_core::alerts::templates`), and any future caller all derive
+/// the "is system template" answer from the same source of truth.
+///
+/// User-created templates whose names happen to start with `prebuilt_` but
+/// don't match a registered type stay freely editable and deletable.
+pub fn is_prebuilt_template_name(name: &str) -> bool {
+    name.strip_prefix(PREBUILT_TEMPLATE_PREFIX)
+        .is_some_and(|t| get_prebuilt_template(t).is_some())
+}
+
 /// Get a specific prebuilt template by type (e.g., "slack", "teams", "email")
 pub fn get_prebuilt_template(prebuilt_type: &str) -> Option<Template> {
     let config = load_prebuilt_config();
@@ -133,6 +158,11 @@ pub fn get_prebuilt_template(prebuilt_type: &str) -> Option<Template> {
     None
 }
 
+/// Get the revision number of the prebuilt configuration
+pub fn get_prebuilt_revision() -> u32 {
+    load_prebuilt_config().revision
+}
+
 /// Convert TemplateConfig to Template
 fn convert_template_config(config: &TemplateConfig, dest_type: &str) -> Template {
     let template_type = if dest_type == "email" {
@@ -153,6 +183,7 @@ fn convert_template_config(config: &TemplateConfig, dest_type: &str) -> Template
         is_default: false,
         template_type,
         body: config.body.clone(),
+        kind: TemplateKind::default(),
     }
 }
 
@@ -161,6 +192,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
     // Return built-in configuration with templates embedded
     // This ensures the system works even if the JSON file is missing
     PrebuiltDestinationsConfig {
+        revision: 1,
         destinations: vec![
             PrebuiltDestinationConfig {
                 id: "slack".to_string(),
@@ -245,7 +277,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_pagerduty".to_string(),
-                    body: r#"{"event_action": "trigger", "payload": {"summary": "Alert: {alert_name}"}}"#.to_string(),
+                    body: r#"{"payload": {"summary": "OpenObserve Alert: {alert_name}", "severity": "{severity}", "source": "{source}"}, "routing_key": "{routing_key}", "event_action": "trigger"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -317,7 +349,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_opsgenie".to_string(),
-                    body: r#"{"message": "Alert: {alert_name}"}"#.to_string(),
+                    body: r#"{"message": "Alert: {alert_name}", "priority": "{credential_priority}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -341,7 +373,7 @@ fn load_builtin_config() -> PrebuiltDestinationsConfig {
                 }),
                 template: TemplateConfig {
                     name: "prebuilt_servicenow".to_string(),
-                    body: r#"{"short_description": "Alert: {alert_name}"}"#.to_string(),
+                    body: r#"{"short_description": "Alert: {alert_name}", "assignment_group": "{credential_assignmentGroup}"}"#.to_string(),
                     title: None,
                 },
                 credential_fields: vec![],
@@ -422,7 +454,6 @@ fn convert_to_destination(config: PrebuiltDestinationConfig) -> Result<Destinati
                     } else {
                         Some(headers)
                     },
-                    action_id: None,
                     output_format: Some(output_format),
                     destination_type: Some(endpoint_config.destination_type),
                     metadata: endpoint_metadata,
@@ -490,7 +521,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                         "Content-Type".to_string(),
                         "application/json".to_string(),
                     )])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("slack".to_string()),
                     metadata: HashMap::from([
@@ -518,7 +548,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                         "Content-Type".to_string(),
                         "application/json".to_string(),
                     )])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("teams".to_string()),
                     metadata: HashMap::from([
@@ -548,7 +577,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                             "Token YOUR_INTEGRATION_KEY".to_string(),
                         ),
                     ])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("pagerduty".to_string()),
                     metadata: HashMap::from([
@@ -575,7 +603,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                         "Content-Type".to_string(),
                         "application/json".to_string(),
                     )])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("discord".to_string()),
                     metadata: HashMap::from([
@@ -602,7 +629,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                         "Content-Type".to_string(),
                         "application/json".to_string(),
                     )])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("webhook".to_string()),
                     metadata: HashMap::from([
@@ -632,7 +658,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                             "GenieKey YOUR_API_KEY".to_string(),
                         ),
                     ])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("opsgenie".to_string()),
                     metadata: HashMap::from([
@@ -662,7 +687,6 @@ fn load_builtin_destinations() -> Vec<Destination> {
                             "Basic YOUR_AUTH_TOKEN".to_string(),
                         ),
                     ])),
-                    action_id: None,
                     output_format: Some(HTTPOutputFormat::JSON),
                     destination_type: Some("servicenow".to_string()),
                     metadata: HashMap::from([
@@ -694,6 +718,37 @@ mod tests {
     use std::fs;
 
     use super::*;
+
+    #[test]
+    fn builtin_prebuilt_config_is_revised_and_clean() {
+        let cfg = load_builtin_config();
+        assert!(cfg.revision >= 1, "builtin config must carry revision >= 1");
+        for d in &cfg.destinations {
+            assert!(
+                !d.template.body.contains("{alert_time}"),
+                "dangling {{alert_time}} in builtin body: {}",
+                d.id
+            );
+        }
+    }
+
+    #[test]
+    fn shipped_prebuilt_json_is_revised_and_clean() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../config/prebuilt-destinations.json"
+        );
+        let raw = std::fs::read_to_string(path).unwrap();
+        let cfg: PrebuiltDestinationsConfig = serde_json::from_str(&raw).unwrap();
+        assert!(cfg.revision >= 1);
+        for d in &cfg.destinations {
+            assert!(
+                !d.template.body.contains("{alert_time}"),
+                "dangling in JSON body: {}",
+                d.id
+            );
+        }
+    }
 
     #[test]
     fn test_load_prebuilt_destinations() {
@@ -773,17 +828,17 @@ mod tests {
         fs::write(config_path, test_config).unwrap();
 
         // Temporarily replace the main config path
-        if let Ok(config_str) = fs::read_to_string(config_path) {
-            if let Ok(config) = serde_json::from_str::<PrebuiltDestinationsConfig>(&config_str) {
-                let destinations: Vec<Destination> = config
-                    .destinations
-                    .into_iter()
-                    .filter_map(|dest| convert_to_destination(dest).ok())
-                    .collect();
+        if let Ok(config_str) = fs::read_to_string(config_path)
+            && let Ok(config) = serde_json::from_str::<PrebuiltDestinationsConfig>(&config_str)
+        {
+            let destinations: Vec<Destination> = config
+                .destinations
+                .into_iter()
+                .filter_map(|dest| convert_to_destination(dest).ok())
+                .collect();
 
-                assert_eq!(destinations.len(), 1);
-                assert_eq!(destinations[0].name, "Test Destination");
-            }
+            assert_eq!(destinations.len(), 1);
+            assert_eq!(destinations[0].name, "Test Destination");
         }
 
         // Clean up
@@ -865,5 +920,47 @@ mod tests {
     fn test_get_prebuilt_template_invalid_type() {
         let template = get_prebuilt_template("nonexistent");
         assert!(template.is_none(), "Should return None for invalid type");
+    }
+
+    #[test]
+    fn test_convert_template_config_http_type() {
+        let config = TemplateConfig {
+            name: "my_template".to_string(),
+            body: "alert body".to_string(),
+            title: None,
+        };
+        let result = convert_template_config(&config, "http");
+        assert_eq!(result.name, "my_template");
+        assert_eq!(result.body, "alert body");
+        assert!(matches!(result.template_type, TemplateType::Http));
+    }
+
+    #[test]
+    fn test_convert_template_config_email_with_title() {
+        let config = TemplateConfig {
+            name: "email_tpl".to_string(),
+            body: "email body".to_string(),
+            title: Some("Custom Subject".to_string()),
+        };
+        let result = convert_template_config(&config, "email");
+        assert_eq!(result.name, "email_tpl");
+        match result.template_type {
+            TemplateType::Email { title } => assert_eq!(title, "Custom Subject"),
+            _ => panic!("Expected Email template type"),
+        }
+    }
+
+    #[test]
+    fn test_convert_template_config_email_uses_default_title_when_none() {
+        let config = TemplateConfig {
+            name: "email_tpl2".to_string(),
+            body: "body".to_string(),
+            title: None,
+        };
+        let result = convert_template_config(&config, "email");
+        match result.template_type {
+            TemplateType::Email { title } => assert_eq!(title, "OpenObserve Alert"),
+            _ => panic!("Expected Email template type"),
+        }
     }
 }

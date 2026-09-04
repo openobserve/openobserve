@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -12,6 +12,13 @@
 //
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// LLM UI visibility is controlled at build time via the
+// `VITE_OPENOBSERVE_LLM_UI` env var. Visible by default; set the env
+// var to "false" to hide the LLM Observability UI.
+function readLLMUIFlag(): "true" | "false" {
+  return String(import.meta.env.VITE_OPENOBSERVE_LLM_UI) === "false" ? "false" : "true";
+}
 
 const config = {
   aws_mobile_analytics_app_id: "ab7e9321f83c45a8967ff3b9bd90e83a",
@@ -39,6 +46,13 @@ const config = {
   ddClientToken: import.meta.env.VITE_DD_CLIENT_TOKEN,
   ddSite: import.meta.env.VITE_DD_SITE,
   REO_CLIENT_KEY: import.meta.env.VITE_REODOTDEV_CLIENT_KEY || "",
+  // Master switch for the LLM Observability UI (LLM Insights + Sessions
+  // tabs on the traces page, Thread tab inside trace details).
+  //
+  // Controlled at build time by `VITE_OPENOBSERVE_LLM_UI`. Visible by
+  // default; set the env var to "false" to hide. Consumers use the
+  // existing string check `config.showLLMUI !== 'false'`.
+  showLLMUI: readLLMUIFlag(),
 };
 
 export default config;

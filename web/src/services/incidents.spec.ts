@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,6 +17,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import incidents from "./incidents";
 import http from "./http";
 import serviceStreamsApi from "./service_streams";
+import { gt } from "@/types/i18n";
 
 // Mock the http module
 vi.mock("./http");
@@ -42,7 +43,7 @@ describe("incidents service", () => {
 
       expect(http).toHaveBeenCalled();
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents?limit=50&offset=0"
+        "/api/v2/test-org/alerts/incidents?limit=50&offset=0",
       );
     });
 
@@ -52,7 +53,7 @@ describe("incidents service", () => {
       incidents.list("test-org", "open");
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents?limit=50&offset=0&status=open"
+        "/api/v2/test-org/alerts/incidents?limit=50&offset=0&status=open",
       );
     });
 
@@ -62,7 +63,7 @@ describe("incidents service", () => {
       incidents.list("test-org", undefined, 20, 10);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents?limit=20&offset=10"
+        "/api/v2/test-org/alerts/incidents?limit=20&offset=10",
       );
     });
 
@@ -72,7 +73,7 @@ describe("incidents service", () => {
       incidents.list("test-org", "resolved", 100, 50);
 
       expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents?limit=100&offset=50&status=resolved"
+        "/api/v2/test-org/alerts/incidents?limit=100&offset=50&status=resolved",
       );
     });
   });
@@ -89,9 +90,7 @@ describe("incidents service", () => {
       incidents.get("test-org", "incident-123");
 
       expect(http).toHaveBeenCalled();
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123"
-      );
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/v2/test-org/alerts/incidents/incident-123");
     });
   });
 
@@ -104,7 +103,7 @@ describe("incidents service", () => {
       expect(http).toHaveBeenCalled();
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/incidents/incident-123/update",
-        { status: "acknowledged" }
+        { status: "acknowledged" },
       );
     });
 
@@ -115,7 +114,7 @@ describe("incidents service", () => {
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/incidents/incident-123/update",
-        { status: "open" }
+        { status: "open" },
       );
     });
 
@@ -126,7 +125,7 @@ describe("incidents service", () => {
 
       expect(mockHttp.patch).toHaveBeenCalledWith(
         "/api/v2/test-org/alerts/incidents/incident-123/update",
-        { status: "resolved" }
+        { status: "resolved" },
       );
     });
   });
@@ -145,9 +144,7 @@ describe("incidents service", () => {
       incidents.getStats("test-org");
 
       expect(http).toHaveBeenCalled();
-      expect(mockHttp.get).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/stats"
-      );
+      expect(mockHttp.get).toHaveBeenCalledWith("/api/v2/test-org/alerts/incidents/stats");
     });
   });
 
@@ -161,7 +158,9 @@ describe("incidents service", () => {
 
       expect(http).toHaveBeenCalled();
       expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/v2/test-org/alerts/incidents/incident-123/rca"
+        "/api/v2/test-org/alerts/incidents/incident-123/rca",
+        null,
+        { params: {} },
       );
     });
   });
@@ -170,7 +169,7 @@ describe("incidents service", () => {
     it("should call correlate API with incident stable dimensions", async () => {
       const mockIncident = {
         id: "incident-123",
-        stable_dimensions: {
+        group_values: {
           service: "api-gateway",
           namespace: "production",
         },
@@ -193,12 +192,12 @@ describe("incidents service", () => {
 
       vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(mockCorrelationResponse);
 
-      const result = await incidents.getCorrelatedStreams("test-org", mockIncident);
+      const result = await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "api-gateway",
         source_type: "logs",
-        available_dimensions: mockIncident.stable_dimensions,
+        available_dimensions: mockIncident.group_values,
       });
 
       expect(result.serviceName).toBe("api-gateway");
@@ -210,7 +209,7 @@ describe("incidents service", () => {
     it("should fallback to default when service dimension missing", async () => {
       const mockIncident = {
         id: "incident-123",
-        stable_dimensions: {
+        group_values: {
           namespace: "production",
         },
       } as any;
@@ -226,19 +225,19 @@ describe("incidents service", () => {
 
       vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(mockCorrelationResponse);
 
-      await incidents.getCorrelatedStreams("test-org", mockIncident);
+      await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "default",
         source_type: "logs",
-        available_dimensions: mockIncident.stable_dimensions,
+        available_dimensions: mockIncident.group_values,
       });
     });
 
     it("should check multiple service dimension variations", async () => {
       const mockIncident = {
         id: "incident-123",
-        stable_dimensions: {
+        group_values: {
           serviceName: "api-gateway",
         },
       } as any;
@@ -254,59 +253,13 @@ describe("incidents service", () => {
 
       vi.mocked(serviceStreamsApi.correlate).mockResolvedValue(mockCorrelationResponse);
 
-      await incidents.getCorrelatedStreams("test-org", mockIncident);
+      await incidents.getCorrelatedStreams("test-org", mockIncident, gt);
 
       expect(serviceStreamsApi.correlate).toHaveBeenCalledWith("test-org", {
         source_stream: "api-gateway",
         source_type: "logs",
-        available_dimensions: mockIncident.stable_dimensions,
+        available_dimensions: mockIncident.group_values,
       });
-    });
-  });
-
-  describe("extractTraceId", () => {
-    it("should extract trace_id from stable dimensions", () => {
-      const incident = {
-        stable_dimensions: {
-          trace_id: "abc123",
-        },
-      } as any;
-
-      const result = incidents.extractTraceId(incident);
-      expect(result).toBe("abc123");
-    });
-
-    it("should handle traceId variation", () => {
-      const incident = {
-        stable_dimensions: {
-          traceId: "xyz789",
-        },
-      } as any;
-
-      const result = incidents.extractTraceId(incident);
-      expect(result).toBe("xyz789");
-    });
-
-    it("should handle trace.id variation", () => {
-      const incident = {
-        stable_dimensions: {
-          "trace.id": "def456",
-        },
-      } as any;
-
-      const result = incidents.extractTraceId(incident);
-      expect(result).toBe("def456");
-    });
-
-    it("should return undefined when no trace_id found", () => {
-      const incident = {
-        stable_dimensions: {
-          service: "api-gateway",
-        },
-      } as any;
-
-      const result = incidents.extractTraceId(incident);
-      expect(result).toBeUndefined();
     });
   });
 });

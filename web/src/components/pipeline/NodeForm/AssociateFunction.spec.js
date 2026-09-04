@@ -1,396 +1,219 @@
-import { flushPromises, mount } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { Dialog, Notify } from "quasar";
-import useDnD from '@/plugins/pipelines/useDnD';
-import { installQuasar } from "@/test/unit/helpers";
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+// AssociateFunction.vue is CHROME ONLY: the drawer + Save/Cancel/Delete +
+// addNode. The body (function list, select, after-flatten, the inline
+// AddFunction editor, and the zod schema for required / already-associated) is
+// the SHARED FunctionPicker — covered in
+// components/flow/forms/FunctionPicker.spec.ts, which the workflow Function node
+// exercises through the very same component. Here we drive the picker via a stub
+// and assert only this drawer's own responsibilities.
+
+import { mount } from "@vue/test-utils";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import store from "@/test/unit/helpers/store";
-import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 import AssociateFunction from "./AssociateFunction.vue";
+import useDnD from "@/plugins/pipelines/useDnD";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
+vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 
 const mockAddNode = vi.fn();
-vi.mock('@/plugins/pipelines/useDnD', () => ({
-  default: vi.fn(),
-  useDnD: () => ({
+const mockDeletePipelineNode = vi.fn();
+
+vi.mock("@/plugins/pipelines/useDnD", () => ({ default: vi.fn() }));
+
+// Picker stub: submit() resolves whatever the test queues; clicking it emits
+// expand(true) to simulate opening the inline function editor.
+let pickerPayload = { name: "fn-a", after_flatten: true };
+const FunctionPickerStub = {
+  name: "FunctionPicker",
+  props: [
+    "initialName",
+    "initialAfterFlatten",
+    "isUpdating",
+    "duplicateNames",
+    "showFlatten",
+    "sampleEvents",
+  ],
+  emits: ["expand", "created"],
+  template: '<div class="function-picker-stub" @click="$emit(\'expand\', true)" />',
+  methods: {
+    submit: () => Promise.resolve(pickerPayload),
+  },
+};
+
+const ODrawerStub = {
+  name: "ODrawer",
+  props: [
+    "open",
+    "title",
+    "width",
+    "primaryButtonLabel",
+    "secondaryButtonLabel",
+    "neutralButtonLabel",
+    "neutralButtonVariant",
+  ],
+  emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
+  template: `
+    <div class="o-drawer-stub" :data-width="width">
+      <slot />
+      <button v-if="primaryButtonLabel" data-test="save-btn" @click="$emit('click:primary')">{{ primaryButtonLabel }}</button>
+      <button v-if="secondaryButtonLabel" data-test="cancel-btn" @click="$emit('click:secondary')">{{ secondaryButtonLabel }}</button>
+      <button v-if="neutralButtonLabel" data-test="delete-btn" @click="$emit('click:neutral')">{{ neutralButtonLabel }}</button>
+    </div>
+  `,
+};
+
+function createWrapper(pipelineObjOverrides = {}, props = {}) {
+  const mockPipelineObj = {
+    currentSelectedNodeData: { data: {}, type: "function" },
+    currentSelectedNodeID: "node-123",
+    userClickedNode: {},
+    userSelectedNode: { id: "x" },
+    isEditNode: false,
+    ...pipelineObjOverrides,
+  };
+
+  vi.mocked(useDnD).mockImplementation(() => ({
+    pipelineObj: mockPipelineObj,
     addNode: mockAddNode,
-    pipelineObj: {
-      isEditNode: false,
-      currentSelectedNodeData: null,
-      userClickedNode: {},
-      userSelectedNode: {},
+    deletePipelineNode: mockDeletePipelineNode,
+  }));
+
+  return mount(AssociateFunction, {
+    props: { open: true, functions: [], associatedFunctions: [], ...props },
+    global: {
+      plugins: [i18n, store],
+      stubs: {
+        ConfirmDialog: true,
+        ODrawer: ODrawerStub,
+        FunctionPicker: FunctionPickerStub,
+      },
     },
-    deletePipelineNode: vi.fn()
-  })
-}));
-
-describe("AssociateFunction Component", () => {
-  let wrapper;
-  let mockPipelineObj;
-  let mockStore;
-
-  beforeEach(async () => {
-    // Setup mock store
-    mockStore = {
-      state: {
-        theme: 'light',
-        selectedOrganization: {
-          identifier: "test-org"
-        },
-        userInfo: {
-          email: "test@example.com"
-        }
-      }
-    };
-
-    // Setup mock pipeline object
-    mockPipelineObj = {
-      currentSelectedNodeData: {
-        data: {},
-        type: 'function'
-      },
-      userSelectedNode: {},
-      isEditNode: false,
-      functions: {
-        function1: {
-          function: 'console.log("test function 1");',
-          name: 'function1'
-        },
-        function2: {
-          function: 'console.log("test function 2");',
-          name: 'function2'
-        },
-        function3: {
-          function: 'console.log("test function 3");',
-          name: 'function3'
-        }
-      }
-    };
-
-    // Mock useDnD composable
-    vi.mocked(useDnD).mockImplementation(() => ({
-      pipelineObj: mockPipelineObj,
-      addNode: mockAddNode,
-      deletePipelineNode: vi.fn()
-    }));
-
-    // Mount component
-    wrapper = mount(AssociateFunction, {
-      global: {
-        plugins: [i18n],
-        provide: {
-          store: mockStore,
-        },
-        stubs: {
-          AddFunction: true,
-          ConfirmDialog: true,
-        }
-      },
-      props: {
-        functions: ["function1", "function2", "function3"],
-        associatedFunctions: ["function4"]
-      }
-    });
-
-    const notifyMock = vi.fn();
-    wrapper.vm.$q.notify = notifyMock;
-
-    await flushPromises();
   });
+}
 
-  afterEach(() => {
+const tick = () => new Promise((r) => setTimeout(r, 0));
+
+describe("AssociateFunction.vue (drawer chrome)", () => {
+  beforeEach(() => {
     vi.clearAllMocks();
+    pickerPayload = { name: "fn-a", after_flatten: true };
   });
 
-  describe("Component Initialization", () => {
-    it("mounts successfully", () => {
-      expect(wrapper.exists()).toBe(true);
-    });
-
-    it("initializes with default values", () => {
-      expect(wrapper.vm.createNewFunction).toBe(false);
-      expect(wrapper.vm.afterFlattening).toBe(true);
-      expect(wrapper.vm.loading).toBe(false);
-    });
-
-    it("initializes with provided functions", () => {
-      expect(wrapper.vm.filteredFunctions).toEqual(["function1", "function2", "function3"]);
-    });
+  it("mounts and renders the shared FunctionPicker as its body", () => {
+    const wrapper = createWrapper();
+    expect(wrapper.find(".function-picker-stub").exists()).toBe(true);
   });
 
-  describe("Function Selection", () => {
-    it("filters functions based on search value", async () => {
-      const mockUpdate = vi.fn();
-      wrapper.vm.filterFunctions("function1", mockUpdate);
-      
-      expect(mockUpdate).toHaveBeenCalled();
-      const updateFn = mockUpdate.mock.calls[0][0];
-      updateFn();
-      expect(wrapper.vm.filteredFunctions).toContain("function1");
+  it("seeds the picker from the saved node when editing", () => {
+    const wrapper = createWrapper({
+      isEditNode: true,
+      currentSelectedNodeData: { data: { name: "fn-b", after_flatten: false } },
     });
-
-    it("prevents selecting already associated function", async () => {
-      wrapper.vm.selectedFunction = "function4";
-      await wrapper.vm.saveFunction();
-      
-      expect(wrapper.vm.functionExists).toBe(true);
-      expect(mockAddNode).not.toHaveBeenCalled();
-    });
+    const picker = wrapper.findComponent({ name: "FunctionPicker" });
+    expect(picker.props("initialName")).toBe("fn-b");
+    expect(picker.props("initialAfterFlatten")).toBe(false);
+    // Editing a NODE must NOT bind `is-updating` — that flag means "editing an
+    // existing FUNCTION" and locks the select + disables the create-new name
+    // field. A node edit still has to let you re-point at a different function.
+    expect(picker.props("isUpdating")).toBeFalsy();
   });
 
-  describe("Create New Function Mode", () => {
-    it("toggles create new function mode", async () => {
-      await wrapper.find('[data-test="create-function-toggle"]').trigger('click');
-      expect(wrapper.vm.createNewFunction).toBe(true);
-    });
-
-    it("shows create function form when in create mode", async () => {
-      wrapper.vm.createNewFunction = true;
-      await wrapper.vm.$nextTick();
-      
-      expect(wrapper.find('.pipeline-add-function').exists()).toBe(true);
-    });
-
-    it("prevents saving when function name is empty in create mode", async () => {
-      wrapper.vm.createNewFunction = true;
-      await wrapper.vm.$nextTick();
-      
-      // Mock the addFunctionRef properly
-      wrapper.vm.addFunctionRef = {
-        formData: {
-          name: "",
-          function: ""
-        }
-      };
-
-      await wrapper.vm.saveFunction();
-      
-      expect(wrapper.vm.$q.notify).toHaveBeenCalledWith(
-        expect.objectContaining({
-          message: "Function Name is required",
-          color: "negative"
-        })
-      );
-    });
-
-    it("handles valid function creation", async () => {
-      wrapper.vm.createNewFunction = true;
-      await wrapper.vm.$nextTick();
-      
-      wrapper.vm.addFunctionRef = {
-        formData: {
-          name: "newFunction",
-          function: "console.log('test')"
-        }
-      };
-
-      await wrapper.vm.saveFunction();
-      expect(wrapper.vm.$q.notify).not.toHaveBeenCalled();
-    });
+  it("passes the already-associated names to the picker for uniqueness", () => {
+    const wrapper = createWrapper({}, { associatedFunctions: ["fn-a", "fn-b"] });
+    expect(wrapper.findComponent({ name: "FunctionPicker" }).props("duplicateNames")).toEqual([
+      "fn-a",
+      "fn-b",
+    ]);
   });
 
-  describe("Dialog Handling", () => {
-    it("opens cancel dialog with changes", async () => {
-      wrapper.vm.selectedFunction = "function1";
-      await wrapper.vm.openCancelDialog();
-      
-      expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Discard Changes");
-      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to cancel changes?");
-    });
+  // ── Save ────────────────────────────────────────────────────────────────
+  it("adds the node with the correct payload on save", async () => {
+    const wrapper = createWrapper();
+    await wrapper.find('[data-test="save-btn"]').trigger("click");
+    await tick();
 
-
-    it("opens delete dialog with correct content", async () => {
-      await wrapper.vm.openDeleteDialog();
-      
-      expect(wrapper.vm.dialog.show).toBe(true);
-      expect(wrapper.vm.dialog.title).toBe("Delete Node");
-      expect(wrapper.vm.dialog.message).toBe("Are you sure you want to delete function association?");
+    expect(mockAddNode).toHaveBeenCalledWith({
+      name: "fn-a",
+      after_flatten: true,
     });
-
-    it("handles dialog confirmation", async () => {
-      await wrapper.vm.openDeleteDialog();
-      await wrapper.vm.dialog.okCallback();
-      
-      expect(wrapper.emitted()["cancel:hideform"]).toBeTruthy();
-    });
+    expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
   });
 
-  describe("Edit Mode", () => {
-    beforeEach(async () => {
-      mockPipelineObj.isEditNode = true;
-      mockPipelineObj.currentSelectedNodeData = {
-        data: {
-          name: "function1",
-          after_flatten: false
-        }
-      };
-      mockPipelineObj.functions = {
-        function1: {
-          function: 'console.log("test function 1");',
-          name: 'function1'
-        },
-        function2: {
-          function: 'console.log("test function 2");',
-          name: 'function2'
-        },
-        function3: {
-          function: 'console.log("test function 3");',
-          name: 'function3'
-        }
-      };
+  it("does NOT add a node when the picker blocks the save (invalid/duplicate)", async () => {
+    pickerPayload = null; // schema rejected it; the picker shows the error inline
+    const wrapper = createWrapper();
+    await wrapper.find('[data-test="save-btn"]').trigger("click");
+    await tick();
 
-      // Mock useDnD composable for edit mode
-      vi.mocked(useDnD).mockImplementation(() => ({
-        pipelineObj: mockPipelineObj,
-        addNode: mockAddNode,
-        deletePipelineNode: vi.fn()
-      }));
-
-      // Mount component with edit mode props
-      wrapper = mount(AssociateFunction, {
-        global: {
-          plugins: [i18n],
-          provide: {
-            store: mockStore,
-          },
-          stubs: {
-            AddFunction: true,
-            ConfirmDialog: true
-          }
-        },
-        props: {
-          functions: ["function1", "function2", "function3"],
-          associatedFunctions: ["function4"]
-        }
-      });
-
-      const notifyMock = vi.fn();
-      wrapper.vm.$q.notify = notifyMock;
-
-      await flushPromises();
-      await wrapper.vm.$nextTick();
-    });
-
-    it("loads existing function data in edit mode", () => {
-      expect(wrapper.vm.selectedFunction).toBe("function1");
-      expect(wrapper.vm.afterFlattening).toBe(false);
-    });
-
-    it("disables function selection in edit mode", async () => {
-      // Set isUpdating to true to trigger readonly and disable
-      wrapper.vm.isUpdating = true;
-      await wrapper.vm.$nextTick();
-
-      // Find the select input wrapper
-      const selectInput = wrapper.find('[data-test="associate-function-select-function-input"]');
-      expect(selectInput.exists()).toBe(true);
-
-      // Find the q-select element
-      const select = selectInput.find('.q-select');
-      expect(select.exists()).toBe(true);
-
-
-      // Verify the component is actually disabled
-      const inputElement = select.find('input');
-      expect(inputElement.exists()).toBe(true);
-      expect(inputElement.attributes().disabled).toBe('');
-    });
-
-    it("shows delete button in edit mode", () => {
-      const deleteButton = wrapper.find('[data-test="associate-function-delete-btn"]');
-      expect(deleteButton.exists()).toBe(true);
-    });
+    expect(mockAddNode).not.toHaveBeenCalled();
+    expect(wrapper.emitted("cancel:hideform")).toBeFalsy();
   });
 
-  describe("After Flattening Toggle", () => {
-    it("toggles after flattening option", async () => {
-      const toggle = wrapper.find('[data-test="associate-function-after-flattening-toggle"]');
-      await toggle.trigger('click');
-      expect(wrapper.vm.afterFlattening).toBe(false);
-    });
+  // ── Inline editor (expand) ──────────────────────────────────────────────
+  it("widens the drawer and hides the footer while the inline editor is open", async () => {
+    const wrapper = createWrapper();
+    expect(wrapper.find(".o-drawer-stub").attributes("data-width")).toBe("30");
+    expect(wrapper.find('[data-test="save-btn"]').exists()).toBe(true);
 
-    it("saves function with after flattening option", async () => {
-      wrapper.vm.selectedFunction = "function1";
-      wrapper.vm.afterFlattening = false;
-      
-      await wrapper.vm.saveFunction();
-      
-      expect(mockAddNode).toHaveBeenCalledWith({
-        name: "function1",
-        after_flatten: false
-      });
-    });
+    await wrapper.find(".function-picker-stub").trigger("click"); // expand(true)
+
+    expect(wrapper.find(".o-drawer-stub").attributes("data-width")).toBe("97");
+    expect(wrapper.find('[data-test="save-btn"]').exists()).toBe(false);
+    expect(wrapper.find('[data-test="cancel-btn"]').exists()).toBe(false);
   });
 
-  describe("Function List Management", () => {
-    it("sorts functions alphabetically", async () => {
-      wrapper = mount(AssociateFunction, {
-        global: {
-          plugins: [i18n],
-          provide: { store: mockStore },
-          stubs: {
-            AddFunction: true,
-            ConfirmDialog: true,
-          }
-        },
-        props: {
-          functions: ["zFunction", "aFunction", "mFunction"],
-          associatedFunctions: []
-        }
-      });
-
-      await flushPromises();
-      expect(wrapper.vm.filteredFunctions).toEqual(["aFunction", "mFunction", "zFunction"]);
-    });
-
-    it("filters functions case-insensitively", async () => {
-      const mockUpdate = vi.fn();
-      wrapper.vm.filterFunctions("FUNCTION1", mockUpdate);
-      
-      expect(mockUpdate).toHaveBeenCalled();
-      const updateFn = mockUpdate.mock.calls[0][0];
-      updateFn();
-      expect(wrapper.vm.filteredFunctions).toContain("function1");
-    });
+  it("re-emits add:function when the picker creates one", async () => {
+    const wrapper = createWrapper();
+    wrapper.findComponent({ name: "FunctionPicker" }).vm.$emit("created", { name: "new-fn" });
+    await tick();
+    expect(wrapper.emitted("add:function")[0]).toEqual([{ name: "new-fn" }]);
   });
 
-  describe("Component Style", () => {
-    it("applies correct style based on create function mode", async () => {
-      expect(wrapper.vm.computedStyleForFunction).toEqual({ width: "100%", height: "100%" });
-      
-      wrapper.vm.createNewFunction = true;
-      await wrapper.vm.$nextTick();
-      
-      expect(wrapper.vm.computedStyleForFunction).toEqual({ width: "100%" });
-    });
+  // ── Buttons / cancel / delete ───────────────────────────────────────────
+  it("shows delete only when editing a node", () => {
+    expect(createWrapper({ isEditNode: false }).find('[data-test="delete-btn"]').exists()).toBe(
+      false,
+    );
+    expect(createWrapper({ isEditNode: true }).find('[data-test="delete-btn"]').exists()).toBe(
+      true,
+    );
   });
 
-  describe("Loading State", () => {
-    it("shows spinner when loading", async () => {
-      wrapper.vm.loading = true;
-      await wrapper.vm.$nextTick();
-      
-      const spinner = wrapper.find('.q-spinner');
-      expect(spinner.exists()).toBe(true);
-    });
+  it("prompts to discard on cancel", async () => {
+    const wrapper = createWrapper();
+    await wrapper.find('[data-test="cancel-btn"]').trigger("click");
+    expect(wrapper.vm.dialog.show).toBe(true);
+    expect(wrapper.vm.dialog.title).toBe("Discard changes");
+    expect(wrapper.vm.pipelineObj.userSelectedNode).toEqual({});
+  });
 
-    it("hides form content when loading", async () => {
-      wrapper.vm.loading = true;
-      await wrapper.vm.$nextTick();
-      
-      const formContent = wrapper.find('.stream-routing-container');
-      // Check if v-else is working correctly
-      expect(formContent.exists()).toBe(false);
-      
-      // Also verify that when not loading, the form is visible
-      wrapper.vm.loading = false;
-      await wrapper.vm.$nextTick();
-      const visibleForm = wrapper.find('.stream-routing-container');
-      expect(visibleForm.exists()).toBe(true);
-    });
+  it("opens the delete confirmation with the expected copy", async () => {
+    const wrapper = createWrapper({ isEditNode: true });
+    await wrapper.find('[data-test="delete-btn"]').trigger("click");
+    expect(wrapper.vm.dialog.show).toBe(true);
+    expect(wrapper.vm.dialog.title).toBe("Delete Node");
+    expect(typeof wrapper.vm.dialog.okCallback).toBe("function");
+  });
+
+  it("deletes the node when the deletion is confirmed", () => {
+    const wrapper = createWrapper({ isEditNode: true });
+    wrapper.vm.deleteFunction();
+    expect(mockDeletePipelineNode).toHaveBeenCalledWith("node-123");
+    expect(wrapper.emitted("cancel:hideform")).toBeTruthy();
   });
 });

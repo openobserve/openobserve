@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,30 +13,22 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount, DOMWrapper } from "@vue/test-utils";
+import { mount } from "@vue/test-utils";
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
 import General from "./General.vue";
 import i18n from "@/locales";
-import { Dialog, Notify } from "quasar";
 import { nextTick } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 
-installQuasar({
-  plugins: [Dialog, Notify],
-});
-
-// Mock useQuasar
-const mockNotify = vi.fn(() => vi.fn()); // notify returns dismiss function
-vi.mock("quasar", async () => {
-  const actual = await vi.importActual("quasar");
-  return {
-    ...actual,
-    useQuasar: () => ({
-      notify: mockNotify,
-    }),
-  };
-});
+// Mock toast
+// vi.hoisted ensures mockToast is initialized before the vi.mock factory runs
+const { mockToast } = vi.hoisted(() => ({
+  mockToast: vi.fn(() => vi.fn()),
+}));
+vi.mock("@/lib/feedback/Toast/useToast", () => ({
+  toast: mockToast,
+  useToast: () => ({ toast: mockToast, toasts: [] }),
+}));
 
 // Mock external services and composables
 vi.mock("@/services/organizations", () => ({
@@ -56,6 +48,7 @@ vi.mock("@/services/settings", () => ({
 vi.mock("@/services/config", () => ({
   default: {
     get_config: vi.fn(),
+    get_config_full: vi.fn(),
   },
 }));
 
@@ -137,8 +130,6 @@ beforeEach(async () => {
   vi.spyOn(router, "push");
 });
 
-// Mock Quasar notify is defined above
-
 const createWrapper = (props = {}, options = {}) => {
   return mount(General, {
     props: {
@@ -149,118 +140,111 @@ const createWrapper = (props = {}, options = {}) => {
       mocks: {
         $store: mockStore,
         $router: router,
-        $q: {
-          notify: mockNotify,
-        },
       },
       provide: {
         store: mockStore,
       },
       stubs: {
-        QForm: {
-          template:
-            "<form data-test-stub='q-form' @submit.prevent='$emit(\"submit\", $event)'><slot></slot></form>",
-          emits: ["submit"],
-        },
-        QInput: {
-          template: `<input 
-            data-test-stub='q-input' 
-            :data-test='$attrs["data-test"]'
-            :value='modelValue'
-            @input='$emit("update:modelValue", Number($event.target.value))'
-            :type='type'
-            :min='min'
-          />`,
-          props: ["modelValue", "type", "min", "label", "rules", "lazyRules"],
-          emits: ["update:modelValue"],
-        },
-        QToggle: {
-          template: `<input 
-            type='checkbox' 
-            data-test-stub='q-toggle' 
-            :data-test='$attrs["data-test"]'
-            :checked='modelValue'
-            @change='$emit("update:modelValue", $event.target.checked)'
-          />`,
-          props: ["modelValue", "label"],
-          emits: ["update:modelValue"],
-        },
-        QBtn: {
-          template: `<button 
-            data-test-stub='q-btn' 
+        // OForm / OFormInput / OInput are intentionally NOT stubbed so the real
+        // schema validation runs (per the migration playbook: at least one path
+        // must mount the real <OForm>).
+        OButton: {
+          template: `<button
+            data-test-stub='o-button'
             :data-test='$attrs["data-test"]'
             @click='$emit("click", $event)'
             :disabled='loading'
             :type='type'
           >
-            {{ label }}
             <slot></slot>
           </button>`,
-          props: ["label", "loading", "color", "type", "size", "icon"],
+          props: ["loading", "type", "variant", "size", "iconLeft", "iconRight", "label"],
           emits: ["click"],
         },
-        QSeparator: {
-          template: "<div data-test-stub='q-separator'></div>",
-        },
-        QImg: {
-          template:
-            "<img data-test-stub='q-img' :src='src' :alt='alt' data-test='setting_ent_custom_logo_img' />",
-          props: ["src", "alt", "style", "class"],
-        },
-        QFile: {
-          template: `<input 
-            type='file' 
-            data-test-stub='q-file' 
+        OFile: {
+          template: `<input
+            type='file'
+            data-test-stub='o-file'
             :data-test='$attrs["data-test"]'
             @change='handleFileChange'
             :accept='accept'
           />`,
-          props: [
-            "modelValue",
-            "label",
-            "accept",
-            "maxFileSize",
-            "counterLabel",
-          ],
+          props: ["modelValue", "label", "accept", "counter", "counterLabel"],
           emits: ["update:modelValue", "rejected"],
           methods: {
             handleFileChange(event: any) {
               const file = event.target.files[0];
               if (file) {
-                if (file.size > this.maxFileSize) {
-                  this.$emit("rejected", [
-                    { name: file.name, size: file.size },
-                  ]);
-                } else {
-                  this.$emit("update:modelValue", file);
-                }
+                this.$emit("update:modelValue", file);
               }
             },
           },
         },
-        QIcon: {
-          template: "<span data-test-stub='q-icon'></span>",
-          props: ["name"],
+        OIcon: {
+          template: "<span data-test-stub='OIcon'></span>",
+          props: ["name", "size"],
         },
-        QSpinnerHourglass: {
-          template: "<div data-test-stub='q-spinner-hourglass'></div>",
-          props: ["class", "size", "color"],
+        ODialog: {
+          name: "ODialog",
+          template: `<div
+              data-test-stub='o-dialog'
+              :data-open='String(open)'
+              :data-size='size'
+              :data-title='title'
+              :data-primary-label='primaryButtonLabel'
+              :data-secondary-label='secondaryButtonLabel'
+            >
+              <slot name='header' />
+              <slot />
+              <slot name='footer' />
+              <button
+                data-test-stub='o-dialog-primary'
+                @click='$emit("click:primary")'
+              >{{ primaryButtonLabel }}</button>
+              <button
+                data-test-stub='o-dialog-secondary'
+                @click='$emit("click:secondary")'
+              >{{ secondaryButtonLabel }}</button>
+            </div>`,
+          props: [
+            "open",
+            "size",
+            "title",
+            "subTitle",
+            "persistent",
+            "showClose",
+            "width",
+            "primaryButtonLabel",
+            "secondaryButtonLabel",
+            "neutralButtonLabel",
+            "primaryButtonVariant",
+            "secondaryButtonVariant",
+            "neutralButtonVariant",
+            "primaryButtonDisabled",
+            "secondaryButtonDisabled",
+            "neutralButtonDisabled",
+            "primaryButtonLoading",
+            "secondaryButtonLoading",
+            "neutralButtonLoading",
+          ],
+          emits: ["update:open", "click:primary", "click:secondary", "click:neutral"],
         },
-        QDialog: {
-          template:
-            "<div data-test-stub='q-dialog' v-if='modelValue'><slot></slot></div>",
+        OColor: {
+          template: '<div data-test-stub="o-color" :data-value="modelValue"></div>',
           props: ["modelValue"],
           emits: ["update:modelValue"],
         },
-        QCard: {
-          template: "<div data-test-stub='q-card'><slot></slot></div>",
+        OSpinner: {
+          template: '<div data-test-stub="o-spinner" :data-test="$attrs[\'data-test\']"></div>',
+          props: ["size"],
         },
-        QCardSection: {
-          template: "<div data-test-stub='q-card-section'><slot></slot></div>",
+        OTooltip: {
+          template: '<div data-test-stub="o-tooltip"><slot></slot></div>',
+          props: ["content", "side", "align", "maxWidth"],
         },
-        QCardActions: {
-          template: "<div data-test-stub='q-card-actions'><slot></slot></div>",
-          props: ["align"],
+        GroupHeader: {
+          template: '<div data-test-stub="group-header"><slot></slot></div>',
+          props: ["title", "showIcon"],
         },
       },
     },
@@ -288,6 +272,7 @@ describe("General", () => {
     mockSettingsService.deleteLogo.mockResolvedValue({ status: 200 });
     mockSettingsService.updateCustomText.mockResolvedValue({ status: 200 });
     mockConfigService.get_config.mockResolvedValue({ data: {} });
+    mockConfigService.get_config_full.mockResolvedValue({ data: {} });
     mockDOMPurify.sanitize.mockImplementation((text) => text);
   });
 
@@ -305,33 +290,29 @@ describe("General", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
-    it("should initialize with organization settings values", () => {
+    it("should seed the form defaults from organization settings", () => {
       const wrapper = createWrapper();
-
-      expect(wrapper.vm.scrapeIntereval).toBe(30);
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.scrape_interval).toBe(30);
     });
   });
 
   describe("Form inputs", () => {
-    it("should update scrape interval value", async () => {
+    it("should keep the scrape interval and max series inputs (data-tests preserved)", () => {
       const wrapper = createWrapper();
-      const scrapeInput = wrapper.find('input[data-test-stub="q-input"]');
-
-      await scrapeInput.setValue("45");
-      expect(wrapper.vm.scrapeIntereval).toBe(45);
+      expect(wrapper.find('[data-test="general-settings-scrape-interval"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="general-settings-max-series-per-query"]').exists()).toBe(
+        true,
+      );
     });
   });
 
-  describe("Form submission", () => {
+  describe("Form submission (real OForm)", () => {
     it("should save organization settings successfully", async () => {
       const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
 
-      // Set the scrape interval in the component
-      wrapper.vm.scrapeIntereval = 30;
-      await wrapper.vm.$nextTick();
-
-      const form = wrapper.find('[data-test-stub="q-form"]');
-      await form.trigger("submit");
+      await form.vm.form.handleSubmit();
       await nextTick();
 
       // The dispatch is called with the spread of existing organizationSettings plus scrape_interval
@@ -347,10 +328,9 @@ describe("General", () => {
         expect.any(Object),
       );
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Organization settings updated",
-        timeout: 2000,
       });
     });
 
@@ -360,14 +340,13 @@ describe("General", () => {
       });
 
       const wrapper = createWrapper();
-      const form = wrapper.find('[data-test-stub="q-form"]');
-      await form.trigger("submit");
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
       await nextTick();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
         message: "Server error",
-        timeout: 2000,
       });
     });
 
@@ -375,14 +354,13 @@ describe("General", () => {
       mockOrganizations.post_organization_settings.mockRejectedValue({});
 
       const wrapper = createWrapper();
-      const form = wrapper.find('[data-test-stub="q-form"]');
-      await form.trigger("submit");
+      const form = wrapper.findComponent({ name: "OForm" });
+      await form.vm.form.handleSubmit();
       await nextTick();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
         message: "Something went wrong",
-        timeout: 2000,
       });
     });
   });
@@ -414,17 +392,13 @@ describe("General", () => {
         expect(wrapper.text()).toContain("Test Logo Text");
       } else {
         // Fallback: verify component has access to the custom text from store
-        expect(mockStore.state.zoConfig.custom_logo_text).toBe(
-          "Test Logo Text",
-        );
+        expect(mockStore.state.zoConfig.custom_logo_text).toBe("Test Logo Text");
       }
     });
 
     it("should enter edit mode when edit button is clicked", async () => {
       const wrapper = createWrapper();
-      const editButton = wrapper.find(
-        '[data-test="settings_ent_logo_custom_text_edit_btn"]',
-      );
+      const editButton = wrapper.find('[data-test="settings_ent_logo_custom_text_edit_btn"]');
 
       if (editButton.exists()) {
         await editButton.trigger("click");
@@ -441,9 +415,7 @@ describe("General", () => {
       Object.assign(wrapper.vm, { editingText: true });
       await nextTick();
 
-      const textInput = wrapper.find(
-        '[data-test="settings_ent_logo_custom_text"]',
-      );
+      const textInput = wrapper.find('[data-test="settings_ent_logo_custom_text"]');
       if (textInput.exists()) {
         expect(textInput.exists()).toBe(true);
       } else {
@@ -459,9 +431,7 @@ describe("General", () => {
         customText: "New Logo Text",
       });
 
-      const saveButton = wrapper.find(
-        '[data-test="settings_ent_logo_custom_text_save_btn"]',
-      );
+      const saveButton = wrapper.find('[data-test="settings_ent_logo_custom_text_save_btn"]');
       if (saveButton.exists()) {
         await saveButton.trigger("click");
       } else {
@@ -486,9 +456,7 @@ describe("General", () => {
         customText: longText,
       });
 
-      const saveButton = wrapper.find(
-        '[data-test="settings_ent_logo_custom_text_save_btn"]',
-      );
+      const saveButton = wrapper.find('[data-test="settings_ent_logo_custom_text_save_btn"]');
       if (saveButton.exists()) {
         await saveButton.trigger("click");
       } else {
@@ -497,10 +465,9 @@ describe("General", () => {
       }
       await nextTick();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
         message: "Text should be less than 100 characters.",
-        timeout: 2000,
       });
       expect(mockSettingsService.updateCustomText).not.toHaveBeenCalled();
     });
@@ -544,10 +511,9 @@ describe("General", () => {
       // Wait for async operations to complete
       await wrapper.vm.$nextTick();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
         message: "Update failed",
-        timeout: 2000,
       });
     });
   });
@@ -568,9 +534,7 @@ describe("General", () => {
       mockStore.state.zoConfig.custom_logo_img = null;
       const wrapper = createWrapper();
 
-      const fileUpload = wrapper.find(
-        '[data-test="setting_ent_custom_logo_img_file_upload"]',
-      );
+      const fileUpload = wrapper.find('[data-test="setting_ent_custom_logo_img_file_upload"]');
       if (fileUpload.exists()) {
         expect(fileUpload.exists()).toBe(true);
       } else {
@@ -590,10 +554,9 @@ describe("General", () => {
         expect.any(FormData),
         "light", // default theme
       );
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Light Mode logo updated successfully.",
-        timeout: 2000,
       });
     });
 
@@ -608,10 +571,9 @@ describe("General", () => {
         expect.any(FormData),
         "dark",
       );
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Dark Mode logo updated successfully.",
-        timeout: 2000,
       });
     });
 
@@ -627,18 +589,15 @@ describe("General", () => {
       // Wait for async operations to complete
       await wrapper.vm.$nextTick();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
         message: "Upload failed",
-        timeout: 2000,
       });
     });
 
     it("should show delete confirmation dialog", async () => {
       const wrapper = createWrapper();
-      const deleteButton = wrapper.find(
-        '[data-test="setting_ent_custom_logo_img_delete_btn"]',
-      );
+      const deleteButton = wrapper.find('[data-test="setting_ent_custom_logo_img_delete_btn"]');
 
       if (deleteButton.exists()) {
         await deleteButton.trigger("click");
@@ -656,10 +615,9 @@ describe("General", () => {
       await wrapper.vm.deleteLogo();
 
       expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "light");
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Light Mode logo deleted successfully.",
-        timeout: 2000,
       });
     });
 
@@ -669,10 +627,9 @@ describe("General", () => {
       await wrapper.vm.deleteLogo("dark");
 
       expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "dark");
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "positive",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "success",
         message: "Dark Mode logo deleted successfully.",
-        timeout: 2000,
       });
     });
 
@@ -686,11 +643,120 @@ describe("General", () => {
       // Wait for async operations to complete
       await wrapper.vm.$nextTick();
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
         message: "Something went wrong",
-        timeout: 2000,
       });
+    });
+  });
+
+  describe("Delete confirmation ODialog", () => {
+    it("renders the delete confirmation ODialog stub", () => {
+      const wrapper = createWrapper();
+      // both ODialogs are always present (visibility driven by `open`)
+      const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
+      expect(dialogs.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("opens the delete confirmation ODialog when confirmDeleteLogo is called", async () => {
+      const wrapper = createWrapper();
+      await wrapper.vm.confirmDeleteLogo("dark");
+      await nextTick();
+
+      expect(wrapper.vm.confirmDeleteImage).toBe(true);
+      expect(wrapper.vm.logoThemeToDelete).toBe("dark");
+    });
+
+    it("closes the delete ODialog when secondary (cancel) is emitted", async () => {
+      const wrapper = createWrapper();
+      // open the dialog first
+      await wrapper.vm.confirmDeleteLogo("light");
+      await nextTick();
+      expect(wrapper.vm.confirmDeleteImage).toBe(true);
+
+      // Simulate ODialog emitting click:secondary -> cancelConfirmDialog
+      const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
+      // first ODialog corresponds to the delete-confirmation dialog
+      const cancelBtn = dialogs[0].find('[data-test-stub="o-dialog-secondary"]');
+      await cancelBtn.trigger("click");
+      await nextTick();
+
+      expect(wrapper.vm.confirmDeleteImage).toBe(false);
+      expect(mockSettingsService.deleteLogo).not.toHaveBeenCalled();
+    });
+
+    it("invokes deleteLogo when primary (ok) is emitted on delete ODialog", async () => {
+      const wrapper = createWrapper();
+      await wrapper.vm.confirmDeleteLogo("dark");
+      await nextTick();
+
+      const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
+      const okBtn = dialogs[0].find('[data-test-stub="o-dialog-primary"]');
+      await okBtn.trigger("click");
+      await nextTick();
+
+      expect(wrapper.vm.confirmDeleteImage).toBe(false);
+      expect(mockSettingsService.deleteLogo).toHaveBeenCalledWith("test-org", "dark");
+    });
+  });
+
+  describe("Color picker ODialog", () => {
+    it("opens the color picker ODialog when a theme chip is clicked", async () => {
+      const wrapper = createWrapper();
+      await wrapper.vm.handleThemeChipClick("light");
+      await nextTick();
+
+      expect(wrapper.vm.showColorPicker).toBe(true);
+      expect(wrapper.vm.currentPickerMode).toBe("light");
+    });
+
+    it("opens the color picker for dark mode and seeds tempColor", async () => {
+      const wrapper = createWrapper();
+      // set a custom dark color so tempColor is seeded with it
+      wrapper.vm.customDarkColor = "#123456";
+      await wrapper.vm.handleThemeChipClick("dark");
+      await nextTick();
+
+      expect(wrapper.vm.showColorPicker).toBe(true);
+      expect(wrapper.vm.currentPickerMode).toBe("dark");
+      expect(wrapper.vm.tempColor).toBe("#123456");
+    });
+
+    it("closes the color picker when primary (close) is emitted", async () => {
+      const wrapper = createWrapper();
+      await wrapper.vm.handleThemeChipClick("light");
+      await nextTick();
+      expect(wrapper.vm.showColorPicker).toBe(true);
+
+      // Select the color-picker dialog by title (order-independent — other dialogs
+      // like the delete-org confirmation also exist in the template).
+      const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
+      const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick Custom Color");
+      const closeBtn = colorDialog.find('[data-test-stub="o-dialog-primary"]');
+      await closeBtn.trigger("click");
+      await nextTick();
+
+      expect(wrapper.vm.showColorPicker).toBe(false);
+    });
+
+    it("forwards size and primary label to the delete confirmation ODialog", () => {
+      const wrapper = createWrapper();
+      const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
+      const deleteDialog = dialogs[0];
+      // Component template uses size="sm" for delete confirmation dialog
+      expect(deleteDialog.attributes("data-size")).toBe("sm");
+      expect(deleteDialog.attributes("data-primary-label")).toBe("OK");
+      expect(deleteDialog.attributes("data-secondary-label")).toBe("Cancel");
+    });
+
+    it("forwards title and size to the color picker ODialog", () => {
+      const wrapper = createWrapper();
+      const dialogs = wrapper.findAll('[data-test-stub="o-dialog"]');
+      // Select by title (order-independent — the delete-org confirmation dialog also
+      // exists and would otherwise be the last dialog in the template).
+      const colorDialog = dialogs.find((d) => d.attributes("data-title") === "Pick Custom Color");
+      expect(colorDialog.attributes("data-size")).toBe("xs");
+      expect(colorDialog.attributes("data-primary-label")).toBe("Close");
     });
   });
 
@@ -699,7 +765,7 @@ describe("General", () => {
       const wrapper = createWrapper();
       Object.assign(wrapper.vm, { loadingState: true });
 
-      const spinner = wrapper.find('[data-test-stub="q-spinner-hourglass"]');
+      const spinner = wrapper.find('[data-test="general-settings-loading-indicator"]');
       if (spinner.exists()) {
         expect(spinner.exists()).toBe(true);
       } else {
@@ -712,28 +778,93 @@ describe("General", () => {
       const wrapper = createWrapper();
       Object.assign(wrapper.vm, { loadingState: false });
 
-      const spinner = wrapper.find('[data-test-stub="q-spinner-hourglass"]');
+      const spinner = wrapper.find('[data-test="general-settings-loading-indicator"]');
       expect(spinner.exists()).toBe(false);
     });
   });
 
-  describe("Form validation", () => {
-    it("should validate scrape interval is required", () => {
+  describe("Form validation (real OForm)", () => {
+    it("blocks submit and does NOT save when scrape interval is empty (restored required rule)", async () => {
       const wrapper = createWrapper();
-      const scrapeInput = wrapper.findComponent({ name: "QInput" });
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("scrape_interval", "");
 
-      if (scrapeInput.exists()) {
-        expect(scrapeInput.props("rules")).toEqual([expect.any(Function)]);
+      await form.vm.form.handleSubmit();
+      await nextTick();
 
-        // Test the validation rule
-        const validationRule = scrapeInput.props("rules")[0];
-        expect(validationRule(0)).toBe("Scrape interval is required");
-        expect(validationRule(15)).toBe(true);
-      } else {
-        // Fallback: verify component has validation logic
-        const wrapper = createWrapper();
-        expect(wrapper.vm.scrapeIntereval).toBeDefined();
-      }
+      expect(form.vm.form.state.isValid).toBe(false);
+      expect(mockOrganizations.post_organization_settings).not.toHaveBeenCalled();
+    });
+
+    it("blocks submit when scrape interval is negative", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("scrape_interval", -5);
+
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(form.vm.form.state.isValid).toBe(false);
+      expect(mockOrganizations.post_organization_settings).not.toHaveBeenCalled();
+    });
+
+    it("allows a scrape interval of 0", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("scrape_interval", 0);
+
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(mockOrganizations.post_organization_settings).toHaveBeenCalled();
+    });
+
+    it("blocks submit when max series per query is below 1000 (restored optional range rule)", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("max_series_per_query", 500);
+
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(form.vm.form.state.isValid).toBe(false);
+      expect(mockOrganizations.post_organization_settings).not.toHaveBeenCalled();
+    });
+
+    it("blocks submit when max series per query is above 1000000", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("max_series_per_query", 2000000);
+
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(form.vm.form.state.isValid).toBe(false);
+      expect(mockOrganizations.post_organization_settings).not.toHaveBeenCalled();
+    });
+
+    it("keeps max series per query OPTIONAL — empty value saves", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      // default is null (empty) — should still submit
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(mockOrganizations.post_organization_settings).toHaveBeenCalled();
+    });
+
+    it("submits a valid in-range max series per query", async () => {
+      const wrapper = createWrapper();
+      const form = wrapper.findComponent({ name: "OForm" });
+      form.vm.form.setFieldValue("max_series_per_query", 50000);
+
+      await form.vm.form.handleSubmit();
+      await nextTick();
+
+      expect(mockStore.dispatch).toHaveBeenCalledWith(
+        "setOrganizationSettings",
+        expect.objectContaining({ max_series_per_query: 50000 }),
+      );
     });
   });
 
@@ -744,9 +875,9 @@ describe("General", () => {
 
       await wrapper.vm.onRejected(rejectedFiles);
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
-        message: "1 file(s) did not pass validation constraints",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
+        message: "1 file did not pass validation constraints",
       });
     });
   });
@@ -768,16 +899,11 @@ describe("General", () => {
   });
 
   describe("Accessibility", () => {
-    it("should have proper form labels", () => {
+    it("should render the scrape interval as a number input", () => {
       const wrapper = createWrapper();
-      const scrapeInput = wrapper.findComponent({ name: "QInput" });
-
-      if (scrapeInput.exists()) {
-        expect(scrapeInput.props("label")).toBeTruthy();
-      } else {
-        // Fallback: verify component has proper structure
-        expect(wrapper.exists()).toBe(true);
-      }
+      const input = wrapper.find('[data-test="general-settings-scrape-interval"] input');
+      expect(input.exists()).toBe(true);
+      expect(input.attributes("type")).toBe("number");
     });
   });
 
@@ -786,8 +912,9 @@ describe("General", () => {
       mockStore.state.organizationData.organizationSettings = null;
       const wrapper = createWrapper();
 
-      // Component uses default values when organizationSettings is null
-      expect(wrapper.vm.scrapeIntereval).toBe(15); // default from component
+      // The form falls back to the default scrape_interval (15) from the schema defaults.
+      const form = wrapper.findComponent({ name: "OForm" });
+      expect(form.vm.form.state.values.scrape_interval).toBe(15);
     });
 
     it("should handle upload when not enterprise", async () => {
@@ -800,10 +927,9 @@ describe("General", () => {
 
       await wrapper.vm.uploadImage(mockFile);
 
-      expect(mockNotify).toHaveBeenCalledWith({
-        type: "negative",
+      expect(mockToast).toHaveBeenCalledWith({
+        variant: "error",
         message: "You are not allowed to perform this action.",
-        timeout: 2000,
       });
 
       // Restore original value

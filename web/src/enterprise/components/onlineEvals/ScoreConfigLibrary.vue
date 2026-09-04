@@ -1,0 +1,302 @@
+﻿<!-- Copyright 2026 OpenObserve Inc.
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version. -->
+
+<template>
+  <div class="flex h-full min-h-0 flex-col p-4" data-test="score-config-library">
+    <div
+      v-if="isLoadingCatalog"
+      class="flex flex-1 flex-col items-center justify-center p-8"
+      data-test="score-config-library-loading"
+    >
+      <OSpinner size="lg" />
+    </div>
+
+    <div
+      v-else-if="loadError"
+      class="text-text-secondary flex flex-1 flex-col items-center justify-center p-8"
+      data-test="score-config-library-error"
+    >
+      <OIcon name="error-outline" class="mb-2 !h-[3em] !w-[3em]" />
+      <div class="text-status-error-text">{{ loadError }}</div>
+      <OButton variant="primary" size="sm" class="mt-4" @click="loadCatalog">
+        {{ t("common.retry") }}
+      </OButton>
+    </div>
+
+    <div v-else class="flex min-h-0 flex-1 flex-col">
+      <OSearchInput
+        v-model="searchQuery"
+        :placeholder="t('onlineEvals.scoreConfigLibrary.searchPlaceholder')"
+        clearable
+        class="mb-4"
+        data-test="score-config-library-search"
+      />
+
+      <div
+        class="border-border-default mb-3 flex items-center justify-between gap-3 border-b ps-4.25 pe-3 pb-2"
+      >
+        <div
+          v-if="filteredEntries.length > 0"
+          class="text-text-body inline-flex items-center gap-2 py-0.5 text-xs font-medium select-none"
+          data-test="score-config-library-select-all"
+        >
+          <OCheckbox :model-value="selectAllState" @update:model-value="toggleSelectAll" />
+          <span class="cursor-pointer" @click="toggleSelectAll">{{
+            selectAllState === true ? t("common.clearAll") : t("common.selectAll")
+          }}</span>
+        </div>
+        <span class="text-text-secondary text-xs tabular-nums">{{ countLabel }}</span>
+      </div>
+
+      <div class="min-h-0 flex-1 overflow-y-auto pb-4">
+        <section
+          v-for="(group, index) in groupedEntries"
+          :key="group.dataType"
+          :class="{ 'mt-4': index > 0 }"
+          :data-test="`score-config-library-section-${group.dataType}`"
+        >
+          <div
+            class="text-text-heading mx-0 mt-0 mb-1.5 flex items-baseline gap-1.5 text-xs font-bold tracking-[0.04em] uppercase"
+          >
+            <span class="text-text-heading">{{ group.label }}</span>
+            <span class="text-text-secondary font-medium">({{ group.entries.length }})</span>
+          </div>
+          <ul class="rounded-default border-border-default flex flex-col border">
+            <li
+              v-for="entry in group.entries"
+              :key="entry.name"
+              class="flex cursor-pointer items-center gap-2 px-3 py-2 transition-colors duration-200"
+              :class="[isSelected(entry.name) ? 'bg-accent/6' : 'hover:bg-table-row-hover-bg']"
+              :data-test="`score-config-library-item-${entry.name}`"
+              @click="toggle(entry)"
+            >
+              <div class="shrink-0 pe-2">
+                <OCheckbox
+                  :model-value="isSelected(entry.name)"
+                  @update:model-value="toggle(entry)"
+                  @click.stop
+                />
+              </div>
+              <div class="flex min-w-0 flex-1 flex-col">
+                <span
+                  class="text-sm"
+                  :class="
+                    isSelected(entry.name) ? 'text-text-heading font-semibold' : 'font-medium'
+                  "
+                  >{{ entry.displayName }}</span
+                >
+                <span v-if="entry.description" class="text-text-secondary block text-xs">
+                  {{ entry.description }}
+                </span>
+              </div>
+            </li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed, onMounted, ref, watch } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import onlineEvalsService from "@/services/online-evals.service";
+import {
+  fetchOnlineEvalsCatalog,
+  type CatalogScoreConfig,
+} from "@/services/online-evals-catalog.service";
+import { showError } from "./utils/evalFormat";
+import { useI18nTyped, raw, type I18nKey } from "@/types/i18n";
+
+const { t } = useI18nTyped();
+
+const props = defineProps<{
+  orgId: string;
+}>();
+
+const emit = defineEmits<{
+  (e: "update:selected-count", value: number): void;
+  (e: "imported"): void;
+}>();
+
+const isLoadingCatalog = ref(false);
+const loadError = ref("");
+const entries = ref<CatalogScoreConfig[]>([]);
+const selectedNames = ref<Set<string>>(new Set());
+const searchQuery = ref("");
+const isImporting = ref(false);
+
+onMounted(loadCatalog);
+
+async function loadCatalog() {
+  isLoadingCatalog.value = true;
+  loadError.value = "";
+  try {
+    const catalog = await fetchOnlineEvalsCatalog();
+    entries.value = catalog.scoreConfigs.filter((entry) => entry.level === "span");
+  } catch (err: any) {
+    loadError.value = err?.message || t("onlineEvals.failedToLoadCatalog");
+  } finally {
+    isLoadingCatalog.value = false;
+  }
+}
+
+const filteredEntries = computed(() => {
+  const q = searchQuery.value.trim().toLowerCase();
+  if (!q) return entries.value;
+  return entries.value.filter(
+    (e) =>
+      e.displayName.toLowerCase().includes(q) ||
+      e.name.toLowerCase().includes(q) ||
+      (e.description ?? "").toLowerCase().includes(q),
+  );
+});
+
+const DATA_TYPE_ORDER = ["numeric", "categorical", "boolean"] as const;
+// Keys, not resolved text: this map is built once at setup, so a resolved
+// string would freeze at the locale in force then.
+const DATA_TYPE_LABEL_KEYS: Record<string, I18nKey> = {
+  numeric: "onlineEvals.scoreConfig.dataTypes.numeric",
+  categorical: "onlineEvals.scoreConfig.dataTypes.categorical",
+  boolean: "onlineEvals.scoreConfig.dataTypes.boolean",
+};
+
+const groupedEntries = computed(() => {
+  const buckets = new Map<string, CatalogScoreConfig[]>();
+  for (const entry of filteredEntries.value) {
+    const key = String(entry.dataType);
+    const list = buckets.get(key) ?? [];
+    list.push(entry);
+    buckets.set(key, list);
+  }
+  // Preserve canonical ordering; append any unknown dataTypes at the end.
+  const ordered: string[] = [];
+  for (const k of DATA_TYPE_ORDER) if (buckets.has(k)) ordered.push(k);
+  for (const k of buckets.keys()) if (!ordered.includes(k)) ordered.push(k);
+  return ordered.map((dataType) => ({
+    dataType,
+    label: DATA_TYPE_LABEL_KEYS[dataType] ? t(DATA_TYPE_LABEL_KEYS[dataType]) : raw(dataType),
+    entries: buckets.get(dataType) ?? [],
+  }));
+});
+
+const allVisibleSelected = computed(() => {
+  const visible = filteredEntries.value;
+  if (visible.length === 0) return false;
+  return visible.every((e) => selectedNames.value.has(e.name));
+});
+
+/** Three states, not two. With a plain boolean a part-selected list renders as
+ *  an EMPTY box, which reads as "nothing is selected". */
+const selectAllState = computed<boolean | "indeterminate">(() => {
+  if (allVisibleSelected.value) return true;
+  return filteredEntries.value.some((e) => selectedNames.value.has(e.name))
+    ? "indeterminate"
+    : false;
+});
+
+const countLabel = computed(() => {
+  const selected = filteredEntries.value.filter((e) => selectedNames.value.has(e.name)).length;
+  if (selected === 0) {
+    return t("onlineEvals.scoreConfigLibrary.scoreConfigsLabel", {
+      count: filteredEntries.value.length,
+    });
+  }
+  return t("onlineEvals.scoreConfigLibrary.selectedOfTotal", {
+    selected,
+    total: filteredEntries.value.length,
+  });
+});
+
+function toggleSelectAll() {
+  const next = new Set(selectedNames.value);
+  if (allVisibleSelected.value) {
+    for (const e of filteredEntries.value) next.delete(e.name);
+  } else {
+    for (const e of filteredEntries.value) next.add(e.name);
+  }
+  selectedNames.value = next;
+}
+
+function isSelected(name: string) {
+  return selectedNames.value.has(name);
+}
+
+function toggle(entry: CatalogScoreConfig) {
+  const next = new Set(selectedNames.value);
+  if (next.has(entry.name)) next.delete(entry.name);
+  else next.add(entry.name);
+  selectedNames.value = next;
+}
+
+watch(selectedNames, (val) => emit("update:selected-count", val.size), {
+  deep: true,
+  immediate: true,
+});
+
+async function importSelected() {
+  if (isImporting.value || selectedNames.value.size === 0) return;
+  isImporting.value = true;
+
+  const selected = entries.value.filter((e) => selectedNames.value.has(e.name));
+  let successCount = 0;
+  let skipCount = 0;
+  let failCount = 0;
+
+  for (const entry of selected) {
+    try {
+      await onlineEvalsService.scoreConfigs.create(props.orgId, payloadFor(entry));
+      successCount++;
+    } catch (err: any) {
+      // Duplicates are not a hard failure — user explicitly asked for the
+      // library to allow re-clicking already-imported items.
+      if (err?.response?.status === 409) {
+        skipCount++;
+        continue;
+      }
+      failCount++;
+      // Surface only the first hard error; subsequent failures keep counting.
+      if (failCount === 1) showError(err, t("onlineEvals.failedToImportScoreConfig"));
+    }
+  }
+
+  isImporting.value = false;
+  selectedNames.value = new Set();
+  emit("imported");
+
+  if (successCount > 0 || skipCount > 0) {
+    // Each clause is a whole translated phrase; only the list separator is
+    // assembled here, never a sentence built from translated fragments.
+    const parts: string[] = [];
+    if (successCount) parts.push(t("onlineEvals.import.summaryImported", { count: successCount }));
+    if (skipCount) parts.push(t("onlineEvals.import.summarySkipped", { count: skipCount }));
+    if (failCount) parts.push(t("onlineEvals.import.summaryFailed", { count: failCount }));
+    toast({
+      variant: failCount > 0 && successCount === 0 ? "error" : "success",
+      message: raw(parts.join(" · ")),
+    });
+  }
+}
+
+function payloadFor(entry: CatalogScoreConfig) {
+  const payload: Record<string, any> = {
+    name: entry.name,
+    dataType: entry.dataType,
+  };
+  if (entry.description) payload.description = entry.description;
+  if (entry.numericRange !== undefined) payload.numericRange = entry.numericRange;
+  if (entry.categories !== undefined) payload.categories = entry.categories;
+  return payload;
+}
+
+defineExpose({ importSelected });
+</script>

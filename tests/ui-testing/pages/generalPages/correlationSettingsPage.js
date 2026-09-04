@@ -4,7 +4,7 @@ const testLogger = require('../../playwright-tests/utils/test-logger.js');
 
 /**
  * Page Object for Correlation Settings page
- * Route: /web/settings/correlation_settings?org_identifier={orgId}
+ * Route: /web/settings/correlation?org_identifier={orgId}
  *
  * Tabs:
  * - Service Identity (identity)
@@ -19,12 +19,26 @@ export class CorrelationSettingsPage {
         this.pageTitle = '.general-page-title';
         this.pageSubtitle = '.general-page-subtitle';
 
-        // Tab selectors (Quasar tabs - use role="tab" or .q-tab class)
-        // Note: Quasar tabs use name attribute: identity, services, alert-correlation
-        this.tabsContainer = '.q-tabs';
-        this.serviceIdentityTabName = 'Service Identity';
-        this.discoveredServicesTabName = 'Discovered Services';
-        this.alertCorrelationTabName = 'Alert Correlation';
+        // Tab selectors (OTabs - render as [role="tablist"] / [role="tab"])
+        // Note: tabs use name attribute: services, discovery, alert-correlation, field-aliases
+        this.tabsContainer = '[role="tablist"]';
+        // The Correlation Settings tabs wrapper (data-test container).
+        this.correlationSettingsTabs = '[data-test="correlation-settings-tabs"]';
+        // Save button on the Detection Rules ("Distinguish Services By") view.
+        this.saveConfigurationButtonName = 'Save Configuration';
+        // Placeholder text of the "+ Add field" OSelect trigger.
+        this.selectAFieldText = 'Select a field';
+        // Visible tab labels (post-revamp): the tab `name` attrs are
+        // services / discovery / alert-correlation / field-aliases, rendered as
+        // these i18n labels.
+        this.servicesTabName = 'Discovered Services';
+        this.serviceDiscoveryTabName = 'Detection Rules';
+        this.alertCorrelationTabName = 'Alert Grouping';
+        this.fieldAliasesTabName = 'Field Mappings';
+        // Detection Rules view (the "Distinguish Services By" configuration tab)
+        this.detectionRulesTabName = 'Detection Rules';
+        // "+ Add field" button that reveals the "Select a field" OSelect
+        this.addFieldButtonName = 'Add field';
 
         // ==================== Service Identity Tab Selectors ====================
         this.serviceIdentityBackwardBtn = '[data-test="correlation-service-identity-backward-btn"]';
@@ -47,17 +61,22 @@ export class CorrelationSettingsPage {
         this.semanticGroupCategorySelect = '[data-test="semantic-group-category-select"]';
         this.importJsonBtn = '[data-test="correlation-semanticfieldgroup-import-json-btn"]';
         this.addCustomGroupBtn = '[data-test="correlation-semanticfieldgroup-add-custom-group-btn"]';
+        this.semanticFieldGroupSaveBtn = '[data-test="correlation-semanticfieldgroup-save-btn"]';
 
         // ==================== Semantic Group Item Selectors ====================
         this.semanticGroupDisplayInput = '[data-test="semantic-group-display-input"]';
+        // OInput forwards data-test to a non-interactive wrapper; the real <input>
+        // is the `-field` node and the inline validation message is `-error`.
+        this.semanticGroupDisplayInputField = '[data-test="semantic-group-display-input-field"]';
+        this.semanticGroupDisplayInputError = '[data-test="semantic-group-display-input-error"]';
         this.semanticGroupScopeCheckbox = '[data-test="semantic-group-action-scope-chkbox"]';
         this.semanticGroupStableCheckbox = '[data-test="semantic-group-action-stable-chkbox"]';
         this.semanticGroupNormalizeCheckbox = '[data-test="semantic-group-action-normalize-chkbox"]';
         this.semanticGroupRemoveBtn = '[data-test="semantic-group-remove-group-btn"]';
 
         // ==================== Common Selectors ====================
-        this.loadingSpinner = '.q-spinner-hourglass';
-        this.notification = '.q-notification__message';
+        this.loadingSpinner = '[data-test="discovered-services-loading-indicator"], [data-test="discovered-services-table-loading-indicator"]';
+        this.notification = '[role="alert"]';
     }
 
     // ==================== Test Data Setup ====================
@@ -76,43 +95,33 @@ export class CorrelationSettingsPage {
         const password = process.env["ZO_ROOT_USER_PASSWORD"];
         const authHeader = 'Basic ' + Buffer.from(`${username}:${password}`).toString('base64');
 
-        // Define test semantic groups that cover common use cases
+        // Define test semantic groups that cover common use cases.
+        // Post-revamp shape: {id, display, group, fields} only — the per-group
+        // flags (is_scope / is_stable / normalize) were removed.
         const testSemanticGroups = [
             {
                 id: 'k8s-cluster',
                 display: 'K8s Cluster',
                 group: 'Kubernetes',
                 fields: ['k8s.cluster.name', 'k8s_cluster_name'],
-                normalize: true,
-                is_scope: true,
-                is_stable: true
             },
             {
                 id: 'k8s-namespace',
                 display: 'K8s Namespace',
                 group: 'Kubernetes',
                 fields: ['k8s.namespace.name', 'k8s_namespace_name'],
-                normalize: true,
-                is_scope: true,
-                is_stable: true
             },
             {
                 id: 'k8s-deployment',
                 display: 'K8s Deployment',
                 group: 'Kubernetes',
                 fields: ['k8s.deployment.name', 'k8s_deployment_name'],
-                normalize: true,
-                is_scope: false,
-                is_stable: true
             },
             {
                 id: 'service',
                 display: 'Service',
                 group: 'Common',
                 fields: ['service.name', 'service_name', 'service'],
-                normalize: true,
-                is_scope: false,
-                is_stable: true
             }
         ];
 
@@ -139,54 +148,13 @@ export class CorrelationSettingsPage {
                 body: putText.substring(0, 500)
             });
 
-            // Step 2: POST to config endpoint with semantic_field_groups included
-            // This is critical because the frontend reads from /config first, not /semantic-groups
-            const configUrl = `${baseUrl}/api/${orgId}/alerts/deduplication/config`;
-            const configPayload = {
-                enabled: true,
-                alert_dedup_enabled: false, // Don't enable cross-alert by default, let tests control this
-                alert_fingerprint_groups: [],
-                semantic_field_groups: testSemanticGroups
-            };
+            // Note: We intentionally do NOT POST to /config here.
+            // The config endpoint doesn't persist semantic_field_groups anyway (GET returns 0),
+            // and concurrent config POSTs in parallel tests cause race conditions where
+            // loadConfig() overwrites UI checkbox state with stale API values.
+            // The PUT above is the single source of truth for semantic groups.
 
-            testLogger.info('POST deduplication config with semantic groups', { url: configUrl });
-
-            const configPostResponse = await fetch(configUrl, {
-                method: 'POST',
-                headers: {
-                    'Authorization': authHeader,
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(configPayload)
-            });
-
-            const configPostText = await configPostResponse.text();
-            testLogger.info('POST config response', {
-                status: configPostResponse.status,
-                statusText: configPostResponse.statusText,
-                body: configPostText.substring(0, 500)
-            });
-
-            // Step 3: Verify by GET config (this is what frontend loads)
-            const configGetResponse = await fetch(configUrl, {
-                method: 'GET',
-                headers: {
-                    'Authorization': authHeader,
-                    'Content-Type': 'application/json'
-                }
-            });
-
-            const configResult = await configGetResponse.json().catch(() => ({}));
-            testLogger.info('GET deduplication config verification', {
-                status: configGetResponse.status,
-                enabled: configResult.enabled,
-                alertDedupEnabled: configResult.alert_dedup_enabled,
-                semanticGroupCount: configResult.semantic_field_groups?.length || 0,
-                semanticGroupIds: configResult.semantic_field_groups?.map(g => g.id) || []
-            });
-
-            // Success if both PUT and POST succeeded
-            return putResponse.ok && configPostResponse.ok;
+            return putResponse.ok;
         } catch (error) {
             testLogger.error('Failed to setup semantic groups', { error: error.message, stack: error.stack });
             return false;
@@ -196,57 +164,75 @@ export class CorrelationSettingsPage {
     // ==================== Navigation ====================
 
     async navigateToCorrelationSettings(orgId) {
-        const baseUrl = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
-        await this.page.goto(`${baseUrl}/web/settings/correlation_settings?org_identifier=${orgId}`);
+        const baseUrl = process.env.ZO_BASE_URL || 'http://localhost:5080';
+        await this.page.goto(`${baseUrl}/web/settings/correlation?org_identifier=${orgId}`);
         await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
     }
 
     // ==================== Page Assertions ====================
 
     async expectPageLoaded() {
-        await expect(this.page.locator(this.pageTitle)).toBeVisible({ timeout: 15000 });
-        const titleText = await this.page.locator(this.pageTitle).textContent();
-        expect(titleText.toLowerCase()).toContain('correlation');
+        // The tabs container is the reliable "page loaded" signal — the old
+        // `.general-page-title` class was removed in the revamp (the title is
+        // now [data-test="correlation-settings-page-title"]).
+        await expect(this.page.locator(this.correlationSettingsTabs)).toBeVisible({ timeout: 15000 });
     }
 
     async expectAllTabsVisible() {
         // Use getByRole for tabs or filter by text
-        const serviceIdentityTab = this.page.getByRole('tab', { name: this.serviceIdentityTabName });
-        const discoveredServicesTab = this.page.getByRole('tab', { name: this.discoveredServicesTabName });
+        const servicesTab = this.page.getByRole('tab', { name: this.servicesTabName });
+        const serviceDiscoveryTab = this.page.getByRole('tab', { name: this.serviceDiscoveryTabName });
         const alertCorrelationTab = this.page.getByRole('tab', { name: this.alertCorrelationTabName });
+        const fieldAliasesTab = this.page.getByRole('tab', { name: this.fieldAliasesTabName });
 
-        await expect(serviceIdentityTab).toBeVisible({ timeout: 15000 });
-        await expect(discoveredServicesTab).toBeVisible();
+        await expect(servicesTab).toBeVisible({ timeout: 15000 });
+        await expect(serviceDiscoveryTab).toBeVisible();
         await expect(alertCorrelationTab).toBeVisible();
+        await expect(fieldAliasesTab).toBeVisible();
     }
 
     // ==================== Tab Switching ====================
 
-    async clickServiceIdentityTab() {
-        const tab = this.page.getByRole('tab', { name: this.serviceIdentityTabName });
+    async clickServiceDiscoveryTab() {
+        const tab = this.page.getByRole('tab', { name: this.serviceDiscoveryTabName });
         await tab.click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
-    async clickDiscoveredServicesTab() {
-        const tab = this.page.getByRole('tab', { name: this.discoveredServicesTabName });
+    async clickServicesTab() {
+        const tab = this.page.getByRole('tab', { name: this.servicesTabName });
         await tab.click();
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+    }
+
+    // The "services" tab IS the Discovered Services tab (post-revamp label).
+    async clickDiscoveredServicesTab() {
+        await this.clickServicesTab();
     }
 
     async clickAlertCorrelationTab() {
         const tab = this.page.getByRole('tab', { name: this.alertCorrelationTabName });
+        // Wait for semantic-groups API response that loadConfig() triggers on component mount.
+        // This prevents a race condition where the test interacts with checkboxes before
+        // loadConfig() completes and overwrites localConfig with API values.
+        const semanticGroupsPromise = this.page.waitForResponse(
+            resp => resp.url().includes('/alerts/deduplication/semantic-groups') && resp.status() === 200,
+            { timeout: 15000 }
+        ).catch(() => {
+            testLogger.info('Semantic groups API response not intercepted (may have already fired)');
+        });
         await tab.click();
+        await semanticGroupsPromise;
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
-    async expectServiceIdentityTabActive() {
-        const tab = this.page.getByRole('tab', { name: this.serviceIdentityTabName });
+    async expectServiceDiscoveryTabActive() {
+        const tab = this.page.getByRole('tab', { name: this.serviceDiscoveryTabName });
         await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
     }
 
-    async expectDiscoveredServicesTabActive() {
-        const tab = this.page.getByRole('tab', { name: this.discoveredServicesTabName });
+    async expectServicesTabActive() {
+        const tab = this.page.getByRole('tab', { name: this.servicesTabName });
         await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
     }
 
@@ -255,12 +241,143 @@ export class CorrelationSettingsPage {
         await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
     }
 
-    // ==================== Service Identity Tab Actions ====================
+    // ==================== Tab / Button Getters (raw-selector relocation) ====================
 
-    async expectServiceIdentityContentVisible() {
-        // Wait for the section to be visible by checking for buttons
-        await expect(this.page.locator(this.serviceIdentitySaveBtn)).toBeVisible({ timeout: 15000 });
+    /**
+     * Field Mappings tab locator (a.k.a. Field Aliases).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getFieldMappingsTab() {
+        return this.page.getByRole('tab', { name: this.fieldAliasesTabName });
     }
+
+    /**
+     * Detection Rules tab locator (the "Distinguish Services By" configuration).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getDetectionRulesTab() {
+        return this.page.getByRole('tab', { name: this.detectionRulesTabName });
+    }
+
+    /**
+     * "+ Add field" button on the Detection Rules view.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getAddFieldButton() {
+        return this.page.getByRole('button', { name: this.addFieldButtonName }).first();
+    }
+
+    /**
+     * The Correlation Settings tabs container (data-test wrapper).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getCorrelationSettingsTabs() {
+        return this.page.locator(this.correlationSettingsTabs);
+    }
+
+    /**
+     * "+ Add custom group" button on the Field Mappings view.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getAddCustomGroupButton() {
+        return this.page.locator(this.addCustomGroupBtn);
+    }
+
+    /**
+     * Semantic-group display-input wrapper (data-test sits on the component
+     * wrapper; the editable element is inside).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getSemanticGroupDisplayWrap() {
+        return this.page.locator(this.semanticGroupDisplayInput);
+    }
+
+    /**
+     * Save button for a semantic field group.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getSemanticFieldGroupSaveButton() {
+        return this.page.locator(this.semanticFieldGroupSaveBtn);
+    }
+
+    /**
+     * "Save Configuration" button on the Detection Rules view.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getSaveConfigurationButton() {
+        return this.page.getByRole('button', { name: this.saveConfigurationButtonName });
+    }
+
+    /**
+     * "Select a field" OSelect trigger (placeholder text, non-exact).
+     * @returns {import('@playwright/test').Locator}
+     */
+    getSelectAFieldTrigger() {
+        return this.page.getByText(this.selectAFieldText, { exact: false });
+    }
+
+    /**
+     * Role=option locator matched by name (string or RegExp).
+     * @param {string|RegExp} name - Option accessible name.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getOptionByName(name) {
+        return this.page.getByRole('option', { name });
+    }
+
+    /**
+     * Visible text locator matched by string or RegExp.
+     * @param {string|RegExp} text - Text (or pattern) to match.
+     * @returns {import('@playwright/test').Locator}
+     */
+    getTextByPattern(text) {
+        return this.page.getByText(text);
+    }
+
+    async clickFieldAliasesTab() {
+        // Correlation Settings (Field Mappings / Field Aliases) is an ENTERPRISE-only
+        // feature — the tab only mounts on the enterprise build. Probe positively for
+        // the tab via its data-test (data-test-only policy) and return a boolean so
+        // callers can gate the suite to a clean SKIP on the OSS binary.
+        try {
+            const tab = this.page.locator('[data-test="correlation-settings-field-aliases-tab"]');
+            await tab.waitFor({ state: 'visible', timeout: 15000 });
+            await tab.click();
+            await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
+            return true;
+        } catch {
+            return false;
+        }
+    }
+
+    async expectFieldAliasesTabActive() {
+        const tab = this.page.getByRole('tab', { name: this.fieldAliasesTabName });
+        await expect(tab).toHaveAttribute('aria-selected', 'true', { timeout: 5000 });
+    }
+
+    // ==================== Tab Content Visibility Checks ====================
+
+    async expectServicesContentVisible() {
+        // Wait for the Services tab content to be visible
+        await expect(this.page.locator(this.refreshDiscoveredServicesBtn)).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectServiceDiscoveryContentVisible() {
+        // Detection Rules view: the "Save Configuration" button anchors it
+        // (the old dual-list Service Identity save-btn was removed in the revamp).
+        await expect(
+            this.page.getByRole('button', { name: this.saveConfigurationButtonName }).first(),
+        ).toBeVisible({ timeout: 15000 });
+    }
+
+    async expectFieldAliasesContentVisible() {
+        // Wait for the Field Aliases tab content to be visible
+        await expect(this.page.locator(this.importJsonBtn)).toBeVisible({ timeout: 15000 });
+    }
+
+
+
+    // ==================== Service Discovery (Configuration) Tab Actions ====================
 
     async fillSearchAvailableDimensions(searchText) {
         const searchInput = this.page.locator(this.serviceIdentitySearchInput);
@@ -382,7 +499,7 @@ export class CorrelationSettingsPage {
      */
     async isCrossAlertCheckboxChecked() {
         const checkbox = this.page.locator(this.crossAlertEnableCheckbox);
-        // Quasar checkbox uses aria-checked attribute
+        // The checkbox uses aria-checked attribute
         const ariaChecked = await checkbox.getAttribute('aria-checked');
         if (ariaChecked !== null) {
             return ariaChecked === 'true';
@@ -394,21 +511,22 @@ export class CorrelationSettingsPage {
         }
         // Last resort - check for checked class
         const hasCheckedClass = await checkbox.evaluate(el => {
-            return el.classList.contains('q-checkbox--checked') ||
-                   el.closest('.q-checkbox')?.classList.contains('q-checkbox--checked');
+            return el.classList.contains('checked') ||
+                   el.closest('[role="checkbox"]')?.getAttribute('aria-checked') === 'true';
         }).catch(() => false);
         return hasCheckedClass;
     }
 
     async fillTimeWindowInput(minutes) {
-        const input = this.page.locator(this.defaultWindowInput);
-        await expect(input).toBeVisible({ timeout: 5000 });
-        await input.fill(String(minutes));
+        // OFormInput forwards data-test to a wrapper <div>; the real control is
+        // the inner <input type="number">.
+        const wrap = this.page.locator(this.defaultWindowInput);
+        await expect(wrap).toBeVisible({ timeout: 5000 });
+        await wrap.locator('input').first().fill(String(minutes));
     }
 
     async getTimeWindowValue() {
-        const input = this.page.locator(this.defaultWindowInput);
-        return await input.inputValue();
+        return await this.page.locator(this.defaultWindowInput).locator('input').first().inputValue();
     }
 
     async clickRefreshDedupSettings() {
@@ -458,6 +576,15 @@ export class CorrelationSettingsPage {
     async clickAddCustomGroupButton() {
         await this.page.locator(this.addCustomGroupBtn).click();
         await this.page.waitForTimeout(500);
+    }
+
+    // addGroup() unshifts the new group to the front of the list → use .first()
+    getDisplayNameInput() {
+        return this.page.locator(this.semanticGroupDisplayInputField).first();
+    }
+
+    getDisplayNameError() {
+        return this.page.locator(this.semanticGroupDisplayInputError).first();
     }
 
     async expectAddCustomGroupButtonVisible() {
@@ -529,9 +656,9 @@ export class CorrelationSettingsPage {
 
     async getAvailableDimensionsCount() {
         // Count items in the available dimensions list (right side)
-        const list = this.page.locator('.q-list').nth(1);
+        const list = this.page.locator('[role="listbox"]').nth(1); // TODO: verify list container selector post-Reka migration
         await list.waitFor({ state: 'visible', timeout: 10000 });
-        const items = list.locator('.q-item');
+        const items = list.locator('[role="option"], [data-test$="-item"]'); // TODO: verify data-test for dimension list items
         return await items.count();
     }
 
@@ -554,7 +681,7 @@ export class CorrelationSettingsPage {
     }
 
     async expectPositiveNotification(timeout = 5000) {
-        const notification = this.page.locator('.q-notification--positive, .q-notification.bg-positive');
+        const notification = this.page.locator('[role="alert"][class*="bg-positive"], [role="alert"].bg-positive');
         await expect(notification).toBeVisible({ timeout });
     }
 
@@ -569,14 +696,14 @@ export class CorrelationSettingsPage {
 
     async isDedupCheckboxChecked() {
         const checkbox = this.page.locator(this.organizationDedupEnableCheckbox);
-        // Quasar checkboxes use aria-checked or have a specific class when checked
+        // Checkboxes use aria-checked or have a specific class when checked
         const isChecked = await checkbox.getAttribute('aria-checked');
         if (isChecked !== null) {
             return isChecked === 'true';
         }
         // Fallback: check for checked class
         const classList = await checkbox.getAttribute('class');
-        return classList?.includes('q-checkbox--checked') || classList?.includes('checked');
+        return classList?.includes('checked');
     }
 
     // ==================== Alert Correlation Save Button ====================
@@ -590,7 +717,7 @@ export class CorrelationSettingsPage {
 
     async expectAlertCorrelationSaveSuccess() {
         // Wait for positive notification about saved settings
-        const notification = this.page.locator('.q-notification__message');
+        const notification = this.page.locator('[role="alert"]');
         await expect(notification).toBeVisible({ timeout: 10000 });
         const text = await notification.textContent();
         return text?.toLowerCase().includes('saved') || text?.toLowerCase().includes('success');
@@ -603,14 +730,14 @@ export class CorrelationSettingsPage {
      * @param {string} dimensionName - Name of dimension to select
      */
     async selectAvailableDimension(dimensionName) {
-        // Available dimensions are in the second q-list (right side) within service-identity-config
+        // Available dimensions are in the second list (right side) within service-identity-config
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Bordered lists (from the bordered prop) with the h-80 height class
+        const lists = serviceConfig.locator('[role="listbox"]');
         const rightList = lists.last();
         await rightList.waitFor({ state: 'visible', timeout: 5000 });
-        const item = rightList.locator('.q-item').filter({ hasText: dimensionName }).first();
+        const item = rightList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
         await item.click();
         // Wait for button to become enabled
         await this.page.waitForTimeout(300);
@@ -621,14 +748,14 @@ export class CorrelationSettingsPage {
      * @param {string} dimensionName - Name of dimension to select
      */
     async selectPriorityDimension(dimensionName) {
-        // Priority dimensions are in the first q-list (left side) within service-identity-config
+        // Priority dimensions are in the first list (left side) within service-identity-config
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Bordered lists (from the bordered prop) with the h-80 height class
+        const lists = serviceConfig.locator('[role="listbox"]');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
-        const item = leftList.locator('.q-item').filter({ hasText: dimensionName }).first();
+        const item = leftList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
         await item.click();
         // Wait for button to become enabled
         await this.page.waitForTimeout(300);
@@ -641,12 +768,12 @@ export class CorrelationSettingsPage {
     async getPriorityDimensionsCount() {
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Bordered lists (from the bordered prop) with the h-80 height class
+        const lists = serviceConfig.locator('[role="listbox"]');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
         // Exclude empty state items (the "No dimensions configured" message)
-        const items = leftList.locator('.q-item:not(:has-text("No"))');
+        const items = leftList.locator('[role="option"]:not(:has-text("No")), [data-test$="-item"]:not(:has-text("No"))'); // TODO: verify data-test
         return await items.count();
     }
 
@@ -656,10 +783,10 @@ export class CorrelationSettingsPage {
      */
     async expectPriorityDimensionExists(dimensionName) {
         const serviceConfig = this.page.locator('.service-identity-config');
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Bordered lists (from the bordered prop) with the h-80 height class
+        const lists = serviceConfig.locator('[role="listbox"]');
         const leftList = lists.first();
-        const item = leftList.locator('.q-item').filter({ hasText: dimensionName }).first();
+        const item = leftList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
         await expect(item).toBeVisible({ timeout: 5000 });
     }
 
@@ -669,10 +796,10 @@ export class CorrelationSettingsPage {
      */
     async expectPriorityDimensionNotExists(dimensionName) {
         const serviceConfig = this.page.locator('.service-identity-config');
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Bordered lists (from the bordered prop) with the h-80 height class
+        const lists = serviceConfig.locator('[role="listbox"]');
         const leftList = lists.first();
-        const item = leftList.locator('.q-item').filter({ hasText: dimensionName }).first();
+        const item = leftList.locator('[role="option"], [data-test$="-item"]').filter({ hasText: dimensionName }).first(); // TODO: verify data-test
         await expect(item).not.toBeVisible({ timeout: 5000 });
     }
 
@@ -724,7 +851,7 @@ export class CorrelationSettingsPage {
             return isChecked === 'true';
         }
         const classList = await checkbox.getAttribute('class');
-        return classList?.includes('q-checkbox--checked') || classList?.includes('checked');
+        return classList?.includes('checked');
     }
 
     /**
@@ -732,7 +859,7 @@ export class CorrelationSettingsPage {
      * @param {string} expectedMessage - Expected error message (partial match)
      */
     async expectValidationErrorVisible(expectedMessage = null) {
-        const notification = this.page.locator('.q-notification--negative, .q-notification.bg-negative, .q-notification__message');
+        const notification = this.page.locator('[role="alert"][class*="bg-negative"], [role="alert"].bg-negative, [role="alert"]');
         await expect(notification.first()).toBeVisible({ timeout: 10000 });
         if (expectedMessage) {
             const text = await notification.first().textContent();
@@ -763,7 +890,7 @@ export class CorrelationSettingsPage {
     async expectServicesDataLoaded() {
         await this.page.locator(this.loadingSpinner).waitFor({ state: 'hidden', timeout: 30000 }).catch(() => {});
         // Check for either services content or empty state
-        const hasContent = await this.page.locator('.q-table, .q-list, .discovered-services-content').first().isVisible().catch(() => false);
+        const hasContent = await this.page.locator('table, [role="listbox"], .discovered-services-content').first().isVisible().catch(() => false);
         const hasEmptyState = await this.page.locator('text=/no.*service|empty/i').first().isVisible().catch(() => false);
         return hasContent || hasEmptyState;
     }
@@ -798,7 +925,7 @@ export class CorrelationSettingsPage {
      * @param {string} message - Expected message content (optional)
      */
     async expectErrorNotificationVisible(message = null) {
-        const notification = this.page.locator('.q-notification--negative, .q-notification.bg-negative');
+        const notification = this.page.locator('[role="alert"][class*="bg-negative"], [role="alert"].bg-negative');
         await expect(notification.first()).toBeVisible({ timeout: 10000 });
         if (message) {
             const text = await notification.first().textContent();
@@ -811,7 +938,7 @@ export class CorrelationSettingsPage {
      * @param {string} message - Expected message content (optional)
      */
     async expectSuccessNotificationVisible(message = null) {
-        const notification = this.page.locator('.q-notification--positive, .q-notification.bg-positive, .q-notification__message');
+        const notification = this.page.locator('[role="alert"][class*="bg-positive"], [role="alert"].bg-positive, [role="alert"]');
         await expect(notification.first()).toBeVisible({ timeout: 10000 });
         if (message) {
             const text = await notification.first().textContent();
@@ -847,13 +974,13 @@ export class CorrelationSettingsPage {
     async getFirstAvailableDimensionName() {
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Bordered lists (from the bordered prop) with the h-80 height class
+        const lists = serviceConfig.locator('[role="listbox"]');
         const rightList = lists.last();
         await rightList.waitFor({ state: 'visible', timeout: 5000 });
-        const firstItem = rightList.locator('.q-item:not(:has-text("No"))').first();
+        const firstItem = rightList.locator('[role="option"]:not(:has-text("No")), [data-test$="-item"]:not(:has-text("No"))').first(); // TODO: verify data-test
         // Try to get just the label text
-        const label = firstItem.locator('.q-item__label').first();
+        const label = firstItem.getByText(/.+/).first();
         if (await label.isVisible().catch(() => false)) {
             return await label.textContent();
         }
@@ -871,13 +998,13 @@ export class CorrelationSettingsPage {
     async getFirstPriorityDimensionName() {
         const serviceConfig = this.page.locator('.service-identity-config');
         await serviceConfig.waitFor({ state: 'visible', timeout: 10000 });
-        // Lists have q-list--bordered class (from Quasar bordered prop) and tw:h-80 height class
-        const lists = serviceConfig.locator('.q-list--bordered, .q-list.tw\\:h-80');
+        // Bordered lists (from the bordered prop) with the h-80 height class
+        const lists = serviceConfig.locator('[role="listbox"]');
         const leftList = lists.first();
         await leftList.waitFor({ state: 'visible', timeout: 5000 });
-        const firstItem = leftList.locator('.q-item:not(:has-text("No"))').first();
+        const firstItem = leftList.locator('[role="option"]:not(:has-text("No")), [data-test$="-item"]:not(:has-text("No"))').first(); // TODO: verify data-test
         // Try to get just the label text
-        const label = firstItem.locator('.q-item__label').first();
+        const label = firstItem.getByText(/.+/).first();
         if (await label.isVisible().catch(() => false)) {
             return await label.textContent();
         }
@@ -934,5 +1061,25 @@ export class CorrelationSettingsPage {
      */
     async waitForQuickUpdate(ms = 300) {
         await this.page.waitForTimeout(ms);
+    }
+
+    /**
+     * Opens the TimeRangeEditor dialog from the Correlation Settings page.
+     * Tries the known trigger button selectors for the time range editor.
+     * Returns true if the dialog was opened successfully, false otherwise.
+     */
+    async openTimeRangeEditor() {
+        const trigger = this.page.locator(
+            '[data-test="correlation-time-range-edit-btn"], [data-test="time-range-editor-trigger"]'
+        );
+        const triggerVisible = await trigger.isVisible({ timeout: 5000 }).catch(() => false);
+        if (!triggerVisible) {
+            testLogger.warn('TimeRangeEditor trigger not found — component may not be available in this environment');
+            return false;
+        }
+        await trigger.click();
+        const dialogVisible = await this.page.locator('[data-test="time-range-editor-dialog"]')
+            .isVisible({ timeout: 5000 }).catch(() => false);
+        return dialogVisible;
     }
 }

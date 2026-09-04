@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,26 +14,31 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 28] = [
-    ("config", 0),         // /config
-    ("summary", 2),        // /api/{org_id}/summary
-    ("organizations", 1),  // /api/organizations
-    ("settings", 2),       // /api/{org_id}/settings/...
-    ("schema", 3),         // /api/{org_id}/streams/{stream_name}/schema
-    ("streams", 2),        // /api/{org_id}/streams/...
-    ("traces/latest", 3),  // /api/{org_id}/{stream_name}/traces/latest
-    ("traces/session", 3), // /api/{org_id}/{stream_name}/traces/session
-    ("traces/user", 3),    // /api/{org_id}/{stream_name}/traces/user
-    ("dag", 5),            // /api/{org_id}/{stream_name}/traces/{trace_id}/dag
-    ("clusters", 1),       // /api/clusters
-    ("query_manager", 2),  // /api/{org_id}/query_manager/...
-    ("_search", 2),        // /api/{org_id}/_search
-    ("_search_stream", 2), // /api/{org_id}/_search_stream
-    ("_values_stream", 2), // /api/{org_id}/_values_stream
-    ("_around", 3),        // /api/{org_id}/{stream_name}/_around
-    ("_values", 3),        // /api/{org_id}/{stream_name}/_values
-    ("patterns/extract", 3), /* /api/{org_id}/streams/{stream_name}/patterns/
-                            * extract */
+const QUERIER_ROUTES: [(&str, usize); 37] = [
+    ("config", 0),               // /config (unauthenticated bootstrap)
+    ("config", 2),               // /api/{org_id}/config (authenticated full)
+    ("summary", 2),              // /api/{org_id}/summary
+    ("organizations", 1),        // /api/organizations
+    ("settings", 2),             // /api/{org_id}/settings/...
+    ("schema", 3),               // /api/{org_id}/streams/{stream_name}/schema
+    ("streams", 2),              // /api/{org_id}/streams/...
+    ("traces/latest", 3),        // /api/{org_id}/{stream_name}/traces/latest
+    ("traces/latest_stream", 3), // /api/{org_id}/{stream_name}/traces/latest_stream
+    ("traces/session", 3),       // /api/{org_id}/{stream_name}/traces/session
+    ("traces/user", 3),          // /api/{org_id}/{stream_name}/traces/user
+    ("dag", 5),                  // /api/{org_id}/{stream_name}/traces/{trace_id}/dag
+    ("details", 5),              // /api/{org_id}/{stream_name}/traces/{trace_id}/details
+    ("traces/time_range", 3),    // /api/{org_id}/{stream_name}/traces/time_range
+    ("traces/time_range", 2),    // /api/{org_id}/traces/time_range
+    ("clusters", 1),             // /api/clusters
+    ("query_manager", 2),        // /api/{org_id}/query_manager/...
+    ("_search", 2),              // /api/{org_id}/_search
+    ("_search_stream", 2),       // /api/{org_id}/_search_stream
+    ("_values_stream", 2),       // /api/{org_id}/_values_stream
+    ("_around", 3),              // /api/{org_id}/{stream_name}/_around
+    ("_values", 3),              // /api/{org_id}/{stream_name}/_values
+    ("patterns/extract", 3),     /* /api/{org_id}/streams/{stream_name}/patterns/
+                                  * extract */
     ("functions?page_num=", 2),               // /api/{org_id}/functions
     ("prometheus/api/v1/series", 2),          // /api/{org_id}/prometheus/api/v1/series
     ("prometheus/api/v1/query", 2),           // /api/{org_id}/prometheus/api/v1/query
@@ -45,7 +50,11 @@ const QUERIER_ROUTES: [(&str, usize); 28] = [
     ("chat_stream", 3),                       /* /api/{org_id}/ai/chat_stream
                                                * {label_name}/
                                                * values */
-    ("service_streams", 2), // /api/{org_id}/service_streams/...
+    ("discovery", 2),         // /api/{org_id}/discovery
+    ("annotation_queues", 2), // /api/{org_id}/annotation_queues/...
+    ("playground", 2),        // /api/{org_id}/playground/...
+    ("service_streams", 2),   // /api/{org_id}/service_streams/...
+    ("node/list", 2),         // /api/_meta/node/list
 ];
 const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
     "/_search",
@@ -136,9 +145,10 @@ mod tests {
 
     #[test]
     fn test_is_querier_route() {
-        // Test config route
+        // Test config routes: the unauthenticated bootstrap and the
+        // authenticated per-org config are both served by queriers.
         assert!(is_querier_route("/config"));
-        assert!(!is_querier_route("/api/org1/config"));
+        assert!(is_querier_route("/api/org1/config"));
 
         // Test summary route
         assert!(is_querier_route("/api/org1/summary"));
@@ -156,14 +166,44 @@ mod tests {
         assert!(is_querier_route("/api/org1/service_streams/_analytics"));
         assert!(is_querier_route("/api/org1/service_streams/_correlate"));
         assert!(is_querier_route("/api/org1/service_streams/_grouped"));
+
+        // AI evaluation reads execute searches and must never fall through to
+        // the default ingester route.
+        assert!(is_querier_route("/api/org1/discovery"));
+        assert!(is_querier_route(
+            "/api/org1/annotation_queues/queue-1/items/item-1"
+        ));
+        assert!(is_querier_route(
+            "/api/org1/annotation_queues/queue-1/items/item-1/reviews"
+        ));
+        assert!(is_querier_route("/api/org1/playground/run"));
+        // Test trace detail routes
+        assert!(is_querier_route(
+            "/api/org1/default/traces/trace-id/details"
+        ));
+        assert!(is_querier_route(
+            "/api/org1/default/traces/time_range?trace_id=trace-id"
+        ));
+        assert!(is_querier_route(
+            "/api/org1/default/traces/time_range?session_id=session-id"
+        ));
+        assert!(is_querier_route(
+            "/api/org1/traces/time_range?trace_id=a,b,c"
+        ));
+        // the org-level entry must not swallow the OTLP ingest route
+        assert!(!is_querier_route("/api/org1/traces"));
     }
 
     #[test]
     fn test_is_querier_route_by_body() {
         assert!(is_querier_route_by_body("/_search"));
         assert!(is_querier_route_by_body("/_search?foo=bar"));
+        assert!(is_querier_route_by_body("/_search_multi_stream"));
+        assert!(is_querier_route_by_body("/_search_multi_stream?foo=bar"));
         assert!(is_querier_route_by_body("/_search_stream"));
+        assert!(is_querier_route_by_body("/_search_stream?foo=bar"));
         assert!(is_querier_route_by_body("/_values_stream"));
+        assert!(is_querier_route_by_body("/_values_stream?foo=bar"));
         assert!(is_querier_route_by_body("/prometheus/api/v1/query_range"));
         assert!(is_querier_route_by_body(
             "/prometheus/api/v1/query_exemplars"
@@ -191,5 +231,37 @@ mod tests {
 
         assert!(!is_fixed_querier_route("/other_route"));
         assert!(is_fixed_querier_route("/summary_other"));
+    }
+
+    #[test]
+    fn test_is_querier_route_ingester_exclusion() {
+        // streams/_json is a querier-prefix route but ends with an ingester suffix
+        assert!(!is_querier_route("/api/org1/streams/_json"));
+        assert!(!is_querier_route("/api/org1/streams/_bulk"));
+        assert!(!is_querier_route("/api/org1/streams/v1/logs"));
+        // regular streams route should pass
+        assert!(is_querier_route("/api/org1/streams"));
+    }
+
+    #[test]
+    fn test_is_querier_route_not_enough_segments() {
+        // "traces/latest" needs skip_segments=3, but "/traces/latest" only has 2 segments
+        assert!(!is_querier_route("/traces/latest"));
+        // "summary" needs skip_segments=2, "/summary" only has 1 segment
+        assert!(!is_querier_route("/summary"));
+    }
+
+    #[test]
+    fn test_extract_path_without_query_edge_cases() {
+        assert_eq!(extract_path_without_query(""), "");
+        assert_eq!(extract_path_without_query("?only_query"), "");
+        assert_eq!(extract_path_without_query("/path"), "/path");
+    }
+
+    #[test]
+    fn test_is_querier_route_by_body_false_cases() {
+        assert!(!is_querier_route_by_body("/"));
+        assert!(!is_querier_route_by_body(""));
+        assert!(!is_querier_route_by_body("/api/org1/something"));
     }
 }

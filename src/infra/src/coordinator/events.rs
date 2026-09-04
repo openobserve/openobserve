@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,11 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock as Lazy};
 
 use bytes::Bytes;
 use config::utils::json;
-use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use tokio::sync::{RwLock, mpsc};
 
@@ -70,10 +69,11 @@ static COORDINATOR_WATCHER_PREFIXES: Lazy<RwLock<Vec<WatcherPrefix>>> =
     Lazy::new(|| RwLock::new(Vec::new()));
 
 pub async fn init() -> Result<()> {
-    // if local node is single node or meta store is not nats, return ok
+    // if local node is single node or queue store is not nats, return ok
     let cfg = config::get_config();
-    let meta_store: config::meta::meta_store::MetaStore = cfg.common.queue_store.as_str().into();
-    if cfg.common.local_mode || meta_store != config::meta::meta_store::MetaStore::Nats {
+    let queue_store =
+        config::meta::queue_store::QueueStore::try_from(cfg.common.queue_store.as_str());
+    if cfg.common.local_mode || queue_store != Ok(config::meta::queue_store::QueueStore::Nats) {
         return Ok(());
     }
 
@@ -174,35 +174,32 @@ async fn subscribe(tx: mpsc::Sender<CoordinatorEvent>) -> Result<()> {
         });
         loop {
             match receiver.recv().await {
-                Some(message) => match message {
-                    queue::Message::Nats(message) => {
-                        let event: CoordinatorEvent = match serde_json::from_slice(&message.payload)
-                        {
-                            Ok(event) => event,
-                            Err(e) => {
+                Some(message) => {
+                    let event: CoordinatorEvent = match serde_json::from_slice(message.message()) {
+                        Ok(event) => event,
+                        Err(e) => {
+                            log::error!(
+                                "[COORDINATOR::EVENTS] failed to deserialize coordinator event: {e}"
+                            );
+                            continue;
+                        }
+                    };
+                    match tx.send(event).await {
+                        Ok(_) => {
+                            if let Err(e) = message.ack().await {
                                 log::error!(
-                                    "[COORDINATOR::EVENTS] failed to deserialize coordinator event: {e}"
-                                );
-                                continue;
-                            }
-                        };
-                        match tx.send(event).await {
-                            Ok(_) => {
-                                if let Err(e) = message.ack().await {
-                                    log::error!(
-                                        "[COORDINATOR::EVENTS] failed to ack coordinator event: {e}"
-                                    );
-                                }
-                            }
-                            Err(e) => {
-                                // don't ack the message if the channel is closed
-                                log::error!(
-                                    "[COORDINATOR::EVENTS] failed to process coordinator event: {e}"
+                                    "[COORDINATOR::EVENTS] failed to ack coordinator event: {e}"
                                 );
                             }
                         }
+                        Err(e) => {
+                            // don't ack the message if the channel is closed
+                            log::error!(
+                                "[COORDINATOR::EVENTS] failed to process coordinator event: {e}"
+                            );
+                        }
                     }
-                },
+                }
                 None => {
                     log::error!("[COORDINATOR::EVENTS] coordinator topic closed");
                     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
@@ -259,4 +256,48 @@ pub async fn delete_event(key: &str, start_dt: Option<i64>) -> Result<()> {
         return Err(e);
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_meta_event_put_converts_to_db_event_put() {
+        let ev = MetaEvent {
+            action: MetaAction::Put,
+            key: "/test/key".to_string(),
+            start_dt: Some(1000),
+            value: None,
+        };
+        let db_ev: crate::db::Event = ev.into();
+        assert!(matches!(db_ev, crate::db::Event::Put(d) if d.key == "/test/key"));
+    }
+
+    #[test]
+    fn test_meta_event_delete_converts_to_db_event_delete() {
+        let ev = MetaEvent {
+            action: MetaAction::Delete,
+            key: "/test/del".to_string(),
+            start_dt: None,
+            value: None,
+        };
+        let db_ev: crate::db::Event = ev.into();
+        assert!(matches!(db_ev, crate::db::Event::Delete(d) if d.key == "/test/del"));
+    }
+
+    #[test]
+    fn test_meta_event_preserves_start_dt() {
+        let ev = MetaEvent {
+            action: MetaAction::Put,
+            key: "k".to_string(),
+            start_dt: Some(42),
+            value: None,
+        };
+        if let crate::db::Event::Put(data) = crate::db::Event::from(ev) {
+            assert_eq!(data.start_dt, Some(42));
+        } else {
+            panic!("expected Put variant");
+        }
+    }
 }

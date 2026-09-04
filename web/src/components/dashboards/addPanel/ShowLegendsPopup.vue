@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,110 +15,120 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card
-    class="show-legends-popup"
-    data-test="dashboard-show-legends-popup"
-    style="min-width: 700px"
+  <ODialog
+    :open="open"
+    @update:open="$emit('update:open', $event)"
+    :title="t('dashboard.legendsOfCharts')"
+    size="lg"
+    data-test="dashboard-show-legends-dialog"
   >
-    <q-card-section>
-      <!-- Header -->
-      <div
-        class="flex justify-between items-center q-px-md q-py-sm header tw:top-0 tw:sticky"
-        style="margin-bottom: 5px"
-      >
-        <div class="flex items-center q-table__title q-mr-md">
-          <span>{{ t("dashboard.legendsOfCharts") }}</span>
-        </div>
-        <div class="flex items-center">
-          <span class="legend-count q-mr-md" style="font-size: 14px">
-            {{ t("dashboard.totalLegends", { count: legends.length }) }}
-          </span>
-          <q-btn
-            :icon="isAllCopied ? 'check' : 'content_copy'"
-            :label="isAllCopied ? 'Copied' : 'Copy all'"
-            class="q-px-sm q-mr-sm tw:border tw:border-solid tw:border-[var(--o2-border-color)] tw:font-normal"
-            no-caps
-            dense
-            size="sm"
-            @click.stop="copyAllLegends"
-            data-test="dashboard-show-legends-copy-all"
-          />
-          <q-btn
-            icon="close"
-            class="q-ml-xs"
-            unelevated
-            size="sm"
-            round
-            flat
-            :title="t('common.close')"
-            @click.stop="closePopup"
-            data-test="dashboard-show-legends-close"
-          ></q-btn>
-        </div>
+    <template #header-right>
+      <div class="flex items-center">
+        <span class="legend-count me-3 text-sm" data-test="dashboard-show-legends-count">
+          {{ t("dashboard.totalLegends", { count: legends.length }) }}
+        </span>
+        <OButton
+          variant="outline"
+          size="sm"
+          @click.stop="copyAllLegends"
+          data-test="dashboard-show-legends-copy-all"
+        >
+          <template #icon-left
+            ><OIcon :name="isAllCopied ? 'check' : 'content-copy'" size="sm"
+          /></template>
+          {{ isAllCopied ? t("common.copied") : t("common.copyAll") }}
+        </OButton>
       </div>
+    </template>
 
-      <!-- Legends List -->
-      <q-card-section class="legends-content scroll">
-        <div v-if="legends.length === 0" class="no-legends q-pa-md text-center">
+    <!-- Legends List -->
+    <div data-test="dashboard-show-legends-popup">
+      <div class="scroll max-h-100 overflow-y-auto py-0.75">
+        <div
+          v-if="legends.length === 0"
+          class="flex min-h-25 items-center justify-center p-3 text-center"
+        >
           {{ t("dashboard.noLegendsAvailable") }}
         </div>
-        <div v-else class="legends-list">
+        <div v-else class="flex flex-col">
           <div
             v-for="(legend, index) in legends"
             :key="index"
-            class="legend-item q-px-sm q-py-xs"
+            class="legend-item group px-2 py-1 last:border-b-0"
             :data-test="`dashboard-legend-item-${index}`"
           >
-            <div class="flex items-center legend-row">
+            <div class="flex w-full flex-nowrap items-center">
               <div
-                class="legend-color-box"
-                :style="{ backgroundColor: legend.color || '#5960b2' }"
+                class="rounded-default me-2.5 h-3 w-5 shrink-0"
+                :style="{ backgroundColor: legend.color || DEFAULT_LEGEND_COLOR }"
               ></div>
-              <div class="legend-text">
+              <div
+                class="overflow-wrap-anywhere text-xs leading-[1.4] break-all whitespace-normal"
+                data-test="dashboard-legend-item-text"
+              >
                 {{ legend.name }}
               </div>
-              <q-btn
-                :icon="isLegendCopied(index) ? 'check' : 'content_copy'"
-                dense
-                size="xs"
-                no-caps
-                class="copy-btn q-ml-sm tw:font-normal"
-                @click.stop="copyLegend(legend.name, index)"
+              <OButton
+                variant="ghost"
+                size="icon"
+                class="ms-1 shrink-0 opacity-0 transition-opacity duration-200 ease-in-out group-hover:opacity-100"
+                data-test="dashboard-legend-copy-btn"
+                :data-copied="isLegendCopied(Number(index)) ? 'true' : undefined"
+                @click.stop="copyLegend(legend.name, Number(index))"
               >
-                <q-tooltip>{{
-                  isLegendCopied(index) ? "Copied!" : "Copy legend"
-                }}</q-tooltip>
-              </q-btn>
+                <template #icon-left
+                  ><OIcon
+                    :name="isLegendCopied(Number(index)) ? 'check' : 'content-copy'"
+                    size="sm"
+                /></template>
+                <OTooltip
+                  :content="
+                    isLegendCopied(Number(index))
+                      ? t('common.copiedExclaim')
+                      : t('dashboard.copyLegend')
+                  "
+                />
+              </OButton>
             </div>
           </div>
         </div>
-      </q-card-section>
-    </q-card-section>
-  </q-card>
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
 import { defineComponent, computed, ref } from "vue";
-import { useI18n } from "vue-i18n";
-import { copyToClipboard } from "quasar";
-import { useStore } from "vuex";
-import {
-  getSeriesColor,
-  getColorPalette,
-} from "@/utils/dashboard/colorPalette";
+import { useI18nTyped } from "@/types/i18n";
+import { copyToClipboard } from "@/utils/clipboard";
+import { useTheme } from "@/composables/useTheme";
+import { getSeriesColor, getColorPalette } from "@/utils/dashboard/colorPalette";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+// Fallback swatch colour for a legend entry that carries no series colour.
+// A :style binding is resolved by the DOM, so it takes the brand token directly.
+const DEFAULT_LEGEND_COLOR = "var(--color-brand-indigo)";
 
 export default defineComponent({
   name: "ShowLegendsPopup",
+  components: { OButton, ODialog, OIcon, OTooltip },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     panelData: {
       type: Object,
       default: () => ({}),
     },
   },
-  emits: ["close"],
+  emits: ["update:open"],
   setup(props: any, { emit }) {
-    const { t } = useI18n();
-    const store = useStore();
+    const { t } = useI18nTyped();
+    const { isDark } = useTheme();
     const copiedLegendIndices = ref(new Set<number>());
     const isAllCopied = ref(false);
 
@@ -150,7 +160,7 @@ export default defineComponent({
 
       // Collect all values to determine min/max
       series.forEach((s: any) => {
-        if (s.data && Array.isArray(s.data)) {
+        if (s && s.data && Array.isArray(s.data)) {
           s.data.forEach((d: any) => {
             if (Array.isArray(d)) {
               // Usually [time, value] or [value, name]
@@ -167,7 +177,7 @@ export default defineComponent({
       if (chartMin === Infinity) chartMin = 0;
       if (chartMax === -Infinity) chartMax = 0;
 
-      const theme = store.state.theme === "dark" ? "dark" : "light";
+      const theme = isDark.value ? "dark" : "light";
       const colorPalette = getColorPalette(theme);
 
       // Helper to get color
@@ -183,11 +193,7 @@ export default defineComponent({
           const colorConfig = props.panelData.config.color;
 
           // If mode is palette-classic (or not set), use the palette loop
-          if (
-            !colorConfig ||
-            !colorConfig.mode ||
-            colorConfig.mode === "palette-classic"
-          ) {
+          if (!colorConfig || !colorConfig.mode || colorConfig.mode === "palette-classic") {
             return colorPalette[index % colorPalette.length];
           }
 
@@ -211,17 +217,11 @@ export default defineComponent({
       };
 
       // For pie/donut charts, extract from series[0].data
-      if (
-        series.length > 0 &&
-        series[0].data &&
-        Array.isArray(series[0].data)
-      ) {
-        const firstSeriesData = series[0].data;
+      const firstSeries = series.find((s: any) => s != null);
+      if (firstSeries && firstSeries.data && Array.isArray(firstSeries.data)) {
+        const firstSeriesData = firstSeries.data;
         // Check if it's pie/donut format (data has name property)
-        if (
-          firstSeriesData.length > 0 &&
-          firstSeriesData[0].name !== undefined
-        ) {
+        if (firstSeriesData.length > 0 && firstSeriesData[0].name !== undefined) {
           return firstSeriesData
             .filter((item: any) => item && item.name)
             .map((item: any, index: number) => ({
@@ -241,7 +241,7 @@ export default defineComponent({
     });
 
     const closePopup = () => {
-      emit("close");
+      emit("update:open", false);
     };
 
     const isLegendCopied = (index: number) => {
@@ -249,28 +249,27 @@ export default defineComponent({
     };
 
     const copyLegend = (text: string, index: number) => {
-      copyToClipboard(text)
-        .then(() => {
-          copiedLegendIndices.value.add(index);
-          setTimeout(() => {
-            copiedLegendIndices.value.delete(index);
-          }, 3000);
-        });
+      copyToClipboard(text, t, { silent: true, timeout: 3000 }).then(() => {
+        copiedLegendIndices.value.add(index);
+        setTimeout(() => {
+          copiedLegendIndices.value.delete(index);
+        }, 3000);
+      });
     };
 
     const copyAllLegends = () => {
       const allLegendsText = legends.value.map((l: any) => l.name).join("\n");
-      copyToClipboard(allLegendsText)
-        .then(() => {
-          isAllCopied.value = true;
-          setTimeout(() => {
-            isAllCopied.value = false;
-          }, 3000);
-        });
+      copyToClipboard(allLegendsText, t, { silent: true, timeout: 3000 }).then(() => {
+        isAllCopied.value = true;
+        setTimeout(() => {
+          isAllCopied.value = false;
+        }, 3000);
+      });
     };
 
     return {
       t,
+      DEFAULT_LEGEND_COLOR,
       legends,
       closePopup,
       copyLegend,
@@ -281,69 +280,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.show-legends-popup {
-  .header {
-    background-color: var(--q-background);
-    border-bottom: 2px solid var(--o2-border-color);
-    z-index: 10;
-  }
-
-  .legends-content {
-    max-height: 400px;
-    overflow-y: auto;
-    padding: 3px 0;
-  }
-
-  .legends-list {
-    display: flex;
-    flex-direction: column;
-    gap: 0px;
-  }
-
-  .legend-item {
-    &:last-child {
-      border-bottom: none;
-    }
-
-    .legend-row {
-      flex-wrap: nowrap;
-      width: 100%;
-    }
-
-    .legend-color-box {
-      width: 20px;
-      height: 12px;
-      border-radius: 2px;
-      margin-right: 10px;
-      flex-shrink: 0;
-    }
-
-    .legend-text {
-      word-break: break-all;
-      overflow-wrap: anywhere;
-      white-space: normal;
-      line-height: 1.4;
-      font-size: 12px;
-    }
-
-    .copy-btn {
-      opacity: 0;
-      transition: opacity 0.2s ease-in-out;
-      flex-shrink: 0;
-    }
-
-    &:hover .copy-btn {
-      opacity: 1;
-    }
-  }
-
-  .no-legends {
-    min-height: 100px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-}
-</style>

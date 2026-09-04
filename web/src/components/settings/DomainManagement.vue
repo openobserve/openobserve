@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,375 +15,573 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-px-md q-py-md domain_management">
-    <!-- Claim Parser Function Selection -->
-    <div class="q-mb-xl">
-      <div class="text-h6 text-bold q-mb-xs">
-        {{ t("settings.claimParserFunction") }}
-      </div>
-      <div class="text-body2 text-grey-7 q-mb-md">
-        {{ t("settings.claimParserFunctionDescription") }}
-      </div>
+  <div class="domain_management">
+    <!-- Section header is provided full-width by the Settings shell. This page is a
+       CONSTRAINED section, so ConstrainedPage owns the scroll + page gutter — the
+       content just flows. (A nested h-full/overflow here can't resolve against
+       ConstrainedPage's auto-height column and only forces a premature scrollbar.) -->
+    <div>
+      <!-- Claim Parser Function Selection -->
+      <div class="mb-6">
+        <div
+          data-test="domain-management-claim-parser-title"
+          class="mb-1 text-xl font-bold font-semibold"
+        >
+          {{ t("settings.claimParserFunction") }}
+        </div>
+        <div class="text-text-secondary mb-3 text-sm">
+          {{
+            t("settings.claimParserFunctionDescription", {
+              product1: raw("VRL"),
+              product2: raw("JavaScript"),
+            })
+          }}
+        </div>
 
-      <div class="row q-gutter-md items-end">
-        <div class="col-auto claim-parser-select">
-          <q-select
-            v-model="claimParserFunction"
-            :options="functionOptions"
-            :label="t('settings.claimParserFunctionLabel')"
-            color="input-border"
-            bg-color="input-bg"
-            class="showLabelOnTop"
-            stack-label
-            outlined
-            dense
-            :loading="loadingFunctions"
-            @filter="filterFunctions"
-            use-input
-            fill-input
-            hide-selected
-            input-debounce="300"
-            clearable
-          >
-            <template v-slot:hint>
-              {{ t("settings.claimParserFunctionHint") }}
-            </template>
-            <template v-slot:no-option>
-              <q-item>
-                <q-item-section class="text-grey">
-                  {{ t("settings.noVrlFunctionsFound") }}
-                </q-item-section>
-              </q-item>
-            </template>
-          </q-select>
-        </div>
-        <div class="col-auto">
-          <q-btn
-            :label="t('common.save')"
-            color="primary"
-            class="text-bold text-capitalize no-border"
-            unelevated
-            @click="saveClaimParserFunction"
-            :loading="savingClaimParser"
-            :disable="!hasClaimParserChanged"
-          />
-        </div>
-        <div class="col-auto">
-          <q-btn
-            flat
-            round
-            dense
-            icon="help_outline"
-            @click="showVrlInfo = true"
-          >
-            <q-tooltip>{{ t("settings.claimParserFunctionInfoTitle") }}</q-tooltip>
-          </q-btn>
-        </div>
-      </div>
-
-      <!-- Right Drawer for VRL Information -->
-      <q-drawer
-        v-model="showVrlInfo"
-        side="right"
-        bordered
-        :width="450"
-        overlay
-        elevated
-      >
-        <div class="q-pa-md">
-          <div class="row items-center q-mb-md">
-            <div class="col text-h6 text-bold">
-              {{ t("settings.claimParserFunctionInfoTitle") }}
-            </div>
-            <div class="col-auto">
-              <q-btn
-                flat
-                round
-                dense
-                icon="close"
-                @click="showVrlInfo = false"
-              />
-            </div>
+        <div class="flex items-end gap-3">
+          <div class="claim-parser-select col-auto min-w-100">
+            <OSelect
+              v-model="claimParserFunction"
+              :options="functionOptions"
+              :label="t('settings.claimParserFunctionLabel')"
+              searchable
+              clearable
+              :loading="loadingFunctions"
+            >
+              <template #empty>
+                <span>{{ t("settings.noVrlFunctionsFound") }}</span>
+              </template>
+            </OSelect>
           </div>
+          <div class="col-auto">
+            <OButton
+              variant="primary"
+              size="sm-action"
+              @click="saveClaimParserFunction"
+              :loading="savingClaimParser"
+              :disabled="!hasClaimParserChanged"
+              >{{ t("common.save") }}</OButton
+            >
+          </div>
+          <div class="col-auto">
+            <OButton
+              variant="ghost-muted"
+              size="icon-xs-sq"
+              @click="showVrlInfo = true"
+              icon-left="help-outline"
+            >
+              <OTooltip :content="t('settings.claimParserFunctionInfoTitle')" side="top" />
+            </OButton>
+          </div>
+        </div>
 
-          <div class="text-body2">
-            <div class="q-mb-md q-pa-md info-box">
-              <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionInputTitle") }}</div>
+        <!-- Right Drawer for VRL Information -->
+        <ODrawer
+          v-model:open="showVrlInfo"
+          :title="t('settings.claimParserFunctionInfoTitle')"
+          side="right"
+          :width="40"
+        >
+          <div class="text-sm">
+            <div class="rounded-default bg-surface-subtle mb-4 p-4">
+              <div class="mb-2 font-medium">{{ t("settings.claimParserFunctionInputTitle") }}</div>
               <div>{{ t("settings.claimParserFunctionInputDescription") }}</div>
             </div>
 
-            <div class="q-mb-md q-pa-md info-box">
-              <div class="text-weight-medium q-mb-sm">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
-              <div class="q-mb-sm">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
-              <div class="q-ml-md">
-                <div class="q-mb-xs">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
+            <div class="rounded-default bg-surface-subtle mb-4 p-4">
+              <div class="mb-2 font-medium">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
+              <div class="mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
+              <div class="ms-4">
+                <div class="mb-1">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
                 <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
               </div>
             </div>
 
             <!-- Recent Errors Section -->
-            <div v-if="claimParserFunction" class="q-pa-md info-box error-section">
-              <div class="row items-center q-mb-sm">
-                <div class="col text-weight-medium">{{ t("settings.claimParserRecentErrors") }}</div>
-                <div class="col-auto">
-                  <q-btn
-                    flat
-                    dense
-                    size="sm"
-                    icon="refresh"
+            <div
+              v-if="claimParserFunction"
+              class="rounded-default bg-surface-subtle border-s-status-negative border-s-3 p-4"
+            >
+              <div class="mb-2 flex items-center">
+                <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
+                <div>
+                  <OButton
+                    icon-left="refresh"
+                    variant="ghost-muted"
+                    size="icon-xs-sq"
                     @click="loadRecentErrors"
                     :loading="loadingErrors"
                   >
-                    <q-tooltip>{{ t("common.refresh") }}</q-tooltip>
-                  </q-btn>
+                    <OTooltip :content="t('common.refresh')" side="top" />
+                  </OButton>
                 </div>
               </div>
 
-              <div v-if="loadingErrors" class="text-center q-py-md">
-                <q-spinner color="primary" size="sm" />
+              <div v-if="loadingErrors" class="py-4 text-center">
+                <OSpinner size="xs" />
               </div>
 
-              <div v-else-if="recentErrors.length === 0" class="text-grey-7 text-center q-py-sm">
+              <div v-else-if="recentErrors.length === 0" class="text-text-muted py-2 text-center">
                 {{ t("settings.noRecentErrors") }}
               </div>
 
-              <div v-else class="error-list">
+              <div v-else class="error-list max-h-100 overflow-y-auto">
                 <div
                   v-for="(error, index) in recentErrors.slice(0, 3)"
                   :key="index"
-                  class="error-item q-pa-sm q-mb-xs"
+                  class="rounded-default bg-status-error-bg border-s-status-negative mb-1 border-s-2 p-2"
                 >
-                  <div class="row items-start q-mb-xs">
-                    <q-icon name="error" color="negative" size="xs" class="q-mr-xs q-mt-xs" />
-                    <div class="col">
-                      <div class="text-caption text-weight-medium">{{ error.error_type }}</div>
-                      <div class="text-caption text-grey-7">{{ formatTimestamp(error._timestamp) }}</div>
+                  <div class="mb-1 flex items-start">
+                    <OIcon name="error" size="xs" class="me-1 mt-1" />
+                    <div class="flex-1">
+                      <div class="text-xs font-medium">{{ error.error_type }}</div>
+                      <div class="text-text-muted text-xs">
+                        {{ formatTimestamp(error._timestamp) }}
+                      </div>
                     </div>
                   </div>
-                  <div class="text-caption error-message">{{ error.error }}</div>
+                  <div class="text-text-secondary text-xs wrap-break-word">{{ error.error }}</div>
                 </div>
 
                 <!-- Show More Button -->
-                <div class="q-mt-sm text-center">
-                  <q-btn
-                    flat
-                    dense
-                    color="primary"
-                    :label="t('common.showMore')"
-                    icon-right="open_in_new"
+                <div class="mt-2 text-center">
+                  <OButton
+                    icon-right="open-in-new"
+                    variant="ghost-primary"
                     size="sm"
                     @click="viewAllErrors"
-                  />
+                  >
+                    {{ t("common.showMore") }}
+                  </OButton>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </q-drawer>
-    </div>
-
-    <!-- Divider -->
-    <q-separator class="q-mb-xl" />
-
-    <div class="text-h6 text-bold q-mb-xs">
-      {{ t("settings.domainRestrictionsSubsection") }}
-    </div>
-    <div class="text-body2 text-grey-7 q-mb-lg">
-      {{ t("settings.domainRestrictionsSubsectionDescription") }}
-    </div>
-
-    <!-- Domain Input Section -->
-    <div class="q-mb-xs">
-      <div class="text-body1 text-bold q-mb-md">
-        {{ t("settings.domainAndAllowedUsers") }}
-      </div>
-      
-      <div class="row q-gutter-md items-center q-mb-md">
-        <div class="col-auto">
-          <q-input
-            v-model="newDomain"
-            :hint="t('settings.domainHint', { 'at_sign': '@' })"
-            class="domain-input"
-            borderless
-            hide-bottom-space
-            dense
-            @keydown.enter="addDomain"
-            :placeholder="t('settings.domainPlaceholder')"
-            :rules="[
-              (val) => isValidDomain(val) || t('settings.invalidDomain')
-            ]"
-          />
-        </div>
-        <div class="col-auto q-my-none">
-          <q-btn
-            :label="t('settings.addDomain')"
-            color="primary"
-            class="text-bold text-capitalize no-border"
-            @click="addDomain"
-            :disabled="!newDomain || !isValidDomain(newDomain)"
-            unelevated
-          />
-        </div>
+        </ODrawer>
       </div>
 
-      <div class="text-caption text-grey-6 q-mb-md" v-if="domains.length > 0">
-        {{ t("settings.domainConfiguredCount", { count: domains.length }) }}
-      </div>
-    </div>
+      <!-- Divider -->
+      <OSeparator class="mb-8" />
 
-    <!-- Domain List -->
-    <div v-if="domains.length > 0" class="q-mb-lg">
-      <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
-        <div 
-          v-if="domain && domain.name"
-          class="domain-card q-mb-xs"
+      <div
+        data-test="domain-management-domain-restrictions-title"
+        class="mb-1 text-xl font-bold font-semibold"
+      >
+        {{ t("settings.domainRestrictionsSubsection") }}
+      </div>
+      <div class="text-text-secondary mb-4 text-sm">
+        {{ t("settings.domainRestrictionsSubsectionDescription") }}
+      </div>
+
+      <!-- Domain Input Section -->
+      <div class="mb-1">
+        <div class="mb-3 text-base font-bold">
+          {{ t("settings.domainAndAllowedUsers") }}
+        </div>
+
+        <OForm
+          ref="addDomainForm"
+          :schema="addDomainSchema"
+          :default-values="addDomainDefaults()"
+          @submit="addDomain"
+          v-slot="{ isSubmitting }"
+          class="flex items-start gap-x-2"
         >
-        <div class="domain-header row items-center justify-between q-px-md q-py-sm">
-          <div class="text-body1 text-bold">{{ domain.name }}</div>
-          <q-btn
-            icon="close"
-            flat
-            round
-            dense
-            color="negative"
-            @click="removeDomain(index)"
-            :title="t('common.delete')"
-          />
+          <div class="w-[18.75rem] shrink-0">
+            <OFormInput
+              data-test="domain-management-new-domain-input"
+              name="newDomain"
+              class="domain-input"
+              :placeholder="t('settings.domainPlaceholder', { example: raw('example.com') })"
+            />
+          </div>
+          <OButton
+            data-test="domain-management-add-domain-btn"
+            variant="primary"
+            size="sm-action"
+            type="submit"
+            :loading="isSubmitting"
+            >{{ t("settings.addDomain") }}
+          </OButton>
+        </OForm>
+        <div class="text-text-secondary mt-1 text-xs">
+          {{ t("settings.domainHint", { at_sign: "@" }) }}
         </div>
 
-        <div class="q-pa-md">
-          <!-- Radio Button Options -->
-          <div class="q-mb-xs">
-            <q-radio
-              v-model="domain.allowAllUsers"
-              :val="true"
-              :label="t('settings.allowAllUsersFromDomain', { domain: '@'+domain.name })"
-              color="primary"
-            />
-          </div>
-          
-          <div class="q-mb-md">
-            <q-radio
-              v-model="domain.allowAllUsers"
-              :val="false"
-              :label="t('settings.allowOnlySpecificUsers', { domain: '@'+domain.name })"
-              color="primary"
-            />
-          </div>
-
-          <!-- Info message for all users -->
-          <div 
-            v-if="domain.allowAllUsers"
-            class="q-pa-sm bg-blue-1 text-blue-8 rounded-borders q-mb-md"
-          >
-            {{ t("settings.allUsersAllowedMessage", { domain: '@'+domain.name }) }}
-          </div>
-
-          <!-- Specific users section -->
-          <div v-if="!domain.allowAllUsers" class="specific-users-section">
-            <div class="row q-gutter-md items-center q-mb-md">
-              <div class="col">
-                <q-input
-                  v-model="domain.newEmail"
-                  :label="t('settings.emailPlaceholder', { domain: '@' + domain.name })"
-                  color="input-border"
-                  bg-color="input-bg"
-                  class="email-input"
-                  outlined
-                  dense
-                  @keydown.enter="addEmail(domain)"
-                  :rules="[
-                    (val) => !val || isValidEmail(val, domain.name) || t('settings.invalidEmail')
-                  ]"
-                />
-              </div>
-              <div class="col-auto q-my-none">
-                <q-btn
-                  :label="t('settings.addEmail')"
-                  color="secondary"
-                  class="text-bold text-capitalize no-border"
-                  @click="addEmail(domain)"
-                  :disabled="!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)"
-                  unelevated
-                  dense
-                />
-              </div>
-            </div>
-
-            <!-- Email List -->
-            <div v-if="domain.allowedEmails && domain.allowedEmails.length > 0">
-              <div 
-                v-for="(email, emailIndex) in domain.allowedEmails"
-                :key="email"
-                class="email-item row items-center justify-between q-pa-sm q-mb-xs"
-              >
-                <div class="text-body2">{{ email }}</div>
-                <q-btn
-                  icon="close"
-                  flat
-                  round
-                  dense
-                  size="sm"
-                  color="negative"
-                  @click="removeEmail(domain, emailIndex)"
-                  :title="t('common.delete')"
-                />
-              </div>
-            </div>
-          </div>
+        <div class="text-text-secondary mt-1 mb-3 text-xs" v-if="domains.length > 0">
+          {{ t("settings.domainConfiguredCount", { count: domains.length }) }}
         </div>
       </div>
-      </template>
-    </div>
-    <div v-else class="text-h6 text-grey-6 q-mt-md q-mb-lg tw:w-full text-center q-pa-lg domain-card">
-      {{ t("settings.noDomainMessage") }}
-    </div>
 
-    <!-- Action Buttons -->
-    <div class="flex justify-end q-px-lg q-py-lg full-width tw:absolute tw:bottom-0">
-      <q-btn
-        :label="t('common.cancel')"
-        class="q-mr-md o2-secondary-button tw:h-[36px]"
-        @click="resetForm"
-      />
-      <q-btn
-        :label="t('settings.saveChanges')"
-        class="o2-primary-button no-border tw:h-[36px] q-mr-md"
-        unelevated
-        @click="saveChanges"
-        :loading="saving"
-      />
+      <!-- Domain List -->
+      <div v-if="domains.length > 0" class="mb-4">
+        <template v-for="(domain, index) in domains" :key="domain?.name || `domain-${index}`">
+          <div
+            v-if="domain && domain.name"
+            class="border-border-default rounded-default bg-surface-base mb-1 border"
+          >
+            <div
+              class="border-b-border-default rounded-t-default bg-surface-subtle flex items-center justify-between border-b px-3 py-2"
+            >
+              <div
+                :data-test="`domain-management-domain-name-${domain.name}`"
+                class="text-base font-bold"
+              >
+                {{ domain.name }}
+              </div>
+              <OButton
+                icon-left="close"
+                variant="ghost-destructive"
+                size="icon-xs-sq"
+                @click="removeDomain(index)"
+                :title="t('common.delete')"
+              />
+            </div>
+
+            <div class="p-3">
+              <!-- Access policy for this domain (allow/block are mutually exclusive per domain) -->
+              <ORadioGroup v-model="domain.policy" orientation="vertical">
+                <div class="mb-1">
+                  <ORadio
+                    :data-test="`domain-management-allow-all-radio-${domain.name}`"
+                    val="allow_all"
+                    :label="t('settings.allowAllUsersFromDomain', { domain: '@' + domain.name })"
+                  />
+                </div>
+                <div class="mb-1">
+                  <ORadio
+                    :data-test="`domain-management-allow-specific-radio-${domain.name}`"
+                    val="allow_specific"
+                    :label="t('settings.allowOnlySpecificUsers', { domain: '@' + domain.name })"
+                  />
+                </div>
+                <div class="mb-1">
+                  <ORadio
+                    :data-test="`domain-management-block-specific-radio-${domain.name}`"
+                    val="block_specific"
+                    :label="t('settings.blockSpecificUsers', { domain: '@' + domain.name })"
+                  />
+                </div>
+                <div class="mb-3">
+                  <ORadio
+                    :data-test="`domain-management-block-all-radio-${domain.name}`"
+                    val="block_all"
+                    :label="t('settings.blockAllUsersFromDomain', { domain: '@' + domain.name })"
+                  />
+                </div>
+              </ORadioGroup>
+
+              <!-- Info message for all users -->
+              <div
+                v-if="domain.policy === 'allow_all'"
+                class="rounded-default bg-status-info-bg text-status-info-text mb-3 p-2"
+              >
+                {{ t("settings.allUsersAllowedMessage", { domain: "@" + domain.name }) }}
+              </div>
+
+              <!-- Info message for whole-domain block -->
+              <div
+                v-if="domain.policy === 'block_all'"
+                class="rounded-default bg-status-error-bg text-status-error-text mb-3 p-2"
+              >
+                {{ t("settings.allUsersBlockedMessage", { domain: "@" + domain.name }) }}
+              </div>
+
+              <!-- Specific allowed users section -->
+              <div v-if="domain.policy === 'allow_specific'" class="specific-users-section ms-6">
+                <OForm
+                  :ref="(el) => setEmailFormRef(domain.name, el)"
+                  :schema="getEmailSchema(domain.name)"
+                  :default-values="addEmailDefaults()"
+                  @submit="(v) => addEmail(domain, v.newEmail)"
+                  v-slot="{ isSubmitting }"
+                >
+                  <!-- Hint label above the row, so the error can grow below the
+                     input without shoving the Add button out of alignment. -->
+                  <div
+                    class="o-input-label text-compact text-input-label-text mb-1 leading-tight font-medium"
+                  >
+                    {{ t("settings.emailPlaceholder", { domain: "@" + domain.name }) }}
+                  </div>
+                  <div class="flex items-start gap-x-2">
+                    <OFormInput
+                      :data-test="`domain-management-allow-email-input-${domain.name}`"
+                      name="newEmail"
+                      class="email-input min-w-62.5"
+                    />
+                    <OButton
+                      data-test="domain-management-add-email-btn"
+                      variant="primary"
+                      size="sm-action"
+                      type="submit"
+                      :loading="isSubmitting"
+                      >{{ t("settings.addEmail") }}</OButton
+                    >
+                  </div>
+                </OForm>
+
+                <!-- Allowed Email List -->
+                <div v-if="domain.allowedEmails && domain.allowedEmails.length > 0" class="mt-1">
+                  <div
+                    v-for="(email, emailIndex) in domain.allowedEmails"
+                    :key="email"
+                    class="rounded-default border-border-default bg-surface-subtle mb-1 flex items-center justify-between border p-2"
+                  >
+                    <div class="text-sm">{{ email }}</div>
+                    <OButton
+                      icon-left="close"
+                      variant="ghost-destructive"
+                      size="icon-xs-sq"
+                      @click="removeEmail(domain, emailIndex)"
+                      :title="t('common.delete')"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Specific blocked users section (mirrors the allow-email OForm pattern) -->
+              <div v-if="domain.policy === 'block_specific'" class="specific-users-section ms-6">
+                <OForm
+                  :ref="(el) => setBlockedEmailFormRef(domain.name, el)"
+                  :schema="getEmailSchema(domain.name)"
+                  :default-values="addEmailDefaults()"
+                  @submit="(v) => addBlockedEmail(domain, v.newEmail)"
+                  v-slot="{ isSubmitting }"
+                >
+                  <div
+                    class="o-input-label text-compact text-input-label-text mb-1 leading-tight font-medium"
+                  >
+                    {{ t("settings.blockedEmailPlaceholder", { domain: "@" + domain.name }) }}
+                  </div>
+                  <div class="flex items-start gap-x-2">
+                    <OFormInput
+                      :data-test="`domain-management-block-email-input-${domain.name}`"
+                      name="newEmail"
+                      class="email-input min-w-62.5"
+                    />
+                    <OButton
+                      data-test="domain-management-block-email-btn"
+                      variant="destructive"
+                      size="sm-action"
+                      type="submit"
+                      :loading="isSubmitting"
+                      >{{ t("settings.addBlockedEmail") }}</OButton
+                    >
+                  </div>
+                </OForm>
+
+                <!-- Blocked Email List -->
+                <div v-if="domain.blockedEmails && domain.blockedEmails.length > 0" class="mt-1">
+                  <div
+                    v-for="(email, emailIndex) in domain.blockedEmails"
+                    :key="email"
+                    class="rounded-default bg-banner-error-soft-bg border-banner-error-soft-border mb-1 flex items-center justify-between border p-2"
+                  >
+                    <div class="text-sm">{{ email }}</div>
+                    <OButton
+                      icon-left="close"
+                      variant="ghost-destructive"
+                      size="icon-xs-sq"
+                      @click="removeBlockedEmail(domain, emailIndex)"
+                      :title="t('common.delete')"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <!-- Hint for any block policy -->
+              <div
+                v-if="domain.policy === 'block_specific' || domain.policy === 'block_all'"
+                class="text-text-secondary mt-3 text-xs"
+              >
+                {{ t("settings.blockedUsersHint") }}
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
+      <div
+        v-else
+        data-test="domain-management-no-domain-message"
+        class="text-text-muted border-border-default rounded-default bg-surface-base mt-3 mb-4 w-full border p-4 text-center text-xl font-semibold"
+      >
+        {{ t("settings.noDomainMessage") }}
+      </div>
+    </div>
+    <!-- Action Buttons — flow inline at the end of the constrained column. -->
+    <div
+      class="border-card-glass-border mt-2 flex items-center justify-between gap-2 border-t pt-4"
+    >
+      <!-- Unsaved-changes indicator: makes it obvious the in-card edits (domains, policies,
+           allow/block emails) are staged until Save is clicked. -->
+      <div
+        v-if="isDirty"
+        data-test="domain-management-unsaved-indicator"
+        class="text-text-muted flex items-center gap-2 text-sm"
+      >
+        <span class="bg-accent inline-block h-2 w-2 shrink-0 rounded-full"></span>
+        {{ t("common.unsavedChanges") }}
+      </div>
+      <div v-else></div>
+
+      <div class="flex gap-2">
+        <OButton
+          variant="outline"
+          size="sm-action"
+          :disabled="!isDirty || saving"
+          @click="resetForm"
+          >{{ t("common.cancel") }}</OButton
+        >
+        <OButton
+          data-test="domain-management-save-changes-btn"
+          variant="primary"
+          size="sm-action"
+          @click="saveChanges"
+          :loading="saving"
+          :disabled="!isDirty"
+          >{{ t("settings.saveChanges") }}</OButton
+        >
+      </div>
     </div>
   </div>
+
+  <!-- Confirm remove domain dialog -->
+  <ODialog
+    v-model:open="confirmRemoveDomainOpen"
+    size="sm"
+    :title="t('common.confirm')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="confirmRemoveDomainOpen = false"
+    @click:primary="doRemoveDomain"
+  >
+    <p v-if="pendingRemoveDomainIndex !== null">
+      {{ t("settings.confirmRemoveDomain", { domain: domains[pendingRemoveDomainIndex]?.name }) }}
+    </p>
+  </ODialog>
+
+  <!-- Confirm remove email dialog -->
+  <ODialog
+    v-model:open="confirmRemoveEmailOpen"
+    size="sm"
+    :title="t('common.confirm')"
+    :secondary-button-label="t('confirmDialog.cancel')"
+    :primary-button-label="t('confirmDialog.ok')"
+    @click:secondary="confirmRemoveEmailOpen = false"
+    @click:primary="doRemoveEmail"
+  >
+    <p v-if="pendingRemoveEmail !== null">
+      {{
+        pendingRemoveEmail.blocked
+          ? t("settings.confirmRemoveBlockedEmail", { email: pendingRemoveEmail.email })
+          : t("settings.confirmRemoveEmail", { email: pendingRemoveEmail.email })
+      }}
+    </p>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
 import { ref, reactive, onMounted, onActivated, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+
 import domainManagement from "@/services/domainManagement";
 import { useRouter } from "vue-router";
-import { add, formatDistanceToNow } from "date-fns";
+import { formatDistanceToNow } from "date-fns";
 import jstransform from "@/services/jstransform";
 import organizations from "@/services/organizations";
 import searchService from "@/services/search";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import ORadio from "@/lib/forms/Radio/ORadio.vue";
+import ORadioGroup from "@/lib/forms/Radio/ORadioGroup.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import {
+  isValidEmail,
+  makeAddDomainSchema,
+  makeAddEmailSchema,
+  addDomainDefaults,
+  addEmailDefaults,
+  type AddDomainForm,
+} from "./DomainManagement.schema";
+
+type DomainPolicy = "allow_all" | "allow_specific" | "block_specific" | "block_all";
 
 interface Domain {
   name: string;
-  allowAllUsers: boolean;
+  policy: DomainPolicy;
   allowedEmails: string[];
-  newEmail: string;
+  blockedEmails: string[];
 }
 
-const { t } = useI18n();
-const q = useQuasar();
+const { t } = useI18nTyped();
+
+// Dialog state for domain/email removal confirmations
+const confirmRemoveDomainOpen = ref(false);
+const pendingRemoveDomainIndex = ref<number | null>(null);
+const confirmRemoveEmailOpen = ref(false);
+const pendingRemoveEmail = ref<{
+  domain: any;
+  emailIndex: number;
+  email: string;
+  blocked: boolean;
+} | null>(null);
 const store = useStore();
 const router = useRouter();
 
-const newDomain = ref("");
 const domains = reactive<Domain[]>([]);
 const saving = ref(false);
+
+// Schema-driven validation (upstream): pure validators live in the schema file; the component only
+// needs `isValidEmail` for the add guards, imported directly.
+const addDomainForm = ref<any>(null);
+const addDomainSchema = makeAddDomainSchema(t);
+
+// Per-domain email add-row forms: a schema cache (keyed by domain name, since the email schema
+// embeds the domain) + ref maps so each row can be reset after a successful add. The blocklist adds
+// a parallel set of refs for the block-email add-row (same schema — the email must belong to the
+// domain — but an independent form instance).
+const emailSchemaCache = new Map<string, ReturnType<typeof makeAddEmailSchema>>();
+const getEmailSchema = (domainName: string) => {
+  if (!emailSchemaCache.has(domainName)) {
+    emailSchemaCache.set(domainName, makeAddEmailSchema(domainName, t));
+  }
+  return emailSchemaCache.get(domainName);
+};
+const emailFormRefs = ref<Record<string, any>>({});
+const setEmailFormRef = (domainName: string, el: any) => {
+  if (el) emailFormRefs.value[domainName] = el;
+  else delete emailFormRefs.value[domainName];
+};
+const blockedEmailFormRefs = ref<Record<string, any>>({});
+const setBlockedEmailFormRef = (domainName: string, el: any) => {
+  if (el) blockedEmailFormRefs.value[domainName] = el;
+  else delete blockedEmailFormRefs.value[domainName];
+};
+
+// Baseline snapshot of the persisted domain-restriction state. `isDirty` compares the current
+// (normalized) config to this — set on load and after a successful save.
+const savedSnapshot = ref("");
+const domainSnapshot = (): string =>
+  JSON.stringify(
+    domains
+      .map((d) => ({
+        name: (d.name || "").toLowerCase(),
+        policy: d.policy,
+        allowedEmails: [...(d.allowedEmails || [])].sort(),
+        blockedEmails: [...(d.blockedEmails || [])].sort(),
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name)),
+  );
+const isDirty = computed(() => domainSnapshot() !== savedSnapshot.value);
 
 // Claim parser function state
 const claimParserFunction = ref("");
@@ -398,13 +596,15 @@ const loadingErrors = ref(false);
 
 const emit = defineEmits(["cancel", "saved"]);
 
-// Computed property to check if claim parser function value has changed
+// Computed property to check if claim parser function value has changed.
+// The field is pre-populated with the saved value, so Save stays disabled until
+// the user picks a genuinely different function.
 const hasClaimParserChanged = computed(() => {
-  return claimParserFunction.value !== originalClaimParserFunction.value;
+  return (claimParserFunction.value || "") !== originalClaimParserFunction.value;
 });
 
 onMounted(() => {
-  if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
+  if (store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
     loadDomainSettings();
     loadFunctions();
   } else {
@@ -413,12 +613,12 @@ onMounted(() => {
       query: {
         org_identifier: store.state.selectedOrganization.identifier,
       },
-    })
+    });
   }
 });
 
 onActivated(() => {
-  if(store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
+  if (store.state.zoConfig.meta_org == store.state.selectedOrganization.identifier) {
     loadDomainSettings();
     loadFunctions();
   } else {
@@ -427,7 +627,7 @@ onActivated(() => {
       query: {
         org_identifier: store.state.selectedOrganization.identifier,
       },
-    })
+    });
   }
 });
 
@@ -435,220 +635,215 @@ const loadDomainSettings = async () => {
   try {
     const response = await domainManagement.getDomainRestrictions(store.state.zoConfig.meta_org);
 
-    if (response.data && response.data.domains) {
-      const loadedDomains = response.data.domains
-        .filter((domain: any) => domain && typeof domain === 'object' && domain.domain) // Filter out invalid entries
-        .map((domain: any) => ({
-          name: domain.domain,
-          allowAllUsers: domain.allow_all_users,
-          allowedEmails: domain.allowed_emails || []
-        }));
-      domains.splice(0, domains.length, ...loadedDomains);
+    if (response.data) {
+      // Decompose the flat backend model (domains + blocked_domains + blocked_emails) into one
+      // per-domain card each, keyed by domain name. Policy precedence when a domain appears in
+      // more than one list: block_all > block_specific > allow rules (block wins over allow).
+      const byDomain = new Map<string, Domain>();
+      const ensure = (name: string): Domain => {
+        const key = name.toLowerCase();
+        if (!byDomain.has(key)) {
+          byDomain.set(key, {
+            name,
+            policy: "allow_all",
+            allowedEmails: [],
+            blockedEmails: [],
+          });
+        }
+        return byDomain.get(key) as Domain;
+      };
+
+      // Allow rules
+      (response.data.domains || [])
+        .filter((d: any) => d && typeof d === "object" && d.domain)
+        .forEach((d: any) => {
+          const card = ensure(d.domain);
+          card.policy = d.allow_all_users ? "allow_all" : "allow_specific";
+          card.allowedEmails = d.allowed_emails || [];
+        });
+
+      // Blocked specific emails — grouped under their domain
+      (response.data.blocked_emails || [])
+        .filter((e: any) => typeof e === "string" && e.includes("@"))
+        .forEach((email: string) => {
+          const domainPart = email.split("@")[1];
+          const card = ensure(domainPart);
+          card.policy = "block_specific";
+          card.blockedEmails.push(email.toLowerCase());
+        });
+
+      // Blocked whole domains — highest precedence
+      (response.data.blocked_domains || [])
+        .filter((d: any) => typeof d === "string" && d)
+        .forEach((d: string) => {
+          const card = ensure(d);
+          card.policy = "block_all";
+        });
+
+      domains.splice(0, domains.length, ...Array.from(byDomain.values()));
     }
 
-    // Load claim parser function from organization settings
-    const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
+    // Pre-populate the OSelect with the saved value so the configured parser is
+    // visible on load. Save stays disabled (hasClaimParserChanged) until the user
+    // selects a different function.
+    const storedFunction =
+      store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
     claimParserFunction.value = storedFunction;
-    originalClaimParserFunction.value = storedFunction; // Store original for change detection
+    originalClaimParserFunction.value = storedFunction;
   } catch (error: any) {
     // If the API doesn't exist yet or returns an error, use example data
     console.warn("Domain restrictions API not available, using example data:", error);
 
-    const existingDomains = [];
+    const existingDomains: Domain[] = [];
 
     domains.splice(0, domains.length, ...existingDomains);
   }
+
+  // Capture the loaded state as the clean baseline → the form starts not-dirty.
+  savedSnapshot.value = domainSnapshot();
 };
 
-const isValidDomain = (domain: any): boolean => {
-  // Handle null, undefined, and non-string inputs
-  if (domain === null || domain === undefined) return true; // Empty is valid
-  if (typeof domain !== 'string') return false; // Non-strings are invalid
-  
-  // Handle empty strings - empty is valid, but whitespace-only is not
-  const trimmed = domain.trim();
-  if (!trimmed) return domain.length === 0; // Empty string is valid, whitespace-only is not
-  
-  // Security: Check for potentially malicious content (more targeted patterns)
-  const maliciousPatterns = [
-    '<script', '</script', 'javascript:', 'DROP TABLE', 'SELECT FROM', 'INSERT INTO', 
-    'UPDATE SET', 'DELETE FROM', 'UNION SELECT', '--', '/*', '*/', '\0', '\n', '\r'
-  ];
-  
-  const upperDomain = trimmed.toUpperCase();
-  if (maliciousPatterns.some(pattern => upperDomain.includes(pattern.toUpperCase()))) {
-    return false;
-  }
-  
-  // Length validation (DNS limit is 253 characters)
-  if (trimmed.length > 253) return false;
-  
-  // Remove trailing dot if present (valid in DNS)
-  const cleanDomain = trimmed.endsWith('.') ? trimmed.slice(0, -1) : trimmed;
-  
-  // Improved domain validation that properly handles hyphens and edge cases
-  // Domain parts can contain letters, numbers, and hyphens (but not start/end with hyphens)
-  // Each label can be 1-63 characters, and the domain must have at least one dot
-  const domainRegex = /^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/;
-  
-  try {
-    return domainRegex.test(cleanDomain);
-  } catch (error) {
-    return false; // Any regex error means invalid
-  }
-};
+// @submit handler — fires only once the schema passes (required + valid
+// domain), so the old empty/invalid guards are gone. The submitted form value
+// is the single source of truth; the cross-state duplicate check stays here.
+const addDomain = (value?: AddDomainForm) => {
+  const candidate = (value?.newDomain ?? "").trim();
+  if (!candidate) return;
 
-const isValidEmail = (email: any, domain: any): boolean => {
-  // Handle null, undefined, and non-string inputs
-  if (email === null || email === undefined || typeof email !== 'string') return false;
-  if (domain === null || domain === undefined || typeof domain !== 'string') return false;
-  
-  // Handle empty strings
-  if (!email.trim() || !domain.trim()) return false;
-  
-  // Security: Check for potentially malicious content
-  const maliciousPatterns = [
-    '<', '>', 'script', 'javascript:', 'DROP', 'SELECT', 'INSERT', 'UPDATE', 'DELETE',
-    'UNION', 'CREATE', 'ALTER', 'TABLE', 'FROM', '--', '/*', '*/', "'", '"',
-    '\0', '\n', '\r', '\t'
-  ];
-  
-  const upperEmail = email.toUpperCase();
-  if (maliciousPatterns.some(pattern => upperEmail.includes(pattern.toUpperCase()))) {
-    return false;
-  }
-  
-  // Length validation (practical email limit)
-  if (email.length > 254 || domain.length > 253) return false;
-  
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  
-  try {
-    if (!emailRegex.test(email)) return false;
-    
-    // Check if email belongs to the domain
-    return email.toLowerCase().endsWith(`@${domain.toLowerCase()}`);
-  } catch (error) {
-    return false; // Any error means invalid
-  }
-};
-
-const addDomain = () => {
-  if (!newDomain.value || !isValidDomain(newDomain.value)) return;
-  
   // Check if domain already exists
-  if (domains.some(d => d.name.toLowerCase() === newDomain.value.toLowerCase())) {
-    q.notify({
-      type: "negative",
+  if (domains.some((d) => d.name.toLowerCase() === candidate.toLowerCase())) {
+    toast({
+      variant: "error",
       message: t("settings.domainAlreadyExists"),
-      timeout: 3000,
     });
     return;
   }
 
   domains.push({
-    name: newDomain.value,
-    allowAllUsers: true,
+    name: candidate,
+    policy: "allow_all",
     allowedEmails: [],
-    newEmail: ""
+    blockedEmails: [],
   });
 
-  newDomain.value = "";
-
-  // q.notify({
-  //   type: "positive",
-  //   message: t("settings.domainAdded"),
-  //   timeout: 3000,
-  // });
+  // Inline add-row cleared after save → reset() clears the field AND submit
+  // state (submissionAttempts → 0), so no post-save "required" flash.
+  addDomainForm.value?.form?.reset();
 };
 
 const removeDomain = (index: number) => {
-  q.dialog({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveDomain", { domain: domains[index].name }),
-    cancel: true,
-    persistent: true,
-  }).onOk(() => {
-    domains.splice(index, 1);
-    q.notify({
-      type: "positive",
-      message: t("settings.domainRemoved"),
-      timeout: 3000,
-    });
+  pendingRemoveDomainIndex.value = index;
+  confirmRemoveDomainOpen.value = true;
+};
+
+const doRemoveDomain = () => {
+  const index = pendingRemoveDomainIndex.value;
+  if (index === null) return;
+  domains.splice(index, 1);
+  pendingRemoveDomainIndex.value = null;
+  confirmRemoveDomainOpen.value = false;
+  toast({
+    variant: "success",
+    message: t("settings.domainRemoved"),
   });
 };
 
-const addEmail = (domain: Domain) => {
-  if (!domain.newEmail || !isValidEmail(domain.newEmail, domain.name)) return;
+// @submit handler for a domain's email add-row. The schema is conditional
+// (empty passes), so an empty submit is a no-op; otherwise the email must be
+// valid + belong to the domain. Still callable directly with the row model.
+const addEmail = (domain: Domain, emailValue?: string) => {
+  const email = (emailValue ?? "").trim();
+  if (!email || !isValidEmail(email, domain.name)) return;
 
   // Check if email already exists
-  if (domain.allowedEmails.includes(domain.newEmail.toLowerCase())) {
-    q.notify({
-      type: "negative",
+  if (domain.allowedEmails.includes(email.toLowerCase())) {
+    toast({
+      variant: "error",
       message: t("settings.emailAlreadyExists"),
-      timeout: 3000,
     });
     return;
   }
 
-  domain.allowedEmails.push(domain.newEmail.toLowerCase());
-  domain.newEmail = "";
-
-  q.notify({
-    type: "positive",
-    message: t("settings.emailAdded"),
-    timeout: 3000,
-  });
+  // Staged until Save — reset the row's form field, but no "saved" toast (the unsaved-changes
+  // indicator + enabled Save button already signal there are pending changes).
+  domain.allowedEmails.push(email.toLowerCase());
+  emailFormRefs.value[domain.name]?.form?.reset();
 };
 
 const removeEmail = (domain: Domain, emailIndex: number) => {
-  q.dialog({
-    title: t("common.confirm"),
-    message: t("settings.confirmRemoveEmail", { email: domain.allowedEmails[emailIndex] }),
-    cancel: true,
-    persistent: true,
-  }).onOk(() => {
-    domain.allowedEmails.splice(emailIndex, 1);
-    q.notify({
-      type: "positive",
-      message: t("settings.emailRemoved"),
-      timeout: 3000,
+  pendingRemoveEmail.value = {
+    domain,
+    emailIndex,
+    email: domain.allowedEmails[emailIndex],
+    blocked: false,
+  };
+  confirmRemoveEmailOpen.value = true;
+};
+
+// @submit handler for a domain's block-email add-row — mirrors addEmail (schema-validated, then
+// reset the row's form). The blocked email must be valid + belong to the domain.
+const addBlockedEmail = (domain: Domain, emailValue?: string) => {
+  const email = (emailValue ?? "").trim();
+  if (!email || !isValidEmail(email, domain.name)) return;
+
+  if (domain.blockedEmails.includes(email.toLowerCase())) {
+    toast({
+      variant: "error",
+      message: t("settings.emailAlreadyExists"),
     });
-  });
+    return;
+  }
+
+  // Staged until Save (see addEmail) — reset the row's form field, no "saved" toast.
+  domain.blockedEmails.push(email.toLowerCase());
+  blockedEmailFormRefs.value[domain.name]?.form?.reset();
+};
+
+const removeBlockedEmail = (domain: Domain, emailIndex: number) => {
+  pendingRemoveEmail.value = {
+    domain,
+    emailIndex,
+    email: domain.blockedEmails[emailIndex],
+    blocked: true,
+  };
+  confirmRemoveEmailOpen.value = true;
+};
+
+const doRemoveEmail = () => {
+  const pending = pendingRemoveEmail.value;
+  if (!pending) return;
+  const list = pending.blocked ? pending.domain.blockedEmails : pending.domain.allowedEmails;
+  list.splice(pending.emailIndex, 1);
+  pendingRemoveEmail.value = null;
+  confirmRemoveEmailOpen.value = false;
 };
 
 // Load VRL functions from _meta org
 const loadFunctions = async () => {
   try {
     loadingFunctions.value = true;
-    const response = await jstransform.list(1, 10000, "name", false, "", store.state.zoConfig.meta_org);
+    const response = await jstransform.list(
+      1,
+      10000,
+      "name",
+      false,
+      "",
+      store.state.zoConfig.meta_org,
+    );
+
+    // Populate options. The model value (claimParserFunction) is set in loadDomainSettings;
+    // here we only keep the change-detection baseline in sync.
+    const storedFunction =
+      store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
+    originalClaimParserFunction.value = storedFunction;
 
     allFunctions.value = response.data.list.map((fn: any) => fn.name);
     functionOptions.value = allFunctions.value;
-
-    // Set the current value from store if it exists
-    const storedFunction = store.state?.organizationData?.organizationSettings?.claim_parser_function || "";
-    claimParserFunction.value = storedFunction;
-    originalClaimParserFunction.value = storedFunction; // Store original for change detection
   } catch (e: any) {
     console.error("Error loading functions:", e);
   } finally {
     loadingFunctions.value = false;
   }
-};
-
-// Filter functions for autocomplete
-const filterFunctions = (val: string, update: Function) => {
-  update(() => {
-    if (val === "") {
-      functionOptions.value = allFunctions.value;
-    } else {
-      const needle = val.toLowerCase();
-      functionOptions.value = allFunctions.value.filter(
-        (v) => v.toLowerCase().indexOf(needle) > -1
-      );
-    }
-  });
 };
 
 // Save claim parser function separately
@@ -672,19 +867,17 @@ const saveClaimParserFunction = async () => {
     };
     store.dispatch("setOrganizationSettings", updatedSettings);
 
-    // Update original value after successful save
+    // Update original value after successful save so Save disables again
     originalClaimParserFunction.value = claimParserFunction.value || "";
 
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.claimParserFunctionSaved"),
-      timeout: 3000,
     });
   } catch (error: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || t("settings.errorSavingClaimParserFunction"),
-      timeout: 3000,
     });
   } finally {
     savingClaimParser.value = false;
@@ -693,7 +886,7 @@ const saveClaimParserFunction = async () => {
 
 // Build SQL query for claim parser errors
 const buildErrorsQuery = (functionName: string, limit?: number): string => {
-  const limitClause = limit ? ` LIMIT ${limit}` : '';
+  const limitClause = limit ? ` LIMIT ${limit}` : "";
   return `SELECT * FROM "errors" WHERE error_source='${functionName}' ORDER BY _timestamp DESC${limitClause}`;
 };
 
@@ -725,7 +918,7 @@ const loadRecentErrors = async () => {
         query: query,
         page_type: "logs",
       },
-      "ui"
+      "ui",
     );
 
     if (response.data && response.data.hits) {
@@ -747,7 +940,7 @@ const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp / 1000); // Convert microseconds to milliseconds
     return formatDistanceToNow(date, { addSuffix: true });
   } catch (e) {
-    return "Unknown time";
+    return t("settings.domainManagement.unknownTime");
   }
 };
 
@@ -791,45 +984,62 @@ const viewAllErrors = () => {
 
 const saveChanges = async () => {
   saving.value = true;
-  
+
   try {
     // Validate all domains have proper configuration
     for (const domain of domains) {
-      if (!domain.allowAllUsers && domain.allowedEmails.length === 0) {
-        q.notify({
-          type: "negative",
+      if (domain.policy === "allow_specific" && domain.allowedEmails.length === 0) {
+        toast({
+          variant: "error",
           message: t("settings.domainNeedsEmails", { domain: domain.name }),
-          timeout: 3000,
+        });
+        saving.value = false;
+        return;
+      }
+      if (domain.policy === "block_specific" && domain.blockedEmails.length === 0) {
+        toast({
+          variant: "error",
+          message: t("settings.domainNeedsBlockedEmails", { domain: domain.name }),
         });
         saving.value = false;
         return;
       }
     }
 
-    // Prepare data for API
+    // Compose the flat backend model from the per-domain cards.
     const domainData: any = {
-      domains: domains.map(domain => ({
-        domain: domain.name,
-        allow_all_users: domain.allowAllUsers,
-        allowed_emails: !domain.allowAllUsers ? domain.allowedEmails : []
-      }))
+      // Allow rules → domains[]
+      domains: domains
+        .filter((d) => d.policy === "allow_all" || d.policy === "allow_specific")
+        .map((domain) => ({
+          domain: domain.name,
+          allow_all_users: domain.policy === "allow_all",
+          allowed_emails: domain.policy === "allow_specific" ? domain.allowedEmails : [],
+        })),
+      // Whole-domain blocks → blocked_domains[]
+      blocked_domains: domains.filter((d) => d.policy === "block_all").map((domain) => domain.name),
+      // Specific blocked users → flat blocked_emails[]
+      blocked_emails: domains
+        .filter((d) => d.policy === "block_specific")
+        .flatMap((domain) => domain.blockedEmails),
     };
 
     // Save to backend API
     await domainManagement.updateDomainRestrictions(store.state.zoConfig.meta_org, domainData);
 
-    q.notify({
-      type: "positive",
+    toast({
+      variant: "success",
       message: t("settings.domainSettingsSaved"),
-      timeout: 3000,
     });
+
+    // Persisted → this is now the clean baseline, so isDirty resets to false.
+    savedSnapshot.value = domainSnapshot();
 
     emit("saved", domains);
   } catch (error: any) {
-    q.notify({
-      type: "negative",
+    toast({
+      variant: "error",
       message: error?.message || t("settings.errorSavingDomainSettings"),
-      timeout: 3000,
     });
   } finally {
     saving.value = false;
@@ -837,111 +1047,9 @@ const saveChanges = async () => {
 };
 
 const resetForm = () => {
-  newDomain.value = "";
+  // Reset the add-domain row through the form (clears the field + submit state),
+  // keeping TanStack the single owner of that field — no parallel ref.
+  addDomainForm.value?.form?.reset();
   loadDomainSettings();
 };
 </script>
-
-<style scoped lang="scss">
-.claim-parser-select {
-  min-width: 400px;
-}
-
-.info-box {
-  background-color: #f5f5f5;
-  border-radius: 4px;
-}
-
-.domain-input {
-  width: 300px;
-}
-
-.email-input {
-  min-width: 250px;
-}
-
-.function-select {
-  max-width: 500px;
-}
-
-.domain-card {
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  background: white;
-}
-
-.domain-header {
-  background: #f5f5f5;
-  border-bottom: 1px solid #e0e0e0;
-  border-radius: 8px 8px 0 0;
-}
-
-.specific-users-section {
-  margin-left: 24px;
-}
-
-.email-item {
-  background: #f9f9f9;
-  border-radius: 4px;
-  border: 1px solid #e0e0e0;
-}
-
-.error-section {
-  border-left: 3px solid #c10015;
-}
-
-.error-list {
-  max-height: 400px;
-  overflow-y: auto;
-}
-
-.error-item {
-  background: #fff9f9;
-  border-radius: 4px;
-  border-left: 2px solid #ff9e9e;
-}
-
-.error-message {
-  color: #666;
-  word-break: break-word;
-}
-
-.body--dark {
-  .info-box {
-    background-color: #2a2a2a;
-  }
-
-  .domain-card {
-    border-color: #444;
-    background: #1e1e1e;
-  }
-
-  .domain-header {
-    background: #2a2a2a;
-    border-bottom-color: #444;
-  }
-
-  .email-item {
-    background: #2a2a2a;
-    border-color: #444;
-  }
-
-  .error-section {
-    border-left-color: #ff6b6b;
-  }
-
-  .error-item {
-    background: #2a1f1f;
-    border-left-color: #ff6b6b;
-  }
-
-  .error-message {
-    color: #ccc;
-  }
-}
-</style>
-<style lang="scss">
-.domain_management .q-field__bottom {
-  padding-left: 0px;
-}
-</style>

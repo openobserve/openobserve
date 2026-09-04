@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,28 +15,22 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import CustomChartEditor from "@/components/dashboards/addPanel/CustomChartEditor.vue";
 import i18n from "@/locales";
-
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 // Use vi.hoisted to define mock data that can be used in vi.mock
 const { globalMockStore, globalMockDashboardPanelData } = vi.hoisted(() => {
   return {
     globalMockStore: {
       state: {
-        theme: 'light'
-      }
+        theme: "light",
+      },
     },
     globalMockDashboardPanelData: {
       dashboardPanelData: {
-        value: {}
-      }
-    }
+        value: {},
+      },
+    },
   };
 });
 
@@ -46,13 +40,13 @@ vi.mock("vuex", async () => {
   return {
     ...actual,
     useStore: () => globalMockStore,
-    createStore: vi.fn(() => globalMockStore)
+    createStore: vi.fn(() => globalMockStore),
   };
 });
 
-// Mock useDashboardPanelData composable 
-vi.mock("@/composables/useDashboardPanel", () => ({
-  default: () => globalMockDashboardPanelData
+// Mock useDashboardPanelData composable
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
+  default: () => globalMockDashboardPanelData,
 }));
 
 // Create test-scoped references
@@ -61,15 +55,15 @@ let mockDashboardPanelData: any;
 
 describe("CustomChartEditor", () => {
   let wrapper: any;
-  const defaultModelValue = `\ // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// The data variable is accessible and holds the response data from the search result, which is formatted as an array.\noption = {  \n \n};
+  const defaultModelValue = ` // To know more about ECharts , \n// visit: https://echarts.apache.org/examples/en/index.html \n// Example: https://echarts.apache.org/examples/en/editor.html?c=line-simple \n// Define your ECharts 'option' here. \n// The data variable is accessible and holds the response data from the search result, which is formatted as an array.\noption = {  \n \n};
   `;
 
   beforeEach(() => {
     vi.clearAllMocks();
     // Reset global mock objects to default state
-    globalMockStore.state = { theme: 'light' };
+    globalMockStore.state = { theme: "light" };
     globalMockDashboardPanelData.dashboardPanelData = { value: {} };
-    
+
     // Create test-scoped references that point to the same objects
     mockStore = globalMockStore;
     mockDashboardPanelData = globalMockDashboardPanelData;
@@ -85,17 +79,17 @@ describe("CustomChartEditor", () => {
     return mount(CustomChartEditor, {
       props: {
         modelValue: defaultModelValue,
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n],
         stubs: {
-          'QueryEditor': true
+          QueryEditor: true,
         },
         mocks: {
-          $t: (key: string) => key
-        }
-      }
+          $t: (key: string) => key,
+        },
+      },
     });
   };
 
@@ -103,36 +97,43 @@ describe("CustomChartEditor", () => {
     it("should render markdown editor container", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('.markdown-editor').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-custom-chart-editor-container"]').exists()).toBe(
+        true,
+      );
     });
 
     it("should render editor container with correct styling", () => {
       wrapper = createWrapper();
 
-      const container = wrapper.find('.markdown-editor');
-      const style = container.element.getAttribute('style');
+      const container = wrapper.find('[data-test="dashboard-custom-chart-editor-container"]');
+      // Inline width/height/overflow are now utilities.
+      const classes = container.classes();
 
-      expect(style).toContain('width: 100%');
-      expect(style).toContain('height: 100%');
-      expect(style).toContain('overflow: hidden');
+      expect(classes).toContain("w-full");
+      expect(classes).toContain("h-full");
+      expect(classes).toContain("overflow-hidden");
     });
 
     it("should render inner container with correct height", () => {
       wrapper = createWrapper();
 
-      const innerContainer = wrapper.find('div').findAll('div').find(el =>
-        el.attributes('style') && el.attributes('style').includes('width: 100%') && el.attributes('style').includes('height: 100%')
-      );
-      expect(innerContainer).toBeDefined();
+      const innerContainer = wrapper.find('[data-test="dashboard-custom-chart-editor-inner"]');
+      expect(innerContainer.exists()).toBe(true);
+      const classes = innerContainer.classes();
+      expect(classes).toContain("w-full");
+      expect(classes).toContain("h-full");
     });
 
     it("should render column container with correct styling", () => {
       wrapper = createWrapper();
 
-      const colContainer = wrapper.findAll('.col').find(el => 
-        el.attributes('style') && el.attributes('style').includes('height: 100%')
-      );
-      expect(colContainer).toBeDefined();
+      const colContainer = wrapper.find('[data-test="dashboard-custom-chart-editor-flex-col"]');
+      expect(colContainer.exists()).toBe(true);
+      // Inline `flex-direction: column; height: 100%` -> flex-col / h-full.
+      const classes = colContainer.classes();
+      expect(classes).toContain("flex");
+      expect(classes).toContain("flex-col");
+      expect(classes).toContain("h-full");
     });
 
     it("should render query editor with correct attributes", () => {
@@ -154,7 +155,7 @@ describe("CustomChartEditor", () => {
     it("should have correct component name", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.$options.name).toBe('CustomChartEditor');
+      expect(wrapper.vm.$options.name).toBe("CustomChartEditor");
     });
 
     it("should register QueryEditor component", () => {
@@ -168,7 +169,7 @@ describe("CustomChartEditor", () => {
     it("should accept modelValue prop with default value", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.props('modelValue')).toBe(defaultModelValue);
+      expect(wrapper.props("modelValue")).toBe(defaultModelValue);
       expect(wrapper.vm.javascriptCodeContent).toBe(defaultModelValue);
     });
 
@@ -176,21 +177,21 @@ describe("CustomChartEditor", () => {
       const customValue = "option = { title: { text: 'Test Chart' } };";
       wrapper = createWrapper({ modelValue: customValue });
 
-      expect(wrapper.props('modelValue')).toBe(customValue);
+      expect(wrapper.props("modelValue")).toBe(customValue);
       expect(wrapper.vm.javascriptCodeContent).toBe(customValue);
     });
 
     it("should handle empty modelValue", () => {
       wrapper = createWrapper({ modelValue: "" });
 
-      expect(wrapper.props('modelValue')).toBe("");
+      expect(wrapper.props("modelValue")).toBe("");
       expect(wrapper.vm.javascriptCodeContent).toBe("");
     });
 
     it("should handle null modelValue", () => {
       wrapper = createWrapper({ modelValue: null });
 
-      expect(wrapper.props('modelValue')).toBe(null);
+      expect(wrapper.props("modelValue")).toBe(null);
       expect(wrapper.vm.javascriptCodeContent).toBe(null);
     });
 
@@ -198,24 +199,24 @@ describe("CustomChartEditor", () => {
       const createWrapperOverride = () => {
         return mount(CustomChartEditor, {
           props: {
-            modelValue: undefined
+            modelValue: undefined,
           },
           global: {
             plugins: [i18n],
             stubs: {
-              'QueryEditor': true
+              QueryEditor: true,
             },
             mocks: {
-              $t: (key: string) => key
-            }
-          }
+              $t: (key: string) => key,
+            },
+          },
         });
       };
 
       wrapper = createWrapperOverride();
-      
+
       // When undefined is passed, Vue uses the default value
-      expect(wrapper.props('modelValue')).toBe(defaultModelValue);
+      expect(wrapper.props("modelValue")).toBe(defaultModelValue);
       expect(wrapper.vm.javascriptCodeContent).toBe(defaultModelValue);
     });
   });
@@ -260,17 +261,17 @@ describe("CustomChartEditor", () => {
       it("should exist and be a function", () => {
         wrapper = createWrapper();
 
-        expect(typeof wrapper.vm.layoutSplitterUpdated).toBe('function');
+        expect(typeof wrapper.vm.layoutSplitterUpdated).toBe("function");
       });
 
       it("should dispatch resize event", () => {
         wrapper = createWrapper();
 
-        const dispatchEventSpy = vi.spyOn(window, 'dispatchEvent');
+        const dispatchEventSpy = vi.spyOn(window, "dispatchEvent");
         wrapper.vm.layoutSplitterUpdated();
 
         expect(dispatchEventSpy).toHaveBeenCalledWith(expect.any(Event));
-        expect(dispatchEventSpy.mock.calls[0][0].type).toBe('resize');
+        expect(dispatchEventSpy.mock.calls[0][0].type).toBe("resize");
 
         dispatchEventSpy.mockRestore();
       });
@@ -280,7 +281,7 @@ describe("CustomChartEditor", () => {
       it("should exist and be a function", () => {
         wrapper = createWrapper();
 
-        expect(typeof wrapper.vm.onEditorValueChange).toBe('function');
+        expect(typeof wrapper.vm.onEditorValueChange).toBe("function");
       });
 
       it("should update javascriptCodeContent", () => {
@@ -298,8 +299,8 @@ describe("CustomChartEditor", () => {
         const newValue = "option = { title: { text: 'New Chart' } };";
         wrapper.vm.onEditorValueChange(newValue);
 
-        expect(wrapper.emitted('update:modelValue')).toBeTruthy();
-        expect(wrapper.emitted('update:modelValue')[0]).toEqual([newValue]);
+        expect(wrapper.emitted("update:modelValue")).toBeTruthy();
+        expect(wrapper.emitted("update:modelValue")[0]).toEqual([newValue]);
       });
 
       it("should handle empty string value", () => {
@@ -308,7 +309,7 @@ describe("CustomChartEditor", () => {
         wrapper.vm.onEditorValueChange("");
 
         expect(wrapper.vm.javascriptCodeContent).toBe("");
-        expect(wrapper.emitted('update:modelValue')[0]).toEqual([""]);
+        expect(wrapper.emitted("update:modelValue")[0]).toEqual([""]);
       });
 
       it("should handle null value", () => {
@@ -317,7 +318,7 @@ describe("CustomChartEditor", () => {
         wrapper.vm.onEditorValueChange(null);
 
         expect(wrapper.vm.javascriptCodeContent).toBe(null);
-        expect(wrapper.emitted('update:modelValue')[0]).toEqual([null]);
+        expect(wrapper.emitted("update:modelValue")[0]).toEqual([null]);
       });
 
       it("should handle undefined value", () => {
@@ -326,7 +327,7 @@ describe("CustomChartEditor", () => {
         wrapper.vm.onEditorValueChange(undefined);
 
         expect(wrapper.vm.javascriptCodeContent).toBe(undefined);
-        expect(wrapper.emitted('update:modelValue')[0]).toEqual([undefined]);
+        expect(wrapper.emitted("update:modelValue")[0]).toEqual([undefined]);
       });
 
       it("should handle complex ECharts option object as string", () => {
@@ -343,14 +344,14 @@ describe("CustomChartEditor", () => {
         wrapper.vm.onEditorValueChange(complexOption);
 
         expect(wrapper.vm.javascriptCodeContent).toBe(complexOption);
-        expect(wrapper.emitted('update:modelValue')[0]).toEqual([complexOption]);
+        expect(wrapper.emitted("update:modelValue")[0]).toEqual([complexOption]);
       });
 
       it("should handle malformed JavaScript gracefully", () => {
         wrapper = createWrapper();
 
         const malformedCode = "option = { invalid: syntax }";
-        
+
         expect(() => {
           wrapper.vm.onEditorValueChange(malformedCode);
         }).not.toThrow();
@@ -361,18 +362,18 @@ describe("CustomChartEditor", () => {
       it("should handle error during processing gracefully", () => {
         wrapper = createWrapper();
 
-        const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-        
+        const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
         // Test with potentially problematic value
         const newValue = "test value";
-        
+
         // The actual component doesn't have try-catch, so this tests normal flow
         expect(() => {
           wrapper.vm.onEditorValueChange(newValue);
         }).not.toThrow();
 
         expect(wrapper.vm.javascriptCodeContent).toBe(newValue);
-        expect(wrapper.emitted('update:modelValue')).toBeTruthy();
+        expect(wrapper.emitted("update:modelValue")).toBeTruthy();
 
         consoleSpy.mockRestore();
       });
@@ -381,17 +382,17 @@ describe("CustomChartEditor", () => {
 
   describe("Store Integration", () => {
     it("should access store theme for light theme", () => {
-      mockStore.state.theme = 'light';
+      mockStore.state.theme = "light";
       wrapper = createWrapper();
 
-      expect(wrapper.vm.store.state.theme).toBe('light');
+      expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
     it("should access store theme for dark theme", () => {
-      mockStore.state.theme = 'dark';
+      mockStore.state.theme = "dark";
       wrapper = createWrapper();
 
-      expect(wrapper.vm.store.state.theme).toBe('dark');
+      expect(wrapper.vm.store.state.theme).toBe("dark");
     });
 
     it("should handle undefined theme", () => {
@@ -411,9 +412,9 @@ describe("CustomChartEditor", () => {
     });
 
     it("should handle different dashboard panel data", () => {
-      const customPanelData = { value: { customProperty: 'test' } };
+      const customPanelData = { value: { customProperty: "test" } };
       mockDashboardPanelData.dashboardPanelData = customPanelData;
-      
+
       wrapper = createWrapper();
 
       expect(wrapper.vm.dashboardPanelData).toBe(customPanelData);
@@ -425,62 +426,63 @@ describe("CustomChartEditor", () => {
       wrapper = createWrapper();
 
       const queryEditor = wrapper.find('[data-test="dashboard-markdown-editor-query-editor"]');
-      expect(queryEditor.attributes('language')).toBe('javascript');
+      expect(queryEditor.attributes("language")).toBe("javascript");
     });
 
     it("should configure QueryEditor with debounce time", () => {
       wrapper = createWrapper();
 
       const queryEditor = wrapper.find('[data-test="dashboard-markdown-editor-query-editor"]');
-      expect(queryEditor.attributes('debouncetime')).toBe('500');
+      expect(queryEditor.attributes("debouncetime")).toBe("500");
     });
 
     it("should configure QueryEditor with correct CSS class", () => {
       wrapper = createWrapper();
 
       const queryEditor = wrapper.find('[data-test="dashboard-markdown-editor-query-editor"]');
-      expect(queryEditor.classes()).toContain('javascript-query-editor');
+      expect(queryEditor.classes()).toContain("javascript-query-editor");
     });
 
-    it("should configure QueryEditor with inline styling", () => {
+    it("should configure QueryEditor with layout utilities", () => {
       wrapper = createWrapper();
 
       const queryEditor = wrapper.find('[data-test="dashboard-markdown-editor-query-editor"]');
-      const style = queryEditor.attributes('style');
+      // Inline `padding-left: 20px; height: 100%` -> ps-5 (1.25rem) / h-full.
+      const classes = queryEditor.classes();
 
-      expect(style).toContain('padding-left: 20px');
-      expect(style).toContain('height: 100%');
+      expect(classes).toContain("ps-5");
+      expect(classes).toContain("h-full");
     });
   });
 
   describe("Dynamic Styling Based on Theme", () => {
     it("should apply light theme background color", () => {
-      mockStore.state.theme = 'light';
+      mockStore.state.theme = "light";
       wrapper = createWrapper();
 
       // Since we're testing the computed style binding, we check the component's reactive data
-      expect(wrapper.vm.store.state.theme).toBe('light');
+      expect(wrapper.vm.store.state.theme).toBe("light");
     });
 
     it("should apply dark theme background color", () => {
-      mockStore.state.theme = 'dark';
+      mockStore.state.theme = "dark";
       wrapper = createWrapper();
 
-      expect(wrapper.vm.store.state.theme).toBe('dark');
+      expect(wrapper.vm.store.state.theme).toBe("dark");
     });
 
     it("should handle theme changes", async () => {
       wrapper = createWrapper();
 
-      mockStore.state.theme = 'dark';
+      mockStore.state.theme = "dark";
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.store.state.theme).toBe('dark');
+      expect(wrapper.vm.store.state.theme).toBe("dark");
 
-      mockStore.state.theme = 'light';
+      mockStore.state.theme = "light";
       await wrapper.vm.$nextTick();
 
-      expect(wrapper.vm.store.state.theme).toBe('light');
+      expect(wrapper.vm.store.state.theme).toBe("light");
     });
   });
 
@@ -489,16 +491,16 @@ describe("CustomChartEditor", () => {
       wrapper = createWrapper();
 
       const newQuery = "option = { tooltip: { trigger: 'axis' } };";
-      const queryEditor = wrapper.findComponent({ name: 'QueryEditor' });
-      
+      const queryEditor = wrapper.findComponent({ name: "QueryEditor" });
+
       if (queryEditor.exists()) {
-        await queryEditor.vm.$emit('update:query', newQuery);
+        await queryEditor.vm.$emit("update:query", newQuery);
         expect(wrapper.vm.javascriptCodeContent).toBe(newQuery);
       } else {
         // Manually trigger the method since component is stubbed
         wrapper.vm.onEditorValueChange(newQuery);
         expect(wrapper.vm.javascriptCodeContent).toBe(newQuery);
-        expect(wrapper.emitted('update:modelValue')).toBeTruthy();
+        expect(wrapper.emitted("update:modelValue")).toBeTruthy();
       }
     });
 
@@ -514,15 +516,15 @@ describe("CustomChartEditor", () => {
       const updates = [
         "option = { title: { text: '1' } };",
         "option = { title: { text: '2' } };",
-        "option = { title: { text: '3' } };"
+        "option = { title: { text: '3' } };",
       ];
 
-      updates.forEach(update => {
+      updates.forEach((update) => {
         wrapper.vm.onEditorValueChange(update);
       });
 
       expect(wrapper.vm.javascriptCodeContent).toBe(updates[2]);
-      expect(wrapper.emitted('update:modelValue')).toHaveLength(3);
+      expect(wrapper.emitted("update:modelValue")).toHaveLength(3);
     });
   });
 
@@ -530,30 +532,26 @@ describe("CustomChartEditor", () => {
     it("should have proper container structure", () => {
       wrapper = createWrapper();
 
-      const outerContainer = wrapper.find('.markdown-editor');
+      const outerContainer = wrapper.find('[data-test="dashboard-custom-chart-editor-container"]');
       expect(outerContainer.exists()).toBe(true);
 
       // Check for inner div with proper styling
-      const innerDivs = wrapper.findAll('div');
-      const hasInnerContainer = innerDivs.some(div => {
-        const style = div.attributes('style');
-        return style && style.includes('width: 100%') && style.includes('height: 100%');
-      });
-      expect(hasInnerContainer).toBe(true);
+      const innerContainer = wrapper.find('[data-test="dashboard-custom-chart-editor-inner"]');
+      expect(innerContainer.exists()).toBe(true);
+      expect(innerContainer.classes()).toContain("w-full");
+      expect(innerContainer.classes()).toContain("h-full");
 
-      // Check for col container
-      const colContainers = wrapper.findAll('.col');
-      const hasColContainer = colContainers.some(col => {
-        const style = col.attributes('style');
-        return style && style.includes('height: 100%');
-      });
-      expect(hasColContainer).toBe(true);
+      // Check for flex-column container (replacement for old .col)
+      const flexColContainer = wrapper.find('[data-test="dashboard-custom-chart-editor-flex-col"]');
+      expect(flexColContainer.exists()).toBe(true);
+      expect(flexColContainer.classes()).toContain("h-full");
+      expect(flexColContainer.classes()).toContain("flex-col");
     });
 
     it("should maintain component hierarchy", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.$options.name).toBe('CustomChartEditor');
+      expect(wrapper.vm.$options.name).toBe("CustomChartEditor");
       expect(wrapper.vm.$options.components.QueryEditor).toBeDefined();
     });
   });
@@ -590,7 +588,7 @@ describe("CustomChartEditor", () => {
           type: 'bar'
         }]
       };`;
-      
+
       wrapper = createWrapper({ modelValue: multilineCode });
 
       expect(wrapper.vm.javascriptCodeContent).toBe(multilineCode);
@@ -647,10 +645,10 @@ describe("CustomChartEditor", () => {
       wrapper.vm.onEditorValueChange(newOption);
 
       expect(wrapper.vm.javascriptCodeContent).toBe(newOption);
-      expect(wrapper.emitted('update:modelValue')).toBeTruthy();
+      expect(wrapper.emitted("update:modelValue")).toBeTruthy();
 
       // Trigger layout update
-      const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+      const dispatchSpy = vi.spyOn(window, "dispatchEvent");
       wrapper.vm.layoutSplitterUpdated();
 
       expect(dispatchSpy).toHaveBeenCalled();
@@ -662,7 +660,7 @@ describe("CustomChartEditor", () => {
 
       const initialState = {
         splitterModel: wrapper.vm.splitterModel,
-        dataToBeRendered: wrapper.vm.dataToBeRendered
+        dataToBeRendered: wrapper.vm.dataToBeRendered,
       };
 
       wrapper.vm.onEditorValueChange("option = { grid: {} };");
@@ -682,7 +680,7 @@ describe("CustomChartEditor", () => {
 
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm.javascriptCodeContent).toBe("option = { title: { text: 'Chart 49' } };");
-      expect(wrapper.emitted('update:modelValue')).toHaveLength(50);
+      expect(wrapper.emitted("update:modelValue")).toHaveLength(50);
     });
   });
 
@@ -690,7 +688,7 @@ describe("CustomChartEditor", () => {
     it("should handle default modelValue correctly", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.props('modelValue')).toBe(defaultModelValue);
+      expect(wrapper.props("modelValue")).toBe(defaultModelValue);
       expect(wrapper.vm.$props.modelValue).toBe(defaultModelValue);
     });
 
@@ -698,7 +696,7 @@ describe("CustomChartEditor", () => {
       const stringValue = "custom code";
       wrapper = createWrapper({ modelValue: stringValue });
 
-      expect(wrapper.props('modelValue')).toBe(stringValue);
+      expect(wrapper.props("modelValue")).toBe(stringValue);
     });
 
     it("should handle prop updates", async () => {
@@ -707,7 +705,7 @@ describe("CustomChartEditor", () => {
       const newValue = "option = { updated: true };";
       await wrapper.setProps({ modelValue: newValue });
 
-      expect(wrapper.props('modelValue')).toBe(newValue);
+      expect(wrapper.props("modelValue")).toBe(newValue);
     });
   });
 });

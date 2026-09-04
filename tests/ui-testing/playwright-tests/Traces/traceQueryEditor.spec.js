@@ -19,15 +19,16 @@ test.describe("Trace Query Editor testcases", () => {
     pm = new PageManager(page);
 
     // Post-authentication stabilization wait
-    await page.waitForLoadState('networkidle');
+    await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
     // Navigate to traces page
     await pm.tracesPage.navigateToTraces();
 
     // Select the default stream as data is ingested for it only
-    if (await pm.tracesPage.isStreamSelectVisible()) {
-      await pm.tracesPage.selectTraceStream('default');
-    }
+    await pm.tracesPage.isStreamSelectVisible()
+    await pm.tracesPage.selectTraceStream('default');
+    await page.waitForTimeout(2000);
+
 
     testLogger.info('Test setup completed for trace query editor');
   });
@@ -162,6 +163,11 @@ test.describe("Trace Query Editor testcases", () => {
       testLogger.info('Clicked on trace with errors');
 
       await page.waitForTimeout(2000);
+
+      // All three checks below read the waterfall span tree, which only renders
+      // on the 'waterfall' tab. The view opens on the flame graph by default and
+      // the last active tab is persisted, so select waterfall explicitly.
+      await pm.tracesPage.openTraceDetailsTab('waterfall');
 
       // Look for ERROR status in the span details using page object
       const errorCellVisible = await pm.tracesPage.isErrorStatusVisible();

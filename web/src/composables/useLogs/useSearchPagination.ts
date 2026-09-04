@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,12 +14,22 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { searchState } from "@/composables/useLogs/searchState";
+import type { TranslateFn } from "@/types/i18n";
 
-export const useSearchPagination = () => {
-  const {
-    searchObj,
-    notificationMsg,
-  } = searchState();
+// Sorting types and interfaces
+interface OrderByField {
+  0: string;
+  1: "asc" | "desc" | "ASC" | "DESC";
+}
+
+type OrderByArray = OrderByField[];
+
+interface RecordObject {
+  [key: string]: any;
+}
+
+export const useSearchPagination = (t: TranslateFn) => {
+  const { searchObj, notificationMsg } = searchState();
 
   const getAggsTotal = () => {
     return (searchObj.data.queryResults.aggs || []).reduce(
@@ -29,12 +39,12 @@ export const useSearchPagination = () => {
   };
 
   const refreshPagination = (regenerateFlag: boolean = false) => {
+    void regenerateFlag;
     try {
       const { rowsPerPage } = searchObj.meta.resultGrid;
       const { currentPage } = searchObj.data.resultGrid;
 
-      if (searchObj.meta.jobId != "")
-        searchObj.meta.resultGrid.rowsPerPage = 100;
+      if (searchObj.meta.jobId != "") searchObj.meta.resultGrid.rowsPerPage = 100;
 
       let total = 0;
       let totalPages = 0;
@@ -61,9 +71,10 @@ export const useSearchPagination = () => {
       }
     } catch (e: any) {
       console.log("Error while refreshing partition pagination", e);
-      notificationMsg.value = "Error while refreshing partition pagination.";
+      notificationMsg.value = t("search.errorWhileRefreshingPartitionPagination");
       return false;
     }
+    return;
   };
 
   const updateResult = async (
@@ -72,49 +83,37 @@ export const useSearchPagination = () => {
     isPagination: boolean,
     appendResult: boolean = false,
   ) => {
-    if (
-      searchObj.meta.refreshInterval > 0 &&
-      window.location.pathname.includes("logs")
-    ) {
+    if (searchObj.meta.refreshInterval > 0 && window.location.pathname.includes("logs")) {
       searchObj.data.queryResults.from = response.content.results.from;
-      searchObj.data.queryResults.scan_size =
-        response.content.results.scan_size;
+      searchObj.data.queryResults.scan_size = response.content.results.scan_size;
       searchObj.data.queryResults.took = response.content.results.took;
       searchObj.data.queryResults.aggs = response.content.results.aggs;
       searchObj.data.queryResults.hits = response.content.results.hits;
     }
 
     if (searchObj.meta.refreshInterval == 0) {
-      if (!queryReq.query.hasOwnProperty("track_total_hits")) {
+      if (!Object.prototype.hasOwnProperty.call(queryReq.query, "track_total_hits")) {
         delete response.content.total;
       }
 
       if (appendResult) {
-        await chunkedAppend(
-          searchObj.data.queryResults.hits,
-          response.content.results.hits,
-        );
+        await chunkedAppend(searchObj.data.queryResults.hits, response.content.results.hits);
 
         searchObj.data.queryResults.total += response.content.results.total;
         searchObj.data.queryResults.took += response.content.results.took;
-        searchObj.data.queryResults.scan_size +=
-          response.content.results.scan_size;
+        searchObj.data.queryResults.scan_size += response.content.results.scan_size;
       } else {
         if (response.content?.streaming_aggs) {
           searchObj.data.queryResults = {
             ...response.content.results,
-            took:
-              (searchObj.data?.queryResults?.took || 0) +
-              response.content.results.took,
+            took: (searchObj.data?.queryResults?.took || 0) + response.content.results.took,
             scan_size:
-              (searchObj.data?.queryResults?.scan_size || 0) +
-              response.content.results.scan_size,
+              (searchObj.data?.queryResults?.scan_size || 0) + response.content.results.scan_size,
           };
         } else if (isPagination) {
           searchObj.data.queryResults.hits = response.content.results.hits;
           searchObj.data.queryResults.from = response.content.results.from;
-          searchObj.data.queryResults.scan_size =
-            response.content.results.scan_size;
+          searchObj.data.queryResults.scan_size = response.content.results.scan_size;
           searchObj.data.queryResults.took = response.content.results.took;
           searchObj.data.queryResults.total = response.content.results.total;
         } else {
@@ -135,20 +134,13 @@ export const useSearchPagination = () => {
     }
   };
 
-  const handlePageCountResponse = (
-    queryReq: any,
-    traceId: string,
-    response: any,
-  ) => {
+  const handlePageCountResponse = (queryReq: any, traceId: string, response: any) => {
     if (searchObj.data.queryResults.aggs == null) {
       searchObj.data.queryResults.aggs = [];
     }
 
     let regeneratePaginationFlag = false;
-    if (
-      response.content.results.hits.length !=
-      searchObj.meta.resultGrid.rowsPerPage
-    ) {
+    if (response.content.results.hits.length != searchObj.meta.resultGrid.rowsPerPage) {
       regeneratePaginationFlag = true;
     }
 
@@ -184,19 +176,13 @@ export const useSearchPagination = () => {
     searchObj.data.queryResults.pageCountTotal = undefined;
   };
 
-  const updatePageCountTotal = (
-    queryReq: any,
-    currentHits: number,
-    totalHits: number,
-  ) => {
+  const updatePageCountTotal = (queryReq: any, currentHits: number, totalHits: number) => {
     try {
       const shouldGetPageCountResult = shouldGetPageCount(queryReq);
 
       if (shouldGetPageCountResult && totalHits === queryReq.query.size) {
         searchObj.data.queryResults.pageCountTotal =
-          searchObj.meta.resultGrid.rowsPerPage *
-            searchObj.data.resultGrid.currentPage +
-          1;
+          searchObj.meta.resultGrid.rowsPerPage * searchObj.data.resultGrid.currentPage + 1;
       } else if (shouldGetPageCountResult && totalHits !== queryReq.query.size) {
         searchObj.data.queryResults.pageCountTotal =
           searchObj.meta.resultGrid.rowsPerPage *
@@ -213,11 +199,10 @@ export const useSearchPagination = () => {
       const shouldGetPageCountResult = shouldGetPageCount(queryReq);
 
       if (shouldGetPageCountResult && totalHits === queryReq.query.size) {
-        searchObj.data.queryResults.hits =
-          searchObj.data.queryResults.hits.slice(
-            0,
-            searchObj.data.queryResults.hits.length - 1,
-          );
+        searchObj.data.queryResults.hits = searchObj.data.queryResults.hits.slice(
+          0,
+          searchObj.data.queryResults.hits.length - 1,
+        );
       }
     } catch (e: any) {
       console.error("Error while trimming page count extra hit", e);
@@ -225,7 +210,6 @@ export const useSearchPagination = () => {
   };
 
   const shouldGetPageCount = (queryReq: any): boolean => {
-    // Simplified logic - in the actual implementation this would be more complex
     if (!queryReq || !queryReq.query) return false;
 
     // Check if it's a simple query that supports page count
@@ -247,6 +231,76 @@ export const useSearchPagination = () => {
     };
   };
 
+  // Convert timestamp to microseconds
+  function getTsValue(tsColumn: string, record: RecordObject): number {
+    const ts = record[tsColumn];
+
+    if (ts === undefined || ts === null) return 0;
+
+    if (typeof ts === "string") {
+      const timestamp = Date.parse(ts);
+      return Number.isFinite(timestamp) ? timestamp * 1000 : 0;
+    }
+
+    if (typeof ts === "number") {
+      if (!Number.isFinite(ts)) return 0;
+
+      // Normalize based on magnitude:
+      // - < 10^11: seconds (multiply by 1,000,000)
+      // - < 10^14: milliseconds (multiply by 1,000)
+      // - >= 10^14: microseconds (use as-is)
+      if (ts < 1e11) {
+        return ts * 1e6; // seconds to microseconds
+      } else if (ts < 1e14) {
+        return ts * 1e3; // milliseconds to microseconds
+      }
+      return ts; // already in microseconds
+    }
+
+    return 0;
+  }
+
+  function sortResponse(
+    responseObj: RecordObject[],
+    tsColumn: string,
+    orderBy: OrderByArray,
+  ): void {
+    if (!Array.isArray(orderBy) || orderBy.length === 0) return;
+
+    responseObj.sort((a: RecordObject, b: RecordObject) => {
+      for (const entry of orderBy) {
+        if (!Array.isArray(entry) || entry.length !== 2) continue;
+        const [field, order] = entry;
+        let cmp = 0;
+
+        if (field === tsColumn) {
+          const aTs = getTsValue(tsColumn, a);
+          const bTs = getTsValue(tsColumn, b);
+          cmp = aTs - bTs;
+        } else {
+          const aVal = a[field] ?? null;
+          const bVal = b[field] ?? null;
+
+          if (typeof aVal === "string" && typeof bVal === "string") {
+            cmp = aVal.localeCompare(bVal);
+          } else if (typeof aVal === "number" && typeof bVal === "number") {
+            cmp = aVal - bVal;
+          } else if (typeof aVal === "string" && typeof bVal === "number") {
+            cmp = -1;
+          } else if (typeof aVal === "number" && typeof bVal === "string") {
+            cmp = 1;
+          } else {
+            cmp = 0;
+          }
+        }
+
+        const finalCmp = order.toLowerCase() === "desc" ? -cmp : cmp;
+        if (finalCmp !== 0) return finalCmp;
+      }
+      return 0;
+    });
+  }
+
   return {
     refreshPagination,
     updateResult,
@@ -259,6 +313,7 @@ export const useSearchPagination = () => {
     shouldGetPageCount,
     getCurrentPageData,
     getAggsTotal,
+    sortResponse,
   };
 };
 

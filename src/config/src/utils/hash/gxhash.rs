@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -36,17 +36,25 @@ pub fn new_hasher() -> impl Hasher {
 
 impl Sum64 for GxHash {
     fn sum64(&mut self, key: &str) -> u64 {
-        #[cfg(feature = "gxhash")]
-        let n = gxhash::gxhash64(key.as_bytes(), 0);
-        #[cfg(not(feature = "gxhash"))]
-        let n = {
-            use std::hash::{DefaultHasher, Hasher};
-            let mut h = DefaultHasher::new();
-            h.write(key.as_bytes());
-            h.finish()
-        };
-        n
+        sum64_bytes(key.as_bytes())
     }
+}
+
+/// Hash arbitrary bytes — same algorithm as [`GxHash::sum64`] but
+/// without forcing a `&str` round-trip. Used by callers that hold raw
+/// `&[u8]` (e.g. SBBF point checks where the value comes from a
+/// tantivy term dictionary and isn't necessarily valid UTF-8).
+pub fn sum64_bytes(bytes: &[u8]) -> u64 {
+    #[cfg(feature = "gxhash")]
+    let n = gxhash::gxhash64(bytes, 0);
+    #[cfg(not(feature = "gxhash"))]
+    let n = {
+        use std::hash::{DefaultHasher, Hasher};
+        let mut h = DefaultHasher::new();
+        h.write(bytes);
+        h.finish()
+    };
+    n
 }
 
 #[cfg(test)]
@@ -91,5 +99,22 @@ mod tests {
         assert_eq!(h.sum64("test1"), 17623087596200270265);
         assert_eq!(h.sum64("test2"), 2079727570557907492);
         assert_eq!(h.sum64("test3"), 3631677894875752354);
+    }
+
+    #[test]
+    fn test_gxhash_new_hasher_produces_nonzero_hash() {
+        use std::hash::Hasher;
+        let mut hasher = new_hasher();
+        hasher.write(b"hello");
+        let hash = hasher.finish();
+        assert_ne!(hash, 0);
+    }
+
+    #[test]
+    fn test_gxhash_empty_string_deterministic() {
+        let mut h = new();
+        let hash1 = h.sum64("");
+        let hash2 = h.sum64("");
+        assert_eq!(hash1, hash2);
     }
 }

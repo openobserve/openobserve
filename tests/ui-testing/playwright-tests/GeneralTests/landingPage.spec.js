@@ -15,6 +15,7 @@ const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require('../../fixtures/log.json');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 test.describe("Landing Page Test Cases", () => {
   test.describe.configure({ mode: 'serial' });
@@ -66,7 +67,7 @@ test.describe("Landing Page Test Cases", () => {
    */
   async function setupLogsState(page, pm) {
     // Navigate to logs page
-    const logsUrl = `${logData.logsUrl}?org_identifier=${process.env["ORGNAME"]}`;
+    const logsUrl = `${logData.logsUrl}?org_identifier=${getOrgIdentifier()}`;
     await page.goto(logsUrl);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
@@ -89,8 +90,9 @@ test.describe("Landing Page Test Cases", () => {
       testLogger.warn('Could not run query', { error: error.message });
     }
 
-    // Wait for results
-    await page.waitForTimeout(2000);
+    // Wait for the logs results table to be attached as a positive signal that
+    // the query finished rendering (race against the "no results" state).
+    await pm.homePage.getLogsResultsTable().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     return await captureLogsState(pm);
   }
@@ -98,12 +100,25 @@ test.describe("Landing Page Test Cases", () => {
   /**
    * Returns to logs page via sidebar with retry logic
    */
+  // Fatal, non-recoverable page/context death (worker browser crash, e.g. OOM).
+  // Retrying navigation against a dead target only masks the real failure and
+  // burns three timeout cycles, so we detect it and fail fast.
+  function isFatalClosedError(page, error) {
+    return page.isClosed()
+      || /has been closed|Target (page|frame)?.*closed|Target closed/i.test(error.message || '');
+  }
+
   async function returnToLogs(page, pm) {
     const maxRetries = 3;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      // Fail fast: never retry against a dead page/context. A closed page means
+      // the worker's browser crashed — surface it immediately instead of looping.
+      if (page.isClosed()) {
+        throw new Error('Cannot return to logs page: page/context already closed (browser likely crashed).');
+      }
       try {
-        // Wait for sidebar to be interactive
-        await page.waitForTimeout(500);
+        // Wait for the sidebar logs menu to be visible/interactive before clicking.
+        await pm.homePage.getLogsMenuItem().waitFor({ state: 'visible', timeout: 5000 });
 
         // Click on logs menu using page object method
         await pm.homePage.clickLogsMenu();
@@ -114,17 +129,23 @@ test.describe("Landing Page Test Cases", () => {
         await page.waitForURL(/logs/, { timeout: 20000 });
 
         // Wait for logs page indicator
-        await pm.homePage.logsPageIndicator.waitFor({ state: 'visible', timeout: 15000 }).catch(() => {});
-        await page.waitForTimeout(1000);
+        await pm.homePage.logsPageIndicator.waitFor({ state: 'visible', timeout: 15000 });
 
         testLogger.info(`Successfully returned to logs page on attempt ${attempt}`);
         return; // Success, exit function
       } catch (error) {
+        // A closed page/context is fatal and non-recoverable — surface it now
+        // rather than retrying (and eventually reporting a misleading
+        // "Failed after 3 attempts" that hides the real crash).
+        if (isFatalClosedError(page, error)) {
+          throw new Error(`Return to logs aborted: page/context closed (browser crashed): ${error.message}`);
+        }
         testLogger.warn(`Return to logs attempt ${attempt} failed`, { error: error.message });
         if (attempt === maxRetries) {
           throw new Error(`Failed to return to logs page after ${maxRetries} attempts`);
         }
-        await page.waitForTimeout(2000); // Longer wait before retry
+        // Brief deterministic wait keyed on the sidebar logs menu re-appearing.
+        await pm.homePage.getLogsMenuItem().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
       }
     }
   }
@@ -244,8 +265,8 @@ test.describe("Landing Page Test Cases", () => {
       // Return to logs (includes URL verification)
       await returnToLogs(page, pm);
 
-      // Extra wait to ensure page is stable
-      await page.waitForTimeout(500);
+      // Extra deterministic wait keyed on the logs page indicator being stable.
+      await pm.homePage.logsPageIndicator.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
       // Verify state preservation
       const verification = await verifyStatePreserved(pm, initialState);
@@ -302,14 +323,14 @@ test.describe("Landing Page Test Cases", () => {
         }
       },
       {
-        name: 'Settings - Alert Destinations',
+        name: 'Reliability - Notification Destinations',
         navigate: async () => {
           await pm.homePage.navigateToAlertDestinations();
         },
-        urlPattern: /alert_destinations/,
+        urlPattern: /alert-destinations/,
         uiChecks: async () => {
           await pm.homePage.validateSettingsAlertDestinationsPageElements();
-          testLogger.info('Settings - Alert Destinations: Validated add destination button');
+          testLogger.info('Reliability - Notification Destinations: Validated add destination button');
         }
       },
       {
@@ -329,14 +350,14 @@ test.describe("Landing Page Test Cases", () => {
         skipIfNotVisible: true
       },
       {
-        name: 'Settings - Templates',
+        name: 'Reliability - Templates',
         navigate: async () => {
           await pm.homePage.navigateToTemplates();
         },
-        urlPattern: /templates/,
+        urlPattern: /alert-templates/,
         uiChecks: async () => {
           await pm.homePage.validateSettingsTemplatesPageElements();
-          testLogger.info('Settings - Templates: Validated add template button');
+          testLogger.info('Reliability - Templates: Validated add template button');
         }
       },
       {
@@ -398,8 +419,8 @@ test.describe("Landing Page Test Cases", () => {
       // Return to logs (includes URL verification)
       await returnToLogs(page, pm);
 
-      // Extra wait to ensure page is stable
-      await page.waitForTimeout(500);
+      // Extra deterministic wait keyed on the logs page indicator being stable.
+      await pm.homePage.logsPageIndicator.waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
       // Verify state preservation
       const verification = await verifyStatePreserved(pm, initialState);
@@ -423,7 +444,7 @@ test.describe("Landing Page Test Cases", () => {
     pm = new PageManager(page);
 
     // Navigate to home page
-    const homeUrl = `/web/?org_identifier=${process.env["ORGNAME"]}`;
+    const homeUrl = `/web/?org_identifier=${getOrgIdentifier()}`;
     await page.goto(homeUrl);
     await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
 
@@ -468,7 +489,7 @@ test.describe("Landing Page Test Cases", () => {
     await pm.homePage.openProfileMenu();
     await expect(pm.homePage.logoutButton).toBeVisible();
     await expect(pm.homePage.themeManager).toBeVisible();
-    await page.keyboard.press('Escape');
+    await pm.homePage.pressEscape();
     testLogger.info('Profile menu verified');
 
     // ==========================================
@@ -478,18 +499,21 @@ test.describe("Landing Page Test Cases", () => {
 
     await pm.homePage.openOrgSelector();
     await expect(pm.homePage.orgMenuList).toBeVisible();
-    await expect(pm.homePage.orgSearchInput).toBeVisible();
+    // Visibility lives on the OInput wrapper; the inner native input itself isn't
+    // a visible element on its own (it's wrapped in a styled div).
+    await expect(pm.homePage.orgSearchInputWrapper).toBeVisible();
 
-    // Test search
+    // Test search — fill the input, then wait deterministically for the first
+    // matching org row to appear in the menu (no fixed delay).
     await pm.homePage.orgSearchInput.fill('default');
-    await page.waitForTimeout(1000);
+    await pm.homePage.orgMenuItemLabel.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
 
     const firstResult = pm.homePage.orgMenuItemLabel.first();
     if (await firstResult.isVisible()) {
       const text = await firstResult.textContent();
       expect(text.toLowerCase()).toContain('default');
     }
-    await page.keyboard.press('Escape');
+    await pm.homePage.pressEscape();
     testLogger.info('Organization selector verified');
 
     // ==========================================

@@ -3,8 +3,13 @@ on:
     tags:
       - "v*.*.*"
 name: Release
+
+# Default for every job; the `release` job widens this for itself below.
+permissions:
+  contents: read
+
 env:
-  RUST_TOOLCHAIN: nightly-2025-11-11
+  RUST_TOOLCHAIN: nightly-2026-05-20
 jobs:
   build:
     name: Build binary
@@ -12,37 +17,37 @@ jobs:
       matrix:
         include:
           - arch: x86_64-unknown-linux-gnu
-            os: ubicloud-standard-8
+            os: ubicloud-standard-16
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64
             file_ext: .tar.gz
           - arch: x86_64-unknown-linux-gnu
-            os: ubicloud-standard-8
+            os: ubicloud-standard-16
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64-simd
             file_ext: .tar.gz
           - arch: x86_64-unknown-linux-musl
-            os: ubicloud-standard-8
+            os: ubicloud-standard-16
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-amd64-musl
             file_ext: .tar.gz
-          # - arch: aarch64-unknown-linux-musl
-          #   os: ubicloud-standard-8
-          #   features: "--features mimalloc"
-          #   file_name: openobserve-${{ github.ref_name }}-linux-arm64-musl
-          #   file_ext: .tar.gz
+          - arch: aarch64-unknown-linux-musl
+            os: ubicloud-standard-16
+            features: "--features mimalloc"
+            file_name: openobserve-${{ github.ref_name }}-linux-arm64-musl
+            file_ext: .tar.gz
           - arch: aarch64-unknown-linux-gnu
             os: ubicloud-standard-16-arm
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-linux-arm64
             file_ext: .tar.gz
           - arch: x86_64-apple-darwin
-            os: macos-latest
+            os: macos-latest-xlarge
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-darwin-amd64
             file_ext: .tar.gz
           - arch: aarch64-apple-darwin
-            os: macos-latest
+            os: macos-latest-xlarge
             features: "--features mimalloc"
             file_name: openobserve-${{ github.ref_name }}-darwin-arm64
             file_ext: .tar.gz
@@ -58,10 +63,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Install Node
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@v7
         with:
-          node-version: 22
+          node-version: 24
           cache: "npm"
           cache-dependency-path: web/package-lock.json
       - name: Build UI
@@ -69,11 +75,11 @@ jobs:
           NODE_OPTIONS: "--max-old-space-size=8192"
         run: |
           cd web/
-          npm install
+          npm ci
           npm run build
 
       - name: Install Protoc for linux
-        if: contains(matrix.arch, 'x86_64-unknown-linux')
+        if: contains(matrix.arch, 'x86_64-unknown-linux') || contains(matrix.arch, 'linux-musl')
         run: | # Make sure the protoc is >= 3.15
           wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-x86_64.zip
           unzip protoc-21.12-linux-x86_64.zip -d protoc
@@ -81,7 +87,7 @@ jobs:
           sudo cp -r protoc/include/google /usr/local/include/
 
       - name: Install Protoc for linux ARM
-        if: contains(matrix.arch, 'aarch64-unknown-linux')
+        if: contains(matrix.arch, 'aarch64-unknown-linux') && contains(matrix.arch, 'linux-musl') == false
         run: | # Make sure the protoc is >= 3.15
           wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protoc-21.12-linux-aarch_64.zip
           unzip protoc-21.12-linux-aarch_64.zip -d protoc
@@ -102,18 +108,11 @@ jobs:
         run: |
           brew install protobuf coreutils boost
 
-      - name: Install dependencies for linux-gnu
+      - name: Install dependencies for linux
         if: contains(matrix.arch, 'linux-gnu')
         run: |
           sudo apt-get -y update
-          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu
-
-      - name: Install dependencies for linux-musl
-        if: contains(matrix.arch, 'linux-musl')
-        run: |
-          sudo apt-get -y update
-          sudo apt-get -y install libssl-dev pkg-config g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
-          sudo ln -s "/usr/bin/g++" "/usr/bin/musl-g++"
+          sudo apt-get -y install libssl-dev pkg-config gcc g++ g++-aarch64-linux-gnu gcc-aarch64-linux-gnu musl-dev musl-tools
 
       - name: Install rust toolchain
         uses: dtolnay/rust-toolchain@master
@@ -125,6 +124,13 @@ jobs:
         with:
           cache-on-failure: true
           prefix-key: release-${{ matrix.arch }}
+          # Release target directories are multi-GB and have low cross-tag
+          # reuse. Keep Cargo registry/git inputs without crowding PR caches.
+          cache-targets: false
+
+      - name: Install cross-rs
+        if: contains(matrix.arch, 'linux-musl')
+        run: RUSTFLAGS="" cargo install cross --git https://github.com/cross-rs/cross --force
 
       - name: Output package versions
         run: protoc --version ; cargo version ; rustc --version ; gcc --version ; g++ --version
@@ -133,8 +139,14 @@ jobs:
         run: rustc -C target-cpu=native --print cfg
 
       - name: Run cargo build (standard)
-        if: contains(matrix.file_name, '-simd') == false
+        if: contains(matrix.file_name, '-simd') == false && contains(matrix.arch, 'linux-musl') == false
         run: cargo build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}
+
+      - name: Run cargo build (musl)
+        if: contains(matrix.arch, 'linux-musl')
+        env:
+          CROSS_CONFIG: Cross.oss.toml
+        run: cross build ${{ matrix.features }} --profile release-prod --target ${{ matrix.arch }}
 
       - name: Run cargo build (SIMD)
         if: contains(matrix.file_name, '-simd')
@@ -171,7 +183,7 @@ jobs:
   release:
     name: Release artifacts
     needs: [build]
-    runs-on: repo-openobserve-standard-4
+    runs-on: eks-openobserve-standard-4
     permissions:
       id-token: write
       contents: write
@@ -220,7 +232,7 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
   
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           name: "Release ${{ github.ref_name }}"
@@ -228,7 +240,7 @@ jobs:
           body: ${{ steps.generate-body.outputs.body }}
 
       - name: Send release notification to Strapi
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -284,4 +296,3 @@ jobs:
         env:
           STRAPI_WEBHOOK_URL: ${{ secrets.STRAPI_WEBHOOK_URL }}
           STRAPI_API_TOKEN: ${{ secrets.STRAPI_API_TOKEN }}
-  

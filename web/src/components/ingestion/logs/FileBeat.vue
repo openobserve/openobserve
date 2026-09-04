@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,17 +15,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="q-pa-sm">
-    <CopyContent class="copy-content-container-cls" :content="content" />
-  </div>
+  <IngestionContent>
+    <CopyContent class="copy-content-container-cls" :content="raw(content)" />
+  </IngestionContent>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, type Ref } from "vue";
+import { raw } from "@/types/i18n";
+import { defineComponent, ref } from "vue";
 import config from "../../../aws-exports";
 import { useStore } from "vuex";
 import { getEndPoint, getImageURL, getIngestionURL } from "../../../utils/zincutils";
 import CopyContent from "@/components/CopyContent.vue";
+import IngestionContent from "@/components/ingestion/IngestionContent.vue";
 export default defineComponent({
   name: "FileBeat",
   props: {
@@ -36,7 +38,7 @@ export default defineComponent({
       type: String,
     },
   },
-  components: { CopyContent },
+  components: { CopyContent, IngestionContent },
   setup() {
     const store = useStore();
     const endpoint: any = ref({
@@ -46,7 +48,7 @@ export default defineComponent({
       protocol: "",
       tls: "",
     });
-    
+
     const ingestionURL = getIngestionURL();
     endpoint.value = getEndPoint(ingestionURL);
     const content = `setup.ilm.enabled: false
@@ -66,6 +68,7 @@ output.elasticsearch:
   username: "[EMAIL]"
   password: "[PASSCODE]"`;
     return {
+      raw,
       store,
       config,
       endpoint,

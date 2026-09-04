@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -39,35 +39,19 @@ impl MigrationTrait for Migration {
 
 // Add the is_local_region column to the enrichment_table_urls table.
 async fn add_is_local_region_column(manager: &SchemaManager<'_>) -> Result<(), DbErr> {
-    if matches!(manager.get_database_backend(), sea_orm::DbBackend::MySql) {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(EnrichmentTableUrls::Table)
-                    .add_column(
-                        ColumnDef::new(EnrichmentTableUrls::IsLocalRegion)
-                            .boolean()
-                            .not_null()
-                            .default(true),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-    } else {
-        manager
-            .alter_table(
-                Table::alter()
-                    .table(EnrichmentTableUrls::Table)
-                    .add_column_if_not_exists(
-                        ColumnDef::new(EnrichmentTableUrls::IsLocalRegion)
-                            .boolean()
-                            .not_null()
-                            .default(true),
-                    )
-                    .to_owned(),
-            )
-            .await?;
-    }
+    manager
+        .alter_table(
+            Table::alter()
+                .table(EnrichmentTableUrls::Table)
+                .add_column_if_not_exists(
+                    ColumnDef::new(EnrichmentTableUrls::IsLocalRegion)
+                        .boolean()
+                        .not_null()
+                        .default(true),
+                )
+                .to_owned(),
+        )
+        .await?;
 
     Ok(())
 }
@@ -77,4 +61,19 @@ async fn add_is_local_region_column(manager: &SchemaManager<'_>) -> Result<(), D
 enum EnrichmentTableUrls {
     Table,
     IsLocalRegion,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20251226_000001_add_enrichment_table_urls_is_local_region"
+        );
+    }
 }

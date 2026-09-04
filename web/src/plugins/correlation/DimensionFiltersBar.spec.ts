@@ -16,7 +16,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { mount } from "@vue/test-utils";
 import { createI18n } from "vue-i18n";
-import { Quasar, QSelect, QBtn, QTooltip } from "quasar";
 import DimensionFiltersBar from "./DimensionFiltersBar.vue";
 import store from "@/test/unit/helpers/store";
 import { nextTick } from "vue";
@@ -55,6 +54,25 @@ describe("DimensionFiltersBar.vue", () => {
     showApplyButton: true,
   };
 
+  // Stub O2 components so tests don't depend on full O2 lib internals
+  const OSelectStub = {
+    name: "OSelect",
+    props: ["modelValue", "options", "labelKey", "valueKey"],
+    emits: ["update:modelValue"],
+    template: `<select :data-test="$attrs['data-test']" :value="modelValue" @change="$emit('update:modelValue', $event.target.value)"><option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option></select>`,
+  };
+  const OTooltipStub = {
+    name: "OTooltip",
+    props: ["content", "side", "maxWidth"],
+    template: `<div data-test-stub="o-tooltip" :title="content"></div>`,
+  };
+  const OButtonStub = {
+    name: "OButton",
+    props: ["variant", "size", "disabled"],
+    emits: ["click"],
+    template: `<button :data-test="$attrs['data-test']" :disabled="disabled || null" @click="$emit('click')"><slot /></button>`,
+  };
+
   const createWrapper = (props = {}) => {
     return mount(DimensionFiltersBar, {
       props: {
@@ -62,20 +80,12 @@ describe("DimensionFiltersBar.vue", () => {
         ...props,
       },
       global: {
-        plugins: [
-          [
-            Quasar,
-            {
-              components: {
-                QSelect,
-                QBtn,
-                QTooltip,
-              },
-            },
-          ],
-          i18n,
-          store,
-        ],
+        plugins: [i18n, store],
+        stubs: {
+          OSelect: OSelectStub,
+          OTooltip: OTooltipStub,
+          OButton: OButtonStub,
+        },
       },
     });
   };
@@ -154,13 +164,13 @@ describe("DimensionFiltersBar.vue", () => {
       const html = wrapper.html();
 
       // Check if opacity classes are applied
-      expect(html).toContain("tw:opacity-60");
-      expect(html).toContain("tw:opacity-100");
+      expect(html).toContain("opacity-60");
+      expect(html).toContain("opacity-100");
     });
 
     it("should show tooltip for unstable dimensions", () => {
       wrapper = createWrapper();
-      const tooltips = wrapper.findAllComponents(QTooltip);
+      const tooltips = wrapper.findAll('[data-test-stub="o-tooltip"]');
       expect(tooltips.length).toBeGreaterThan(0);
     });
   });
@@ -180,16 +190,18 @@ describe("DimensionFiltersBar.vue", () => {
 
     it("should disable apply button when no pending changes", () => {
       wrapper = createWrapper({ hasPendingChanges: false });
-      const applyBtn = wrapper.findComponent(QBtn);
-      // Check the Quasar button component's disable prop directly
-      expect(applyBtn.props("disable")).toBe(true);
+      // OButton uses the native HTML disabled attribute (not a disable prop)
+      const applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
+      expect(applyBtn.exists()).toBe(true);
+      expect(applyBtn.attributes("disabled")).toBeDefined();
     });
 
     it("should enable apply button when there are pending changes", () => {
       wrapper = createWrapper({ hasPendingChanges: true });
-      const applyBtn = wrapper.findComponent(QBtn);
-      // When enabled, the disable prop should be false
-      expect(applyBtn.props("disable")).toBe(false);
+      // OButton: when enabled, native disabled attribute should be absent
+      const applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
+      expect(applyBtn.exists()).toBe(true);
+      expect(applyBtn.attributes("disabled")).toBeUndefined();
     });
 
     it("should emit apply event when apply button is clicked", async () => {
@@ -253,9 +265,7 @@ describe("DimensionFiltersBar.vue", () => {
 
     it("should compute unstableDimensionTooltipComputed with default", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.unstableDimensionTooltipComputed).toBe(
-        "This dimension is unstable"
-      );
+      expect(wrapper.vm.unstableDimensionTooltipComputed).toBe("This dimension is unstable");
     });
   });
 
@@ -284,19 +294,19 @@ describe("DimensionFiltersBar.vue", () => {
   describe("Styling and Layout", () => {
     it("should have correct container classes", () => {
       wrapper = createWrapper();
-      const container = wrapper.find(".tw\\:py-2");
+      const container = wrapper.find(".py-2");
       expect(container.exists()).toBe(true);
     });
 
     it("should use flex layout for dimensions", () => {
       wrapper = createWrapper();
-      const flexContainer = wrapper.find(".tw\\:flex");
+      const flexContainer = wrapper.find(".flex");
       expect(flexContainer.exists()).toBe(true);
     });
 
     it("should have proper spacing between elements", () => {
       wrapper = createWrapper();
-      const gapContainer = wrapper.find(".tw\\:gap-3");
+      const gapContainer = wrapper.find(".gap-3");
       expect(gapContainer.exists()).toBe(true);
     });
   });
@@ -342,15 +352,17 @@ describe("DimensionFiltersBar.vue", () => {
 
     it("should react to hasPendingChanges prop changes", async () => {
       wrapper = createWrapper({ hasPendingChanges: false });
-      let applyBtn = wrapper.findComponent(QBtn);
-      expect(applyBtn.props("disable")).toBe(true);
+      // OButton: use native disabled attribute check
+      let applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
+      expect(applyBtn.exists()).toBe(true);
+      expect(applyBtn.attributes("disabled")).toBeDefined();
 
       await wrapper.setProps({ hasPendingChanges: true });
       await nextTick();
 
       // Re-find the button after prop change
-      applyBtn = wrapper.findComponent(QBtn);
-      expect(applyBtn.props("disable")).toBe(false);
+      applyBtn = wrapper.find('[data-test="apply-dimension-filters"]');
+      expect(applyBtn.attributes("disabled")).toBeUndefined();
     });
   });
 });

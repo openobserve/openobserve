@@ -1,0 +1,574 @@
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
+
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock},
+};
+
+use infra::{
+    coordinator::get_coordinator,
+    db::Event,
+    table::workflows::{Workflow, WorkflowAssociation, WorkflowRunErrors},
+};
+use serde::{Deserialize, Serialize};
+use tokio::sync::RwLock;
+
+#[derive(Serialize, Deserialize)]
+pub enum AssociationDeleteEvent {
+    Workflow {
+        org_id: String,
+        workflow_id: String,
+    },
+    Entity {
+        org_id: String,
+        entity_id: String,
+    },
+    Trigger {
+        org_id: String,
+        trigger: String,
+    },
+    Specific {
+        org_id: String,
+        entity_id: String,
+        workflow_id: String,
+    },
+    TriggerWorkflow {
+        org_id: String,
+        trigger: String,
+        workflow_id: String,
+    },
+}
+
+#[derive(Serialize, Deserialize, Debug, Default, PartialEq, Eq)]
+pub enum WorkflowTriggerType {
+    #[default]
+    AlertFired,
+    IncidentEvent,
+    Webhook,
+    Manual,
+    Test,
+    Retry,
+    // A trigger type written by a newer node. Decoding to a real variant instead would
+    // relabel it as that trigger, and run history is searched across regions.
+    Unknown,
+}
+
+impl From<&str> for WorkflowTriggerType {
+    fn from(value: &str) -> Self {
+        match value {
+            "AlertFired" => Self::AlertFired,
+            "IncidentEvent" => Self::IncidentEvent,
+            "Webhook" => Self::Webhook,
+            "Manual" => Self::Manual,
+            "Test" => Self::Test,
+            "Retry" => Self::Retry,
+            _ => Self::Unknown,
+        }
+    }
+}
+
+impl std::fmt::Display for WorkflowTriggerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::AlertFired => write!(f, "AlertFired"),
+            Self::IncidentEvent => write!(f, "IncidentEvent"),
+            Self::Webhook => write!(f, "Webhook"),
+            Self::Manual => write!(f, "Manual"),
+            Self::Test => write!(f, "Test"),
+            Self::Retry => write!(f, "Retry"),
+            Self::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
+pub const WORKFLOWS_PREFIX: &str = "/workflows/";
+
+static CACHE: LazyLock<RwLock<HashMap<String, Workflow>>> =
+    LazyLock::new(|| RwLock::new(HashMap::new()));
+
+pub async fn get_workflow(
+    org_id: &str,
+    workflow_id: &str,
+) -> Result<Option<Workflow>, anyhow::Error> {
+    let lock = CACHE.read().await;
+    if let Some(workflow) = lock.get(workflow_id)
+        && workflow.org_id == org_id
+    {
+        return Ok(Some(workflow.clone()));
+    }
+    drop(lock);
+
+    let workflow = infra::table::workflows::get_by_org_wid(org_id, workflow_id).await?;
+    if let Some(workflow) = workflow.as_ref() {
+        CACHE
+            .write()
+            .await
+            .insert(workflow_id.to_string(), workflow.clone());
+    }
+    Ok(workflow)
+}
+
+pub async fn get_draft(org_id: &str, id: &str) -> Result<Option<Workflow>, anyhow::Error> {
+    let draft = infra::table::workflows::get_draft_by_org_draft_id(org_id, id).await?;
+    Ok(draft)
+}
+
+pub async fn save_workflow_record(workflow: Workflow) -> Result<(), anyhow::Error> {
+    infra::table::workflows::save_workflow(workflow).await?;
+    Ok(())
+}
+
+pub async fn save_draft_record(workflow: Workflow) -> Result<(), anyhow::Error> {
+    infra::table::workflows::save_draft(workflow).await?;
+    Ok(())
+}
+
+pub async fn update_workflow_record(workflow: Workflow) -> Result<(), anyhow::Error> {
+    infra::table::workflows::update_workflow(workflow).await?;
+    Ok(())
+}
+
+pub async fn update_draft_record(workflow: Workflow) -> Result<(), anyhow::Error> {
+    infra::table::workflows::update_draft(workflow).await?;
+    Ok(())
+}
+
+pub async fn promote_draft(org_id: &str, workflow: Workflow) -> Result<(), anyhow::Error> {
+    infra::table::workflows::promote_draft_to_workflow(org_id, workflow).await?;
+    Ok(())
+}
+
+pub async fn delete_workflow_record(id: &str) -> Result<(), anyhow::Error> {
+    infra::table::workflows::delete_workflow(id).await?;
+    Ok(())
+}
+
+pub async fn delete_draft_record(id: &str) -> Result<(), anyhow::Error> {
+    infra::table::workflows::delete_draft(id).await?;
+    Ok(())
+}
+
+pub async fn notify_workflow_upsert(workflow: &Workflow) -> Result<(), anyhow::Error> {
+    get_coordinator()
+        .await
+        .put(
+            WORKFLOWS_PREFIX,
+            serde_json::to_vec(workflow)?.into(),
+            true,
+            None,
+        )
+        .await?;
+
+    let config = o2_enterprise::enterprise::common::config::get_config();
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::add_workflow(workflow.clone()).await
+        {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow upsert notification to super cluster queue for {}/{}",
+                    workflow.org_id,
+                    workflow.id
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow upsert notification to super cluster queue for {}/{} : {e}",
+                    workflow.org_id,
+                    workflow.id
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn notify_workflow_delete(id: &str) -> Result<(), anyhow::Error> {
+    get_coordinator()
+        .await
+        .delete(&format!("{WORKFLOWS_PREFIX}{id}"), false, true, None)
+        .await?;
+
+    let config = o2_enterprise::enterprise::common::config::get_config();
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::delete_workflow(id).await {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow delete notification to super cluster queue for {id}"
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow delete notification to super cluster queue for {id} : {e}"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn notify_draft_upsert(workflow: &Workflow) -> Result<(), anyhow::Error> {
+    let config = o2_enterprise::enterprise::common::config::get_config();
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::add_workflow_draft(workflow.clone())
+            .await
+        {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow draft upsert notification to super cluster queue for {}/{}",
+                    workflow.org_id,
+                    workflow.id
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow draft upsert notification to super cluster queue for {}/{} : {e}",
+                    workflow.org_id,
+                    workflow.id
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn notify_draft_delete(id: &str) -> Result<(), anyhow::Error> {
+    let config = o2_enterprise::enterprise::common::config::get_config();
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::delete_workflow_draft(id).await {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow draft delete notification to super cluster queue for {id}"
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow draft delete notification to super cluster queue for {id} : {e}"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn save_workflow_errors(mut errors: WorkflowRunErrors) -> Result<(), anyhow::Error> {
+    infra::table::workflows::save_workflow_errors(errors.clone()).await?;
+
+    let org_id = errors.org_id.clone();
+    let wid = errors.workflow_id.clone();
+    let run_id = errors.run_id.clone();
+    // we reset the input data here so we don't need to sent it via nats
+    errors.input_data = None;
+
+    let config = o2_enterprise::enterprise::common::config::get_config();
+    if config.super_cluster.enabled {
+        match o2_enterprise::enterprise::super_cluster::queue::add_workflow_errors(errors).await {
+            Ok(_) => {
+                log::info!(
+                    "successfully sent workflow errors add notification to super cluster queue for {org_id}/{wid} : run {run_id}",
+                );
+            }
+            Err(e) => {
+                log::error!(
+                    "error in sending workflow errors add notification to super cluster queue for {org_id}/{wid} : run {run_id} : {e}",
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn update_error_input_file_cluster_data(
+    errors: WorkflowRunErrors,
+) -> Result<(), anyhow::Error> {
+    infra::table::workflows::update_error_input_file_cluster_data(errors).await?;
+    Ok(())
+}
+
+pub async fn delete_errors_older_than(limit_time: i64) -> Result<usize, anyhow::Error> {
+    let entries = infra::table::workflows::delete_all_errors_older_than(limit_time).await?;
+    Ok(entries.len())
+}
+
+pub async fn delete_runs_older_than(limit_time: i64) -> Result<usize, anyhow::Error> {
+    let entries = infra::table::workflows::delete_all_runs_older_than(limit_time).await?;
+    Ok(entries.len())
+}
+
+pub async fn get_workflow_associations(
+    org_id: &str,
+    workflow_id: &str,
+) -> Result<Vec<WorkflowAssociation>, anyhow::Error> {
+    infra::table::workflows::get_all_associations_for_workflow(org_id, workflow_id).await
+}
+
+pub async fn associate_workflow(
+    org_id: &str,
+    workflow_id: &str,
+    entity_id: &str,
+    entity_type: String,
+    trigger_type: String,
+) -> Result<(), anyhow::Error> {
+    let assoc = WorkflowAssociation {
+        id: 0,
+        org_id: org_id.to_string(),
+        entity_id: entity_id.to_string(),
+        entity_type,
+        workflow_id: workflow_id.to_string(),
+        trigger_type,
+        created_at: chrono::Utc::now().timestamp_micros(),
+    };
+    infra::table::workflows::add_workflow_association(assoc.clone()).await?;
+    #[cfg(feature = "enterprise")]
+    {
+        let config = o2_enterprise::enterprise::common::config::get_config();
+        if config.super_cluster.enabled {
+            match o2_enterprise::enterprise::super_cluster::queue::send_workflow_association(
+                serde_json::to_string(&assoc)?,
+            )
+            .await
+            {
+                Ok(_) => {
+                    log::info!(
+                        "successfully sent workflow association notification to super cluster queue for org: {} type {} entity_id: {} workflow_id: {}",
+                        assoc.org_id,
+                        assoc.trigger_type,
+                        assoc.entity_id,
+                        assoc.workflow_id
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "error in sending workflow association notification to super cluster queue for org: {} type {} entity_id: {} workflow_id: {} : {e}",
+                        assoc.org_id,
+                        assoc.trigger_type,
+                        assoc.entity_id,
+                        assoc.workflow_id
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn delete_workflow_association(
+    event: AssociationDeleteEvent,
+) -> Result<(), anyhow::Error> {
+    let org: &str;
+    let mut entity = "";
+    let mut trigger_type = "";
+    let mut workflow = "";
+    match &event {
+        AssociationDeleteEvent::Entity { org_id, entity_id } => {
+            org = org_id;
+            entity = entity_id;
+            infra::table::workflows::delete_association_by_entity(org_id, entity_id).await?;
+        }
+        AssociationDeleteEvent::Workflow {
+            org_id,
+            workflow_id,
+        } => {
+            org = org_id;
+            workflow = workflow_id;
+            infra::table::workflows::delete_association_by_workflow(org_id, workflow_id).await?;
+        }
+        AssociationDeleteEvent::Trigger { org_id, trigger } => {
+            org = org_id;
+            trigger_type = trigger;
+            infra::table::workflows::delete_association_by_trigger(org_id, trigger).await?;
+        }
+        AssociationDeleteEvent::Specific {
+            org_id,
+            entity_id,
+            workflow_id,
+        } => {
+            org = org_id;
+            entity = entity_id;
+            workflow = workflow_id;
+            infra::table::workflows::delete_workflow_association(org_id, workflow_id, entity_id)
+                .await?;
+        }
+        AssociationDeleteEvent::TriggerWorkflow {
+            org_id,
+            trigger,
+            workflow_id,
+        } => {
+            org = org_id;
+            workflow = workflow_id;
+            trigger_type = trigger;
+            infra::table::workflows::delete_association_by_trigger_workflow(
+                org_id,
+                trigger,
+                workflow_id,
+            )
+            .await?;
+        }
+    }
+
+    #[cfg(feature = "enterprise")]
+    {
+        let config = o2_enterprise::enterprise::common::config::get_config();
+        if config.super_cluster.enabled {
+            let payload = serde_json::to_string(&event).unwrap();
+            match o2_enterprise::enterprise::super_cluster::queue::delete_workflow_association(
+                payload,
+            )
+            .await
+            {
+                Ok(_) => {
+                    log::info!(
+                        "successfully sent workflow association delete notification to super cluster queue for org: {org} trigger_type {trigger_type} entity_id: {entity} workflow_id: {workflow}",
+                    );
+                }
+                Err(e) => {
+                    log::error!(
+                        "error in sending workflow association delete notification to super cluster queue for org: {org} trigger_type {trigger_type} entity_id: {entity} workflow_id: {workflow} : {e}",
+                    );
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+pub async fn watch() -> Result<(), anyhow::Error> {
+    let mut events = get_coordinator().await.watch(WORKFLOWS_PREFIX).await?;
+    let events = Arc::get_mut(&mut events).unwrap();
+    log::info!("Start watching workflow keys");
+
+    loop {
+        let Some(event) = events.recv().await else {
+            log::error!("watch_workflows: event channel closed");
+            return Ok(());
+        };
+
+        match event {
+            Event::Put(event) => {
+                let Some(value) = event.value else {
+                    log::error!("watch_workflows: missing value for put");
+                    continue;
+                };
+                let Ok(workflow) = serde_json::from_slice::<Workflow>(&value) else {
+                    log::error!("watch_workflows: invalid json value for put");
+                    continue;
+                };
+                CACHE.write().await.remove(&workflow.id);
+            }
+            Event::Delete(event) => {
+                let id = event.key.strip_prefix(WORKFLOWS_PREFIX).unwrap();
+                if id.contains('/') {
+                    log::error!("watch_workflows: invalid key {id} for delete");
+                    continue;
+                }
+                CACHE.write().await.remove(id);
+            }
+            Event::Empty => {}
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unknown_trigger_type_does_not_decode_to_a_real_one() {
+        // A type a NEWER node wrote. Decoding it to a real variant would relabel the run
+        // as that trigger, and run history is searched across regions.
+        assert_eq!(
+            WorkflowTriggerType::from("SomeFutureTrigger"),
+            WorkflowTriggerType::Unknown
+        );
+        assert_eq!(WorkflowTriggerType::from(""), WorkflowTriggerType::Unknown);
+        assert_ne!(
+            WorkflowTriggerType::from("SomeFutureTrigger"),
+            WorkflowTriggerType::AlertFired
+        );
+    }
+
+    #[test]
+    fn known_trigger_types_round_trip_through_the_history_key() {
+        for ty in [
+            WorkflowTriggerType::AlertFired,
+            WorkflowTriggerType::IncidentEvent,
+            WorkflowTriggerType::Webhook,
+        ] {
+            let encoded = ty.to_string();
+            assert!(!encoded.contains('/'), "key separator in {encoded}");
+            assert!(!encoded.contains(' '), "space in {encoded}");
+            assert_eq!(WorkflowTriggerType::from(encoded.as_str()), ty);
+        }
+    }
+
+    #[test]
+    fn manual_test_and_retry_are_distinct_trigger_types() {
+        for ty in [
+            WorkflowTriggerType::Manual,
+            WorkflowTriggerType::Test,
+            WorkflowTriggerType::Retry,
+        ] {
+            assert_ne!(ty, WorkflowTriggerType::Unknown);
+            assert_ne!(ty, WorkflowTriggerType::Webhook);
+        }
+        assert_ne!(WorkflowTriggerType::Manual, WorkflowTriggerType::Test);
+        assert_ne!(WorkflowTriggerType::Test, WorkflowTriggerType::Retry);
+        assert_ne!(WorkflowTriggerType::Manual, WorkflowTriggerType::Retry);
+    }
+
+    #[test]
+    fn manual_test_and_retry_round_trip_through_the_history_key() {
+        for ty in [
+            WorkflowTriggerType::Manual,
+            WorkflowTriggerType::Test,
+            WorkflowTriggerType::Retry,
+        ] {
+            let encoded = ty.to_string();
+            assert!(!encoded.contains('/'), "key separator in {encoded}");
+            assert!(!encoded.contains(' '), "space in {encoded}");
+            assert_eq!(WorkflowTriggerType::from(encoded.as_str()), ty);
+        }
+    }
+
+    #[test]
+    fn manual_encodes_as_manual_not_webhook() {
+        assert_eq!(WorkflowTriggerType::Manual.to_string(), "Manual");
+        assert_eq!(WorkflowTriggerType::Test.to_string(), "Test");
+        assert_eq!(WorkflowTriggerType::Retry.to_string(), "Retry");
+    }
+
+    #[test]
+    fn every_trigger_type_is_fieldless_so_display_stays_positional() {
+        // A fielded variant would Display braces/slashes into the 4-part history key.
+        for ty in [
+            WorkflowTriggerType::AlertFired,
+            WorkflowTriggerType::IncidentEvent,
+            WorkflowTriggerType::Webhook,
+            WorkflowTriggerType::Manual,
+            WorkflowTriggerType::Test,
+            WorkflowTriggerType::Retry,
+            WorkflowTriggerType::Unknown,
+        ] {
+            let encoded = ty.to_string();
+            // The key separator is `/`; a fielded variant would Debug-format braces and
+            // spaces into it. Underscores or hyphens would be harmless, so don't forbid them.
+            assert!(
+                !encoded.contains('/') && !encoded.contains(' ') && !encoded.contains('{'),
+                "trigger type {encoded} would corrupt the positional history key"
+            );
+            assert!(!encoded.is_empty());
+        }
+    }
+}

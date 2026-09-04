@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -19,42 +19,45 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-if="visible"
       ref="menuRef"
-      class="alert-context-menu"
+      class="bg-dropdown-bg border-dropdown-border rounded-default fixed z-9999 min-w-70 border px-0 py-1 shadow-sm dark:shadow-sm"
       :style="menuStyle"
       @click.stop
       data-test="alert-context-menu"
     >
       <div
-        class="menu-item"
+        class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
         @click="handleMenuItemClick('above')"
-        @mouseenter="hoveredItem = 'above'"
-        @mouseleave="hoveredItem = null"
-        :class="{ 'hovered': hoveredItem === 'above' }"
         data-test="alert-context-menu-above"
       >
-        <q-icon name="arrow_upward" size="xs" class="q-mr-sm" />
-        <span>Create Alert with threshold above {{ formattedValue }}</span>
+        <OIcon name="arrow-upward" size="sm" class="me-2" />
+        <span class="select-none">{{
+          t("dashboard.alertContextMenu.thresholdAbove", { value: formattedValue })
+        }}</span>
       </div>
       <div
-        class="menu-item"
+        class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm [transition:background-color_0.2s]"
         @click="handleMenuItemClick('below')"
-        @mouseenter="hoveredItem = 'below'"
-        @mouseleave="hoveredItem = null"
-        :class="{ 'hovered': hoveredItem === 'below' }"
         data-test="alert-context-menu-below"
       >
-        <q-icon name="arrow_downward" size="xs" class="q-mr-sm" />
-        <span>Create Alert with threshold below {{ formattedValue }}</span>
+        <OIcon name="arrow-downward" size="sm" class="me-2" />
+        <span class="select-none">{{
+          t("dashboard.alertContextMenu.thresholdBelow", { value: formattedValue })
+        }}</span>
       </div>
     </div>
   </teleport>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, computed, watch, onMounted, onBeforeUnmount } from 'vue';
+import { defineComponent, ref, computed, watch, onBeforeUnmount } from "vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { useI18nTyped } from "@/types/i18n";
 
 export default defineComponent({
-  name: 'AlertContextMenu',
+  name: "AlertContextMenu",
+  components: {
+    OIcon,
+  },
   props: {
     visible: {
       type: Boolean,
@@ -73,13 +76,13 @@ export default defineComponent({
       required: true,
     },
   },
-  emits: ['select', 'close'],
+  emits: ["select", "close"],
   setup(props, { emit }) {
+    const { t } = useI18nTyped();
     const menuRef = ref<HTMLElement | null>(null);
-    const hoveredItem = ref<string | null>(null);
 
     const formattedValue = computed(() => {
-      if (typeof props.value === 'number') {
+      if (typeof props.value === "number") {
         return props.value.toLocaleString(undefined, {
           maximumFractionDigits: 2,
         });
@@ -92,8 +95,8 @@ export default defineComponent({
       top: `${props.y}px`,
     }));
 
-    const handleMenuItemClick = (condition: 'above' | 'below') => {
-      emit('select', {
+    const handleMenuItemClick = (condition: "above" | "below") => {
+      emit("select", {
         condition,
         threshold: props.value,
       });
@@ -101,13 +104,13 @@ export default defineComponent({
 
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.value && !menuRef.value.contains(event.target as Node)) {
-        emit('close');
+        emit("close");
       }
     };
 
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
-        emit('close');
+      if (event.key === "Escape") {
+        emit("close");
       }
     };
 
@@ -116,24 +119,24 @@ export default defineComponent({
       (newVisible) => {
         if (newVisible) {
           setTimeout(() => {
-            document.addEventListener('click', handleClickOutside);
-            document.addEventListener('keydown', handleEscape);
+            document.addEventListener("click", handleClickOutside);
+            document.addEventListener("keydown", handleEscape);
           }, 0);
         } else {
-          document.removeEventListener('click', handleClickOutside);
-          document.removeEventListener('keydown', handleEscape);
+          document.removeEventListener("click", handleClickOutside);
+          document.removeEventListener("keydown", handleEscape);
         }
       },
     );
 
     onBeforeUnmount(() => {
-      document.removeEventListener('click', handleClickOutside);
-      document.removeEventListener('keydown', handleEscape);
+      document.removeEventListener("click", handleClickOutside);
+      document.removeEventListener("keydown", handleEscape);
     });
 
     return {
+      t,
       menuRef,
-      hoveredItem,
       formattedValue,
       menuStyle,
       handleMenuItemClick,
@@ -141,60 +144,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped lang="scss">
-.alert-context-menu {
-  position: fixed;
-  z-index: 9999;
-  background: white;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-  min-width: 280px;
-  padding: 4px 0;
-
-  .menu-item {
-    display: flex;
-    align-items: center;
-    padding: 8px 16px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-    font-size: 14px;
-    color: #333;
-
-    &.hovered,
-    &:hover {
-      background-color: #f5f5f5;
-    }
-
-    &:active {
-      background-color: #e0e0e0;
-    }
-
-    span {
-      user-select: none;
-    }
-  }
-}
-
-body.body--dark {
-  .alert-context-menu {
-    background: #2c2c2c;
-    border-color: #404040;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-
-    .menu-item {
-      color: #e0e0e0;
-
-      &.hovered,
-      &:hover {
-        background-color: #383838;
-      }
-
-      &:active {
-        background-color: #404040;
-      }
-    }
-  }
-}
-</style>

@@ -23,7 +23,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Parse PR description and update features.json
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         id: parse-feature
         with:
           script: |
@@ -142,7 +142,7 @@ jobs:
       - name: Check for translation keys
         if: steps.parse-feature.outputs.success == 'true'
         id: check-translations
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const fs = require('fs');
@@ -151,8 +151,8 @@ jobs:
             const featureId = '${{ steps.parse-feature.outputs.feature_id }}';
             const expectedKey = `feature_${featureId}`;
 
-            // Check if translation exists in en.json
-            const enJsonPath = path.join(process.env.GITHUB_WORKSPACE, 'web/src/locales/languages/en.json');
+            // Check if translation exists in en-US.json
+            const enJsonPath = path.join(process.env.GITHUB_WORKSPACE, 'web/src/locales/languages/en-US.json');
             const enJson = JSON.parse(fs.readFileSync(enJsonPath, 'utf8'));
 
             const hasTranslation = enJson.about && enJson.about[expectedKey];
@@ -181,7 +181,7 @@ jobs:
 
       - name: Comment on PR - Success
         if: steps.parse-feature.outputs.success == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const featureId = '${{ steps.parse-feature.outputs.feature_id }}';
@@ -197,9 +197,9 @@ jobs:
             if (!hasTranslation) {
               message += `### ⚠️ Translation Missing\n\n`;
               message += `Please add the translation key \`${translationKey}\` to:\n`;
-              message += `- \`web/src/locales/languages/en.json\`\n`;
+              message += `- \`web/src/locales/languages/en-US.json\`\n`;
               message += `- All other language files\n\n`;
-              message += `Example for \`en.json\`:\n`;
+              message += `Example for \`en-US.json\`:\n`;
               message += `\`\`\`json\n`;
               message += `{\n`;
               message += `  "about": {\n`;
@@ -223,7 +223,7 @@ jobs:
 
       - name: Comment on PR - Error
         if: steps.parse-feature.outputs.success == 'false'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             const error = '${{ steps.parse-feature.outputs.error }}';
@@ -242,7 +242,7 @@ jobs:
 
       - name: Add label
         if: steps.parse-feature.outputs.success == 'true'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v9
         with:
           script: |
             github.rest.issues.addLabels({

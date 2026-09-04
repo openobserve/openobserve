@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,96 +15,76 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-card class="column full-height">
-    <q-card-section class="q-px-md q-py-md">
-      <div class="row items-center no-wrap">
-        <div class="col">
-          <div class="text-body1 text-bold text-dark">
-            {{ t("user.editUser") }}
-          </div>
-          <!-- <div>({{ orgMemberData.first_name }}: {{ orgMemberData.email }})</div> -->
-        </div>
-        <div class="col-auto">
-          <q-btn v-close-popup="true" round flat icon="cancel" />
-        </div>
-      </div>
-    </q-card-section>
-    <q-separator />
-    <q-card-section class="q-w-md q-mx-lg">
-      <q-form ref="updateUserForm" @submit.prevent="onSubmit">
-        <q-input
-          v-model="orgMemberData.first_name"
+  <ODialog
+    data-test="update-role-dialog"
+    :open="open"
+    size="sm"
+    :title="t('user.editUser')"
+    persistent
+    @update:open="$emit('update:open', $event)"
+  >
+    <div>
+      <OForm
+        id="update-role-form"
+        :schema="updateRoleSchema"
+        :default-values="updateRoleDefaults"
+        @submit="onSubmit"
+        v-slot="{ isSubmitting }"
+      >
+        <OFormInput
+          name="first_name"
           :label="t('user.name')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
+          class="showLabelOnTop py-3"
           readonly
-          filled
-          dense
         />
 
-        <!--
-        <q-input
-          v-model="orgMemberData.email"
-          :label="t('user.email')"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-py-md showLabelOnTop"
-          stack-label
-          outlined
-          readonly
-          filled
-          dense
-        />
-        -->
-
-        <q-select
-          v-model="orgMemberData.role"
+        <OFormSelect
+          name="role"
           :label="t('user.role')"
           :options="roleOptions"
-          color="input-border"
-          bg-color="input-bg"
-          class="q-pt-md q-pb-sm showLabelOnTop"
-          stack-label
-          outlined
-          filled
-          dense
+          required
+          class="showLabelOnTop pt-3 pb-2"
+          data-test="iam-update-role-select"
         />
 
-        <div class="flex justify-center q-mt-lg">
-          <q-btn
-            v-close-popup="true"
-            class="q-mb-md text-bold no-border"
-            :label="t('user.cancel')"
-            text-color="light-text"
-            padding="sm md"
-            color="accent"
-            no-caps
-          />
-          <q-btn
-            :label="t('user.save')"
-            class="q-mb-md text-bold no-border q-ml-md"
-            color="secondary"
-            padding="sm xl"
+        <div class="mt-4 flex justify-center gap-2">
+          <OButton
+            @click="$emit('update:open', false)"
+            variant="outline"
+            size="sm-action"
+            :disabled="isSubmitting"
+            data-test="iam-update-role-cancel-btn"
+          >
+            {{ t("user.cancel") }}
+          </OButton>
+          <OButton
+            variant="primary"
+            size="sm-action"
             type="submit"
-            no-caps
-          />
+            :loading="isSubmitting"
+            data-test="iam-update-role-save-btn"
+          >
+            {{ t("user.save") }}
+          </OButton>
         </div>
-      </q-form>
-    </q-card-section>
-  </q-card>
+      </OForm>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, computed } from "vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
-import { getImageURL } from "@/utils/zincutils";
 
 import organizationsService from "@/services/organizations";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { makeUpdateRoleSchema, type UpdateRoleForm } from "./UpdateRole.schema";
 
 const defaultValue: any = () => {
   return {
@@ -114,113 +94,84 @@ const defaultValue: any = () => {
     email: "",
   };
 };
-let callOrgMember: any;
 
 export default defineComponent({
   name: "ComponentUpdateUser",
+  components: { OButton, ODialog, OForm, OFormInput, OFormSelect },
   props: {
+    open: {
+      type: Boolean,
+      default: false,
+    },
     modelValue: {
       type: Object,
       default: () => defaultValue(),
     },
   },
-  emits: ["update:modelValue", "updated", "finish"],
-  setup() {
+  emits: ["update:modelValue", "updated", "finish", "update:open"],
+  setup(props) {
     const store: any = useStore();
-    const { t } = useI18n();
-    const $q = useQuasar();
+    const { t } = useI18nTyped();
     const roleOptions = ["admin"];
-    const orgMemberData: any = ref(defaultValue());
-    const updateUserForm: any = ref(null);
 
+    const updateRoleSchema = makeUpdateRoleSchema(t);
+
+    // EDIT-prefill: the OForm owns role/first_name; this typed computed seeds them
+    // from the externally-provided modelValue each time the dialog body mounts.
+    // org_member_id/email stay non-form data (read from modelValue at submit).
+    const updateRoleDefaults = computed((): UpdateRoleForm => ({
+      role: props.modelValue?.role ?? "",
+      first_name: props.modelValue?.first_name ?? "",
+    }));
+
+    // Options-API: the schema (and the defaults computed) MUST be returned from
+    // setup() — a bare module import is out of the template's scope, so :schema
+    // would resolve to undefined and validation would silently no-op.
     return {
       t,
-      orgMemberData,
       store,
       roleOptions,
-      updateUserForm,
-      getImageURL,
+      updateRoleSchema,
+      updateRoleDefaults,
     };
   },
-  created() {
-    if (this.modelValue) {
-      this.orgMemberData = {
-        org_member_id: this.modelValue.org_member_id,
-        role: this.modelValue.role,
-        first_name: this.modelValue.first_name,
-        email: this.modelValue.email,
-      };
-    }
-  },
   methods: {
-    onSubmit() {
-      const dismiss = this.$q.notify({
-        spinner: true,
-        message: "Please wait...",
-        timeout: 2000,
-      });
-
-      this.updateUserForm.validate().then((valid: any) => {
-        if (!valid) {
-          return false;
-        }
-
-        callOrgMember = organizationsService.update_member_role(
+    // Plain async @submit handler — fires only after the Zod schema passes
+    // (role required), so no manual roleError guard. Awaited by OForm, so the
+    // Save button's spinner spans the request.
+    async onSubmit(value: UpdateRoleForm) {
+      try {
+        const res = await organizationsService.update_member_role(
           {
-            id: parseInt(this.orgMemberData.org_member_id),
-            role: this.orgMemberData.role,
+            id: parseInt(this.modelValue?.org_member_id),
+            role: value.role,
             organization_id: parseInt(this.store.state.selectedOrganization.id),
           },
-          this.store.state.selectedOrganization.identifier
+          this.store.state.selectedOrganization.identifier,
         );
 
-        callOrgMember.then((res: { data: any }) => {
-          if (res?.data?.error_members != null) {
-            const message = `Error while updating organization member`;
+        if (res?.data?.error_members != null) {
+          toast({
+            variant: "error",
+            message: this.t("iam.updateRole.errorUpdatingMember"),
+            timeout: 15000,
+          });
+        } else {
+          toast({
+            variant: "success",
+            message: this.t("iam.updateRole.memberUpdatedSuccessfully"),
+          });
+        }
 
-            this.$q.notify({
-              type: "negative",
-              message: message,
-              timeout: 15000,
-            });
-          } else {
-            this.$q.notify({
-              type: "positive",
-              message: "Organization member updated successfully.",
-              timeout: 3000,
-            });
-          }
-
-          this.$emit("updated", res?.data);
-          this.updateUserForm.resetValidation();
-          dismiss();
+        this.$emit("updated", res?.data);
+        this.$emit("update:open", false);
+      } catch (err: any) {
+        toast({
+          variant: "error",
+          message: err?.response?.data?.message || this.t("iam.updateRole.errorUpdatingMember"),
         });
-      });
+      }
     },
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.q-menu {
-  box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-  transform: translateY(0.5rem);
-  border-radius: 8px;
-
-  .q-virtual-scroll__content {
-    padding: 0.5rem;
-
-    .q-item {
-      text-transform: capitalize;
-      border-radius: 0.25rem;
-      margin-bottom: 0.25rem;
-      font-weight: 600;
-
-      &--active {
-        background-color: $selected-list-bg;
-        color: $primary;
-      }
-    }
-  }
-}
-</style>

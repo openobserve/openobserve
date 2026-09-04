@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -17,21 +17,23 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import Usage from "@/enterprise/components/billings/usage.vue";
 import BillingService from "@/services/billings";
-import { Notify } from "quasar";
+import organizations from "@/services/organizations";
 import store from "@/test/unit/helpers/store";
-import { installQuasar } from "@/test/unit/helpers";
 import router from "@/test/unit/helpers/router";
 import i18n from "@/locales";
 import { nextTick } from "vue";
-
-installQuasar({
-  plugins: [Notify],
-});
 
 // Mock the billings service
 vi.mock("@/services/billings", () => ({
   default: {
     get_data_usage: vi.fn(),
+    get_ai_usage: vi.fn(),
+  },
+}));
+
+vi.mock("@/services/organizations", () => ({
+  default: {
+    post_organization_settings: vi.fn(),
   },
 }));
 
@@ -39,23 +41,32 @@ vi.mock("@/services/billings", () => ({
 const mockRouter = {
   currentRoute: {
     value: {
-      query: {}
-    }
-  }
+      query: {},
+    },
+  },
 };
 
 vi.mock("@/router", () => ({
-  default: mockRouter
+  default: mockRouter,
 }));
 
-vi.mock("vue-router", () => ({
-  useRouter: () => mockRouter
-}));
+vi.mock("vue-router", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("vue-router")>();
+  return {
+    ...actual,
+    useRouter: () => mockRouter,
+  };
+});
 
-// Mock zincutils
-vi.mock("@/utils/zincutils", () => ({
-  getImageURL: vi.fn((path) => `mocked-image-url-${path}`),
-}));
+// Mock zincutils — partial so the store (pulled in transitively via the
+// dashboards renderer) still resolves useLocalOrganization etc.
+vi.mock("@/utils/zincutils", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/utils/zincutils")>();
+  return {
+    ...actual,
+    getImageURL: vi.fn((path) => `mocked-image-url-${path}`),
+  };
+});
 
 // Mock convertBillingData
 vi.mock("@/utils/billing/convertBillingData", () => ({
@@ -70,6 +81,25 @@ vi.mock("@/components/dashboards/panels/CustomChartRenderer.vue", () => ({
   },
 }));
 
+// Stub the heavy dashboards renderer + date picker the daily view uses.
+vi.mock("@/components/dashboards/PanelSchemaRenderer.vue", () => ({
+  default: {
+    name: "PanelSchemaRenderer",
+    template: "<div class='panel-schema-renderer'></div>",
+  },
+}));
+vi.mock("@/components/DateTimePickerDashboard.vue", () => ({
+  default: {
+    name: "DateTimePickerDashboard",
+    template: "<div class='date-time-picker'></div>",
+    methods: {
+      getConsumableDateTime() {
+        return { startTime: 1000, endTime: 2000 };
+      },
+    },
+  },
+}));
+
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
@@ -77,7 +107,6 @@ document.body.appendChild(node);
 describe("Usage Component", () => {
   let wrapper: any = null;
   const mockBillingService = vi.mocked(BillingService);
-  let mockNotify: any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -88,14 +117,20 @@ describe("Usage Component", () => {
         data: [
           { event: "INGESTION", value: "10.50" },
           { event: "SEARCH", value: "5.25" },
-          { event: "FUNCTIONS", value: "2.75" }
-        ]
-      }
+          { event: "FUNCTIONS", value: "2.75" },
+        ],
+      },
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
-
-    // Mock quasar notify
-    mockNotify = vi.fn(() => vi.fn()); // Returns dismiss function
+    mockBillingService.get_ai_usage.mockResolvedValue({
+      data: {
+        mode: "free",
+        credits_used: 0,
+        credits_limit: 1000,
+        credits_remaining: 1000,
+        requires_additional_credits: false,
+      },
+    });
 
     wrapper = mount(Usage, {
       attachTo: "#app",
@@ -104,12 +139,11 @@ describe("Usage Component", () => {
         provide: {
           store,
           $router: mockRouter,
+          // The daily view injects the resolved range from the Billing shell.
+          usageRange: { start: 1000, end: 2000, key: 1 },
         },
         mocks: {
-          $q: {
-            notify: mockNotify,
-          },
-          $t: (key: string) => key, // Mock translation function
+          $t: (key: string) => key,
         },
         stubs: {
           ChartRenderer: {
@@ -147,7 +181,7 @@ describe("Usage Component", () => {
   it("should initialize reactive data correctly", async () => {
     expect(wrapper.vm.lastUsageUpdated).toBe(0);
     expect(wrapper.vm.pipelinesPanelDataKey).toBe(0);
-    expect(wrapper.vm.elapsedText).toBe('Just now');
+    expect(wrapper.vm.elapsedText).toBe("Just now");
     // After mounted hook completes, dataLoading should be false
     await flushPromises();
     expect(wrapper.vm.dataLoading).toBe(false);
@@ -163,8 +197,20 @@ describe("Usage Component", () => {
       dataretention: "0.00",
       functions: "2.75",
       pipeline: "0.00",
-      remotepipeline: "0.00"
+      remotepipeline: "0.00",
+      ai_credits: "0.00",
     });
+  });
+
+  it("should direct exhausted contract organizations to add AI credits", async () => {
+    wrapper.vm.aiUsage = {
+      mode: "exhausted",
+      requires_additional_credits: true,
+    };
+    await nextTick();
+
+    expect(wrapper.find('[data-test="contract-ai-credits-exhausted"]').exists()).toBe(true);
+    expect(wrapper.text()).toContain("Contact your account manager to add more AI credits");
   });
 
   // Test 5: Chart data initial state
@@ -191,7 +237,6 @@ describe("Usage Component", () => {
 
   // Test 9: Icon URLs generation
   it("should generate correct icon URLs", () => {
-    expect(wrapper.vm.actionScriptIcon).toBe("mocked-image-url-images/usage/action_script.svg");
     expect(wrapper.vm.errorTrackingIcon).toBe("mocked-image-url-images/usage/error_tracking.svg");
     expect(wrapper.vm.rumSessionIcon).toBe("mocked-image-url-images/usage/rum_session.svg");
     expect(wrapper.vm.ingestionIcon).toBe("mocked-image-url-images/usage/ingestion.svg");
@@ -228,7 +273,9 @@ describe("Usage Component", () => {
   it("should display loading message when data is loading", async () => {
     wrapper.vm.dataLoading = true;
     await nextTick();
-    expect(wrapper.text()).toContain("Loading...");
+    // Component shows an OSpinner (aria-label="Loading") when dataLoading is true,
+    // not a "Loading..." text string.
+    expect(wrapper.find('[aria-label="Loading"]').exists()).toBe(true);
   });
 
   // Test 15: Usage tiles display when data is available
@@ -236,14 +283,13 @@ describe("Usage Component", () => {
     wrapper.vm.usageData = {
       ingestion: "10.50",
       search: "5.25",
-      functions: "2.75"
+      functions: "2.75",
     };
     wrapper.vm.dataLoading = false;
     await nextTick();
 
     expect(wrapper.text()).toContain("Ingestion");
     expect(wrapper.text()).toContain("Search");
-    expect(wrapper.text()).toContain("Functions");
   });
 
   // Test 16: Usage data formatting in tiles
@@ -251,16 +297,45 @@ describe("Usage Component", () => {
     wrapper.vm.usageData = {
       ingestion: "10.50",
       search: "5.25",
-      functions: "2.75"
+      functions: "2.75",
     };
     wrapper.vm.dataLoading = false;
     await nextTick();
 
-    expect(wrapper.text()).toContain("10.50 GB");
-    expect(wrapper.text()).toContain("5.25 GB");
-    expect(wrapper.text()).toContain("2.75 GB");
+    // Value and unit render in separate spans (no literal space in .text()).
+    expect(wrapper.text()).toContain("10.50");
+    expect(wrapper.text()).toContain("5.25");
+    expect(wrapper.text()).toContain("GB");
   });
 
+  it("auto-scales large byte values up from the base unit", async () => {
+    // base GB: 10930.96 GB → 10.67 TB; 1095652 GB → ~1.05 PB
+    wrapper.vm.usageData = {
+      ingestion: "10930.96",
+      dataretention: "1095652",
+      search: "5.25",
+      ai_credits: "42",
+    };
+    wrapper.vm.dataLoading = false;
+    await nextTick();
+
+    const tiles = wrapper.vm.usageTiles;
+    const ing = tiles.find((t: any) => t.key === "ingestion");
+    expect(ing.unit).toBe("TB");
+    expect(parseFloat(ing.value)).toBeCloseTo(10.67, 1);
+
+    const ret = tiles.find((t: any) => t.key === "dataretention");
+    expect(ret.unit).toBe("PB");
+
+    // small value keeps the base unit
+    const srch = tiles.find((t: any) => t.key === "search");
+    expect(srch.unit).toBe("GB");
+    expect(srch.value).toBe("5.25");
+
+    // AI credits is a plain count, never scaled
+    const ai = tiles.find((t: any) => t.key === "ai_credits");
+    expect(ai.unit).toBe("Credits");
+  });
 
   // Test 19: GetUsage function call with notification
   it("should call getUsage and show notification", async () => {
@@ -269,9 +344,9 @@ describe("Usage Component", () => {
         data: [
           { event: "INGESTION", value: "15.50" },
           { event: "SEARCH", value: "7.25" },
-          { event: "FUNCTIONS", value: "3.75" }
-        ]
-      }
+          { event: "FUNCTIONS", value: "3.75" },
+        ],
+      },
     };
 
     // The notification should have been called during component mounting
@@ -293,9 +368,9 @@ describe("Usage Component", () => {
         data: [
           { event: "INGESTION", value: "10.50" },
           { event: "SEARCH", value: "5.25" },
-          { event: "FUNCTIONS", value: "2.75" }
-        ]
-      }
+          { event: "FUNCTIONS", value: "2.75" },
+        ],
+      },
     };
 
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
@@ -309,7 +384,8 @@ describe("Usage Component", () => {
       functions: "2.75",
       pipeline: "0.00",
       remotepipeline: "0.00",
-      dataretention: "0.00"
+      dataretention: "0.00",
+      ai_credits: "0.00",
     });
   });
 
@@ -334,13 +410,11 @@ describe("Usage Component", () => {
 
   // Test 22: SelectUsageDate function resets chart data
   it("should reset chart data when selectUsageDate is called", async () => {
-    // Mock the API response first 
+    // Mock the API response first
     const mockResponse = {
       data: {
-        data: [
-          { event: "INGESTION", value: "10.50" },
-        ]
-      }
+        data: [{ event: "INGESTION", value: "10.50" }],
+      },
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
 
@@ -458,8 +532,8 @@ describe("Usage Component", () => {
         data: [
           { event: "INGESTION", value: "10.567" },
           { event: "SEARCH", value: "5.234" },
-        ]
-      }
+        ],
+      },
     };
 
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
@@ -478,9 +552,9 @@ describe("Usage Component", () => {
         data: [
           { event: "ingestion", value: "10.50" },
           { event: "SEARCH", value: "5.25" },
-          { event: "Functions", value: "2.75" }
-        ]
-      }
+          { event: "Functions", value: "2.75" },
+        ],
+      },
     };
 
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
@@ -498,10 +572,8 @@ describe("Usage Component", () => {
     // Mock the API response first
     const mockResponse = {
       data: {
-        data: [
-          { event: "INGESTION", value: "10.50" },
-        ]
-      }
+        data: [{ event: "INGESTION", value: "10.50" }],
+      },
     };
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
 
@@ -514,13 +586,14 @@ describe("Usage Component", () => {
     expect(mockBillingService.get_data_usage).toHaveBeenCalledWith(
       orgIdentifier,
       "30days",
-      "gb"
+      "gb",
+      undefined,
     );
   });
 
   // Test 37: Loading state during API call
   it("should set loading state during API call", async () => {
-    const mockPromise = new Promise(() => { }); // Never resolves
+    const mockPromise = new Promise(() => {}); // Never resolves
     mockBillingService.get_data_usage.mockReturnValue(mockPromise);
 
     wrapper.vm.getUsage();
@@ -537,24 +610,17 @@ describe("Usage Component", () => {
     expect(wrapper.vm.dataLoading).toBe(false);
   });
 
-  // Test 39: Hidden action script tiles
-  it("should not display action script tiles when v-if is false", () => {
-    const actionScriptTiles = wrapper.findAll('.usage-tile-title');
-    const actionScriptExists = actionScriptTiles.some((tile: any) => tile.text().includes('Action Scripts'));
-    expect(actionScriptExists).toBe(false);
-  });
-
   // Test 40: Hidden error tracking tiles
   it("should not display error tracking tiles when v-if is false", () => {
-    const tiles = wrapper.findAll('.usage-tile-title');
-    const errorTrackingExists = tiles.some((tile: any) => tile.text().includes('Error Tracking'));
+    const tiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
+    const errorTrackingExists = tiles.some((tile: any) => tile.text().includes("Error Tracking"));
     expect(errorTrackingExists).toBe(false);
   });
 
   // Test 41: Hidden RUM session tiles
   it("should not display RUM session tiles when v-if is false", () => {
-    const tiles = wrapper.findAll('.usage-tile-title');
-    const rumSessionExists = tiles.some((tile: any) => tile.text().includes('RUM Session'));
+    const tiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
+    const rumSessionExists = tiles.some((tile: any) => tile.text().includes("RUM Session"));
     expect(rumSessionExists).toBe(false);
   });
 
@@ -564,12 +630,13 @@ describe("Usage Component", () => {
     wrapper.vm.dataLoading = false;
     await nextTick();
 
-    const usageTiles = wrapper.findAll('.usage-tile-title');
+    const usageTiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
     const tileTexts = usageTiles.map((tile: any) => tile.text());
 
-    expect(tileTexts).toContain('Ingestion');
-    expect(tileTexts).toContain('Search');
-    expect(tileTexts).toContain('Functions');
+    expect(tileTexts).toContain("Ingestion");
+    expect(tileTexts).toContain("Search");
+    // Functions card was removed (not a billable line item).
+    expect(tileTexts).not.toContain("Functions");
   });
 
   // Test 43: Usage tiles hidden when loading
@@ -578,8 +645,8 @@ describe("Usage Component", () => {
     wrapper.vm.usageData = {};
     await nextTick();
 
-    const tiles = wrapper.findAll('.usage-tile-title');
-    const ingestionExists = tiles.some((tile: any) => tile.text().includes('Ingestion'));
+    const tiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
+    const ingestionExists = tiles.some((tile: any) => tile.text().includes("Ingestion"));
     expect(ingestionExists).toBe(false);
   });
 
@@ -589,24 +656,26 @@ describe("Usage Component", () => {
     wrapper.vm.dataLoading = false;
     await nextTick();
 
-    const tiles = wrapper.findAll('.usage-tile-title');
-    const ingestionExists = tiles.some((tile: any) => tile.text().includes('Ingestion'));
+    const tiles = wrapper.findAll('[data-test="billings-usage-tile-title"]');
+    const ingestionExists = tiles.some((tile: any) => tile.text().includes("Ingestion"));
     expect(ingestionExists).toBe(false);
   });
 
   // Test 45: Total usage heading display
-  it("should display total usage heading", () => {
-    expect(wrapper.text()).toContain(wrapper.vm.t("billing.totalUsage"));
+  it("renders the billable usage tiles", () => {
+    // The "Total Usage" heading was removed; tiles carry the usage now.
+    const tiles = wrapper.findAll('[data-test="billings-usage-tile"]');
+    expect(tiles.length).toBeGreaterThan(0);
   });
 
   // Test 46: Component container styling
   it("should have correct container styling", () => {
-    const container = wrapper.find('.q-pa-md');
+    const container = wrapper.find('[style="height: calc(100vh - 130px);"]');
     expect(container.exists()).toBe(true);
-    expect(container.attributes('style')).toContain('height: calc(100vh - 130px)');
-    expect(container.attributes('style')).toContain('width: 100%');
+    expect(container.attributes("style")).toContain("height: calc(100vh - 130px)");
+    // width is now applied via the w-full utility class rather than inline style
+    expect(container.classes()).toContain("w-full");
   });
-
 
   // Test 48: No data section visibility
   it("should show no data section when usage data is empty", async () => {
@@ -661,8 +730,8 @@ describe("Usage Component", () => {
         data: [
           { event: "INGESTION", value: "invalid" },
           { event: "SEARCH", value: "5.25" },
-        ]
-      }
+        ],
+      },
     };
 
     mockBillingService.get_data_usage.mockResolvedValue(mockResponse);
@@ -677,5 +746,163 @@ describe("Usage Component", () => {
   // Test 55: Router access in component
   it("should have access to router", () => {
     expect(wrapper.vm.router).toBeDefined();
+  });
+
+  // The member-org selector now lives in Billing.vue (rendered beside this
+  // component) and shares the selection via inject; its formatting/search is
+  // covered in UsageMemberList.spec.ts.
+
+  // --- Daily chart appended below the existing cards (self-usage ON) -----
+  describe("Daily chart", () => {
+    afterEach(() => {
+      store.state.organizationData.organizationSettings.usage_stream_enabled = false;
+    });
+
+    it("hides the daily chart when self-usage is off", async () => {
+      store.state.organizationData.organizationSettings.usage_stream_enabled = false;
+      await nextTick();
+      expect(wrapper.vm.usageStreamEnabled).toBe(false);
+      expect(wrapper.find('[data-test="usage-daily-chart"]').exists()).toBe(false);
+    });
+
+    it("shows the daily chart when self-usage is on", async () => {
+      store.state.organizationData.organizationSettings.usage_stream_enabled = true;
+      await nextTick();
+      expect(wrapper.vm.usageStreamEnabled).toBe(true);
+      expect(wrapper.find('[data-test="usage-daily-chart"]').exists()).toBe(true);
+    });
+
+    it("builds one combined line panel over the org's usage stream", async () => {
+      store.state.organizationData.organizationSettings.usage_stream_enabled = true;
+      store.state.selectedOrganization.identifier = "org-daily";
+      await nextTick();
+      const schema = wrapper.vm.combinedSchema;
+      expect(schema.type).toBe("line");
+      expect(schema.queries).toHaveLength(1);
+      expect(schema.queries[0].fields.stream).toBe("usage");
+      expect(schema.queries[0].query).toContain("org_id = 'org-daily'");
+      expect(schema.queries[0].query).toContain(
+        "event IN ('Ingestion', 'Search', 'Pipeline', 'RemotePipeline')",
+      );
+      expect(schema.queries[0].query).not.toContain("Functions");
+      expect(schema.queries[0].fields.breakdown).toHaveLength(1);
+    });
+
+    it("uses the injected range for the chart's time window", async () => {
+      store.state.organizationData.organizationSettings.usage_stream_enabled = true;
+      await nextTick();
+      // injected usageRange = { start: 1000, end: 2000 } (micros)
+      expect(wrapper.vm.dailyTimeObj.start_time.getTime()).toBe(1000);
+      expect(wrapper.vm.dailyTimeObj.end_time.getTime()).toBe(2000);
+    });
+
+    it("fetches the cards with a calendar-derived <N>days range when on", async () => {
+      mockBillingService.get_data_usage.mockClear();
+      store.state.organizationData.organizationSettings.usage_stream_enabled = true;
+      store.state.selectedOrganization.identifier = "org-cal";
+      await nextTick();
+      await wrapper.vm.getUsage();
+      await flushPromises();
+      // injected sub-day window rounds up to "1days"
+      expect(mockBillingService.get_data_usage).toHaveBeenLastCalledWith(
+        "org-cal",
+        "1days",
+        expect.any(String),
+        undefined,
+      );
+    });
+  });
+
+  describe("Usage enable-reporting CTA", () => {
+    const mountUsage = () =>
+      mount(Usage, {
+        global: {
+          plugins: [store, router, i18n],
+        },
+      });
+
+    beforeEach(() => {
+      (BillingService.get_data_usage as any).mockResolvedValue({
+        data: { data: [], start_time: 0, end_time: 0 },
+      });
+      store.state.selectedOrganization = { identifier: "org-a" } as any;
+      store.state.organizationData = store.state.organizationData || ({} as any);
+    });
+
+    it("shows the enable CTA when usage_stream_enabled is false", async () => {
+      store.state.organizationData.organizationSettings = {
+        usage_stream_enabled: false,
+      } as any;
+      const wrapper = mountUsage();
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-enable-cta"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="usage-daily-chart"]').exists()).toBe(false);
+    });
+
+    it("hides the CTA when usage_stream_enabled is true", async () => {
+      store.state.organizationData.organizationSettings = {
+        usage_stream_enabled: true,
+      } as any;
+      const wrapper = mountUsage();
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-enable-cta"]').exists()).toBe(false);
+    });
+
+    it("posts a merged settings payload with usage_stream_enabled:true on click", async () => {
+      store.state.organizationData.organizationSettings = {
+        usage_stream_enabled: false,
+        scrape_interval: 15,
+      } as any;
+      (organizations.post_organization_settings as any).mockResolvedValue({});
+      const wrapper = mountUsage();
+      await flushPromises();
+      // The CTA now opens a confirm dialog before enabling: fire the empty
+      // state's action, then confirm the dialog to run the enable flow.
+      wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action");
+      await flushPromises();
+      wrapper.findComponent({ name: "ConfirmDialog" }).vm.$emit("update:ok");
+      await flushPromises();
+      expect(organizations.post_organization_settings).toHaveBeenCalledWith(
+        "org-a",
+        expect.objectContaining({
+          scrape_interval: 15,
+          usage_stream_enabled: true,
+        }),
+      );
+      expect(store.state.organizationData.organizationSettings.usage_stream_enabled).toBe(true);
+    });
+
+    it("shows the waiting-for-data graphic when the usage stream is missing", async () => {
+      store.state.organizationData.organizationSettings = {
+        usage_stream_enabled: true,
+      } as any;
+      const wrapper = mountUsage();
+      await flushPromises();
+      // No error yet → no overlay.
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(false);
+      // Chart search errors because the org's usage stream doesn't exist yet.
+      wrapper
+        .findComponent({ name: "PanelSchemaRenderer" })
+        .vm.$emit("error", { message: "Search stream not found: usage" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(true);
+      // When data lands the error clears → overlay goes away.
+      wrapper.findComponent({ name: "PanelSchemaRenderer" }).vm.$emit("error", null);
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(false);
+    });
+
+    it("does not show the waiting graphic for unrelated chart errors", async () => {
+      store.state.organizationData.organizationSettings = {
+        usage_stream_enabled: true,
+      } as any;
+      const wrapper = mountUsage();
+      await flushPromises();
+      wrapper
+        .findComponent({ name: "PanelSchemaRenderer" })
+        .vm.$emit("error", { message: "SQL parse error near GROUP" });
+      await flushPromises();
+      expect(wrapper.find('[data-test="usage-waiting-for-data"]').exists()).toBe(false);
+    });
   });
 });

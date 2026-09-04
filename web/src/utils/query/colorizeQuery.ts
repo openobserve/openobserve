@@ -1,13 +1,17 @@
 import { editor, languages } from "monaco-editor/esm/vs/editor/editor.api";
 import { vrlLanguageDefinition } from "@/utils/query/vrlLanguageDefinition";
+import { loadPromqlLanguage } from "@/utils/query/promqlLanguageDefinition";
 
 let languagesRegistered = false;
 
 const registerLanguages = async () => {
   if (languagesRegistered) return;
 
-  // Register PromQL
+  // Monaco has no built-in PromQL — register the official grammar.
   languages.register({ id: "promql" });
+  const promql = await loadPromqlLanguage();
+  languages.setMonarchTokensProvider("promql", promql.language as any);
+  languages.setLanguageConfiguration("promql", promql.languageConfiguration as any);
 
   // Register VRL
   languages.register({ id: "vrl" });
@@ -23,6 +27,15 @@ const registerLanguages = async () => {
   languagesRegistered = true;
 };
 
+/** Escape a plain string for safe insertion into an HTML context. */
+const escapeHtml = (s: string): string =>
+  s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+
 export const colorizeQuery = async (query: string, language: string): Promise<string> => {
   if (!query) return "";
 
@@ -36,6 +49,8 @@ export const colorizeQuery = async (query: string, language: string): Promise<st
     const colorized = await editor.colorize(query, lang, {});
     return colorized;
   } catch (e) {
-    return query;
+    // Monaco failed — fall back to plain escaped text so the caller can
+    // safely render via v-html without XSS risk (GHSA-hx23-g7m8-h76j class).
+    return escapeHtml(query);
   }
 };

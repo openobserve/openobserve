@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,19 +16,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div
-    style="width: 100%; height: 100%"
+    class="h-full w-full"
     @mouseleave="hidePopupsAndOverlays"
     @mouseenter="showPopupsAndOverlays"
   >
-    <div
-      ref="chartPanelRef"
-      style="height: 100%; position: relative"
-      :class="chartPanelClass"
-    >
-      <div
-        v-if="!errorDetail?.message"
-        :style="{ height: chartPanelHeight, width: '100%' }"
-      >
+    <div class="relative h-full" ref="chartPanelRef" :class="chartPanelClass">
+      <div v-if="!errorDetail?.message" :style="{ height: chartPanelHeight, width: '100%' }">
         <MapsRenderer
           v-if="panelSchema.type == 'maps'"
           :data="panelData.chartType == 'maps' ? panelData : { options: {} }"
@@ -42,36 +35,36 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
         />
         <PromQLTableChart
-          v-else-if="
-            panelSchema.type == 'table' && panelSchema.queryType === 'promql'
-          "
+          v-else-if="panelSchema.type == 'table' && panelSchema.queryType === 'promql'"
+          ref="tableRendererRef"
           :data="tableRendererData"
           :config="panelSchema.config"
+          :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
           @row-click="onChartClick"
         />
         <TableRenderer
           v-else-if="panelSchema.type == 'table'"
-          :data="
-            panelData.chartType == 'table'
-              ? panelData
-              : { options: { backgroundColor: 'transparent' } }
-          "
+          :data="tableRendererData"
           :value-mapping="panelSchema?.config?.mappings ?? []"
           @row-click="onChartClick"
+          @explore-cell="(params) => exploreCellInLogs(params.columnId, params.value, params.row)"
+          @format-column="onFormatColumn"
           ref="tableRendererRef"
           :wrap-cells="panelSchema.config?.wrap_table_cells"
-          :show-pagination="panelSchema.config?.table_pagination"
+          :show-pagination="panelSchema.config?.table_pagination && !store.state.printMode"
           :rows-per-page="panelSchema.config?.table_pagination_rows_per_page"
+          :enable-filtering="!!panelSchema.config?.table_filtering && !store.state.printMode"
+          :enable-column-format="enableColumnFormat"
+          :drilldown-columns="store.state.printMode ? [] : drilldownColumnAliases"
+          :drilldown-all-columns="!store.state.printMode && drilldownAllColumns"
         />
         <div
           v-else-if="panelSchema.type == 'html'"
-          class="col column"
-          style="width: 100%; height: 100%; flex: 1"
+          class="column flex h-full w-full flex-1 flex-col"
         >
           <HTMLRenderer
             :htmlContent="panelSchema.htmlContent"
-            style="width: 100%; height: 100%"
-            class="col"
+            class="flex h-full w-full flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -79,13 +72,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else-if="panelSchema.type == 'markdown'"
-          class="col column"
-          style="width: 100%; height: 100%; flex: 1"
+          class="column flex h-full w-full flex-1 flex-col"
         >
           <MarkdownRenderer
             :markdownContent="panelSchema.markdownContent"
-            style="width: 100%; height: 100%"
-            class="col"
+            class="flex h-full w-full flex-col"
             :variablesData="currentVariablesData || variablesData"
             :tabId="tabId"
             :panelId="panelSchema.id"
@@ -95,28 +86,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <CustomChartRenderer
           v-else-if="panelSchema.type == 'custom_chart'"
           :data="panelData"
-          style="width: 100%; height: 100%"
-          class="col"
+          class="flex h-full w-full flex-col"
           @error="errorDetail = $event"
         />
         <ChartRenderer
           v-else
-          :data="
-            panelSchema.queryType === 'promql' ||
-            (panelData.chartType != 'geomap' &&
-              panelData.chartType != 'table' &&
-              panelData.chartType != 'maps' &&
-              loading)
-              ? panelData
-              : noData == 'No Data'
-                ? {
-                    options: {
-                      backgroundColor: 'transparent',
-                    },
-                  }
-                : panelData
-          "
+          ref="chartRendererRef"
+          :data="chartRendererData"
           :height="chartPanelHeight"
+          :render-type="panelSchema?.type === 'metric' ? 'svg' : 'canvas'"
           @updated:data-zoom="onDataZoom"
           @error="errorDetail = $event"
           @click="onChartClick"
@@ -125,30 +103,59 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <div
+        v-if="metricItems.length && !noData && !loading"
+        class="pointer-events-none absolute inset-0 z-8"
+        data-test="dashboard-metric-copy-overlay"
+      >
+        <div
+          class="pointer-events-auto absolute"
+          v-for="m in metricItems"
+          :key="m.idx"
+          :style="metricZoneStyle(m)"
+          @mouseenter="hoveredMetricIdx = m.idx"
+          @mouseleave="hoveredMetricIdx = null"
+        >
+          <OButton
+            class="absolute"
+            v-show="hoveredMetricIdx === m.idx || metricCopiedIdx === m.idx"
+            variant="ghost"
+            size="icon-xs-sq"
+            :style="m.iconStyle"
+            @click="copyMetricItem(m)"
+            data-test="dashboard-metric-copy-btn"
+            :data-copied="metricCopiedIdx === m.idx ? 'true' : undefined"
+          >
+            <OIcon :name="metricCopiedIdx === m.idx ? 'check' : 'content-copy'" size="sm" />
+          </OButton>
+        </div>
+      </div>
+      <OEmptyState
         v-if="
+          noData &&
           !errorDetail?.message &&
           panelSchema.type != 'geomap' &&
           panelSchema.type != 'maps' &&
+          panelSchema.type != 'table' &&
           !loading
         "
-        class="noData"
+        size="inline"
+        icon="bar-chart"
+        :title="t('panel.noData')"
+        :backdrop="false"
         data-test="no-data"
-      >
-        {{ noData }}
-      </div>
+        class="noData [container-type:size] absolute! inset-0 h-full !min-h-0 w-full !p-2"
+      />
       <div
-        v-if="
-          errorDetail?.message &&
-          !panelSchema?.error_config?.custom_error_handeling
-        "
-        class="errorMessage"
+        v-if="errorDetail?.message && !panelSchema?.error_config?.custom_error_handeling"
+        class="absolute top-[20%] h-[80%] w-full overflow-hidden text-center text-ellipsis"
+        data-test="panel-schema-renderer-error-message"
       >
-        <q-icon size="md" name="warning" />
-        <div style="height: 80%; width: 100%">
+        <OIcon size="md" name="warning" />
+        <div class="h-4/5 w-full">
           {{
             errorDetail?.code?.toString().startsWith("4")
               ? errorDetail.message
-              : "Error Loading Data"
+              : t("common.errorLoadingData")
           }}
         </div>
       </div>
@@ -159,158 +166,48 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           !panelSchema?.error_config?.default_data_on_error &&
           panelSchema?.error_config?.custom_error_message
         "
-        class="customErrorMessage"
+        class="absolute top-[20%] h-[80%] w-full overflow-hidden text-center text-ellipsis"
+        data-test="panel-schema-renderer-custom-error-message"
       >
         {{ panelSchema?.error_config?.custom_error_message }}
       </div>
-      <div
-        class="row"
-        style="position: absolute; top: 0px; width: 100%; z-index: 999"
-      >
+      <div class="absolute top-0 z-999 flex w-full">
         <LoadingProgress
           :loading="loading"
           :loadingProgressPercentage="loadingProgressPercentage"
         />
       </div>
+
       <div
-        v-if="isCursorOverPanel"
-        class="flex items-center q-gutter-x-xs"
-        style="
-          position: absolute;
-          top: 0px;
-          right: 0px;
-          z-index: 9;
-          padding-right: 2px;
-          padding-top: 2px;
-        "
-        @click.stop
-      >
-        <q-btn
-          v-if="
-            showLegendsButton &&
-            noData !== 'No Data' &&
-            ![
-              'table',
-              'html',
-              'markdown',
-              'custom_chart',
-              'geomap',
-              'maps',
-              'heatmap',
-              'metric',
-              'gauge',
-            ].includes(panelSchema.type)
-          "
-          color="primary"
-          icon="format_list_bulleted"
-          round
-          outline
-          size="sm"
-          @click="$emit('show-legends')"
-          class="el-border"
-        >
-          <q-tooltip anchor="top middle" self="bottom right">
-            Show Legends
-          </q-tooltip>
-        </q-btn>
-        <q-btn
-          v-if="
-            [
-              'area',
-              'area-stacked',
-              'bar',
-              'h-bar',
-              'line',
-              'scatter',
-              'stacked',
-              'h-stacked',
-            ].includes(panelSchema.type) &&
-            checkIfPanelIsTimeSeries === true &&
-            allowAnnotationsAdd &&
-            !viewOnly
-          "
-          color="primary"
-          :icon="isAddAnnotationMode ? 'cancel' : 'edit'"
-          round
-          outline
-          size="sm"
-          @click="toggleAddAnnotationMode"
-          class="el-border"
-        >
-          <q-tooltip anchor="top middle" self="bottom right">
-            {{
-              isAddAnnotationMode ? "Exit Annotations Mode" : "Add Annotations"
-            }}
-          </q-tooltip>
-        </q-btn>
-      </div>
-      <div
-        style="
-          border: 1px solid gray;
-          border-radius: 4px;
-          padding: 3px;
-          position: absolute;
-          top: 0px;
-          left: 0px;
-          display: none;
-          text-wrap: nowrap;
-          z-index: 9999999;
-        "
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        class="rounded-default border-dropdown-border bg-dropdown-bg absolute top-0 left-0 z-9999999 hidden min-w-50 border px-0 py-1 whitespace-nowrap shadow-sm dark:shadow-sm"
+        data-test="drilldown-menu"
         ref="drilldownPopUpRef"
         @mouseleave="hidePopupsAndOverlays"
       >
-        <div
-          v-for="(drilldown, index) in drilldownArray"
-          :key="JSON.stringify(drilldown)"
-          class="drilldown-item q-px-sm q-py-xs"
-          style="
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            position: relative;
-          "
-        >
+        <template v-for="(drilldown, index) in drilldownArray" :key="JSON.stringify(drilldown)">
+          <OSeparator
+            v-if="
+              drilldown._isCrossLink &&
+              Number(index) > 0 &&
+              !drilldownArray[Number(index) - 1]._isCrossLink
+            "
+          />
           <div
+            class="text-dropdown-item-text hover:bg-dropdown-item-hover-bg active:bg-dropdown-item-active-bg flex cursor-pointer items-center px-4 py-2 text-sm transition-colors duration-200"
+            :data-test="`drilldown-menu-item-${drilldown.name}`"
             @click="openDrilldown(index)"
-            style="cursor: pointer; display: flex; align-items: center"
           >
-            <q-icon class="q-mr-xs q-mt-xs" size="16px" name="link" />
-            <span>{{ drilldown.name }}</span>
+            <OIcon size="xs" class="me-2" :name="drilldown._isCrossLink ? 'open-in-new' : 'link'" />
+            <span class="select-none">{{ drilldown.name }}</span>
           </div>
-        </div>
+        </template>
       </div>
       <div
-        style="
-          border: 1px solid gray;
-          border-radius: 4px;
-          padding: 3px;
-          position: absolute;
-          top: 0px;
-          left: 0px;
-          display: none;
-          max-width: 200px;
-          white-space: normal;
-          word-wrap: break-word;
-          overflow-wrap: break-word;
-          z-index: 9999999;
-        "
-        :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+        class="border-border-default rounded-default bg-surface-base absolute top-0 left-0 z-9999999 hidden max-w-50 border p-0.75 [overflow-wrap:break-word] whitespace-normal [word-wrap:break-word]"
         ref="annotationPopupRef"
       >
-        <div
-          class="q-px-sm q-py-xs"
-          style="
-            display: flex;
-            flex-direction: row;
-            align-items: center;
-            position: relative;
-            word-break: break-word;
-          "
-        >
-          <span style="word-break: break-word">{{
-            selectedAnnotationData.text
-          }}</span>
+        <div class="relative flex flex-row items-center px-2 py-1 break-words">
+          <span class="break-words">{{ selectedAnnotationData.text }}</span>
         </div>
       </div>
       <!-- Annotation Dialog -->
@@ -331,6 +228,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @close="hideContextMenu"
       />
     </div>
+
+    <!-- Cell explorer drawer -->
+    <ODrawer
+      v-model:open="cellDrawer.open"
+      side="right"
+      :width="75"
+      bleed
+      :title="t('panel.logExplorer.title')"
+      data-test="dashboard-cell-explorer-drawer"
+      @update:open="onCellDrawerOpenChange"
+    >
+      <DashboardLogDrawer
+        v-if="cellDrawer.open"
+        :stream="cellDrawer.stream"
+        :stream-type="cellDrawer.streamType"
+        :field="cellDrawer.field"
+        :value="cellDrawer.value"
+        :start-time="cellDrawer.startTime"
+        :end-time="cellDrawer.endTime"
+        :base-where="cellDrawer.baseWhere"
+      />
+    </ODrawer>
   </div>
 </template>
 
@@ -339,6 +258,7 @@ import {
   defineComponent,
   watch,
   ref,
+  shallowRef,
   toRefs,
   computed,
   inject,
@@ -348,29 +268,22 @@ import {
   onUnmounted,
 } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
+import { chartColor } from "@/utils/chartTheme";
+import { useI18nTyped } from "@/types/i18n";
 import { usePanelDataLoader } from "@/composables/dashboard/usePanelDataLoader";
 import { convertPanelData } from "@/utils/dashboard/convertPanelData";
-import useDashboardPanelData from "@/composables/useDashboardPanel";
-import {
-  getAllDashboardsByFolderId,
-  getDashboard,
-  getFoldersList,
-} from "@/utils/commons";
+import { getDataValue } from "@/utils/dashboard/aliasUtils";
+import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
 import { useRoute, useRouter } from "vue-router";
-import { b64EncodeUnicode, escapeSingleQuotes } from "@/utils/zincutils";
-import { generateDurationLabel } from "../../utils/date";
-import { onBeforeMount } from "vue";
-import { useLoading } from "@/composables/useLoading";
 import useNotifications from "@/composables/useNotifications";
-import {
-  getUTCTimestampFromZonedTimestamp,
-  validateSQLPanelFields,
-} from "@/utils/dashboard/convertDataIntoUnitValue";
+import { validateSQLPanelFields } from "@/utils/dashboard/panelValidation";
 import { useAnnotationsData } from "@/composables/dashboard/useAnnotationsData";
-import { event } from "quasar";
-import { exportFile } from "quasar";
 import LoadingProgress from "@/components/common/LoadingProgress.vue";
-import { throttle } from "lodash-es";
+import { usePanelAlertCreation, usePanelDownload } from "@/composables/dashboard/usePanelActions";
+import { usePanelDrilldown } from "@/composables/dashboard/usePanelDrilldown";
+import { overlayNewDataOnOldOptions, isOverlayEligible } from "@/utils/dashboard/streaming";
+import { detectChunkingDirection } from "@/utils/dashboard/chunkingDirection";
 
 const ChartRenderer = defineAsyncComponent(() => {
   return import("@/components/dashboards/panels/ChartRenderer.vue");
@@ -403,17 +316,31 @@ const MarkdownRenderer = defineAsyncComponent(() => {
 const AddAnnotation = defineAsyncComponent(() => {
   return import("./addPanel/AddAnnotation.vue");
 });
-const CustomChartRenderer = defineAsyncComponent(() => {
-  return import("./panels/CustomChartRenderer.vue");
-});
+// Statically imported by several route-level components, so it cannot be
+// code-split into its own chunk — import it statically to avoid the mixed
+// dynamic/static import build warning.
+import CustomChartRenderer from "./panels/CustomChartRenderer.vue";
 
 const AlertContextMenu = defineAsyncComponent(() => {
   return import("./AlertContextMenu.vue");
 });
 
+const DashboardLogDrawer = defineAsyncComponent(() => {
+  return import("./DashboardLogDrawer.vue");
+});
+
+import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import { copyToClipboard } from "@/utils/clipboard";
+import { calculateWidthText } from "@/utils/dashboard/chartDimensionUtils";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+
 export default defineComponent({
   name: "PanelSchemaRenderer",
   components: {
+    OSeparator,
     ChartRenderer,
     AlertContextMenu,
     TableRenderer,
@@ -425,6 +352,11 @@ export default defineComponent({
     AddAnnotation,
     CustomChartRenderer,
     LoadingProgress,
+    OButton,
+    OIcon,
+    OEmptyState,
+    ODrawer,
+    DashboardLogDrawer,
   },
   props: {
     selectedTimeObj: {
@@ -473,6 +405,11 @@ export default defineComponent({
       required: false,
       type: Boolean,
     },
+    allowAnnotationsAPI: {
+      default: true,
+      required: false,
+      type: Boolean,
+    },
     allowAlertCreation: {
       default: false,
       required: false,
@@ -511,6 +448,11 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    // Table preview's per-column format icon; explicit opt-in, not derived from `viewOnly` (which tracks print mode) — only PanelEditor sets this.
+    enableColumnFormat: {
+      type: Boolean,
+      default: false,
+    },
     shouldRefreshWithoutCache: {
       type: Boolean,
       required: false,
@@ -520,6 +462,24 @@ export default defineComponent({
       type: Boolean,
       required: false,
       default: false,
+    },
+    regionClusterParams: {
+      type: Object,
+      required: false,
+      default: undefined,
+    },
+    /**
+     * Pre-fetched PromQL results to render instead of the panel running its own
+     * query. `{ data, metadata?, resultMetaData? }`, where `data` is one entry
+     * per query (the shape the PromQL executor writes to `state.data`). Used by
+     * the metrics explorer, which owns the fetch lifecycle via its preview
+     * queue but still wants to render through this component. Undefined for
+     * normal dashboard panels, which fetch their own data.
+     */
+    injectedPromqlData: {
+      type: Object,
+      required: false,
+      default: undefined,
     },
   },
   emits: [
@@ -533,13 +493,17 @@ export default defineComponent({
     "updated:vrlFunctionFieldList",
     "loading-state-change",
     "limit-number-of-series-warning-message-update",
+    "sparkline-warning-update",
     "is-partial-data-update",
     "series-data-update",
     "contextmenu",
     "show-legends",
+    "format-column",
   ],
   setup(props, { emit }) {
     const store = useStore();
+    const { isDark } = useTheme();
+    const { t } = useI18nTyped();
     const route = useRoute();
     const router = useRouter();
 
@@ -558,16 +522,11 @@ export default defineComponent({
     // - PreviewAlert.vue (no page key) - doesn't need it
     // - PanelContainer.vue (no page key) - doesn't need it
     // - PreviewPromqlQuery.vue (no page key) - doesn't need it
-    //
-    // To avoid breaking these other contexts, we:
-    // 1. Inject with null default to detect if page key was explicitly provided
-    // 2. Only call useDashboardPanelData if a page key exists
-    // 3. Return empty array [] if no hiddenQueries (no filtering applied)
     // ============================================================================
 
     const dashboardPanelDataPageKey: any = inject(
       "dashboardPanelDataPageKey",
-      null // null default allows us to detect if key was provided
+      null, // null default allows us to detect if key was provided
     );
 
     // Only access the composable if we're in a context that provides a page key
@@ -575,7 +534,7 @@ export default defineComponent({
     // wrong panel data in contexts that don't need the hiding feature
     let dashboardPanelDataForHiding: any = null;
     if (dashboardPanelDataPageKey) {
-      const result = useDashboardPanelData(dashboardPanelDataPageKey);
+      const result = useDashboardPanelData(dashboardPanelDataPageKey, t);
       dashboardPanelDataForHiding = result.dashboardPanelData;
     }
 
@@ -585,12 +544,12 @@ export default defineComponent({
       return dashboardPanelDataForHiding?.layout?.hiddenQueries || [];
     });
 
-    // stores the converted data which can be directly used for rendering different types of panels
-    const panelData: any = ref({}); // holds the data to render the panel after getting data from the api based on panel config
+    const panelData: any = shallowRef({}); // holds the data to render the panel after getting data from the api based on panel config
     const chartPanelRef: any = ref(null); // holds the ref to the whole div
-    const drilldownArray: any = ref([]);
+    const chartRendererRef: any = ref(null); // holds the ref to the ChartRenderer component
     const selectedAnnotationData: any = ref([]);
     const drilldownPopUpRef: any = ref(null);
+
     const annotationPopupRef: any = ref(null);
 
     const limitNumberOfSeriesWarningMessage: any = ref("");
@@ -605,6 +564,97 @@ export default defineComponent({
       isCursorOverPanel.value = true;
     };
 
+    // Metric chart: one copy icon per rendered value (multi-SQL renders many).
+    // Values are already unit/decimal/timestamp formatted at the metric level;
+    // _metricLayout gives the canvas pixel position so the icon sits beside it.
+    // Values whose cell has no overlap-free spot for the icon are dropped —
+    // no copy affordance beats covering the digits.
+    const metricItems = computed(() => {
+      if (props.panelSchema?.type !== "metric") return [];
+      const series = panelData.value?.options?.series ?? [];
+      return series
+        .map((s: any, idx: number) => ({
+          idx,
+          text: s?._metricText,
+          layout: s?._metricLayout,
+        }))
+        .filter((m: any) => {
+          if (!m.layout || m.text == null || String(m.text).trim() === "") return false;
+          const num = parseFloat(
+            String(m.text)
+              .replace(/,/g, "")
+              .replace(/[^0-9.eE+-]/g, ""),
+          );
+          return Number.isNaN(num) || num !== 0;
+        })
+        .map((m: any) => ({ ...m, iconStyle: metricIconStyle(m) }))
+        .filter((m: any) => m?.iconStyle !== null);
+    });
+    // Hover zone = each value's grid cell.
+    const metricZoneStyle = (m: any) => ({
+      left: `${m?.layout?.left ?? 0}px`,
+      top: `${m?.layout?.top ?? 0}px`,
+      width: `${m?.layout?.width ?? 0}px`,
+      height: `${m?.layout?.height ?? 0}px`,
+    });
+    // Fixed copy-button size (icon-xs-sq), matching the table chart.
+    const COPY_BTN_PX = 28;
+    // Icon placement: beside the value (the font fit reserves the slot),
+    // else wrapped below/above it, else docked at the right edge (tiny cells).
+    const metricIconStyle = (m: any) => {
+      const layout = m?.layout;
+      if (!layout) return null;
+      const fs = layout?.fontSize || 24;
+      const width = layout?.width ?? 0;
+      const height = layout?.height ?? 0;
+      const cxLocal = (layout?.cx ?? 0) - (layout?.left ?? 0);
+      const cyLocal = (layout?.cy ?? 0) - (layout?.top ?? 0);
+      const textWidth = calculateWidthText(String(m?.text ?? ""), `${fs}px`);
+
+      const besideLeft = cxLocal + textWidth / 2 + 2;
+      if (besideLeft + COPY_BTN_PX + 2 <= width && height >= COPY_BTN_PX) {
+        return {
+          left: `${besideLeft}px`,
+          top: `${Math.min(Math.max(cyLocal, COPY_BTN_PX / 2), height - COPY_BTN_PX / 2)}px`,
+          transform: "translateY(-50%)",
+        };
+      }
+
+      const centeredLeft = Math.max(0, Math.min(cxLocal - COPY_BTN_PX / 2, width - COPY_BTN_PX));
+      // rendered line is ~1.2em tall around the vertical center
+      const halfTextHeight = (fs * 1.2) / 2;
+      const belowTop = cyLocal + halfTextHeight + (layout?.labelClearance ?? 0) + 2;
+      if (belowTop + COPY_BTN_PX <= height) {
+        return { left: `${centeredLeft}px`, top: `${belowTop}px` };
+      }
+      const aboveTop = cyLocal - halfTextHeight - 2 - COPY_BTN_PX;
+      if (aboveTop >= 0) {
+        return { left: `${centeredLeft}px`, top: `${aboveTop}px` };
+      }
+
+      // cell too small for any clean spot — dock at the right edge with a
+      // solid background so the icon stays legible over the value's edge
+      return {
+        left: `${Math.max(0, width - COPY_BTN_PX - 2)}px`,
+        top: `${Math.max(cyLocal, COPY_BTN_PX / 2)}px`,
+        transform: "translateY(-50%)",
+        backgroundColor: (void isDark.value, chartColor("--color-surface-base")),
+        // eslint-disable-next-line local/no-hardcoded-px -- optical effect, not layout — scaling it with text makes elevation bloom
+        boxShadow: "0 0 3px rgba(0, 0, 0, 0.35)",
+      };
+    };
+    const hoveredMetricIdx = ref<number | null>(null);
+    const metricCopiedIdx = ref<number | null>(null);
+    const copyMetricItem = (m: any) => {
+      if (m?.text == null) return;
+      copyToClipboard(String(m.text), t, { silent: true }).then(() => {
+        metricCopiedIdx.value = m?.idx;
+        setTimeout(() => {
+          if (metricCopiedIdx.value === m.idx) metricCopiedIdx.value = null;
+        }, 3000);
+      });
+    };
+
     // get refs from props
     const {
       panelSchema,
@@ -616,6 +666,7 @@ export default defineComponent({
       folderId,
       reportId,
       allowAnnotationsAdd,
+      allowAnnotationsAPI,
       allowAlertCreation,
       runId,
       tabId,
@@ -625,7 +676,8 @@ export default defineComponent({
       searchResponse,
       is_ui_histogram,
       shouldRefreshWithoutCache,
-      showLegendsButton,
+      regionClusterParams,
+      injectedPromqlData,
     } = toRefs(props);
     // calls the apis to get the data based on the panel config
     let {
@@ -634,6 +686,8 @@ export default defineComponent({
       errorDetail,
       metadata,
       resultMetaData,
+      sparklineData,
+      sparklineWarning,
       annotations,
       lastTriggeredAt,
       isCachedDataDifferWithCurrentTimeRange,
@@ -658,6 +712,9 @@ export default defineComponent({
       dashboardName,
       folderName,
       shouldRefreshWithoutCache,
+      regionClusterParams,
+      allowAnnotationsAPI,
+      injectedPromqlData,
     );
 
     const {
@@ -668,6 +725,7 @@ export default defineComponent({
       toggleAddAnnotationMode,
       handleAddAnnotation,
       closeAddAnnotation,
+      disableAddAnnotationMode,
       fetchAllPanels,
       panelsList,
     } = useAnnotationsData(
@@ -675,6 +733,7 @@ export default defineComponent({
       dashboardId.value,
       panelSchema.value.id,
       folderId.value,
+      t,
     );
 
     // Filter data based on hiddenQueries for PromQL panels
@@ -684,173 +743,112 @@ export default defineComponent({
         return data.value;
       }
 
-      // Only filter for PromQL queries
-      if (panelSchema.value.queryType !== "promql") {
-        return data.value;
-      }
-
       // If no hidden queries or empty array, return as is
-      if (
-        !hiddenQueries.value ||
-        hiddenQueries.value.length === 0 ||
-        !Array.isArray(data.value)
-      ) {
+      if (!hiddenQueries.value || hiddenQueries.value.length === 0 || !Array.isArray(data.value)) {
         return data.value;
       }
 
-      // Filter out hidden queries
+      // Filter out hidden queries by index (works for both SQL and PromQL)
       const filtered = data.value.filter(
         (_: any, index: number) => !hiddenQueries.value.includes(index),
       );
 
-      // Return filtered data
       return filtered;
+    });
+
+    // Keep metric sparkline hits index-aligned with filteredData (same filter).
+    const filteredSparklineData = computed(() => {
+      const sd = sparklineData?.value;
+      if (!Array.isArray(sd)) return sd;
+      if (!hiddenQueries.value || hiddenQueries.value.length === 0) return sd;
+      return sd.filter((_: any, index: number) => !hiddenQueries.value.includes(index));
+    });
+
+    // Also filter panelSchema.queries in sync with filteredData
+    // to keep data[i] aligned with queries[i] in convertMultiSQLData
+    const filteredPanelSchema = computed(() => {
+      if (
+        panelSchema.value.queryType === "promql" ||
+        !hiddenQueries.value?.length ||
+        !Array.isArray(panelSchema.value.queries)
+      ) {
+        return panelSchema.value;
+      }
+
+      return {
+        ...panelSchema.value,
+        queries: panelSchema.value.queries.filter(
+          (_: any, i: number) => !hiddenQueries.value.includes(i),
+        ),
+      };
+    });
+
+    // The latest metadata chunk's time_offset.start_time (┬╡s) marks the left boundary
+    // of data received so far. Also pull the full query start so the overlay function
+    // can compute the fraction against the complete query range, not just received data.
+    // Direction-aware boundary for the streaming overlay.
+    //
+    //  - RTL (chunks arrive newest-first): fresh data is to the RIGHT of
+    //    `boundaryTime`. Overlay covers the stale LEFT portion. boundaryTime
+    //    is the LAST entry's time_offset.start_time (earliest received).
+    //  - LTR (chunks arrive earliest-first): fresh data is to the LEFT of
+    //    `boundaryTime`. Overlay covers the stale RIGHT portion. boundaryTime
+    //    is the LAST entry's time_offset.end_time (latest received).
+    //
+    // Times are in microseconds to match resultMetaData; convert to ms downstream.
+    const overlayBoundaryInfo = computed(() => {
+      const resultMeta = resultMetaData.value?.[0];
+      const queryStart = Number(metadata.value?.queries?.[0]?.startTime ?? 0);
+      const queryEnd = Number(metadata.value?.queries?.[0]?.endTime ?? 0);
+      // PromQL always streams LTR (oldest timestamps first), no time_offset.
+      const isPromQL = panelSchema.value?.queryType === "promql";
+
+      if (isPromQL || !resultMeta?.length) {
+        return { boundaryTime: 0, queryStart, queryEnd, isLTR: isPromQL };
+      }
+
+      const firstEntry = resultMeta[0];
+      const lastEntry = resultMeta[resultMeta.length - 1];
+
+      const isLTR =
+        detectChunkingDirection(
+          firstEntry?.time_offset?.start_time ?? 0,
+          firstEntry?.time_offset?.end_time ?? 0,
+          queryStart,
+          queryEnd,
+        ) ?? false;
+
+      const boundaryTime = isLTR
+        ? (lastEntry?.time_offset?.end_time ?? 0)
+        : (lastEntry?.time_offset?.start_time ?? 0);
+
+      return { boundaryTime, queryStart, queryEnd, isLTR };
     });
 
     // need tableRendererRef to access downloadTableAsCSV method
     const tableRendererRef: any = ref(null);
 
-    // Context menu state for alert creation
-    const contextMenuVisible = ref(false);
-    const contextMenuPosition = ref({ x: 0, y: 0 });
-    const contextMenuValue = ref(0);
+    // Context menu state for alert creation (shared with usePanelAlertCreation)
     const contextMenuData = ref<any>(null);
 
-    const onChartContextMenu = (event: any) => {
-      // Emit contextmenu event for general usage (drilldowns, annotations, etc.)
-      emit("contextmenu", {
-        ...event,
-        panelTitle: panelSchema.value.title,
-        panelId: panelSchema.value.id,
-      });
-    };
-
-    const onChartDomContextMenu = (event: any) => {
-      // Handle DOM contextmenu event specifically for alert creation
-      if (!allowAlertCreation.value) {
-        return;
-      }
-
-      contextMenuVisible.value = true;
-      contextMenuPosition.value = { x: event.x, y: event.y };
-      contextMenuValue.value = event.value;
-      contextMenuData.value = event;
-    };
-
-    const hideContextMenu = () => {
-      contextMenuVisible.value = false;
-    };
-
-    const handleCreateAlert = (selection: {
-      condition: string;
-      threshold: number;
-    }) => {
-      hideContextMenu();
-
-      // Prepare panel data to pass to alert creation
-      const query = panelSchema.value.queries?.[0];
-      if (!query) {
-        return;
-      }
-
-      // Determine query type based on panel configuration
-      // Only care about SQL vs PromQL distinction
-      let queryType = "sql"; // Default to SQL
-      if (panelSchema.value.queryType === "promql") {
-        queryType = "promql";
-      }
-
-      // Get the executed query with variables replaced from metadata
-      // Only use metadata if it's available and has queries
-      const executedQuery =
-        metadata.value?.queries && metadata.value.queries.length > 0
-          ? metadata.value.queries[0]?.query || query.query
-          : query.query;
-
-      // Get the Y-axis column for threshold comparison
-      // Only needed for SQL queries, not for PromQL
-      let yAxisColumn = null;
-
-      if (queryType === "sql") {
-        const clickedSeriesName = contextMenuData.value?.seriesName;
-        const sqlQuery = executedQuery || query.query;
-
-        // First, try to get from query.fields.y if available (most reliable for query builder)
-        if (query.fields?.y && query.fields.y.length > 0) {
-          // For query builder queries, use the Y-axis field
-          const yField = query.fields.y[0];
-          const aliasOrColumn = yField.alias || yField.column;
-
-          // Extract from SQL to get the exact case (without quotes)
-          if (sqlQuery) {
-            // Look for pattern: aggregation_func(...) as "alias" or aggregation_func(...) as alias
-            const escapedAlias = aliasOrColumn.replace(
-              /[.*+?^${}()|[\]\\]/g,
-              "\\$&",
-            );
-            const regex = new RegExp(
-              `\\s+as\\s+(["']?${escapedAlias}["']?)(?:\\s|,|\\)|$)`,
-              "i",
-            );
-            const match = sqlQuery.match(regex);
-            if (match && match[1]) {
-              // Strip quotes - the parser will add them back if needed
-              yAxisColumn = match[1].replace(/^["']|["']$/g, "");
-            } else {
-              yAxisColumn = aliasOrColumn;
-            }
-          } else {
-            yAxisColumn = aliasOrColumn;
-          }
-        } else if (clickedSeriesName && sqlQuery) {
-          // Fallback: try to match the clicked series name in the SQL
-          // First try exact match with the series name
-          const regex = new RegExp(
-            `\\s+as\\s+["']?(${clickedSeriesName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")})["']?(?:\\s|,|\\)|$)`,
-            "i",
-          );
-          const match = sqlQuery.match(regex);
-          if (match && match[1]) {
-            yAxisColumn = match[1];
-          } else {
-            // Last resort: extract any aggregation column from SQL (first one found)
-            // Pattern: count(...) as alias, avg(...) as alias, etc.
-            const aggRegex =
-              /(?:count|sum|avg|min|max|median)\s*\([^)]+\)\s+as\s+["']?([^"',\s)]+)["']?/i;
-            const aggMatch = sqlQuery.match(aggRegex);
-            if (aggMatch && aggMatch[1]) {
-              yAxisColumn = aggMatch[1];
-            } else {
-              yAxisColumn = clickedSeriesName;
-            }
-          }
-        }
-      }
-
-      const panelDataToPass = {
-        panelTitle: panelSchema.value.title || "Unnamed Panel",
-        panelId: panelSchema.value.id,
-        queries: panelSchema.value.queries,
-        queryType: queryType,
-        timeRange: selectedTimeObj.value,
-        threshold: selection.threshold,
-        condition: selection.condition,
-        // Pass the Y-axis column name for threshold comparison
-        yAxisColumn: yAxisColumn,
-        // Pass the executed query with variables already replaced
-        executedQuery: executedQuery,
-      };
-
-      // Navigate to alert creation page
-      router.push({
-        name: "addAlert",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-          fromPanel: "true",
-          panelData: encodeURIComponent(JSON.stringify(panelDataToPass)),
-        },
-      });
-    };
+    const {
+      contextMenuVisible,
+      contextMenuPosition,
+      contextMenuValue,
+      onChartContextMenu,
+      onChartDomContextMenu,
+      hideContextMenu,
+      handleCreateAlert,
+    } = usePanelAlertCreation({
+      panelSchema,
+      allowAlertCreation,
+      metadata,
+      selectedTimeObj,
+      contextMenuData,
+      store,
+      router,
+      emit,
+    });
 
     // hovered series state
     // used to show tooltip axis for all charts
@@ -866,26 +864,19 @@ export default defineComponent({
 
       const currentXLabel =
         panelSchema?.value?.type == "table"
-          ? "First Column"
+          ? t("panel.firstColumn")
           : panelSchema?.value?.type == "h-bar"
-            ? "Y-Axis"
-            : "X-Axis";
+            ? t("panel.yAxisShort")
+            : t("panel.xAxisShort");
 
       const currentYLabel =
         panelSchema?.value?.type == "table"
-          ? "Other Columns"
+          ? t("panel.otherColumn")
           : panelSchema?.value?.type == "h-bar"
-            ? "X-Axis"
-            : "Y-Axis";
+            ? t("panel.xAxisShort")
+            : t("panel.yAxisShort");
 
-      validateSQLPanelFields(
-        panelSchema.value,
-        0,
-        currentXLabel,
-        currentYLabel,
-        errors,
-        true,
-      );
+      validateSQLPanelFields(t, panelSchema.value, 0, currentXLabel, currentYLabel, errors, true);
 
       return errors;
     });
@@ -894,14 +885,18 @@ export default defineComponent({
 
     //inject variablesAndPanelsDataLoadingState from parent
     // default values will be empty object of panels and variablesData
-    const variablesAndPanelsDataLoadingState: any = inject(
-      "variablesAndPanelsDataLoadingState",
-      { panels: {}, variablesData: {}, searchRequestTraceIds: {} },
-    );
+    const variablesAndPanelsDataLoadingState: any = inject("variablesAndPanelsDataLoadingState", {
+      panels: {},
+      variablesData: {},
+      searchRequestTraceIds: {},
+    });
 
     // Watch loading state changes and emit them to parent
     watch(loading, (newLoadingState) => {
       emit("loading-state-change", newLoadingState);
+      if (newLoadingState) {
+        disableAddAnnotationMode();
+      }
     });
 
     // on loading state change, update the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -928,7 +923,6 @@ export default defineComponent({
     onMounted(async () => {
       // fetch all panels
       await fetchAllPanels();
-      panelsList.value = panelsList.value;
     });
 
     // When switching of tab was done, reset the loading state of the panels in variablesAndPanelsDataLoadingState
@@ -950,16 +944,27 @@ export default defineComponent({
       drilldownPopUpRef.value = null;
       annotationPopupRef.value = null;
       tableRendererRef.value = null;
-      parser = null;
     });
-    const convertPanelDataCommon = async () => {
-      if (
-        !errorDetail?.value?.message &&
-        validatePanelData?.value?.length === 0
-      ) {
+    const convertPanelDataCommon = async (applyOverlay = false) => {
+      // Preserve the previously rendered chart during a reload. While loading,
+      // if the new data buffer has no rows yet but a chart is already rendered,
+      // skip conversion so non-streaming callers (the panelSchema deep watcher,
+      // resize observer, etc.) can't replace it with an empty 0-series result
+      // before the first streaming chunk arrives. The streaming overlay path
+      // (applyOverlay=true) and loading=false final renders are unaffected.
+      const hasRows =
+        data.value?.length > 0 &&
+        (data.value[0]?.result?.length > 0 ||
+          (Array.isArray(data.value[0]) && data.value[0].length > 0));
+      const hasOldChart = panelData.value?.options?.series?.length > 0;
+      if (!applyOverlay && loading.value && !hasRows && hasOldChart) {
+        return;
+      }
+
+      if (!errorDetail?.value?.message && validatePanelData?.value?.length === 0) {
         try {
-          panelData.value = await convertPanelData(
-            panelSchema.value,
+          const result = await convertPanelData(
+            filteredPanelSchema.value,
             filteredData.value,
             store,
             chartPanelRef,
@@ -969,7 +974,111 @@ export default defineComponent({
             chartPanelStyle.value,
             annotations,
             loading.value,
+            filteredSparklineData.value,
           );
+
+          // Apply overlay BEFORE assigning to panelData.value.
+          // This ensures a single watcher trigger with the overlaid options,
+          // avoiding the double-setOption issue (one without graphic, one with).
+          // Even without old data, overlay adds phantom anchor points so the
+          // first streaming chunk doesn't fill the entire chart width.
+          if (applyOverlay) {
+            const hasFullOverlay =
+              previousOptionsSnapshot &&
+              isOverlayEligible(panelSchema.value, previousOptionsSnapshot);
+
+            // Pass container dimensions so the overlay can calculate
+            // graphic width/height and barMaxWidth for bar charts.
+            const containerEl = chartPanelRef.value;
+            const containerSize = containerEl
+              ? {
+                  width: containerEl.clientWidth,
+                  height: containerEl.clientHeight,
+                }
+              : undefined;
+            const boundaryInfo = overlayBoundaryInfo.value;
+            // Resolve the primary theme color using the same priority as App.vue:
+            // 1. Vuex tempThemeColors (live preview)
+            // 2. localStorage saved color
+            // 3. Org settings color
+            // 4. Default theme color from store
+            const _themeMode = isDark.value ? "dark" : "light";
+            const primaryColor: string =
+              (_themeMode === "dark"
+                ? store.state.tempThemeColors?.dark
+                : store.state.tempThemeColors?.light) ||
+              window.localStorage.getItem(
+                _themeMode === "dark" ? "customDarkColor" : "customLightColor",
+              ) ||
+              (_themeMode === "dark"
+                ? store.state?.organizationData?.organizationSettings?.dark_mode_theme_color
+                : store.state?.organizationData?.organizationSettings?.light_mode_theme_color) ||
+              (_themeMode === "dark"
+                ? store.state.defaultThemeColors?.dark
+                : store.state.defaultThemeColors?.light) ||
+              "#3F7994";
+            const meta = resultMetaData.value?.[0]?.[0];
+            // SQL: histogram_interval in seconds. PromQL: step in µs.
+            const histogramIntervalMs = meta?.histogram_interval
+              ? meta.histogram_interval * 1000
+              : meta?.step
+                ? meta.step / 1000
+                : 0;
+
+            // For PromQL (no time_offset), derive boundaryTime from the
+            // last timestamp in the new series data (LTR: fresh edge).
+            // Convert ms → µs to match the boundaryTime convention.
+            let { boundaryTime } = boundaryInfo;
+            if (!boundaryTime && boundaryInfo.isLTR && result.options?.series) {
+              for (const s of result.options.series) {
+                if (!s.name || !Array.isArray(s.data) || !s.data.length) continue;
+                const lastPt = s.data[s.data.length - 1];
+                if (!Array.isArray(lastPt)) continue;
+                const t = typeof lastPt[0] === "number" ? lastPt[0] : new Date(lastPt[0]).getTime();
+                if (!isNaN(t) && t * 1000 > boundaryTime) {
+                  boundaryTime = t * 1000; // ms → µs
+                }
+              }
+            }
+
+            // Refresh _gridRect from the live chart so the overlay tracks
+            // the current grid dimensions. The snapshot captured at stream
+            // start can be stale if y-axis labels grew wider (larger values)
+            // or if bottom spacing changed during streaming.
+            if (hasFullOverlay && previousOptionsSnapshot) {
+              try {
+                const chartInstance = chartRendererRef.value?.chart;
+                if (chartInstance) {
+                  const gridModel = chartInstance?.getModel()?.getComponent("grid");
+                  const freshRect = gridModel?.coordinateSystem?.getRect();
+                  if (freshRect) {
+                    previousOptionsSnapshot._gridRect = {
+                      x: freshRect.x,
+                      y: freshRect.y,
+                      width: freshRect.width,
+                      height: freshRect.height,
+                    };
+                  }
+                }
+              } catch {
+                // Keep existing _gridRect if chart isn't ready
+              }
+            }
+
+            result.options = overlayNewDataOnOldOptions(
+              hasFullOverlay ? previousOptionsSnapshot : null,
+              result.options,
+              containerSize,
+              hasFullOverlay ? boundaryTime : undefined,
+              boundaryInfo.queryStart,
+              boundaryInfo.queryEnd,
+              boundaryInfo.isLTR,
+              primaryColor,
+              histogramIntervalMs,
+            );
+          }
+
+          panelData.value = result;
 
           limitNumberOfSeriesWarningMessage.value =
             panelData.value?.extras?.limitNumberOfSeriesWarningMessage ?? "";
@@ -992,9 +1101,7 @@ export default defineComponent({
           panelSchema.value?.error_config?.custom_error_handeling &&
           panelSchema.value?.error_config?.default_data_on_error
         ) {
-          data.value = JSON.parse(
-            panelSchema.value?.error_config?.default_data_on_error,
-          );
+          data.value = JSON.parse(panelSchema.value?.error_config?.default_data_on_error);
           errorDetail.value = {
             message: "",
             code: "",
@@ -1003,16 +1110,15 @@ export default defineComponent({
       }
     };
 
-    // Track if we've rendered the first chunk with actual data
-    let hasRenderedFirstDataChunk = ref(false);
+    // --- Streaming overlay state ---
+    // Snapshot of old panelData.options taken when streaming starts (for refresh overlay).
+    // Immutable once set — each chunk overlays against the same original.
+    let previousOptionsSnapshot: any = null;
 
-    // Create a throttled version for streaming updates (350ms throttle)
-    // Chunks arrive ~300-400ms apart, so 350ms ensures updates every 2-3 chunks
-    // This prevents excessive re-renders while showing progressive updates
-    const convertPanelDataThrottled = throttle(convertPanelDataCommon, 350, {
-      leading: true,  // Call immediately on first invocation
-      trailing: true  // Ensure final call after throttle period
-    });
+    // Guard flag to prevent double final render when the stream ends with a
+    // simultaneous data change. Both watch([data,...]) and watch(loading) fire
+    // in the same tick — this ensures only the first one executes the render.
+    let streamEndRenderPending = false;
 
     // Watch for panel schema changes to re-convert panel data
     watch(
@@ -1052,35 +1158,49 @@ export default defineComponent({
     );
 
     watch(
-      [
-        data,
-        () => store?.state?.theme,
-        () => store?.state?.timezone,
-        annotations
-      ],
+      [data, () => store?.state?.theme, () => store?.state?.timezone, annotations, sparklineData],
       async () => {
-        // emit vrl function field list
-        if (data.value?.length && data.value[0] && data.value[0].length) {
-          // Find the index of the record with max attributes
-          const maxAttributesIndex = data.value[0].reduce(
-            (
-              maxIndex: string | number | any,
-              obj: {},
-              currentIndex: any,
-              array: Array<Record<string, unknown>>,
-            ) => {
-              const numAttributes = Object.keys(obj).length;
-              const maxNumAttributes = Object.keys(array[maxIndex]).length;
-              return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
-            },
-            0,
-          );
-
-          const recordwithMaxAttribute = data.value[0][maxAttributesIndex];
-
-          const responseFields = Object.keys(recordwithMaxAttribute);
-
-          emit("updated:vrlFunctionFieldList", responseFields);
+        // emit vrl function field list per query index
+        if (data.value?.length) {
+          // data.value is in compacted/executor order (empty queries are
+          // skipped, time-shift queries expand into multiple entries), which
+          // does NOT line up with the panel query (tab) index. Re-key the
+          // detected fields by panelQueryIndex so downstream per-query field
+          // storage maps to the correct query tab. Build a DENSE array (one
+          // slot per panel query, default []) so the consumer's
+          // Array.isArray(fieldList[0]) format check and forEach both see every
+          // index even when a query returned no rows.
+          // Size the array to cover BOTH the panel's queries and the actual
+          // data results (data.value can have more entries than panel queries,
+          // e.g. time-shift expansion), so no query's fields are dropped.
+          const totalQueries = Math.max(panelSchema.value?.queries?.length ?? 0, data.value.length);
+          const perQueryFields: string[][] = Array.from({ length: totalQueries }, () => []);
+          for (let qi = 0; qi < data.value.length; qi++) {
+            const panelIdx = metadata.value?.queries?.[qi]?.panelQueryIndex ?? qi;
+            const queryData = data.value[qi];
+            if (
+              queryData &&
+              queryData.length &&
+              panelIdx >= 0 &&
+              panelIdx < perQueryFields.length
+            ) {
+              const maxAttributesIndex = queryData.reduce(
+                (
+                  maxIndex: string | number | any,
+                  obj: {},
+                  currentIndex: any,
+                  array: Array<Record<string, unknown>>,
+                ) => {
+                  const numAttributes = Object.keys(obj).length;
+                  const maxNumAttributes = Object.keys(array[maxIndex]).length;
+                  return numAttributes > maxNumAttributes ? currentIndex : maxIndex;
+                },
+                0,
+              );
+              perQueryFields[panelIdx] = Object.keys(queryData[maxAttributesIndex]);
+            }
+          }
+          emit("updated:vrlFunctionFieldList", perQueryFields);
         }
         if (panelData.value.chartType == "custom_chart")
           errorDetail.value = {
@@ -1089,30 +1209,104 @@ export default defineComponent({
           };
 
         // Check if this is the first chunk with actual data
-        const hasData = data.value?.length > 0 &&
-                       data.value[0]?.result?.length > 0;
+        // SQL queries have data.value[0] as an array of hits (not an object with .result)
+        // PromQL queries have data.value[0] as an object with .result property
+        const hasData =
+          data.value?.length > 0 &&
+          (data.value[0]?.result?.length > 0 ||
+            (Array.isArray(data.value[0]) && data.value[0].length > 0));
 
-        // Use throttled version during loading (streaming), immediate version when complete
-        // This prevents excessive re-renders during PromQL data streaming
         if (loading.value) {
-          // First chunk with actual data: render immediately!
-          if (hasData && !hasRenderedFirstDataChunk.value) {
-            hasRenderedFirstDataChunk.value = true;
-            await convertPanelDataCommon();
-          } else {
-            // Subsequent chunks: throttle to reduce re-render frequency
-            await convertPanelDataThrottled();
+          // ---- STREAMING (chunks arriving) ----
+          // Every chunk overlays against previousOptionsSnapshot (captured
+          // once in the loading watcher when streaming starts), or falls back
+          // to phantom anchors when no snapshot is available.
+          if (hasData) {
+            await convertPanelDataCommon(true);
           }
+          // else: no data yet → skip conversion → loading bar shown
         } else {
-          // Loading complete: immediate final render with full data
-          // Cancel any pending throttled calls and render immediately
-          convertPanelDataThrottled.cancel();
-          hasRenderedFirstDataChunk.value = false; // Reset for next query
+          // ---- LOADING COMPLETE ----
+          // Skip refresh-reset firings: when the executor sets state.data = []
+          // at the start of a new query, this watcher fires with hasData=false
+          // while loading hasn't yet been flipped to true. If we converted here
+          // we'd assign an empty result to panelData.value, destroying the
+          // previous chart before the streaming first-chunk can snapshot it
+          // for the overlay. True zero-result completions are handled by the
+          // watch(loading, ...) handler below.
+          if (!hasData && panelData.value?.options?.series?.length > 0) {
+            return;
+          }
+
+          // Claim the final render before awaiting so that watch(loading),
+          // which fires in the same tick, sees the flag and skips its render.
+          streamEndRenderPending = true;
+
+          // Final render with FULL data — no overlay needed (new data is complete)
           await convertPanelDataCommon();
+
+          streamEndRenderPending = false;
+
+          // Clear streaming state — old snapshot no longer needed
+          if (previousOptionsSnapshot) {
+            previousOptionsSnapshot = null;
+          }
         }
       },
       { deep: true },
     );
+
+    // Watch loading to bookend each streaming session.
+    // Start (false→true): snapshot the current chart for the overlay.
+    //   Every chunk overlays against this same original — the snapshot is
+    //   immutable from here until the stream ends.
+    // End (true→false): do the final render without overlay (unless the
+    //   data watcher already claimed it via streamEndRenderPending) and
+    //   clear the snapshot so the next stream captures fresh.
+    watch(loading, async (newLoading, oldLoading) => {
+      if (oldLoading === false && newLoading === true) {
+        const hasOldChart = panelData.value?.options?.series?.length > 0;
+        if (hasOldChart) {
+          previousOptionsSnapshot = JSON.parse(JSON.stringify(panelData.value.options));
+          previousOptionsSnapshot._chartType = panelSchema.value?.type;
+          previousOptionsSnapshot._queryCount = panelSchema.value?.queries?.length;
+
+          // Capture actual grid pixel rect from the ECharts instance.
+          // With containLabel: true, the actual plot area differs from raw grid config.
+          // WARNING: getModel().getComponent() is an ECharts internal API, not public.
+          // Validated against echarts 5.6.0. Revisit if ECharts is upgraded.
+          try {
+            const chartInstance = chartRendererRef.value?.chart;
+            if (chartInstance) {
+              const gridModel = chartInstance?.getModel()?.getComponent("grid");
+              const gridRect = gridModel?.coordinateSystem?.getRect();
+              if (gridRect) {
+                previousOptionsSnapshot._gridRect = {
+                  x: gridRect.x,
+                  y: gridRect.y,
+                  width: gridRect.width,
+                  height: gridRect.height,
+                };
+              }
+            }
+          } catch {
+            // Ignore — will fall back to grid config values in overlay
+          }
+        }
+      } else if (oldLoading === true && newLoading === false) {
+        // If the data watcher's else-branch already claimed the final render
+        // (simultaneous data + loading change in the same tick), skip here.
+        if (streamEndRenderPending) return;
+
+        // Final render with complete data — no overlay
+        await convertPanelDataCommon();
+
+        // Clear streaming state
+        if (previousOptionsSnapshot) {
+          previousOptionsSnapshot = null;
+        }
+      }
+    });
 
     const checkIfPanelIsTimeSeries = computed(() => {
       return panelData.value?.extras?.isTimeSeries;
@@ -1137,7 +1331,7 @@ export default defineComponent({
 
     // ResizeObserver to detect chartPanelRef dimension changes
     let resizeObserver: ResizeObserver | null = null;
-    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+    let resizeTimeout: number | null = null;
 
     onMounted(() => {
       if (chartPanelRef.value) {
@@ -1160,6 +1354,37 @@ export default defineComponent({
       }
     });
 
+    // Restore the cell drawer when navigating to a URL that already carries cell-explorer params.
+    onMounted(() => {
+      const query = route?.query;
+      if (!query || String(query.cell_panel) !== String(props.panelSchema.id)) return;
+      if (props.panelSchema.type !== "table" || props.panelSchema.queryType === "promql") return;
+      const field = String(query.cell_field ?? "");
+      const rawValue = String(query.cell_value ?? "");
+      const value: string | number =
+        String(query.cell_vtype) === "number" &&
+        rawValue !== "" &&
+        Number.isFinite(Number(rawValue))
+          ? Number(rawValue)
+          : rawValue;
+      const stream = String(query.cell_stream ?? "");
+      const stype = String(query.cell_stype ?? "logs");
+      const t0 = Number(query.cell_t0 ?? 0);
+      const t1 = Number(query.cell_t1 ?? 0);
+      const SQL_IDENT = /^[A-Za-z_][A-Za-z0-9_.]*$/;
+      if (!SQL_IDENT.test(field) || !SQL_IDENT.test(stream) || !t0 || !t1) return;
+      cellDrawer.value = {
+        open: true,
+        field,
+        value,
+        stream,
+        streamType: stype,
+        startTime: t0,
+        endTime: t1,
+        baseWhere: "",
+      };
+    });
+
     onUnmounted(() => {
       if (resizeObserver) {
         resizeObserver.disconnect();
@@ -1171,13 +1396,11 @@ export default defineComponent({
       }
     });
 
-    watch(
-      panelData,
-      () => {
-        emit("series-data-update", panelData.value);
-      },
-      { deep: true },
-    );
+    // panelData is a shallowRef replaced wholesale, so no deep watch needed —
+    // deep would traverse every data point of the chart options per update.
+    watch(panelData, () => {
+      emit("series-data-update", panelData.value);
+    });
 
     // when we get the new limitNumberOfSeriesWarningMessage from the convertPanelData, emit the limitNumberOfSeriesWarningMessage
     watch(
@@ -1216,112 +1439,91 @@ export default defineComponent({
       }
     };
 
-    const handleNoData = (panelType: any) => {
-      const xAlias = panelSchema.value.queries[0].fields.x.map(
-        (it: any) => it.alias || [],
-      );
-      const yAlias = panelSchema.value.queries[0].fields.y.map(
-        (it: any) => it.alias || [],
-      );
-      const zAlias = panelSchema.value.queries[0].fields.z.map(
-        (it: any) => it.alias || [],
-      );
-
-      switch (panelType) {
-        case "area":
-        case "area-stacked":
-        case "bar":
-        case "h-bar":
-        case "stacked":
-        case "h-stacked":
-        case "line":
-        case "scatter":
-        case "gauge": {
-          // return data.value[0].some((it: any) => {return (xAlias.every((x: any) => it[x]) && yAlias.every((y: any) => it[y]))});
-          return (
-            data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => data.value[0][0][x] != null) &&
-              yAlias.every((y: any) => data.value[0][0][y]) != null)
-          );
-        }
-        case "table": {
-          // For tables, simply check if there's any data in the array
-          return (
-            data.value[0]?.length > 1 ||
-            (data.value[0]?.length == 1 &&
-              (xAlias.some((x: any) => data.value[0][0][x] != null) ||
-                yAlias.some((y: any) => data.value[0][0][y] != null)))
-          );
-        }
-        case "metric": {
-          return (
-            data.value[0]?.length > 1 ||
-            yAlias.every(
-              (y: any) =>
-                data.value[0][0][y] != null || data.value[0][0][y] === 0,
-            )
-          );
-        }
-        case "heatmap": {
-          return (
-            data.value[0]?.length > 1 ||
-            (xAlias.every((x: any) => data.value[0][0][x] != null) &&
-              yAlias.every((y: any) => data.value[0][0][y] != null) &&
-              zAlias.every((z: any) => data.value[0][0][z]) != null)
-          );
-        }
-        case "pie":
-        case "donut": {
-          return (
-            data.value[0]?.length > 1 ||
-            yAlias.every((y: any) => data.value[0][0][y] != null)
-          );
-        }
-        case "maps":
-        case "geomap": {
-          return true;
-        }
-        case "sankey": {
-          const source = panelSchema.value.queries[0].fields.source.alias;
-          const target = panelSchema.value.queries[0].fields.target.alias;
-          const value = panelSchema.value.queries[0].fields.value.alias;
-          return (
-            data.value[0]?.length > 1 ||
-            source.every((s: any) => data.value[0][0][s] != null) ||
-            target.every((t: any) => data.value[0][0][t] != null) ||
-            value.every((v: any) => data.value[0][0][v] != null)
-          );
-        }
-        default:
-          break;
-      }
-    };
-
-    // Compute the value of the 'noData' variable
+    // Compute the value of the 'noData' variable.
+    // Instead of re-scanning raw rows, this checks the conversion output
+    // (panelData) which the pipeline already computed — O(1) property access.
+    // Multi-SQL note: panelData is built from filteredData (visible queries only)
+    // by convertSQLData and friends, so the type-specific checks below
+    // already reflect the multi-query aggregate.
     const noData = computed(() => {
-      // if panel type is 'html' or 'markdown', return an empty string
-      if (
-        panelSchema.value.type == "html" ||
-        panelSchema.value.type == "markdown" ||
-        panelSchema.value.type == "custom_chart"
-      ) {
+      const type = panelSchema.value.type;
+
+      if (type === "html" || type === "markdown" || type === "custom_chart") {
         return "";
       }
-      // Check if the queryType is 'promql'
-      else if (panelSchema.value?.queryType == "promql") {
-        // Check if the 'filteredData' array has elements and every item has a non-empty 'result' array
-        return filteredData.value?.length &&
-          filteredData.value.some((item: any) => item?.result?.length)
-          ? "" // Return an empty string if there is data
-          : "No Data"; // Return "No Data" if there is no data
-      } else {
-        // The queryType is not 'promql'
-        return data.value.length &&
-          data.value[0]?.length &&
-          handleNoData(panelSchema.value.type)
-          ? ""
-          : "No Data"; // Return "No Data" if the 'data' array is empty, otherwise return an empty string
+
+      if (panelSchema.value?.queryType === "promql") {
+        const hasResults =
+          filteredData.value?.length &&
+          filteredData.value.some((item: any) => item?.result?.length);
+        if (hasResults) return "";
+        // During a reload the executor clears state.data before the new results
+        // stream in. Keep showing the previously rendered chart while loading
+        // (matching the SQL branch below); only show "No Data" once the load
+        // completes with no results.
+        return loading.value && panelData.value?.options?.series?.length > 0 ? "" : "No Data";
       }
+
+      const hasRawData = data.value?.length && data.value[0]?.length;
+
+      // During data buffer reset (executor clears state.data before reload),
+      // suppress "No Data" only while still loading to avoid flicker.
+      // Once loading completes with empty data, show "No Data".
+      if (!hasRawData) {
+        return loading.value && panelData.value?.chartType ? "" : "No Data";
+      }
+
+      // Raw data exists but conversion hasn't produced output yet — wait.
+      if (!panelData.value?.chartType) {
+        return "";
+      }
+
+      // Table renders raw rows; the conversion returns { rows, columns }.
+      if (type === "table") {
+        return panelData.value?.rows?.length > 0 ? "" : "No Data";
+      }
+
+      // Maps/geomap handle their own empty state.
+      if (type === "geomap" || type === "maps") {
+        return "";
+      }
+
+      // Sankey returns { options: null } when data is invalid.
+      if (type === "sankey") {
+        return panelData.value?.options != null ? "" : "No Data";
+      }
+
+      // Metric/gauge series are always created by the converter
+      // (they use renderItem, not data arrays), so check the raw Y value.
+      if (type === "metric" || type === "gauge") {
+        const firstRow = data.value[0]?.[0];
+        const yAlias = panelSchema.value.queries[0].fields.y.map((it: any) => it.alias || []);
+        return yAlias.every((y: any) => getDataValue(firstRow, y) != null) ? "" : "No Data";
+      }
+
+      // For all other chart types (line, area, bar, scatter, heatmap, etc.),
+      // the series filter in the conversion pipeline already excluded series
+      // whose data is entirely null. Just check what survived.
+      return panelData.value?.options?.series?.length > 0 ? "" : "No Data";
+    });
+
+    // Determines what data to pass to ChartRenderer.
+    // noData check is evaluated first so promql panels with no results
+    // also get the transparent background instead of showing a skeleton.
+    const chartRendererData = computed(() => {
+      if (noData.value === "No Data") {
+        return { options: { backgroundColor: "transparent" } };
+      }
+      if (
+        panelSchema.value.queryType === "promql" ||
+        (panelData.value.chartType !== "geomap" &&
+          panelData.value.chartType !== "table" &&
+          panelData.value.chartType !== "maps" &&
+          loading.value)
+      ) {
+        return panelData.value;
+      }
+      return panelData.value;
     });
 
     // when the error changes, emit the error
@@ -1331,861 +1533,68 @@ export default defineComponent({
       emit("error", errorDetail.value);
     });
 
-    const hidePopupsAndOverlays = () => {
-      if (drilldownPopUpRef.value) {
-        drilldownPopUpRef.value.style.display = "none";
-      }
-      if (annotationPopupRef.value) {
-        annotationPopupRef.value.style.display = "none";
-      }
-      isCursorOverPanel.value = false;
-    };
+    const { showErrorNotification, showPositiveNotification } = useNotifications();
 
-    // drilldown
-    const replacePlaceholders = (str: any, obj: any) => {
-      // if the str is same as the key, return it's value(it can be an string or array).
-      for (const key in obj) {
-        // ${varName} == str
-        if (`\$\{${key}\}` == str) {
-          return obj[key];
-        }
-      }
+    const onFormatColumn = (field: string) => emit("format-column", field);
 
-      return str.replace(/\$\{([^}]+)\}/g, function (_: any, key: any) {
-        // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
-        let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
-
-        let value = obj;
-        for (let part of parts) {
-          if (value && part in value) {
-            value = value[part];
-          } else {
-            return "${" + key + "}";
-          }
-        }
-        return value;
-      });
-    };
-
-    const replaceDrilldownToLogs = (str: any, obj: any) => {
-      // If str is exactly equal to a key, return its value directly
-      for (const key in obj) {
-        if (`\$\{${key}\}` === str) {
-          let value = obj[key];
-
-          // Ensure string values are wrapped in quotes
-          return typeof value === "string" ? `'${value}'` : value;
-        }
-      }
-
-      return str.replace(/\$\{([^}]+)\}/g, function (_: any, key: any) {
-        // Split the key into parts by either a dot or a ["xyz"] pattern and filter out empty strings
-        let parts = key.split(/\.|\["(.*?)"\]/).filter(Boolean);
-
-        let value = obj;
-        for (let part of parts) {
-          if (value && part in value) {
-            value = value[part];
-          } else {
-            return "${" + key + "}"; // Keep the placeholder if the key is not found
-          }
-        }
-
-        // Ensure string values are wrapped in quotes
-        return typeof value === "string" ? `'${value}'` : value;
-      });
-    };
-    // get offset from parent
-    function getOffsetFromParent(parent: any, child: any) {
-      const parentRect = parent.getBoundingClientRect();
-      const childRect = child.getBoundingClientRect();
-
-      return {
-        left: childRect.left - parentRect.left,
-        top: childRect.top - parentRect.top,
-      };
-    }
-
-    // need to save click event params, to open drilldown
-    let drilldownParams: any = [];
-    const onChartClick = async (params: any, ...args: any) => {
-      // Check if we have both drilldown and annotation at the same point
-      const hasAnnotation =
-        params?.componentType === "markLine" ||
-        params?.componentType === "markArea";
-      const hasDrilldown = panelSchema.value.config.drilldown?.length > 0;
-
-      // If in annotation add mode, handle that first
-      if (allowAnnotationsAdd.value) {
-        if (isAddAnnotationMode.value) {
-          if (hasAnnotation) {
-            editAnnotation(params?.data?.annotationDetails);
-          } else {
-            handleAddAnnotation(
-              params?.data?.[0] || params?.data?.time || params?.data?.name,
-              null,
-            );
-          }
-          return;
-        }
-      }
-
-      // Store click parameters for drilldown
-      if (hasDrilldown) {
-        drilldownParams = [params, args];
-        drilldownArray.value = panelSchema.value.config.drilldown ?? [];
-      }
-
-      // Calculate offset values based on chart type
-      let offsetValues = { left: 0, top: 0 };
-      if (panelSchema.value.type === "table") {
-        offsetValues = getOffsetFromParent(chartPanelRef.value, params?.target);
-        offsetValues.left += params?.offsetX;
-        offsetValues.top += params?.offsetY;
-      } else {
-        offsetValues.left = params?.event?.offsetX;
-        offsetValues.top = params?.event?.offsetY;
-      }
-
-      // Handle popup displays with priority
-      if (hasDrilldown) {
-        // Show drilldown popup first
-        drilldownPopUpRef.value.style.display = "block";
-        await nextTick();
-
-        const drilldownOffset = calculatePopupOffset(
-          offsetValues.left,
-          offsetValues.top,
-          drilldownPopUpRef,
-          chartPanelRef,
-        );
-
-        drilldownPopUpRef.value.style.top = drilldownOffset.top + 5 + "px";
-        drilldownPopUpRef.value.style.left = drilldownOffset.left + 5 + "px";
-      } else if (hasAnnotation) {
-        // Only show annotation popup if there's no drilldown
-        const description = params?.data?.annotationDetails?.text;
-        if (description) {
-          selectedAnnotationData.value = params?.data?.annotationDetails;
-          annotationPopupRef.value.style.display = "block";
-
-          await nextTick();
-
-          const annotationOffset = calculatePopupOffset(
-            offsetValues.left,
-            offsetValues.top,
-            annotationPopupRef,
-            chartPanelRef,
-          );
-
-          annotationPopupRef.value.style.top = annotationOffset.top + 5 + "px";
-          annotationPopupRef.value.style.left =
-            annotationOffset.left + 5 + "px";
-        }
-      }
-
-      // Hide popups if no content to display
-      if (
-        !hasDrilldown &&
-        (!hasAnnotation || !params?.data?.annotationDetails?.text)
-      ) {
-        hidePopupsAndOverlays();
-      }
-    };
-
-    // Helper function to calculate popup offset
-    const calculatePopupOffset = (
-      offsetX: any,
-      offsetY: any,
-      popupRef: any,
-      containerRef: any,
-    ) => {
-      let offSetValues = { left: offsetX, top: offsetY };
-
-      if (popupRef.value) {
-        if (
-          offSetValues.top + popupRef.value.offsetHeight >
-          containerRef.value.offsetHeight
-        ) {
-          offSetValues.top -= popupRef.value.offsetHeight;
-        }
-        if (
-          offSetValues.left + popupRef.value.offsetWidth >
-          containerRef.value.offsetWidth
-        ) {
-          offSetValues.left -= popupRef.value.offsetWidth;
-        }
-      }
-
-      return offSetValues;
-    };
-
-    const { showErrorNotification, showPositiveNotification } =
-      useNotifications();
-
-    let parser: any;
-    onBeforeMount(async () => {
-      await importSqlParser();
+    const {
+      drilldownArray,
+      onChartClick,
+      openDrilldown,
+      hidePopupsAndOverlays,
+      drilldownColumnAliases,
+      drilldownAllColumns,
+      getCellDrilldownField,
+      panelBaseWhere,
+      panelWhereByStream,
+      ensureDrilldownSchema,
+    } = usePanelDrilldown({
+      panelSchema,
+      variablesData,
+      selectedTimeObj,
+      metadata,
+      data,
+      panelData,
+      filteredData,
+      resultMetaData,
+      store,
+      route,
+      router,
+      emit,
+      allowAnnotationsAdd,
+      isAddAnnotationMode,
+      editAnnotation,
+      handleAddAnnotation,
+      chartPanelRef,
+      drilldownPopUpRef,
+      annotationPopupRef,
+      selectedAnnotationData,
+      isCursorOverPanel,
+      showErrorNotification,
+      t,
     });
 
-    const importSqlParser = async () => {
-      const useSqlParser: any = await import("@/composables/useParser");
-      const { sqlParser }: any = useSqlParser.default();
-      parser = await sqlParser();
-    };
+    const { downloadDataAsCSV, downloadDataAsJSON, getPanelCsvString } = usePanelDownload({
+      panelSchema,
+      data,
+      filteredData,
+      tableRendererRef,
+      showErrorNotification,
+      showPositiveNotification,
+      t,
+    });
 
-    // get interval from resultMetaData if it exists
-    const interval = computed(
-      () => resultMetaData?.value?.[0]?.[0]?.histogram_interval,
+    // Trellis only applies when EVERY query has a breakdown field (each
+    // breakdown value becomes a subplot). Mirrors the converter's isTrellis.
+    const allQueriesHaveBreakdown = computed(
+      () =>
+        (panelSchema.value?.queries?.length ?? 0) > 0 &&
+        panelSchema.value.queries.every((q: any) => (q?.fields?.breakdown?.length ?? 0) > 0),
     );
-
-    // get interval in micro seconds
-    const intervalMicro = computed(() => interval.value * 1000 * 1000);
-
-    watch(
-      () => resultMetaData.value,
-      (newVal) => {
-        emit("result-metadata-update", newVal);
-      },
-      { deep: true },
-    );
-
-    const getOriginalQueryAndStream = (queryDetails: any, metadata: any) => {
-      const originalQuery = metadata?.value?.queries[0]?.query;
-      const streamName = queryDetails?.queries[0]?.fields?.stream;
-
-      if (!originalQuery || !streamName) {
-        return null;
-      }
-
-      return { originalQuery, streamName };
-    };
-
-    const calculateTimeRange = (
-      hoveredTimestamp: number | null,
-      interval: number | undefined,
-    ) => {
-      if (interval && hoveredTimestamp) {
-        const startTime = hoveredTimestamp; // hovertedTimestamp is in microseconds
-        return {
-          startTime,
-          endTime: startTime + interval,
-        };
-      }
-      return {
-        startTime: selectedTimeObj.value.start_time.getTime(),
-        endTime: selectedTimeObj.value.end_time.getTime(),
-      };
-    };
-
-    const parseQuery = async (originalQuery: string, parser: any) => {
-      try {
-        return parser.astify(originalQuery);
-      } catch (error) {
-        return null;
-      }
-    };
-
-    const buildWhereClause = (
-      ast: any,
-      breakdownColumn?: string,
-      breakdownValue?: string,
-    ): string => {
-      let whereClause = ast?.where
-        ? parser
-            .sqlify({ type: "select", where: ast.where })
-            .slice("SELECT".length)
-        : "";
-
-      if (breakdownColumn && breakdownValue) {
-        const breakdownCondition = `${breakdownColumn} = '${breakdownValue}'`;
-        whereClause += whereClause
-          ? ` AND ${breakdownCondition}`
-          : ` WHERE ${breakdownCondition}`;
-      }
-
-      return whereClause;
-    };
-
-    const replaceVariablesValue = (
-      query: any,
-      currentDependentVariablesData: any,
-      panelSchema: any,
-    ) => {
-      const queryType = panelSchema?.value?.queryType;
-      currentDependentVariablesData?.forEach((variable: any) => {
-        const variableName = `$${variable.name}`;
-        const variableNameWithBrackets = `\${${variable.name}}`;
-
-        let variableValue = "";
-        if (Array.isArray(variable.value)) {
-          const value = variable.value
-            .map(
-              (value: any) =>
-                `'${variable.escapeSingleQuotes ? escapeSingleQuotes(value) : value}'`,
-            )
-            .join(",");
-          const possibleVariablesPlaceHolderTypes = [
-            {
-              placeHolder: `\${${variable.name}:csv}`,
-              value: variable.value.join(","),
-            },
-            {
-              placeHolder: `\${${variable.name}:pipe}`,
-              value: variable.value.join("|"),
-            },
-            {
-              placeHolder: `\${${variable.name}:doublequote}`,
-              value: variable.value.map((value: any) => `"${value}"`).join(","),
-            },
-            {
-              placeHolder: `\${${variable.name}:singlequote}`,
-              value: value,
-            },
-            {
-              placeHolder: `\${${variable.name}}`,
-              value: queryType === "sql" ? value : variable.value.join("|"),
-            },
-            {
-              placeHolder: `\$${variable.name}`,
-              value: queryType === "sql" ? value : variable.value.join("|"),
-            },
-          ];
-
-          possibleVariablesPlaceHolderTypes.forEach((placeHolderObj) => {
-            // if (query.includes(placeHolderObj.placeHolder)) {
-            //   metadata.push({
-            //     type: "variable",
-            //     name: variable.name,
-            //     value: placeHolderObj.value,
-            //   });
-            // }
-            query = query.replaceAll(
-              placeHolderObj.placeHolder,
-              placeHolderObj.value,
-            );
-          });
-        } else {
-          variableValue =
-            variable.value === null
-              ? ""
-              : `${
-                  variable.escapeSingleQuotes
-                    ? escapeSingleQuotes(variable.value)
-                    : variable.value
-                }`;
-          // if (query.includes(variableName)) {
-          //   metadata.push({
-          //     type: "variable",
-          //     name: variable.name,
-          //     value: variable.value,
-          //   });
-          // }
-          query = query.replaceAll(variableNameWithBrackets, variableValue);
-          query = query.replaceAll(variableName, variableValue);
-        }
-      });
-
-      return query;
-    };
-    const constructLogsUrl = (
-      streamName: string,
-      calculatedTimeRange: { startTime: number; endTime: number },
-      encodedQuery: string,
-      queryDetails: any,
-      currentUrl: string,
-    ) => {
-      const logsUrl = new URL(currentUrl + "/logs");
-      logsUrl.searchParams.set(
-        "stream_type",
-        queryDetails.queries[0]?.fields?.stream_type,
-      );
-      logsUrl.searchParams.set("stream", streamName);
-      logsUrl.searchParams.set(
-        "from",
-        calculatedTimeRange.startTime.toString(),
-      );
-      logsUrl.searchParams.set("to", calculatedTimeRange.endTime.toString());
-      logsUrl.searchParams.set("sql_mode", "true");
-      logsUrl.searchParams.set("query", encodedQuery);
-      logsUrl.searchParams.set(
-        "org_identifier",
-        store.state.selectedOrganization.identifier,
-      );
-      if (store.state.zoConfig.quick_mode_enabled) {
-        logsUrl.searchParams.set("quick_mode", "true");
-      } else {
-        logsUrl.searchParams.set("quick_mode", "false");
-      }
-      logsUrl.searchParams.set("show_histogram", "false");
-
-      return logsUrl;
-    };
-    const openDrilldown = async (index: any) => {
-      // hide the drilldown pop up
-      hidePopupsAndOverlays();
-
-      // if panelSchema exists
-      if (panelSchema.value) {
-        // check if drilldown data exists
-        if (
-          !panelSchema.value.config.drilldown ||
-          panelSchema.value.config.drilldown.length == 0
-        ) {
-          return;
-        }
-
-        // find drilldown data
-        const drilldownData = panelSchema.value.config.drilldown[index];
-
-        const navigateToLogs = async () => {
-          const queryDetails = panelSchema.value;
-          if (!queryDetails) {
-            return;
-          }
-
-          const { originalQuery, streamName } =
-            getOriginalQueryAndStream(queryDetails, metadata) || {};
-          if (!originalQuery || !streamName) return;
-
-          const hoveredTime = drilldownParams[0]?.value?.[0];
-          const hoveredTimestamp = hoveredTime
-            ? getUTCTimestampFromZonedTimestamp(
-                hoveredTime,
-                store.state.timezone,
-              )
-            : null;
-          const breakdown = queryDetails.queries[0].fields?.breakdown || [];
-
-          const calculatedTimeRange = calculateTimeRange(
-            hoveredTimestamp,
-            intervalMicro.value,
-          );
-
-          let modifiedQuery = originalQuery;
-
-          // Check if this is a PromQL query - if so, skip auto mode SQL parsing
-          const isPromQLQuery = panelSchema.value.queryType === "promql";
-
-          if (drilldownData.data.logsMode === "auto" && !isPromQLQuery) {
-            if (!parser) {
-              await importSqlParser();
-            }
-            const ast = await parseQuery(originalQuery, parser);
-
-            if (!ast) return;
-
-            const tableAliases = ast.from
-              ?.filter((fromEntry: any) => fromEntry.as)
-              .map((fromEntry: any) => fromEntry.as);
-
-            const aliasClause = tableAliases?.length
-              ? ` AS ${tableAliases.join(", ")}`
-              : "";
-
-            const breakdownColumn = breakdown[0]?.column;
-
-            const seriesIndex = drilldownParams[0]?.seriesIndex;
-            const breakdownSeriesName =
-              seriesIndex !== undefined
-                ? panelData.value.options.series[seriesIndex]
-                : undefined;
-            const uniqueSeriesName = breakdownSeriesName
-              ? breakdownSeriesName.originalSeriesName
-              : drilldownParams[0]?.seriesName;
-            const breakdownValue = uniqueSeriesName;
-
-            const whereClause = buildWhereClause(
-              ast,
-              breakdownColumn,
-              breakdownValue,
-            );
-
-            modifiedQuery = `SELECT * FROM "${streamName}"${aliasClause} ${whereClause}`;
-          } else if (drilldownData.data.logsMode === "auto" && isPromQLQuery) {
-            // For PromQL queries in auto mode, create a simple SELECT * query
-            // since we can't parse PromQL syntax with SQL parser
-            modifiedQuery = `SELECT * FROM "${streamName}"`;
-          } else {
-            // Create drilldown variables object exactly as you do for other drilldown types
-            const drilldownVariables: any = {};
-
-            // Add time range
-            if (
-              selectedTimeObj?.value?.start_time &&
-              selectedTimeObj?.value?.start_time != "Invalid Date"
-            ) {
-              drilldownVariables.start_time = new Date(
-                selectedTimeObj?.value?.start_time?.toISOString(),
-              ).getTime();
-            }
-            if (
-              selectedTimeObj?.value?.end_time &&
-              selectedTimeObj?.value?.end_time != "Invalid Date"
-            ) {
-              drilldownVariables.end_time = new Date(
-                selectedTimeObj?.value?.end_time?.toISOString(),
-              ).getTime();
-            }
-
-            // Add query and encoded query
-            drilldownVariables.query =
-              metadata?.value?.queries[0]?.query ??
-              panelSchema?.value?.queries[0]?.query ??
-              "";
-            drilldownVariables.query_encoded = b64EncodeUnicode(
-              drilldownVariables.query,
-            );
-
-            // Handle different chart types
-            if (panelSchema.value.type == "table") {
-              const fields: any = {};
-              panelSchema.value.queries.forEach((query: any) => {
-                const panelFields: any = [
-                  ...(query.fields.x || []),
-                  ...(query.fields.y || []),
-                  ...(query.fields.z || []),
-                ];
-                panelFields.forEach((field: any) => {
-                  fields[field.label] = drilldownParams[1][0][field.alias];
-                  fields[field.alias] = drilldownParams[1][0][field.alias];
-                });
-              });
-              drilldownVariables.row = {
-                field: fields,
-                index: drilldownParams[1][1],
-              };
-            } else if (panelSchema.value.type == "sankey") {
-              if (drilldownParams[0].dataType == "node") {
-                drilldownVariables.node = {
-                  __name: drilldownParams[0]?.name ?? "",
-                  __value: drilldownParams[0]?.value ?? "",
-                };
-              } else {
-                drilldownVariables.edge = {
-                  __source: drilldownParams[0]?.data?.source ?? "",
-                  __target: drilldownParams[0]?.data?.target ?? "",
-                  __value: drilldownParams[0]?.data?.value ?? "",
-                };
-              }
-            } else {
-              drilldownVariables.series = {
-                __name: ["pie", "donut", "heatmap"].includes(
-                  panelSchema.value.type,
-                )
-                  ? drilldownParams[0].name
-                  : drilldownParams[0].seriesName,
-                __value: Array.isArray(drilldownParams[0].value)
-                  ? drilldownParams[0].value[
-                      drilldownParams[0].value.length - 1
-                    ]
-                  : drilldownParams[0].value,
-                __axisValue:
-                  drilldownParams?.[0]?.value?.[0] ??
-                  drilldownParams?.[0]?.name,
-              };
-            }
-
-            variablesData?.value?.values?.forEach((variable: any) => {
-              if (variable.type != "dynamic_filters") {
-                drilldownVariables[variable.name] = variable.value;
-              }
-            });
-
-            let queryWithReplacedPlaceholders = replaceVariablesValue(
-              drilldownData?.data?.logsQuery,
-              variablesData?.value?.values,
-              panelSchema,
-            );
-
-            queryWithReplacedPlaceholders = replaceDrilldownToLogs(
-              queryWithReplacedPlaceholders,
-              drilldownVariables,
-            );
-
-            modifiedQuery = queryWithReplacedPlaceholders;
-          }
-
-          modifiedQuery = modifiedQuery.replace(/`/g, '"');
-
-          const encodedQuery: any = b64EncodeUnicode(modifiedQuery);
-
-          const pos = window.location.pathname.indexOf("/web/");
-          const currentUrl =
-            pos > -1
-              ? window.location.origin +
-                window.location.pathname.slice(0, pos) +
-                "/web"
-              : window.location.origin;
-
-          const logsUrl = constructLogsUrl(
-            streamName,
-            calculatedTimeRange,
-            encodedQuery,
-            queryDetails,
-            currentUrl,
-          );
-
-          try {
-            if (drilldownData.targetBlank) {
-              window.open(logsUrl.toString(), "_blank");
-            } else {
-              await store.dispatch("logs/setIsInitialized", false);
-              await nextTick();
-              await router.push({
-                path: "/logs",
-                query: Object.fromEntries(logsUrl.searchParams.entries()),
-              });
-            }
-          } catch (error) {
-          }
-        };
-
-        // need to change dynamic variables to it's value using current variables, current chart data(params)
-        // if pie, donut or heatmap then series name will come in name field
-        // also, if value is an array, then last value will be taken
-        const drilldownVariables: any = {};
-
-        // selected start time and end time
-        if (
-          selectedTimeObj?.value?.start_time &&
-          selectedTimeObj?.value?.start_time != "Invalid Date"
-        ) {
-          drilldownVariables.start_time = new Date(
-            selectedTimeObj?.value?.start_time?.toISOString(),
-          ).getTime();
-        }
-
-        if (
-          selectedTimeObj?.value?.end_time &&
-          selectedTimeObj?.value?.end_time != "Invalid Date"
-        ) {
-          drilldownVariables.end_time = new Date(
-            selectedTimeObj?.value?.end_time?.toISOString(),
-          ).getTime();
-        }
-
-        // param to pass current query
-        // use metadata query[replaced variables values] or panelSchema query
-        drilldownVariables.query =
-          metadata?.value?.queries[0]?.query ??
-          panelSchema?.value?.queries[0]?.query ??
-          "";
-        drilldownVariables.query_encoded = b64EncodeUnicode(
-          metadata?.value?.queries[0]?.query ??
-            panelSchema?.value?.queries[0]?.query ??
-            "",
-        );
-
-        // if chart type is 'table' then we need to pass the table name
-        if (panelSchema.value.type == "table") {
-          const fields: any = {};
-          panelSchema.value.queries.forEach((query: any) => {
-            // take all field from x, y and z
-            const panelFields: any = [
-              ...query.fields.x,
-              ...query.fields.y,
-              ...query.fields.z,
-            ];
-            panelFields.forEach((field: any) => {
-              // we have label and alias, use both in dynamic values
-              fields[field.label] = drilldownParams[1][0][field.alias];
-              fields[field.alias] = drilldownParams[1][0][field.alias];
-            });
-          });
-          drilldownVariables.row = {
-            field: fields,
-            index: drilldownParams[1][1],
-          };
-        } else if (panelSchema.value.type == "sankey") {
-          // if dataType is node then set node data
-          // else set edge data
-          if (drilldownParams[0].dataType == "node") {
-            // set node data
-            drilldownVariables.node = {
-              __name: drilldownParams[0]?.name ?? "",
-              __value: drilldownParams[0]?.value ?? "",
-            };
-          } else {
-            // set edge data
-            drilldownVariables.edge = {
-              __source: drilldownParams[0]?.data?.source ?? "",
-              __target: drilldownParams[0]?.data?.target ?? "",
-              __value: drilldownParams[0]?.data?.value ?? "",
-            };
-          }
-        } else {
-          // we have an series object
-          drilldownVariables.series = {
-            __name: ["pie", "donut", "heatmap"].includes(panelSchema.value.type)
-              ? drilldownParams[0].name
-              : drilldownParams[0].seriesName,
-            __value: Array.isArray(drilldownParams[0].value)
-              ? drilldownParams[0].value[drilldownParams[0].value.length - 1]
-              : drilldownParams[0].value,
-            __axisValue:
-              drilldownParams?.[0]?.value?.[0] ?? drilldownParams?.[0]?.name,
-          };
-        }
-
-        variablesData?.value?.values?.forEach((variable: any) => {
-          if (variable.type != "dynamic_filters") {
-            drilldownVariables[variable.name] = variable.value;
-          }
-        });
-
-        // if drilldown by url
-        if (drilldownData.type == "byUrl") {
-          try {
-            // open url
-            return window.open(
-              replacePlaceholders(drilldownData.data.url, drilldownVariables),
-              drilldownData.targetBlank ? "_blank" : "_self",
-            );
-          } catch (error) {}
-        } else if (drilldownData.type == "logs") {
-          try {
-            navigateToLogs();
-          } catch (error) {
-            showErrorNotification("Failed to navigate to logs");
-          }
-        } else if (drilldownData.type == "byDashboard") {
-          // we have folder, dashboard and tabs name
-          // so we have to get id of folder, dashboard and tab
-
-          // get folder id
-          if (
-            !store.state.organizationData.folders ||
-            (Array.isArray(store.state.organizationData.folders) &&
-              store.state.organizationData.folders.length === 0)
-          ) {
-            await getFoldersList(store);
-          }
-          const folderId = store.state.organizationData.folders.find(
-            (folder: any) => folder.name == drilldownData.data.folder,
-          )?.folderId;
-
-          if (!folderId) {
-            return;
-          }
-
-          // get dashboard id
-          const allDashboardData = await getAllDashboardsByFolderId(
-            store,
-            folderId,
-          );
-
-          const dashboardId = allDashboardData?.find(
-            (dashboard: any) =>
-              dashboard.title === drilldownData.data.dashboard,
-          )?.dashboardId;
-
-          const dashboardData = await getDashboard(
-            store,
-            dashboardId,
-            folderId,
-          );
-
-          if (!dashboardData) {
-            return;
-          }
-
-          // get tab id
-          const tabId =
-            dashboardData.tabs.find(
-              (tab: any) => tab.name == drilldownData.data.tab,
-            )?.tabId ?? dashboardData.tabs[0].tabId;
-
-          // if targetBlank is true then create new url
-          // else made changes in current router only
-          if (drilldownData.targetBlank) {
-            // get current origin
-            const pos = window.location.pathname.indexOf("/web/");
-            // if there is /web/ in path
-            // url will be: origin from window.location.origin + pathname up to /web/ + /web/
-            let currentUrl: any =
-              pos > -1
-                ? window.location.origin +
-                  window.location.pathname.slice(0, pos) +
-                  "/web"
-                : window.location.origin;
-
-            // always, go to view dashboard page
-            currentUrl += "/dashboards/view?";
-
-            // if pass all variables in url
-            currentUrl += drilldownData.data.passAllVariables
-              ? new URLSearchParams(route.query as any).toString()
-              : "";
-
-            const url = new URL(currentUrl);
-
-            // set variables provided by user
-            drilldownData.data.variables.forEach((variable: any) => {
-              if (variable?.name?.trim() && variable?.value?.trim()) {
-                url.searchParams.set(
-                  "var-" +
-                    replacePlaceholders(variable.name, drilldownVariables),
-                  replacePlaceholders(variable.value, drilldownVariables),
-                );
-              }
-            });
-
-            url.searchParams.set("dashboard", dashboardData.dashboardId);
-            url.searchParams.set("folder", folderId);
-            url.searchParams.set("tab", tabId);
-            currentUrl = url.toString();
-
-            window.open(currentUrl, "_blank");
-          } else {
-            let oldParams: any = [];
-            // if pass all variables is true
-            if (drilldownData.data.passAllVariables) {
-              // get current query params
-              oldParams = route.query;
-            }
-
-            drilldownData.data.variables.forEach((variable: any) => {
-              if (variable?.name?.trim() && variable?.value?.trim()) {
-                oldParams[
-                  "var-" +
-                    replacePlaceholders(variable.name, drilldownVariables)
-                ] = replacePlaceholders(variable.value, drilldownVariables);
-              }
-            });
-
-            // make changes in router
-            await router.push({
-              path: "/dashboards/view",
-              query: {
-                ...oldParams,
-                org_identifier: store.state.selectedOrganization.identifier,
-                dashboard: dashboardData.dashboardId,
-                folder: folderId,
-                tab: tabId,
-              },
-            });
-
-            // ======= [START] default variable values
-
-            const initialVariableValues: any = {};
-            Object.keys(route.query).forEach((key) => {
-              if (key.startsWith("var-")) {
-                const newKey = key.slice(4);
-                initialVariableValues[newKey] = route.query[key];
-              }
-            });
-            // ======= [END] default variable values
-
-            emit("update:initialVariableValues", initialVariableValues);
-          }
-        }
-      }
-    };
 
     const chartPanelHeight = computed(() => {
       if (
-        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
+        allQueriesHaveBreakdown.value &&
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
@@ -2197,7 +1606,7 @@ export default defineComponent({
 
     const chartPanelClass = computed(() => {
       if (
-        panelSchema.value?.queries?.[0]?.fields?.breakdown?.length > 0 &&
+        allQueriesHaveBreakdown.value &&
         panelSchema.value.config?.trellis?.layout &&
         !loading.value
       ) {
@@ -2207,234 +1616,199 @@ export default defineComponent({
       return "";
     });
 
-    const downloadDataAsCSV = (title: string) => {
-      // if panel type is table then download data as csv
-      if (panelSchema.value.type == "table") {
-        tableRendererRef?.value?.downloadTableAsCSV(title);
-      } else {
-        // For non-table charts
-        try {
-          // Check if data exists
-          if (!data?.value || data?.value?.length === 0) {
-            showErrorNotification("No data available to download");
-            return;
-          }
-
-          let csvContent;
-
-          // Check if this is a PromQL query type panel
-          if (panelSchema.value.queryType === "promql") {
-            // Handle PromQL data format
-            const flattenedData: any[] = [];
-
-            // Iterate through each response item (multiple queries can produce multiple responses)
-            // Use filteredData to exclude hidden queries
-            filteredData?.value?.forEach((promData: any, queryIndex: number) => {
-              if (!promData?.result || !Array.isArray(promData.result)) return;
-
-              // Iterate through each result (time series)
-              promData.result.forEach((series: any, seriesIndex: number) => {
-                const metricLabels = series.metric || {};
-
-                // Iterate through values array (timestamp, value pairs)
-                series.values.forEach((point: any) => {
-                  const timestamp = point[0];
-                  const value = point[1];
-
-                  // Create a row with timestamp, value, and all metric labels
-                  const row = {
-                    timestamp: timestamp,
-                    value: value,
-                    ...metricLabels,
-                  };
-
-                  flattenedData.push(row);
-                });
-              });
-            });
-
-            // Get all unique keys across all data points
-            const allKeys = new Set();
-            flattenedData.forEach((row: any) => {
-              Object.keys(row).forEach((key: any) => allKeys.add(key));
-            });
-
-            // Convert Set to Array and ensure timestamp and value come first
-            const keys = Array.from(allKeys);
-            keys.sort((a: any, b: any) => {
-              if (a === "timestamp") return -1;
-              if (b === "timestamp") return 1;
-              if (a === "value") return -1;
-              if (b === "value") return 1;
-              return a.localeCompare(b);
-            });
-
-            // Create CSV content
-            csvContent = [
-              keys.join(","), // Headers row
-              ...flattenedData.map((row: any) =>
-                keys.map((key: any) => wrapCsvValue(row[key] ?? "")).join(","),
-              ),
-            ].join("\r\n");
-          } else {
-            // Handle standard SQL format - now supporting multiple arrays
-            const flattenedData: any[] = [];
-
-            // Iterate through all datasets/arrays in the response
-            data?.value?.forEach((dataset: any, datasetIndex: number) => {
-              // Skip if dataset is empty or not an array
-              if (!dataset || !Array.isArray(dataset) || dataset.length === 0)
-                return;
-
-              dataset.forEach((row: any) => {
-                flattenedData.push({
-                  ...row,
-                });
-              });
-            });
-
-            // If after flattening we have no data, show notification and return
-            if (flattenedData.length === 0) {
-              showErrorNotification("No data available to download");
-              return;
-            }
-
-            // Collect all possible keys from all objects
-            const allKeys = new Set();
-            flattenedData.forEach((row: any) => {
-              Object.keys(row).forEach((key: any) => allKeys.add(key));
-            });
-
-            // Convert Set to Array and sort for consistent order
-            const headers = Array.from(allKeys).sort();
-
-            // Create CSV content with headers and data rows
-            csvContent = [
-              headers?.join(","), // Headers row
-              ...flattenedData?.map((row: any) =>
-                headers
-                  ?.map((header: any) => wrapCsvValue(row[header] ?? ""))
-                  .join(","),
-              ),
-            ].join("\r\n");
-          }
-
-          const status = exportFile(
-            (title ?? "chart-export") + ".csv",
-            csvContent,
-            "text/csv",
-          );
-
-          if (status === true) {
-            showPositiveNotification("Chart data downloaded as a CSV file", {
-              timeout: 2000,
-            });
-          } else {
-            showErrorNotification("Browser denied file download...");
-          }
-        } catch (error) {
-          showErrorNotification("Failed to download data as CSV");
-        }
-      }
-    };
-
-    // Helper function to properly wrap CSV values
-    const wrapCsvValue = (val: any): string => {
-      if (val === null || val === undefined) {
-        return "";
-      }
-
-      // Convert to string and escape any quotes
-      const str = String(val).replace(/"/g, '""');
-
-      // Wrap in quotes if the value contains comma, quotes, or newlines
-      const needsQuotes =
-        str.includes(",") ||
-        str.includes('"') ||
-        str.includes("\n") ||
-        str.includes("\r");
-      return needsQuotes ? `"${str}"` : str;
-    };
-
-    const downloadDataAsJSON = (title: string) => {
-      try {
-        // Handle table type charts
-        if (panelSchema?.value?.type === "table") {
-          tableRendererRef?.value?.downloadTableAsJSON(title);
-        } else {
-          // Handle non-table charts
-          // Use filteredData for PromQL to exclude hidden queries, otherwise use data
-          const chartData =
-            panelSchema.value.queryType === "promql"
-              ? filteredData.value
-              : data.value;
-
-          if (!chartData || !chartData.length) {
-            showErrorNotification("No data available to download");
-            return;
-          }
-
-          // Export the data as JSON
-          const content = JSON.stringify(chartData, null, 2);
-
-          const status = exportFile(
-            (title ?? "data-export") + ".json",
-            content,
-            "application/json",
-          );
-
-          if (status === true) {
-            showPositiveNotification("Chart data downloaded as a JSON file", {
-              timeout: 2000,
-            });
-          } else {
-            showErrorNotification("Browser denied file download...");
-          }
-        }
-      } catch (error) {
-        showErrorNotification("Failed to download data as JSON");
-      }
-    };
-
     // Watch isPartialData changes and emit them
     watch(isPartialData, (newValue) => {
       emit("is-partial-data-update", newValue);
     });
 
-    // Computed property for table data with logging
+    // Surface the sparkline-unavailable warning (e.g. JOIN queries) on the header.
+    watch(sparklineWarning, (newValue) => {
+      emit("sparkline-warning-update", newValue);
+    });
+
     const tableRendererData = computed(() => {
       if (panelSchema.value.type === "table") {
-        let tableData;
-
+        // Once the underlying data is cleared (e.g. required columns removed
+        // after a successful run), convertPanelDataCommon bails on validation
+        // and never refreshes panelData — so guard on noData here to avoid
+        // rendering the stale converted rows behind the "No Data" state.
+        // Mirrors chartRendererData's noData guard for the chart path.
+        if (noData.value === "No Data") {
+          return { rows: [], columns: [] };
+        }
         if (panelSchema.value.queryType === "promql") {
           // For PromQL tables, the data is in panelData.options (same as pie/donut)
           // The TableConverter returns {columns, rows, ...} which gets placed in options
-          tableData = panelData.value?.options || { rows: [], columns: [] };
+          return panelData.value?.options || { rows: [], columns: [] };
         } else if (panelData.value?.chartType == "table") {
-          tableData = panelData.value;
-        } else {
-          tableData = { options: { backgroundColor: "transparent" } };
+          return panelData.value;
         }
-
-        return tableData;
+        return { options: { backgroundColor: "transparent" } };
       }
       return { options: { backgroundColor: "transparent" } };
     });
 
+    const cellDrawer = ref<{
+      open: boolean;
+      field: string;
+      value: string | number;
+      stream: string;
+      streamType: string;
+      startTime: number;
+      endTime: number;
+      baseWhere: string;
+    }>({
+      open: false,
+      field: "",
+      value: "",
+      stream: "",
+      streamType: "logs",
+      startTime: 0,
+      endTime: 0,
+      baseWhere: "",
+    });
+
+    function resolveAliasToColumn(alias: string, query: any, executedSql = ""): string {
+      // Field-config lookup (field-based panels).
+      const allConfigFields: any[] = [
+        ...(Array.isArray(query?.fields?.x) ? query.fields.x : []),
+        ...(Array.isArray(query?.fields?.y) ? query.fields.y : []),
+        ...(Array.isArray(query?.fields?.breakdown) ? query.fields.breakdown : []),
+      ];
+      const fromConfig = allConfigFields.find((f: any) => f.alias === alias && f.column);
+      if (fromConfig) return fromConfig.column;
+
+      // SQL fallback (custom SQL panels): aliases are double-quoted; column may carry a stream prefix.
+      const sql: string = executedSql || query?.query || "";
+      if (sql) {
+        const escaped = alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const re = new RegExp(
+          `([\\w.]+)\\s+(?:as\\s+)?"?${escaped}"?(?=\\s*,|\\s+from|\\s*\\)|\\s*$)`,
+          "i",
+        );
+        const m = re.exec(sql.replace(/\n/g, " "));
+        if (m?.[1]) {
+          const parts = m[1].split("."); // strip stream prefix
+          const col = parts[parts.length - 1];
+          if (col && col.toLowerCase() !== alias.toLowerCase()) return col;
+        }
+      }
+
+      return alias; // last resort — works when the alias IS the stream field name
+    }
+
+    // Dashboard timestamps are µs; Dates are built from µs so getTime() returns µs.
+    function toMicros(v: any): number {
+      if (v instanceof Date) return v.getTime();
+      const n = Number(v);
+      return Number.isFinite(n) && n > 0 ? n : 0;
+    }
+
+    function openCellDrawer(params: {
+      field: string;
+      value: string | number;
+      stream: string;
+      streamType: string;
+      startTime: number;
+      endTime: number;
+      baseWhere: string;
+    }) {
+      cellDrawer.value = { open: true, ...params };
+      // Sync to URL so the drawer state is shareable.
+      router.replace({
+        query: {
+          ...route.query,
+          cell_panel: props.panelSchema.id,
+          cell_field: params.field,
+          cell_value: String(params.value),
+          cell_vtype: typeof params.value,
+          cell_stream: params.stream,
+          cell_stype: params.streamType,
+          cell_t0: String(params.startTime),
+          cell_t1: String(params.endTime),
+        },
+      });
+    }
+
+    function onCellDrawerOpenChange(open: boolean) {
+      cellDrawer.value.open = open;
+      if (!open) {
+        // Clear cell-explorer URL params without touching other query params.
+        const q = { ...route.query };
+        for (const k of [
+          "cell_panel",
+          "cell_field",
+          "cell_value",
+          "cell_vtype",
+          "cell_stream",
+          "cell_stype",
+          "cell_t0",
+          "cell_t1",
+          "cell_where",
+          "cell_event_ts",
+        ]) {
+          delete (q as any)[k];
+        }
+        router.replace({ query: q });
+      }
+    }
+
+    // Called directly by the search icon so it works even with a panel drilldown config.
+    async function exploreCellInLogs(alias: string, value: unknown, row: any) {
+      const queries = props.panelSchema.queries ?? [];
+      const qi = Number.isInteger(row?.__q) && queries[row.__q] ? row.__q : 0;
+      const query = queries[qi];
+      const executedSql = String(metadata.value?.queries?.[qi]?.query ?? query?.query ?? "");
+
+      // Panel WHERE is fetched lazily (not on panel render) — resolve it for THIS query
+      await ensureDrilldownSchema(qi);
+
+      const cell = getCellDrilldownField(qi, alias);
+      const stream = cell?.streamName ?? query?.fields?.stream ?? query?.stream ?? "";
+      const streamType =
+        cell?.streamType ?? query?.fields?.stream_type ?? query?.stream_type ?? "logs";
+      const realField = cell?.column ?? resolveAliasToColumn(alias, query, executedSql);
+      // Base WHERE is BE-only (result_schema); no FE fallback — if the BE gives none, use none.
+      const baseWhere = cell?.isJoin
+        ? (panelWhereByStream.value[cell.streamName] ?? "")
+        : panelBaseWhere.value;
+
+      const metaStartMicros = Number(metadata.value?.queries?.[qi]?.startTime ?? 0);
+      const metaEndMicros = Number(metadata.value?.queries?.[qi]?.endTime ?? 0);
+      const selStartMicros = toMicros((props.selectedTimeObj as any).start_time);
+      const selEndMicros = toMicros((props.selectedTimeObj as any).end_time);
+
+      openCellDrawer({
+        field: realField,
+        value: value as string | number,
+        stream,
+        streamType,
+        startTime: metaStartMicros || selStartMicros,
+        endTime: metaEndMicros || selEndMicros || Date.now() * 1000,
+        baseWhere,
+      });
+    }
+
     return {
+      t,
       store,
       chartPanelRef,
+      chartRendererRef,
       data,
       loading,
       searchRequestTraceIds,
       errorDetail,
       panelData,
       noData,
+      chartRendererData,
       metadata,
       tableRendererRef,
       tableRendererData,
       onChartClick,
+      onFormatColumn,
       onDataZoom,
+      drilldownColumnAliases,
+      drilldownAllColumns,
       drilldownArray,
       selectedAnnotationData,
       openDrilldown,
@@ -2453,8 +1827,26 @@ export default defineComponent({
       panelsList,
       isCursorOverPanel,
       showPopupsAndOverlays,
+      metricItems,
+      metricZoneStyle,
+      metricIconStyle,
+      hoveredMetricIdx,
+      metricCopiedIdx,
+      copyMetricItem,
       downloadDataAsCSV,
       downloadDataAsJSON,
+      getPanelCsvData: (title: string) => {
+        const csv = getPanelCsvString();
+        if (!csv) return null;
+        return {
+          title: title ?? panelSchema.value?.title ?? "panel",
+          csv,
+        };
+      },
+      logDataAsJSON: (title: string) => {
+        console.group(`[oo] ${title ?? panelSchema.value?.title ?? "panel"}`);
+        console.groupEnd();
+      },
       loadingProgressPercentage,
       isPartialData,
       contextMenuVisible,
@@ -2465,41 +1857,18 @@ export default defineComponent({
       onChartDomContextMenu,
       hideContextMenu,
       handleCreateAlert,
+      cellDrawer,
+      exploreCellInLogs,
+      onCellDrawerOpenChange,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.drilldown-item:hover {
-  background-color: rgba(202, 201, 201, 0.908);
-}
-
-.errorMessage {
-  position: absolute;
-  top: 20%;
-  width: 100%;
-  height: 80%;
-  overflow: hidden;
-  text-align: center;
-  // color: rgba(255, 0, 0, 0.8);
-  text-overflow: ellipsis;
-}
-
-.customErrorMessage {
-  position: absolute;
-  top: 20%;
-  width: 100%;
-  height: 80%;
-  overflow: hidden;
-  text-align: center;
-  text-overflow: ellipsis;
-}
-
-.noData {
-  position: absolute;
-  top: 20%;
-  width: 100%;
-  text-align: center;
+<style scoped>
+/* keep(lib-override:o2-empty-state): container query hides OEmptyState's internally-rendered icon when the panel is too short — targets a deep descendant of the lib component, not expressible as a utility on this template */
+@container (max-height: 5rem) {
+  .noData :deep(.o2-empty-state__inline-icon) {
+    display: none;
+  }
 }
 </style>

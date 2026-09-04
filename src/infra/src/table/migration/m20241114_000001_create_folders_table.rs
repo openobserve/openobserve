@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -154,31 +154,6 @@ mod tests {
         assert_eq!(
             &create_folders_org_folder_id_idx_stmnt().to_string(PostgresQueryBuilder),
             r#"CREATE UNIQUE INDEX IF NOT EXISTS "folders_org_folder_id_idx" ON "folders" ("org", "folder_id")"#
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        collapsed_eq!(
-            &create_folders_table_statement().to_string(MysqlQueryBuilder),
-            r#"
-                CREATE TABLE IF NOT EXISTS `folders` (
-                `id` bigint NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                `org` varchar(100) NOT NULL,
-                `folder_id` varchar(256) NOT NULL,
-                `name` varchar(256) NOT NULL,
-                `description` text,
-                `type` smallint NOT NULL,
-                `created_at` timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL
-            )"#
-        );
-        assert_eq!(
-            &create_folders_org_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE INDEX `folders_org_idx` ON `folders` (`org`)"#
-        );
-        assert_eq!(
-            &create_folders_org_folder_id_idx_stmnt().to_string(MysqlQueryBuilder),
-            r#"CREATE UNIQUE INDEX `folders_org_folder_id_idx` ON `folders` (`org`, `folder_id`)"#
         );
     }
 

@@ -3,6 +3,78 @@ export default class DashboardFilter {
     this.page = page;
   }
 
+  // Click the "add condition" (+) button in the filter builder
+  async clickAddConditionBtn() {
+    await this.page.locator('[data-test="dashboard-add-condition-add"]').click();
+  }
+
+  // Click the "Add Group" menu option
+  async clickAddGroupOption() {
+    await this.page.getByText("Add Group").click();
+  }
+
+  // Click the last "Add Group" menu option (for nested groups)
+  async clickAddGroupOptionLast() {
+    await this.page.getByText("Add Group").last().click();
+  }
+
+  // Click the nth "Add Group" div (legacy nested-group flow)
+  async clickAddGroupDivByNth(n) {
+    await this.page.locator("div").filter({ hasText: "Add Group" }).nth(n).click();
+  }
+
+  // Click the "add condition" (+) button within a row matched by text/regex
+  async clickAddConditionWithinRowText(text) {
+    await this.page
+      .locator("div")
+      .filter({ hasText: text })
+      .locator('[data-test="dashboard-add-condition-add"]')
+      .click();
+  }
+
+  // Group container locator by group index
+  getGroup(groupIndex) {
+    return this.page.locator(
+      `[data-test="dashboard-group"][style*="--group-index: ${groupIndex}"]`
+    );
+  }
+
+  // Wait for a filter group (by index) to be visible
+  async waitForGroupVisible(groupIndex) {
+    await this.getGroup(groupIndex).waitFor({ state: "visible" });
+  }
+
+  // Click the "add condition" (+) button inside a specific group
+  async clickAddConditionInGroup(groupIndex) {
+    await this.getGroup(groupIndex)
+      .locator('[data-test="dashboard-add-condition-add"]')
+      .click();
+  }
+
+  // Click the remove-condition (trash) button
+  async clickRemoveCondition() {
+    await this.page.locator('[data-test="dashboard-add-condition-remove"]').click();
+  }
+
+  // Filter-condition label locator by index + field name
+  getAddConditionLabel(index, fieldName) {
+    return this.page.locator(
+      `[data-test="dashboard-add-condition-label-${index}-${fieldName}"]`
+    );
+  }
+
+  // Click the logical operator toggle (AND/OR) at a given condition index
+  async clickLogicalOperator(index) {
+    await this.page
+      .locator(`[data-test="dashboard-add-condition-logical-operator-${index}"]`)
+      .click();
+  }
+
+  // Select an operator option by its accessible name (e.g. "OR")
+  async selectOperatorOption(name) {
+    await this.page.getByRole("option", { name }).click();
+  }
+
   /**
    * Helper method to select a field from the StreamFieldSelect dropdown
    * @param {string} fieldName - The field name to select
@@ -11,37 +83,28 @@ export default class DashboardFilter {
   async selectFieldFromDropdown(fieldName, dropdownLocator) {
     await dropdownLocator.click();
 
-    // Find the input element within the StreamFieldSelect component
-    const inputField = dropdownLocator.locator('input[aria-label="Select Field"]');
-    await inputField.waitFor({ state: "visible" });
-    await inputField.fill(fieldName);
+    // Find the input element within the StreamFieldSelect component using data-test
+    const streamFieldSelect = this.page.locator('[data-test="stream-field-select"]').last();
+    await streamFieldSelect.waitFor({ state: "visible" });
+    // Use pressSequentially to properly trigger Vue reactive filtering
+    await streamFieldSelect.pressSequentially(fieldName, { delay: 50 });
 
-    // Wait for the dropdown menu to appear - use .last() to get the most recent menu
-    const dropdownMenu = this.page.locator('.q-menu[role="listbox"]').last();
+    // Wait for the dropdown menu to appear — OSelect popover uses data-test="stream-field-select-popover".
+    const dropdownMenu = this.page.locator('[data-test="stream-field-select-popover"]').last();
     await dropdownMenu.waitFor({ state: "visible", timeout: 5000 });
 
-    // Wait for options to be filtered
-    await this.page.waitForTimeout(500);
+    // Wait for the option with the matching label to appear after filtering
+    await dropdownMenu
+      .locator(`[data-test="stream-field-select-option"][data-test-label="${fieldName}"]`)
+      .first()
+      .waitFor({ state: "visible", timeout: 5000 })
+      .catch(() => {});
 
-    // First, ensure expansion items are expanded
-    const expansionItems = dropdownMenu.locator('.q-expansion-item');
-    const expansionCount = await expansionItems.count();
-
-    for (let i = 0; i < expansionCount; i++) {
-      const expansion = expansionItems.nth(i);
-      const isExpanded = await expansion.evaluate(el => el.classList.contains('q-expansion-item--expanded'));
-
-      if (!isExpanded) {
-        await expansion.click();
-        await this.page.waitForTimeout(500);
-      }
-    }
-
-    // Wait a bit more for expansion animation to complete
-    await this.page.waitForTimeout(500);
-
-    // Now find and click the field item - use getByText which is more reliable
-    await dropdownMenu.getByText(fieldName, { exact: true }).click();
+    // Find and click the field item by data-test-label (label = field name)
+    await dropdownMenu
+      .locator(`[data-test="stream-field-select-option"][data-test-label="${fieldName}"]`)
+      .first()
+      .click();
   }
 
   // Add filter condition
@@ -58,6 +121,15 @@ export default class DashboardFilter {
     // Step 1: Click on the filter condition button
     // The label might have changed from previous edits, so we use a more flexible selector
     if (initialFieldName || newFieldName || operator || value) {
+      // Ensure any previously open filter popover is fully closed before re-opening.
+      // Reka UI portals leave stale condition-tab elements in DOM mid-transition,
+      // causing "element not stable / detached" failures on subsequent edits.
+      await this.page.keyboard.press("Escape").catch(() => {});
+      await this.page
+        .locator('[data-test="dashboard-add-condition-operator-popover"]')
+        .waitFor({ state: "hidden", timeout: 2000 })
+        .catch(() => {});
+
       // Try to find by the exact label first (for new filters)
       const exactLabelButton = this.page.locator(
         `[data-test="dashboard-add-condition-label-${idx}-${initialFieldName}"]`
@@ -79,23 +151,42 @@ export default class DashboardFilter {
           throw new Error(`Could not find filter condition button at index ${idx}`);
         }
       }
+      // Wait for popover to fully open and tabs to mount — deterministically
+      // wait on the condition-tab itself becoming visible (the dependent step).
+      await this.page
+        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+        .last()
+        .waitFor({ state: "visible", timeout: 10000 })
+        .catch(() => {});
     }
 
     // Step 2: Select the new field from dropdown
     if (newFieldName) {
       const fieldDropdown = this.page.locator(
-        `[data-test="dashboard-add-condition-column-${idx}}"]`
+        `[data-test="dashboard-add-condition-column-${idx}"]`
       );
       await this.selectFieldFromDropdown(newFieldName, fieldDropdown);
     }
 
     // Step 3: Open the condition selector
     if (operator || value) {
-      const conditionLocator = this.page.locator(
-        `[data-test="dashboard-add-condition-condition-${idx}"]`
-      );
-      await conditionLocator.waitFor({ state: "visible" });
-      await conditionLocator.click(); // double click for stability
+      // Use .last() to target the most recently opened portal — when a filter
+      // condition is re-edited, the tab from the previous popover may still
+      // exist in the DOM mid-transition.
+      const conditionLocator = this.page
+        .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
+        .last();
+      await conditionLocator.waitFor({ state: "visible", timeout: 10000 });
+      // Reka UI tabs may re-mount during portal transition; retry click with force
+      // to bypass detached-element instability.
+      await conditionLocator.click({ force: true, timeout: 10000 });
+      // Wait deterministically for the operator dropdown (Step 4's target) to
+      // appear instead of a fixed-ms buffer.
+      await this.page
+        .locator('[data-test="dashboard-add-condition-operator"]')
+        .first()
+        .waitFor({ state: "visible", timeout: 10000 })
+        .catch(() => {});
     }
 
     // Step 4: Operator dropdown
@@ -109,84 +200,79 @@ export default class DashboardFilter {
               .locator('[data-test="dashboard-add-condition-operator"]')
               .last();
 
-      await operatorLocator.click();
-      await this.page
-        .getByRole("option", { name: operator, exact: true })
+      // OSelect in listbox mode: outer div gets data-test; PopoverTrigger is the inner button.
+      // Use JS click to avoid viewport/portal click interception issues.
+      // 30s: the condition row renders after the field is added and its schema resolves,
+      // which under parallel CI load lands well past 10s.
+      await operatorLocator.waitFor({ state: "visible", timeout: 30000 });
+      await operatorLocator.locator('button').first().evaluate((el) => el.click());
+      // Options render in portal with data-test="${parent}-popover"
+      const operatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
+      await operatorPopover.waitFor({ state: "visible", timeout: 10000 });
+      // Wait deterministically for the virtualizer's first option to mount inside the popover.
+      await operatorPopover
+        .locator('[data-test="dashboard-add-condition-operator-option"]')
         .first()
-        .click();
+        .waitFor({ state: "visible", timeout: 10000 })
+        .catch(() => {});
+      // The virtualizer renders items asynchronously; search then select
+      // Type into the search filter to narrow results, then click
+      const searchInput = operatorPopover.locator('[data-test="o-select-search-input"]').first();
+      const hasSearch = await searchInput.count() > 0;
+      if (hasSearch) {
+        await searchInput.fill(operator);
+        // After typing, wait for the filtered option to be visible — the
+        // option's `data-test-value` mirrors the typed operator text.
+        await operatorPopover
+          .locator(`[data-test="dashboard-add-condition-operator-option"][data-test-value="${operator}"]`)
+          .first()
+          .waitFor({ state: "visible", timeout: 5000 })
+          .catch(() => {});
+      }
+      // Pick the option by its data-test-value (OSelect option convention).
+      const optionByValue = operatorPopover.locator(
+        `[data-test="dashboard-add-condition-operator-option"][data-test-value="${operator}"]`,
+      ).first();
+      if (await optionByValue.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await optionByValue.click();
+      } else {
+        // Fallback to first visible option in the popover (post-filter only one should remain).
+        await operatorPopover
+          .locator('[data-test="dashboard-add-condition-operator-option"]')
+          .first()
+          .click();
+      }
+      // Wait for the operator dropdown portal to fully close before step 5.
+      await operatorPopover
+        .waitFor({ state: "hidden", timeout: 5000 })
+        .catch(() => {});
     }
 
     // Step 5: Enter value (if required)
     if (value) {
-      const valueInput =
-        index === 0
-          ? this.page.locator('[data-test="common-auto-complete"]').first()
-          : this.page.locator('[data-test="common-auto-complete"]').last();
+      // OCombobox in AddCondition.vue has data-test="dashboard-add-condition-value";
+      // OCombobox renders its inner input as [data-test="${name}-input"]
+      const valueInput = this.page.locator('[data-test="dashboard-add-condition-value-input"]');
 
       await valueInput.waitFor({ state: "visible", timeout: 10000 });
       await valueInput.click();
-      await valueInput.fill(value);
+      // Use pressSequentially char-by-char to trigger OCombobox's reactive filtering
+      await valueInput.pressSequentially(value, { delay: 50 });
 
-      // Retry logic for clicking autocomplete suggestion
-      const maxRetries = 5;
-      let clicked = false;
+      // Try to click a matching autocomplete suggestion if one appears
+      const optionLocator = '[data-test="dashboard-add-condition-value-option"]';
+      const optionVisible = await this.page.locator(optionLocator).first()
+        .isVisible({ timeout: 3000 }).catch(() => false);
 
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      if (optionVisible) {
         try {
-          // Get a fresh reference to the suggestion each time
-          const suggestion = this.page
-            .locator('[data-test="common-auto-complete-option"]')
-            .first();
-
-          // Wait for suggestion to appear
-          await suggestion.waitFor({ state: "visible", timeout: 10000 });
-
-          // Wait for element to be attached and stable
-          await suggestion.waitFor({ state: "attached", timeout: 3000 });
-
-          // Check if still visible
-          const isVisible = await suggestion.isVisible();
-          if (!isVisible) {
-            throw new Error('Element not visible');
-          }
-
-          // Try to click
-          await suggestion.click({ timeout: 3000 });
-
-          clicked = true;
-          break;
-
-        } catch (error) {
-          const isRetryable =
-            error.message.includes('detached') ||
-            error.message.includes('not visible') ||
-            error.message.includes('not found') ||
-            error.message.includes('Target closed');
-
-          if (isRetryable && attempt < maxRetries) {
-            // Wait progressively longer between retries
-            await this.page.waitForTimeout(150 * attempt);
-            continue;
-          }
-
-          // Last attempt failed or non-retryable error
-          throw new Error(`Failed to click autocomplete after ${attempt} attempts: ${error.message}`);
+          await this.page.locator(optionLocator).first().click({ timeout: 3000 });
+        } catch {
+          // If suggestion click fails, value is already typed — accept with Tab
+          await this.page.keyboard.press('Tab');
         }
       }
-
-      if (!clicked) {
-        throw new Error(`Failed to click autocomplete suggestion after ${maxRetries} retries`);
-      }
-    } else if (operator && (newFieldName || initialFieldName)) {
-      const selectedField = newFieldName || initialFieldName;
-      const expectedError = `Filter: ${selectedField}: Condition value required`;
-
-      const errorMessage = this.page
-        .locator("div")
-        .filter({ hasText: expectedError })
-        .first();
-      // Optional: assert if error must be visible
-      // await expect(errorMessage).toBeVisible();
+      // If no suggestions appeared, the typed value is accepted as-is
     }
   }
 
@@ -195,30 +281,79 @@ export default class DashboardFilter {
   async selectListFilterItems(index, fieldName, values) {
     const idx = String(index);
 
+    // 1. Open the condition popover via the label button
     const labelLocator = this.page.locator(
       `[data-test="dashboard-add-condition-label-${idx}-${fieldName}"]`
     );
     await labelLocator.waitFor({ state: "visible" });
     await labelLocator.click();
 
-    const listTab = this.page.locator(
-      '[data-test="dashboard-add-condition-list-tab"]'
+    // 2. Click the "List" OTab to switch to list mode
+    // OTab has data-test="dashboard-add-condition-list-${conditionIndex}"
+    const listTabTrigger = this.page
+      .locator(`[data-test="dashboard-add-condition-list-${idx}"]`)
+      .last();
+    await listTabTrigger.waitFor({ state: "visible", timeout: 10000 });
+    await listTabTrigger.click();
+
+    // 3. Click the OSelect trigger button to open the list dropdown
+    // OSelect renders its trigger as [data-test="${parent}-trigger"]
+    const listSelect = this.page
+      .locator('[data-test="dashboard-add-condition-list-tab"]')
+      .last();
+    await listSelect.waitFor({ state: "visible", timeout: 5000 });
+    await listSelect.locator('button').first().evaluate((el) => el.click());
+
+    // 4. Wait for the OSelect popover and its options to load
+    const listPopover = this.page.locator(
+      '[data-test="dashboard-add-condition-list-tab-popover"]'
     );
-    await listTab.waitFor({ state: "visible" });
-    await listTab.click();
-
-    await this.page
-      .locator('[data-test="dashboard-add-condition-list-item"]')
+    await listPopover.waitFor({ state: "visible", timeout: 10000 });
+    await listPopover
+      .locator('[data-test="dashboard-add-condition-list-tab-option"]')
       .first()
-      .waitFor({ state: "visible" });
+      .waitFor({ state: "visible", timeout: 5000 })
+      .catch(() => {});
 
+    // 5. Click each option by its data-test-value
     for (const val of values) {
-      const option = this.page
-        .getByRole("option", { name: val, exact: true })
-        .locator('[data-test="dashboard-add-condition-list-item"]');
+      const option = listPopover.locator(
+        `[data-test="dashboard-add-condition-list-tab-option"][data-test-value="${val}"]`
+      );
       await option.waitFor({ state: "visible" });
       await option.click();
     }
+  }
+
+  // Open a condition's list-tab OSelect, search for a value and pick the
+  // matching option (by data-test-value). Mirrors the maps filter flow:
+  // label -> list-tab OSelect -> search -> option.
+  async applyListConditionBySearch(index, fieldName, searchValue, optionValue) {
+    const idx = String(index);
+
+    const conditionLabel = this.page.locator(
+      `[data-test="dashboard-add-condition-label-${idx}-${fieldName}"]`
+    );
+    await conditionLabel.click();
+
+    const conditionList = this.page.locator(
+      '[data-test="dashboard-add-condition-list-tab"]'
+    );
+    await conditionList.click();
+
+    // Fill the search input inside the OSelect popover
+    const conditionSearch = this.page.locator(
+      '[data-test="dashboard-add-condition-list-tab-search"]'
+    );
+    await conditionSearch.waitFor({ state: "visible", timeout: 5000 });
+    await conditionSearch.fill(searchValue);
+
+    // Select the matching option via data-test-value
+    const optionLocator = this.page.locator(
+      `[data-test="dashboard-add-condition-list-tab-option"][data-test-value="${optionValue}"]`
+    );
+    await optionLocator.waitFor({ state: "visible", timeout: 5000 });
+    await optionLocator.click();
   }
 
   // Add filter condition with dynamic ,Group inside group filter
@@ -265,51 +400,61 @@ export default class DashboardFilter {
               .locator('[data-test="dashboard-add-condition-operator"]')
               .last();
 
-      // Wait until operator dropdown is visible and stable
       await operatorLocator.waitFor({ state: "visible", timeout: 5000 });
-      await this.page.waitForTimeout(500); // Wait for any animations to complete
-      await operatorLocator.click();
+      await operatorLocator.locator('button').first().evaluate((el) => el.click());
 
-      // Wait for the specific option to appear in any visible menu
-      const optionLocator = this.page
-        .getByRole("option", { name: operator, exact: true })
-        .last();
+      const operatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
+      await operatorPopover.waitFor({ state: "visible", timeout: 10000 });
 
-      // Wait until option is visible with increased timeout
-      await optionLocator.waitFor({ state: "visible", timeout: 10000 });
-      await optionLocator.click();
+      const searchInput = operatorPopover.locator('[data-test="o-select-search-input"]').first();
+      const hasSearch = await searchInput.count() > 0;
+      if (hasSearch) {
+        await searchInput.fill(operator);
+        await operatorPopover
+          .locator(`[data-test="dashboard-add-condition-operator-option"][data-test-value="${operator}"]`)
+          .first()
+          .waitFor({ state: "visible", timeout: 5000 })
+          .catch(() => {});
+      }
+
+      const optionByValue = operatorPopover.locator(
+        `[data-test="dashboard-add-condition-operator-option"][data-test-value="${operator}"]`
+      ).first();
+      if (await optionByValue.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await optionByValue.click();
+      } else {
+        await operatorPopover.locator('[data-test="dashboard-add-condition-operator-option"]').first().click();
+      }
+
+      await operatorPopover
+        .waitFor({ state: "hidden", timeout: 5000 })
+        .catch(() => {});
     }
 
     // Step 5: Fill value field
     if (value) {
-      const valueInput =
-        index === 0
-          ? this.page.locator('[data-test="common-auto-complete"]').first()
-          : this.page.locator('[data-test="common-auto-complete"]').last();
+      const valueInput = this.page.locator('[data-test="dashboard-add-condition-value-input"]').last();
 
-      // Wait until input is visible
       await valueInput.waitFor({ state: "visible", timeout: 5000 });
       await valueInput.click();
-      await valueInput.fill(value);
+      await valueInput.pressSequentially(value, { delay: 50 });
 
-      const suggestion = this.page
-        .locator('[data-test="common-auto-complete-option"]')
-        .first();
+      const optionLocator = '[data-test="dashboard-add-condition-value-option"]';
+      const optionVisible = await this.page.locator(optionLocator).first()
+        .isVisible({ timeout: 3000 }).catch(() => false);
 
-      // Wait until suggestion is visible
-      await suggestion.waitFor({ state: "visible", timeout: 5000 });
-      await suggestion.click();
-    } else if (operator && newFieldName) {
-      const expectedError = `Filter: ${newFieldName}: Condition value required`;
-      const errorMessage = this.page
-        .locator("div")
-        .filter({ hasText: expectedError });
-      // Optional: Assert here if needed
+      if (optionVisible) {
+        try {
+          await this.page.locator(optionLocator).first().click({ timeout: 3000 });
+        } catch {
+          await this.page.keyboard.press('Tab');
+        }
+      }
     }
 
     // Step 2: Handle multiple matching elements for column dropdown
     const allColumnLocators = this.page.locator(
-      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+      `[data-test="dashboard-add-condition-column-${idx}"]`
     );
     const count = await allColumnLocators.count();
 
@@ -328,7 +473,7 @@ export default class DashboardFilter {
     const idx = String(conditionIndex);
 
     // Step 1: Locate the specific group by its style attribute
-    const groupLocator = this.page.locator(`.group[style*="--group-index: ${groupIndex}"]`);
+    const groupLocator = this.page.locator(`[data-test="dashboard-group"][style*="--group-index: ${groupIndex}"]`);
     await groupLocator.waitFor({ state: "visible", timeout: 5000 });
 
     // Step 2: Find all label buttons within this specific group and click the one at conditionIndex
@@ -343,7 +488,17 @@ export default class DashboardFilter {
         .locator(`[data-test="dashboard-add-condition-condition-${idx}"]`)
         .last();
       await conditionSelector.waitFor({ state: "visible", timeout: 5000 });
-      await conditionSelector.click();
+      // The popover opened by the label click above is still animating in, and
+      // its Reka popper wrapper swallows pointer events until it settles — the
+      // plain click then fails actionability, and by the retry the tab has been
+      // re-mounted and detached. Force past the interception check, then gate on
+      // the operator dropdown (Step 5's target) actually being mounted.
+      await conditionSelector.click({ force: true, timeout: 10000 });
+      await this.page
+        .locator('[data-test="dashboard-add-condition-operator"]')
+        .last()
+        .waitFor({ state: "visible", timeout: 10000 })
+        .catch(() => {});
     }
 
     // Step 5: Select operator (dropdown appears in portal, use page scope)
@@ -353,40 +508,57 @@ export default class DashboardFilter {
         .last();
 
       await operatorLocator.waitFor({ state: "visible", timeout: 5000 });
-      await operatorLocator.waitFor({ state: "attached", timeout: 5000 });
-      await operatorLocator.click();
+      await operatorLocator.locator('button').first().evaluate((el) => el.click());
 
-      // Wait for operator option to be available and click it
-      const operatorOption = this.page
-        .getByRole("option", { name: operator, exact: true })
-        .last();
+      const nestedOperatorPopover = this.page.locator('[data-test="dashboard-add-condition-operator-popover"]');
+      await nestedOperatorPopover.waitFor({ state: "visible", timeout: 10000 });
 
-      await operatorOption.waitFor({ state: "visible", timeout: 10000 });
-      await operatorOption.click();
+      const nestedSearchInput = nestedOperatorPopover.locator('[data-test="o-select-search-input"]').first();
+      const nestedHasSearch = await nestedSearchInput.count() > 0;
+      if (nestedHasSearch) {
+        await nestedSearchInput.fill(operator);
+        await nestedOperatorPopover
+          .locator(`[data-test="dashboard-add-condition-operator-option"][data-test-value="${operator}"]`)
+          .first()
+          .waitFor({ state: "visible", timeout: 5000 })
+          .catch(() => {});
+      }
+
+      const nestedOptionByValue = nestedOperatorPopover.locator(
+        `[data-test="dashboard-add-condition-operator-option"][data-test-value="${operator}"]`
+      ).first();
+      if (await nestedOptionByValue.isVisible({ timeout: 3000 }).catch(() => false)) {
+        await nestedOptionByValue.click();
+      } else {
+        await nestedOperatorPopover.locator('[data-test="dashboard-add-condition-operator-option"]').first().click();
+      }
+
+      await nestedOperatorPopover
+        .waitFor({ state: "hidden", timeout: 5000 })
+        .catch(() => {});
     }
 
     // Step 6: Fill value if provided (appears in portal, use page scope)
     if (value) {
       const valueInput = this.page
-        .locator('[data-test="common-auto-complete"]')
+        .locator('[data-test="dashboard-add-condition-value-input"]')
         .last();
 
       await valueInput.waitFor({ state: "visible", timeout: 5000 });
       await valueInput.click();
-      await valueInput.fill(value);
+      await valueInput.pressSequentially(value, { delay: 50 });
 
-      // Wait for autocomplete suggestion
       const suggestion = this.page
-        .locator('[data-test="common-auto-complete-option"]')
+        .locator('[data-test="dashboard-add-condition-value-option"]')
         .first();
 
-      await suggestion.waitFor({ state: "visible", timeout: 5000 });
-      await suggestion.click();
+      await suggestion.waitFor({ state: "visible", timeout: 10000 });
+      await suggestion.click({ timeout: 15000 });
     }
 
     // Step 7: Update the field name (appears in portal, use page scope)
     const allColumnLocators = this.page.locator(
-      `[data-test="dashboard-add-condition-column-${idx}\\}"]`
+      `[data-test="dashboard-add-condition-column-${idx}"]`
     );
     const count = await allColumnLocators.count();
 

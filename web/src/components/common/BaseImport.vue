@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,73 +15,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tw:w-full" :class="containerClass" :style="containerStyle">
-    <!-- Header Section -->
-    <div class="card-container tw:mb-[0.625rem]" :class="headerContainerClass">
-      <div class="flex tw:px-4 items-center no-wrap tw:h-[68px]" :class="headerClass">
-        <div class="col">
-          <div class="flex">
-            <q-btn
-              no-caps
-              padding="xs"
-              outline
-              @click="handleBack"
-              icon="arrow_back_ios_new"
-              :data-test="`${testPrefix}-import-back-btn`"
-            />
-            <div :class="titleClass" class="q-ml-md">{{ title }}</div>
-          </div>
-        </div>
-
+  <div
+    class="flex h-full min-h-0 w-full flex-col overflow-hidden"
+    :class="[containerClass]"
+    :style="containerStyle"
+  >
+    <!-- Header Section — the standard OPageHeader (back tile + title + actions)
+         used across the app. Hidden when the host page provides its own page
+         header, e.g. the pipeline shell's OPageHeader (avoids a duplicate). -->
+    <OPageHeader
+      v-if="!hideHeader"
+      :title="title"
+      :back="{ label: raw(''), onClick: handleBack, dataTest: `${testPrefix}-import-back-btn` }"
+      class="border-border-default shrink-0 border-b"
+      :class="headerContainerClass"
+    >
+      <template #actions>
         <!-- Slot for additional header content (e.g., folder dropdown) -->
         <slot name="header-additional" />
 
-        <div class="flex justify-center">
-          <q-btn
-            v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('function.cancel')"
-            no-caps
-            flat
-            :class="cancelButtonClass"
-            @click="handleCancel"
-            :data-test="`${testPrefix}-import-cancel-btn`"
-          />
-          <q-btn
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('dashboard.import')"
-            type="submit"
-            no-caps
-            flat
-            :class="importButtonClass"
-            @click="handleImport"
-            :loading="isImporting"
-            :disable="isImporting"
-            :data-test="`${testPrefix}-import-json-btn`"
-          />
-        </div>
-      </div>
-    </div>
+        <OButton
+          variant="outline"
+          size="sm"
+          :class="cancelButtonClass"
+          @click="handleCancel"
+          :data-test="`${testPrefix}-import-cancel-btn`"
+          >{{ t("function.cancel") }}</OButton
+        >
+        <OButton
+          variant="primary"
+          size="sm"
+          type="submit"
+          :class="importButtonClass"
+          @click="handleImport"
+          :loading="isImportingLocal || isImporting"
+          :disabled="isImportingLocal || isImporting"
+          :data-test="`${testPrefix}-import-json-btn`"
+          >{{ t("dashboard.import") }}</OButton
+        >
+      </template>
+    </OPageHeader>
 
-    <div class="flex" :class="contentWrapperClass">
-      <div class="flex" :style="contentStyle">
-        <q-splitter
+    <!-- No px-page-edge here: the tabs section carries its own px-page-edge so
+         it aligns with the header back-button icon (which is inset one
+         page-edge from the container). A page-edge on this wrapper too would
+         double the inset and push the content past the header icon. -->
+    <div class="flex min-h-0 flex-1" :class="contentWrapperClass">
+      <div class="flex min-h-0 w-full" :style="contentStyle">
+        <OSplitter
           v-if="showSplitter"
-          class="logs-search-splitter"
-          no-scroll
+          class="logs-search-splitter h-full min-h-0 w-full"
           v-model="splitterModel"
           :style="splitterStyle"
           :limits="[30, 60]"
+          :horizontal="false"
         >
           <template #before>
-            <div class="tw:w-full tw:h-full">
+            <div class="border-border-default flex h-full w-full flex-col border-e">
               <!-- Tabs Section -->
-              <div class="card-container tw:py-[0.625rem] tw:px-[0.625rem] tw:mb-[0.625rem]">
-                <div class="app-tabs-container tw:h-[36px] tw:w-fit">
-                  <app-tabs
+              <div class="bg-card-glass-bg px-page-edge mb-1 shrink-0 py-2.5">
+                <div class="app-tabs-container h-9 w-fit">
+                  <AppTabs
                     :data-test="`${testPrefix}-import-tabs`"
                     class="tabs-selection-container"
-                    :tabs="tabs"
+                    :tabs="resolvedTabs"
                     v-model:active-tab="activeTab"
                     @update:active-tab="handleTabChange"
                   />
@@ -91,100 +88,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <!-- URL Import Tab -->
               <div
                 v-if="activeTab === 'import_json_url'"
-                class="editor-container-url card-container tw:py-1"
+                class="editor-container-url bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
               >
-                <q-form class="tw:mx-2 tw:pb-2" @submit.prevent>
+                <div class="mx-2 mt-1 flex min-h-0 flex-1 flex-col pb-2">
                   <!-- Slot for custom URL input section -->
                   <slot name="url-input-section" :url="url" :updateUrl="updateUrl">
-                    <div class="flex tw:mt-[0.725rem] tw:h-[64px]">
-                      <div style="width: 100%" class="q-pr-sm">
-                        <q-input
-                          :data-test="`${testPrefix}-import-url-input`"
-                          v-model="url"
-                          :placeholder="t('dashboard.addURL')"
-                          borderless
-                          style="padding: 10px 0px;"
-                        />
-                      </div>
+                    <div class="mb-3 flex shrink-0">
+                      <OInput
+                        :data-test="`${testPrefix}-import-url-input`"
+                        v-model="url"
+                        size="md"
+                        :placeholder="t('dashboard.addURL')"
+                      />
                     </div>
                   </slot>
 
-                  <query-editor
+                  <QueryEditor
                     :key="`editor-${editorKey}`"
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="monaco-editor tw:mx-2"
+                    class="import-url-editor border-card-glass-border rounded-default min-h-0 flex-1 overflow-hidden border"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
-                    :class="
-                      jsonStr === '' && queryEditorPlaceholderFlag
-                        ? 'empty-query'
-                        : ''
-                    "
-                    @focus="queryEditorPlaceholderFlag = false"
-                    @blur="queryEditorPlaceholderFlag = true"
                   />
-                </q-form>
+                </div>
               </div>
-
-              <!-- File Upload Tab -->
               <div
                 v-if="activeTab === 'import_json_file'"
-                class="editor-container-json card-container tw:py-1"
+                class="editor-container-json bg-card-glass-bg flex min-h-0 flex-1 flex-col py-1"
               >
-                <q-form class="tw:mx-2 q-mt-md tw:pb-2" @submit.prevent>
+                <div class="mx-2 mt-1 flex min-h-0 flex-1 flex-col pb-2">
                   <!-- Slot for custom file input section -->
                   <slot name="file-input-section" :jsonFiles="jsonFiles" :updateFiles="updateFiles">
-                    <div style="width: calc(100% - 10px)" class="q-mb-xs flex">
-                      <div style="width: 100%" class="q-pr-sm">
-                        <q-file
+                    <div class="mb-1 flex w-full shrink-0">
+                      <div class="w-full">
+                        <OFile
                           :data-test="`${testPrefix}-import-json-file-input`"
                           v-model="jsonFiles"
-                          filled
                           bottom-slots
                           :label="t('dashboard.dropFileMsg')"
                           accept=".json"
                           multiple
+                          :helpText="t('common.jsonFilesOnlyHint')"
                         >
                           <template v-slot:prepend>
-                            <q-icon name="cloud_upload" @click.stop.prevent />
+                            <OIcon name="cloud-upload" size="sm" @click.stop.prevent />
                           </template>
                           <template v-slot:append>
-                            <q-icon
+                            <OIcon
                               name="close"
+                              size="sm"
                               @click.stop.prevent="jsonFiles = null"
                               class="cursor-pointer"
                             />
                           </template>
-                          <template v-slot:hint> .json files only </template>
-                        </q-file>
+                        </OFile>
                       </div>
                     </div>
                   </slot>
 
-                  <query-editor
+                  <QueryEditor
                     :key="`editor-${editorKey}`"
                     :data-test="`${testPrefix}-import-sql-editor`"
                     ref="queryEditorRef"
                     :editor-id="`${testPrefix}-import-query-editor`"
-                    class="monaco-editor tw:mx-2"
+                    class="import-file-editor border-card-glass-border rounded-default min-h-0 flex-1 overflow-hidden border"
                     :debounceTime="300"
                     v-model:query="jsonStr"
                     language="json"
-                    :class="
-                      jsonStr === '' && queryEditorPlaceholderFlag
-                        ? 'empty-query'
-                        : ''
-                    "
-                    @focus="queryEditorPlaceholderFlag = false"
-                    @blur="queryEditorPlaceholderFlag = true"
                   />
-                </q-form>
+                </div>
               </div>
-
-              <!-- Slot for custom tabs (e.g., built-in patterns) -->
+              <!-- Slot for custom tab (e.g., built-in patterns) -->
               <slot name="custom-tab" :activeTab="activeTab" />
             </div>
           </template>
@@ -192,27 +169,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               :data-test="`${testPrefix}-import-output-editor`"
-              class="card-container tw:mb-[0.625rem] tw:w-full"
-              :style="outputContainerStyle"
+              class="bg-card-glass-bg flex h-full min-h-0 w-full flex-col"
             >
               <!-- Slot for complete output section customization -->
               <slot name="output-section">
                 <!-- Default output section - only shown if slot not used -->
                 <slot name="output-content">
-                  <div class="text-center text-h6 tw:py-2">Output Messages</div>
-                  <q-separator class="q-mx-md q-mt-md" />
-                  <div class="error-report-container">
-                    <div class="text-center q-pa-md text-grey-6">
-                      No messages to display
+                  <div class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
+                    {{ t("dashboard.outputMessages") }}
+                  </div>
+                  <OSeparator class="mt-1 shrink-0" />
+                  <div class="error-report-container min-h-0 flex-1 resize-none overflow-auto">
+                    <div class="text-text-muted p-3 text-center">
+                      {{ t("dashboard.noMessagesToDisplay") }}
                     </div>
                   </div>
                 </slot>
               </slot>
             </div>
           </template>
-        </q-splitter>
+        </OSplitter>
 
-        <!-- Slot for full-width content (when splitter is not shown) -->
+        <!-- Slot for w-full content (when splitter is not shown) -->
         <slot name="full-width-content" v-if="!showSplitter" />
       </div>
     </div>
@@ -223,44 +201,51 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 import {
   defineComponent,
   ref,
-  reactive,
   watch,
   defineAsyncComponent,
   computed,
   onBeforeUnmount,
+  type PropType,
 } from "vue";
-import { useI18n } from "vue-i18n";
-import { useQuasar } from "quasar";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import axios from "axios";
 import AppTabs from "./AppTabs.vue";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OSplitter from "@/lib/core/Splitter/OSplitter.vue";
 
 export default defineComponent({
   name: "BaseImport",
   components: {
-    QueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    OSeparator,
+    OSplitter,
+    QueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
     AppTabs,
+    OPageHeader,
+    OButton,
+    OInput,
+    OIcon,
+    OFile,
   },
   props: {
     // Title for the import page
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
-    // Tabs configuration
+    // Tabs configuration (shape matches AppTabs' Tab interface).
+    // No `default` here on purpose: a prop default factory runs outside the i18n
+    // context and would freeze the labels at one locale — see `resolvedTabs`.
     tabs: {
-      type: Array,
-      default: () => [
-        {
-          label: "File Upload / JSON",
-          value: "import_json_file",
-        },
-        {
-          label: "URL Import",
-          value: "import_json_url",
-        },
-      ],
+      type: Array as PropType<
+        { label: I18nText; value: string; icon?: string; disabled?: boolean }[]
+      >,
+      required: false,
     },
     // Default active tab
     defaultActiveTab: {
@@ -282,20 +267,30 @@ export default defineComponent({
       type: Boolean,
       default: true,
     },
+    // Hide the built-in header (title + back + cancel/import buttons) when the
+    // host page already renders its own page header and teleports the actions.
+    hideHeader: {
+      type: Boolean,
+      default: false,
+    },
     // Custom heights for different editor sections
     editorHeights: {
       type: Object,
       default: () => ({
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         urlEditor: "calc(100vh - 286px)", // Default for management pages
-        fileEditor: "calc(100vh - 308px)", // Default for management pages
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
+        fileEditor: "calc(100vh - 290px)", // Default for management pages
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         outputContainer: "calc(100vh - 130px)", // Default for management pages
+        // eslint-disable-next-line local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent
         errorReport: "calc(100vh - 192px)", // Default for management pages
       }),
     },
     // Custom classes
     containerClass: {
       type: String,
-      default: "tw:px-[0.625rem] tw:mb-[0.625rem] q-pt-xs",
+      default: "mb-2.5",
     },
     containerStyle: {
       type: String,
@@ -307,11 +302,11 @@ export default defineComponent({
     },
     headerClass: {
       type: String,
-      default: "tw:py-3",
+      default: "py-3",
     },
     titleClass: {
       type: String,
-      default: "tw:font-[600] tw:text-[20px]",
+      default: "font-[600] text-xl",
     },
     contentWrapperClass: {
       type: String,
@@ -327,17 +322,9 @@ export default defineComponent({
       default: "",
     },
   },
-  emits: [
-    "back",
-    "cancel",
-    "import",
-    "update:jsonStr",
-    "update:jsonArray",
-    "update:activeTab",
-  ],
+  emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray", "update:activeTab"],
   setup(props, { emit }) {
-    const { t } = useI18n();
-    const q = useQuasar();
+    const { t } = useI18nTyped();
 
     // State
     const jsonStr = ref<any>("");
@@ -346,9 +333,8 @@ export default defineComponent({
     const jsonArrayOfObj = ref<any[]>([]);
     const activeTab = ref(props.defaultActiveTab);
     const splitterModel = ref(60);
-    const queryEditorPlaceholderFlag = ref(true);
     const editorKey = ref(0); // Force editor to re-render when changes
-    const isImporting = ref(false); // Track if import is in progress
+    const isImportingLocal = ref(false); // Track if import is in progress
 
     // Expose methods to allow parent to update jsonStr
     const updateJsonStr = (newJsonStr: string) => {
@@ -358,26 +344,28 @@ export default defineComponent({
     const updateJsonArray = (newJsonArray: any[], skipEditorUpdate = false) => {
       jsonArrayOfObj.value = newJsonArray;
       jsonStr.value = JSON.stringify(newJsonArray, null, 2);
-      if (!skipEditorUpdate && !isImporting.value) {
+      if (!skipEditorUpdate && !isImportingLocal.value) {
         editorKey.value++; // Force editor to update only if not importing
       }
     };
 
+    const resolvedTabs = computed(
+      () =>
+        props.tabs ?? [
+          { label: t("common.fileUploadJsonTab"), value: "import_json_file", icon: "upload" },
+          { label: t("common.urlImportTab"), value: "import_json_url", icon: "link" },
+        ],
+    );
+
     // Computed styles
     const contentStyle = computed(() => {
-      return props.showSplitter ? "width: calc(100vw - 100px);" : "width: 100%;";
+      return "width: 100%;";
     });
 
     const splitterStyle = computed(() => {
       return {
         width: "100%",
         height: "100%",
-      };
-    });
-
-    const outputContainerStyle = computed(() => {
-      return {
-        height: props.editorHeights.outputContainer,
       };
     });
 
@@ -391,7 +379,7 @@ export default defineComponent({
     };
 
     const handleImport = () => {
-      isImporting.value = true;
+      isImportingLocal.value = true;
       emit("import", {
         jsonStr: jsonStr.value,
         jsonArray: jsonArrayOfObj.value,
@@ -428,16 +416,14 @@ export default defineComponent({
                 try {
                   const parsedJson = JSON.parse(e.target.result);
                   // Convert to array if it's a single object
-                  const jsonArray = Array.isArray(parsedJson)
-                    ? parsedJson
-                    : [parsedJson];
+                  const jsonArray = Array.isArray(parsedJson) ? parsedJson : [parsedJson];
                   resolve(jsonArray);
                 } catch (error) {
-                  q.notify({
-                    message: `Error parsing JSON from file ${file.name}`,
-                    color: "negative",
-                    position: "bottom",
-                    timeout: 2000,
+                  toast({
+                    message: t("toastMessages.common.errorParsingJsonFromFile", {
+                      fileName: file.name,
+                    }),
+                    variant: "error",
                   });
                   resolve([]);
                 }
@@ -464,42 +450,32 @@ export default defineComponent({
       try {
         if (newVal) {
           const response = await axios.get(newVal);
+          const contentType = response.headers["content-type"] as string | undefined;
 
           // Check if the response body is valid JSON
           try {
-            if (
-              response.headers["content-type"]?.includes("application/json") ||
-              response.headers["content-type"]?.includes("text/plain")
-            ) {
+            if (contentType?.includes("application/json") || contentType?.includes("text/plain")) {
               jsonStr.value = JSON.stringify(response.data, null, 2);
-              jsonArrayOfObj.value = Array.isArray(response.data)
-                ? response.data
-                : [response.data];
+              jsonArrayOfObj.value = Array.isArray(response.data) ? response.data : [response.data];
               emit("update:jsonStr", jsonStr.value);
               emit("update:jsonArray", jsonArrayOfObj.value);
             } else {
-              q.notify({
-                message: "Invalid JSON format in the URL",
-                color: "negative",
-                position: "bottom",
-                timeout: 2000,
+              toast({
+                message: t("toastMessages.common.invalidJsonFormatInTheUrl"),
+                variant: "error",
               });
             }
           } catch (parseError) {
-            q.notify({
-              message: "Invalid JSON format",
-              color: "negative",
-              position: "bottom",
-              timeout: 2000,
+            toast({
+              message: t("toastMessages.common.invalidJsonFormat"),
+              variant: "error",
             });
           }
         }
       } catch (error) {
-        q.notify({
-          message: "Error fetching data",
-          color: "negative",
-          position: "bottom",
-          timeout: 2000,
+        toast({
+          message: t("toastMessages.common.errorFetchingData"),
+          variant: "error",
         });
       }
     });
@@ -509,6 +485,13 @@ export default defineComponent({
       () => jsonStr.value,
       (newVal) => {
         emit("update:jsonStr", newVal);
+        // Editor emptied → clear the selected file(s) too, so the file input
+        // stays in sync with the editor (mirrors the file→editor clear above).
+        if (newVal === "" && jsonFiles.value) {
+          jsonFiles.value = null;
+          jsonArrayOfObj.value = [];
+          emit("update:jsonArray", jsonArrayOfObj.value);
+        }
       },
     );
 
@@ -522,28 +505,29 @@ export default defineComponent({
           emit("update:jsonArray", newVal);
         }
       },
-      { deep: true }
+      { deep: true },
     );
 
     // Cleanup before component unmounts to prevent Monaco editor errors
     onBeforeUnmount(() => {
       // Stop any pending updates
-      isImporting.value = true;
+      isImportingLocal.value = true;
       // Clear the jsonStr to prevent Monaco from trying to update
       jsonStr.value = "";
     });
 
     return {
+      raw,
       t,
       jsonStr,
       jsonFiles,
       url,
       jsonArrayOfObj,
       activeTab,
+      resolvedTabs,
       splitterModel,
-      queryEditorPlaceholderFlag,
       editorKey,
-      isImporting,
+      isImportingLocal,
       handleBack,
       handleCancel,
       handleImport,
@@ -554,71 +538,19 @@ export default defineComponent({
       updateJsonArray,
       contentStyle,
       splitterStyle,
-      outputContainerStyle,
     };
   },
 });
 </script>
 
-<style scoped lang="scss">
-.empty-query .monaco-editor-background {
-  background-image: url("../../assets/images/common/query-editor.png");
-  background-repeat: no-repeat;
-  background-size: 115px;
-}
-
-.editor-container-url {
-  .monaco-editor {
-    height: v-bind('editorHeights.urlEditor') !important;
-    overflow: auto;
-    resize: none;
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.375rem;
-    padding-top: 12px;
-  }
-}
-
-.editor-container-json {
-  .monaco-editor {
-    height: v-bind('editorHeights.fileEditor') !important;
-    overflow: auto;
-    resize: none;
-    border: 1px solid var(--o2-border-color);
-    border-radius: 0.375rem;
-    padding-top: 12px;
-  }
-}
-
-.monaco-editor {
-  height: v-bind('editorHeights.fileEditor') !important;
-  overflow: auto;
+<style scoped>
+/* keep(lib-override:monaco): fixed Monaco height for the URL import editor.
+   Previously inherited from ImportDashboard.vue's global .editor-container-url
+   rule; now owned locally (via :deep to Monaco's DOM), same value/props, so the
+   editor no longer depends on that view having been mounted first. */
+.editor-container-url :deep(.monaco-editor) {
+  height: calc(100vh - 17.8125rem) !important;
+  overflow: hidden;
   resize: none;
-  border: 1px solid var(--o2-border-color);
-  border-radius: 0.375rem;
-}
-
-.error-report-container {
-  height: v-bind('editorHeights.errorReport') !important;
-  overflow: auto;
-  resize: none;
-}
-
-.error-section {
-  padding: 10px;
-  margin-bottom: 10px;
-}
-
-.section-title {
-  font-size: 16px;
-  margin-bottom: 10px;
-  text-transform: uppercase;
-}
-
-.error-list {
-}
-
-.error-item {
-  padding: 5px 0px;
-  font-size: 14px;
 }
 </style>

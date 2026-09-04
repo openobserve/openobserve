@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,7 +15,7 @@
 
 use async_trait::async_trait;
 use chrono::Duration;
-use config::utils::{json, time::now_micros};
+use config::utils::time::now_micros;
 use sqlx::Row;
 
 use super::{TRIGGERS_KEY, Trigger, TriggerModule, TriggerStatus, get_scheduler_max_retries};
@@ -26,6 +26,37 @@ use crate::{
     },
     errors::{DbError, Error, Result},
 };
+
+const PULL_QUERY: &str = r#"UPDATE scheduled_jobs
+SET status = $1, start_time = $2, claim_epoch = claim_epoch + 1,
+    end_time = CASE WHEN module = $3 THEN $4 ELSE $5 END
+WHERE id IN (
+    SELECT id FROM scheduled_jobs
+    WHERE status = $6 AND next_run_at <= $7
+      AND NOT (is_realtime = $8 AND is_silenced = $9)
+    ORDER BY next_run_at, id LIMIT $10
+)
+RETURNING *;"#;
+
+const PULL_QUERY_BY_MODULE: &str = r#"UPDATE scheduled_jobs
+SET status = $1, start_time = $2, claim_epoch = claim_epoch + 1,
+    end_time = CASE WHEN module = $3 THEN $4 ELSE $5 END
+WHERE id IN (
+    SELECT id FROM scheduled_jobs
+    WHERE status = $6 AND next_run_at <= $7
+      AND NOT (is_realtime = $8 AND is_silenced = $9) AND module = $10
+    ORDER BY next_run_at, id LIMIT $11
+)
+RETURNING *;"#;
+
+const KEEP_ALIVE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
+SET end_time = CASE WHEN module = $1 THEN $2 ELSE $3 END
+WHERE id = $4 AND claim_epoch = $5 AND status = $6;"#;
+
+const COMPLETE_CLAIM_QUERY: &str = r#"UPDATE scheduled_jobs
+SET status = $1, retries = $2, next_run_at = $3,
+    is_realtime = $4, is_silenced = $5, data = $6
+WHERE id = $7 AND claim_epoch = $8 AND status = $9;"#;
 
 pub struct SqliteScheduler {}
 
@@ -46,7 +77,6 @@ impl super::Scheduler for SqliteScheduler {
     /// Creates the Scheduled Jobs table
     async fn create_table(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         sqlx::query(
             r#"
 CREATE TABLE IF NOT EXISTS scheduled_jobs
@@ -62,11 +92,12 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
     end_time     BIGINT,
     retries      INT not null,
     next_run_at  BIGINT not null,
-    data         TEXT not null
+    data         TEXT not null,
+    claim_epoch  BIGINT default 0 not null
 );
             "#,
         )
-        .execute(&*client)
+        .execute(&client)
         .await?;
 
         // create data column for old version <= 0.10.9
@@ -75,6 +106,13 @@ CREATE TABLE IF NOT EXISTS scheduled_jobs
             "scheduled_jobs",
             "data",
             "TEXT NOT NULL DEFAULT ''",
+        )
+        .await?;
+        add_column(
+            &client,
+            "scheduled_jobs",
+            "claim_epoch",
+            "BIGINT NOT NULL DEFAULT 0",
         )
         .await?;
 
@@ -136,7 +174,6 @@ SELECT COUNT(*) as num FROM scheduled_jobs WHERE module = $1;"#,
     /// Pushes a Trigger job into the queue
     async fn push(&self, trigger: Trigger) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let mut tx = client.begin().await?;
 
         if let Err(e) = sqlx::query(
@@ -174,36 +211,24 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         // release lock
         drop(client);
 
-        // For now, only send realtime alert triggers
-        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
-            let key = format!(
-                "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, &trigger.org, &trigger.module_key
-            );
-
-            // TODO: For sqlite cluster coordinator, the alert triggers are put
-            // into the sqlite meta database to send watch events. Hence, there is a
-            // redundancy of alert triggers stored both in scheduled_jobs and meta
-            // tables. How to remove this redundancy?
-            let cluster_coordinator = db::get_coordinator().await;
-            cluster_coordinator
-                .put(&key, json::to_vec(&trigger).unwrap().into(), true, None)
-                .await?;
-        }
+        // TODO: For sqlite cluster coordinator, the alert triggers are put
+        // into the sqlite meta database to send watch events. Hence, there is a
+        // redundancy of alert triggers stored both in scheduled_jobs and meta
+        // tables. How to remove this redundancy?
+        super::emit_realtime_trigger_event(&trigger).await?;
         Ok(())
     }
 
     /// Deletes the Trigger job matching the given parameters
     async fn delete(&self, org: &str, module: TriggerModule, key: &str) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         sqlx::query(
             r#"DELETE FROM scheduled_jobs WHERE org = $1 AND module_key = $2 AND module = $3;"#,
         )
         .bind(org)
         .bind(key)
         .bind(&module)
-        .execute(&*client)
+        .execute(&client)
         .await?;
 
         drop(client);
@@ -231,7 +256,6 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         data: Option<&str>,
     ) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let query = match data {
             Some(data) => {
                 sqlx::query(
@@ -255,7 +279,7 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .bind(&module)
             },
         };
-        query.execute(&*client).await?;
+        query.execute(&client).await?;
 
         drop(client);
 
@@ -267,7 +291,6 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
 
     async fn update_trigger(&self, trigger: Trigger, clone: bool) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let query = if clone {
             sqlx::query(
                 r#"UPDATE scheduled_jobs
@@ -302,22 +325,12 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
             .bind(&trigger.module)
         };
 
-        query.execute(&*client).await?;
+        query.execute(&client).await?;
 
         // release lock
         drop(client);
 
-        // For now, only send alert triggers
-        if trigger.module == TriggerModule::Alert && trigger.is_realtime {
-            let key = format!(
-                "{TRIGGERS_KEY}{}/{}/{}",
-                trigger.module, &trigger.org, &trigger.module_key
-            );
-            let cluster_coordinator = db::get_coordinator().await;
-            cluster_coordinator
-                .put(&key, json::to_vec(&trigger).unwrap().into(), true, None)
-                .await?;
-        }
+        super::emit_realtime_trigger_event(&trigger).await?;
         Ok(())
     }
 
@@ -363,15 +376,61 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .join(",")
         );
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         sqlx::query(&sql)
             .bind(TriggerModule::Report)
             .bind(report_max_time)
             .bind(alert_max_time)
-            .execute(&*client)
+            .execute(&client)
             .await?;
 
         Ok(())
+    }
+
+    async fn keep_alive_claim(
+        &self,
+        claim: &Trigger,
+        alert_timeout: i64,
+        report_timeout: i64,
+    ) -> Result<bool> {
+        let now = now_micros();
+        let report_max_time = now
+            + Duration::try_seconds(report_timeout)
+                .ok_or_else(|| Error::Message("invalid report timeout".into()))?
+                .num_microseconds()
+                .ok_or_else(|| Error::Message("report timeout overflow".into()))?;
+        let alert_max_time = now
+            + Duration::try_seconds(alert_timeout)
+                .ok_or_else(|| Error::Message("invalid alert timeout".into()))?
+                .num_microseconds()
+                .ok_or_else(|| Error::Message("alert timeout overflow".into()))?;
+        let client = CLIENT_RW.clone();
+        let result = sqlx::query(KEEP_ALIVE_CLAIM_QUERY)
+            .bind(TriggerModule::Report)
+            .bind(report_max_time)
+            .bind(alert_max_time)
+            .bind(claim.id)
+            .bind(claim.claim_epoch)
+            .bind(TriggerStatus::Processing)
+            .execute(&client)
+            .await?;
+        Ok(result.rows_affected() == 1)
+    }
+
+    async fn complete_claim(&self, trigger: Trigger) -> Result<bool> {
+        let client = CLIENT_RW.clone();
+        let result = sqlx::query(COMPLETE_CLAIM_QUERY)
+            .bind(&trigger.status)
+            .bind(trigger.retries)
+            .bind(trigger.next_run_at)
+            .bind(trigger.is_realtime)
+            .bind(trigger.is_silenced)
+            .bind(&trigger.data)
+            .bind(trigger.id)
+            .bind(trigger.claim_epoch)
+            .bind(TriggerStatus::Processing)
+            .execute(&client)
+            .await?;
+        Ok(result.rows_affected() == 1)
     }
 
     /// Returns the Trigger jobs with "Waiting" status.
@@ -387,9 +446,9 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
         concurrency: i64,
         alert_timeout: i64,
         report_timeout: i64,
+        module: Option<TriggerModule>,
     ) -> Result<Vec<Trigger>> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
 
         let now = now_micros();
         let report_max_time = now
@@ -402,22 +461,17 @@ INSERT INTO scheduled_jobs (org, module, module_key, is_realtime, is_silenced, s
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
-        let query = r#"UPDATE scheduled_jobs
-SET status = $1, start_time = $2,
-    end_time = CASE
-        WHEN module = $3 THEN $4
-        ELSE $5
-    END
-WHERE id IN (
-    SELECT id
-    FROM scheduled_jobs
-    WHERE status = $6 AND next_run_at <= $7 AND NOT (is_realtime = $8 AND is_silenced = $9)
-    ORDER BY next_run_at
-    LIMIT $10
-)
-RETURNING *;"#;
+        // Sqlite holds the single global CLIENT_RW write lock here, so there is no per-module
+        // advisory lock — all writes are already serialized (single-node/dev backend). The
+        // `module` filter still scopes which rows a per-module puller claims; see postgres.rs for
+        // the C3 lock rationale. Legacy `None` string is byte-identical (LIMIT $10).
+        let query = if module.is_some() {
+            PULL_QUERY_BY_MODULE
+        } else {
+            PULL_QUERY
+        };
 
-        let jobs: Vec<Trigger> = sqlx::query_as::<_, Trigger>(query)
+        let mut q = sqlx::query_as::<_, Trigger>(query)
             .bind(TriggerStatus::Processing)
             .bind(now)
             .bind(TriggerModule::Report)
@@ -426,10 +480,12 @@ RETURNING *;"#;
             .bind(TriggerStatus::Waiting)
             .bind(now)
             .bind(true)
-            .bind(false)
-            .bind(concurrency)
-            .fetch_all(&*client)
-            .await?;
+            .bind(false);
+        if let Some(m) = module {
+            q = q.bind(m);
+        }
+        q = q.bind(concurrency);
+        let jobs: Vec<Trigger> = q.fetch_all(&client).await?;
         Ok(jobs)
     }
 
@@ -497,7 +553,6 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     /// retries >= threshold set through environment
     async fn clean_complete(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let (include_max, mut max_retries) = get_scheduler_max_retries();
         if include_max {
             max_retries += 1;
@@ -509,7 +564,7 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
         .bind(TriggerStatus::Completed)
         .bind(max_retries)
         .bind(TriggerModule::Alert)
-        .execute(&*client)
+        .execute(&client)
         .await?;
         Ok(())
     }
@@ -522,7 +577,6 @@ WHERE org = $1 AND module = $2 AND module_key = $3;"#;
     /// - Update their status back to "Waiting" and increase their "retries" by 1
     async fn watch_timeout(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         let now = now_micros();
         sqlx::query(
             r#"UPDATE scheduled_jobs
@@ -533,7 +587,7 @@ WHERE status = $2 AND end_time <= $3;
         .bind(TriggerStatus::Waiting)
         .bind(TriggerStatus::Processing)
         .bind(now)
-        .execute(&*client)
+        .execute(&client)
         .await?;
         Ok(())
     }
@@ -565,9 +619,8 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
 
     async fn clear(&self) -> Result<()> {
         let client = CLIENT_RW.clone();
-        let client = client.lock().await;
         match sqlx::query(r#"DELETE FROM scheduled_jobs;"#)
-            .execute(&*client)
+            .execute(&client)
             .await
         {
             Ok(_) => log::info!("[SCHEDULER] scheduled_jobs table cleared"),
@@ -575,5 +628,48 @@ SELECT COUNT(*) as num FROM scheduled_jobs;"#,
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{COMPLETE_CLAIM_QUERY, KEEP_ALIVE_CLAIM_QUERY, PULL_QUERY, SqliteScheduler};
+
+    #[test]
+    fn test_sqlite_scheduler_new() {
+        let _scheduler = SqliteScheduler::new();
+    }
+
+    #[test]
+    fn test_sqlite_scheduler_default() {
+        let _scheduler = SqliteScheduler::default();
+    }
+
+    #[test]
+    fn sqlite_claim_epoch_is_created_incremented_and_returned_by_claim() {
+        assert!(PULL_QUERY.contains("claim_epoch = claim_epoch + 1"));
+        assert!(PULL_QUERY.contains("RETURNING"));
+    }
+
+    #[test]
+    fn sqlite_composite_keepalive_and_completion_are_epoch_fenced() {
+        for (operation, query) in [
+            ("keep alive", KEEP_ALIVE_CLAIM_QUERY),
+            ("completion", COMPLETE_CLAIM_QUERY),
+        ] {
+            let compact = query.split_whitespace().collect::<Vec<_>>().join(" ");
+            assert!(
+                compact.contains("id = $"),
+                "{operation} must match the job ID"
+            );
+            assert!(
+                compact.contains("claim_epoch = $"),
+                "{operation} must match the captured epoch"
+            );
+            assert!(
+                compact.contains("status = $"),
+                "{operation} must require Processing status"
+            );
+        }
     }
 }

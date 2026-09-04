@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,65 +15,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="flex justify-center items-start">
+  <div class="flex items-end gap-2">
     <!-- select new folder -->
-    <q-select
+    <OSelect
       v-model="selectedFolder"
       :label="t('dashboard.selectFolderLabel')"
-      :options="store.state.organizationData.folders.map((item: any)=> {return {label: item.name, value: item.folderId}})"
+      :labelPosition="labelPosition"
+      :options="folderOptions"
       data-test="index-dropdown-stream_type"
-      input-debounce="0"
-      behavior="menu"
-      borderless
-      dense
-      class="showLabelOnTop no-case tw:mr-1 tw:mt-[1px] o2-custom-select-dashboard"
-      style="width: calc(100% - 44px)"
+      labelKey="label"
+      class="flex-1"
     >
-      <template #no-option>
-        <q-item>
-          <q-item-section> {{ t("search.noResult") }}</q-item-section>
-        </q-item>
+      <template v-if="selectedFolder" #icon-left>
+        <FolderIcon :token="selectedFolderIcon" class="text-select-text" />
       </template>
-    </q-select>
+    </OSelect>
 
-    <q-btn
-      class="q-mb-md add-folder-btn"
+    <OButton
       data-test="dashboard-folder-move-new-add"
-      style="width: 40px;"
-      :style="computedStyle"
-      no-caps
-      dense
+      variant="outline"
+      size="icon-xs-sq"
+      class="h-8! w-8!"
+      @mousedown.prevent
       @click="
         () => {
           showAddFolderDialog = true;
         }
       "
+      icon-left="add"
     >
-      <q-icon name="add" size="xs" />
-    </q-btn>
+    </OButton>
   </div>
   <!-- add folder -->
-  <q-dialog
-    v-model="showAddFolderDialog"
-    position="right"
-    full-height
-    maximized
+  <ODialog
+    v-model:open="showAddFolderDialog"
+    :title="t('common.addFolder')"
+    size="sm"
     data-test="dashboard-folder-move-dialog"
+    :secondary-button-label="t('dashboard.cancel')"
+    :primary-button-label="t('dashboard.save')"
+    form-id="add-folder-dashboards-form"
+    @click:secondary="showAddFolderDialog = false"
   >
-    <AddFolder @update:modelValue="updateFolderList" :edit-mode="false" />
-  </q-dialog>
+    <AddFolder ref="addFolderRef" @update:modelValue="updateFolderList" :edit-mode="false" />
+  </ODialog>
 </template>
 
 <script lang="ts">
-import { defineComponent, onActivated, ref, watch, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, onActivated, ref, watch, computed, type PropType } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import AddFolder from "../../components/dashboards/AddFolder.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import { useRoute } from "vue-router";
+import { useFolderIcons } from "@/composables/useFolderIcons";
+import { folderIconOption } from "@/components/common/sidebar/folderIconOption";
+import FolderIcon from "@/components/common/sidebar/FolderIcon.vue";
 
 export default defineComponent({
   name: "SelectedFolderDropdown",
-  components: { AddFolder },
+  components: { AddFolder, OButton, ODialog, OSelect, FolderIcon },
   emits: ["folder-selected"],
   props: {
     activeFolderId: {
@@ -82,44 +85,56 @@ export default defineComponent({
         return typeof value === "string" || value === null;
       },
     },
+    labelPosition: {
+      type: String as PropType<"inside" | "outside">,
+      default: "outside",
+    },
   },
   setup(props, { emit }) {
     const store: any = useStore();
+    const { iconFor } = useFolderIcons();
+
+    const selectedFolderIcon = computed(() =>
+      iconFor(
+        store.state.organizationData.folders.find(
+          (item: any) => item.folderId === selectedFolder.value,
+        ),
+      ),
+    );
+
+    const folderOptions = computed(() =>
+      store.state.organizationData.folders.map((item: any) => ({
+        label: item.name,
+        value: item.folderId,
+        iconComponent: folderIconOption(iconFor(item)),
+      })),
+    );
     const route = useRoute();
     const showAddFolderDialog: any = ref(false);
+    const addFolderRef: any = ref(null);
 
-    const getInitialFolderValue = () => {
+    const getInitialFolderValue = (): string => {
       // priority: activeFolderId > query.folder > default
-      // use activeFolderId if available
-      // else use router query if available
-      // else use default
+      const folderId = props.activeFolderId ?? route.query.folder ?? "default";
       const activeFolderData = store.state.organizationData.folders.find(
-        (item: any) =>
-          item.folderId === (props.activeFolderId ?? route.query.folder ?? "default")
+        (item: any) => item.folderId === folderId,
       );
-
-      return {
-        label: activeFolderData?.name ?? "default",
-        value: activeFolderData?.folderId ?? "default",
-      };
+      return activeFolderData?.folderId ?? "default";
     };
 
-    //dropdown selected folder index
-    const selectedFolder = ref(getInitialFolderValue());
-    const { t } = useI18n();
+    //dropdown selected folder id (primitive string for OSelect)
+    const selectedFolder = ref<string>(getInitialFolderValue());
+    const { t } = useI18nTyped();
 
     const updateFolderList = async (newFolder: any) => {
       showAddFolderDialog.value = false;
       if (newFolder && newFolder.data) {
-        selectedFolder.value = {
-          label: newFolder.data.name,
-          value: newFolder.data.folderId,
-        };
+        selectedFolder.value = newFolder.data.folderId;
       }
     };
 
     const computedStyle = computed(() => {
-      return 'height: 35px; margin-top: 13px';
+      return "";
     });
 
     onActivated(() => {
@@ -132,31 +147,34 @@ export default defineComponent({
       () => {
         // refresh selected folder, on folders list change
         selectedFolder.value = getInitialFolderValue();
-      }
+      },
     );
 
     watch(
       () => selectedFolder.value,
-      () => {
-        emit("folder-selected", selectedFolder.value);
-      }
+      (folderId) => {
+        const folder = store.state.organizationData.folders.find(
+          (item: any) => item.folderId === folderId,
+        );
+        // emit {label, value} for backward compatibility with parents
+        emit("folder-selected", {
+          label: folder?.name ?? folderId,
+          value: folderId,
+        });
+      },
     );
 
     return {
+      folderOptions,
+      selectedFolderIcon,
       t,
       store,
       selectedFolder,
       updateFolderList,
       showAddFolderDialog,
+      addFolderRef,
       computedStyle,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-.q-select .q-field__control-container .q-field__native {
-  height: 1rem !important;
-  min-height: 1rem !important;
-}
-</style>

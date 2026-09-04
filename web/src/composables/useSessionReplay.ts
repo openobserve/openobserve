@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -94,6 +94,7 @@ const defaultObject = {
       timestamp: 0,
       type: "",
       time_spent: 0,
+      source: "",
     },
   },
 };

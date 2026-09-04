@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,7 +23,7 @@ use std::{
 };
 
 use bytes::Bytes;
-use config::utils::time::get_ymdh_from_micros;
+use config::utils::time::{HourFormat, get_ymdh_from_micros};
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
 use object_store::{GetOptions, GetResult};
@@ -52,6 +52,7 @@ enum CacheStrategy {
 enum FileType {
     Parquet,
     Ttv,
+    Vortex,
 }
 
 impl CacheStrategy {
@@ -109,7 +110,7 @@ impl CacheStrategy {
                     return None;
                 }
                 let mut idx = None;
-                for (_, val) in map.iter() {
+                for val in map.values() {
                     if !cache[*val].is_empty() {
                         idx = Some(*val);
                         break;
@@ -220,6 +221,15 @@ async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Erro
                 return Err(anyhow::anyhow!("payload size mismatch"));
             }
         }
+        FileType::Vortex => {
+            if bytes.len() < 12 {
+                return Err(anyhow::anyhow!("invalid vortex file"));
+            }
+            const VORTEX_MAGIC: &[u8; 4] = b"VTXF";
+            if &bytes[..4] != VORTEX_MAGIC || &bytes[bytes.len() - 4..] != VORTEX_MAGIC {
+                return Err(anyhow::anyhow!("vortex magic bytes mismatch"));
+            }
+        }
     }
     Ok(())
 }
@@ -287,18 +297,22 @@ async fn download_from_storage(
             } else {
                 // the entry in db does not match what there is actually in the blob store
                 // so we check if the footer is valid. If it is, then the db entry is invalid
-                // and we reset it. If footer is invalid, the the store has a corrupted file
+                // and we reset it. If footer is invalid, the store has a corrupted file
                 // so we mark it as deleted, and return error.
+                // data files (parquet/vortex) are tracked in file_list, ttv index files are not
+                let is_data_file = file.ends_with(".parquet") || file.ends_with(".vortex");
                 let valid_parquet = file.ends_with(".parquet")
                     && validate_file(&data_bytes, FileType::Parquet).await.is_ok();
+                let valid_vortex = file.ends_with(".vortex")
+                    && validate_file(&data_bytes, FileType::Vortex).await.is_ok();
                 let valid_ttv = file.ends_with(".ttv")
                     && validate_file(&data_bytes, FileType::Ttv).await.is_ok();
-                if valid_parquet || valid_ttv {
+                if valid_parquet || valid_vortex || valid_ttv {
                     log::warn!(
                         "download file {file} found size mismatch, remote : {expected_blob_size}, db: {size}, correcting db as valid file",
                     );
-                    // only update for parquet files, not ttv files
-                    if file.ends_with(".parquet") {
+                    // only update for data files, not ttv files
+                    if is_data_file {
                         crate::file_list::update_compressed_size(file, data_len as i64).await?;
                         crate::file_list::LOCAL_CACHE
                             .update_compressed_size(file, data_len as i64)
@@ -309,8 +323,8 @@ async fn download_from_storage(
                     log::warn!(
                         "download file {file} found corrupt file, remote: {expected_blob_size}, db: {size}, deleting entry from file_list "
                     );
-                    // only update for parquet files, not ttv files
-                    if file.ends_with(".parquet") {
+                    // only update for data files, not ttv files
+                    if is_data_file {
                         crate::file_list::remove(file).await?;
                         crate::file_list::LOCAL_CACHE.remove(file).await?;
                     }
@@ -410,6 +424,45 @@ pub async fn get_size_opts(account: &str, file: &str, remote: bool) -> object_st
     })
 }
 
+/// Batched range read across the cache ladder.
+///
+/// `memory → disk → remote storage`, returning one `Bytes` per input
+/// range in input order. The hit-path stays inside a single file
+/// handle: memory cache slices its in-memory `Bytes`, disk cache does
+/// one `File::open` + N `pread`s. Only on a full cache miss do we go
+/// to remote storage (which itself implements batched `get_ranges`
+/// for local FS and any object_store backend).
+///
+/// `remote = false` is the search-side semantic — never hit S3 on a
+/// miss, return NotFound so the caller can degrade gracefully.
+pub async fn get_ranges_opts(
+    account: &str,
+    file: &str,
+    ranges: &[Range<u64>],
+    remote: bool,
+) -> object_store::Result<Vec<Bytes>> {
+    let cfg = config::get_config();
+    if cfg.memory_cache.enabled
+        && let Some(v) = memory::get_ranges(file, ranges).await
+    {
+        return Ok(v);
+    }
+    if cfg.disk_cache.enabled
+        && let Ok(v) = disk::get_ranges(file, ranges).await
+    {
+        return Ok(v);
+    }
+
+    if remote {
+        return crate::storage::get_ranges(account, file, ranges).await;
+    }
+
+    Err(object_store::Error::NotFound {
+        path: file.to_string(),
+        source: Box::new(std::io::Error::other(file)),
+    })
+}
+
 /// get the file time from the file name
 ///
 /// metrics_cache:
@@ -433,7 +486,7 @@ fn get_file_time(file: &str) -> Option<u64> {
         }
         "results" => {
             let (_, _, _, meta) = disk::parse_result_cache_key(file)?;
-            get_ymdh_from_micros(meta.start_time).replace("/", "")
+            get_ymdh_from_micros(meta.start_time, HourFormat::Real).replace("/", "")
         }
         "files" => {
             if parts.len() < 8 {
@@ -443,7 +496,7 @@ fn get_file_time(file: &str) -> Option<u64> {
         }
         "aggregations" => {
             let (_, _, _, meta) = disk::parse_aggregation_cache_key(file)?;
-            get_ymdh_from_micros(meta.start_time).replace("/", "")
+            get_ymdh_from_micros(meta.start_time, HourFormat::Real).replace("/", "")
         }
         _ => {
             return None;
@@ -516,5 +569,106 @@ mod tests {
         let file = "aggregations/default/logs/default/16042959487540176184/1744081170000000_1744081170000000.arrow";
         let time = get_file_time(file);
         assert_eq!(time, Some(2025040802));
+    }
+
+    #[test]
+    fn test_cache_type_equality_and_copy() {
+        let a = CacheType::Disk;
+        let b = a;
+        assert_eq!(a, b);
+        assert_ne!(CacheType::Disk, CacheType::Memory);
+        assert_ne!(CacheType::Memory, CacheType::None);
+        assert_ne!(CacheType::Disk, CacheType::None);
+    }
+
+    #[test]
+    fn test_cache_strategy_unknown_defaults_to_lru() {
+        let mut lru = CacheStrategy::new("lru");
+        let mut unknown = CacheStrategy::new("something_unknown");
+        let key = "files/default/logs/b/2025/04/08/06/1.parquet";
+        lru.insert(key.to_string(), 10);
+        unknown.insert(key.to_string(), 10);
+        assert!(lru.contains_key(key));
+        assert!(unknown.contains_key(key));
+        assert_eq!(lru.len(), unknown.len());
+    }
+
+    #[test]
+    fn test_cache_strategy_is_empty_and_len() {
+        let mut cache = CacheStrategy::new("fifo");
+        assert!(cache.is_empty());
+        assert_eq!(cache.len(), 0);
+        cache.insert(
+            "files/default/logs/b/2025/04/08/06/x.parquet".to_string(),
+            1,
+        );
+        assert!(!cache.is_empty());
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn test_cache_strategy_lru_is_empty_and_len() {
+        let mut cache = CacheStrategy::new("lru");
+        assert!(cache.is_empty());
+        assert_eq!(cache.len(), 0);
+        cache.insert(
+            "files/default/logs/b/2025/04/08/06/x.parquet".to_string(),
+            5,
+        );
+        assert!(!cache.is_empty());
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn test_cache_strategy_remove_key_lru() {
+        let mut cache = CacheStrategy::new("lru");
+        let key = "files/default/logs/b/2025/04/08/06/k.parquet";
+        cache.insert(key.to_string(), 42);
+        assert!(cache.contains_key(key));
+        let removed = cache.remove_key(key);
+        assert!(removed.is_some());
+        assert_eq!(removed.unwrap().1, 42);
+        assert!(!cache.contains_key(key));
+    }
+
+    #[test]
+    fn test_cache_strategy_remove_key_fifo_empty() {
+        let mut cache = CacheStrategy::new("fifo");
+        let removed = cache.remove_key("nonexistent");
+        assert!(removed.is_none());
+    }
+
+    #[test]
+    fn test_cache_strategy_remove_key_fifo_missing_key() {
+        let mut cache = CacheStrategy::new("fifo");
+        cache.insert(
+            "files/default/logs/b/2025/04/08/06/a.parquet".to_string(),
+            1,
+        );
+        let removed = cache.remove_key("files/default/logs/b/2025/04/08/06/b.parquet");
+        assert!(removed.is_none());
+        assert_eq!(cache.len(), 1);
+    }
+
+    #[test]
+    fn test_cache_strategy_remove_on_empty_returns_none() {
+        let mut lru = CacheStrategy::new("lru");
+        assert!(lru.remove().is_none());
+        let mut fifo = CacheStrategy::new("fifo");
+        assert!(fifo.remove().is_none());
+        let mut time_lru = CacheStrategy::new("time_lru");
+        assert!(time_lru.remove().is_none());
+    }
+
+    #[test]
+    fn test_get_file_time_unknown_prefix_returns_none() {
+        let file = "unknown/default/logs/b/2025/04/08/06/1.parquet";
+        assert_eq!(get_file_time(file), None);
+    }
+
+    #[test]
+    fn test_get_file_time_too_short_path_returns_none() {
+        let file = "files/a/b/c";
+        assert_eq!(get_file_time(file), None);
     }
 }

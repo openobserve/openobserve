@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,403 +15,266 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="feature-comparison-wrapper">
-    <div class="feature-comparison-header tw:mb-6">
-      <div class="tw:flex tw:items-center tw:gap-3 tw:mb-3">
-        <div class="icon-wrapper" :class="store.state.theme === 'dark' ? 'icon-wrapper-dark' : 'icon-wrapper-light'">
-          <q-icon name="compare_arrows" size="24px" />
-        </div>
-        <h3 class="feature-title">{{ t("about.feature_comparison_lbl") }}</h3>
+  <div>
+    <!-- ── Header ──────────────────────────────────────────────────────── -->
+    <div class="mb-2 flex items-start gap-3">
+      <div
+        data-test="feature-comparison-table-icon-wrapper"
+        class="rounded-default text-accent bg-card-glass-tint-medium flex h-12 w-12 shrink-0 items-center justify-center"
+      >
+        <OIcon name="compare-arrows" size="md" />
       </div>
-      <div class="feature-subtitle-wrapper">
-        <p
-          v-if="store.state.zoConfig.build_type === 'opensource'"
-          class="edition-info"
+      <div>
+        <div
+          class="text-accent m-0 mb-0.5 text-[length:var(--text-xs)] font-semibold tracking-[0.1em] uppercase"
         >
-          {{ t("about.feature_comparision_os_msg") }}
-        </p>
-        <p
-          v-else-if="store.state.zoConfig.build_type === 'enterprise'"
-          class="edition-info"
+          {{ t("about.editionsLabel") }}
+        </div>
+        <div
+          class="text-text-heading m-0 text-[length:var(--text-xl)] font-semibold tracking-[-0.015em]"
         >
-          {{ t("about.feature_comparision_ent_msg") }}
-        </p>
-        <p
-          v-else
-          class="feature-subtitle"
-        >
-          {{ t("about.feature_comparision_subtitle") }}
-        </p>
-        <p
-          v-if="store.state.zoConfig.build_type === 'opensource'"
-          class="enterprise-promotion"
-        >
-          {{ t("about.feature_comparision_good_news") }}
-        </p>
-        <p
-          v-else-if="store.state.zoConfig.build_type === 'enterprise'"
-          class="enterprise-promotion"
-        >
-          {{ t("about.feature_comparision_plan_detail") }}
-        </p>
+          {{ t("about.feature_comparison_lbl") }}
+        </div>
       </div>
     </div>
+    <div class="text-typography-body mt-2 text-sm leading-relaxed font-normal">
+      <template v-if="buildType === 'opensource'">{{
+        t("about.feature_comparision_os_msg")
+      }}</template>
+      <template v-else-if="buildType === 'enterprise'">{{
+        t("about.feature_comparision_ent_msg")
+      }}</template>
+      <template v-else>{{ t("about.feature_comparision_subtitle") }}</template>
+    </div>
 
-    <div class="table-wrapper">
-      <q-table
-        :rows="featureData.features"
-        :columns="columns"
-        row-key="name"
-        :pagination="pagination"
-        hide-pagination
-        flat
-        bordered
-        dense
-        class="feature-comparison-table o2-quasar-table"
+    <!-- ── Edition Cards Grid ──────────────────────────────────────────── -->
+    <div class="grid grid-cols-3 gap-5 pt-4">
+      <!-- eslint-disable local/no-hardcoded-px -- query condition: a threshold for WHEN layout changes, not a rendered length -->
+      <div
+        v-for="ed in editionList"
+        :key="ed.id"
+        data-test="feature-comparison-table-edition-card"
+        :data-test-active="buildType === ed.id ? 'true' : undefined"
+        class="bg-card-glass-bg rounded-default border-card-glass-border relative flex flex-col border p-6 max-[1024px]:p-4"
+        :class="{ 'border-accent border-2 pt-7 max-[1024px]:pt-5': buildType === ed.id }"
       >
-        <template v-slot:body="props">
-          <q-tr :props="props">
-            <q-td key="name" :props="props" class="feature-name-cell">
-              {{ props.row.name }}
-            </q-td>
-            <q-td
-              key="opensource"
-              :props="props"
-              class="feature-value-cell"
+        <!-- eslint-enable local/no-hardcoded-px -->
+        <!-- Your Plan badge (floats above the card top border) -->
+        <div
+          v-if="buildType === ed.id"
+          data-test="feature-comparison-table-your-plan-badge"
+          class="text-3xs bg-accent text-button-primary-foreground absolute top-[-0.875rem] left-1/2 inline-flex -translate-x-1/2 items-center rounded-full px-3.5 py-1 font-bold tracking-[0.08em] whitespace-nowrap uppercase"
+        >
+          <OIcon name="arrow-upward" size="sm" class="me-1" />
+          {{ t("about.yourPlan") }}
+        </div>
+
+        <!-- Edition name + hosting + price ────────────────────────────── -->
+        <div class="mb-5">
+          <div class="text-text-heading m-0 mb-0.5 text-base font-bold">{{ ed.shortName }}</div>
+          <div class="text-compact text-text-secondary m-0 mb-3.5">{{ ed.hosting }}</div>
+          <div class="text-accent m-0 mb-1 text-3xl leading-[1.1] font-bold tracking-[-0.03em]">
+            {{ ed.price }}
+          </div>
+          <div class="text-compact text-text-secondary m-0 leading-[1.4]">{{ ed.priceSub }}</div>
+        </div>
+
+        <!-- All Five Pillars chips ────────────────────────────────────── -->
+        <div class="rounded-default border-accent/15 bg-card-glass-tint-subtle mb-4 border p-3">
+          <div class="text-3xs text-text-label m-0 mb-2 font-bold tracking-[0.12em] uppercase">
+            {{ t("about.allFivePillars") }}
+          </div>
+          <div class="mb-1.5 flex flex-wrap gap-1.5">
+            <span
+              v-for="pillarId in PILLAR_IDS"
+              :key="pillarId"
+              data-test="feature-comparison-table-pillar-chip"
+              class="rounded-default text-2xs text-accent border-accent/20 bg-card-glass-tint me-1.5 mb-1.5 inline-flex items-center border px-2 py-[0.1875rem] font-medium"
+            >
+              {{ t(`about.feature_${pillarId}`) }}
+            </span>
+          </div>
+          <span
+            class="rounded-default text-2xs text-accent border-accent/20 bg-card-glass-tint me-1.5 mb-1.5 inline-flex items-center border px-2 py-[0.1875rem] font-medium"
+            >{{ t("about.feature_dashboards") }}</span
+          >
+        </div>
+
+        <!-- Feature list ───────────────────────────────────────────────── -->
+        <ul class="m-0 flex-1 list-none p-0">
+          <li
+            v-for="feature in listFeatures"
+            :key="feature.id"
+            data-test="feature-comparison-table-feature-item"
+            class="text-compact border-card-glass-border flex items-start gap-2 border-b py-[0.4375rem] last:border-b-0"
+            :class="{
+              'text-text-body': getFeatureStatus(feature, ed.id) !== 'unavailable',
+              'text-text-muted': getFeatureStatus(feature, ed.id) === 'unavailable',
+            }"
+          >
+            <span
+              class="mt-0.5 shrink-0 leading-none"
               :class="{
-                'highlighted-column':
-                  store.state.zoConfig.build_type === 'opensource',
+                'text-status-positive': getFeatureStatus(feature, ed.id) !== 'unavailable',
+                'text-text-muted': getFeatureStatus(feature, ed.id) === 'unavailable',
               }"
             >
-              <span v-if="props.row.values.opensource === true" class="status-icon status-available">
-                ✅
+              <OIcon
+                v-if="getFeatureStatus(feature, ed.id) !== 'unavailable'"
+                name="check-circle"
+                size="sm"
+              />
+              <OIcon v-else name="cancel" size="sm" />
+            </span>
+            <span class="flex flex-col gap-[0.0625rem]">
+              <span class="leading-[1.45]">{{ t(getFeatureNameKey(feature)) }}</span>
+              <span v-if="getFeatureNote(feature, ed.id)" class="text-2xs text-text-muted italic">
+                {{ getFeatureNote(feature, ed.id) }}
               </span>
-              <span v-else-if="props.row.values.opensource === false" class="status-icon status-unavailable">
-                ❌
-              </span>
-              <span v-else class="status-text">
-                {{ props.row.values.opensource }}
-              </span>
-            </q-td>
-            <q-td
-              key="enterprise"
-              :props="props"
-              class="feature-value-cell"
-              :class="{
-                'highlighted-column':
-                  store.state.zoConfig.build_type === 'enterprise',
-              }"
+            </span>
+          </li>
+        </ul>
+
+        <!-- Footer: license + support + CTA ──────────────────────────── -->
+        <div class="mt-4">
+          <div class="bg-card-glass-border mb-3 h-px"></div>
+          <div class="mb-3.5">
+            <div
+              data-test="feature-comparison-table-footer-row"
+              class="text-compact flex items-baseline justify-between py-0.5"
             >
-              <span v-if="props.row.values.enterprise === true" class="status-icon status-available">
-                ✅
-              </span>
-              <span v-else-if="props.row.values.enterprise === false" class="status-icon status-unavailable">
-                ❌
-              </span>
-              <span v-else class="status-text">
-                {{ props.row.values.enterprise }}
-              </span>
-            </q-td>
-            <q-td key="cloud" :props="props" class="feature-value-cell">
-              <span v-if="props.row.values.cloud === true" class="status-icon status-available">
-                ✅
-              </span>
-              <span v-else-if="props.row.values.cloud === false" class="status-icon status-unavailable">
-                ❌
-              </span>
-              <span v-else class="status-text">
-                {{ props.row.values.cloud }}
-              </span>
-            </q-td>
-          </q-tr>
-        </template>
-      </q-table>
+              <span class="text-text-muted font-medium">{{ t("about.feature_license") }}</span>
+              <span class="text-text-body font-semibold">{{ ed.license }}</span>
+            </div>
+            <div
+              data-test="feature-comparison-table-footer-row"
+              class="text-compact flex items-baseline justify-between py-0.5"
+            >
+              <span class="text-text-muted font-medium">{{ t("about.feature_support") }}</span>
+              <span class="text-text-body font-semibold">{{ ed.support }}</span>
+            </div>
+          </div>
+          <a
+            v-if="ed.ctaUrl"
+            :href="ed.ctaUrl"
+            target="_blank"
+            data-test="feature-comparison-table-cta-btn"
+            data-test-cta="action"
+            class="rounded-default text-accent hover:border-accent border-accent/30 bg-card-glass-tint hover:bg-card-glass-tint-strong block w-full cursor-pointer border border-solid px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200"
+          >
+            {{ ed.ctaLabel }}
+          </a>
+          <button
+            v-else
+            data-test="feature-comparison-table-cta-btn"
+            data-test-cta="current"
+            class="rounded-default text-text-muted border-card-glass-border block w-full cursor-default border border-solid bg-transparent px-4 py-2 text-center text-sm font-semibold no-underline transition-all duration-200"
+            disabled
+          >
+            {{ ed.ctaLabel }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, computed } from "vue";
+import { computed } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
-import type { QTableColumn } from "quasar";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { FEATURE_REGISTRY, getFeatureNameKey, type FeatureDefinition } from "@/constants/features";
 
-interface FeatureValue {
-  opensource: boolean | string;
-  enterprise: boolean | string;
-  cloud: boolean | string;
-}
-
-interface Feature {
-  name: string;
-  values: FeatureValue;
-}
-
-interface Edition {
-  id: 'opensource' | 'enterprise' | 'cloud';
-  name: string;
-}
-
-interface FeatureData {
-  editions: Edition[];
-  features: Feature[];
-}
-
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
-const columns = ref<QTableColumn[]>([
-  {
-    name: 'name',
-    label: t('about.feature_column_name'),
-    field: 'name',
-    align: 'left',
-    sortable: false,
-    style: 'width: 250px; min-width: 200px;'
-  },
-  {
-    name: 'opensource',
-    label: t('about.edition_opensource'),
-    field: 'opensource',
-    align: 'center',
-    sortable: false,
-    style: 'width: 150px; max-width: 150px;'
-  },
-  {
-    name: 'enterprise',
-    label: t('about.edition_enterprise'),
-    field: 'enterprise',
-    align: 'center',
-    sortable: false,
-    style: 'width: 150px; max-width: 150px;'
-  },
-  {
-    name: 'cloud',
-    label: t('about.edition_cloud'),
-    field: 'cloud',
-    align: 'center',
-    sortable: false,
-    style: 'width: 150px; max-width: 150px;'
-  }
+const buildType: string = store.state.zoConfig.build_type;
+
+// Feature IDs shown as pillar chips (not repeated in the list below)
+const PILLAR_IDS = ["logs", "metrics", "traces", "rum", "alerts"];
+const EXCLUDED_FROM_LIST = new Set([
+  "logs",
+  "metrics",
+  "traces",
+  "rum",
+  "alerts",
+  "dashboards", // shown as extra chip
+  "license", // shown in footer
+  "support", // shown in footer
+  "cost", // not shown in card layout
 ]);
 
-const pagination = ref({
-  rowsPerPage: 0 // 0 means show all rows
-});
+// Features rendered as check/X rows inside each edition card
+const listFeatures = computed(() => FEATURE_REGISTRY.filter((f) => !EXCLUDED_FROM_LIST.has(f.id)));
 
-/**
- * Converts feature registry to display format
- * Features are automatically loaded from the centralized registry
- */
-const loadFeaturesFromRegistry = (): Feature[] => {
-  return FEATURE_REGISTRY.map((feature: FeatureDefinition) => {
-    const nameKey = getFeatureNameKey(feature);
-    const featureValue = feature.availability;
+// ── Edition metadata ──────────────────────────────────────────────────────────
 
-    // Resolve string values to their translations
-    const values: FeatureValue = {
-      opensource: typeof featureValue.opensource === 'string'
-        ? t(featureValue.opensource)
-        : featureValue.opensource,
-      enterprise: typeof featureValue.enterprise === 'string'
-        ? t(featureValue.enterprise)
-        : featureValue.enterprise,
-      cloud: typeof featureValue.cloud === 'string'
-        ? t(featureValue.cloud)
-        : featureValue.cloud,
-    };
-
-    return {
-      name: t(nameKey),
-      values
-    };
-  });
-};
-
-const featureData = ref<FeatureData>({
-  editions: [
-    { id: 'opensource', name: t('about.edition_opensource') },
-    { id: 'enterprise', name: t('about.edition_enterprise') },
-    { id: 'cloud', name: t('about.edition_cloud') }
-  ],
-  features: loadFeaturesFromRegistry()
-});
-
-const currentPlanName = computed(() => {
-  const buildType = store.state.zoConfig.build_type;
-  const edition = featureData.value.editions.find((ed) => ed.id === buildType);
-  return edition ? edition.name : "";
-});
-</script>
-
-<style lang="scss" scoped>
-.feature-comparison-wrapper {
-  padding: 0.1rem;
-
-  .feature-comparison-header {
-    .icon-wrapper {
-      width: 56px;
-      height: 56px;
-      border-radius: 0.375rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      transition: all 0.3s ease;
-    }
-
-    .icon-wrapper-dark {
-      background: rgba(33, 150, 243, 0.18);
-      color: #64B5F6;
-    }
-
-    .icon-wrapper-light {
-      background: rgba(33, 150, 243, 0.12);
-      color: #1565C0;
-    }
-
-    .feature-title {
-      font-size: 1.375rem;
-      font-weight: 600;
-      margin: 0;
-      letter-spacing: -0.02em;
-    }
-
-    .feature-subtitle-wrapper {
-      .feature-subtitle {
-        font-size: 0.9375rem;
-        line-height: 1.8;
-        opacity: 0.8;
-        margin-bottom: 0;
-
-        strong {
-          font-weight: 600;
-          opacity: 1;
-        }
-      }
-
-      .edition-info {
-        font-size: 0.9375rem;
-        line-height: 1.8;
-        opacity: 0.9;
-        margin-bottom: 0;
-      }
-
-      .enterprise-promotion {
-        font-size: 0.9375rem;
-        line-height: 1.8;
-        margin-top: 0.5rem;
-        margin-bottom: 0;
-        padding: 0.75rem 1rem;
-        background: linear-gradient(
-          135deg,
-          rgba(76, 175, 80, 0.1),
-          rgba(33, 150, 243, 0.1)
-        );
-        border-left: 3px solid #4caf50;
-        border-radius: 0.375rem;
-
-        strong {
-          font-weight: 600;
-          color: #4caf50;
-        }
-      }
-    }
-  }
-
-  .table-wrapper {
-    overflow-x: auto;
-    border-radius: 0.5rem;
-  }
-
-  .feature-comparison-table {
-    width: auto;
-    margin: auto;
-    max-width: 800px;
-    
-    .feature-name-cell {
-      font-weight: 500;
-      color: var(--q-text-color);
-      padding: 0.875rem 1rem;
-    }
-
-    .feature-value-cell {
-      text-align: center;
-      padding: 0.875rem 1rem;
-      word-wrap: break-word;
-      white-space: normal;
-
-      .status-icon {
-        font-size: 0.9rem;
-        display: inline-block;
-
-        &.status-available {
-          color: #4caf50;
-        }
-
-        &.status-unavailable {
-          color: #f44336;
-        }
-      }
-
-      .status-text {
-        font-size: 0.875rem;
-        color: var(--q-text-color);
-        display: block;
-        padding: 0 0.5rem;
-        word-wrap: break-word;
-        white-space: normal;
-      }
-
-      &.highlighted-column {
-        background-color: color-mix(in srgb, var(--o2-theme-color) 15%, var(--o2-theme-mode) 85%);
-        font-weight: 500;
-        position: relative;
-
-        &::before {
-          content: "";
-          position: absolute;
-          left: 0;
-          top: 0;
-          bottom: 0;
-          width: 3px;
-        }
-      }
-    }
-  }
-
-  // Dark theme adjustments
-  :deep(.body--dark) {
-    .feature-comparison-table tbody tr:nth-child(even) {
-      background: rgba(255, 255, 255, 0.03);
-
-      &:hover {
-        background: rgba(33, 150, 243, 0.08);
-      }
-    }
-  }
-
-  // Responsive design
-  @media (max-width: 768px) {
-    padding: 1rem;
-
-    .feature-comparison-table {
-      font-size: 0.8125rem;
-
-      :deep(thead tr th) {
-        padding: 0.75rem 0.5rem;
-        font-size: 0.875rem;
-      }
-
-      .feature-name-cell,
-      .feature-value-cell {
-        padding: 0.625rem 0.5rem;
-      }
-
-      .feature-value-cell .status-text {
-        font-size: 0.8125rem;
-      }
-    }
-  }
+interface EditionMeta {
+  id: string;
+  shortName: I18nText;
+  hosting: I18nText;
+  price: I18nText;
+  priceSub: I18nText;
+  license: I18nText;
+  support: I18nText;
+  ctaLabel: I18nText;
+  ctaUrl: string | null;
 }
-</style>
+
+const editionList = computed((): EditionMeta[] => [
+  {
+    id: "opensource",
+    shortName: raw("Open Source"),
+    hosting: t("about.selfHosted"),
+    price: t("about.value_cost_free"),
+    priceSub: t("about.foreverNoLimits"),
+    license: raw("AGPL"),
+    support: t("about.value_support_community"),
+    ctaLabel: buildType === "opensource" ? t("about.currentPlan") : t("about.learnMore"),
+    ctaUrl: buildType === "opensource" ? null : "https://openobserve.ai",
+  },
+  {
+    id: "enterprise",
+    shortName: raw("Enterprise"),
+    hosting: t("about.selfHosted"),
+    price: t("about.value_cost_free"),
+    priceSub: t("about.upToFiftyGbPaidBeyond"),
+    license: t("about.value_license_enterprise"),
+    support: t("about.value_support_enterprise"),
+    ctaLabel: buildType === "enterprise" ? t("about.currentPlan") : t("about.download"),
+    ctaUrl: buildType === "enterprise" ? null : "https://openobserve.ai/download",
+  },
+  {
+    id: "cloud",
+    shortName: raw("Cloud"),
+    hosting: t("about.fullyManaged"),
+    price: t("about.trialFourteenDay"),
+    priceSub: t("about.usageBasedThereafter"),
+    license: t("about.value_license_cloud"),
+    support: t("about.value_support_cloud"),
+    ctaLabel: buildType === "cloud" ? t("about.currentPlan") : t("about.startFreeTrial"),
+    ctaUrl: buildType === "cloud" ? null : "https://cloud.openobserve.ai",
+  },
+]);
+
+// ── Feature availability helpers ─────────────────────────────────────────────
+
+type FeatureStatus = "available" | "unavailable" | "conditional";
+
+function getFeatureStatus(feature: FeatureDefinition, editionId: string): FeatureStatus {
+  const raw = feature.availability[editionId as keyof typeof feature.availability];
+  if (raw === true) return "available";
+  if (raw === false) return "unavailable";
+  return "conditional"; // string value = available with a condition
+}
+
+function getFeatureNote(feature: FeatureDefinition, editionId: string): string {
+  const raw = feature.availability[editionId as keyof typeof feature.availability];
+  if (typeof raw !== "string") return "";
+  // Translate the key and strip any leading emoji (e.g. "✅ ") so we show clean text
+  return t(raw)
+    .replace(/^[✅❌]\s*/u, "")
+    .trim();
+}
+</script>

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -77,18 +77,6 @@ mod tests {
             &create_table_stmt().to_string(PostgresQueryBuilder),
             &format!(
                 r#"CREATE TABLE IF NOT EXISTS "kv_store" ( "org_id" varchar(256) NOT NULL, "key" varchar(256) NOT NULL, "value" {} NOT NULL, "created_at" bigint NOT NULL, "updated_at" bigint NOT NULL, PRIMARY KEY ("org_id", "key") )"#,
-                binary_type
-            )
-        );
-    }
-
-    #[test]
-    fn mysql() {
-        let binary_type = super::get_binary_type();
-        collapsed_eq!(
-            &create_table_stmt().to_string(MysqlQueryBuilder),
-            &format!(
-                r#"CREATE TABLE IF NOT EXISTS `kv_store` ( `org_id` varchar(256) NOT NULL, `key` varchar(256) NOT NULL, `value` {} NOT NULL, `created_at` bigint NOT NULL, `updated_at` bigint NOT NULL, PRIMARY KEY (`org_id`, `key`) )"#,
                 binary_type
             )
         );

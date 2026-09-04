@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -53,4 +53,19 @@ async fn drop_created_at_column(manager: &SchemaManager<'_>) -> Result<(), DbErr
 enum Folders {
     Table,
     CreatedAt,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm_migration::MigrationName;
+
+    use super::*;
+
+    #[test]
+    fn test_migration_name() {
+        assert_eq!(
+            Migration.name(),
+            "m20241116_000002_drop_folders_created_at_column"
+        );
+    }
 }

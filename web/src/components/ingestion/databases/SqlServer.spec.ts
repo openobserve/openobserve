@@ -1,313 +1,437 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { mount, VueWrapper } from '@vue/test-utils';
-import { Quasar } from 'quasar';
-import SqlServer from './SqlServer.vue';
-import { createStore } from 'vuex';
-import { createI18n } from 'vue-i18n';
-import { nextTick, ref } from 'vue';
+// Copyright 2026 OpenObserve Inc.
+//
+// This program is free software: you can redistribute it and/or modify
+// it under the terms of the GNU Affero General Public License as published by
+// the Free Software Foundation, either version 3 of the License, or
+// (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+// GNU Affero General Public License for more details.
+//
+// You should have received a copy of the GNU Affero General Public License
+// along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Mock aws-exports
-vi.mock('../../../aws-exports', () => ({
-  default: {
-    region: 'us-east-1',
-    userPoolId: 'us-east-1_test',
-    userPoolWebClientId: 'test-client-id',
-  },
-}));
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { mount, VueWrapper } from "@vue/test-utils";
+import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
+import { ref } from "vue";
+import SqlServer from "./SqlServer.vue";
+import sqlServerCard from "@/components/ingestion/setupCard/content/sqlServer";
+import { getDataSourceCard, hasDataSourceCard } from "@/components/ingestion/setupCard/registry";
+import { gt } from "@/types/i18n";
 
-// Mock zincutils
-vi.mock('../../../utils/zincutils', () => ({
-  getImageURL: vi.fn((path) => `/mocked/path/${path}`),
-  getEndPoint: vi.fn(() => ({
-    url: 'https://test.openobserve.ai',
-    host: 'test.openobserve.ai',
-    port: 443,
-    protocol: 'https',
-    tls: true,
-  })),
-  getIngestionURL: vi.fn(() => 'https://test.openobserve.ai'),
-}));
-
-// Mock useIngestion composable
+// Mock useIngestion so the endpoint is deterministic (no network / URL lookup).
 const mockEndpoint = ref({
-  url: 'https://test.openobserve.ai',
-  host: 'test.openobserve.ai',
+  url: "https://test.openobserve.ai",
+  host: "test.openobserve.ai",
   port: 443,
-  protocol: 'https',
+  protocol: "https",
   tls: true,
 });
 
-const mockDatabaseContent = `exporters:
-  otlphttp/openobserve:
-    endpoint: https://test.openobserve.ai/api/test-org/[STREAM_NAME]
-    headers:
-      Authorization: Basic [BASIC_PASSCODE]
-      stream-name: [STREAM_NAME]`;
-
-const mockDatabaseDocURLs = {
-  sqlServer: "https://short.openobserve.ai/database/sql-server",
-  postgres: "https://short.openobserve.ai/database/postgres",
-  mongoDB: "https://short.openobserve.ai/database/mongodb",
-  redis: "https://short.openobserve.ai/database/redis",
-};
-
-vi.mock('@/composables/useIngestion', () => ({
-  default: vi.fn(() => ({
-    endpoint: mockEndpoint,
-    databaseContent: mockDatabaseContent,
-    databaseDocURLs: mockDatabaseDocURLs,
-  })),
+vi.mock("@/composables/useIngestion", () => ({
+  default: vi.fn(() => ({ endpoint: mockEndpoint })),
 }));
 
-// Mock CopyContent component
-const MockCopyContent = {
-  name: 'CopyContent',
-  props: ['content'],
-  template: '<div data-test="copy-content">{{ content }}</div>',
-};
+// Replace the heavy presentational card with a light stub so we can assert the
+// content/subs the wrapper hands it without mounting OStepper/useStreamDetect/etc.
+vi.mock("@/components/ingestion/setupCard/SetupCardRenderer.vue", () => ({
+  default: {
+    name: "SetupCardRenderer",
+    props: ["content", "subs", "logoUrl", "logoUrlDark"],
+    template: '<div data-test="rich-card-stub" />',
+  },
+}));
 
 const mockStore = createStore({
   state: {
-    selectedOrganization: {
-      identifier: 'test-org',
-      name: 'Test Organization',
-    },
-    userInfo: {
-      email: 'test@example.com',
-    },
-  },
-  getters: {},
-  mutations: {},
-  actions: {},
-});
-
-const mockI18n = createI18n({
-  locale: 'en',
-  messages: {
-    en: {},
+    selectedOrganization: { identifier: "test-org", name: "Test Organization" },
+    userInfo: { email: "test@example.com" },
+    organizationData: { organizationPasscode: "test-passcode" },
+    theme: "light",
   },
 });
 
-describe('SqlServer.vue Component - Comprehensive Coverage', () => {
-  let wrapper: VueWrapper<any>;
-  
-  const createWrapper = (props = {}) => {
-    return mount(SqlServer, {
-      props: {
-        currOrgIdentifier: 'test-org',
-        currUserEmail: 'test@example.com',
-        ...props,
-      },
-      global: {
-        plugins: [Quasar, mockStore, mockI18n],
-        components: {
-          CopyContent: MockCopyContent,
-        },
-        stubs: {
-          CopyContent: MockCopyContent,
-        },
-      },
-    });
-  };
+const mockI18n = createI18n({ locale: "en", messages: { en: {} } });
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+const SUBS = {
+  url: "https://test.openobserve.ai",
+  org: "test-org",
+  token: "dGVzdEB0b2tlbg==",
+};
+
+describe("sqlServerCard builder", () => {
+  it("builds the SQL Server card metadata", () => {
+    const card = sqlServerCard(SUBS, gt);
+    expect(card.provider.name).toBe("SQL Server");
+    // Non-AI metrics card → replaces the "Cost & Tokens Captured" hero badge.
+    // Logs too: the optional Database Monitoring steps ship blocking-chain
+    // samples into the _o2_dbm_server logs stream.
+    expect(card.provider.metaBadges).toEqual(["Metrics", "Logs"]);
+    expect(card.docUrl).toBe("https://openobserve.ai/blog/monitor-sql-server-with-otel/");
+    // The blog's flow: prepare → install → configure → run → verify, then the
+    // optional Database Monitoring group.
+    expect(card.steps.map((s) => s.id)).toEqual([
+      "prepare",
+      "install",
+      "configure",
+      "run",
+      "verify",
+      "dbm-grant",
+      "dbm-configure",
+      "dbm-run",
+      "verify-dbm",
+    ]);
   });
 
-  afterEach(() => {
-    if (wrapper) {
-      wrapper.unmount();
+  // SQL Server ships BLOCKING only. Deadlocks arrive as an XML deadlock graph in
+  // the system_health session, which the ingest parser cannot read — so a
+  // deadlock recipe here would fill the stream with records the Deadlocks page
+  // silently drops, which is exactly the "collecting but empty" trap the lock
+  // empty-states exist to prevent.
+  it("ships a Database Monitoring config the ingest parser can read", () => {
+    const card = sqlServerCard(SUBS, gt);
+
+    const grant = card.steps.find((s) => s.id === "dbm-grant")!;
+    const grantSql = grant.variants!.find((v) => v.id === "sqlcmd")!.code.raw;
+    expect(grantSql).toContain("GRANT VIEW SERVER STATE");
+    // BOTH grants, and this one is not optional: sys.fn_xe_file_target_read_file
+    // fails with msg 300 without it, so the Deadlocks tab would stay empty
+    // forever while blocking kept working — measured against SQL Server 2022.
+    expect(grantSql).toContain("GRANT VIEW SERVER PERFORMANCE STATE");
+
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+    expect(config).toContain("dbm-config.yaml");
+    expect(config).toContain("sqlquery/mssql_blocking");
+    // The exact recipe tag server_vantage.rs matches on to resolve the engine.
+    expect(config).toContain("mssql_blocking_chain");
+    // The aliases canonicalize_blocking reads — renaming any of these silently
+    // produces records the backend skips.
+    expect(config).toContain("blocked_pid");
+    expect(config).toContain("blocking_pid");
+    expect(config).toContain("blocking_query");
+    expect(config).toContain("stream-name: _o2_dbm_server");
+    // The filter is load-bearing: filelog tails the WHOLE database log, so
+    // without it every ordinary log line lands in _o2_dbm_server too (measured:
+    // 787 events vs 4.8M untagged rows in one hour) and the Deadlocks page
+    // slows to a crawl. A processor that is defined but not listed in the
+    // pipeline does nothing, so both are asserted.
+    expect(config).toContain("filter/dbm:");
+    expect(config).toContain("processors: [memory_limiter, filter/dbm, batch]");
+
+    // Deadlocks ship too, but as a sqlquery receiver rather than a filelog one:
+    // SQL Server keeps them in the system_health Extended Events ring buffer as
+    // XML, which is shredded server-side into flat rows.
+    expect(config).toContain("sqlquery/mssql_deadlocks");
+    expect(config).toContain("mssql_deadlock");
+    expect(config).not.toContain("filelog/");
+    // QUOTED_IDENTIFIER is required for XML methods; without it every collection
+    // fails with msg 1934 while the pipeline still looks healthy.
+    expect(config).toContain("SET QUOTED_IDENTIFIER ON");
+    // The victim is resolved IN the query — SQL Server names it inline, so there
+    // is no cross-record verdict to stitch as there is for MySQL/MariaDB.
+    expect(config).toContain("victim-list/victimProcess");
+    expect(config).toContain("mssql_is_victim");
+    // The aliases canonicalize_mssql_deadlock reads.
+    expect(config).toContain("mssql_spid");
+    expect(config).toContain("mssql_query");
+
+    // EVERY pill this config can fill. Activity and Table health JOINED this
+    // list when sqlserverreceiver's events and the mssql table/index-stats
+    // recipes were wired in; before that the card promised two tabs and
+    // shipped a config that left the others permanently empty.
+    const verify = card.steps.find((s) => s.id === "verify-dbm")!;
+    expect(verify.pills).toEqual(["Deadlocks", "Blocked queries", "Activity", "Table health"]);
+  });
+
+  /**
+   * ACTIVITY, TOP QUERIES AND EXECUTION PLANS, from the stock
+   * `sqlserverreceiver`. Measured on the rig against SQL Server 2022: 21
+   * top_query and 4 query_sample records per window, both previously ZERO.
+   *
+   * The plans the Top queries detail page renders ride on
+   * `db.server.top_query`, so that one key is what turns the plan tree on —
+   * which is why the two events are pinned together rather than separately.
+   */
+  /**
+   * THE DEFECT THIS PINS SHIPPED, AND A GREEN SUITE DID NOT NOTICE.
+   *
+   * `index_name` was the `body_column` and was missing from
+   * `attribute_columns`. The canonicalizer reads it as a required ATTRIBUTE and
+   * never from the body, so every row was dropped: measured against a live
+   * SQL Server, 54 `mssql_index_stats` records arrived with `o2_dbm_kind` null
+   * and index health never reached the page — while the collector was healthy,
+   * the rows were in the stream, and the Playwright suite passed 53/53.
+   *
+   * Postgres does not expose this because it has an `index_def` for the body.
+   * SQL Server has no equivalent, so the name is BOTH the body and an
+   * attribute, and the duplication is what makes the row readable.
+   */
+  it("rides every stats alias the canonicalizer reads as an attribute", () => {
+    const card = sqlServerCard(SUBS, gt);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    const tableAttrs = config.match(
+      /body_column: table_name\s+attribute_columns:\s+\[([^\]]+)\]/,
+    )![1];
+    for (const alias of [
+      "schema_name",
+      "total_bytes",
+      "heap_bytes",
+      "n_live_tup",
+      "server_address",
+      "o2_recipe",
+    ]) {
+      expect(tableAttrs, `table alias ${alias} must ride as an attribute`).toContain(alias);
+    }
+
+    // `index_name` first: it is the one that was missing, and the only alias
+    // here that is also the body_column.
+    const indexAttrs = config.match(
+      /body_column: index_name\s+attribute_columns:\s+\[([^\]]+)\]/,
+    )![1];
+    for (const alias of [
+      "index_name",
+      "schema_name",
+      "table_name",
+      "idx_scan",
+      "index_bytes",
+      "is_unique",
+      "server_address",
+      "o2_recipe",
+    ]) {
+      expect(indexAttrs, `index alias ${alias} must ride as an attribute`).toContain(alias);
     }
   });
 
-  // Test 1: Component mounts successfully
-  it('should mount component successfully', () => {
+  /**
+   * A '#' in the SA password truncated the DSN at the URL fragment and every
+   * scrape failed once per interval while the collector's own health stayed
+   * green:
+   *   parse "sqlserver://sa:dbm_Passw0rd": invalid port ":dbm_Passw0rd" after host
+   * Two receivers used the URL form and two already used key-value, so the file
+   * disagreed with itself. All four must stay key-value.
+   */
+  it("uses the key-value DSN on every mssql receiver, never the URL form", () => {
+    const card = sqlServerCard(SUBS, gt);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    const datasources = [...config.matchAll(/^\s*datasource: .+$/gm)].map((m) => m[0]);
+    expect(datasources.length).toBeGreaterThanOrEqual(4);
+    for (const ds of datasources) {
+      expect(ds, "a sqlserver:// datasource breaks on '#' in the password").not.toContain(
+        "sqlserver://",
+      );
+      expect(ds).toContain("server={host};port={port}");
+    }
+  });
+
+  it("ships the receiver's activity, top-query and plan events on, spelled out", () => {
+    const card = sqlServerCard(SUBS, gt);
+    const configure = card.steps.find((s) => s.id === "dbm-configure")!;
+    const config = configure.variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+
+    expect(config).toContain("sqlserver/dbm_events:");
+    expect(config).toContain("db.server.query_sample: { enabled: true }");
+    expect(config).toContain("db.server.top_query: { enabled: true }");
+
+    // `events:` must be TOP-LEVEL on the receiver (a sibling of the collection
+    // blocks) — nesting it inside them is a fatal config error. Upstream
+    // v0.148.0 flipped both default-OFF, so without this block the collector
+    // looks healthy and emits nothing.
+    expect(config).toMatch(/\n {4}events:\n/);
+
+    // SHAPE, and it is NOT mysqlreceiver's. sqlserverreceiver splits `server`
+    // and `port` where mysqlreceiver takes one `endpoint`, and it takes NO
+    // `database` at all — it reads across the whole instance. These blocks are
+    // strictly key-validated, so a key copied across receivers is fatal at
+    // startup rather than merely ignored.
+    const receiver = config.slice(config.indexOf("sqlserver/dbm_events:"));
+    const receiverBlock = receiver.slice(0, receiver.indexOf("\nprocessors:"));
+    expect(receiverBlock).toMatch(/\n {4}server:/);
+    expect(receiverBlock).toMatch(/\n {4}port:/);
+    expect(receiverBlock).not.toMatch(/\n {4}endpoint:/);
+    expect(receiverBlock).not.toMatch(/\n {4}database:/);
+    // top_query_count is the key this receiver takes; the mysql block's extra
+    // knobs are not copied across.
+    expect(receiverBlock).toContain("top_query_count:");
+    expect(receiverBlock).not.toContain("lookback_time:");
+
+    // The events pipeline must BYPASS filter/dbm: receiver-native events carry
+    // no o2_recipe tag, so the filter would silently drop every one.
+    // memory_limiter must still be FIRST — anything ahead of it is outside the
+    // OOM guard.
+    expect(config).toMatch(/logs\/dbm_events:\n\s+receivers: \[sqlserver\/dbm_events\]/);
+    expect(config).toMatch(/logs\/dbm_events:[\s\S]*?processors: \[memory_limiter, batch\]/);
+    const eventsProcessors = config.match(/logs\/dbm_events:[\s\S]*?processors: \[([^\]]+)\]/)![1];
+    expect(eventsProcessors).not.toContain("filter/dbm");
+
+    // NO engine-identity transform here, unlike MariaDB: sqlserverreceiver is
+    // SQL Server's own receiver and stamps the right engine itself. Only the
+    // borrowed mysqlreceiver on the MariaDB lane misreports.
+    expect(config).not.toContain("transform/");
+  });
+
+  /**
+   * The honesty copy §7 of the ship plan makes a release requirement: SQL
+   * Server's capture polls SQL views (works on managed instances, EXCEPT Azure
+   * SQL Database), its deadlock text is the whole client batch, and manual runs
+   * via sqlcmd hit the QUOTED_IDENTIFIER default-off trap.
+   */
+  it("states the managed-instance scope and the deadlock-text limits", () => {
+    const card = sqlServerCard(SUBS, gt);
+    const note = card.steps.find((s) => s.id === "dbm-configure")!.note!;
+
+    // Opposite of the PG/MySQL/MariaDB caveat: SQL polling DOES work managed…
+    expect(note).toMatch(/managed SQL Server/i);
+    // …except Azure SQL Database, and the reason travels with the limit.
+    expect(note).toContain("Azure SQL Database");
+    expect(note).toContain("sys.fn_xe_file_target_read_file");
+    // Query-text honesty: whole batch, and procs reduce to the EXEC call.
+    expect(note).toMatch(/whole batch/i);
+    expect(note).toMatch(/EXEC/);
+    // The silent sqlcmd trap — the shipped SQL sets it, a manual run must too.
+    expect(note).toContain("QUOTED_IDENTIFIER");
+  });
+
+  it("writes the config via a shell command with the org's exporter filled in", () => {
+    const configure = sqlServerCard(SUBS, gt).steps.find((s) => s.id === "configure")!;
+    const unix = configure.variants!.find((v) => v.id === "linux-amd64")!.code;
+    expect(unix.lang).toBe("bash");
+    // It's a one-shot file-writing command wrapping the full config.
+    expect(unix.raw).toContain("cat > config.yaml <<'EOF'");
+    expect(unix.raw).toContain("receivers:");
+    expect(unix.raw).toContain("otlphttp/openobserve:");
+    expect(unix.raw).toContain(`endpoint: ${SUBS.url}/api/${SUBS.org}`);
+    expect(unix.raw).toContain(`Basic ${SUBS.token}`);
+    // Verified single-receiver config — the blog's duplicate is dropped.
+    expect(unix.raw).not.toContain("sqlserver/1");
+    // Masked variant hides the token but keeps the rest.
+    expect(unix.masked).toBeDefined();
+    expect(unix.masked).not.toContain(SUBS.token);
+    expect(unix.masked).toContain("otlphttp/openobserve:");
+    // Windows variant uses a PowerShell here-string.
+    const win = configure.variants!.find((v) => v.id === "windows-amd64")!.code;
+    expect(win.lang).toBe("powershell");
+    expect(win.raw).toContain("Set-Content -Path config.yaml");
+  });
+
+  it("puts host/port inputs on the configure step, referenced via placeholders", () => {
+    const configure = sqlServerCard(SUBS, gt).steps.find((s) => s.id === "configure")!;
+    expect(configure.inputs?.map((i) => i.id)).toEqual(["server", "port"]);
+    // The config keeps {server}/{port} unsubstituted so the renderer fills them
+    // live from the inputs (build-time subs only touch url/org/token).
+    const unix = configure.variants!.find((v) => v.id === "linux-amd64")!.code;
+    expect(unix.raw).toContain("server: {server}");
+    expect(unix.raw).toContain("port: {port}");
+  });
+
+  it("offers method tabs for applying the grants (sqlcmd / docker / GUI)", () => {
+    const prepare = sqlServerCard(SUBS, gt).steps.find((s) => s.id === "prepare")!;
+    expect(prepare.code).toBeUndefined();
+    expect(prepare.variants?.map((v) => v.id)).toEqual(["sqlcmd", "docker", "sql-client"]);
+    // sqlcmd/docker are runnable commands that pipe the SQL via -Q.
+    const sqlcmd = prepare.variants!.find((v) => v.id === "sqlcmd")!.code;
+    expect(sqlcmd.raw).toContain("sqlcmd");
+    expect(sqlcmd.raw).toContain('-Q "');
+    expect(sqlcmd.raw).toContain("CREATE LOGIN otel");
+    expect(prepare.variants!.find((v) => v.id === "docker")!.code.raw).toContain("docker exec");
+    // The GUI tab is the raw SQL to paste into a client.
+    const gui = prepare.variants!.find((v) => v.id === "sql-client")!.code;
+    expect(gui.lang).toBe("sql");
+    expect(gui.raw).toContain("GRANT VIEW SERVER PERFORMANCE STATE");
+    expect(gui.raw).not.toContain("sqlcmd");
+    // Every tab carries an icon.
+    expect(prepare.variants!.every((v) => !!v.icon)).toBe(true);
+  });
+
+  it("uses the same literal login in Step 1 and the collector config (in lockstep)", () => {
+    const card = sqlServerCard(SUBS, gt);
+    const prepare = card.steps.find((s) => s.id === "prepare")!;
+    // No extra input fields to decide on — credentials are edited inline.
+    expect(prepare.inputs).toBeUndefined();
+    const config = card.steps
+      .find((s) => s.id === "configure")!
+      .variants!.find((v) => v.id === "linux-amd64")!.code.raw;
+    expect(config).toContain("username: otel");
+    expect(config).toContain('password: "YourStrong@Passw0rd"');
+  });
+
+  it("offers OS-specific install variants (no single code block)", () => {
+    const install = sqlServerCard(SUBS, gt).steps.find((s) => s.id === "install")!;
+    expect(install.code).toBeUndefined();
+    expect(install.variants?.map((v) => v.id)).toEqual([
+      "linux-amd64",
+      "linux-arm64",
+      "darwin-arm64",
+      "darwin-amd64",
+      "windows-amd64",
+    ]);
+    // Each variant's command targets its own platform asset, pinned to the
+    // DBM-verified upstream contrib release (v0.158.0) — the version every
+    // Tier-1 recipe was verified against. The OpenObserve collector distro is
+    // NOT an option here: it bundles zero database receivers.
+    const linux = install.variants!.find((v) => v.id === "linux-amd64")!;
+    expect(linux.code.raw).toContain("otelcol-contrib_0.158.0_linux_amd64.tar.gz");
+    const win = install.variants!.find((v) => v.id === "windows-amd64")!;
+    expect(win.code.lang).toBe("powershell");
+    expect(win.code.raw).toContain("windows_amd64");
+  });
+});
+
+describe("data-source card registry", () => {
+  it("resolves the sqlServer slug", () => {
+    expect(hasDataSourceCard("sqlServer")).toBe(true);
+    expect(getDataSourceCard("sqlServer", SUBS, gt)?.provider.name).toBe("SQL Server");
+  });
+
+  it("returns undefined for an unregistered slug", () => {
+    expect(hasDataSourceCard("not-a-real-slug")).toBe(false);
+    expect(getDataSourceCard("not-a-real-slug", SUBS, gt)).toBeUndefined();
+    expect(getDataSourceCard(undefined, SUBS, gt)).toBeUndefined();
+  });
+});
+
+describe("SqlServer.vue", () => {
+  let wrapper: VueWrapper<any>;
+
+  const createWrapper = () =>
+    mount(SqlServer, {
+      global: { plugins: [mockStore, mockI18n] },
+    });
+
+  afterEach(() => {
+    if (wrapper) wrapper.unmount();
+  });
+
+  it("renders the shared setup card for the sqlServer slug", () => {
     wrapper = createWrapper();
-    expect(wrapper.exists()).toBe(true);
+    expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
+    // Wrapper tags the card with its own data-test (falls through onto the root).
+    expect(wrapper.find('[data-test="data-source-setup-card"]').exists()).toBe(true);
   });
 
-  // Test 2: Component has correct name
-  it('should have correct component name', () => {
+  it("passes the per-org substitutions and SQL Server content to the card", () => {
     wrapper = createWrapper();
-    expect(wrapper.vm.$options.name).toBe('AWSConfig');
+    const stub = wrapper.findComponent({ name: "SetupCardRenderer" });
+    expect(stub.exists()).toBe(true);
+
+    const subs = stub.props("subs") as Record<string, string>;
+    expect(subs.url).toBe("https://test.openobserve.ai");
+    expect(subs.org).toBe("test-org");
+    // token = base64("email:passcode"), non-empty.
+    expect(subs.token).toBeTruthy();
+
+    const content = stub.props("content") as any;
+    expect(content.provider.name).toBe("SQL Server");
+    const configure = content.steps.find((s: any) => s.id === "configure");
+    const unix = configure.variants.find((v: any) => v.id === "linux-amd64");
+    expect(unix.code.raw).toContain(`Basic ${subs.token}`);
   });
-
-  // Test 3: Component accepts currOrgIdentifier prop
-  it('should accept currOrgIdentifier prop', () => {
-    wrapper = createWrapper({ currOrgIdentifier: 'custom-org' });
-    expect(wrapper.props('currOrgIdentifier')).toBe('custom-org');
-  });
-
-  // Test 4: Component accepts currUserEmail prop
-  it('should accept currUserEmail prop', () => {
-    wrapper = createWrapper({ currUserEmail: 'custom@example.com' });
-    expect(wrapper.props('currUserEmail')).toBe('custom@example.com');
-  });
-
-  // Test 5: Props have correct types
-  it('should have correct prop types', () => {
-    wrapper = createWrapper();
-    const propTypes = wrapper.vm.$options.props;
-    expect(propTypes.currOrgIdentifier.type).toBe(String);
-    expect(propTypes.currUserEmail.type).toBe(String);
-  });
-
-  // Test 6: Component renders template correctly
-  it('should render template with correct structure', () => {
-    wrapper = createWrapper();
-    expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:text-\\[16px\\]').exists()).toBe(true);
-  });
-
-  // Test 7: CopyContent component is rendered
-  it('should render CopyContent component', () => {
-    wrapper = createWrapper();
-    expect(wrapper.find('[data-test="copy-content"]').exists()).toBe(true);
-  });
-
-  // Test 8: Documentation link is rendered
-  it('should render documentation link correctly', () => {
-    wrapper = createWrapper();
-    const link = wrapper.find('a[target="_blank"]');
-    expect(link.exists()).toBe(true);
-    expect(link.attributes('href')).toBe('https://short.openobserve.ai/database/sql-server');
-  });
-
-  // Test 9: Documentation link has correct styling
-  it('should have correct styling for documentation link', () => {
-    wrapper = createWrapper();
-    const link = wrapper.find('a[target="_blank"]');
-    expect(link.classes()).toContain('text-blue-500');
-    expect(link.classes()).toContain('hover:text-blue-600');
-    expect(link.attributes('style')).toContain('text-decoration: underline');
-  });
-
-  // Test 10: Name is correctly set to sqlServer
-  it('should set name to sqlServer', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.name).toBe('sqlServer');
-  });
-
-  // Test 11: Config is exposed in component data
-  it('should expose config in component data', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.config).toBeDefined();
-    expect(wrapper.vm.config.region).toBe('us-east-1');
-  });
-
-  // Test 12: docURL is correctly set
-  it('should set docURL correctly from databaseDocURLs', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.docURL).toBe('https://short.openobserve.ai/database/sql-server');
-  });
-
-  // Test 13: getImageURL is exposed
-  it('should expose getImageURL function', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.getImageURL).toBeDefined();
-    expect(typeof wrapper.vm.getImageURL).toBe('function');
-  });
-
-
-  // Test 23: Endpoint data is exposed
-  it('should expose endpoint data', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.endpoint).toBeDefined();
-    expect(wrapper.vm.endpoint.url).toBe('https://test.openobserve.ai');
-  });
-
-  // Test 24: Database content is exposed
-  it('should expose databaseContent', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.databaseContent).toBeDefined();
-    expect(wrapper.vm.databaseContent).toContain('exporters:');
-  });
-
-  // Test 25: Database doc URLs are exposed
-  it('should expose databaseDocURLs', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.databaseDocURLs).toBeDefined();
-    expect(wrapper.vm.databaseDocURLs.sqlServer).toBe('https://short.openobserve.ai/database/sql-server');
-  });
-
-  // Test 26: Component with null props
-  it('should handle null props gracefully', () => {
-    wrapper = createWrapper({ currOrgIdentifier: null, currUserEmail: null });
-    expect(wrapper.props('currOrgIdentifier')).toBeNull();
-    expect(wrapper.props('currUserEmail')).toBeNull();
-  });
-
-  // Test 27: Component with undefined props
-  it('should handle undefined props gracefully', () => {
-    wrapper = createWrapper({ currOrgIdentifier: undefined, currUserEmail: undefined });
-    expect(wrapper.props('currOrgIdentifier')).toBeUndefined();
-    expect(wrapper.props('currUserEmail')).toBeUndefined();
-  });
-
-  // Test 28: Component with empty string props
-  it('should handle empty string props', () => {
-    wrapper = createWrapper({ currOrgIdentifier: '', currUserEmail: '' });
-    expect(wrapper.props('currOrgIdentifier')).toBe('');
-    expect(wrapper.props('currUserEmail')).toBe('');
-  });
-
-  // Test 29: Template renders content from CopyContent
-  it('should pass content to CopyContent component', () => {
-    wrapper = createWrapper();
-    const copyContentEl = wrapper.find('[data-test="copy-content"]');
-    expect(copyContentEl.text()).toContain('exporters:');
-  });
-
-  // Test 30: Component reactivity - content updates when dependencies change
-  it('should maintain content reactivity', async () => {
-    wrapper = createWrapper();
-    const originalContent = wrapper.vm.content;
-    expect(originalContent).toBeDefined();
-    expect(originalContent).toContain('sqlserver');
-  });
-
-
-  // Test 33: Component instance properties
-  it('should have correct instance properties', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm).toHaveProperty('name');
-    expect(wrapper.vm).toHaveProperty('content');
-    expect(wrapper.vm).toHaveProperty('docURL');
-    expect(wrapper.vm).toHaveProperty('config');
-  });
-
-
-  // Test 35: Template structure validation
-  it('should have correct template structure and classes', () => {
-    wrapper = createWrapper();
-    expect(wrapper.find('.q-pa-sm').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:text-\\[16px\\]').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:font-bold').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:pt-6').exists()).toBe(true);
-    expect(wrapper.find('.tw\\:pb-2').exists()).toBe(true);
-  });
-
-  // Test 36: Link attributes validation
-  it('should have correct link attributes and behavior', () => {
-    wrapper = createWrapper();
-    const link = wrapper.find('a');
-    expect(link.attributes('target')).toBe('_blank');
-    expect(link.text()).toBe('here');
-  });
-
-  // Test 37: Component composition API usage
-  it('should use composition API correctly', () => {
-    wrapper = createWrapper();
-    expect(wrapper.vm.$options.setup).toBeDefined();
-    expect(typeof wrapper.vm.$options.setup).toBe('function');
-  });
-
-  // Test 38: Props validation
-  it('should validate props correctly', () => {
-    const propValidators = SqlServer.props;
-    expect(propValidators.currOrgIdentifier.type).toBe(String);
-    expect(propValidators.currUserEmail.type).toBe(String);
-  });
-
-
 });

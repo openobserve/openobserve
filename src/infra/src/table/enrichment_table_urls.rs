@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,8 +16,6 @@
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter, QuerySelect, Set, entity::prelude::*};
 use serde::{Deserialize, Serialize};
 
-use super::get_lock;
-
 // Status constants for enrichment table URL jobs
 const STATUS_PROCESSING: i16 = 1;
 // Re-export the entity for convenience
@@ -25,7 +23,7 @@ pub use crate::table::entity::enrichment_table_urls::{
     ActiveModel, Column, Entity, Model, Relation,
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors,
 };
 
@@ -78,9 +76,7 @@ impl From<Model> for EnrichmentTableUrlRecord {
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn put(record: EnrichmentTableUrlRecord) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     // Try to find existing record by ID
     let existing = Entity::find()
@@ -140,7 +136,7 @@ pub async fn get(
     org: &str,
     table_name: &str,
 ) -> Result<Option<EnrichmentTableUrlRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(table_name))
@@ -159,9 +155,7 @@ pub async fn get(
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn delete(org: &str, table_name: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     Entity::delete_many()
         .filter(Column::Org.eq(org))
@@ -180,7 +174,7 @@ pub async fn delete(org: &str, table_name: &str) -> Result<(), errors::Error> {
 /// # Returns
 /// * `Result<Vec<EnrichmentTableUrlRecord>, errors::Error>` - List of records or error
 pub async fn list_by_org(org: &str) -> Result<Vec<EnrichmentTableUrlRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::Org.eq(org))
         .all(client)
@@ -203,7 +197,7 @@ pub async fn get_all_for_table(
 ) -> Result<Vec<EnrichmentTableUrlRecord>, errors::Error> {
     use sea_orm::QueryOrder;
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let records = Entity::find()
         .filter(Column::Org.eq(org))
         .filter(Column::Name.eq(table_name))
@@ -222,7 +216,7 @@ pub async fn get_all_for_table(
 /// # Returns
 /// * `Result<Option<EnrichmentTableUrlRecord>, errors::Error>` - The record or None
 pub async fn get_by_id(job_id: &str) -> Result<Option<EnrichmentTableUrlRecord>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
     let record = Entity::find()
         .filter(Column::Id.eq(job_id))
         .one(client)
@@ -239,8 +233,7 @@ pub async fn get_by_id(job_id: &str) -> Result<Option<EnrichmentTableUrlRecord>,
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn delete_by_id(job_id: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     Entity::delete_many()
         .filter(Column::Id.eq(job_id))
@@ -259,7 +252,7 @@ pub async fn delete_by_id(job_id: &str) -> Result<(), errors::Error> {
 /// # Returns
 /// * `Result<bool, errors::Error>` - true if any job is processing
 pub async fn has_processing_jobs(org: &str, table_name: &str) -> Result<bool, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     let count = Entity::find()
         .filter(Column::Org.eq(org))
@@ -280,8 +273,7 @@ pub async fn has_processing_jobs(org: &str, table_name: &str) -> Result<bool, er
 /// # Returns
 /// * `Result<(), errors::Error>` - Success or error
 pub async fn delete_all_for_table(org: &str, table_name: &str) -> Result<(), errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
-    let _lock = get_lock().await;
+    let client = get_orm_client_rw().await;
 
     Entity::delete_many()
         .filter(Column::Org.eq(org))
@@ -295,22 +287,21 @@ pub async fn delete_all_for_table(org: &str, table_name: &str) -> Result<(), err
 /// Atomically claims stale jobs that are stuck in Processing status
 ///
 /// This function is used for stale job recovery in both single-node (SQLite) and distributed
-/// deployments (PostgreSQL/MySQL). The implementation varies by database backend.
+/// deployments (PostgreSQL). The implementation varies by database backend.
 ///
 /// # How it works
 ///
 /// ## SQLite (single-node)
-/// 1. Uses `get_lock()` for process-level synchronization
-/// 2. Finds up to `limit` stale jobs using Sea-ORM queries
-/// 3. Updates each job to Pending status sequentially
-/// 4. Returns the updated jobs
+/// 1. Finds up to `limit` stale jobs using Sea-ORM queries
+/// 2. Updates each job to Pending status sequentially
+/// 3. Returns the updated jobs
 ///
 /// Since SQLite is single-node, only one ingester exists, so no distributed coordination needed.
 ///
-/// ## PostgreSQL/MySQL (distributed)
+/// ## PostgreSQL (distributed)
 /// 1. Uses database-level atomic UPDATE with subquery
 /// 2. Only ONE ingester successfully claims each job (database ensures atomicity)
-/// 3. Returns the claimed jobs via RETURNING (PostgreSQL) or separate SELECT (MySQL)
+/// 3. Returns the claimed jobs via RETURNING
 ///
 /// Multiple ingesters can run this simultaneously - database ensures proper distribution.
 ///
@@ -331,13 +322,12 @@ pub async fn claim_stale_jobs(
 ) -> Result<Vec<EnrichmentTableUrlRecord>, errors::Error> {
     use sea_orm::{ConnectionTrait, Statement};
 
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let backend = client.get_database_backend();
-    let _lock = get_lock().await;
     let now = chrono::Utc::now().timestamp_micros();
 
-    // For SQLite (single-node), use simple Sea-ORM API since get_lock() provides sufficient
-    // protection
+    // SQLite serializes writers on the single write connection, so the plain
+    // Sea-ORM path is enough here; postgres needs the locking query below.
     if backend == sea_orm::DatabaseBackend::Sqlite {
         // Find stale jobs (only local region jobs)
         let stale_jobs: Vec<Model> = Entity::find()
@@ -386,25 +376,6 @@ pub async fn claim_stale_jobs(
                 pending_status, now, processing_status, stale_threshold_timestamp, limit
             )
         }
-        sea_orm::DatabaseBackend::MySql => {
-            // MySQL supports UPDATE with subquery
-            format!(
-                r#"
-                UPDATE enrichment_table_urls
-                SET status = {}, updated_at = {}
-                WHERE (org, name) IN (
-                    SELECT org, name
-                    FROM (
-                        SELECT org, name
-                        FROM enrichment_table_urls
-                        WHERE status = {} AND updated_at < {} AND is_local_region = true
-                        LIMIT {}
-                    ) AS subquery
-                )
-                "#,
-                pending_status, now, processing_status, stale_threshold_timestamp, limit
-            )
-        }
         _ => {
             return Err(errors::Error::Message(format!(
                 "Unsupported database backend: {:?}",
@@ -413,44 +384,23 @@ pub async fn claim_stale_jobs(
         }
     };
 
-    // MySQL doesn't support RETURNING, so we need separate UPDATE and SELECT
-    if backend == sea_orm::DatabaseBackend::MySql {
-        // Execute UPDATE
-        let result = client.execute(Statement::from_string(backend, sql)).await?;
+    // PostgreSQL supports RETURNING
+    let models = Entity::find()
+        .from_raw_sql(Statement::from_string(backend, sql))
+        .all(client)
+        .await?;
 
-        if result.rows_affected() == 0 {
-            return Ok(vec![]);
-        }
+    Ok(models.into_iter().map(|model| model.into()).collect())
+}
 
-        // SELECT the jobs we just updated
-        let select_sql = format!(
-            r#"
-            SELECT id, org, name, url, status, error_message, created_at, updated_at,
-                   total_bytes_fetched, total_records_processed, retry_count,
-                   append_data, last_byte_position, supports_range, is_local_region
-            FROM enrichment_table_urls
-            WHERE status = {} AND updated_at = {} AND is_local_region = true
-            ORDER BY updated_at DESC
-            LIMIT {}
-            "#,
-            pending_status, now, limit
-        );
-
-        let models = Entity::find()
-            .from_raw_sql(Statement::from_string(backend, select_sql))
-            .all(client)
-            .await?;
-
-        Ok(models.into_iter().map(|model| model.into()).collect())
-    } else {
-        // PostgreSQL supports RETURNING
-        let models = Entity::find()
-            .from_raw_sql(Statement::from_string(backend, sql))
-            .all(client)
-            .await?;
-
-        Ok(models.into_iter().map(|model| model.into()).collect())
-    }
+/// Deletes all enrichment table URL entries belonging to the given org.
+pub async fn delete_by_org(org: &str) -> Result<(), errors::Error> {
+    let client = get_orm_client_rw().await;
+    Entity::delete_many()
+        .filter(Column::Org.eq(org))
+        .exec(client)
+        .await?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -464,5 +414,74 @@ mod tests {
         // In test environment without DB, this will error or return false
         // The test validates the function signature
         assert!(result.is_ok() || result.is_err());
+    }
+
+    fn make_model() -> Model {
+        Model {
+            id: "id-abc".to_string(),
+            org: "myorg".to_string(),
+            name: "my-table".to_string(),
+            url: "https://example.com/data.csv".to_string(),
+            status: 0,
+            error_message: None,
+            created_at: 1_000_000,
+            updated_at: 2_000_000,
+            total_bytes_fetched: 512,
+            total_records_processed: 100,
+            retry_count: 2,
+            append_data: true,
+            last_byte_position: 512,
+            supports_range: true,
+            is_local_region: false,
+        }
+    }
+
+    #[test]
+    fn test_from_model_maps_scalar_fields() {
+        let model = make_model();
+        let record = EnrichmentTableUrlRecord::from(model);
+        assert_eq!(record.id, "id-abc");
+        assert_eq!(record.org, "myorg");
+        assert_eq!(record.name, "my-table");
+        assert_eq!(record.url, "https://example.com/data.csv");
+        assert_eq!(record.status, 0);
+        assert_eq!(record.created_at, 1_000_000);
+        assert_eq!(record.updated_at, 2_000_000);
+        assert_eq!(record.total_bytes_fetched, 512);
+        assert_eq!(record.total_records_processed, 100);
+        assert_eq!(record.retry_count, 2);
+        assert_eq!(record.last_byte_position, 512);
+    }
+
+    #[test]
+    fn test_from_model_maps_bool_fields() {
+        let model = make_model();
+        let record = EnrichmentTableUrlRecord::from(model);
+        assert!(record.append_data);
+        assert!(record.supports_range);
+        assert!(!record.is_local_region);
+    }
+
+    #[test]
+    fn test_from_model_no_error_message() {
+        let model = make_model();
+        let record = EnrichmentTableUrlRecord::from(model);
+        assert!(record.error_message.is_none());
+    }
+
+    #[test]
+    fn test_from_model_with_error_message() {
+        let mut model = make_model();
+        model.error_message = Some("connection refused".to_string());
+        let record = EnrichmentTableUrlRecord::from(model);
+        assert_eq!(record.error_message, Some("connection refused".to_string()));
+    }
+
+    #[test]
+    fn test_from_model_is_local_region_true() {
+        let mut model = make_model();
+        model.is_local_region = true;
+        let record = EnrichmentTableUrlRecord::from(model);
+        assert!(record.is_local_region);
     }
 }

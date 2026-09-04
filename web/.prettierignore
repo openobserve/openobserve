@@ -1,0 +1,14 @@
+# Build output & generated assets
+dist/
+coverage/
+node_modules/
+
+# Generated / vendored files
+*.min.js
+src/assets/
+public/
+stats.html
+sbom.json
+
+# Lockfiles & data
+package-lock.json

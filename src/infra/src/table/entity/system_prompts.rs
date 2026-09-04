@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -35,3 +35,19 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            r#type: "default".to_string(),
+            content: "You are a helpful assistant.".to_string(),
+            updated_at: 1000,
+        };
+        assert_eq!(m.r#type, "default");
+        assert!(!m.content.is_empty());
+    }
+}

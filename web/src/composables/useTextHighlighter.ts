@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -31,8 +31,10 @@
  * const result = processTextWithHighlights(text, queryString, colors, showQuotes);
  */
 
+import type { I18nText } from "@/types/i18n";
+
 import { useStore } from "vuex";
-import useLogs from "./useLogs";
+import { escapeHtml } from "@/utils/html";
 
 /**
  * Represents a processed text segment with styling information
@@ -40,7 +42,7 @@ import useLogs from "./useLogs";
 
 export interface TextSegment {
   id: string;
-  content: string;
+  content: I18nText;
   color?: string;
   isHighlighted: boolean;
   isWhitespace: boolean;
@@ -50,8 +52,7 @@ export interface TextSegment {
  * Composable for text highlighting and semantic colorization
  */
 export function useTextHighlighter() {
-  // Initialize store within the composable for accessing configuration
-  const store = useStore();
+  useStore();
 
   /**
    * Extracts keywords from SQL query strings
@@ -87,7 +88,6 @@ export function useTextHighlighter() {
 
   /**
    * Splits text by highlight keywords and marks matched parts
-   * Similar to the original HighLight component logic
    *
    * @param text - Text to process
    * @param keywords - Array of keywords to highlight
@@ -102,9 +102,7 @@ export function useTextHighlighter() {
     }
 
     // Create regex pattern from keywords (escape special characters)
-    const escapedKeywords = keywords.map((k) =>
-      k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
-    );
+    const escapedKeywords = keywords.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
 
     const pattern = new RegExp(`(${escapedKeywords.join("|")})`, "gi");
 
@@ -127,94 +125,8 @@ export function useTextHighlighter() {
   }
 
   /**
-   * Escapes HTML characters in text for safe rendering
-   *
-   * Prevents XSS attacks by converting dangerous HTML characters into safe HTML entities.
-   * This ensures user content displays as literal text instead of executing as HTML markup.
-   *
-   * @param str - String to escape
-   * @returns HTML-safe string with entities escaped
-   *
-   * @example
-   * // Input containing malicious HTML
-   * const userInput = '<script>alert("hack")</script>';
-   * const safeOutput = escapeHtml(userInput);
-   * // Output: '&lt;script&gt;alert("hack")&lt;/script&gt;'
-   * // Displays as: <script>alert("hack")</script> (visible text, not executed)
-   *
-   * @example
-   * // Log data with HTML tags
-   * const logMessage = '<h1>Error: Database connection failed</h1>';
-   * const escapedLog = escapeHtml(logMessage);
-   * // Output: '&lt;h1&gt;Error: Database connection failed&lt;/h1&gt;'
-   * // Displays as: <h1>Error: Database connection failed</h1> (visible text)
-   *
-   * @example
-   * // JSON data with quotes and ampersands
-   * const jsonData = '{"message": "Success & complete", "html": "<div>content</div>"}';
-   * const safeJson = escapeHtml(jsonData);
-   * // Output: '{&quot;message&quot;: &quot;Success &amp; complete&quot;, &quot;html&quot;: &quot;&lt;div&gt;content&lt;/div&gt;&quot;}'
-   */
-  function escapeHtml(str: string): string {
-    return str
-      .replace(/&/g, "&amp;") // Must be first: & → &amp;
-      .replace(/</g, "&lt;") // Less than: < → &lt;
-      .replace(/>/g, "&gt;") // Greater than: > → &gt;
-      .replace(/"/g, "&quot;"); // Double quote: " → &quot;
-  }
-
-  /**
-   * Simplified tokenization - just split by whitespace
-   *
-   * KEY SIMPLIFICATION: We removed the complex "quoted" and "bracketed" types!
-   *
-   * OLD BEHAVIOR (COMPLEX - ~180 lines):
-   * ────────────────────────────────────
-   * Input:  'Hello "quoted text" world [bracket]'
-   * Output: [
-   *   {content: "Hello", type: "token"},
-   *   {content: " ", type: "whitespace"},
-   *   {content: '"quoted text"', type: "quoted"},      ← Special handling!
-   *   {content: " ", type: "whitespace"},
-   *   {content: "world", type: "token"},
-   *   {content: " ", type: "whitespace"},
-   *   {content: "[bracket]", type: "bracketed"}        ← Special handling!
-   * ]
-   *
-   * Problems with old approach:
-   * - Complex state machine to track quotes/brackets
-   * - Special logic for apostrophes (don't, it's, 5'10")
-   * - Used .trim() which caused character loss
-   * - Hard to maintain and debug
-   *
-   * NEW BEHAVIOR (SIMPLIFIED - 19 lines):
-   * ────────────────────────────────────
-   * Input:  'Hello "quoted text" world [bracket]'
-   * Output: [
-   *   {content: "Hello", type: "token"},
-   *   {content: " ", type: "whitespace"},
-   *   {content: '"quoted', type: "token"},              ← Just a token!
-   *   {content: " ", type: "whitespace"},
-   *   {content: 'text"', type: "token"},                ← Just a token!
-   *   {content: " ", type: "whitespace"},
-   *   {content: "world", type: "token"},
-   *   {content: " ", type: "whitespace"},
-   *   {content: "[bracket]", type: "token"}             ← Just a token!
-   * ]
-   *
-   * Why this works better:
-   * 1. Quotes and brackets are just regular characters - they're part of the data!
-   * 2. No character loss - every character appears exactly once
-   * 3. Semantic detection (IPs, URLs, emails) happens AFTER tokenization
-   * 4. Much simpler to understand and maintain
-   * 5. Identical performance (837ms → 839ms, within variance)
-   *
-   * How quotes/brackets are now handled:
-   * - They stay attached to the text they're part of
-   * - Split happens ONLY on whitespace
-   * - Example: '"hello' and 'world"' are separate tokens
-   * - Semantic highlighting still works correctly
-   * - Keyword highlighting works correctly
+   * Tokenizes text by splitting on whitespace only. Quotes and brackets stay
+   * attached to the text they are part of; semantic detection happens afterwards.
    *
    * @param text - Text to tokenize
    * @returns Array of token objects with only 2 types: "token" or "whitespace"
@@ -230,27 +142,22 @@ export function useTextHighlighter() {
    * //   {content: '[test]', type: 'token'}
    * // ]
    */
-  function smartTokenize(
-    text: string,
-  ): Array<{ content: string; type: string }> {
+  function smartTokenize(text: string): Array<{ content: string; type: string }> {
     if (!text) return [];
 
     const tokens: Array<{ content: string; type: string }> = [];
 
     // Split by whitespace but keep the whitespace in the result
-    // Using a regex with capturing group (\s+) preserves the separators
-    // This is the ONLY splitting logic - no quote/bracket detection!
+    // (capturing group (\s+) preserves the separators)
     const parts = text.split(/(\s+)/);
 
     for (const part of parts) {
       if (!part) continue; // Skip empty strings from split
 
-      // Only 2 types now: "whitespace" or "token"
-      // No more "quoted", "bracketed", or other complex types
       const isWhitespace = /^\s+$/.test(part);
       tokens.push({
         content: part,
-        type: isWhitespace ? "whitespace" : "token"
+        type: isWhitespace ? "whitespace" : "token",
       });
     }
 
@@ -281,11 +188,7 @@ export function useTextHighlighter() {
     if (/^https?:\/\//i.test(cleaned)) return "url";
 
     // Email addresses
-    if (
-      analysis.hasAtSymbol &&
-      analysis.hasDots &&
-      /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)
-    ) {
+    if (analysis.hasAtSymbol && analysis.hasDots && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleaned)) {
       return "email";
     }
 
@@ -338,23 +241,21 @@ export function useTextHighlighter() {
       hasColons: text.includes(":"),
       hasSlashes: text.includes("/"),
       hasHyphens: text.includes("-"),
-      hasParentheses: /[()\[\]]/.test(text),
+      hasParentheses: /[()[\]]/.test(text),
       dotSeparatedNumbers: (text.match(/\d+/g) || []).length,
       startsWithUppercase: /^[A-Z]/.test(text),
-      isThreeDigitStatusCode: /^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(text),
+      isThreeDigitStatusCode:
+        /^(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))$/.test(
+          text,
+        ),
       isLargeNumber: /^\d{4,}$/.test(text),
       hasDateTimePattern:
         /\d{1,4}[/-]\w{1,3}[/-]\d{1,4}[:\s]\d{1,2}:\d{1,2}(?::\d{1,2})?(?:\s*[+-]\d{4})?/.test(
           text,
         ),
       hasVersionPattern: /\d+\.\d+/.test(text),
-      hasCommonHttpVerb: /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)$/.test(
-        text,
-      ),
-      isUuidPattern:
-        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-          text,
-        ),
+      hasCommonHttpVerb: /^(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)$/.test(text),
+      isUuidPattern: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(text),
       isFilePath: /^\//.test(text) || /^[A-Za-z]:\\/.test(text),
     };
   }
@@ -431,11 +332,7 @@ export function useTextHighlighter() {
    * @param cellValue - The cell value to analyze
    * @returns True if the column contains FTS content
    */
-  function isFTSColumn(
-    columnId: string,
-    cellValue: any,
-    selectedStreamFtsKeys: string[],
-  ): boolean {
+  function isFTSColumn(columnId: string, cellValue: any, selectedStreamFtsKeys: string[]): boolean {
     // Skip for source column (already handled separately)
     if (columnId === "source") return false;
     // Only analyze string values
@@ -448,127 +345,6 @@ export function useTextHighlighter() {
   }
 
   /**
-   * Splits text into semantic segments (IPs, emails, URLs, etc.)
-   * @param text - Text to split into semantic parts
-   * @returns Array of text parts with their positions
-   */
-  function splitTextBySemantic(
-    text: string,
-  ): Array<{ text: string; start: number; end: number; type: string }> {
-    if (!text || typeof text !== "string") {
-      return [
-        {
-          text: text || "",
-          start: 0,
-          end: (text || "").length,
-          type: "default",
-        },
-      ];
-    }
-
-    const semanticPatterns = [
-      { pattern: /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, type: "ip" },
-      { pattern: /\b[^\s@]+@[^\s@]+\.[^\s@]+\b/g, type: "email" },
-      { pattern: /\bhttps?:\/\/[^\s]+\b/g, type: "url" },
-      {
-        pattern: /\b(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\b/g,
-        type: "http_method",
-      },
-      { pattern: /\b(1(0[0-3])|2(0[0-8]|26)|3(0[0-8])|4(0[0-9]|1[0-9]|2[0-9]|3[01]|51)|5(0[0-9]|1[01]))\b/g, type: "status_code" },
-      {
-        pattern:
-          /\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b/g,
-        type: "uuid",
-      },
-      { pattern: /\b\d{13,}\b/g, type: "timestamp" },
-      {
-        pattern: /\b\d+(\.\d+)?\s*(KB|MB|GB|TB|bytes?)\b/gi,
-        type: "file_size",
-      },
-      { pattern: /\/[^\s]*(?:\?[^\s]*)?(?:#[^\s]*)?\b/g, type: "path" },
-    ];
-
-    const matches: Array<{
-      text: string;
-      start: number;
-      end: number;
-      type: string;
-    }> = [];
-
-    // Find all semantic matches
-    semanticPatterns.forEach(({ pattern, type }) => {
-      // Reset regex lastIndex to ensure proper matching
-      pattern.lastIndex = 0;
-      let match;
-      while ((match = pattern.exec(text)) !== null) {
-        matches.push({
-          text: match[0],
-          start: match.index,
-          end: match.index + match[0].length,
-          type,
-        });
-      }
-    });
-
-    // Sort by position
-    matches.sort((a, b) => a.start - b.start);
-
-    // Remove overlapping matches (prioritize by pattern order - first wins)
-    const filteredMatches = [];
-    for (const match of matches) {
-      const hasOverlap = filteredMatches.some(
-        (existing) =>
-          (match.start >= existing.start && match.start < existing.end) ||
-          (match.end > existing.start && match.end <= existing.end) ||
-          (existing.start >= match.start && existing.start < match.end),
-      );
-      if (!hasOverlap) {
-        filteredMatches.push(match);
-      }
-    }
-
-    // Create segments with semantic and non-semantic parts
-    const segments = [];
-    let lastEnd = 0;
-
-    for (const match of filteredMatches) {
-      // Add text before this match (only if non-empty)
-      if (match.start > lastEnd) {
-        const beforeText = text.slice(lastEnd, match.start);
-        if (beforeText.trim()) {
-          segments.push({
-            text: beforeText,
-            start: lastEnd,
-            end: match.start,
-            type: "default",
-          });
-        }
-      }
-
-      // Add the semantic match
-      segments.push(match);
-      lastEnd = match.end;
-    }
-
-    // Add remaining text (only if non-empty)
-    if (lastEnd < text.length) {
-      const remainingText = text.slice(lastEnd);
-      if (remainingText.trim()) {
-        segments.push({
-          text: remainingText,
-          start: lastEnd,
-          end: text.length,
-          type: "default",
-        });
-      }
-    }
-
-    return segments.length > 0
-      ? segments
-      : [{ text, start: 0, end: text.length, type: "default" }];
-  }
-
-  /**
    * Processes text segments with both semantic coloring and keyword highlighting
    * Simplified version - just handles tokens and whitespace
    *
@@ -578,8 +354,13 @@ export function useTextHighlighter() {
    * @param showQuotes - Whether to add quotes around values
    * @returns HTML string with applied styling
    */
-  function processTextSegments(segments: Array<{ content: string; type: string }>, keywords: string[], colors: any, showQuotes: boolean = false): string {
-    let result = '';
+  function processTextSegments(
+    segments: Array<{ content: string; type: string }>,
+    keywords: string[],
+    colors: any,
+    showQuotes: boolean = false,
+  ): string {
+    let result = "";
 
     // Add opening quote if requested
     if (showQuotes) {
@@ -587,27 +368,31 @@ export function useTextHighlighter() {
     }
 
     // Process each segment individually
-    result += segments.map(segment => {
-      // For whitespace, just return as-is with no special styling
-      if (segment.type === "whitespace") {
-        return segment.content;
-      }
-
-      // For regular tokens, split by keywords and apply semantic colors
-      const parts = splitTextByKeywords(segment.content, keywords);
-      return parts.map(part => {
-        const content = escapeHtml(part.text);
-        if (part.isHighlighted) {
-          // Highlighted keywords get yellow background
-          return `<span class="log-highlighted">${content}</span>`;
-        } else {
-          // Apply semantic colorization based on content type
-          const semanticType = detectSemanticType(part.text);
-          const semanticClass = getSemanticCSSClass(semanticType);
-          return `<span class="${semanticClass}">${content}</span>`;
+    result += segments
+      .map((segment) => {
+        // For whitespace, just return as-is with no special styling
+        if (segment.type === "whitespace") {
+          return segment.content;
         }
-      }).join('');
-    }).join('');
+
+        // For regular tokens, split by keywords and apply semantic colors
+        const parts = splitTextByKeywords(segment.content, keywords);
+        return parts
+          .map((part) => {
+            const content = escapeHtml(part.text);
+            if (part.isHighlighted) {
+              // Highlighted keywords get yellow background
+              return `<span class="log-highlighted">${content}</span>`;
+            } else {
+              // Apply semantic colorization based on content type
+              const semanticType = detectSemanticType(part.text);
+              const semanticClass = getSemanticCSSClass(semanticType);
+              return `<span class="${semanticClass}">${content}</span>`;
+            }
+          })
+          .join("");
+      })
+      .join("");
 
     // Add closing quote if requested
     if (showQuotes) {
@@ -650,7 +435,6 @@ export function useTextHighlighter() {
     splitTextByKeywords,
     getSingleSemanticColor,
     getSemanticCSSClass,
-    escapeHtml,
     isFTSColumn,
   };
 }

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,138 +14,43 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!--
+  Pipeline "External Destination" node drawer.
+
+  This file is CHROME ONLY: the drawer + Save/Cancel/Delete + addNode. The body
+  is the SHARED DestinationPicker, the same component the workflow Destination
+  node renders, so the two canvases cannot drift. The picker owns the form (zod
+  schema + OForm) and hands back the payload from its awaited submit().
+
+  While the picker's inline "create destination" form is open it carries its own
+  Save/Cancel, so we hide this drawer's footer (the picker emits `expand`).
+-->
 <template>
-  <div
-    data-test="add-stream-input-stream-routing-section"
-    class="tw:h-[calc(100vh)] tw:overflow-auto tw:w-[40vw]"
-    :class="store.state.theme === 'dark' ? 'bg-dark' : 'bg-white'"
+  <ODrawer
+    :open="internalOpen"
+    @update:open="handleDrawerClose"
+    :title="t('alerts.externalDestinationTitle')"
+    size="lg"
+    :show-close="true"
+    @keydown.stop
+    :primaryButtonLabel="!creating ? t('alerts.save') : undefined"
+    :secondaryButtonLabel="!creating ? t('alerts.cancel') : undefined"
+    :neutralButtonLabel="!creating && pipelineObj.isEditNode ? t('pipeline.deleteNode') : undefined"
+    neutralButtonVariant="outline-destructive"
+    @click:primary="saveDestination"
+    @click:secondary="handleCancel"
+    @click:neutral="openDeleteDialog"
   >
-    <q-page>
-      <div class="o2-input">
-        <div class="row items-center no-wrap q-mx-md q-pb-sm q-pl-md q-pt-md">
-          <div class="flex items-center tw:w-full">
-            <div class="tw:w-full" data-test="add-destination-title">
-              <div
-                class="tw:text-[18px] tw:flex tw:items-center tw:justify-between"
-              >
-                External Destination
-                <div>
-                  <q-btn v-close-popup="true" round flat icon="cancel"> </q-btn>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <q-separator />
-        <div class="row q-col-gutter-sm q-px-lg">
-          <q-toggle
-            data-test="create-stream-toggle"
-            class="q-mb-sm tw:h-[36px] o2-toggle-button-xs tw:mr-3 q-mt-md"
-            size="xs"
-            :class="
-              store.state.theme === 'dark'
-                ? 'o2-toggle-button-xs-dark'
-                : 'o2-toggle-button-xs-light'
-            "
-            :label="'Create new Destination'"
-            v-model="createNewDestination"
-          />
-
-          <div v-if="createNewDestination" class="q-mt-sm q-mb-md col-12">
-              
-            <!-- Create New Destination Form -->
-            <CreateDestinationForm
-              @created="handleDestinationCreated"
-              @cancel="handleCancel"
-            />
-          </div>
-
-          <!-- Select Existing Destination -->
-          <div v-else class="col-12">
-            <div class="col-12 q-py-xs destination-method-select">
-              <q-select
-                data-test="external-destination-select"
-                v-model="selectedDestination"
-                :label="'Destination *'"
-                :options="getFormattedDestinations"
-                color="input-border"
-                bg-color="input-bg"
-                class="showLabelOnTop"
-                stack-label
-                outlined
-                filled
-                dense
-                tabindex="0"
-              >
-                <template v-slot:option="scope">
-                  <q-item
-                    style="max-width: calc(40vw - 42px)"
-                    v-bind="scope.itemProps"
-                  >
-                    <q-item-section class="flex flex-col">
-                      <q-item-label>
-                        <span class="text-bold"> {{ scope.opt.label }}</span> -
-                        <span class="truncate-url"> {{ scope.opt.url }}</span>
-                      </q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </template>
-              </q-select>
-            </div>
-
-            <!-- Action buttons for existing destination selection -->
-            <div class="flex justify-start q-mt-md q-mb-md">
-              <q-btn
-                v-if="pipelineObj.isEditNode"
-                data-test="add-destination-delete-btn"
-                class="o2-secondary-button tw:h-[36px] q-mr-sm"
-                color="negative"
-                flat
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-secondary-button-dark'
-                    : 'o2-secondary-button-light'
-                "
-                no-caps
-                @click="openDeleteDialog"
-              >
-                <q-icon name="delete" class="q-mr-xs" />
-                {{ t("pipeline.deleteNode") }}
-              </q-btn>
-              <q-btn
-                data-test="add-destination-cancel-btn"
-                v-close-popup="true"
-                class="o2-secondary-button tw:h-[36px]"
-                :label="t('alerts.cancel')"
-                flat
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-secondary-button-dark'
-                    : 'o2-secondary-button-light'
-                "
-                no-caps
-                @click="handleCancel"
-              />
-              <q-btn
-                data-test="add-destination-save-btn"
-                :label="t('alerts.save')"
-                class="no-border q-ml-sm o2-primary-button tw:h-[36px]"
-                :class="
-                  store.state.theme === 'dark'
-                    ? 'o2-primary-button-dark'
-                    : 'o2-primary-button-light'
-                "
-                flat
-                no-caps
-                @click="saveDestination"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-    </q-page>
-  </div>
-  <confirm-dialog
+    <!-- No padding here: ODrawer now pads its own body (bodyPaddingClass). -->
+    <div class="w-full">
+      <DestinationPicker
+        ref="picker"
+        :initial-name="initialDestinationName"
+        @expand="(v) => (creating = v)"
+      />
+    </div>
+  </ODrawer>
+  <ConfirmDialog
     v-model="dialog.show"
     :title="dialog.title"
     :message="dialog.message"
@@ -155,129 +60,64 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onBeforeMount, watch } from "vue";
-import { useI18n } from "vue-i18n";
-import destinationService from "@/services/alert_destination";
+import { ref, watch } from "vue";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useQuasar } from "quasar";
+import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
-import CreateDestinationForm from "./CreateDestinationForm.vue";
+import DestinationPicker from "@/components/flow/forms/DestinationPicker.vue";
 import useDragAndDrop from "@/plugins/pipelines/useDnD";
 
-const emit = defineEmits(["get:destinations", "cancel:hideform"]);
-const q = useQuasar();
-const store = useStore();
-const { t } = useI18n();
+const props = withDefaults(defineProps<{ open?: boolean }>(), { open: false });
+const emit = defineEmits(["cancel:hideform"]);
 
-const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop();
-const createNewDestination = ref(false);
-const selectedDestination: any = ref(
-  pipelineObj.currentSelectedNodeData?.data?.destination_name
-    ? {
-        label: pipelineObj.currentSelectedNodeData.data.destination_name,
-        value: pipelineObj.currentSelectedNodeData.data.destination_name,
-      }
-    : { label: "", value: "" },
-);
-const destinations = ref([]);
-
-const dialog = ref({
-  show: false,
-  title: "",
-  message: "",
-  okCallback: () => {},
-});
-
-onBeforeMount(() => {
-  getDestinations();
-});
-
+const internalOpen = ref(!!props.open);
 watch(
-  () => createNewDestination.value,
-  (val) => {
-    if (!val) {
-      // When switching back to select mode, refresh destinations
-      getDestinations();
-    }
+  () => props.open,
+  (v) => {
+    internalOpen.value = !!v;
   },
 );
 
-const getFormattedDestinations = computed(() => {
-  return destinations.value.map((destination: any) => {
-    const truncatedUrl =
-      destination.url.length > 70
-        ? destination.url.slice(0, 70) + "..."
-        : destination.url;
+function handleDrawerClose(v: boolean) {
+  internalOpen.value = v;
+  if (!v) {
+    setTimeout(() => emit("cancel:hideform"), 300);
+  }
+}
 
-    return {
-      label: destination.name,
-      value: destination.name,
-      url: truncatedUrl,
-    };
-  });
+const store = useStore();
+const { t } = useI18nTyped();
+const { addNode, pipelineObj, deletePipelineNode } = useDragAndDrop(t);
+
+const picker = ref<any>(null);
+// True while the picker's inline create form is open — the drawer hides its
+// footer then (the create form carries its own Save/Cancel).
+const creating = ref(false);
+
+// Edit prefill — pipelines store the destination under `destination_name`.
+const initialDestinationName = pipelineObj.currentSelectedNodeData?.data?.destination_name ?? "";
+
+const dialog = ref({
+  show: false,
+  // raw("") is only the empty placeholder — the real values are assigned from t().
+  title: raw(""),
+  message: raw(""),
+  okCallback: () => {},
 });
 
-const getDestinations = () => {
-  const dismiss = q.notify({
-    spinner: true,
-    message: "Please wait while loading destinations...",
-  });
-  destinationService
-    .list({
-      page_num: 1,
-      page_size: 100000,
-      sort_by: "name",
-      desc: false,
-      org_identifier: store.state.selectedOrganization.identifier,
-      module: "pipeline",
-    })
-    .then((res) => {
-      destinations.value = res.data;
-    })
-    .catch((err) => {
-      if (err.response.status != 403) {
-        q.notify({
-          type: "negative",
-          message: "Error while pulling destinations.",
-          timeout: 2000,
-        });
-      }
-      dismiss();
-    })
-    .finally(() => dismiss());
-};
-
-const saveDestination = () => {
-  const destinationData = {
-    destination_name: selectedDestination.value.value,
+// The picker validates through the shared schema and returns null when the
+// field is empty (rendering the error inline), so there is no guard here.
+const saveDestination = async () => {
+  const payload = await picker.value?.submit();
+  if (!payload) return;
+  addNode({
+    destination_name: payload.destination_name,
     node_type: "remote_stream",
     io_type: "output",
     org_id: store.state.selectedOrganization.identifier,
-  };
-  if (
-    selectedDestination.value.hasOwnProperty("value") &&
-    selectedDestination.value.value === ""
-  ) {
-    q.notify({
-      message: "Please select External destination from the list",
-      color: "negative",
-      position: "bottom",
-      timeout: 2000,
-    });
-    return;
-  }
-  addNode(destinationData);
+  });
   emit("cancel:hideform");
-};
-
-const handleDestinationCreated = (destinationName: string) => {
-  // Switch back to selection mode and select the newly created destination
-  selectedDestination.value = {
-    label: destinationName,
-    value: destinationName,
-  };
-  createNewDestination.value = false;
-  getDestinations();
 };
 
 const handleCancel = () => {
@@ -286,8 +126,8 @@ const handleCancel = () => {
 
 const openDeleteDialog = () => {
   dialog.value.show = true;
-  dialog.value.title = "Delete Node";
-  dialog.value.message = "Are you sure you want to delete stream routing?";
+  dialog.value.title = t("pipeline.deleteNodeTitle");
+  dialog.value.message = t("pipeline.deleteStreamRoutingConfirm");
   dialog.value.okCallback = deleteRoute;
 };
 
@@ -296,33 +136,14 @@ const deleteRoute = () => {
   emit("cancel:hideform");
 };
 
-// Expose functions for testing
 defineExpose({
-  getDestinations,
+  picker,
+  creating,
   saveDestination,
-  selectedDestination,
-  destinations,
-  getFormattedDestinations,
-  createNewDestination,
-  pipelineObj,
-  handleDestinationCreated,
   handleCancel,
+  openDeleteDialog,
+  deleteRoute,
+  dialog,
+  pipelineObj,
 });
 </script>
-
-<style lang="scss" scoped>
-.destination-method-select {
-  .q-field__native > :first-child {
-    text-transform: uppercase !important;
-  }
-}
-
-.truncate-url {
-  display: inline-block;
-  max-width: calc(40vw - 200px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  vertical-align: bottom;
-}
-</style>

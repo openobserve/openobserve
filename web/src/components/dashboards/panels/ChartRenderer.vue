@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -19,22 +19,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="chart-renderer"
     ref="chartRef"
     id="chart1"
-    class="chart-container"
+    class="chart-container h-full w-full"
     @mouseover="
       () => {
         // if hoveredSeriesState is not null then set panelId
-        if (hoveredSeriesState)
-          hoveredSeriesState.panelId = data?.extras?.panelId;
+        if (hoveredSeriesState) hoveredSeriesState.panelId = data?.extras?.panelId;
       }
     "
     @mouseleave="
-      () => {
+      (e) => {
+        if ((e?.relatedTarget as Element | null)?.closest?.('.o2-echarts-tooltip')) return;
         // if hoveredSeriesState is not null then set -1
         if (hoveredSeriesState) hoveredSeriesState.setIndex(-1, -1, -1, null);
       }
     "
     @contextmenu="handleNativeContextMenu"
-    style="height: 100%; width: 100%"
   ></div>
 </template>
 
@@ -55,8 +54,7 @@ function findNearestIndex(sortedArray: any, target: any) {
 
     if (
       nearestIndex === -1 ||
-      Math.abs(sortedArray[mid][0] - target) <
-        Math.abs(sortedArray[nearestIndex][0] - target)
+      Math.abs(sortedArray[mid][0] - target) < Math.abs(sortedArray[nearestIndex][0] - target)
     ) {
       nearestIndex = mid; // Update nearestIndex if current element is closer to the target
     }
@@ -84,6 +82,8 @@ import {
   inject,
 } from "vue";
 import { useStore } from "vuex";
+import { useTheme } from "@/composables/useTheme";
+import { chartColor } from "@/utils/chartTheme";
 import * as echarts from "echarts/core";
 import {
   BarChart,
@@ -109,57 +109,11 @@ import {
   DataZoomComponent,
   MarkLineComponent,
   MarkAreaComponent,
+  GraphicComponent,
 } from "echarts/components";
 import { LabelLayout, UniversalTransition } from "echarts/features";
 import { CanvasRenderer, SVGRenderer } from "echarts/renderers";
-import type {
-  BarSeriesOption,
-  LineSeriesOption,
-  CustomSeriesOption,
-  GaugeSeriesOption,
-  PieSeriesOption,
-  ScatterSeriesOption,
-  HeatmapSeriesOption,
-  SankeySeriesOption,
-  TreeSeriesOption,
-} from "echarts/charts";
-import type { ComposeOption } from "echarts/core";
-import type {
-  TitleComponentOption,
-  TooltipComponentOption,
-  GridComponentOption,
-  ToolboxComponentOption,
-  DatasetComponentOption,
-  LegendComponentOption,
-  PolarComponentOption,
-  VisualMapComponentOption,
-  DataZoomComponentOption,
-  MarkLineComponentOption,
-  MarkAreaComponentOption,
-} from "echarts/components";
-
-type ECOption = ComposeOption<
-  | BarSeriesOption
-  | LineSeriesOption
-  | CustomSeriesOption
-  | GaugeSeriesOption
-  | PieSeriesOption
-  | ScatterSeriesOption
-  | HeatmapSeriesOption
-  | SankeySeriesOption
-  | TreeSeriesOption
-  | TitleComponentOption
-  | TooltipComponentOption
-  | GridComponentOption
-  | ToolboxComponentOption
-  | DatasetComponentOption
-  | LegendComponentOption
-  | PolarComponentOption
-  | VisualMapComponentOption
-  | DataZoomComponentOption
-  | MarkLineComponentOption
-  | MarkAreaComponentOption
->;
+import { withChartFont } from "@/utils/fonts";
 
 echarts.use([
   TitleComponent,
@@ -173,6 +127,7 @@ echarts.use([
   DataZoomComponent,
   MarkLineComponent,
   MarkAreaComponent,
+  GraphicComponent,
   BarChart,
   LineChart,
   CustomChart,
@@ -221,6 +176,7 @@ export default defineComponent({
     const chartRef: any = ref(null);
     let chart: any;
     const store = useStore();
+    const { isDark } = useTheme();
 
     const cleanupChart = () => {
       // Remove all event listeners from chart
@@ -263,12 +219,9 @@ export default defineComponent({
     }, DEBOUNCE_TIMEOUT);
 
     // Create a stable throttled function that persists between renders
-    const throttledSetHoveredSeriesIndex = throttle(
-      (arg1, arg2, arg3, arg4) => {
-        hoveredSeriesState?.value?.setIndex(arg1, arg2, arg3, arg4);
-      },
-      DEBOUNCE_TIMEOUT,
-    );
+    const throttledSetHoveredSeriesIndex = throttle((arg1, arg2, arg3, arg4) => {
+      hoveredSeriesState?.value?.setIndex(arg1, arg2, arg3, arg4);
+    }, DEBOUNCE_TIMEOUT);
 
     const mouseHoverEffectFn = (params: any) => {
       // if chart type is pie then set seriesName and seriesIndex from data and dataIndex
@@ -310,9 +263,7 @@ export default defineComponent({
 
     const legendSelectChangedFn = (params: any) => {
       // check if all series are selected (all will be false)
-      if (
-        Object.values(params.selected).every((value: any) => value === false)
-      ) {
+      if (Object.values(params.selected).every((value: any) => value === false)) {
         // set all series to true
         Object.keys(params.selected).forEach((name: any) => {
           params.selected[name] = true;
@@ -375,20 +326,15 @@ export default defineComponent({
       if (params.value !== undefined && params.value !== null) {
         // For array format [x, y], take y value
         if (Array.isArray(params.value)) {
-          dataPointValue =
-            params.value[1] !== undefined ? params.value[1] : params.value[0];
+          dataPointValue = params.value[1] !== undefined ? params.value[1] : params.value[0];
         } else {
           dataPointValue = params.value;
         }
       } else if (params.data !== undefined && params.data !== null) {
         // Alternative data format
         if (Array.isArray(params.data)) {
-          dataPointValue =
-            params.data[1] !== undefined ? params.data[1] : params.data[0];
-        } else if (
-          typeof params.data === "object" &&
-          params.data.value !== undefined
-        ) {
+          dataPointValue = params.data[1] !== undefined ? params.data[1] : params.data[0];
+        } else if (typeof params.data === "object" && params.data.value !== undefined) {
           dataPointValue = params.data.value;
         } else {
           dataPointValue = params.data;
@@ -442,30 +388,16 @@ export default defineComponent({
         }
 
         const rect = chartContainer.getBoundingClientRect();
-        const pixelPoint = [
-          event.clientX - rect.left,
-          event.clientY - rect.top,
-        ];
+        const pixelPoint = [event.clientX - rect.left, event.clientY - rect.top];
 
         // Convert pixel coordinates to data values using the chart's coordinate system
-        const pointInGrid = chart.convertFromPixel(
-          { gridIndex: 0 },
-          pixelPoint,
-        );
+        const pointInGrid = chart.convertFromPixel({ gridIndex: 0 }, pixelPoint);
 
-        if (
-          pointInGrid &&
-          Array.isArray(pointInGrid) &&
-          pointInGrid.length >= 2
-        ) {
+        if (pointInGrid && Array.isArray(pointInGrid) && pointInGrid.length >= 2) {
           const yAxisValue = pointInGrid[1]; // Y-axis value at cursor position
 
           // Emit domcontextmenu event for alert creation
-          if (
-            yAxisValue !== null &&
-            yAxisValue !== undefined &&
-            !isNaN(Number(yAxisValue))
-          ) {
+          if (yAxisValue !== null && yAxisValue !== undefined && !isNaN(Number(yAxisValue))) {
             emit("domcontextmenu", {
               x: event.clientX,
               y: event.clientY,
@@ -581,8 +513,7 @@ export default defineComponent({
         ) {
           // need to check index should not be greater than series length
           const hoveredSeriesIndex =
-            chart?.getOption()?.series.length >
-            hoveredSeriesState?.value?.seriesIndex
+            chart?.getOption()?.series.length > hoveredSeriesState?.value?.seriesIndex
               ? hoveredSeriesState?.value?.seriesIndex
               : 0;
           let hoveredSeriesDataIndex = hoveredSeriesState?.value?.dataIndex;
@@ -590,12 +521,9 @@ export default defineComponent({
           // if hovered series dataindex is not there
           // or check hovered time is not at the same index in the current chart (ie if at same index then not need to find nearest index)
           if (
-            !chart?.getOption()?.series[hoveredSeriesIndex]?.data[
-              hoveredSeriesDataIndex
-            ] ||
-            chart?.getOption()?.series[hoveredSeriesIndex]?.data[
-              hoveredSeriesDataIndex
-            ][0] != hoveredSeriesState.value?.hoveredTime
+            !chart?.getOption()?.series[hoveredSeriesIndex]?.data[hoveredSeriesDataIndex] ||
+            chart?.getOption()?.series[hoveredSeriesIndex]?.data[hoveredSeriesDataIndex][0] !=
+              hoveredSeriesState.value?.hoveredTime
           ) {
             hoveredSeriesDataIndex = findNearestIndex(
               chart?.getOption()?.series[hoveredSeriesIndex]?.data ?? [],
@@ -639,25 +567,25 @@ export default defineComponent({
         cleanupChart();
         chart = echarts.init(chartRef.value, theme, {
           renderer: props.renderType,
+          devicePixelRatio: window.devicePixelRatio || 1,
         });
         const options = props.data.options || {};
 
         // change color and background color of tooltip
         options.tooltip &&
           options.tooltip.textStyle &&
-          (options.tooltip.textStyle.color =
-            theme === "dark" ? "#fff" : "#000");
-        options.tooltip &&
-          (options.tooltip.backgroundColor =
-            theme === "dark" ? "rgba(0,0,0,1)" : "rgba(255,255,255,1)");
+          (options.tooltip.textStyle.color = chartColor("--color-tooltip-text"));
+        if (options.tooltip) {
+          options.tooltip.backgroundColor = chartColor("--color-tooltip-bg");
+          options.tooltip.borderColor = chartColor("--color-tooltip-border");
+          options.tooltip.borderWidth = 1;
+        }
         options.animation = false;
         try {
           // Use notMerge flag from data prop if available, otherwise default to true
-          const notMerge =
-            props.data?.notMerge !== undefined ? props.data.notMerge : true;
-          const lazyUpdate =
-            props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
-          chart?.setOption(options, { lazyUpdate, notMerge });
+          const notMerge = props.data?.notMerge !== undefined ? props.data.notMerge : true;
+          const lazyUpdate = props.data?.lazyUpdate !== undefined ? props.data.lazyUpdate : true;
+          chart?.setOption(withChartFont(options), { lazyUpdate, notMerge });
           chart?.setOption({ animation: true }, { lazyUpdate: true });
         } catch (e: any) {
           emit("error", {
@@ -670,6 +598,39 @@ export default defineComponent({
       },
     );
 
+    // Repairs a chart that ECharts initialized while the element had no
+    // layout size (e.g. mounted mid-splitter/flex settle). In that state
+    // ECharts creates zero-width canvas layers but may still record the
+    // final element size internally, so a plain chart.resize() no-ops as
+    // "unchanged" and the chart stays invisible forever. A full re-init on
+    // the first real size is the only reliable repair.
+    let zeroSizeReinitObserver: ResizeObserver | null = null;
+    const reinitWhenSized = () => {
+      if (!chartRef.value || zeroSizeReinitObserver) return;
+      zeroSizeReinitObserver = new ResizeObserver(() => {
+        if (!chartRef.value) {
+          zeroSizeReinitObserver?.disconnect();
+          zeroSizeReinitObserver = null;
+          return;
+        }
+        if (chartRef.value.clientWidth > 0 && chartRef.value.clientHeight > 0) {
+          zeroSizeReinitObserver?.disconnect();
+          zeroSizeReinitObserver = null;
+          const theme = isDark.value ? "dark" : "light";
+          cleanupChart();
+          chart = echarts.init(chartRef.value, theme, {
+            renderer: props.renderType,
+          });
+          chart?.setOption(withChartFont(props?.data?.options || {}), {
+            lazyUpdate: true,
+            notMerge: true,
+          });
+          chartInitialSetUp();
+        }
+      });
+      zeroSizeReinitObserver.observe(chartRef.value);
+    };
+
     onMounted(async () => {
       try {
         await nextTick();
@@ -679,14 +640,17 @@ export default defineComponent({
         await nextTick();
         await nextTick();
         await nextTick();
-        const theme = store.state.theme === "dark" ? "dark" : "light";
+        const theme = isDark.value ? "dark" : "light";
         if (chartRef.value) {
           cleanupChart();
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
+          if (chartRef.value.clientWidth === 0 || chartRef.value.clientHeight === 0) {
+            reinitWhenSized();
+          }
         }
-        chart?.setOption(props?.data?.options || {}, {
+        chart?.setOption(withChartFont(props?.data?.options || {}), {
           lazyUpdate: true,
           notMerge: true,
         });
@@ -702,6 +666,10 @@ export default defineComponent({
       // Clean up event listeners
       window.removeEventListener("resize", windowResizeEventCallback);
 
+      // Clean up the zero-size re-init observer
+      zeroSizeReinitObserver?.disconnect();
+      zeroSizeReinitObserver = null;
+
       // Cancel throttled functions
       throttledSetHoveredSeriesName.cancel();
       throttledSetHoveredSeriesIndex.cancel();
@@ -709,13 +677,6 @@ export default defineComponent({
       // Clean up chart instance
       chart?.dispose();
       chart = null;
-
-      // Clean up intersection observer
-      if (chartRef.value && isChartVisibleObserver) {
-        isChartVisibleObserver.unobserve(chartRef.value);
-        isChartVisibleObserver.disconnect();
-        isChartVisibleObserver = null;
-      }
 
       // Clear chart reference
       if (chartRef.value) {
@@ -750,11 +711,9 @@ export default defineComponent({
     });
 
     onUnmounted(() => {
-      if (chartRef.value) {
-        // unobserve chart
-        isChartVisibleObserver?.unobserve(chartRef.value);
-        isChartVisibleObserver?.disconnect();
-      }
+      // Never guard on chartRef: Vue nulls template refs before unmounted hooks run.
+      isChartVisibleObserver?.disconnect();
+      isChartVisibleObserver = null;
 
       cleanupChart();
     });
@@ -769,14 +728,14 @@ export default defineComponent({
         await nextTick();
         await nextTick();
         await nextTick();
-        const theme = store.state.theme === "dark" ? "dark" : "light";
+        const theme = isDark.value ? "dark" : "light";
         if (chartRef.value) {
           cleanupChart();
           chart = echarts.init(chartRef.value, theme, {
             renderer: props.renderType,
           });
         }
-        chart?.setOption(props?.data?.options || {}, {
+        chart?.setOption(withChartFont(props?.data?.options || {}), {
           lazyUpdate: true,
           notMerge: true,
         });
@@ -821,7 +780,7 @@ export default defineComponent({
           await nextTick();
           chart?.resize();
           try {
-            chart?.setOption(props?.data?.options || {}, {
+            chart?.setOption(withChartFont(props?.data?.options || {}), {
               lazyUpdate: true,
               notMerge: true,
             });
@@ -848,36 +807,34 @@ export default defineComponent({
       },
       { deep: true },
     );
-    return { chartRef, hoveredSeriesState, handleNativeContextMenu };
+    return {
+      chartRef,
+      hoveredSeriesState,
+      handleNativeContextMenu,
+      get chart() {
+        return chart;
+      },
+    };
   },
 });
 </script>
 
-<style>
-/**
- * Print mode styles for ECharts
- *
- * These styles must be unscoped (global) to override ECharts' inline styles.
- * ECharts sets fixed pixel dimensions via inline styles (e.g., width: 740px),
- * which causes charts to overflow their containers in print mode when GridStack
- * scales panels down to fit the page.
- *
- * The !important declarations override inline styles, forcing both the chart
- * wrapper div and canvas elements to scale to 100% of their container size.
- * This ensures charts fit properly when printing, regardless of their original
- * render dimensions.
- */
+<style scoped>
+/* keep(lib-override:echarts): print-only overrides for ECharts' inline pixel
+   dimensions, which it writes onto its own DOM, so charts scale to their container when
+   GridStack shrinks panels to fit the printed page. Targets ECharts-generated
+   DOM (wrapper div / canvas / svg) that utilities can't reach. */
 @media print {
   /* Clip the ECharts wrapper to prevent chart overflow but don't scale */
-  .chart-container > div[style*="position: relative"] {
+  .chart-container > :deep(div[style*="position: relative"]) {
     overflow: hidden !important;
     max-width: 100% !important;
     max-height: 100% !important;
   }
 
   /* Prevent canvas from exceeding container size without scaling */
-  .chart-container canvas,
-  .chart-container svg {
+  .chart-container :deep(canvas),
+  .chart-container :deep(svg) {
     max-width: 100% !important;
     max-height: 100% !important;
     object-fit: contain !important;

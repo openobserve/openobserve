@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,16 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <base-import
+  <BaseImport
     ref="baseImportRef"
-    title="Import Semantic Groups"
+    :title="t('correlation.importSemanticGroups.title')"
     test-prefix="semantic-groups"
     :is-importing="isImporting"
     :show-splitter="false"
-    :editor-heights="{
-      urlEditor: 'calc(100vh - 286px)',
-      fileEditor: 'calc(100vh - 308px)',
-    }"
+    container-class="h-[calc(100vh-var(--navbar-height))]!"
     @back="handleBack"
     @cancel="handleBack"
     @import="handleImport"
@@ -32,26 +29,24 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Full-width content for diff view -->
     <template #full-width-content>
-      <div class="import-semantic-groups-container">
+      <div class="flex h-full min-h-0 w-full flex-1 flex-col overflow-hidden p-2">
         <!-- Compact Header with File Upload -->
-        <div class="card-container q-pa-sm q-mb-sm">
-          <div class="row items-center">
-            <div class="col-12 col-md-8">
-              <q-file
+        <div class="bg-card-glass-bg mb-2 p-2">
+          <div class="flex items-center">
+            <div class="col-md-8 w-full">
+              <OFile
                 v-model="jsonFile"
-                dense
-                filled
-                label="Select JSON file"
+                :label="t('correlation.importSemanticGroups.selectJsonFile')"
                 accept=".json"
                 @update:model-value="loadFile"
                 data-test="semantic-groups-import-file"
                 class="compact-file-input"
               >
                 <template v-slot:prepend>
-                  <q-icon name="cloud_upload" size="sm" />
+                  <OIcon name="cloud-upload" size="sm" />
                 </template>
                 <template v-slot:append>
-                  <q-icon
+                  <OIcon
                     v-if="jsonFile"
                     name="close"
                     size="sm"
@@ -59,303 +54,308 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="cursor-pointer"
                   />
                 </template>
-              </q-file>
+              </OFile>
             </div>
-            <div class="col-12 col-md-4 text-right q-pl-sm">
-              <q-btn
+            <div class="col-md-4 w-full ps-2 text-right">
+              <OButton
                 v-if="diffData"
-                label="Apply Changes"
-                color="primary"
+                variant="primary"
+                size="sm"
                 @click="applyChanges"
                 :disable="!hasSelectedChanges"
                 :loading="isApplying"
-                size="sm"
-                no-caps
-              />
+                >{{ t("correlation.importSemanticGroups.applyChanges") }}</OButton
+              >
             </div>
           </div>
         </div>
 
         <!-- Diff Preview Section with Scrollable Content -->
-        <div v-if="diffData" class="diff-container">
+        <div v-if="diffData" class="flex h-full flex-col overflow-hidden">
           <!-- Compact Summary Bar -->
-          <div class="card-container q-pa-sm q-mb-sm">
-            <div class="row items-center q-col-gutter-sm">
+          <div class="bg-card-glass-bg mb-2 p-2">
+            <div class="flex items-center gap-2">
               <div class="col-auto">
-                <q-chip dense color="positive" text-color="white" class="summary-chip">
-                  <strong>{{ diffData.additions.length }}</strong>&nbsp;New
-                </q-chip>
+                <OTag type="diffCategory" value="new" class="text-sm!">
+                  <strong class="text-sm">{{ diffData.additions.length }}</strong
+                  >&nbsp;{{ t("correlation.importSemanticGroups.new") }}
+                </OTag>
               </div>
               <div class="col-auto">
-                <q-chip dense color="warning" text-color="white" class="summary-chip">
-                  <strong>{{ diffData.modifications.length }}</strong>&nbsp;Modified
-                </q-chip>
+                <OTag type="diffCategory" value="modified" class="text-sm!">
+                  <strong class="text-sm">{{ diffData.modifications.length }}</strong
+                  >&nbsp;{{ t("correlation.importSemanticGroups.modified") }}
+                </OTag>
               </div>
               <div class="col-auto">
-                <q-chip dense color="grey-6" text-color="white" class="summary-chip">
-                  {{ diffData.unchanged.length }} Unchanged
-                </q-chip>
+                <OTag type="diffCategory" value="unchanged" class="text-sm!">
+                  {{ diffData.unchanged.length }}
+                  {{ t("correlation.importSemanticGroups.unchanged") }}
+                </OTag>
               </div>
-              <div class="col">
-                <q-btn-group flat class="float-right">
-                  <q-btn
-                    flat
-                    dense
-                    label="Select All New"
-                    @click="selectAllAdditions"
-                    color="positive"
-                    size="sm"
-                    class="action-btn"
-                  />
-                  <q-btn
-                    flat
-                    dense
-                    label="Select All Modified"
-                    @click="selectAllModifications"
-                    color="warning"
-                    size="sm"
-                    class="action-btn"
-                  />
-                  <q-btn
-                    flat
-                    dense
-                    label="Clear All"
-                    @click="deselectAll"
-                    color="grey-7"
-                    size="sm"
-                    class="action-btn"
-                  />
-                </q-btn-group>
+              <div class="flex flex-col">
+                <OButtonGroup class="float-right">
+                  <OButton variant="ghost-primary" size="xs" @click="selectAllAdditions">{{
+                    t("correlation.importSemanticGroups.selectAllNew")
+                  }}</OButton>
+                  <OButton variant="ghost-warning" size="xs" @click="selectAllModifications">{{
+                    t("correlation.importSemanticGroups.selectAllModified")
+                  }}</OButton>
+                  <OButton variant="ghost-muted" size="xs" @click="deselectAll">{{
+                    t("correlation.importSemanticGroups.clearAll")
+                  }}</OButton>
+                </OButtonGroup>
               </div>
             </div>
           </div>
 
           <!-- Scrollable Groups Container -->
-          <div class="card-container groups-scroll-container">
+          <div
+            class="bg-card-glass-bg groups-scroll-container flex-1 overflow-x-hidden overflow-y-auto p-2"
+          >
             <!-- Additions -->
-            <div v-if="diffData.additions.length > 0" class="q-mb-sm">
-              <div class="section-header text-positive q-pa-xs">
-                <q-icon name="add_circle" size="sm" />
-                New ({{ selectedAdditions.length }}/{{ diffData.additions.length }})
+            <div v-if="diffData.additions.length > 0" class="mb-2">
+              <div
+                class="border-separator text-status-positive mb-1 border-b p-1 text-sm font-semibold"
+              >
+                <OIcon name="add-circle" size="sm" />
+                {{ t("correlation.importSemanticGroups.new") }} ({{ selectedAdditions.length }}/{{
+                  diffData.additions.length
+                }})
               </div>
-              <q-list dense bordered separator class="compact-list">
-                <q-item
+              <ul class="divide-border rounded-default mb-0 flex flex-col divide-y border">
+                <li
                   v-for="group in diffData.additions"
                   :key="group.id"
-                  dense
-                  clickable
+                  data-test="semantic-groups-addition-item"
+                  class="compact-item hover:bg-muted/50 flex min-h-11 cursor-pointer items-start gap-2 px-2 py-1"
                   @click="toggleAddition(group.id)"
-                  class="compact-item"
                 >
-                  <q-item-section side top>
-                    <q-checkbox
-                      dense
+                  <div class="flex shrink-0 items-start pt-1">
+                    <OCheckbox
                       :model-value="selectedAdditions.includes(group.id)"
                       @update:model-value="toggleAddition(group.id)"
-                      color="positive"
-                      size="xs"
                     />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label class="text-weight-medium">{{ group.display }}</q-item-label>
-                    <q-item-label caption lines="1">
-                      {{ group.id }} • {{ group.fields.length }} fields
-                      <q-badge v-if="group.normalize" color="blue" label="norm" class="q-ml-xs" />
-                    </q-item-label>
-                  </q-item-section>
-                  <q-item-section side>
-                    <q-btn
-                      flat
-                      dense
-                      round
-                      icon="visibility"
-                      size="xs"
-                      @click.stop="viewGroup(group)"
-                    />
-                  </q-item-section>
-                </q-item>
-              </q-list>
+                  </div>
+                  <div class="flex min-w-0 flex-1 flex-col px-2">
+                    <span class="text-compact font-medium">{{ group.display }}</span>
+                    <span class="text-2xs text-muted-foreground block truncate">
+                      {{ group.id }} • {{ group.fields.length }}
+                      {{ t("correlation.importSemanticGroups.fields") }}
+                      <OTag
+                        v-if="group.normalize"
+                        type="normalizeState"
+                        value="true"
+                        class="ms-1"
+                      />
+                    </span>
+                  </div>
+                  <div class="ms-auto flex shrink-0 items-center">
+                    <OButton variant="ghost" size="icon-circle-sm" @click.stop="viewGroup(group)">
+                      <OIcon name="visibility" size="sm" />
+                    </OButton>
+                  </div>
+                </li>
+              </ul>
             </div>
 
             <!-- Modifications -->
-            <div v-if="diffData.modifications.length > 0" class="q-mb-sm">
-              <div class="section-header text-warning q-pa-xs">
-                <q-icon name="edit" size="sm" />
-                Modified ({{ selectedModifications.length }}/{{ diffData.modifications.length }})
+            <div v-if="diffData.modifications.length > 0" class="mb-2">
+              <div
+                class="border-separator text-status-warning-text mb-1 border-b p-1 text-sm font-semibold"
+              >
+                <OIcon name="edit" size="sm" />
+                {{ t("correlation.importSemanticGroups.modified") }} ({{
+                  selectedModifications.length
+                }}/{{ diffData.modifications.length }})
               </div>
-              <q-list dense bordered separator class="compact-list">
-                <q-item
+              <ul class="divide-border rounded-default mb-0 flex flex-col divide-y border">
+                <li
                   v-for="mod in diffData.modifications"
                   :key="mod.proposed.id"
-                  dense
-                  clickable
+                  data-test="semantic-groups-modification-item"
+                  class="compact-item hover:bg-muted/50 flex min-h-11 cursor-pointer items-start gap-2 px-2 py-1"
                   @click="toggleModification(mod.proposed.id)"
-                  class="compact-item"
                 >
-                  <q-item-section side top>
-                    <q-checkbox
-                      dense
+                  <div class="flex shrink-0 items-start pt-1">
+                    <OCheckbox
                       :model-value="selectedModifications.includes(mod.proposed.id)"
                       @update:model-value="toggleModification(mod.proposed.id)"
-                      color="warning"
-                      size="xs"
                     />
-                  </q-item-section>
-                  <q-item-section>
-                    <q-item-label class="text-weight-medium">{{ mod.proposed.display }}</q-item-label>
-                    <q-item-label caption lines="1">
-                      {{ mod.proposed.id }} • {{ mod.current.fields.length }} → {{ mod.proposed.fields.length }} fields
-                    </q-item-label>
-                  </q-item-section>
-                  <q-item-section side>
-                    <q-btn
-                      flat
-                      dense
-                      round
-                      icon="compare"
-                      size="xs"
+                  </div>
+                  <div class="flex min-w-0 flex-1 flex-col px-2">
+                    <span class="text-compact font-medium">{{ mod.proposed.display }}</span>
+                    <span class="text-2xs text-muted-foreground block truncate">
+                      {{ mod.proposed.id }} • {{ mod.current.fields.length }}
+                      {{ t("correlation.importSemanticGroups.fieldsChangeArrow") }}
+                      {{ mod.proposed.fields.length }}
+                      {{ t("correlation.importSemanticGroups.fields") }}
+                    </span>
+                  </div>
+                  <div class="ms-auto flex shrink-0 items-center">
+                    <OButton
+                      variant="ghost"
+                      size="icon-circle-sm"
                       @click.stop="viewModification(mod)"
-                    />
-                  </q-item-section>
-                </q-item>
-              </q-list>
+                    >
+                      <OIcon name="compare" size="sm" />
+                    </OButton>
+                  </div>
+                </li>
+              </ul>
             </div>
 
             <!-- Unchanged (Collapsed) -->
             <div v-if="diffData.unchanged.length > 0">
-              <q-expansion-item
-                dense
-                :label="`Unchanged (${diffData.unchanged.length})`"
-                icon="check_circle"
-                header-class="text-grey-7 q-pa-xs"
+              <OCollapsible
+                v-model="unchangedOpen"
+                :label="t('common.unchangedCount', { count: diffData.unchanged.length })"
+                icon="check-circle"
               >
-                <q-list dense bordered separator class="compact-list">
-                  <q-item
+                <ul class="divide-border rounded-default mb-0 flex flex-col divide-y border">
+                  <li
                     v-for="group in diffData.unchanged"
                     :key="group.id"
-                    dense
-                    class="compact-item"
+                    class="compact-item flex min-h-11 items-center gap-2 px-2 py-1"
                   >
-                    <q-item-section>
-                      <q-item-label>{{ group.display }}</q-item-label>
-                      <q-item-label caption>{{ group.id }} • {{ group.fields.length }} fields</q-item-label>
-                    </q-item-section>
-                  </q-item>
-                </q-list>
-              </q-expansion-item>
+                    <div class="flex min-w-0 flex-1 flex-col px-2">
+                      <span class="text-compact">{{ group.display }}</span>
+                      <span class="text-2xs text-muted-foreground block"
+                        >{{ group.id }} • {{ group.fields.length }}
+                        {{ t("correlation.importSemanticGroups.fields") }}</span
+                      >
+                    </div>
+                  </li>
+                </ul>
+              </OCollapsible>
             </div>
           </div>
         </div>
 
         <!-- No Diff State -->
-        <div v-else-if="!isImporting && !diffData" class="card-container q-pa-lg text-center">
-          <q-icon name="cloud_upload" size="64px" color="grey-5" class="q-mb-md" />
-          <div class="text-h6 text-grey-7 q-mb-sm">Upload a JSON file to get started</div>
-          <div class="text-body2 text-grey-6">
-            The system will analyze the file and show you what will change
+        <div v-else-if="!isImporting && !diffData" class="bg-card-glass-bg p-4 text-center">
+          <OIcon name="cloud-upload" class="mb-3 size-16!" />
+          <div class="text-text-muted mb-2 text-xl font-semibold">
+            {{ t("correlation.importSemanticGroups.uploadPrompt") }}
+          </div>
+          <div class="text-text-secondary text-sm">
+            {{ t("correlation.importSemanticGroups.uploadHint") }}
           </div>
         </div>
       </div>
     </template>
-  </base-import>
+  </BaseImport>
 
   <!-- Group Details Dialog -->
-  <q-dialog v-model="showGroupDialog">
-    <q-card style="min-width: 500px">
-      <q-card-section>
-        <div class="text-h6">{{ selectedGroup?.display }}</div>
-        <div class="text-caption text-grey-7">ID: {{ selectedGroup?.id }}</div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section>
-        <div class="text-subtitle2 q-mb-sm">Fields ({{ selectedGroup?.fields.length }})</div>
-        <q-chip
-          v-for="field in selectedGroup?.fields"
-          :key="field"
-          dense
-          color="primary"
-          text-color="white"
-          class="q-ma-xs"
-        >
-          {{ field }}
-        </q-chip>
-        <div class="q-mt-md">
-          <q-badge v-if="selectedGroup?.normalize" color="blue" label="Normalized" />
-          <q-badge v-else color="grey" label="Not Normalized" />
-        </div>
-      </q-card-section>
-
-      <q-card-actions align="right">
-        <q-btn flat label="Close" color="primary" v-close-popup />
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+  <ODialog
+    data-test="import-semantic-groups-group-dialog"
+    v-model:open="showGroupDialog"
+    size="md"
+    :title="raw(selectedGroup?.display)"
+    :sub-title="t('common.idPrefix', { id: selectedGroup?.id })"
+    :primary-button-label="t('common.close')"
+    @click:primary="showGroupDialog = false"
+  >
+    <div>
+      <div class="mb-2 text-sm font-medium">
+        {{ t("correlation.importSemanticGroups.fieldsHeading") }} ({{
+          selectedGroup?.fields.length
+        }})
+      </div>
+      <OTag
+        v-for="field in selectedGroup?.fields"
+        :key="field"
+        type="fieldNameChip"
+        value="highlight"
+        class="m-1"
+      >
+        {{ field }}
+      </OTag>
+      <div class="mt-3">
+        <OTag type="normalizeState" :value="!!selectedGroup?.normalize" />
+      </div>
+    </div>
+  </ODialog>
 
   <!-- Modification Comparison Dialog -->
-  <q-dialog v-model="showModificationDialog">
-    <q-card style="min-width: 700px">
-      <q-card-section>
-        <div class="text-h6">{{ selectedModification?.proposed.display }}</div>
-        <div class="text-caption text-grey-7">Compare Changes</div>
-      </q-card-section>
-
-      <q-separator />
-
-      <q-card-section>
-        <div class="row q-col-gutter-md">
-          <div class="col-6">
-            <div class="text-subtitle2 text-negative q-mb-sm">Current</div>
-            <div class="text-caption q-mb-xs">{{ selectedModification?.current.fields.length }} fields</div>
-            <div class="field-chips-container">
-              <q-chip
-                v-for="field in selectedModification?.current.fields"
-                :key="`current-${field}`"
-                dense
-                color="grey-4"
-                size="sm"
-                class="q-ma-xs"
-              >
-                {{ field }}
-              </q-chip>
-            </div>
-          </div>
-          <div class="col-6">
-            <div class="text-subtitle2 text-positive q-mb-sm">Proposed</div>
-            <div class="text-caption q-mb-xs">{{ selectedModification?.proposed.fields.length }} fields</div>
-            <div class="field-chips-container">
-              <q-chip
-                v-for="field in selectedModification?.proposed.fields"
-                :key="`proposed-${field}`"
-                dense
-                :color="isNewField(field) ? 'positive' : 'grey-4'"
-                :text-color="isNewField(field) ? 'white' : 'black'"
-                size="sm"
-                class="q-ma-xs"
-              >
-                {{ field }}
-                <q-icon v-if="isNewField(field)" name="add" size="xs" class="q-ml-xs" />
-              </q-chip>
-            </div>
-          </div>
+  <ODialog
+    data-test="import-semantic-groups-modification-dialog"
+    v-model:open="showModificationDialog"
+    size="lg"
+    :title="raw(selectedModification?.proposed.display)"
+    :sub-title="t('correlation.importSemanticGroups.compareChanges')"
+    :primary-button-label="t('common.close')"
+    @click:primary="showModificationDialog = false"
+  >
+    <div class="flex gap-3">
+      <div class="w-1/2">
+        <div class="text-status-error-text mb-2 text-sm font-medium">
+          {{ t("correlation.importSemanticGroups.current") }}
         </div>
-      </q-card-section>
-
-      <q-card-actions align="right">
-        <q-btn flat label="Close" color="primary" v-close-popup />
-      </q-card-actions>
-    </q-card>
-  </q-dialog>
+        <div class="mb-1 text-xs">
+          {{ selectedModification?.current.fields.length }}
+          {{ t("correlation.importSemanticGroups.fields") }}
+        </div>
+        <div
+          class="field-chips-container bg-surface-base rounded-default max-h-62.5 overflow-y-auto p-2"
+        >
+          <OTag
+            v-for="field in selectedModification?.current.fields"
+            :key="`current-${field}`"
+            type="fieldNameChip"
+            value="muted"
+            class="m-1"
+          >
+            {{ field }}
+          </OTag>
+        </div>
+      </div>
+      <div class="w-1/2">
+        <div class="text-status-positive mb-2 text-sm font-medium">
+          {{ t("correlation.importSemanticGroups.proposed") }}
+        </div>
+        <div class="mb-1 text-xs">
+          {{ selectedModification?.proposed.fields.length }}
+          {{ t("correlation.importSemanticGroups.fields") }}
+        </div>
+        <div
+          class="field-chips-container bg-surface-base rounded-default max-h-62.5 overflow-y-auto p-2"
+        >
+          <OTag
+            v-for="field in selectedModification?.proposed.fields"
+            :key="`proposed-${field}`"
+            type="fieldDiffStatus"
+            :value="isNewField(field) ? 'new' : 'existing'"
+            class="m-1"
+          >
+            {{ field }}
+            <template #trailing>
+              <OIcon v-if="isNewField(field)" name="add" size="xs" class="ms-1" />
+            </template>
+          </OTag>
+        </div>
+      </div>
+    </div>
+  </ODialog>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OCollapsible from "@/lib/core/Collapsible/OCollapsible.vue";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OFile from "@/lib/forms/File/OFile.vue";
+import type { FileValue } from "@/lib/forms/File/OFile.types";
 import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
 import BaseImport from "@/components/common/BaseImport.vue";
 import alertsService from "@/services/alerts";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { raw, useI18nTyped } from "@/types/i18n";
 
 interface SemanticGroup {
   id: string;
@@ -375,8 +375,8 @@ interface SemanticGroupDiff {
   unchanged: SemanticGroup[];
 }
 
+const { t } = useI18nTyped();
 const router = useRouter();
-const q = useQuasar();
 const store = useStore();
 
 const jsonFile = ref<File | null>(null);
@@ -385,6 +385,7 @@ const diffData = ref<SemanticGroupDiff | null>(null);
 const selectedAdditions = ref<string[]>([]);
 const selectedModifications = ref<string[]>([]);
 const isImporting = ref(false);
+const unchangedOpen = ref(false);
 const isApplying = ref(false);
 const showGroupDialog = ref(false);
 const showModificationDialog = ref(false);
@@ -395,7 +396,9 @@ const hasSelectedChanges = computed(() => {
   return selectedAdditions.value.length > 0 || selectedModifications.value.length > 0;
 });
 
-const loadFile = async (file: File | null) => {
+const loadFile = async (value: FileValue) => {
+  // Single-file input; take the first file when the model yields an array.
+  const file = Array.isArray(value) ? value[0] : value;
   if (!file) return;
 
   isImporting.value = true;
@@ -407,18 +410,16 @@ const loadFile = async (file: File | null) => {
     // Validate groups
     for (const group of groups) {
       if (!group.id || !group.display || !Array.isArray(group.fields)) {
-        throw new Error("Invalid semantic group format");
+        throw new Error(t("alerts.import.invalidSemanticGroupFormat"));
       }
     }
 
     importedGroups.value = groups;
     await previewDiff(groups);
   } catch (error: any) {
-    q.notify({
-      message: `Failed to parse JSON: ${error.message}`,
-      color: "negative",
-      position: "bottom",
-      timeout: 3000,
+    toast({
+      message: t("toastMessages.alerts.failedToParseJson", { error: error.message }),
+      variant: "error",
     });
     clearFile();
   } finally {
@@ -442,25 +443,27 @@ const previewDiff = async (groups: SemanticGroup[]) => {
 
     // Auto-select all additions and modifications
     selectedAdditions.value = response.data.additions.map((g: SemanticGroup) => g.id);
-    selectedModifications.value = response.data.modifications.map((m: SemanticGroupModification) => m.proposed.id);
+    selectedModifications.value = response.data.modifications.map(
+      (m: SemanticGroupModification) => m.proposed.id,
+    );
   } catch (error: any) {
-    q.notify({
-      message: `Failed to preview changes: ${error.response?.data?.error || error.message}`,
-      color: "negative",
-      position: "bottom",
-      timeout: 3000,
+    toast({
+      message: t("toastMessages.alerts.failedToPreviewChanges", {
+        error: error.response?.data?.error || error.message,
+      }),
+      variant: "error",
     });
   }
 };
 
 const selectAllAdditions = () => {
   if (!diffData.value) return;
-  selectedAdditions.value = diffData.value.additions.map(g => g.id);
+  selectedAdditions.value = diffData.value.additions.map((g) => g.id);
 };
 
 const selectAllModifications = () => {
   if (!diffData.value) return;
-  selectedModifications.value = diffData.value.modifications.map(m => m.proposed.id);
+  selectedModifications.value = diffData.value.modifications.map((m) => m.proposed.id);
 };
 
 const deselectAll = () => {
@@ -510,15 +513,15 @@ const applyChanges = async () => {
     const finalGroups: SemanticGroup[] = [];
 
     // Add selected additions
-    const selectedAdditionGroups = diffData.value.additions.filter(g =>
-      selectedAdditions.value.includes(g.id)
+    const selectedAdditionGroups = diffData.value.additions.filter((g) =>
+      selectedAdditions.value.includes(g.id),
     );
     finalGroups.push(...selectedAdditionGroups);
 
     // Add selected modifications
     const selectedModificationGroups = diffData.value.modifications
-      .filter(m => selectedModifications.value.includes(m.proposed.id))
-      .map(m => m.proposed);
+      .filter((m) => selectedModifications.value.includes(m.proposed.id))
+      .map((m) => m.proposed);
     finalGroups.push(...selectedModificationGroups);
 
     // Add unchanged groups
@@ -526,29 +529,29 @@ const applyChanges = async () => {
 
     // Add unselected current groups (keep them as-is)
     const unselectedModifications = diffData.value.modifications
-      .filter(m => !selectedModifications.value.includes(m.proposed.id))
-      .map(m => m.current);
+      .filter((m) => !selectedModifications.value.includes(m.proposed.id))
+      .map((m) => m.current);
     finalGroups.push(...unselectedModifications);
 
     // Save to backend
     const org = store.state.selectedOrganization.identifier;
     await alertsService.saveSemanticGroups(org, finalGroups);
 
-    q.notify({
-      message: `Successfully applied ${selectedAdditions.value.length + selectedModifications.value.length} changes`,
-      color: "positive",
-      position: "bottom",
-      timeout: 3000,
+    toast({
+      message: t("toastMessages.alerts.successfullyAppliedChanges", {
+        count: selectedAdditions.value.length + selectedModifications.value.length,
+      }),
+      variant: "success",
     });
 
     // Go back
     handleBack();
   } catch (error: any) {
-    q.notify({
-      message: `Failed to save changes: ${error.response?.data?.error || error.message}`,
-      color: "negative",
-      position: "bottom",
-      timeout: 3000,
+    toast({
+      message: t("toastMessages.alerts.failedToSaveChanges", {
+        error: error.response?.data?.error || error.message,
+      }),
+      variant: "error",
     });
   } finally {
     isApplying.value = false;
@@ -563,125 +566,60 @@ const handleImport = () => {
   // This is handled by the file upload
 };
 
-const handleJsonUpdate = (jsonArray: any[]) => {
-  // Not used in this component since we handle file upload directly
+const handleJsonUpdate = async (jsonArray: any[]) => {
+  if (!jsonArray || jsonArray.length === 0) return;
+
+  isImporting.value = true;
+  try {
+    // Validate groups
+    for (const group of jsonArray) {
+      if (!group.id || !group.display || !Array.isArray(group.fields)) {
+        throw new Error(t("alerts.import.invalidSemanticGroupFormat"));
+      }
+    }
+
+    importedGroups.value = jsonArray;
+    await previewDiff(jsonArray);
+  } catch (error: any) {
+    toast({
+      message: t("toastMessages.alerts.invalidJson", { error: error.message }),
+      variant: "error",
+    });
+  } finally {
+    isImporting.value = false;
+  }
 };
 </script>
 
-<style lang="scss" scoped>
-.import-semantic-groups-container {
-  width: 100%;
-  padding: 8px;
-  height: calc(100vh - 140px);
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+<style scoped>
+/* keep(scrollbar): ::-webkit-scrollbar pseudo-elements aren't expressible as utilities */
+.groups-scroll-container::-webkit-scrollbar {
+  width: 0.5rem;
 }
 
-.compact-file-input {
-  :deep(.q-field__control) {
-    min-height: 40px;
-  }
+.groups-scroll-container::-webkit-scrollbar-track {
+  background: var(--color-surface-base);
 }
 
-.diff-container {
-  display: flex;
-  flex-direction: column;
-  height: 100%;
-  overflow: hidden;
+.groups-scroll-container::-webkit-scrollbar-thumb {
+  background: var(--color-accent);
+  border-radius: 0.25rem;
 }
 
-.groups-scroll-container {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  padding: 8px;
-
-  /* Custom scrollbar */
-  &::-webkit-scrollbar {
-    width: 8px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: var(--q-dark-page);
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--q-primary);
-    border-radius: 4px;
-  }
-
-  &::-webkit-scrollbar-thumb:hover {
-    background: var(--q-primary-dark);
-  }
+.groups-scroll-container::-webkit-scrollbar-thumb:hover {
+  background: var(--color-accent);
 }
 
-.section-header {
-  font-size: 14px;
-  font-weight: 600;
-  border-bottom: 1px solid var(--q-separator-color);
-  margin-bottom: 4px;
+.field-chips-container::-webkit-scrollbar {
+  width: 0.375rem;
 }
 
-.compact-list {
-  margin-bottom: 0;
+.field-chips-container::-webkit-scrollbar-track {
+  background: var(--color-surface-base);
 }
 
-.compact-item {
-  min-height: 44px;
-  padding: 4px 8px;
-
-  :deep(.q-item__section--main) {
-    padding: 0 8px;
-  }
-
-  :deep(.q-item__label) {
-    font-size: 13px;
-  }
-
-  :deep(.q-item__label--caption) {
-    font-size: 11px;
-  }
-}
-
-.field-chips-container {
-  max-height: 250px;
-  overflow-y: auto;
-  padding: 8px;
-  background: var(--q-dark);
-  border-radius: 4px;
-
-  &::-webkit-scrollbar {
-    width: 6px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: var(--q-dark-page);
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: var(--q-primary);
-    border-radius: 3px;
-  }
-}
-
-.summary-chip {
-  font-size: 14px !important;
-
-  :deep(.q-chip__content) {
-    padding: 6px 12px;
-    font-weight: 500;
-  }
-
-  :deep(strong) {
-    font-size: 15px;
-  }
-}
-
-.action-btn {
-  font-size: 13px !important;
-  min-height: 34px;
-  padding: 6px 14px;
-  font-weight: 500;
+.field-chips-container::-webkit-scrollbar-thumb {
+  background: var(--color-accent);
+  border-radius: 0.1875rem;
 }
 </style>

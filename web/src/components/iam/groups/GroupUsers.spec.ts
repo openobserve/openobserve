@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -16,16 +16,111 @@
 import { mount, flushPromises } from "@vue/test-utils";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import GroupUsers from "@/components/iam/groups/GroupUsers.vue";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Notify } from "quasar";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 
-// Enhanced store with required properties for GroupUsers component
+// ── Mock usePermissions composable ──────────────────────────────────
+vi.mock("@/composables/iam/usePermissions", () => ({
+  default: vi.fn(() => ({
+    usersState: {
+      users: [],
+      getOrgUsers: vi.fn(),
+    },
+  })),
+}));
+
+import usePermissions from "@/composables/iam/usePermissions";
+
+// ── O2 component stubs ──────────────────────────────────────────────
+// OTable stub renders the cell-select and empty slots so that
+// checkbox and NoData content is visible to tests.
+const o2Stubs = {
+  OTable: {
+    template: `
+      <div>
+        <template v-for="(row, idx) in data" :key="row[rowKey] || idx">
+          <slot name="cell-select" :row="row" />
+          <slot name="cell-email" :row="row" />
+          <slot name="cell-organization" :row="row" />
+        </template>
+        <slot v-if="!data || data.length === 0" name="empty" />
+      </div>
+    `,
+    props: [
+      "data",
+      "columns",
+      "rowKey",
+      "globalFilter",
+      "pagination",
+      "pageSize",
+      "sorting",
+      "filterMode",
+      "defaultColumns",
+      "showGlobalFilter",
+      "footerTitle",
+      "dense",
+    ],
+  },
+  OCheckbox: {
+    template: `<input type="checkbox" :data-test="dataTest" @click="$emit('update:model-value', !modelValue)" />`,
+    props: ["modelValue", "dataTest"],
+    emits: ["update:model-value"],
+  },
+  OInput: {
+    template: `<div><slot name="icon-left" /><input type="text" :placeholder="placeholder" :value="modelValue" @input="$emit('update:model-value', $event.target.value)" /></div>`,
+    props: ["modelValue", "placeholder"],
+    emits: ["update:model-value"],
+  },
+  OToggleGroup: {
+    template: `<div><slot /></div>`,
+    props: ["modelValue"],
+    emits: ["update:model-value"],
+  },
+  OToggleGroupItem: {
+    template: `<button :data-test="dataTest" @click="$emit('click')"><slot /></button>`,
+    props: ["value", "size", "dataTest"],
+  },
+  OSelect: {
+    template: `<select><option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option></select>`,
+    props: ["modelValue", "options", "labelKey", "valueKey", "searchable", "placeholder"],
+    emits: ["update:model-value"],
+  },
+  OIcon: {
+    template: `<span />`,
+    props: ["name", "size"],
+  },
+  OTooltip: {
+    template: `<div><slot /></div>`,
+    props: ["side"],
+  },
+  NoData: {
+    template: `<div data-test="iam-users-selection-table-no-data">No users added</div>`,
+    props: [],
+  },
+  OEmptyState: {
+    template: `<div data-test="iam-users-selection-table-no-data">No users</div>`,
+    props: ["size", "preset", "filtered", "hideAction"],
+    emits: ["action"],
+  },
+  OSearchInput: {
+    template: `<div><input type="text" :placeholder="placeholder" :value="modelValue" @input="$emit('update:model-value', $event.target.value)" /></div>`,
+    props: ["modelValue", "placeholder"],
+    emits: ["update:model-value"],
+  },
+};
+
+// ── Enhanced store with required properties for GroupUsers ──────────
+// The component accesses store.state.selectedOrganization.identifier,
+// store.state.organizations, store.state.userInfo.email, and
+// store.state.zoConfig.meta_org.
 const enhancedStore = {
   ...store,
   state: {
     ...store.state,
+    selectedOrganization: {
+      ...store.state.selectedOrganization,
+      identifier: "default",
+    },
     organizations: [
       {
         name: "TestOrg1",
@@ -36,8 +131,8 @@ const enhancedStore = {
         status: "active",
         CustomerBillingObj: {
           subscription_type: "premium",
-          note: "Test note"
-        }
+          note: "Test note",
+        },
       },
       {
         name: "TestOrg2",
@@ -48,42 +143,16 @@ const enhancedStore = {
         status: "active",
         CustomerBillingObj: {
           subscription_type: "basic",
-          note: "Another note"
-        }
-      }
+          note: "Another note",
+        },
+      },
     ],
     zoConfig: {
       ...store.state.zoConfig,
-      meta_org: "meta_org"
+      meta_org: "meta_org",
     },
-    theme: "light" // Set to light for consistent theme testing
-  }
-};
-
-installQuasar({
-  plugins: [Notify],
-});
-
-vi.mock("@/composables/iam/usePermissions", () => ({
-  default: vi.fn(() => ({
-    usersState: {
-      users: [],
-      getOrgUsers: vi.fn(),
-    },
-  })),
-}));
-
-vi.mock("@/components/AppTable.vue", () => ({
-  default: {
-    name: "AppTable",
-    template: `
-      <div data-test="app-table-mock">
-        <slot name="select" :column="{ row: { email: 'test@example.com', isInGroup: true } }"></slot>
-      </div>
-    `,
-    props: ["rows", "columns", "dense", "virtualScroll", "filter", "title"],
   },
-}));
+};
 
 describe("GroupUsers Component", () => {
   let wrapper: any;
@@ -111,7 +180,7 @@ describe("GroupUsers Component", () => {
       ]),
     };
 
-    vi.mocked(await import("@/composables/iam/usePermissions")).default.mockReturnValue({
+    vi.mocked(usePermissions).mockReturnValue({
       usersState: mockUsersState,
     });
 
@@ -119,6 +188,7 @@ describe("GroupUsers Component", () => {
       global: {
         provide: { store: enhancedStore },
         plugins: [i18n],
+        stubs: o2Stubs,
       },
       props: {
         groupUsers: ["user1@example.com", "admin@example.com"],
@@ -134,13 +204,12 @@ describe("GroupUsers Component", () => {
   describe("Component Mounting", () => {
     it("renders the component correctly", () => {
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('.col').exists()).toBe(true);
     });
 
     it("renders filter options", () => {
       const showToggle = wrapper.find('[data-test="iam-users-selection-show-toggle"]');
       const showText = wrapper.find('[data-test="iam-users-selection-show-text"]');
-      
+
       expect(showToggle.exists()).toBe(true);
       expect(showText.text()).toBe("Show");
     });
@@ -171,56 +240,59 @@ describe("GroupUsers Component", () => {
     it("renders filter buttons for each option", () => {
       const allButton = wrapper.find('[data-test="iam-users-selection-show-all-btn"]');
       const selectedButton = wrapper.find('[data-test="iam-users-selection-show-selected-btn"]');
-      
+
       expect(allButton.exists()).toBe(true);
       expect(selectedButton.exists()).toBe(true);
     });
 
-    it("switches display option when button is clicked", async () => {
-      const allButton = wrapper.find('[data-test="iam-users-selection-show-all-btn"]');
-      await allButton.trigger("click");
-      
+    it("switches display option via updateUserTable", async () => {
+      // updateUserTable is the public API that sets usersDisplay internally
+      await wrapper.vm.updateUserTable("all");
+
       expect(wrapper.vm.usersDisplay).toBe("all");
     });
   });
 
   describe("Organization Selection", () => {
     it("renders organization selector for meta org when showing all users", async () => {
-      // Set up store with meta org
       const metaStore = {
         ...enhancedStore,
         state: {
           ...enhancedStore.state,
-          selectedOrganization: { identifier: "meta_org" },
+          selectedOrganization: {
+            ...enhancedStore.state.selectedOrganization,
+            identifier: "meta_org",
+          },
           zoConfig: { ...enhancedStore.state.zoConfig, meta_org: "meta_org" },
           organizations: [
-            { 
-              name: "Org1", 
-              identifier: "org1", 
+            {
+              name: "Org1",
+              identifier: "org1",
               id: "1",
               ingest_threshold: 100,
               search_threshold: 50,
               status: "active",
-              CustomerBillingObj: { subscription_type: "basic", note: "" }
+              CustomerBillingObj: { subscription_type: "basic", note: "" },
             },
-            { 
-              name: "Org2", 
-              identifier: "org2", 
+            {
+              name: "Org2",
+              identifier: "org2",
               id: "2",
               ingest_threshold: 200,
               search_threshold: 100,
               status: "active",
-              CustomerBillingObj: { subscription_type: "premium", note: "Test" }
+              CustomerBillingObj: { subscription_type: "premium", note: "Test" },
             },
           ],
           userInfo: { email: "test@example.com" },
         },
       };
 
-      const wrapper = mount(GroupUsers, {
+      const wrapper2 = mount(GroupUsers, {
         global: {
           provide: { store: metaStore },
           plugins: [i18n],
+          stubs: o2Stubs,
         },
         props: {
           groupUsers: [],
@@ -230,16 +302,14 @@ describe("GroupUsers Component", () => {
         },
       });
 
-      wrapper.vm.usersDisplay = "all";
-      await flushPromises(); // Wait for component initialization
+      wrapper2.vm.usersDisplay = "all";
+      await flushPromises();
 
-      const orgSelect = wrapper.find('select, .organizationlist');
-      expect(wrapper.vm.selectedOrg).toBeDefined();
-      // Check that the orgOptions array has at least 3 items (All + 2 orgs)
-      expect(wrapper.vm.orgOptions).toHaveLength(3);
-      expect(wrapper.vm.orgOptions[0]).toEqual({ label: "All", value: "all" });
-      expect(wrapper.vm.orgOptions[1].label).toBe("Org1");
-      expect(wrapper.vm.orgOptions[2].label).toBe("Org2");
+      expect(wrapper2.vm.selectedOrg).toBeDefined();
+      expect(wrapper2.vm.orgOptions).toHaveLength(3);
+      expect(wrapper2.vm.orgOptions[0]).toEqual({ label: "All", value: "all" });
+      expect(wrapper2.vm.orgOptions[1].label).toBe("Org1");
+      expect(wrapper2.vm.orgOptions[2].label).toBe("Org2");
     });
 
     it("initializes organization options on mount", async () => {
@@ -248,23 +318,28 @@ describe("GroupUsers Component", () => {
         state: {
           ...store.state,
           organizations: [
-            { 
-              name: "TestOrg", 
-              identifier: "test-org", 
+            {
+              name: "TestOrg",
+              identifier: "test-org",
               id: "1",
               ingest_threshold: 100,
               search_threshold: 50,
-              status: "active"
+              status: "active",
             },
           ],
           userInfo: { email: "test@example.com" },
+          selectedOrganization: {
+            ...store.state.selectedOrganization,
+            identifier: "default",
+          },
         },
       };
 
-      const wrapper = mount(GroupUsers, {
+      const wrapper2 = mount(GroupUsers, {
         global: {
           provide: { store: metaStore },
           plugins: [i18n],
+          stubs: o2Stubs,
         },
         props: {
           groupUsers: [],
@@ -276,23 +351,8 @@ describe("GroupUsers Component", () => {
 
       await flushPromises();
 
-      expect(wrapper.vm.orgOptions).toHaveLength(2); // "All" + TestOrg
-      expect(wrapper.vm.orgOptions[1].label).toBe("TestOrg");
-    });
-
-    it("filters organizations alphabetically", () => {
-      const orgs = [
-        { label: "ZOrg", value: "z" },
-        { label: "AOrg", value: "a" },
-        { label: "MOrg", value: "m" },
-      ];
-
-      wrapper.vm.orgList = orgs;
-      const mockUpdate = vi.fn();
-
-      wrapper.vm.filterOrganizations("", mockUpdate);
-
-      expect(mockUpdate).toHaveBeenCalledWith(expect.any(Function));
+      expect(wrapper2.vm.orgOptions).toHaveLength(2); // "All" + TestOrg
+      expect(wrapper2.vm.orgOptions[1].label).toBe("TestOrg");
     });
   });
 
@@ -300,7 +360,7 @@ describe("GroupUsers Component", () => {
     it("updates search key when typing", async () => {
       const searchInput = wrapper.find('input[type="text"]');
       await searchInput.setValue("user1");
-      
+
       expect(wrapper.vm.userSearchKey).toBe("user1");
     });
 
@@ -308,47 +368,13 @@ describe("GroupUsers Component", () => {
       const searchInput = wrapper.find('input[placeholder="Search User"]');
       expect(searchInput.exists()).toBe(true);
     });
-
-    it("filters users correctly", () => {
-      const testUsers = [
-        { email: "user1@example.com" },
-        { email: "admin@example.com" },
-        { email: "user2@example.com" },
-      ];
-
-      const filteredResults = wrapper.vm.filterUsers(testUsers, "user");
-      expect(filteredResults).toHaveLength(2);
-      expect(filteredResults[0].email).toBe("user1@example.com");
-      expect(filteredResults[1].email).toBe("user2@example.com");
-    });
-
-    it("filters users case-insensitively", () => {
-      const testUsers = [
-        { email: "User1@example.com" },
-        { email: "admin@example.com" },
-      ];
-
-      const filteredResults = wrapper.vm.filterUsers(testUsers, "USER");
-      expect(filteredResults).toHaveLength(1);
-      expect(filteredResults[0].email).toBe("User1@example.com");
-    });
-
-    it("returns all users when search term is empty", () => {
-      const testUsers = [
-        { email: "user1@example.com" },
-        { email: "admin@example.com" },
-      ];
-
-      const filteredResults = wrapper.vm.filterUsers(testUsers, "");
-      expect(filteredResults).toEqual(testUsers);
-    });
   });
 
   describe("Data Loading", () => {
     it("fetches users on component mount", async () => {
       expect(mockUsersState.getOrgUsers).toHaveBeenCalledWith(
         enhancedStore.state.selectedOrganization.identifier,
-        { list_all: true }
+        { list_all: true },
       );
     });
 
@@ -357,7 +383,6 @@ describe("GroupUsers Component", () => {
 
       expect(wrapper.vm.users).toHaveLength(3);
       expect(wrapper.vm.users[0]).toEqual({
-        "#": 1,
         email: "user1@example.com",
         isInGroup: true,
         org: "TestOrg1, TestOrg2",
@@ -365,7 +390,6 @@ describe("GroupUsers Component", () => {
         is_external: false,
       });
       expect(wrapper.vm.users[1]).toEqual({
-        "#": 2,
         email: "admin@example.com",
         isInGroup: true,
         org: "TestOrg1",
@@ -373,7 +397,6 @@ describe("GroupUsers Component", () => {
         is_external: false,
       });
       expect(wrapper.vm.users[2]).toEqual({
-        "#": 3,
         email: "root@example.com",
         isInGroup: false,
         org: "",
@@ -407,7 +430,6 @@ describe("GroupUsers Component", () => {
       expect(mockUsersState.users).toHaveLength(3);
       expect(mockUsersState.users[0]).toEqual({
         email: "user1@example.com",
-        "#": 1,
         isInGroup: true,
         org: "TestOrg1, TestOrg2",
         role: "user",
@@ -419,15 +441,15 @@ describe("GroupUsers Component", () => {
   describe("Table Structure", () => {
     it("has correct column structure for regular org", () => {
       expect(wrapper.vm.columns).toHaveLength(2);
-      
+
       const selectColumn = wrapper.vm.columns[0];
-      expect(selectColumn.name).toBe("select");
-      expect(selectColumn.slot).toBe(true);
-      expect(selectColumn.slotName).toBe("select");
+      expect(selectColumn.id).toBe("select");
+      expect(selectColumn.accessorKey).toBe("isInGroup");
+      expect(selectColumn.size).toBe(44);
 
       const emailColumn = wrapper.vm.columns[1];
-      expect(emailColumn.name).toBe("email");
-      expect(emailColumn.field).toBe("email");
+      expect(emailColumn.id).toBe("email");
+      expect(emailColumn.accessorKey).toBe("email");
       expect(emailColumn.sortable).toBe(true);
     });
 
@@ -436,15 +458,30 @@ describe("GroupUsers Component", () => {
         ...store,
         state: {
           ...store.state,
-          selectedOrganization: { identifier: "meta_org" },
+          selectedOrganization: {
+            ...store.state.selectedOrganization,
+            identifier: "meta_org",
+          },
           zoConfig: { meta_org: "meta_org" },
+          organizations: [
+            {
+              name: "TestOrg",
+              identifier: "test-org",
+              id: "1",
+              ingest_threshold: 100,
+              search_threshold: 50,
+              status: "active",
+            },
+          ],
+          userInfo: { email: "test@example.com" },
         },
       };
 
-      const wrapper = mount(GroupUsers, {
+      const wrapper2 = mount(GroupUsers, {
         global: {
           provide: { store: metaStore },
           plugins: [i18n],
+          stubs: o2Stubs,
         },
         props: {
           groupUsers: [],
@@ -454,46 +491,50 @@ describe("GroupUsers Component", () => {
         },
       });
 
-      expect(wrapper.vm.columns).toHaveLength(3);
-      
-      const orgColumn = wrapper.vm.columns[2];
-      expect(orgColumn.name).toBe("organization");
-      expect(orgColumn.field).toBe("org");
-      expect(orgColumn.label).toBe("Organizations");
+      expect(wrapper2.vm.columns).toHaveLength(3);
+
+      const orgColumn = wrapper2.vm.columns[2];
+      expect(orgColumn.id).toBe("organization");
+      expect(orgColumn.accessorKey).toBe("org");
+      expect(orgColumn.header).toBe("Organizations");
     });
 
     it("renders table with users data", async () => {
       await wrapper.vm.getchOrgUsers();
       await wrapper.vm.updateUserTable("all");
-      await wrapper.vm.$nextTick();
+      await flushPromises();
 
       expect(wrapper.vm.rows).toHaveLength(3);
     });
 
     it("shows no users message when no data", async () => {
       wrapper.vm.rows = [];
-      await wrapper.vm.$nextTick();
+      await flushPromises();
 
-      const noUsersText = wrapper.find('[data-test="iam-users-selection-table-no-users-text"]');
-      expect(noUsersText.exists()).toBe(true);
-      expect(noUsersText.text()).toBe("No users added");
+      // When rows is empty, the OTable #empty slot renders <NoData />
+      const noDataEl = wrapper.find('[data-test="iam-users-selection-table-no-data"]');
+      expect(noDataEl.exists()).toBe(true);
     });
   });
 
   describe("User Selection", () => {
     it("renders checkboxes for user selection", () => {
-      const checkbox = wrapper.find('[data-test="iam-users-selection-table-body-row-test@example.com-checkbox"]');
+      // After mount, rows have user1@example.com and admin@example.com (isInGroup users)
+      const checkbox = wrapper.find(
+        '[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]',
+      );
       expect(checkbox.exists()).toBe(true);
     });
 
     it("handles user selection toggle", () => {
       const addedUsers = new Set();
       const removedUsers = new Set();
-      
-      wrapper = mount(GroupUsers, {
+
+      const wrapper2 = mount(GroupUsers, {
         global: {
           provide: { store: enhancedStore },
           plugins: [i18n],
+          stubs: o2Stubs,
         },
         props: {
           groupUsers: ["user1@example.com"],
@@ -503,23 +544,23 @@ describe("GroupUsers Component", () => {
         },
       });
 
+      // Simulate selecting an unassigned user (checkbox goes from unchecked → checked)
       const testUser = { email: "user2@example.com", isInGroup: false };
-      
-      // Simulate checking the checkbox (selecting the user)
-      testUser.isInGroup = true;
-      wrapper.vm.toggleUserSelection(testUser);
-      
+
+      wrapper2.vm.toggleUserSelection(testUser);
+
       expect(addedUsers.has("user2@example.com")).toBe(true);
     });
 
     it("adds user to addedUsers when selecting unassigned user", () => {
       const addedUsers = new Set();
       const removedUsers = new Set();
-      
-      wrapper = mount(GroupUsers, {
+
+      const wrapper2 = mount(GroupUsers, {
         global: {
           provide: { store: enhancedStore },
           plugins: [i18n],
+          stubs: o2Stubs,
         },
         props: {
           groupUsers: [],
@@ -529,22 +570,24 @@ describe("GroupUsers Component", () => {
         },
       });
 
-      wrapper.vm.groupUsersMap = new Set([]);
-      const testUser = { email: "user1@example.com", isInGroup: true };
-      
-      wrapper.vm.toggleUserSelection(testUser);
-      
+      wrapper2.vm.groupUsersMap = new Set([]);
+      // User starts as not selected; toggleUserSelection flips to selected
+      const testUser = { email: "user1@example.com", isInGroup: false };
+
+      wrapper2.vm.toggleUserSelection(testUser);
+
       expect(addedUsers.has("user1@example.com")).toBe(true);
     });
 
     it("adds user to removedUsers when deselecting assigned user", () => {
       const addedUsers = new Set();
       const removedUsers = new Set();
-      
-      wrapper = mount(GroupUsers, {
+
+      const wrapper2 = mount(GroupUsers, {
         global: {
           provide: { store: enhancedStore },
           plugins: [i18n],
+          stubs: o2Stubs,
         },
         props: {
           groupUsers: ["user1@example.com"],
@@ -554,22 +597,24 @@ describe("GroupUsers Component", () => {
         },
       });
 
-      wrapper.vm.groupUsersMap = new Set(["user1@example.com"]);
-      const testUser = { email: "user1@example.com", isInGroup: false };
-      
-      wrapper.vm.toggleUserSelection(testUser);
-      
+      wrapper2.vm.groupUsersMap = new Set(["user1@example.com"]);
+      // User starts as selected; toggleUserSelection flips to deselected
+      const testUser = { email: "user1@example.com", isInGroup: true };
+
+      wrapper2.vm.toggleUserSelection(testUser);
+
       expect(removedUsers.has("user1@example.com")).toBe(true);
     });
 
     it("removes user from addedUsers when deselecting newly added user", () => {
       const addedUsers = new Set(["user2@example.com"]);
       const removedUsers = new Set();
-      
-      wrapper = mount(GroupUsers, {
+
+      const wrapper2 = mount(GroupUsers, {
         global: {
           provide: { store: enhancedStore },
           plugins: [i18n],
+          stubs: o2Stubs,
         },
         props: {
           groupUsers: [],
@@ -579,30 +624,44 @@ describe("GroupUsers Component", () => {
         },
       });
 
-      wrapper.vm.groupUsersMap = new Set([]);
-      const testUser = { email: "user2@example.com", isInGroup: false };
-      
-      wrapper.vm.toggleUserSelection(testUser);
-      
+      wrapper2.vm.groupUsersMap = new Set([]);
+      // User was previously added (in addedUsers), currently shown as selected;
+      // deselecting should remove from addedUsers.
+      const testUser = { email: "user2@example.com", isInGroup: true };
+
+      wrapper2.vm.toggleUserSelection(testUser);
+
       expect(addedUsers.has("user2@example.com")).toBe(false);
     });
 
-    it.skip("removes user from removedUsers when reselecting removed user", async () => {
+    it("removes user from removedUsers when reselecting removed user", async () => {
       const addedUsers = new Set();
       const removedUsers = new Set(["user1@example.com"]);
-      
-      await wrapper.setProps({
-        groupUsers: ["user1@example.com"],
-        activeTab: "users",
-        addedUsers,
-        removedUsers,
+
+      const wrapper2 = mount(GroupUsers, {
+        global: {
+          provide: { store: enhancedStore },
+          plugins: [i18n],
+          stubs: o2Stubs,
+        },
+        props: {
+          groupUsers: ["user1@example.com"],
+          activeTab: "users",
+          addedUsers,
+          removedUsers,
+        },
       });
 
-      wrapper.vm.groupUsersMap = new Set(["user1@example.com"]);
-      const testUser = { email: "user1@example.com", isInGroup: true };
-      
-      wrapper.vm.toggleUserSelection(testUser);
-      
+      await flushPromises();
+
+      // user1 was originally in group, has been staged for removal
+      // Currently deselected (isInGroup: false); reselecting flips to true
+      // which should remove from removedUsers
+      wrapper2.vm.groupUsersMap = new Set(["user1@example.com"]);
+      const testUser = { email: "user1@example.com", isInGroup: false };
+
+      wrapper2.vm.toggleUserSelection(testUser);
+
       expect(removedUsers.has("user1@example.com")).toBe(false);
     });
   });
@@ -617,22 +676,21 @@ describe("GroupUsers Component", () => {
       wrapper.vm.users = [
         { email: "user1@example.com", isInGroup: true, org: "TestOrg1" },
         { email: "user2@example.com", isInGroup: false, org: "TestOrg2" },
-        { email: "user3@example.com", isInGroup: true, org: "TestOrg1" }
+        { email: "user3@example.com", isInGroup: true, org: "TestOrg1" },
       ];
-      wrapper.vm.usersDisplay = "all"; // Make sure we're in 'all' mode
-      
+      wrapper.vm.usersDisplay = "all";
+
       wrapper.vm.updateOrganization();
-      
-      expect(wrapper.vm.rows).toHaveLength(3); // All users should be shown
+
+      expect(wrapper.vm.rows).toHaveLength(3);
     });
 
     it("filters users by organization", () => {
       wrapper.vm.selectedOrg = { value: "test", label: "TestOrg1" };
       wrapper.vm.usersDisplay = "all";
-      
+
       wrapper.vm.updateOrganization();
-      
-      // Should include users with TestOrg1 in their orgs and root users
+
       const filteredUsers = wrapper.vm.rows;
       expect(filteredUsers.some((user: any) => user.email === "user1@example.com")).toBe(true);
       expect(filteredUsers.some((user: any) => user.email === "admin@example.com")).toBe(true);
@@ -642,9 +700,9 @@ describe("GroupUsers Component", () => {
     it("includes root role users regardless of organization filter", () => {
       wrapper.vm.selectedOrg = { value: "nonexistent", label: "NonexistentOrg" };
       wrapper.vm.usersDisplay = "all";
-      
+
       wrapper.vm.updateOrganization();
-      
+
       const rootUsers = wrapper.vm.rows.filter((user: any) => user.role === "root");
       expect(rootUsers.length).toBeGreaterThan(0);
     });
@@ -652,19 +710,135 @@ describe("GroupUsers Component", () => {
     it("respects isInGroup filter when organization is selected", () => {
       wrapper.vm.selectedOrg = { value: "test", label: "TestOrg1" };
       wrapper.vm.usersDisplay = "selected";
-      
-      // Set up test data with mixed isInGroup values
+
       wrapper.vm.users = [
         { email: "user1@example.com", isInGroup: true, org: "TestOrg1, TestOrg2", role: "user" },
         { email: "admin@example.com", isInGroup: true, org: "TestOrg1", role: "admin" },
-        { email: "root@example.com", isInGroup: false, org: "", role: "root" }
+        { email: "root@example.com", isInGroup: false, org: "", role: "root" },
       ];
-      
+
       wrapper.vm.updateOrganization();
-      
-      // Should only show selected users from the organization
+
       const hasNonSelectedUsers = wrapper.vm.rows.some((user: any) => !user.isInGroup);
       expect(hasNonSelectedUsers).toBe(true); // Root users are always included
+    });
+
+    it("applies isInGroup filter in the ternary else branch when org is all but display is selected", () => {
+      // When org is "all" but usersDisplay is "selected", the ternary takes
+      // the false branch: users.value.filter((user) => user.isInGroup)
+      wrapper.vm.selectedOrg = { value: "all", label: "All" };
+      wrapper.vm.usersDisplay = "selected";
+
+      wrapper.vm.users = [
+        { email: "user1@example.com", isInGroup: true, org: "TestOrg1" },
+        { email: "user2@example.com", isInGroup: false, org: "TestOrg2" },
+        { email: "user3@example.com", isInGroup: true, org: "TestOrg1" },
+      ];
+
+      wrapper.vm.updateOrganization();
+
+      // Only users with isInGroup true should appear
+      expect(wrapper.vm.rows).toHaveLength(2);
+      expect(wrapper.vm.rows.every((user: any) => user.isInGroup)).toBe(true);
+    });
+  });
+
+  describe("External User Warning", () => {
+    it("shows warning for external user newly added to a role", () => {
+      // context === "role" + is_external + isInGroup + !groupUsersMap.has
+      const user = {
+        email: "external@example.com",
+        isInGroup: true,
+        is_external: true,
+      };
+
+      // Mount with context="role" so the warning condition is active
+      const wrapper2 = mount(GroupUsers, {
+        global: {
+          provide: { store: enhancedStore },
+          plugins: [i18n],
+          stubs: o2Stubs,
+        },
+        props: {
+          groupUsers: [],
+          activeTab: "users",
+          addedUsers: new Set(),
+          removedUsers: new Set(),
+          context: "role",
+        },
+      });
+
+      wrapper2.vm.groupUsersMap = new Set([]);
+
+      const result = wrapper2.vm.shouldShowWarning(user);
+      expect(result).toBe(true);
+    });
+
+    it("does not show warning for non-external users", () => {
+      const user = {
+        email: "normal@example.com",
+        isInGroup: true,
+        is_external: false,
+      };
+
+      const wrapper2 = mount(GroupUsers, {
+        global: {
+          provide: { store: enhancedStore },
+          plugins: [i18n],
+          stubs: o2Stubs,
+        },
+        props: {
+          groupUsers: [],
+          activeTab: "users",
+          addedUsers: new Set(),
+          removedUsers: new Set(),
+          context: "role",
+        },
+      });
+
+      const result = wrapper2.vm.shouldShowWarning(user);
+      expect(result).toBe(false);
+    });
+
+    it("does not show warning when context is group", () => {
+      const user = {
+        email: "external@example.com",
+        isInGroup: true,
+        is_external: true,
+      };
+
+      // Default context is "group" — warning should be disabled
+      const result = wrapper.vm.shouldShowWarning(user);
+      expect(result).toBe(false);
+    });
+
+    it("does not show warning for users already in the role", () => {
+      const user = {
+        email: "existing@example.com",
+        isInGroup: true,
+        is_external: true,
+      };
+
+      const wrapper2 = mount(GroupUsers, {
+        global: {
+          provide: { store: enhancedStore },
+          plugins: [i18n],
+          stubs: o2Stubs,
+        },
+        props: {
+          groupUsers: ["existing@example.com"],
+          activeTab: "users",
+          addedUsers: new Set(),
+          removedUsers: new Set(),
+          context: "role",
+        },
+      });
+
+      wrapper2.vm.groupUsersMap = new Set(["existing@example.com"]);
+
+      // User is in groupUsersMap — no warning (already in role)
+      const result = wrapper2.vm.shouldShowWarning(user);
+      expect(result).toBe(false);
     });
   });
 
@@ -680,61 +854,57 @@ describe("GroupUsers Component", () => {
 
     it("shows only selected users when display is 'selected'", async () => {
       await wrapper.vm.updateUserTable("selected");
-      
+
       const selectedUsers = wrapper.vm.rows.filter((user: any) => user.isInGroup);
       expect(wrapper.vm.rows).toEqual(selectedUsers);
     });
 
     it("fetches data when switching to 'all' for first time", async () => {
       wrapper.vm.hasFetchedOrgUsers = false;
-      const initialDataLength = wrapper.vm.users.length;
-      
+
       await wrapper.vm.updateUserTable("all");
-      
-      // Test behavior: hasFetchedOrgUsers should be set to true after fetch
+
       expect(wrapper.vm.hasFetchedOrgUsers).toBe(true);
     });
 
     it("does not refetch data when switching to 'all' after first fetch", async () => {
       const fetchSpy = vi.spyOn(wrapper.vm, "getchOrgUsers");
       wrapper.vm.hasFetchedOrgUsers = true;
-      
+
       await wrapper.vm.updateUserTable("all");
-      
+
       expect(fetchSpy).not.toHaveBeenCalled();
     });
   });
 
   describe("Props Watching", () => {
     it("updates when groupUsers prop changes", async () => {
-      const initialGroupUsersMapSize = wrapper.vm.groupUsersMap.size;
-      
       await wrapper.setProps({ groupUsers: ["user1@example.com", "root@example.com"] });
       await flushPromises();
-      
-      // Test behavior: groupUsersMap should be updated with new prop values
+
       expect(wrapper.vm.groupUsersMap.size).toBe(2);
       expect(wrapper.vm.groupUsersMap.has("user1@example.com")).toBe(true);
       expect(wrapper.vm.groupUsersMap.has("root@example.com")).toBe(true);
-      expect(wrapper.vm.hasFetchedOrgUsers).toBe(true); // Gets set back to true after fetch
+      expect(wrapper.vm.hasFetchedOrgUsers).toBe(true);
     });
 
     it("resets selectedOrg when groupUsers changes", async () => {
       wrapper.vm.selectedOrg = { value: "test", label: "Test" };
-      
+
       await wrapper.setProps({ groupUsers: ["newuser@example.com"] });
       await flushPromises();
-      
+
       expect(wrapper.vm.selectedOrg.value).toBe("all");
     });
   });
 
   describe("Edge Cases", () => {
     it("handles empty groupUsers prop", async () => {
-      const wrapper = mount(GroupUsers, {
+      const wrapper2 = mount(GroupUsers, {
         global: {
           provide: { store: enhancedStore },
           plugins: [i18n],
+          stubs: o2Stubs,
         },
         props: {
           groupUsers: [],
@@ -744,15 +914,13 @@ describe("GroupUsers Component", () => {
         },
       });
 
-      expect(wrapper.vm.groupUsersMap.size).toBe(0);
+      await flushPromises();
+      expect(wrapper2.vm.groupUsersMap.size).toBe(0);
     });
 
     it("handles API error when fetching users", async () => {
-      // Simply test that the method exists and can handle errors
       expect(typeof wrapper.vm.getchOrgUsers).toBe("function");
-      
-      // The getchOrgUsers method should always return a promise that resolves to true
-      // even when there's an error, as it has a catch block that handles errors gracefully
+
       const result = wrapper.vm.getchOrgUsers();
       expect(result).toBeInstanceOf(Promise);
     });
@@ -765,37 +933,30 @@ describe("GroupUsers Component", () => {
       expect(wrapper.vm.users).toEqual([]);
     });
 
-    it("handles undefined filter input", () => {
-      const testUsers = [{ email: "user@example.com" }];
-      // Test the actual filterUsers method with empty string (which is handled gracefully)
-      const result = wrapper.vm.filterUsers(testUsers, "");
-      expect(result).toEqual(testUsers);
-    });
-
     it("handles organizations without CustomerBillingObj", async () => {
       const storeWithIncompleteOrgs = {
         ...enhancedStore,
         state: {
           ...enhancedStore.state,
           organizations: [
-            { 
-              name: "IncompleteOrg", 
-              identifier: "incomplete", 
+            {
+              name: "IncompleteOrg",
+              identifier: "incomplete",
               id: "1",
               status: "active",
               ingest_threshold: 100,
-              search_threshold: 50
-              // Missing CustomerBillingObj
+              search_threshold: 50,
             },
           ],
           userInfo: { email: "test@example.com" },
         },
       };
 
-      const wrapper = mount(GroupUsers, {
+      const wrapper2 = mount(GroupUsers, {
         global: {
           provide: { store: storeWithIncompleteOrgs },
           plugins: [i18n],
+          stubs: o2Stubs,
         },
         props: {
           groupUsers: [],
@@ -807,12 +968,12 @@ describe("GroupUsers Component", () => {
 
       await flushPromises();
 
-      expect(wrapper.vm.orgOptions[1]).toEqual(
+      expect(wrapper2.vm.orgOptions[1]).toEqual(
         expect.objectContaining({
           label: "IncompleteOrg",
           subscription_type: "",
           note: "",
-        })
+        }),
       );
     });
   });
@@ -821,7 +982,6 @@ describe("GroupUsers Component", () => {
     it("applies correct theme classes", () => {
       const filters = wrapper.find('[data-test="iam-users-selection-filters"]');
       expect(filters.exists()).toBe(true);
-      // Theme classes have been removed from the component
     });
 
     it("switches to dark theme classes when theme is dark", async () => {
@@ -829,14 +989,15 @@ describe("GroupUsers Component", () => {
         ...enhancedStore,
         state: {
           ...enhancedStore.state,
-          theme: 'dark',
+          theme: "dark",
         },
       };
 
-      const wrapper = mount(GroupUsers, {
+      const wrapper2 = mount(GroupUsers, {
         global: {
           provide: { store: darkStore },
           plugins: [i18n],
+          stubs: o2Stubs,
         },
         props: {
           groupUsers: [],
@@ -846,9 +1007,8 @@ describe("GroupUsers Component", () => {
         },
       });
 
-      const filters = wrapper.find('[data-test="iam-users-selection-filters"]');
+      const filters = wrapper2.find('[data-test="iam-users-selection-filters"]');
       expect(filters.exists()).toBe(true);
-      // Theme classes have been removed from the component
     });
   });
 
@@ -861,7 +1021,7 @@ describe("GroupUsers Component", () => {
         "iam-users-selection-table",
       ];
 
-      sections.forEach(selector => {
+      sections.forEach((selector) => {
         expect(wrapper.find(`[data-test="${selector}"]`).exists()).toBe(true);
       });
     });
@@ -872,14 +1032,22 @@ describe("GroupUsers Component", () => {
     });
 
     it("has proper button styling", () => {
-      const filterButtons = wrapper.findAll('.visual-selection-btn');
+      const filterButtons = wrapper.findAll('[data-test^="iam-users-selection-show-"]');
       expect(filterButtons.length).toBeGreaterThan(0);
     });
 
     it("has proper table attributes", () => {
-      const table = wrapper.findComponent({ name: "AppTable" });
-      expect(table.props("virtualScroll")).toBe(false);
-      expect(table.props("dense")).toBe(true);
+      // Verify the table container is rendered and that data-test attributes
+      // from the OTable scoped slots are present (confirming OTable is mounted).
+      const tableContainer = wrapper.find('[data-test="iam-users-selection-table"]');
+      expect(tableContainer.exists()).toBe(true);
+
+      // After mount, rows contain isInGroup users; checkboxes confirm
+      // OTable is rendering with the correct row-key bound ("email").
+      const checkbox = wrapper.find(
+        '[data-test="iam-users-selection-table-body-row-user1@example.com-checkbox"]',
+      );
+      expect(checkbox.exists()).toBe(true);
     });
   });
 });

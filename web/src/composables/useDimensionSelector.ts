@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -48,25 +48,48 @@ interface ScoredField {
 function isHighCardinalityPattern(name: string): boolean {
   const badPatterns = [
     // IDs and unique identifiers
-    /_id$/i, /_uuid$/i, /^id$/i, /_key$/i,
-    /user_?id/i, /customer_?id/i, /session_?id/i, /request_?id/i,
-    /trace_?id/i, /span_?id/i, /transaction_?id/i,
-    /correlation_?id/i, /tracking_?id/i,
+    /_id$/i,
+    /_uuid$/i,
+    /^id$/i,
+    /_key$/i,
+    /user_?id/i,
+    /customer_?id/i,
+    /session_?id/i,
+    /request_?id/i,
+    /trace_?id/i,
+    /span_?id/i,
+    /transaction_?id/i,
+    /correlation_?id/i,
+    /tracking_?id/i,
 
     // Timestamps
-    /timestamp/i, /_time$/i, /_at$/i, /datetime/i,
+    /timestamp/i,
+    /_time$/i,
+    /_at$/i,
+    /datetime/i,
 
     // Long text fields
-    /message$/i, /msg$/i, /_message$/i, /^body$/i,
-    /stack_?trace/i, /backtrace/i, /stack$/i,
-    /description$/i, /^text$/i, /content$/i,
+    /message$/i,
+    /msg$/i,
+    /_message$/i,
+    /^body$/i,
+    /stack_?trace/i,
+    /backtrace/i,
+    /stack$/i,
+    /description$/i,
+    /^text$/i,
+    /content$/i,
 
     // URLs and paths
-    /^url$/i, /^uri$/i, /full_?path/i, /query_?string/i,
-    /referer/i, /user_?agent/i,
+    /^url$/i,
+    /^uri$/i,
+    /full_?path/i,
+    /query_?string/i,
+    /referer/i,
+    /user_?agent/i,
   ];
 
-  return badPatterns.some(pattern => pattern.test(name));
+  return badPatterns.some((pattern) => pattern.test(name));
 }
 
 /**
@@ -75,53 +98,86 @@ function isHighCardinalityPattern(name: string): boolean {
 function matchesGoodPattern(name: string): boolean {
   const goodPatterns = [
     // Log metadata
-    /^level$/i, /log_?level/i, /severity/i, /priority/i,
+    /^level$/i,
+    /log_?level/i,
+    /severity/i,
+    /priority/i,
 
     // Service/Application
-    /^service$/i, /service_?name/i, /^app/i, /application/i,
-    /component/i, /module/i,
+    /^service$/i,
+    /service_?name/i,
+    /^app/i,
+    /application/i,
+    /component/i,
+    /module/i,
 
     // Environment
-    /^env$/i, /environment/i, /^stage$/i, /deployment/i,
+    /^env$/i,
+    /environment/i,
+    /^stage$/i,
+    /deployment/i,
 
     // Infrastructure
-    /^host$/i, /hostname/i, /^server$/i, /^node$/i,
-    /pod_?name/i, /container/i, /^cluster$/i,
-    /region$/i, /zone$/i, /datacenter/i, /availability/i,
+    /^host$/i,
+    /hostname/i,
+    /^server$/i,
+    /^node$/i,
+    /pod_?name/i,
+    /container/i,
+    /^cluster$/i,
+    /region$/i,
+    /zone$/i,
+    /datacenter/i,
+    /availability/i,
 
     // HTTP
-    /^status$/i, /status_?code/i, /http_?status/i, /response_?status/i,
-    /^method$/i, /http_?method/i, /request_?method/i, /verb$/i,
-    /^endpoint$/i, /^route$/i, /^handler$/i, /^path$/i,
+    /^status$/i,
+    /status_?code/i,
+    /http_?status/i,
+    /response_?status/i,
+    /^method$/i,
+    /http_?method/i,
+    /request_?method/i,
+    /verb$/i,
+    /^endpoint$/i,
+    /^route$/i,
+    /^handler$/i,
+    /^path$/i,
 
     // Errors
-    /error_?type/i, /exception_?type/i, /error_?code/i, /error_?class/i,
-    /^category$/i, /^type$/i,
+    /error_?type/i,
+    /exception_?type/i,
+    /error_?code/i,
+    /error_?class/i,
+    /^category$/i,
+    /^type$/i,
 
     // User context (non-PII)
-    /user_?role/i, /user_?type/i, /^role$/i, /account_?type/i,
+    /user_?role/i,
+    /user_?type/i,
+    /^role$/i,
+    /account_?type/i,
 
     // Versions
-    /^version$/i, /build/i, /release/i,
+    /^version$/i,
+    /build/i,
+    /release/i,
   ];
 
-  return goodPatterns.some(pattern => pattern.test(name));
+  return goodPatterns.some((pattern) => pattern.test(name));
 }
 
 /**
  * Check if field is a system/internal field
  */
 function isSystemField(name: string): boolean {
-  return name.startsWith('_') || name === 'o2_timestamp';
+  return name.startsWith("_") || name === "o2_timestamp";
 }
 
 /**
  * Analyze field from log samples to gather statistics
  */
-function analyzeFieldFromSamples(
-  fieldName: string,
-  logSamples: any[]
-): FieldStats {
+function analyzeFieldFromSamples(fieldName: string, logSamples: any[]): FieldStats {
   const stats: FieldStats = {
     uniqueValues: new Set(),
     occurrences: 0,
@@ -129,7 +185,7 @@ function analyzeFieldFromSamples(
     nullCount: 0,
   };
 
-  logSamples.forEach(log => {
+  logSamples.forEach((log) => {
     const value = log[fieldName];
 
     if (value === null || value === undefined) {
@@ -153,7 +209,7 @@ function scoreField(
   fieldName: string,
   fieldMeta: FieldMetadata | undefined,
   stats: FieldStats,
-  sampleCount: number
+  sampleCount: number,
 ): ScoredField {
   let score = 0;
   const reasons: string[] = [];
@@ -254,7 +310,9 @@ function scoreField(
     const uniquenessRatio = cardinality / sampleCount;
     if (uniquenessRatio > 0.7) {
       score -= 100;
-      reasons.push(`Too unique (${cardinality}/${sampleCount} = ${(uniquenessRatio * 100).toFixed(0)}%)`)
+      reasons.push(
+        `Too unique (${cardinality}/${sampleCount} = ${(uniquenessRatio * 100).toFixed(0)}%)`,
+      );
     } else {
       score -= 30;
       reasons.push(`Very high cardinality (${cardinality} values)`);
@@ -294,7 +352,7 @@ function scoreField(
 export function selectDimensionsFromData(
   logSamples: any[],
   schemaFields: FieldMetadata[],
-  maxDimensions: number = 8
+  maxDimensions: number = 8,
 ): string[] {
   if (logSamples.length < 10) {
     return selectDimensionsFromSchema(schemaFields, maxDimensions);
@@ -302,19 +360,19 @@ export function selectDimensionsFromData(
 
   // Build schema metadata map
   const schemaMap = new Map<string, FieldMetadata>();
-  schemaFields.forEach(field => {
+  schemaFields.forEach((field) => {
     schemaMap.set(field.name, field);
   });
 
   // Get all unique field names from samples
   const fieldNames = new Set<string>();
-  logSamples.forEach(log => {
-    Object.keys(log).forEach(key => fieldNames.add(key));
+  logSamples.forEach((log) => {
+    Object.keys(log).forEach((key) => fieldNames.add(key));
   });
 
   // Analyze and score each field
   const scoredFields: ScoredField[] = [];
-  fieldNames.forEach(fieldName => {
+  fieldNames.forEach((fieldName) => {
     const fieldMeta = schemaMap.get(fieldName);
     const stats = analyzeFieldFromSamples(fieldName, logSamples);
     const scored = scoreField(fieldName, fieldMeta, stats, logSamples.length);
@@ -325,9 +383,9 @@ export function selectDimensionsFromData(
   // Sort by score and take top N
   scoredFields.sort((a, b) => b.score - a.score);
   const selected = scoredFields
-    .filter(f => f.score > 0)
+    .filter((f) => f.score > 0)
     .slice(0, maxDimensions)
-    .map(f => f.fieldName);
+    .map((f) => f.fieldName);
 
   // Fallback if no good dimensions found
   if (selected.length === 0) {
@@ -342,35 +400,52 @@ export function selectDimensionsFromData(
  */
 function selectDimensionsFromSchema(
   schemaFields: FieldMetadata[],
-  maxDimensions: number
+  maxDimensions: number,
 ): string[] {
   // Priority list for logs
   const logPriorityList = [
-    "level", "log_level", "severity",
-    "service", "service_name", "app", "application",
-    "environment", "env",
-    "host", "hostname", "server",
-    "status", "status_code", "http_status",
-    "method", "http_method", "request_method",
-    "error_type", "exception_type", "error_code",
-    "endpoint", "route", "path",
+    "level",
+    "log_level",
+    "severity",
+    "service",
+    "service_name",
+    "app",
+    "application",
+    "environment",
+    "env",
+    "host",
+    "hostname",
+    "server",
+    "status",
+    "status_code",
+    "http_status",
+    "method",
+    "http_method",
+    "request_method",
+    "error_type",
+    "exception_type",
+    "error_code",
+    "endpoint",
+    "route",
+    "path",
   ];
 
   const available = schemaFields
-    .filter(f => !isSystemField(f.name) && !f.isFTS && !isHighCardinalityPattern(f.name))
-    .map(f => f.name);
+    .filter((f) => !isSystemField(f.name) && !f.isFTS && !isHighCardinalityPattern(f.name))
+    .map((f) => f.name);
 
   // Try priority list first
-  const selected = logPriorityList.filter(name => available.includes(name));
+  const selected = logPriorityList.filter((name) => available.includes(name));
 
   // Add interesting/indexed fields
   const additionalFields = schemaFields
-    .filter(f =>
-      !selected.includes(f.name) &&
-      available.includes(f.name) &&
-      (f.isInteresting || f.isIndexed)
+    .filter(
+      (f) =>
+        !selected.includes(f.name) &&
+        available.includes(f.name) &&
+        (f.isInteresting || f.isIndexed),
     )
-    .map(f => f.name);
+    .map((f) => f.name);
 
   selected.push(...additionalFields);
 
@@ -382,7 +457,7 @@ function selectDimensionsFromSchema(
  */
 export function selectTraceDimensions(
   schemaFields: FieldMetadata[],
-  maxDimensions: number = 8
+  maxDimensions: number = 8,
 ): string[] {
   const prioritizedDimensions = [
     // Core OTel attributes
@@ -414,8 +489,8 @@ export function selectTraceDimensions(
     "k8s_namespace_name",
   ];
 
-  const availableFields = new Set(schemaFields.map(f => f.name));
-  const existing = prioritizedDimensions.filter(dim => availableFields.has(dim));
+  const availableFields = new Set(schemaFields.map((f) => f.name));
+  const existing = prioritizedDimensions.filter((dim) => availableFields.has(dim));
 
   if (existing.length === 0) {
     return ["service_name", "span_kind", "span_status", "operation_name"];

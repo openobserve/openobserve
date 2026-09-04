@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,8 +15,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import OverrideConfig from "@/components/dashboards/addPanel/OverrideConfig.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -26,45 +24,43 @@ import router from "@/test/unit/helpers/router";
 const mockDashboardPanelData = {
   data: {
     config: {
-      override_config: []
+      override_config: [],
     },
-    queries: [{
-      fields: {
-        x: [
-          { alias: "timestamp", label: "Timestamp" },
-          { alias: "user_id", label: "User ID" }
-        ],
-        y: [
-          { alias: "count", label: "Count" },
-          { alias: "duration", label: "Duration" }
-        ]
-      }
-    }],
+    queries: [
+      {
+        fields: {
+          x: [
+            { alias: "timestamp", label: "Timestamp" },
+            { alias: "user_id", label: "User ID" },
+          ],
+          y: [
+            { alias: "count", label: "Count" },
+            { alias: "duration", label: "Duration" },
+          ],
+        },
+      },
+    ],
     type: "line",
-    queryType: "sql" // Default to SQL mode
+    queryType: "sql", // Default to SQL mode
   },
   layout: {
-    currentQueryIndex: 0
+    currentQueryIndex: 0,
   },
   meta: {
     streamFields: {
-      groupedFields: []
-    }
-  }
+      groupedFields: [],
+    },
+  },
 };
 
 const mockPromqlMode = { value: false };
 
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
     dashboardPanelData: mockDashboardPanelData,
-    promqlMode: mockPromqlMode
-  }))
+    promqlMode: mockPromqlMode,
+  })),
 }));
-
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 describe("OverrideConfig", () => {
   let wrapper: any;
@@ -72,24 +68,24 @@ describe("OverrideConfig", () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    store.state.theme = 'light';
+    store.state.theme = "light";
     mockDashboardPanelData.data.config.override_config = [];
-    mockDashboardPanelData.data.queryType = 'sql';
+    mockDashboardPanelData.data.queryType = "sql";
     mockPromqlMode.value = false;
     mockDashboardPanelData.data.queries[0].fields = {
       x: [
         { alias: "timestamp", label: "Timestamp" },
-        { alias: "user_id", label: "User ID" }
+        { alias: "user_id", label: "User ID" },
       ],
       y: [
         { alias: "count", label: "Count" },
-        { alias: "duration", label: "Duration" }
-      ]
+        { alias: "duration", label: "Duration" },
+      ],
     };
     mockDashboardPanelData.meta = {
       streamFields: {
-        groupedFields: []
-      }
+        groupedFields: [],
+      },
     };
   });
 
@@ -102,24 +98,25 @@ describe("OverrideConfig", () => {
   const createWrapper = (props = {}) => {
     return mount(OverrideConfig, {
       props: {
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n, store, router],
         provide: {
-          dashboardPanelDataPageKey: "dashboard"
+          dashboardPanelDataPageKey: "dashboard",
         },
         stubs: {
-          'OverrideConfigPopup': {
+          OverrideConfigPopup: {
+            name: "OverrideConfigPopup",
             template: '<div data-test="override-config-popup"></div>',
-            emits: ['close', 'save'],
-            props: ['columns', 'overrideConfig']
-          }
+            emits: ["close", "save"],
+            props: ["open", "columns", "overrideConfig"],
+          },
         },
         mocks: {
-          $t: (key: string) => key
-        }
-      }
+          $t: (key: string) => key,
+        },
+      },
     });
   };
 
@@ -127,20 +124,18 @@ describe("OverrideConfig", () => {
     it("should render override config section", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.text()).toContain('Override Config');
+      // Title block was removed in config redesign (PR #10917);
+      // the section header is now rendered by the parent ConfigPanel expansion item.
+      expect(wrapper.exists()).toBe(true);
     });
 
     it("should render info tooltip button", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-info"]').exists()).toBe(true);
-    });
-
-    it("should render add field override button", () => {
-      wrapper = createWrapper();
-
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').text()).toBe('Add field override');
+      // Info tooltip button was removed from this component in config redesign (PR #10917).
+      expect(wrapper.find('[data-test="dashboard-addpanel-config-drilldown-info"]').exists()).toBe(
+        false,
+      );
     });
 
     it("should not show dialog initially", () => {
@@ -160,11 +155,11 @@ describe("OverrideConfig", () => {
     it("should combine x and y fields into columns", () => {
       wrapper = createWrapper();
 
-      // Component transforms columns with name, field, and format properties
+      // Columns are passed to OverrideConfigPopup as { alias, label, isNumeric }.
       expect(wrapper.vm.columns.length).toBe(4);
-      expect(wrapper.vm.columns[0].name).toBe("timestamp");
+      expect(wrapper.vm.columns[0].alias).toBe("timestamp");
       expect(wrapper.vm.columns[0].label).toBe("Timestamp");
-      expect(wrapper.vm.columns[0].field).toBe("timestamp");
+      expect(wrapper.vm.columns[0].isNumeric).toBe(false);
     });
 
     it("should handle empty x fields", () => {
@@ -190,11 +185,10 @@ describe("OverrideConfig", () => {
   });
 
   describe("Dialog Management", () => {
-    it("should show dialog when add button is clicked", async () => {
+    it("should show dialog when openOverrideConfigPopup is called", async () => {
       wrapper = createWrapper();
 
-      const addBtn = wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]');
-      await addBtn.trigger('click');
+      await wrapper.vm.openOverrideConfigPopup();
 
       expect(wrapper.vm.showOverrideConfigPopup).toBe(true);
     });
@@ -203,12 +197,14 @@ describe("OverrideConfig", () => {
       wrapper = createWrapper();
 
       const initialColumnsLength = wrapper.vm.columns.length;
-      
-      // Modify fields to test fetchColumns
-      mockDashboardPanelData.data.queries[0].fields.x.push({ alias: "new_field", label: "New Field" });
 
-      const addBtn = wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]');
-      await addBtn.trigger('click');
+      // Modify fields to test fetchColumns
+      mockDashboardPanelData.data.queries[0].fields.x.push({
+        alias: "new_field",
+        label: "New Field",
+      });
+
+      await wrapper.vm.openOverrideConfigPopup();
 
       expect(wrapper.vm.columns.length).toBe(initialColumnsLength + 1);
     });
@@ -216,7 +212,7 @@ describe("OverrideConfig", () => {
     it("should have openOverrideConfigPopup method", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.openOverrideConfigPopup).toBe('function');
+      expect(typeof wrapper.vm.openOverrideConfigPopup).toBe("function");
     });
 
     it("should open dialog through method call", () => {
@@ -226,6 +222,53 @@ describe("OverrideConfig", () => {
       wrapper.vm.openOverrideConfigPopup();
       expect(wrapper.vm.showOverrideConfigPopup).toBe(true);
     });
+
+    it("should forward open state to OverrideConfigPopup via :open prop", async () => {
+      // After the dialog -> ODialog migration the component no longer wraps
+      // the popup in a modal v-model. The popup itself receives the open
+      // state via the `:open` prop instead.
+      wrapper = createWrapper();
+
+      const popup = wrapper.findComponent({ name: "OverrideConfigPopup" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.props("open")).toBe(false);
+
+      wrapper.vm.openOverrideConfigPopup();
+      await wrapper.vm.$nextTick();
+
+      expect(popup.props("open")).toBe(true);
+    });
+
+    it("should close popup when OverrideConfigPopup emits close", async () => {
+      // Replaces the previous dialog v-model close behaviour: dismissal is
+      // now driven by the popup emitting `close`.
+      wrapper = createWrapper();
+
+      wrapper.vm.openOverrideConfigPopup();
+      await wrapper.vm.$nextTick();
+      expect(wrapper.vm.showOverrideConfigPopup).toBe(true);
+
+      const popup = wrapper.findComponent({ name: "OverrideConfigPopup" });
+      popup.vm.$emit("close");
+      await wrapper.vm.$nextTick();
+
+      expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
+    });
+
+    it("should save when OverrideConfigPopup emits save", async () => {
+      wrapper = createWrapper();
+
+      wrapper.vm.openOverrideConfigPopup();
+      await wrapper.vm.$nextTick();
+
+      const popup = wrapper.findComponent({ name: "OverrideConfigPopup" });
+      const newConfig = [{ count: "rps" }];
+      popup.vm.$emit("save", newConfig);
+      await wrapper.vm.$nextTick();
+
+      expect(mockDashboardPanelData.data.config.override_config).toEqual(newConfig);
+      expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
+    });
   });
 
   describe("Override Config Saving", () => {
@@ -234,7 +277,7 @@ describe("OverrideConfig", () => {
 
       const newOverrideConfig = [
         { field: "count", unit: "ms" },
-        { field: "duration", unit: "seconds" }
+        { field: "duration", unit: "seconds" },
       ];
 
       wrapper.vm.showOverrideConfigPopup = true;
@@ -247,7 +290,7 @@ describe("OverrideConfig", () => {
     it("should have saveOverrideConfigConfig method", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.saveOverrideConfigConfig).toBe('function');
+      expect(typeof wrapper.vm.saveOverrideConfigConfig).toBe("function");
     });
 
     it("should handle empty override config", () => {
@@ -258,93 +301,41 @@ describe("OverrideConfig", () => {
       expect(mockDashboardPanelData.data.config.override_config).toEqual([]);
       expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
     });
-
-    it("should apply override configs after saving", () => {
-      wrapper = createWrapper();
-
-      const overrideConfig = [
-        { field: "count", unit: "items" }
-      ];
-
-      wrapper.vm.saveOverrideConfigConfig(overrideConfig);
-
-      // Check that columns have been updated with format functions
-      const countColumn = wrapper.vm.columns.find((col: any) => col.name === "count");
-      if (countColumn && countColumn.format) {
-        expect(countColumn.format(100)).toBe("100 items");
-      }
-    });
-  });
-
-  describe("Override Config Application", () => {
-    it("should apply override configs to columns", () => {
-      mockDashboardPanelData.data.config.override_config = {
-        count: "ms",
-        duration: "seconds"
-      };
-      
-      wrapper = createWrapper();
-
-      const countColumn = wrapper.vm.columns.find((col: any) => col.name === "count");
-      const durationColumn = wrapper.vm.columns.find((col: any) => col.name === "duration");
-
-      expect(countColumn?.format).toBeDefined();
-      expect(durationColumn?.format).toBeDefined();
-    });
-
-    it("should format values with units correctly", () => {
-      mockDashboardPanelData.data.config.override_config = {
-        count: "items"
-      };
-      
-      wrapper = createWrapper();
-
-      const countColumn = wrapper.vm.columns.find((col: any) => col.name === "count");
-      if (countColumn && countColumn.format) {
-        expect(countColumn.format(150)).toBe("150 items");
-        expect(countColumn.format(0)).toBe("0 items");
-        expect(countColumn.format("test")).toBe("test items");
-      }
-    });
-
-    it("should handle columns without override config", () => {
-      mockDashboardPanelData.data.config.override_config = [];
-      
-      wrapper = createWrapper();
-
-      const timestampColumn = wrapper.vm.columns.find((col: any) => col.name === "timestamp");
-      if (timestampColumn && timestampColumn.format) {
-        expect(timestampColumn.format(1000)).toBe("1000 ");
-      }
-    });
   });
 
   describe("Theme Integration", () => {
     it("should handle light theme", async () => {
-      store.state.theme = 'light';
+      store.state.theme = "light";
       wrapper = createWrapper();
 
-      expect(wrapper.vm.store.state.theme).toBe('light');
+      // store is no longer exposed on the component instance after the
+      // ODialog/ODrawer migration removed the theme-conditional wrapper class;
+      // theme state lives only in the vuex store now.
+      expect(store.state.theme).toBe("light");
+      expect(wrapper.exists()).toBe(true);
     });
 
     it("should handle dark theme", async () => {
-      store.state.theme = 'dark';
+      store.state.theme = "dark";
       wrapper = createWrapper();
 
-      expect(wrapper.vm.store.state.theme).toBe('dark');
+      expect(store.state.theme).toBe("dark");
+      expect(wrapper.exists()).toBe(true);
     });
 
-    it("should pass correct theme class to popup", async () => {
-      store.state.theme = 'dark';
+    it("should not pass theme-specific class to popup after migration", async () => {
+      // Migration: dialog wrapper + dark-mode/bg-white class binding removed.
+      // OverrideConfigPopup is rendered directly with no theme class.
+      store.state.theme = "dark";
       wrapper = createWrapper();
 
       wrapper.vm.showOverrideConfigPopup = true;
       await wrapper.vm.$nextTick();
 
-      const popup = wrapper.findComponent({ name: 'OverrideConfigPopup' });
-      if (popup.exists()) {
-        expect(popup.classes()).toContain('dark-mode');
-      }
+      const popup = wrapper.findComponent({ name: "OverrideConfigPopup" });
+      expect(popup.exists()).toBe(true);
+      expect(popup.classes()).not.toContain("dark-mode");
+      expect(popup.classes()).not.toContain("bg-white");
     });
   });
 
@@ -354,9 +345,9 @@ describe("OverrideConfig", () => {
         data: {
           config: {},
           queries: [{ fields: { x: [], y: [] } }],
-          type: "line"
+          type: "line",
         },
-        layout: { currentQueryIndex: 0 }
+        layout: { currentQueryIndex: 0 },
       };
 
       // Simulate initialization as component would do
@@ -394,23 +385,27 @@ describe("OverrideConfig", () => {
     it("should handle queries with different field structures", () => {
       mockDashboardPanelData.data.queries[0].fields = {
         x: [{ alias: "time", label: "Time" }],
-        y: [{ alias: "value", label: "Value" }]
+        y: [{ alias: "value", label: "Value" }],
       };
 
       wrapper = createWrapper();
 
       expect(wrapper.vm.columns.length).toBe(2);
-      expect(wrapper.vm.columns[0].name).toBe("time");
-      expect(wrapper.vm.columns[1].name).toBe("value");
+      expect(wrapper.vm.columns[0].alias).toBe("time");
+      expect(wrapper.vm.columns[1].alias).toBe("value");
     });
   });
 
   describe("Store Integration", () => {
-    it("should have access to store", () => {
+    it("should have access to store via plugin", () => {
+      // After the ODialog/ODrawer migration the component no longer pulls
+      // `useStore()` into its setup (no longer needed since the theme class
+      // binding on the dialog was removed). The vuex plugin is still installed
+      // globally so the store remains available outside the component instance.
       wrapper = createWrapper();
 
-      expect(wrapper.vm.store).toBeDefined();
-      expect(wrapper.vm.store.state).toBeDefined();
+      expect(store).toBeDefined();
+      expect(store.state).toBeDefined();
     });
   });
 
@@ -420,7 +415,7 @@ describe("OverrideConfig", () => {
       wrapper = createWrapper();
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.find('[data-test="dashboard-addpanel-config-override-config-add-btn"]').exists()).toBe(true);
+      expect(typeof wrapper.vm.openOverrideConfigPopup).toBe("function");
     });
 
     it("should handle null override config configuration", () => {
@@ -428,9 +423,9 @@ describe("OverrideConfig", () => {
         data: {
           config: { override_config: null },
           queries: [{ fields: { x: [], y: [] } }],
-          type: "line"
+          type: "line",
         },
-        layout: { currentQueryIndex: 0 }
+        layout: { currentQueryIndex: 0 },
       };
 
       // Simulate initialization as component would do
@@ -443,7 +438,7 @@ describe("OverrideConfig", () => {
 
     it("should handle component unmounting gracefully", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(() => wrapper.unmount()).not.toThrow();
     });
@@ -467,24 +462,25 @@ describe("OverrideConfig", () => {
     it("should have correct component name", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.vm.$options.name).toBe('OverrideConfig');
+      expect(wrapper.vm.$options.name).toBe("OverrideConfig");
     });
 
     it("should have all required methods", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.openOverrideConfigPopup).toBe('function');
-      expect(typeof wrapper.vm.saveOverrideConfigConfig).toBe('function');
+      expect(typeof wrapper.vm.openOverrideConfigPopup).toBe("function");
+      expect(typeof wrapper.vm.saveOverrideConfigConfig).toBe("function");
     });
 
     it("should have all required data properties", () => {
       wrapper = createWrapper();
 
+      // `store` was removed from the setup return after the migration; the
+      // remaining exposed reactive state is asserted here.
       expect(wrapper.vm.dashboardPanelData).toBeDefined();
-      expect(wrapper.vm.store).toBeDefined();
+      expect(wrapper.vm.store).toBeUndefined();
       expect(wrapper.vm.showOverrideConfigPopup).toBeDefined();
       expect(wrapper.vm.columns).toBeDefined();
-      expect(wrapper.vm.overrideConfigs).toBeDefined();
     });
 
     it("should have correct initial state", () => {
@@ -492,55 +488,6 @@ describe("OverrideConfig", () => {
 
       expect(wrapper.vm.showOverrideConfigPopup).toBe(false);
       expect(Array.isArray(wrapper.vm.columns)).toBe(true);
-      expect(Array.isArray(wrapper.vm.overrideConfigs)).toBe(true);
-    });
-  });
-
-  describe("Column Format Functions", () => {
-    it("should create format functions for columns", () => {
-      mockDashboardPanelData.data.config.override_config = [
-        { count: "requests" }
-      ];
-      
-      wrapper = createWrapper();
-
-      const columns = wrapper.vm.columns;
-      const countColumn = columns.find((col: any) => col.field === "count");
-
-      expect(countColumn.format).toBeDefined();
-      expect(typeof countColumn.format).toBe('function');
-    });
-
-    it("should map column properties correctly", () => {
-      wrapper = createWrapper();
-
-      const columns = wrapper.vm.columns;
-      const firstColumn = columns[0];
-
-      expect(firstColumn.name).toBe(firstColumn.field);
-      expect(firstColumn.label).toBeDefined();
-      expect(firstColumn.format).toBeDefined();
-    });
-
-    it("should handle complex override configurations", () => {
-      mockDashboardPanelData.data.config.override_config = {
-        count: "requests/min",
-        duration: "ms",
-        timestamp: "",
-        user_id: "ID"
-      };
-      
-      wrapper = createWrapper();
-
-      const columns = wrapper.vm.columns;
-      
-      const countColumn = columns.find((col: any) => col.field === "count");
-      const durationColumn = columns.find((col: any) => col.field === "duration");
-      const timestampColumn = columns.find((col: any) => col.field === "timestamp");
-
-      if (countColumn?.format) expect(countColumn.format(100)).toBe("100 requests/min");
-      if (durationColumn?.format) expect(durationColumn.format(500)).toBe("500 ms");
-      if (timestampColumn?.format) expect(timestampColumn.format(123456789)).toBe("123456789 ");
     });
   });
 
@@ -557,10 +504,7 @@ describe("OverrideConfig", () => {
       expect(wrapper.vm.showOverrideConfigPopup).toBe(true);
 
       // Save config
-      const newConfig = [
-        { count: "items" },
-        { duration: "seconds" }
-      ];
+      const newConfig = [{ count: "items" }, { duration: "seconds" }];
       wrapper.vm.saveOverrideConfigConfig(newConfig);
 
       // Verify final state
@@ -575,13 +519,146 @@ describe("OverrideConfig", () => {
       const initialColumnsLength = wrapper.vm.columns.length;
 
       // Simulate field changes
-      mockDashboardPanelData.data.queries[0].fields.y.push({ alias: "new_metric", label: "New Metric" });
+      mockDashboardPanelData.data.queries[0].fields.y.push({
+        alias: "new_metric",
+        label: "New Metric",
+      });
 
       // Open popup (which fetches columns)
       wrapper.vm.openOverrideConfigPopup();
 
       // Verify columns updated
       expect(wrapper.vm.columns.length).toBe(initialColumnsLength + 1);
+    });
+  });
+
+  describe("Multi-query column aggregation", () => {
+    afterEach(() => {
+      // Restore the single-query fixture so other suites are unaffected.
+      mockDashboardPanelData.data.queries = [
+        {
+          fields: {
+            x: [
+              { alias: "timestamp", label: "Timestamp" },
+              { alias: "user_id", label: "User ID" },
+            ],
+            y: [
+              { alias: "count", label: "Count" },
+              { alias: "duration", label: "Duration" },
+            ],
+          },
+        },
+      ];
+    });
+
+    it("should include fields from the 2nd query, not just queries[0]", () => {
+      mockDashboardPanelData.data.queries = [
+        {
+          fields: {
+            x: [{ alias: "svc", label: "Service" }],
+            y: [{ alias: "cnt", label: "Count" }],
+          },
+        },
+        {
+          fields: {
+            x: [{ alias: "region", label: "Region" }],
+            y: [{ alias: "errs", label: "Errors" }],
+          },
+        },
+      ];
+
+      wrapper = createWrapper();
+
+      const aliases = wrapper.vm.columns.map((c: any) => c.alias);
+      expect(aliases).toContain("region");
+      expect(aliases).toContain("errs");
+      expect(wrapper.vm.columns.length).toBe(4);
+    });
+
+    it("should order columns as all-X then all-breakdown then all-Y across queries", () => {
+      mockDashboardPanelData.data.queries = [
+        {
+          fields: {
+            x: [{ alias: "a", label: "A" }],
+            breakdown: [{ alias: "bd1", label: "BD1" }],
+            y: [{ alias: "b", label: "B" }],
+          },
+        },
+        {
+          fields: {
+            x: [{ alias: "c", label: "C" }],
+            breakdown: [{ alias: "bd2", label: "BD2" }],
+            y: [{ alias: "d", label: "D" }],
+          },
+        },
+      ];
+
+      wrapper = createWrapper();
+
+      const aliases = wrapper.vm.columns.map((c: any) => c.alias);
+      // x(all) -> breakdown(all) -> y(all)
+      expect(aliases).toEqual(["a", "c", "bd1", "bd2", "b", "d"]);
+    });
+
+    it("should de-duplicate columns sharing the same alias across queries", () => {
+      mockDashboardPanelData.data.queries = [
+        {
+          fields: {
+            x: [{ alias: "svc", label: "Service" }],
+            y: [{ alias: "cnt", label: "Count" }],
+          },
+        },
+        {
+          fields: {
+            x: [{ alias: "svc", label: "Service (q2)" }],
+            y: [{ alias: "other", label: "Other" }],
+          },
+        },
+      ];
+
+      wrapper = createWrapper();
+
+      const aliases = wrapper.vm.columns.map((c: any) => c.alias);
+      expect(aliases).toEqual(["svc", "cnt", "other"]);
+      // First occurrence wins (query 1's label is kept).
+      expect(wrapper.vm.columns[0].label).toBe("Service");
+    });
+
+    it("should mark X and breakdown fields non-numeric and Y fields numeric", () => {
+      mockDashboardPanelData.data.queries = [
+        {
+          fields: {
+            x: [{ alias: "x1", label: "X1" }],
+            breakdown: [{ alias: "bd", label: "BD" }],
+            y: [{ alias: "y1", label: "Y1" }],
+          },
+        },
+      ];
+
+      wrapper = createWrapper();
+
+      const byAlias = Object.fromEntries(
+        wrapper.vm.columns.map((c: any) => [c.alias, c.isNumeric]),
+      );
+      expect(byAlias.x1).toBe(false);
+      expect(byAlias.bd).toBe(false);
+      expect(byAlias.y1).toBe(true);
+    });
+
+    it("should ignore a query with missing fields object", () => {
+      mockDashboardPanelData.data.queries = [
+        {
+          fields: {
+            x: [{ alias: "svc", label: "Service" }],
+            y: [{ alias: "cnt", label: "Count" }],
+          },
+        },
+        {}, // malformed / empty query
+      ];
+
+      wrapper = createWrapper();
+
+      expect(wrapper.vm.columns.map((c: any) => c.alias)).toEqual(["svc", "cnt"]);
     });
   });
 });

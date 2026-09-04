@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,68 +15,72 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import MetricLegends from "@/plugins/metrics/MetricLegends.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import { createRouter, createWebHistory } from "vue-router";
 
-// Install Quasar plugins
-installQuasar({
-  plugins: [Dialog, Notify],
-});
+/**
+ * Theming contract: the app puts `.dark` on <html> and flips `--color-*`
+ * design tokens; components no longer carry per-theme root classes
+ * (`theme-light`/`theme-dark`/`light-mode`/`dark-mode`). The assertions below
+ * therefore (a) guard that the legacy per-theme class mechanism has NOT come
+ * back, and (b) assert the structure the component actually renders now.
+ *
+ * The ODropdown stub used in these tests renders the trigger and default
+ * slots inline, so the dropdown content is queryable from the test wrapper.
+ */
+const LEGACY_THEME_CLASSES = ["theme-light", "theme-dark", "light-mode", "dark-mode"];
+
+/** Every class present anywhere in the rendered component. */
+const renderedClasses = (w: any): string[] =>
+  w.findAll("[class]").flatMap((el: any) => Array.from(el.element.classList as DOMTokenList));
+
+/** The content container rendered inside the ODropdown default slot. */
+const dropdownContent = (w: any) => w.find(".o-dropdown-stub > div");
 
 describe("MetricLegends", () => {
   let wrapper: any;
   let router: any;
 
-  const createWrapper = async (storeConfig = {}) => {
+  const createWrapper = async () => {
     // Create router for complete component setup
     router = createRouter({
-      history: createWebHistory('/'),
-      routes: [
-        { path: '/', name: 'home', component: { template: '<div>Home</div>' } },
-      ]
+      history: createWebHistory("/"),
+      routes: [{ path: "/", name: "home", component: { template: "<div>Home</div>" } }],
     });
 
-    await router.push('/');
+    await router.push("/");
     await router.isReady();
 
     return mount(MetricLegends, {
       global: {
         plugins: [store, router, i18n],
         stubs: {
-          'q-btn': { 
-            template: '<button class="q-btn" data-cy="metric-legends-button"><slot /></button>' 
+          // ODropdown is portaled in production. Stub it so the trigger and
+          // default slot both render inline, making theme-class assertions
+          // and content queries straightforward without a portal lookup.
+          ODropdown: {
+            template: '<div class="o-dropdown-stub"><slot name="trigger" /><slot /></div>',
           },
-          'q-icon': { 
-            template: '<i class="q-icon" :class="name"><slot /></i>',
-            props: ['name']
+          OButton: {
+            template: '<button class="OButton" v-bind="$attrs"><slot /></button>',
           },
-          'q-menu': { 
-            template: '<div class="q-menu" :class="$attrs.class"><slot /></div>' 
+          OIcon: {
+            template: '<i class="OIcon" :class="name"><slot /></i>',
+            props: ["name"],
           },
-          'q-card': { 
-            template: '<div class="q-card"><slot /></div>' 
-          },
-          'q-card-section': { 
-            template: '<div class="q-card-section" :class="$attrs.class"><slot /></div>' 
-          },
-          'q-separator': { 
-            template: '<div class="q-separator"></div>' 
-          },
-        }
-      }
+        },
+      },
     });
   };
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    
+
     // Reset store state to default values
-    store.state.theme = 'dark';
-    
+    store.state.theme = "dark";
+
     wrapper = await createWrapper();
     await flushPromises();
   });
@@ -132,11 +136,11 @@ describe("MetricLegends", () => {
     });
 
     it("should have correct Histogram metric mapping", () => {
-      expect(wrapper.vm.metricsIconMapping.Histogram).toBe("bar_chart");
+      expect(wrapper.vm.metricsIconMapping.Histogram).toBe("bar-chart");
     });
 
     it("should have correct Counter metric mapping", () => {
-      expect(wrapper.vm.metricsIconMapping.Counter).toBe("pin");
+      expect(wrapper.vm.metricsIconMapping.Counter).toBe("tag");
     });
 
     it("should have exactly 4 metric mappings", () => {
@@ -154,7 +158,7 @@ describe("MetricLegends", () => {
 
     it("should have string values for all mappings", () => {
       const mappingValues = Object.values(wrapper.vm.metricsIconMapping);
-      mappingValues.forEach(value => {
+      mappingValues.forEach((value) => {
         expect(typeof value).toBe("string");
         expect(value.length).toBeGreaterThan(0);
       });
@@ -169,7 +173,7 @@ describe("MetricLegends", () => {
 
   describe("Template Rendering", () => {
     it("should render main button element", () => {
-      const button = wrapper.find('.q-btn');
+      const button = wrapper.find('[data-cy="metric-legends-button"]');
       expect(button.exists()).toBe(true);
     });
 
@@ -179,192 +183,201 @@ describe("MetricLegends", () => {
     });
 
     it("should render category icon in button", () => {
-      const icon = wrapper.find('.q-icon.category');
+      const icon = wrapper.find(".OIcon.category");
       expect(icon.exists()).toBe(true);
     });
 
     it("should render legend label text in button", () => {
-      const button = wrapper.find('.q-btn');
+      const button = wrapper.find('[data-cy="metric-legends-button"]');
       // The translation should be applied, so we expect the translated text "Legend"
-      expect(button.text()).toContain('Legend');
+      expect(button.text()).toContain("Legend");
     });
 
-    it("should render q-menu element", () => {
-      const menu = wrapper.find('.q-menu');
-      expect(menu.exists()).toBe(true);
+    it("should render ODropdown wrapper", () => {
+      // ODropdown is stubbed and renders inline; verify the dropdown wrapper
+      const dropdown = wrapper.find(".o-dropdown-stub");
+      expect(dropdown.exists()).toBe(true);
     });
 
-    it("should render q-card inside menu", () => {
-      const card = wrapper.find('.q-card');
-      expect(card.exists()).toBe(true);
+    it("should render an untheme-classed content wrapper inside dropdown content", () => {
+      // The dropdown content is a plain padded div: theming comes from `.dark`
+      // on <html> + --color-* tokens, not from a per-theme wrapper class.
+      const content = dropdownContent(wrapper);
+      expect(content.exists()).toBe(true);
+      expect(content.classes()).toContain("px-2");
+      // Guard: the legacy per-theme root class mechanism must not return.
+      expect(wrapper.find(".theme-dark, .theme-light").exists()).toBe(false);
+      // The content wrapper actually hosts the title + legends sections.
+      expect(content.find(".metric-legends-title").exists()).toBe(true);
+      expect(content.find(".legends").exists()).toBe(true);
     });
 
-    it("should render card sections", () => {
-      const cardSections = wrapper.findAll('.q-card-section');
-      expect(cardSections.length).toBeGreaterThanOrEqual(2);
+    it("should render title and legends sections", () => {
+      // The migrated component uses native section divs
+      const title = wrapper.find(".metric-legends-title");
+      const legends = wrapper.find(".legends");
+      expect(title.exists()).toBe(true);
+      expect(legends.exists()).toBe(true);
     });
 
     it("should render legend title section", () => {
-      const titleSection = wrapper.find('.q-card-section.metric-legends-title');
+      const titleSection = wrapper.find(".metric-legends-title");
       expect(titleSection.exists()).toBe(true);
     });
 
     it("should render legends content section", () => {
-      const legendsSection = wrapper.find('.q-card-section.legends');
+      const legendsSection = wrapper.find(".legends");
       expect(legendsSection.exists()).toBe(true);
     });
 
     it("should render separator", () => {
-      const separator = wrapper.find('.q-separator');
+      // The migrated component uses a native top-border div as the separator
+      const separator = wrapper.find(".border-t");
       expect(separator.exists()).toBe(true);
     });
 
     it("should render legend grid", () => {
-      const legendGrid = wrapper.find('.legend-grid');
+      // legend-grid scoped class replaced by Tailwind grid utilities
+      const legendGrid = wrapper.find(".legends .grid");
       expect(legendGrid.exists()).toBe(true);
+      expect(legendGrid.classes()).toContain("grid-cols-2");
     });
   });
 
   describe("Legend Items Rendering", () => {
     it("should render legend items for each metric", () => {
-      const legendItems = wrapper.findAll('.legend-item');
+      const legendItems = wrapper.findAll('[data-test^="metrics-legends-item-"]');
       expect(legendItems.length).toBe(4);
     });
 
     it("should render Summary legend item", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const summaryItem = legendItems.find(item => item.text().includes('Summary'));
-      expect(summaryItem).toBeTruthy();
+      const item = wrapper.find('[data-test="metrics-legends-item-Summary"]');
+      expect(item.exists()).toBe(true);
+      expect(item.text()).toContain("Summary");
     });
 
     it("should render Gauge legend item", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const gaugeItem = legendItems.find(item => item.text().includes('Gauge'));
-      expect(gaugeItem).toBeTruthy();
+      const item = wrapper.find('[data-test="metrics-legends-item-Gauge"]');
+      expect(item.exists()).toBe(true);
+      expect(item.text()).toContain("Gauge");
     });
 
     it("should render Histogram legend item", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const histogramItem = legendItems.find(item => item.text().includes('Histogram'));
-      expect(histogramItem).toBeTruthy();
+      const item = wrapper.find('[data-test="metrics-legends-item-Histogram"]');
+      expect(item.exists()).toBe(true);
+      expect(item.text()).toContain("Histogram");
     });
 
     it("should render Counter legend item", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const counterItem = legendItems.find(item => item.text().includes('Counter'));
-      expect(counterItem).toBeTruthy();
+      const item = wrapper.find('[data-test="metrics-legends-item-Counter"]');
+      expect(item.exists()).toBe(true);
+      expect(item.text()).toContain("Counter");
     });
 
     it("should render icon for each legend item", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      legendItems.forEach(item => {
-        const icon = item.find('.q-icon');
+      const legendItems = wrapper.findAll('[data-test^="metrics-legends-item-"]');
+      expect(legendItems.length).toBe(4);
+      legendItems.forEach((item) => {
+        const icon = item.find(".OIcon");
         expect(icon.exists()).toBe(true);
       });
     });
 
     it("should render correct icon for Summary", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const summaryItem = legendItems.find(item => item.text().includes('Summary'));
-      if (summaryItem) {
-        const icon = summaryItem.find('.q-icon');
-        expect(icon.classes()).toContain('description');
-      }
+      const item = wrapper.find('[data-test="metrics-legends-item-Summary"]');
+      expect(item.exists()).toBe(true);
+      const icon = item.find(".OIcon");
+      expect(icon.classes()).toContain("description");
     });
 
     it("should render correct icon for Gauge", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const gaugeItem = legendItems.find(item => item.text().includes('Gauge'));
-      if (gaugeItem) {
-        const icon = gaugeItem.find('.q-icon');
-        expect(icon.classes()).toContain('speed');
-      }
+      const item = wrapper.find('[data-test="metrics-legends-item-Gauge"]');
+      expect(item.exists()).toBe(true);
+      const icon = item.find(".OIcon");
+      expect(icon.classes()).toContain("speed");
     });
 
     it("should render correct icon for Histogram", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const histogramItem = legendItems.find(item => item.text().includes('Histogram'));
-      if (histogramItem) {
-        const icon = histogramItem.find('.q-icon');
-        expect(icon.classes()).toContain('bar_chart');
-      }
+      const item = wrapper.find('[data-test="metrics-legends-item-Histogram"]');
+      expect(item.exists()).toBe(true);
+      const icon = item.find(".OIcon");
+      expect(icon.classes()).toContain("bar-chart");
     });
 
     it("should render correct icon for Counter", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      const counterItem = legendItems.find(item => item.text().includes('Counter'));
-      if (counterItem) {
-        const icon = counterItem.find('.q-icon');
-        expect(icon.classes()).toContain('pin');
-      }
+      const item = wrapper.find('[data-test="metrics-legends-item-Counter"]');
+      expect(item.exists()).toBe(true);
+      const icon = item.find(".OIcon");
+      expect(icon.classes()).toContain("tag");
     });
   });
 
   describe("Theme Integration", () => {
-    it("should apply dark theme class when store theme is dark", async () => {
+    it("should not emit a per-theme class when store theme is dark", async () => {
       // Default store theme is 'dark'
-      expect(wrapper.vm.store.state.theme).toBe('dark');
-      
-      const menu = wrapper.find('.q-menu');
-      expect(menu.classes()).toContain('theme-dark');
+      expect(wrapper.vm.store.state.theme).toBe("dark");
+
+      // Theming is driven by `.dark` on <html> + --color-* tokens; the
+      // component must not reintroduce a per-theme root class.
+      const classes = renderedClasses(wrapper);
+      LEGACY_THEME_CLASSES.forEach((legacy) => expect(classes).not.toContain(legacy));
+      // It still renders its content wrapper regardless of theme.
+      expect(dropdownContent(wrapper).exists()).toBe(true);
     });
 
-    it("should apply light theme class when store theme is light", async () => {
+    it("should not emit a per-theme class when store theme is light", async () => {
       // Change store theme to light
-      wrapper.vm.store.state.theme = 'light';
+      wrapper.vm.store.state.theme = "light";
       await wrapper.vm.$nextTick();
 
-      const menu = wrapper.find('.q-menu');
-      expect(menu.classes()).toContain('theme-light');
+      const classes = renderedClasses(wrapper);
+      LEGACY_THEME_CLASSES.forEach((legacy) => expect(classes).not.toContain(legacy));
+      expect(dropdownContent(wrapper).exists()).toBe(true);
     });
 
-    it("should react to theme changes", async () => {
-      // Reset store theme to dark first
-      wrapper.vm.store.state.theme = 'dark';
+    it("should render identical markup across theme changes", async () => {
+      // Theme is no longer a render input for this component: switching the
+      // store theme must produce byte-identical markup, because the visual
+      // difference comes entirely from token values resolved in CSS.
+      wrapper.vm.store.state.theme = "dark";
       await wrapper.vm.$nextTick();
-      
-      // Start with dark theme
-      expect(wrapper.vm.store.state.theme).toBe('dark');
-      let menu = wrapper.find('.q-menu');
-      expect(menu.classes()).toContain('theme-dark');
+      const darkHtml = wrapper.html();
 
-      // Change to light theme
-      wrapper.vm.store.state.theme = 'light';
+      wrapper.vm.store.state.theme = "light";
       await wrapper.vm.$nextTick();
+      const lightHtml = wrapper.html();
 
-      menu = wrapper.find('.q-menu');
-      expect(menu.classes()).toContain('theme-light');
+      expect(lightHtml).toBe(darkHtml);
+      expect(lightHtml).not.toContain("theme-light");
+      expect(darkHtml).not.toContain("theme-dark");
     });
 
-    it("should have theme-based class binding", () => {
-      const menu = wrapper.find('.q-menu');
-      const hasThemeClass = menu.classes().some(cls => 
-        cls === 'theme-dark' || cls === 'theme-light'
-      );
-      expect(hasThemeClass).toBe(true);
+    it("should have no theme-based class binding", () => {
+      expect(wrapper.find(".theme-dark, .theme-light").exists()).toBe(false);
+      // ...while still rendering all four legend entries.
+      expect(wrapper.findAll('[data-test^="metrics-legends-item-"]').length).toBe(4);
     });
   });
 
   describe("Internationalization", () => {
     it("should use translation function for button label", () => {
-      const button = wrapper.find('.q-btn');
       // The template uses {{ t("search.legendLabel") }}
       expect(wrapper.vm.t).toBeDefined();
     });
 
     it("should use translation function for title", () => {
-      const titleSection = wrapper.find('.metric-legends-title .label');
+      const titleSection = wrapper.find(".metric-legends-title .label");
       expect(titleSection.exists()).toBe(true);
     });
 
     it("should have access to i18n through t function", () => {
-      expect(typeof wrapper.vm.t).toBe('function');
+      expect(typeof wrapper.vm.t).toBe("function");
     });
 
     it("should translate search.legendLabel key", () => {
-      const translationKey = 'search.legendLabel';
+      const translationKey = "search.legendLabel";
       const result = wrapper.vm.t(translationKey);
-      expect(typeof result).toBe('string');
+      expect(typeof result).toBe("string");
     });
   });
 
@@ -376,22 +389,24 @@ describe("MetricLegends", () => {
 
     it("should have correct store theme value", () => {
       expect(wrapper.vm.store.state.theme).toBeDefined();
-      expect(typeof wrapper.vm.store.state.theme).toBe('string');
+      expect(typeof wrapper.vm.store.state.theme).toBe("string");
     });
 
-    it("should use store theme for conditional class application", () => {
-      const themeClass = wrapper.vm.store.state.theme === 'dark' ? 'theme-dark' : 'theme-light';
-      const menu = wrapper.find('.q-menu');
-      expect(menu.classes()).toContain(themeClass);
+    it("should not use store theme for conditional class application", () => {
+      // The store theme is still readable from the component, but it must not
+      // drive any conditional class: theming is token-based now.
+      expect(["dark", "light"]).toContain(wrapper.vm.store.state.theme);
+      expect(wrapper.find(".theme-dark, .theme-light").exists()).toBe(false);
+      expect(wrapper.find(".light-mode, .dark-mode").exists()).toBe(false);
     });
 
     it("should maintain store reactivity", async () => {
       const originalTheme = wrapper.vm.store.state.theme;
-      const newTheme = originalTheme === 'dark' ? 'light' : 'dark';
-      
+      const newTheme = originalTheme === "dark" ? "light" : "dark";
+
       wrapper.vm.store.state.theme = newTheme;
       await wrapper.vm.$nextTick();
-      
+
       expect(wrapper.vm.store.state.theme).toBe(newTheme);
     });
   });
@@ -403,7 +418,7 @@ describe("MetricLegends", () => {
 
     it("should have proper Vue 3 composition API setup", () => {
       expect(wrapper.vm.$options.setup).toBeDefined();
-      expect(typeof wrapper.vm.$options.setup).toBe('function');
+      expect(typeof wrapper.vm.$options.setup).toBe("function");
     });
 
     it("should return all necessary values from setup", () => {
@@ -420,20 +435,20 @@ describe("MetricLegends", () => {
 
   describe("Edge Cases and Error Handling", () => {
     it("should handle missing translation gracefully", () => {
-      const nonExistentKey = 'non.existent.key';
+      const nonExistentKey = "non.existent.key";
       const result = wrapper.vm.t(nonExistentKey);
-      expect(typeof result).toBe('string');
+      expect(typeof result).toBe("string");
     });
 
     it("should handle metricsIconMapping as immutable", () => {
       const originalMapping = { ...wrapper.vm.metricsIconMapping };
-      
+
       // Try to modify the mapping
-      wrapper.vm.metricsIconMapping.NewType = 'new-icon';
-      
+      wrapper.vm.metricsIconMapping.NewType = "new-icon";
+
       // Check if the mapping was modified (it should be, as it's not frozen)
-      expect(wrapper.vm.metricsIconMapping.NewType).toBe('new-icon');
-      
+      expect(wrapper.vm.metricsIconMapping.NewType).toBe("new-icon");
+
       // But the original structure should still be intact
       expect(wrapper.vm.metricsIconMapping.Summary).toBe(originalMapping.Summary);
       expect(wrapper.vm.metricsIconMapping.Gauge).toBe(originalMapping.Gauge);
@@ -442,16 +457,14 @@ describe("MetricLegends", () => {
     });
 
     it("should maintain component stability with store changes", async () => {
-      const originalTheme = wrapper.vm.store.state.theme;
-      
       // Multiple theme changes
-      wrapper.vm.store.state.theme = 'light';
+      wrapper.vm.store.state.theme = "light";
       await wrapper.vm.$nextTick();
-      wrapper.vm.store.state.theme = 'dark';
+      wrapper.vm.store.state.theme = "dark";
       await wrapper.vm.$nextTick();
-      wrapper.vm.store.state.theme = 'light';
+      wrapper.vm.store.state.theme = "light";
       await wrapper.vm.$nextTick();
-      
+
       // Component should still be stable
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm.metricsIconMapping).toBeDefined();
@@ -459,78 +472,65 @@ describe("MetricLegends", () => {
 
     it("should handle component remounting", async () => {
       const originalMapping = wrapper.vm.metricsIconMapping;
-      
+
       // Remount component
       wrapper.unmount();
       wrapper = await createWrapper();
-      
+
       expect(wrapper.vm.metricsIconMapping).toEqual(originalMapping);
     });
 
-    it("should handle undefined theme gracefully", async () => {
-      wrapper.vm.store.state.theme = undefined;
+    // A bogus store theme can no longer break rendering, because theme is not
+    // a render input. These cases assert the component still renders its full
+    // content and emits no legacy per-theme class for any junk value.
+    it.each([
+      ["undefined", undefined],
+      ["empty string", ""],
+      ["null", null],
+    ])("should handle %s theme gracefully", async (_label, themeValue) => {
+      wrapper.vm.store.state.theme = themeValue as any;
       await wrapper.vm.$nextTick();
-      
-      const menu = wrapper.find('.q-menu');
-      expect(menu.exists()).toBe(true);
-      // Should default to theme-light when undefined
-      expect(menu.classes()).toContain('theme-light');
-    });
 
-    it("should handle empty string theme gracefully", async () => {
-      wrapper.vm.store.state.theme = '';
-      await wrapper.vm.$nextTick();
-      
-      const menu = wrapper.find('.q-menu');
-      expect(menu.exists()).toBe(true);
-      // Should default to theme-light when empty
-      expect(menu.classes()).toContain('theme-light');
-    });
-
-    it("should handle null theme gracefully", async () => {
-      wrapper.vm.store.state.theme = null;
-      await wrapper.vm.$nextTick();
-      
-      const menu = wrapper.find('.q-menu');
-      expect(menu.exists()).toBe(true);
-      // Should default to theme-light when null
-      expect(menu.classes()).toContain('theme-light');
+      expect(dropdownContent(wrapper).exists()).toBe(true);
+      expect(wrapper.findAll('[data-test^="metrics-legends-item-"]').length).toBe(4);
+      const classes = renderedClasses(wrapper);
+      LEGACY_THEME_CLASSES.forEach((legacy) => expect(classes).not.toContain(legacy));
     });
   });
 
   describe("Performance and Memory", () => {
     it("should not create new instances of metricsIconMapping on re-render", async () => {
       const initialMapping = wrapper.vm.metricsIconMapping;
-      
+
       // Force re-render by changing reactive data
-      wrapper.vm.store.state.theme = 'light';
+      wrapper.vm.store.state.theme = "light";
       await wrapper.vm.$nextTick();
-      wrapper.vm.store.state.theme = 'dark';
+      wrapper.vm.store.state.theme = "dark";
       await wrapper.vm.$nextTick();
-      
+
       // metricsIconMapping should be the same reference
       expect(wrapper.vm.metricsIconMapping).toBe(initialMapping);
     });
 
     it("should maintain consistent object references", () => {
-      const store = wrapper.vm.store;
-      const t = wrapper.vm.t;
-      const mapping = wrapper.vm.metricsIconMapping;
-      
-      expect(wrapper.vm.store).toBe(store);
-      expect(wrapper.vm.t).toBe(t);
-      expect(wrapper.vm.metricsIconMapping).toBe(mapping);
+      const storeRef = wrapper.vm.store;
+      const tRef = wrapper.vm.t;
+      const mappingRef = wrapper.vm.metricsIconMapping;
+
+      expect(wrapper.vm.store).toBe(storeRef);
+      expect(wrapper.vm.t).toBe(tRef);
+      expect(wrapper.vm.metricsIconMapping).toBe(mappingRef);
     });
 
     it("should handle rapid theme switching without memory leaks", async () => {
       const initialMapping = wrapper.vm.metricsIconMapping;
-      
+
       // Rapid theme switching
       for (let i = 0; i < 10; i++) {
-        wrapper.vm.store.state.theme = i % 2 === 0 ? 'dark' : 'light';
+        wrapper.vm.store.state.theme = i % 2 === 0 ? "dark" : "light";
         await wrapper.vm.$nextTick();
       }
-      
+
       // Component should still be stable
       expect(wrapper.exists()).toBe(true);
       expect(wrapper.vm.metricsIconMapping).toBe(initialMapping);
@@ -539,37 +539,52 @@ describe("MetricLegends", () => {
 
   describe("Accessibility and Standards", () => {
     it("should have proper button accessibility", () => {
-      const button = wrapper.find('.q-btn');
+      const button = wrapper.find('[data-cy="metric-legends-button"]');
       expect(button.exists()).toBe(true);
-      expect(button.attributes('data-cy')).toBe('metric-legends-button');
+      expect(button.attributes("data-cy")).toBe("metric-legends-button");
     });
 
     it("should maintain semantic HTML structure", () => {
-      // Check if the component maintains proper nesting
-      const button = wrapper.find('.q-btn');
-      const menu = wrapper.find('.q-menu');
-      const card = wrapper.find('.q-card');
-      
+      // The migrated component uses native divs for the card surface
+      // (content wrapper + title + legends sections). The wrapper
+      // carries no per-theme class — theming is `.dark` + --color-* tokens.
+      const button = wrapper.find('[data-cy="metric-legends-button"]');
+      const content = dropdownContent(wrapper);
+      const titleSection = wrapper.find(".metric-legends-title");
+      const legendsSection = wrapper.find(".legends");
+
       expect(button.exists()).toBe(true);
-      expect(menu.exists()).toBe(true);
-      expect(card.exists()).toBe(true);
+      expect(content.exists()).toBe(true);
+      expect(content.classes()).not.toContain("theme-dark");
+      expect(content.classes()).not.toContain("theme-light");
+      expect(titleSection.exists()).toBe(true);
+      expect(legendsSection.exists()).toBe(true);
     });
 
     it("should provide proper icon labeling", () => {
-      const legendItems = wrapper.findAll('.legend-item');
-      
-      legendItems.forEach(item => {
-        const icon = item.find('.q-icon');
+      const legendItems = wrapper.findAll('[data-test^="metrics-legends-item-"]');
+      expect(legendItems.length).toBe(4);
+
+      legendItems.forEach((item) => {
+        const icon = item.find(".OIcon");
         const text = item.text();
-        
+
         expect(icon.exists()).toBe(true);
         expect(text.length).toBeGreaterThan(0);
       });
     });
 
-    it("should have consistent spacing classes", () => {
-      const categoryIcon = wrapper.find('.q-icon.category');
-      expect(categoryIcon.classes()).toContain('q-mr-sm');
+    it("should render an icon alongside each legend item label", () => {
+      // Each legend item must have both an icon and a non-empty text label —
+      // the "me-2" spacing class is a visual detail handled by CSS, not a
+      // behavioral assertion.
+      const legendItems = wrapper.findAll('[data-test^="metrics-legends-item-"]');
+      expect(legendItems.length).toBe(4);
+      legendItems.forEach((item) => {
+        const icon = item.find(".OIcon");
+        expect(icon.exists()).toBe(true);
+        expect(item.text().trim().length).toBeGreaterThan(0);
+      });
     });
   });
 });

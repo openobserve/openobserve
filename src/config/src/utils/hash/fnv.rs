@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -72,5 +72,21 @@ mod tests {
         assert_eq!(h.sum64("test1"), 2271358237066212092);
         assert_eq!(h.sum64("test2"), 2271361535601096725);
         assert_eq!(h.sum64("test3"), 2271360436089468514);
+    }
+
+    #[test]
+    fn test_fnv64a_new_hasher_produces_hash() {
+        use std::hash::Hasher;
+        let mut hasher = new_hasher();
+        hasher.write(b"hello");
+        let hash = hasher.finish();
+        assert_ne!(hash, 0);
+    }
+
+    #[test]
+    fn test_fnv64a_empty_string_equals_offset() {
+        let mut h = new();
+        // Empty string hashes to OFFSET64 (no bytes processed)
+        assert_eq!(h.sum64(""), OFFSET64);
     }
 }

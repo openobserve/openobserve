@@ -7,7 +7,7 @@ export class RegexPatternsPage {
     this.page = page;
 
     // Navigation
-    this.settingsMenuItem = page.locator('[data-test="menu-link-settings-item"]');
+    this.settingsMenuItem = page.locator('[data-test="menu-link-/settings-item"]');
     this.regexPatternsTab = page.locator('[data-test="regex-patterns-tab"]');
 
     // List View
@@ -16,14 +16,15 @@ export class RegexPatternsPage {
     this.searchPatternInput = page.getByPlaceholder('Search Pattern');
     this.importButton = page.locator('[data-test="regex-pattern-list-import"]');
 
-    // Add/Edit Pattern Form
-    this.addPatternTitle = page.locator('[data-test="add-regex-pattern-title"]');
+    // Add/Edit Pattern Form (ODrawer — AddRegexPattern.vue)
+    // The form is now rendered inside an ODrawer; wait for the name input to confirm drawer is open
+    this.addPatternTitle = page.locator('[data-test="add-regex-pattern-name-input"]');
     this.patternNameInput = page.locator('[data-test="add-regex-pattern-name-input"]');
     this.patternDescriptionInput = page.locator('[data-test="add-regex-pattern-description-input"]');
     this.patternInput = page.locator('[data-test="add-regex-pattern-input"]');
     this.testInputButton = page.getByRole('button', { name: 'Test Input' });
-    this.saveButton = page.locator('[data-test="add-regex-pattern-save-btn"]');
-    this.cancelButton = page.getByRole('button', { name: /^cancel$/i });
+    this.saveButton = page.locator('[data-test="add-regex-pattern-drawer"] [data-test="o-drawer-primary-btn"]');
+    this.cancelButton = page.locator('[data-test="add-regex-pattern-drawer"] [data-test="o-drawer-secondary-btn"]');
 
     // Messages
     this.successMessage = (text) => page.getByText(text);
@@ -36,7 +37,7 @@ export class RegexPatternsPage {
     const targetUrl = `${baseUrl}/web/settings/regex_patterns?org_identifier=${orgName}`;
     testLogger.info(`Navigating to Regex Patterns settings with org: ${orgName}`);
     await this.page.goto(targetUrl);
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async verifyRegexPatternsPageLoaded() {
@@ -139,7 +140,7 @@ export class RegexPatternsPage {
 
   async confirmDelete() {
     testLogger.info('Confirming pattern deletion');
-    const confirmButton = this.page.locator('[data-test="confirm-button"]');
+    const confirmButton = this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]');
     await expect(this.page.getByText('Delete Regex Pattern')).toBeVisible();
     await confirmButton.click();
   }
@@ -174,7 +175,7 @@ export class RegexPatternsPage {
 
   async waitForPatternListUpdate() {
     testLogger.info('Waiting for pattern list to update');
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
 
   async importPatternsFromFile(filePath) {
@@ -211,19 +212,20 @@ export class RegexPatternsPage {
       testLogger.warn('⚠ Success message not visible after import');
     }
 
-    await this.page.waitForLoadState('networkidle');
+    await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     return isVisible;
   }
 
   async getTotalPatternsCount() {
     testLogger.info('Getting total patterns count from UI');
 
-    // The count text is in format "Showing 1 - 20 of 37 Pattern(s)"
-    const countText = this.page.getByText('Pattern(s)');
-    const text = await countText.textContent().catch(() => '');
+    // The OTable #bottom slot renders the i18n-pluralised total, e.g.
+    // "1 Pattern" or "37 Patterns".
+    const countText = this.page.getByText(/\d+\s+Patterns?\b/);
+    const text = (await countText.first().textContent().catch(() => '')) || '';
 
-    // Extract the total number from "Showing X - Y of Z Pattern(s)"
-    const match = text.match(/of\s+(\d+)\s+Pattern/);
+    // Extract the total number from "Z Pattern(s)"
+    const match = text.match(/(\d+)\s+Patterns?\b/);
     if (match && match[1]) {
       const count = parseInt(match[1], 10);
       testLogger.info(`Total patterns count: ${count}`);

@@ -3,47 +3,22 @@ const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
 const logData = require("../../fixtures/log.json");
 const matchAllLogsData = require("../../../test-data/match_all.json");
+const { ingestCustomData } = require('../utils/data-ingestion.js');
 
 // Legacy login function replaced by global authentication via navigateToBase
 
 async function ingestion(page) {
-  const orgId = process.env["ORGNAME"];
-  const streamName = "e2e_matchall";
-  const basicAuthCredentials = Buffer.from(
-    `${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`
-  ).toString('base64');
-
-  const headers = {
-    "Authorization": `Basic ${basicAuthCredentials}`,
-    "Content-Type": "application/json",
-  };
-  const response = await page.evaluate(async ({ url, headers, orgId, streamName, logsdata }) => {
-    const fetchResponse = await fetch(`${url}/api/${orgId}/${streamName}/_json`, {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify(logsdata)
-    });
-    return await fetchResponse.json();
-  }, {
-    url: process.env.INGESTION_URL,
-    headers: headers,
-    orgId: orgId,
-    streamName: streamName,
-    logsdata: matchAllLogsData
-  });
-  testLogger.debug('API response received', { response });
+  await ingestCustomData(page, "e2e_matchall", matchAllLogsData);
 }
 
 test.describe("Match All Logs Queries testcases", () => {
   let pageManager;
 
-  async function applyQueryButton(page) {
-    const search = page.waitForResponse(logData.applyQuery);
+  async function applyQueryButton(pm) {
+    const search = pm.page.waitForResponse(logData.applyQuery);
     // Strategic 1000ms wait for query preparation - this is functionally necessary
-    await page.waitForTimeout(1000);
-    await page.locator("[data-test='logs-search-bar-refresh-btn']").click({
-      force: true,
-    });
+    await pm.page.waitForTimeout(1000);
+    await pm.logsPage.clickRefreshButton();
     await expect.poll(async () => (await search).status()).toBe(200);
   }
 
@@ -67,7 +42,7 @@ test.describe("Match All Logs Queries testcases", () => {
     // Strategic 1000ms wait for logs page stabilization - this is functionally necessary
     await page.waitForTimeout(1000);
     await pageManager.logsPage.selectStream("e2e_matchall"); 
-    await applyQueryButton(page);
+    await applyQueryButton(pageManager);
     
     testLogger.info('Match All test setup completed');
   });

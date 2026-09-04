@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,44 +14,22 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
+<!--
+  Thin wrapper kept for its existing name/contract; the empty-state UI now
+  lives in src/components/common/empty-states/NoPanels.vue.
+-->
 <template>
-  <div class="flex column justify-center q-pa-xs" style="font-size: 1.5rem">
-    <q-img
-      :src="getImageURL('images/common/clipboard_icon.svg')"
-      style="width: 230px; margin: 5vh auto 2rem"
-    />
-    <div class="flex justify-center q-mb-md">
-      <span>Start by adding your first dashboard panel</span>
-    </div>
-    <div class="flex justify-center" v-if="!viewOnly">
-      <q-btn
-        :label="t('panel.add')"
-        stack
-        padding="md"
-        outline
-        icon="insert_drive_file"
-        @click="$emit('update:Panel')"
-        data-test="dashboard-if-no-panel-add-panel-btn"
-        class="el-border"
-      >
-      </q-btn>
-    </div>
-  </div>
+  <NoPanels :view-only="viewOnly" @add="$emit('update:Panel')" />
 </template>
+
 <script lang="ts">
 import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
-import { getImageURL } from "../../../utils/zincutils";
+import NoPanels from "@/components/common/empty-states/NoPanels.vue";
 
 export default defineComponent({
   name: "NoPanel",
   props: ["Panel", "viewOnly"],
   emits: ["update:Panel"],
-
-  setup() {
-    const { t } = useI18n();
-
-    return { t, getImageURL };
-  },
+  components: { NoPanels },
 });
 </script>

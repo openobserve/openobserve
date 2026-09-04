@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,45 +15,39 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import SortByBtnGrp from "@/components/dashboards/addPanel/SortByBtnGrp.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
 import router from "@/test/unit/helpers/router";
 
 // Mock dashboard panel composable
-vi.mock("@/composables/useDashboardPanel", () => ({
+vi.mock("@/composables/dashboard/useDashboardPanel", () => ({
   default: vi.fn(() => ({
     dashboardPanelData: {
       value: {
         data: {
           queries: [{ fields: [] }],
-          type: "line"
+          type: "line",
         },
         layout: {
-          currentQueryIndex: 0
-        }
-      }
-    }
-  }))
+          currentQueryIndex: 0,
+        },
+      },
+    },
+  })),
 }));
-
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 const defaultFieldObj = {
   name: "testField",
   type: "string",
-  sortBy: null
+  sortBy: null,
 };
 
 describe("SortByBtnGrp", () => {
   let wrapper: any;
 
   const defaultProps = {
-    fieldObj: { ...defaultFieldObj }
+    fieldObj: { ...defaultFieldObj },
   };
 
   beforeEach(() => {
@@ -70,39 +64,42 @@ describe("SortByBtnGrp", () => {
     return mount(SortByBtnGrp, {
       props: {
         ...defaultProps,
-        ...props
+        ...props,
       },
       global: {
         plugins: [i18n, store, router],
         provide: {
-          dashboardPanelDataPageKey: "dashboard"
+          dashboardPanelDataPageKey: "dashboard",
         },
         stubs: {
-          'AscSort': {
-            template: '<div data-test="asc-sort-icon"></div>'
+          AscSort: {
+            template: '<div data-test="asc-sort-icon"></div>',
           },
-          'DescSort': {
-            template: '<div data-test="desc-sort-icon"></div>'
-          }
+          DescSort: {
+            template: '<div data-test="desc-sort-icon"></div>',
+          },
         },
         mocks: {
-          $t: (key: string) => key
-        }
-      }
+          $t: (key: string) => key,
+        },
+      },
     });
   };
 
   describe("Component Rendering", () => {
-    it("should render sort by label", () => {
+    it("should not render the legacy sort by label when redesigned group renders", () => {
+      // The literal "Sort By:" text was removed from the template; the parent
+      // (DynamicFunctionPopUp) now renders the heading instead.
       wrapper = createWrapper();
 
-      expect(wrapper.text()).toContain('Sort By:');
+      expect(wrapper.text()).not.toContain("Sort By:");
+      expect(wrapper.find('[data-test="dashboard-sort-by-btn-group"]').exists()).toBe(true);
     });
 
     it("should render button group", () => {
       wrapper = createWrapper();
 
-      expect(wrapper.find('.q-btn-group').exists()).toBe(true);
+      expect(wrapper.find('[data-test="dashboard-sort-by-btn-group"]').exists()).toBe(true);
     });
 
     it("should render clear sort button", () => {
@@ -137,48 +134,48 @@ describe("SortByBtnGrp", () => {
       wrapper = createWrapper({ fieldObj: fieldObjNoSort });
 
       const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
-      expect(clearBtn.classes()).toContain('selected');
+      expect(clearBtn.classes()).toContain("bg-button-primary");
     });
 
     it("should highlight ascending button when ASC sort is applied", () => {
-      const fieldObjAsc = { ...defaultFieldObj, sortBy: 'ASC' };
+      const fieldObjAsc = { ...defaultFieldObj, sortBy: "ASC" };
       wrapper = createWrapper({ fieldObj: fieldObjAsc });
 
       const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
-      expect(ascBtn.classes()).toContain('selected');
+      expect(ascBtn.classes()).toContain("bg-button-primary");
     });
 
     it("should highlight descending button when DESC sort is applied", () => {
-      const fieldObjDesc = { ...defaultFieldObj, sortBy: 'DESC' };
+      const fieldObjDesc = { ...defaultFieldObj, sortBy: "DESC" };
       wrapper = createWrapper({ fieldObj: fieldObjDesc });
 
       const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
-      expect(descBtn.classes()).toContain('selected');
+      expect(descBtn.classes()).toContain("bg-button-primary");
     });
 
     it("should only highlight one button at a time", () => {
-      const fieldObjAsc = { ...defaultFieldObj, sortBy: 'ASC' };
+      const fieldObjAsc = { ...defaultFieldObj, sortBy: "ASC" };
       wrapper = createWrapper({ fieldObj: fieldObjAsc });
 
       const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
       const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
       const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
 
-      expect(clearBtn.classes()).not.toContain('selected');
-      expect(ascBtn.classes()).toContain('selected');
-      expect(descBtn.classes()).not.toContain('selected');
+      expect(clearBtn.classes()).not.toContain("bg-button-primary");
+      expect(ascBtn.classes()).toContain("bg-button-primary");
+      expect(descBtn.classes()).not.toContain("bg-button-primary");
     });
   });
 
   describe("Button Interactions", () => {
     it("should clear sort when clear button is clicked", async () => {
-      const fieldObjAsc = { ...defaultFieldObj, sortBy: 'ASC' };
+      const fieldObjAsc = { ...defaultFieldObj, sortBy: "ASC" };
       wrapper = createWrapper({ fieldObj: fieldObjAsc });
 
       const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
-      await clearBtn.trigger('click');
+      await clearBtn.trigger("click");
 
-      expect(wrapper.props('fieldObj').sortBy).toBe(null);
+      expect(wrapper.props("fieldObj").sortBy).toBe(null);
     });
 
     it("should set ascending sort when ASC button is clicked", async () => {
@@ -186,9 +183,9 @@ describe("SortByBtnGrp", () => {
       wrapper = createWrapper({ fieldObj: fieldObjNoSort });
 
       const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
-      await ascBtn.trigger('click');
+      await ascBtn.trigger("click");
 
-      expect(wrapper.props('fieldObj').sortBy).toBe('ASC');
+      expect(wrapper.props("fieldObj").sortBy).toBe("ASC");
     });
 
     it("should set descending sort when DESC button is clicked", async () => {
@@ -196,9 +193,9 @@ describe("SortByBtnGrp", () => {
       wrapper = createWrapper({ fieldObj: fieldObjNoSort });
 
       const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
-      await descBtn.trigger('click');
+      await descBtn.trigger("click");
 
-      expect(wrapper.props('fieldObj').sortBy).toBe('DESC');
+      expect(wrapper.props("fieldObj").sortBy).toBe("DESC");
     });
 
     it("should allow switching between sort options", async () => {
@@ -207,18 +204,18 @@ describe("SortByBtnGrp", () => {
 
       // Set to ASC
       const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
-      await ascBtn.trigger('click');
-      expect(wrapper.props('fieldObj').sortBy).toBe('ASC');
+      await ascBtn.trigger("click");
+      expect(wrapper.props("fieldObj").sortBy).toBe("ASC");
 
       // Change to DESC
       const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
-      await descBtn.trigger('click');
-      expect(wrapper.props('fieldObj').sortBy).toBe('DESC');
+      await descBtn.trigger("click");
+      expect(wrapper.props("fieldObj").sortBy).toBe("DESC");
 
       // Clear sort
       const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
-      await clearBtn.trigger('click');
-      expect(wrapper.props('fieldObj').sortBy).toBe(null);
+      await clearBtn.trigger("click");
+      expect(wrapper.props("fieldObj").sortBy).toBe(null);
     });
   });
 
@@ -226,21 +223,21 @@ describe("SortByBtnGrp", () => {
     it("should have updateSortOption method", () => {
       wrapper = createWrapper();
 
-      expect(typeof wrapper.vm.updateSortOption).toBe('function');
+      expect(typeof wrapper.vm.updateSortOption).toBe("function");
     });
 
     it("should update field sort property through updateSortOption", () => {
       const fieldObjNoSort = { ...defaultFieldObj, sortBy: null };
       wrapper = createWrapper({ fieldObj: fieldObjNoSort });
 
-      wrapper.vm.updateSortOption('ASC');
-      expect(wrapper.props('fieldObj').sortBy).toBe('ASC');
+      wrapper.vm.updateSortOption("ASC");
+      expect(wrapper.props("fieldObj").sortBy).toBe("ASC");
 
-      wrapper.vm.updateSortOption('DESC');
-      expect(wrapper.props('fieldObj').sortBy).toBe('DESC');
+      wrapper.vm.updateSortOption("DESC");
+      expect(wrapper.props("fieldObj").sortBy).toBe("DESC");
 
       wrapper.vm.updateSortOption(null);
-      expect(wrapper.props('fieldObj').sortBy).toBe(null);
+      expect(wrapper.props("fieldObj").sortBy).toBe(null);
     });
   });
 
@@ -248,12 +245,12 @@ describe("SortByBtnGrp", () => {
     it("should handle field object with different initial states", () => {
       const variants = [
         { ...defaultFieldObj, sortBy: null },
-        { ...defaultFieldObj, sortBy: 'ASC' },
-        { ...defaultFieldObj, sortBy: 'DESC' },
-        { ...defaultFieldObj, sortBy: undefined }
+        { ...defaultFieldObj, sortBy: "ASC" },
+        { ...defaultFieldObj, sortBy: "DESC" },
+        { ...defaultFieldObj, sortBy: undefined },
       ];
 
-      variants.forEach(fieldObj => {
+      variants.forEach((fieldObj) => {
         const localWrapper = createWrapper({ fieldObj });
         expect(localWrapper.exists()).toBe(true);
         localWrapper.unmount();
@@ -263,36 +260,36 @@ describe("SortByBtnGrp", () => {
     it("should handle field object with additional properties", () => {
       const extendedFieldObj = {
         ...defaultFieldObj,
-        sortBy: 'ASC',
-        extraProp: 'test',
-        nested: { value: 123 }
+        sortBy: "ASC",
+        extraProp: "test",
+        nested: { value: 123 },
       };
 
       wrapper = createWrapper({ fieldObj: extendedFieldObj });
 
       expect(wrapper.exists()).toBe(true);
-      expect(wrapper.props('fieldObj').extraProp).toBe('test');
+      expect(wrapper.props("fieldObj").extraProp).toBe("test");
     });
   });
 
   describe("Styling and CSS Classes", () => {
     it("should apply selected class correctly", () => {
-      const fieldObjAsc = { ...defaultFieldObj, sortBy: 'ASC' };
+      const fieldObjAsc = { ...defaultFieldObj, sortBy: "ASC" };
       wrapper = createWrapper({ fieldObj: fieldObjAsc });
 
       const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
-      expect(ascBtn.classes()).toContain('selected');
+      expect(ascBtn.classes()).toContain("bg-button-primary");
     });
 
     it("should not apply selected class to non-active buttons", () => {
-      const fieldObjAsc = { ...defaultFieldObj, sortBy: 'ASC' };
+      const fieldObjAsc = { ...defaultFieldObj, sortBy: "ASC" };
       wrapper = createWrapper({ fieldObj: fieldObjAsc });
 
       const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
       const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
 
-      expect(clearBtn.classes()).not.toContain('selected');
-      expect(descBtn.classes()).not.toContain('selected');
+      expect(clearBtn.classes()).not.toContain("bg-button-primary");
+      expect(descBtn.classes()).not.toContain("bg-button-primary");
     });
   });
 
@@ -334,17 +331,17 @@ describe("SortByBtnGrp", () => {
       wrapper = createWrapper({ fieldObj: fieldObjUndefined });
 
       expect(wrapper.exists()).toBe(true);
-      
+
       // Should treat undefined as falsy and highlight clear button
       const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
-      expect(clearBtn.classes()).toContain('selected');
+      expect(clearBtn.classes()).toContain("bg-button-primary");
     });
 
     it("should handle empty field object gracefully", () => {
       const emptyFieldObj = {};
 
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      
+      const consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
       wrapper = createWrapper({ fieldObj: emptyFieldObj });
 
       expect(wrapper.exists()).toBe(true);
@@ -353,7 +350,7 @@ describe("SortByBtnGrp", () => {
 
     it("should handle component unmounting gracefully", () => {
       wrapper = createWrapper();
-      
+
       expect(wrapper.exists()).toBe(true);
       expect(() => wrapper.unmount()).not.toThrow();
     });
@@ -365,39 +362,39 @@ describe("SortByBtnGrp", () => {
       wrapper = createWrapper({ fieldObj: fieldObjNoSort });
 
       const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
-      expect(clearBtn.classes()).toContain('selected');
+      expect(clearBtn.classes()).toContain("bg-button-primary");
 
       // Update the field object
-      await wrapper.setProps({ 
-        fieldObj: { ...fieldObjNoSort, sortBy: 'ASC' }
+      await wrapper.setProps({
+        fieldObj: { ...fieldObjNoSort, sortBy: "ASC" },
       });
 
       const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
-      expect(ascBtn.classes()).toContain('selected');
+      expect(ascBtn.classes()).toContain("bg-button-primary");
     });
 
     it("should maintain state consistency during rapid changes", async () => {
       const fieldObjNoSort = { ...defaultFieldObj, sortBy: null };
       wrapper = createWrapper({ fieldObj: fieldObjNoSort });
 
-      const sortOptions = [null, 'ASC', 'DESC', null, 'ASC'];
-      
+      const sortOptions = [null, "ASC", "DESC", null, "ASC"];
+
       for (const sortOption of sortOptions) {
-        await wrapper.setProps({ 
-          fieldObj: { ...fieldObjNoSort, sortBy: sortOption }
+        await wrapper.setProps({
+          fieldObj: { ...fieldObjNoSort, sortBy: sortOption },
         });
-        
+
         // Verify the correct button is highlighted
         const clearBtn = wrapper.find('[data-test="dashboard-sort-by-item-clear"]');
         const ascBtn = wrapper.find('[data-test="dashboard-sort-by-item-asc"]');
         const descBtn = wrapper.find('[data-test="dashboard-sort-by-item-desc"]');
 
         if (sortOption === null) {
-          expect(clearBtn.classes()).toContain('selected');
-        } else if (sortOption === 'ASC') {
-          expect(ascBtn.classes()).toContain('selected');
-        } else if (sortOption === 'DESC') {
-          expect(descBtn.classes()).toContain('selected');
+          expect(clearBtn.classes()).toContain("bg-button-primary");
+        } else if (sortOption === "ASC") {
+          expect(ascBtn.classes()).toContain("bg-button-primary");
+        } else if (sortOption === "DESC") {
+          expect(descBtn.classes()).toContain("bg-button-primary");
         }
       }
     });

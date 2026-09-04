@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,25 +15,26 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="logs-search-bar-component" id="searchBarComponent">
-    <div class="row flex justify-end align-center">
-      <div class="col-auto q-my-xs">
-        <q-btn
-          class="q-mr-sm download-logs-btn q-px-sm"
+  <div
+    data-test="logstream-explore-search-bar-container"
+    class="h-full overflow-hidden pb-px"
+    id="searchBarComponent"
+  >
+    <div class="flex justify-end">
+      <div class="my-1">
+        <OButton
+          class="me-2"
+          variant="ghost"
           size="sm"
           :disabled="
-            queryData.queryResults.hasOwnProperty('hits') &&
-            !queryData.queryResults.hits.length
+            queryData.queryResults.hasOwnProperty('hits') && !queryData.queryResults.hits.length
           "
-          icon="download"
           :title="t('search.exportLogs')"
           @click="downloadLogs"
-        ></q-btn>
-        <div
-          class="float-left"
-          v-show="queryData.streamType !== 'enrichment_tables'"
-        >
-          <date-time
+          icon-left="download"
+        />
+        <div class="float-left" v-show="queryData.streamType !== 'enrichment_tables'">
+          <DateTime
             data-test="logs-search-bar-date-time-dropdown"
             auto-apply
             :default-type="searchObj.data.datetime.type"
@@ -45,31 +46,29 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
         </div>
-        <div class="search-time q-pl-sm float-left q-mr-sm">
-          <q-btn
+        <div class="float-left me-2 ps-2">
+          <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"
-            dense
-            flat
+            variant="primary"
+            size="sm-action"
             :title="t('search.runQuery')"
-            class="q-pa-none search-button"
             @click="searchData"
-            >{{ t("search.runQuery") }}</q-btn
+            >{{ t("search.runQuery") }}</OButton
           >
         </div>
       </div>
     </div>
-    <div class="row query-editor-container">
-      <div class="col" style="border-top: 1px solid #dbdbdb; height: 100px">
-        <b>Query Editor:</b>
-        <code-query-editor
+    <div class="flex h-[calc(100%-2.5rem)]!">
+      <div class="border-border-default flex h-25 flex-col border-t">
+        <b>{{ t("search.queryEditorLabel") }}</b>
+        <CodeQueryEditor
           editor-id="logsStreamQueryEditor"
           ref="queryEditorRef"
-          class="monaco-editor"
           v-model:query="query"
           @update:query="updateQueryValue"
           @run-query="searchData"
-        ></code-query-editor>
+        ></CodeQueryEditor>
       </div>
     </div>
   </div>
@@ -77,22 +76,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onMounted, onBeforeMount } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, onBeforeMount } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useRouter } from "vue-router";
 import { useStore } from "vuex";
 import DateTime from "@/components/DateTime.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import useLogs from "@/composables/useLogs";
 import type { IDateTime } from "@/ts/interfaces";
-
-const defaultValue: any = () => {
-  return {
-    name: "",
-    function: "",
-    params: "row",
-    transType: "0",
-  };
-};
 
 export default defineComponent({
   name: "ComponentSearchSearchBar",
@@ -110,9 +101,8 @@ export default defineComponent({
   },
   components: {
     DateTime,
-    CodeQueryEditor: defineAsyncComponent(
-      () => import("@/components/CodeQueryEditor.vue"),
-    ),
+    OButton,
+    CodeQueryEditor: defineAsyncComponent(() => import("@/components/CodeQueryEditor.vue")),
   },
   emits: ["searchdata", "update-query", "change:date-time"],
   methods: {
@@ -125,11 +115,11 @@ export default defineComponent({
   },
   setup(props, { emit }) {
     const router = useRouter();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     const btnRefreshInterval = ref(null);
 
-    const { searchObj } = useLogs();
+    const { searchObj } = useLogs(t);
     const queryEditorRef = ref(null);
 
     const functionOptions = ref(searchObj.data.transforms);
@@ -156,8 +146,7 @@ export default defineComponent({
 
     const updateQuery = () => {
       // alert(searchObj.data.query);
-      if (queryEditorRef.value?.setValue)
-        queryEditorRef.value.setValue(props.queryData.query);
+      if (queryEditorRef.value?.setValue) queryEditorRef.value.setValue(props.queryData.query);
     };
 
     const jsonToCsv = (jsonData) => {
@@ -223,186 +212,9 @@ export default defineComponent({
 });
 </script>
 
-<style lang="scss">
-#logsStreamQueryEditor,
-#fnEditor {
-  height: calc(100% - 20px) !important;
-}
-#fnEditor {
-  width: 100%;
-  border-radius: 5px;
-  border: 0px solid #dbdbdb;
-  overflow: hidden;
-}
-
-.q-field--standard .q-field__control:before,
-.q-field--standard .q-field__control:focus:before,
-.q-field--standard .q-field__control:hover:before {
-  border: 0px !important;
-  border-color: none;
-  transition: none;
-}
-
-.logs-search-bar-component > .row:nth-child(2) {
-  height: calc(100% - 38px); /* or any other height you want to set */
-}
-
-.logs-search-bar-component {
-  padding-bottom: 1px;
-  height: 100%;
-  overflow: hidden;
-
-  .function-dropdown {
-    width: 205px;
-    padding-bottom: 0px;
-    border: 1px solid #dbdbdb;
-    border-radius: 5px;
-    cursor: pointer;
-
-    .q-field__input {
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 12px;
-    }
-    .q-field__native,
-    .q-field__control {
-      min-height: 29px;
-      height: 29px;
-      padding: 0px 0px 0px 4px;
-    }
-
-    .q-field__marginal {
-      height: 30px;
-    }
-  }
-
-  .q-toggle__inner {
-    font-size: 30px;
-  }
-
-  .q-toggle__label {
-    font-size: 12px;
-  }
-
-  .casesensitive-btn {
-    padding: 8px;
-    margin-left: -6px;
-    background-color: #d5d5d5;
-    border-radius: 0px 3px 3px 0px;
-  }
-
-  .search-field .q-field {
-    &__control {
-      border-radius: 3px 0px 0px 3px !important;
-    }
-
-    &__native {
-      font-weight: 600;
-    }
-  }
-
-  .search-time {
-    // width: 120px;
-    .q-btn-group {
-      border-radius: 3px;
-
-      .q-btn {
-        min-height: auto;
-      }
-    }
-  }
-
-  .search-dropdown {
-    padding: 0px;
-
-    .block {
-      color: $dark-page;
-      font-weight: 600;
-      font-size: 12px;
-    }
-
-    .q-btn-dropdown__arrow-container {
-      color: $light-text2;
-    }
-  }
-
-  .refresh-rate-dropdown-container {
-    width: 220px;
-
-    * .q-btn {
-      font-size: 12px !important;
-      padding-left: 8px;
-      padding-right: 8px;
-    }
-  }
-
-  .flex-start {
-    justify-content: flex-start;
-    align-items: flex-start;
-    display: flex;
-  }
-
-  .resultsOverChart {
-    margin-bottom: 0.75rem;
-    font-size: 0.875rem;
-    color: $dark-page;
-    font-weight: 700;
-  }
-
-  .ddlWrapper {
-    position: relative;
-    z-index: 10;
-
-    .listWrapper {
-      box-shadow: 0px 3px 15px rgba(0, 0, 0, 0.1);
-      transition: height 0.25s ease;
-      height: calc(100vh - 146px);
-      background-color: white;
-      position: absolute;
-      top: 2.75rem;
-      width: 100%;
-      left: 0;
-
-      &:empty {
-        height: 0;
-      }
-
-      &,
-      .q-list {
-        border-radius: 3px;
-      }
-    }
-  }
-
-  .fields_autocomplete {
-    max-height: 250px;
-  }
-
-  .search-button {
-    width: 96px;
-    line-height: 29px;
-    font-weight: bold;
-    text-transform: initial;
-    font-size: 11px;
-    color: white;
-
-    .q-btn__content {
-      background: $secondary;
-      border-radius: 3px 3px 3px 3px;
-
-      .q-icon {
-        font-size: 15px;
-        color: #ffffff;
-      }
-    }
-  }
-
-  .download-logs-btn {
-    height: 30px;
-  }
-}
-
-.query-editor-container {
-  height: calc(100% - 40px) !important;
+<style scoped>
+/* keep(lib-override:monaco): sizes the query editor's own container by id (rendered by the editor lib) */
+:deep(#logsStreamQueryEditor) {
+  height: calc(100% - 1.25rem) !important;
 }
 </style>

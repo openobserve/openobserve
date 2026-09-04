@@ -17,3 +17,22 @@ pub struct Model {
 pub enum Relation {}
 
 impl ActiveModelBehavior for ActiveModel {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_model_construction() {
+        let m = Model {
+            id: "job-1".to_string(),
+            key: "key-1".to_string(),
+            created_at: 1000,
+            ended_at: 2000,
+            status: 0,
+        };
+        assert_eq!(m.id, "job-1");
+        assert_eq!(m.status, 0);
+        assert!(m.ended_at > m.created_at);
+    }
+}

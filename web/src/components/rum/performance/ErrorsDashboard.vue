@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -17,62 +17,80 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <q-page class="relative-position">
+  <div data-test="performance-error-dashboard" class="rounded-default relative-position">
+    <!-- Resolving the _rumdata schema before deciding which panels can run -->
     <div
-      class="performance-error-dashboard"
-      :class="isLoading.length ? 'tw:invisible' : 'tw:visible'"
-    >
-      <div class="performance-dashboard">
-        <RenderDashboardCharts
-          ref="errorRenderDashboardChartsRef"
-          :viewOnly="true"
-          :dashboardData="currentDashboardData.data"
-          :currentTimeObj="dateTime"
-          searchType="RUM"
-          @variablesManagerReady="onVariablesManagerReady"
-          @updated:data-zoom="onDataZoom"
-        />
-      </div>
-    </div>
-    <div
-      v-show="isLoading.length"
-      class="q-pb-lg flex items-center justify-center text-center absolute full-width tw:h-[calc(100vh-15.625rem)] tw:top-0"
+      v-if="!schemaResolved"
+      data-test="errors-dashboard-schema-loading"
+      class="flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
     >
       <div>
-        <q-spinner-hourglass
-          color="primary"
-          size="2.5rem"
-          class="tw:mx-auto tw:block"
-        />
-        <div class="text-center full-width">Loading Dashboard</div>
+        <OSpinner size="md" class="mx-auto block" />
+        <div class="w-full text-center">{{ t("rum.loadingDashboard") }}</div>
       </div>
     </div>
-  </q-page>
+
+    <OEmptyState
+      v-else-if="showEmptyState"
+      data-test="errors-dashboard-empty"
+      size="block"
+      illustration="pulse"
+      :hide-action="true"
+    >
+      <template #title>{{ t("rum.performanceEmptyTitle") }}</template>
+      <template #description>{{ t("rum.performanceEmptyDescription") }}</template>
+    </OEmptyState>
+
+    <template v-else>
+      <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
+      <div
+        class="max-h-[calc(100vh-200px)] min-h-0! overflow-y-auto"
+        :class="isLoading.length ? 'invisible' : 'visible'"
+      >
+        <!-- eslint-enable local/no-hardcoded-px -->
+        <div class="performance-dashboard">
+          <RenderDashboardCharts
+            ref="errorRenderDashboardChartsRef"
+            :viewOnly="true"
+            :frame="false"
+            :dashboardData="dashboardData"
+            :currentTimeObj="dateTime"
+            searchType="RUM"
+            @variablesManagerReady="onVariablesManagerReady"
+            @updated:data-zoom="onDataZoom"
+          />
+        </div>
+      </div>
+      <div
+        v-show="isLoading.length"
+        class="absolute top-0 flex h-[calc(100vh-15.625rem)] w-full items-center justify-center pb-4 text-center"
+      >
+        <div>
+          <OSpinner size="md" class="mx-auto block" />
+          <div class="w-full text-center">{{ t("rum.loadingDashboard") }}</div>
+        </div>
+      </div>
+    </template>
+  </div>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import {
-  defineComponent,
-  ref,
-  watch,
-  onActivated,
-  onMounted,
-  nextTick,
-  type Ref,
-} from "vue";
+import { defineComponent, ref, onActivated, onMounted, nextTick, type Ref } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
-import { reactive } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import errorDashboard from "@/utils/rum/errors.json";
-import searchService from "@/services/search";
-import { convertDashboardSchemaVersion } from "../../../utils/dashboard/convertDashboardSchemaVersion";
+import useRumPerformanceTab from "@/composables/rum/useRumPerformanceTab";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "ErrorsDashboard",
   components: {
     RenderDashboardCharts,
+    OSpinner,
+    OEmptyState,
   },
   props: {
     dateTime: {
@@ -86,11 +104,14 @@ export default defineComponent({
   },
   emits: ["variablesManagerReady"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const currentDashboardData = reactive({
-      data: {},
-    });
+
+    // Adaptive dashboard: drops panels the stream can't serve, reflowing the survivors.
+    // See docs/designs/MOBILE_RUM_ADAPTIVE_UI_DESIGN.md.
+    const { dashboardData, schemaResolved, showEmptyState, ensureRumSchema } =
+      useRumPerformanceTab(errorDashboard);
+
     const showDashboardSettingsDialog = ref(false);
     const viewOnly = ref(true);
     const errorsByView = ref([]);
@@ -101,8 +122,8 @@ export default defineComponent({
     const refreshInterval = ref(0);
     const isLoading: Ref<boolean[]> = ref([]);
 
-    onMounted(async () => {
-      await loadDashboard();
+    onMounted(() => {
+      ensureRumSchema();
       updateLayout();
     });
 
@@ -116,14 +137,6 @@ export default defineComponent({
       await nextTick();
       await nextTick();
       // emit window resize event to trigger the layout
-      if (errorRenderDashboardChartsRef.value) {
-        errorRenderDashboardChartsRef.value.layoutUpdate();
-
-        // Dashboards gets overlapped as we have used keep alive
-        // Its an internal bug of vue-grid-layout
-        // So adding settimeout of 1 sec to fix the issue
-        errorRenderDashboardChartsRef.value.layoutUpdate();
-      }
       window.dispatchEvent(new Event("resize"));
     };
 
@@ -145,27 +158,9 @@ export default defineComponent({
         field: (row: any) => row["error_count"],
         align: "left",
         sortable: true,
-        style: { width: "56px" },
+        style: { width: "3.5rem" },
       },
     ];
-
-    const loadDashboard = async () => {
-      // schema migration
-      currentDashboardData.data = convertDashboardSchemaVersion(errorDashboard);
-
-      // if variables data is null, set it to empty list
-      if (
-        !(
-          currentDashboardData.data?.variables &&
-          currentDashboardData.data?.variables?.list.length
-        )
-      ) {
-        if (variablesData.value) {
-          variablesData.value.isVariablesLoading = false;
-          variablesData.value.values = [];
-        }
-      }
-    };
 
     const addSettingsData = () => {
       showDashboardSettingsDialog.value = true;
@@ -178,7 +173,9 @@ export default defineComponent({
     };
 
     return {
-      currentDashboardData,
+      dashboardData,
+      schemaResolved,
+      showEmptyState,
       t,
       store,
       refDateTime,
@@ -188,7 +185,6 @@ export default defineComponent({
       onVariablesManagerReady,
       addSettingsData,
       showDashboardSettingsDialog,
-      loadDashboard,
       columns,
       errorsByView,
       errorRenderDashboardChartsRef,
@@ -199,30 +195,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.performance_title {
-  font-size: 24px;
-}
-.q-table {
-  &__top {
-    border-bottom: 1px solid $border-color;
-    justify-content: flex-end;
-  }
-}
-
-.view-error-table {
-  margin-top: 4px;
-  border: 1px solid rgba(194, 194, 194, 0.4784313725) !important;
-  border-radius: 4px;
-  min-height: 200px;
-}
-
-.performance-error-dashboard {
-  min-height: auto !important;
-  max-height: calc(100vh - 200px);
-  overflow-y: auto;
-}
-</style>
-
-<style lang="scss"></style>

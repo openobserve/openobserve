@@ -1,5 +1,8 @@
-import { toZonedTime, format } from "date-fns-tz";
-import { forceSimulation, forceManyBody, forceLink, forceCenter, forceCollide, forceX, forceY } from "d3-force";
+import { toZonedTime } from "date-fns-tz";
+import { computeTreeLayout } from "./computeTreeLayout";
+import { resolveModelVendorLogo } from "./modelVendorLogo";
+import { cssToken } from "@/utils/theme";
+import { gt } from "@/types/i18n";
 export const convertTraceData = (props: any, timezone: string) => {
   const options: any = {
     backgroundColor: "transparent",
@@ -22,8 +25,7 @@ export const convertTraceData = (props: any, timezone: string) => {
           show: true,
           fontsize: 12,
           formatter: (name: any) => {
-            if (name.axisDimension == "x")
-              return `${formatDate(new Date(name.value))}`;
+            if (name.axisDimension == "x") return `${formatDate(new Date(name.value))}`;
             else return `${name?.value?.toFixed(2)}ms`;
           },
         },
@@ -166,8 +168,45 @@ export const convertTimelineData = (props: any) => {
 
 export const convertTraceServiceMapData = (
   data: any,
-  treeDepth: number = 3
+  treeDepth: number = 3,
+  enableMultiRootHandling: boolean = false,
 ) => {
+  // Handle multiple root nodes properly for ECharts tree when enabled
+  let treeData = data;
+  let layoutConfig: any = {};
+
+  if (enableMultiRootHandling && Array.isArray(data) && data.length > 1) {
+    // Multiple root services - create a virtual root that doesn't affect layout
+    treeData = [
+      {
+        name: "",
+        children: data,
+        symbol: "none", // Completely hide the symbol
+        symbolSize: 1, // Minimal size to avoid layout calculation issues
+        label: {
+          show: false, // Hide the label
+        },
+        lineStyle: {
+          opacity: 0, // Hide connecting lines from virtual root
+          width: 0, // No line width
+        },
+        itemStyle: {
+          opacity: 0, // Make completely transparent
+        },
+      },
+    ];
+
+    // Use orthogonal layout for better multi-root visualization
+    layoutConfig = {
+      layout: "orthogonal",
+      orient: "LR", // Left to right layout
+      left: "5%",
+      right: "5%",
+      top: "5%",
+      bottom: "5%",
+    };
+  }
+
   const options = {
     tooltip: {
       show: false,
@@ -175,13 +214,16 @@ export const convertTraceServiceMapData = (
     series: [
       {
         type: "tree",
-        data: data,
-        symbolSize: 20,
+        data: treeData,
+        symbolSize: 30,
         initialTreeDepth: treeDepth,
+        roam: "move",
+        expandAndCollapse: false,
+        ...layoutConfig, // Apply layout config for multiple roots
         label: {
           position: "bottom",
           verticalAlign: "bottom",
-          distance: 25,
+          distance: 26,
           fontSize: 12,
         },
       },
@@ -193,19 +235,20 @@ export const convertTraceServiceMapData = (
 /**
  * Convert service graph data (nodes/edges) to ECharts tree format
  * @param graphData - Object containing nodes and edges arrays
- * @param layoutType - Layout orientation: 'horizontal' | 'vertical' | 'radial'
+ * @param layoutType - Layout orientation: 'horizontal' | 'vertical'
+ * @param isDarkMode - Whether dark mode is active
  * @returns ECharts tree options
  */
 export const convertServiceGraphToTree = (
   graphData: { nodes: any[]; edges: any[] },
-  layoutType: string = 'horizontal'
+  layoutType: string = "horizontal",
+  isDarkMode: boolean = true,
+  canvasHeight: number = 700,
+  // When true (Agent Graph page only), agents get the accent treatment:
+  // indigo disc tint + glyph, larger symbol, and the radar-ping halo. On the
+  // regular Service Graph tab this is false and agents render like any node.
+  agentHighlight: boolean = false,
 ) => {
-  console.log('[convertServiceGraphToTree] Called with:', {
-    nodeCount: graphData.nodes.length,
-    edgeCount: graphData.edges.length,
-    layoutType
-  });
-
   // Build adjacency map for edges
   const edgesMap = new Map<string, any[]>();
   graphData.edges.forEach((edge: any) => {
@@ -224,17 +267,94 @@ export const convertServiceGraphToTree = (
     incomingEdgesMap.get(edge.to)!.push(edge);
   });
 
-  // Find all root nodes (nodes with no incoming edges)
-  const nodesWithIncoming = new Set(graphData.edges.map((e: any) => e.to));
+  // Find all root nodes (nodes with no *real* incoming edge). The synthetic
+  // entry edge {from: null → entry service} must be excluded — otherwise the
+  // entry node looks parented, rootNodes comes back empty, buildTree never
+  // starts from it, and the whole hierarchy is built via the arbitrary-order
+  // fallback below, mis-placing children (e.g. an agent's model drawn under the
+  // wrong parent). Mirrors the same guard in computeTreeLayout.
+  const nodesWithIncoming = new Set(
+    graphData.edges.filter((e: any) => e.from != null).map((e: any) => e.to),
+  );
   const rootNodes = graphData.nodes.filter((n: any) => !nodesWithIncoming.has(n.id));
+
+  // Adaptive layout: compute explicit x/y per node so we can use ECharts
+  // `layout: 'none'`. Columns are sized by label width (no horizontal bleed) and
+  // rows by node count at a minimum height (no vertical crowding), so labels stay
+  // attached to their nodes and never overlap regardless of density.
+  const layoutPos = computeTreeLayout(
+    { nodes: graphData.nodes, edges: graphData.edges },
+    layoutType,
+  );
+
+  // ── Auto-shrink to fit ────────────────────────────────────────────────────
+  // ECharts `layout:'none'` fits the whole coordinate bounding box into the
+  // panel, so a tall tree (many leaf rows) gets compressed until labels collide.
+  // We can't stop the compression, so we scale the label font + node symbol
+  // DOWN to match it: the compressed vertical pitch is (panel height ÷ rows),
+  // and a label needs a bit less than that pitch to clear its neighbour.
+  // Number of leaf ROWS drives the height — count nodes with no children in the
+  // spanning tree (parents stack between their kids, so they don't add rows).
+  const parentIds = new Set(graphData.edges.map((e: any) => e.from).filter((f: any) => f != null));
+  const leafRows = Math.max(1, graphData.nodes.filter((n: any) => !parentIds.has(n.id)).length);
+  // Usable vertical pixels: panel minus the top/bottom series insets (~4% each).
+  const usableH = Math.max(120, canvasHeight * 0.92);
+  // Pixels each leaf row gets after ECharts compresses the tree to fit the panel.
+  const pitch = usableH / leafRows;
+  // A row's visual height is the LARGER of its node symbol and its TWO-LINE label
+  // (a bold name line + a smaller "N req" line). Both must fit inside the pitch
+  // (with a breathing gap) or rows collide. The two-line label is the real
+  // driver here — budgeting only a single line lets the "req" line overlap the
+  // next node, so size everything against the pitch as a whole.
+  const ROW_GAP = 6; // min clear space between adjacent rows
+  const avail = Math.max(10, pitch - ROW_GAP);
+  // Two-line label total height ≈ nameFont*1.35 + reqFont*1.35, with req ≈ 0.83×
+  // name. So total ≈ nameFont * 1.35 * 1.83 ≈ nameFont * 2.47. Invert to get the
+  // name font that fits `avail`, capped at the comfortable 12px, floored at 7px.
+  const labelFontSize = Math.max(7, Math.min(12, Math.floor(avail / 2.47)));
+  const reqFontSize = Math.max(6, Math.round(labelFontSize * 0.83));
+  const nameLineHeight = Math.round(labelFontSize * 1.35);
+  const reqLineHeight = Math.round(reqFontSize * 1.35);
+  // When even the shrunk two-line label can't fit the pitch (extreme density),
+  // drop the secondary "N req" line and keep just the name — a single line still
+  // fits, so the essential label stays readable instead of overlapping. The
+  // dropped metric is still available on hover / in the side panel.
+  const showReqLine = nameLineHeight + reqLineHeight <= avail;
+  // Node symbol fits the pitch too (a 30px dot overlaps a 24px pitch regardless
+  // of font). Comfortable 30px, shrunk toward 8px as rows tighten.
+  const nodeSymbolSize = Math.max(8, Math.min(30, Math.round(avail)));
+  // Tighten the label offset from the node as things shrink.
+  const labelDistance = Math.max(3, Math.round(labelFontSize / 2));
+
+  const green = isDarkMode ? "#10b981" : "#52c41a";
+
+  // Node color: same absolute thresholds as Graph View so color matches tooltip
+  // error rate. Dark-mode values resolve from the semantic token layer (exact
+  // token matches); the light-mode values are the legacy Ant palette with no
+  // exact token, so they stay as literals until the palette is unified.
+  const getNodeColor = (errRate: number): string => {
+    if (errRate > 10) return isDarkMode ? cssToken("--color-error-500", "#ef4444") : "#f5222d"; // Red — critical
+    if (errRate > 5) return isDarkMode ? cssToken("--color-orange-500", "#f97316") : "#fa8c16"; // Orange — warning
+    if (errRate > 1) return isDarkMode ? cssToken("--color-amber-400", "#fbbf24") : "#faad14"; // Yellow — degraded
+    return green;
+  };
 
   // Track all visited nodes across all trees to find orphaned components
   const globalVisited = new Set<string>();
 
   // Helper to build tree recursively
   // incomingEdge: the edge that led to this node (for direction-aware metrics)
-  const buildTree = (nodeId: string, visited = new Set<string>(), incomingEdge: any = null): any => {
-    if (visited.has(nodeId)) return null; // Prevent cycles
+  const buildTree = (
+    nodeId: string,
+    visited = new Set<string>(),
+    incomingEdge: any = null,
+  ): any => {
+    if (visited.has(nodeId)) return null; // Prevent cycles within this path
+    // The service graph is a DAG, not a tree: a node shared by multiple parents
+    // (e.g. `cart` called from many services) would otherwise be re-expanded
+    // under each parent, exploding the tree. Render each node exactly once at
+    // its first-encountered position (DAG → spanning tree).
+    if (globalVisited.has(nodeId)) return null;
     visited.add(nodeId);
     globalVisited.add(nodeId);
 
@@ -246,84 +366,148 @@ export const convertServiceGraphToTree = (
       .map((edge: any) => buildTree(edge.to, new Set(visited), edge))
       .filter((child: any) => child !== null);
 
-    // Simple: show only incoming requests from parent in this tree path
+    // Direction-aware request count based on tree position
     let totalRequests: number;
-    let failedRequests: number;
-    let errorRate: number;
 
     if (incomingEdge) {
-      // Non-root: show incoming from parent
+      // Non-root: show traffic via this specific edge from parent
       totalRequests = incomingEdge.total_requests ?? 0;
-      failedRequests = incomingEdge.failed_requests ?? 0;
-      errorRate = incomingEdge.error_rate ?? 0;
     } else {
       // Root: sum of outgoing edges
-      totalRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.total_requests ?? 0), 0);
-      failedRequests = outgoingEdges.reduce((sum: number, edge: any) => sum + (edge.failed_requests ?? 0), 0);
+      totalRequests = outgoingEdges.reduce(
+        (sum: number, edge: any) => sum + (edge.total_requests ?? 0),
+        0,
+      );
 
-      // If no edges, use node's own metrics
+      // If no edges, fall back to node's own metrics
       if (totalRequests === 0 && node.requests !== undefined) {
         totalRequests = node.requests;
-        failedRequests = node.errors ?? 0;
-      }
-
-      errorRate = totalRequests > 0 ? (failedRequests / totalRequests) * 100 : 0;
-
-      // If still no data, try node.error_rate directly
-      if (errorRate === 0 && node.error_rate !== undefined) {
-        errorRate = node.error_rate;
       }
     }
 
-    // Calculate connections count
-    const incomingEdges = incomingEdgesMap.get(nodeId) || [];
-    const connectionCount = incomingEdges.length + outgoingEdges.length;
+    // Node border: colored by this node's error rate relative to baseline
+    const nodeErrorRate =
+      node.error_rate ?? (node.requests > 0 ? (node.errors / node.requests) * 100 : 0);
+    const borderColor = getNodeColor(nodeErrorRate);
 
-    // Determine node color based on error rate
-    let nodeColor = "#4CAF50"; // Green for healthy
-    if (errorRate > 10) nodeColor = "#F44336"; // Red
-    else if (errorRate > 5) nodeColor = "#FF9800"; // Orange
-    else if (errorRate > 1) nodeColor = "#FFC107"; // Yellow
+    // Tree edges are always neutral gray — color belongs on node borders only
+    const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3";
+
+    // Agent accent treatment (tint/size/ping) applies only when the Agent
+    // Graph page asks for it. Elsewhere an un-highlighted agent must render as a
+    // plain node, so we DOWNGRADE its kind to null before the icon builder —
+    // passing the raw "agent" type would re-trigger the accent regardless.
+    const isAgentNode = node.service_type === "agent" && agentHighlight;
+    const iconServiceType =
+      node.service_type === "agent" && !agentHighlight ? null : node.service_type;
+
+    // Reuse the same SVG icon as graph view (circle + service-type icon)
+    const iconDataUrl = getServiceIconSvg(node.id, isDarkMode, borderColor, iconServiceType);
 
     return {
       name: node.label || node.id,
       value: totalRequests,
-      symbolSize: Math.max(20, Math.min(60, Math.log10(totalRequests + 1) * 15)),
+      symbol: iconDataUrl,
+      // Highlighted agents are the subject of the Agent Graph — render them
+      // ~30% larger so they read as the primary entities. Their symbol uses a
+      // padded 104-wide viewBox (vs 56) to give the radar-ping halo room to
+      // expand, so the disc occupies a smaller fraction of the box; the 104/56
+      // factor cancels that out and the ×1.3 on top is the visual emphasis.
+      symbolSize: isAgentNode ? Math.round(nodeSymbolSize * 1.3 * (104 / 56)) : nodeSymbolSize,
+      lineStyle: {
+        color: edgeColor,
+        width: 2,
+      },
       itemStyle: {
-        color: nodeColor,
-        borderColor: nodeColor,
-        borderWidth: 2,
+        color: isDarkMode ? "#1a1f2e" : "#ffffff",
+        borderColor: borderColor,
+        borderWidth: 4,
+        // Neutral drop shadow for every node. Agents no longer carry a static
+        // indigo glow — their emphasis is the animated radar-ping halo baked
+        // into the symbol (highlighted mode only).
+        shadowBlur: 10,
+        shadowColor: isDarkMode ? "rgba(0, 0, 0, 0.3)" : "rgba(0, 0, 0, 0.1)",
+        shadowOffsetX: 0,
+        shadowOffsetY: 0,
+      },
+      emphasis: {
+        scale: true,
+        scaleSize: 1.15,
+        itemStyle: {
+          shadowBlur: 20,
+          shadowColor: isDarkMode ? "rgba(0, 0, 0, 0.5)" : "rgba(0, 0, 0, 0.3)",
+        },
+        label: {
+          show: true,
+          fontSize: 12,
+          fontWeight: "bold",
+        },
+      },
+      select: {
+        // Persistent selection styling - matches graph view
+        itemStyle: {
+          borderColor: borderColor,
+          borderWidth: 5,
+          shadowBlur: 45,
+          shadowColor: "rgba(59, 130, 246, 0.9)", // Prominent blue glow for selected
+          shadowOffsetX: 0,
+          shadowOffsetY: 0,
+        },
+        label: {
+          show: true,
+          fontSize: 12,
+          fontWeight: "bold",
+        },
       },
       label: {
         show: true,
-        position: layoutType === 'vertical' ? 'top' : 'left',
+        position: layoutType === "vertical" ? "bottom" : "right",
+        distance: labelDistance,
         formatter: (params: any) => {
-          return `${params.name}\n${formatNumber(totalRequests)} req`;
+          // Drop the "N req" line at extreme density (see showReqLine) so the
+          // name line alone stays readable rather than the two lines colliding.
+          // `{name|…}`/`{requests|…}` are ECharts rich-text tags, not i18n
+          // placeholders, so they stay in code and only the label is translated.
+          return showReqLine
+            ? `{name|${params.name}}\n{requests|${gt("traces.graphTooltip.requestCount", {
+                count: formatNumber(totalRequests),
+              })}}`
+            : `{name|${params.name}}`;
         },
-      },
-      tooltip: {
-        formatter: (params: any) => {
-          return `
-            <strong>${params.name}</strong><br/>
-            Requests: ${formatNumber(totalRequests)}<br/>
-            Errors: ${failedRequests}<br/>
-            Error Rate: ${errorRate.toFixed(2)}%<br/>
-            Connections: ${connectionCount}
-          `;
+        rich: {
+          // Both lines auto-shrink with the row pitch so the two-line label
+          // never overruns into the next node (see the sizing block above).
+          name: {
+            fontSize: labelFontSize,
+            fontWeight: "600",
+            color: isDarkMode ? "#e4e7eb" : "#1f2937",
+            lineHeight: nameLineHeight,
+          },
+          requests: {
+            fontSize: reqFontSize,
+            fontWeight: "normal",
+            color: isDarkMode ? "#9ca3af" : "#6b7280",
+            lineHeight: reqLineHeight,
+          },
         },
       },
       children: children.length > 0 ? children : undefined,
+      // Explicit position from the adaptive layout (used with layout:'none').
+      x: layoutPos.get(node.id)?.x,
+      y: layoutPos.get(node.id)?.y,
+      // Carry identity so click handlers can detect collapsed boundary nodes
+      // (name is the display label, not the id).
+      id: node.id,
+      is_group: node.is_group,
+      service_type: node.service_type,
     };
   };
 
   // Start with root nodes
-  console.log('[convertServiceGraphToTree] Root nodes:', rootNodes.map((n: any) => n.id));
   let treeData = rootNodes.map((node: any) => buildTree(node.id)).filter((n: any) => n !== null);
-  console.log('[convertServiceGraphToTree] Trees from roots:', treeData.length);
 
   // Find unvisited nodes (disconnected components or cycles)
   const unvisitedNodes = graphData.nodes.filter((n: any) => !globalVisited.has(n.id));
-  console.log('[convertServiceGraphToTree] Unvisited nodes:', unvisitedNodes.map((n: any) => n.id));
 
   // Add unvisited nodes as separate root trees
   if (unvisitedNodes.length > 0) {
@@ -331,282 +515,955 @@ export const convertServiceGraphToTree = (
       .map((node: any) => buildTree(node.id))
       .filter((n: any) => n !== null);
     treeData = [...treeData, ...additionalTrees];
-    console.log('[convertServiceGraphToTree] Total trees after adding unvisited:', treeData.length);
   }
 
   // If still no tree data, create a flat structure
   if (treeData.length === 0 && graphData.nodes.length > 0) {
     return {
-      tooltip: { show: true, trigger: 'item' },
-      series: [{
-        type: 'tree',
-        data: graphData.nodes.map((node: any) => ({
-          name: node.label || node.id,
-          value: 0,
-          symbolSize: 20,
-          itemStyle: { color: '#9E9E9E' },
-        })),
-        layout: 'orthogonal',
-        orient: layoutType === 'vertical' ? 'TB' : 'LR',
-        initialTreeDepth: -1,
-        symbolSize: 20,
-        label: {
-          position: layoutType === 'vertical' ? 'bottom' : 'right',
-          verticalAlign: layoutType === 'vertical' ? 'top' : 'middle',
-          distance: 15,
-          fontSize: 12,
+      backgroundColor: "transparent", // Make chart background transparent to match graph view
+      tooltip: { show: true, trigger: "item", hideDelay: 0, enterable: false },
+      series: [
+        {
+          type: "tree",
+          data: graphData.nodes.map((node: any) => ({
+            name: node.label || node.id,
+            value: 0,
+            symbolSize: Math.max(40, Math.min(80, Math.log10((node.requests || 0) + 1) * 20)),
+            itemStyle: {
+              color: isDarkMode ? "#1a1f2e" : "#ffffff",
+              borderColor: "#9E9E9E",
+              borderWidth: 4,
+              shadowBlur: 10,
+              shadowColor: isDarkMode ? "rgba(0, 0, 0, 0.3)" : "rgba(0, 0, 0, 0.1)",
+            },
+          })),
+          layout: "orthogonal",
+          orient: layoutType === "vertical" ? "TB" : "LR",
+          initialTreeDepth: -1,
+          symbolSize: 50,
+          roam: true, // Pan + bounded wheel-zoom
+          scaleLimit: { min: 0.4, max: 4 },
+          selectedMode: "single", // Enable single node selection
+          label: {
+            position: "inside",
+            fontSize: 11,
+          },
         },
-      }],
+      ],
     };
   }
 
   // ECharts tree needs a single root - create virtual root if multiple trees
-  const finalTreeData = treeData.length > 1
-    ? [{
-        name: 'Services',
-        symbolSize: 1,
-        itemStyle: { opacity: 0 },
-        label: { show: false },
-        children: treeData,
-      }]
-    : treeData;
+  const finalTreeData =
+    treeData.length > 1
+      ? [
+          {
+            name: "Services",
+            symbolSize: 1,
+            itemStyle: { opacity: 0 },
+            label: { show: false },
+            children: treeData,
+          },
+        ]
+      : treeData;
 
   const options = {
+    backgroundColor: "transparent", // Make chart background transparent to match graph view
     tooltip: {
-      show: true,
-      trigger: 'item',
-      triggerOn: 'mousemove',
+      show: false, // Disabled — custom edge tooltips in ServiceGraph.vue handle this
     },
     series: [
       {
-        type: 'tree',
+        type: "tree",
         data: finalTreeData,
-        layout: layoutType === 'radial' ? 'radial' : 'orthogonal',
-        orient: layoutType === 'vertical' ? 'TB' : 'LR',
+        // Adaptive layout: we compute explicit x/y per node (see
+        // computeTreeLayout) so labels never overlap. layout:'none' makes ECharts
+        // honor those positions; orthogonal would recompute and ignore them.
+        layout: "none",
+        orient: layoutType === "vertical" ? "TB" : "LR",
+        left: layoutType === "vertical" ? "2%" : "3%",
+        right: layoutType === "vertical" ? "2%" : "20%",
+        top: layoutType === "vertical" ? "8%" : "2%",
+        bottom: layoutType === "vertical" ? "8%" : "2%",
         initialTreeDepth: -1,
-        symbol: 'circle',
-        symbolSize: 20,
+        // Auto-shrunk to the fit-to-view compression so labels never overlap,
+        // however many leaf rows there are (see the sizing block above).
+        symbolSize: nodeSymbolSize,
+        // Pan + wheel-zoom, but bounded: scaleLimit keeps the wheel from zooming
+        // to extremes (the "erratic" feel), and wheel zoom centers on the cursor
+        // so you can focus an area. The +/- buttons drive the same zoom.
+        roam: true,
+        // Nodes + labels track zoom 1:1 (tree default 0.4 barely grew them);
+        // matches the graph view so both feel the same when focusing in.
+        nodeScaleRatio: 1,
+        scaleLimit: { min: 0.4, max: 4 },
+        selectedMode: "single",
         label: {
-          position: layoutType === 'vertical' ? 'top' : 'left',
-          verticalAlign: layoutType === 'vertical' ? 'bottom' : 'middle',
-          distance: 15,
-          fontSize: 12,
-          rotate: 0, // Keep text horizontal, no rotation
+          position: layoutType === "vertical" ? "bottom" : "right",
+          distance: labelDistance,
+          fontSize: labelFontSize,
+          rotate: 0,
         },
         leaves: {
           label: {
-            position: layoutType === 'vertical' ? 'top' : 'left',
-            verticalAlign: layoutType === 'vertical' ? 'bottom' : 'middle',
-            distance: 15,
-            rotate: 0, // Keep text horizontal, no rotation
+            position: layoutType === "vertical" ? "bottom" : "right",
+            distance: labelDistance,
+            fontSize: labelFontSize,
+            rotate: 0,
           },
         },
-        expandAndCollapse: true,
+        emphasis: {
+          focus: "relative", // dims nodes not connected to the hovered node
+        },
+        blur: {
+          itemStyle: { opacity: 0.15 },
+          label: { opacity: 0.15 },
+          lineStyle: { opacity: 0.08 },
+        },
+        expandAndCollapse: false,
         animationDuration: 550,
         animationDurationUpdate: 750,
       },
     ],
   };
 
-  return { options };
-};
-
-// D3-Force simulation physics parameters
-const FORCE_PHYSICS_PARAMS = {
-  // Many-Body Force (Repulsion)
-  chargeStrength: -3000,       // Lower repulsion to tighten clusters
-  chargeDistanceMax: 1200,     // Limit long-range repulsion
-
-  // Link Force
-  linkDistance: 250,           // Shorter links for tighter grouping
-  linkStrength: 0.6,           // Stronger link pull to hold structure
-  linkIterations: 3,           // Fewer passes, less "rubberiness"
-
-  // Center Force
-  centerStrength: 0.05,        // Stronger centering keeps it compact
-
-  // Position Forces
-  forceXStrength: 0.08,        // Gentle horizontal correction
-  forceYStrength: 0.08,        // Gentle vertical correction
-
-  // Collision Force
-  collisionPadding: 80,        // Reasonable padding without huge gaps
-  collisionStrength: 1.0,      // Full collision enforcement
-  collisionIterations: 2,      // Enough to resolve overlaps
-
-  // Simulation
-  velocityDecay: 0.35,         // Slightly more friction for faster settle
-  totalTicks: 5000,            // Iterations for stabilization
+  return { options, positions: null };
 };
 
 /**
- * Compute force-directed layout using D3-force simulation
- * @param nodes - Array of nodes
- * @param edges - Array of edges
- * @param width - Container width
- * @param height - Container height
- * @returns Nodes with computed x, y positions
+ * Fruchterman-Reingold force-directed layout.
+ *
+ * Produces the organic, well-spread graph layout used by service-graph views.
+ * No external dependencies — runs as a pure-JS physics simulation.
+ *
+ * Algorithm:
+ *  1. Initialise nodes in a circle (avoids singularities).
+ *  2. Iterate: repel all node pairs, attract connected pairs.
+ *  3. Clamp each step by a temperature that cools each iteration.
+ *  4. Normalise final bounding box → canvas with padding.
  */
 const computeForceLayout = (
   nodes: any[],
   edges: any[],
-  width: number = 800,
-  height: number = 600
-) => {
-  // Create a copy of nodes to avoid mutation
-  const nodesCopy = nodes.map(n => ({ ...n }));
+  width: number,
+  height: number,
+): Map<string, { x: number; y: number }> => {
+  const PAD_LEFT = 110;
+  const PAD_RIGHT = 220; // extra right padding for label text overflow
+  const PAD_TOP = 110;
+  const PAD_BOTTOM = 200; // extra bottom padding so bottom-positioned labels don't clip
+  const W = width - PAD_LEFT - PAD_RIGHT;
+  const H = height - PAD_TOP - PAD_BOTTOM;
+  const n = nodes.length;
 
-  // Prepare edges with proper source/target references
-  const edgesCopy = edges.map(e => ({
-    source: e.from,
-    target: e.to,
-    ...e,
-  }));
+  if (n === 0) return new Map();
+  if (n === 1) return new Map([[nodes[0].id, { x: width / 2, y: height / 2 }]]);
 
-  // Create simulation and compute layout using physics params
-  const simulation = forceSimulation(nodesCopy)
-    .force('charge', forceManyBody()
-      .strength(FORCE_PHYSICS_PARAMS.chargeStrength)
-      .distanceMax(FORCE_PHYSICS_PARAMS.chargeDistanceMax)
-    )
-    .force('link', forceLink(edgesCopy)
-      .id((d: any) => d.id)
-      .distance(FORCE_PHYSICS_PARAMS.linkDistance)
-      .strength(FORCE_PHYSICS_PARAMS.linkStrength)
-      .iterations(FORCE_PHYSICS_PARAMS.linkIterations)
-    )
-    .force('center', forceCenter(width / 2, height / 2)
-      .strength(FORCE_PHYSICS_PARAMS.centerStrength)
-    )
-    .force('x', forceX(width / 2).strength(FORCE_PHYSICS_PARAMS.forceXStrength))
-    .force('y', forceY(height / 2).strength(FORCE_PHYSICS_PARAMS.forceYStrength))
-    .force('collision', forceCollide()
-      .radius((d: any) => (d.symbolSize || 60) / 2 + FORCE_PHYSICS_PARAMS.collisionPadding)
-      .strength(FORCE_PHYSICS_PARAMS.collisionStrength)
-      .iterations(FORCE_PHYSICS_PARAMS.collisionIterations)
-    )
-    .velocityDecay(FORCE_PHYSICS_PARAMS.velocityDecay)
-    .stop();
+  // Optimal spring length: scales with canvas area / node count
+  const k = Math.sqrt((W * H) / n) * 1.0;
 
-  // Run simulation for specified iterations to stabilize layout
-  for (let i = 0; i < FORCE_PHYSICS_PARAMS.totalTicks; i++) {
-    simulation.tick();
+  // ── 1. Initialise on a circle to avoid singularities ─────────────────────
+  const pos = new Map<string, { x: number; y: number }>();
+  nodes.forEach((node, i) => {
+    const angle = (2 * Math.PI * i) / n;
+    const r = Math.min(W, H) * 0.32;
+    pos.set(node.id, {
+      x: W / 2 + r * Math.cos(angle),
+      y: H / 2 + r * Math.sin(angle),
+    });
+  });
+
+  // Deduplicate edges (undirected for layout purposes). Only keep edges whose
+  // BOTH endpoints have a position — a dangling endpoint (e.g. an edge left
+  // pointing at a node removed by collapse/filtering) would otherwise crash the
+  // force loops below at `pos.get(endpoint).x`. Filtering here fixes it once for
+  // every loop (repulsion, edge-repulsion, attraction).
+  const seen = new Set<string>();
+  const layoutEdges: { u: string; v: string }[] = [];
+  edges.forEach((e: any) => {
+    if (!pos.has(e.from) || !pos.has(e.to)) return;
+    const key = [e.from, e.to].sort().join("→");
+    if (!seen.has(key)) {
+      seen.add(key);
+      layoutEdges.push({ u: e.from, v: e.to });
+    }
+  });
+
+  const ids = nodes.map((nd: any) => nd.id);
+
+  // ── 2. Simulation ─────────────────────────────────────────────────────────
+  const ITERATIONS = 350;
+  let temp = Math.min(W, H) * 0.3; // initial max displacement
+  const cooling = temp / (ITERATIONS + 1);
+
+  for (let iter = 0; iter < ITERATIONS; iter++) {
+    const disp = new Map<string, { x: number; y: number }>();
+    ids.forEach((id: string) => disp.set(id, { x: 0, y: 0 }));
+
+    // Repulsive forces — O(n²), fast enough for typical service graphs (<200 nodes)
+    for (let i = 0; i < ids.length; i++) {
+      for (let j = i + 1; j < ids.length; j++) {
+        const u = ids[i],
+          v = ids[j];
+        const pu = pos.get(u)!,
+          pv = pos.get(v)!;
+        const dx = pu.x - pv.x;
+        const dy = pu.y - pv.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        const fr = (k * k) / dist;
+        const nx = (dx / dist) * fr;
+        const ny = (dy / dist) * fr;
+        const du = disp.get(u)!;
+        du.x += nx;
+        du.y += ny;
+        const dv = disp.get(v)!;
+        dv.x -= nx;
+        dv.y -= ny;
+      }
+    }
+
+    // Node-on-edge repulsion: push nodes away from edges they are not endpoints of
+    const edgeRepelDist = k * 1.2; // min clearance between a node and a passing edge
+    ids.forEach((id: string) => {
+      const p = pos.get(id)!;
+      layoutEdges.forEach(({ u, v }) => {
+        if (id === u || id === v) return;
+        const pu = pos.get(u)!,
+          pv = pos.get(v)!;
+        const ex = pv.x - pu.x,
+          ey = pv.y - pu.y;
+        const len2 = ex * ex + ey * ey;
+        if (len2 < 1) return;
+        const t = Math.max(0, Math.min(1, ((p.x - pu.x) * ex + (p.y - pu.y) * ey) / len2));
+        const cx = pu.x + t * ex,
+          cy = pu.y + t * ey;
+        const dx = p.x - cx,
+          dy = p.y - cy;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        if (dist < edgeRepelDist) {
+          const force = ((edgeRepelDist - dist) / dist) * k * 0.8;
+          const d = disp.get(id)!;
+          d.x += (dx / dist) * force;
+          d.y += (dy / dist) * force;
+        }
+      });
+    });
+
+    // Attractive forces — along edges only
+    layoutEdges.forEach(({ u, v }) => {
+      if (!pos.has(u) || !pos.has(v)) return;
+      const pu = pos.get(u)!,
+        pv = pos.get(v)!;
+      const dx = pu.x - pv.x;
+      const dy = pu.y - pv.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 0.01;
+      const fa = (dist * dist) / k;
+      const nx = (dx / dist) * fa;
+      const ny = (dy / dist) * fa;
+      const du = disp.get(u)!;
+      du.x -= nx;
+      du.y -= ny;
+      const dv = disp.get(v)!;
+      dv.x += nx;
+      dv.y += ny;
+    });
+
+    // Apply displacements clamped by temperature, keep within working area
+    ids.forEach((id: string) => {
+      const p = pos.get(id)!;
+      const d = disp.get(id)!;
+      const dlen = Math.sqrt(d.x * d.x + d.y * d.y) || 0.01;
+      const scale = Math.min(dlen, temp) / dlen;
+      p.x = Math.max(0, Math.min(W, p.x + d.x * scale));
+      p.y = Math.max(0, Math.min(H, p.y + d.y * scale));
+    });
+
+    temp = Math.max(0, temp - cooling);
   }
 
-  // Return nodes with computed positions
-  return simulation.nodes().map(n => ({ ...n }));
+  // ── 3. Normalise bounding box → full canvas with padding ─────────────────
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+  pos.forEach((p) => {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  });
+  const rangeX = maxX - minX || 1;
+  const rangeY = maxY - minY || 1;
+
+  // Scale uniformly so the layout fills without distortion, then centre
+  const scale = Math.min(W / rangeX, H / rangeY);
+  const offsetX = PAD_LEFT + (W - rangeX * scale) / 2;
+  const offsetY = PAD_TOP + (H - rangeY * scale) / 2;
+
+  const result = new Map<string, { x: number; y: number }>();
+  pos.forEach((p, id) => {
+    result.set(id, {
+      x: offsetX + (p.x - minX) * scale,
+      y: offsetY + (p.y - minY) * scale,
+    });
+  });
+  return result;
+};
+
+// ── Service-type icon helper ──────────────────────────────────────────────────
+
+/**
+ * Authoritative kind → icon. Driven by the backend's service_type /
+ * connection_type (database/queue/rpc/external) rather than guessing from the
+ * node name. Returns null when there is no inferred type (a real instrumented
+ * service), so the caller falls back to the name-regex SERVICE_ICON_RULES.
+ *
+ * The SVG paths mirror the corresponding entries in SERVICE_ICON_RULES so the
+ * visual language stays consistent, but selection here is by explicit type,
+ * not name matching.
+ */
+const KIND_ICON_SVG: Record<string, string> = {
+  database:
+    `<ellipse cx="12" cy="5" rx="9" ry="3"/>` +
+    `<path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>` +
+    `<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>`,
+  queue:
+    `<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>` +
+    `<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>` +
+    `<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>`,
+  rpc: `<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.86 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>`,
+  external:
+    `<circle cx="12" cy="12" r="10"/>` +
+    `<line x1="2" y1="12" x2="22" y2="12"/>` +
+    `<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>`,
+  // GenAI entity kinds (agent-graph feature). Bot / wrench / chip.
+  agent:
+    `<rect x="3" y="11" width="18" height="10" rx="2"/>` +
+    `<circle cx="12" cy="5" r="2"/><path d="M12 7v4"/>` +
+    `<line x1="8" y1="16" x2="8" y2="16"/><line x1="16" y1="16" x2="16" y2="16"/>`,
+  tool: `<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.8 2.8-2.1-2.1 2.8-2.8z"/>`,
+  model:
+    `<rect x="6" y="6" width="12" height="12" rx="1"/>` +
+    `<path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/>`,
 };
 
 /**
- * Convert service graph data to ECharts Graph format (force-directed/circular network)
+ * Return the raw SVG for a node's authoritative kind, or null when the node has
+ * no inferred type (a real service) so the name-regex fallback runs.
+ */
+export function iconSvgForType(serviceType: string | undefined | null): string | null {
+  if (!serviceType) return null;
+  return KIND_ICON_SVG[serviceType] ?? null;
+}
+
+/**
+ * Returns an ECharts image:// data URL containing a full SVG node:
+ *   outer circle (health-based border) + monochrome Feather-style icon.
+ * The icon is chosen from the authoritative service_type when present, else
+ * inferred from the service name via keyword matching.
+ */
+// Ordered icon rules: first match wins. Priority: infra → data → domain → UI → default.
+// Each SVG path is a 24×24 Feather-style stroke icon (no fill).
+const SERVICE_ICON_RULES: { regex: RegExp; svg: string }[] = [
+  // ── Infrastructure / networking ──────────────────────────────────────────
+  {
+    // Globe — API gateway, reverse proxy, ingress, router
+    regex: /gateway|proxy|ingress|nginx|envoy|router/,
+    svg:
+      `<circle cx="12" cy="12" r="10"/>` +
+      `<line x1="2" y1="12" x2="22" y2="12"/>` +
+      `<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>`,
+  },
+  {
+    // Phone — gRPC, RPC, Thrift, Connect RPC
+    regex: /\bgrpc\b|\brpc\b|thrift|connect/,
+    svg: `<path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.86 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>`,
+  },
+  {
+    // Globe — outbound HTTP/REST/API call (span attribute "http", "https", "rest")
+    regex: /\bhttp\b|\bhttps\b|\brest\b/,
+    svg:
+      `<circle cx="12" cy="12" r="10"/>` +
+      `<line x1="2" y1="12" x2="22" y2="12"/>` +
+      `<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>`,
+  },
+  {
+    // Wifi — websocket / realtime / streaming
+    regex: /websocket|realtime|streaming|socket/,
+    svg:
+      `<path d="M5 12.55a11 11 0 0 1 14.08 0"/>` +
+      `<path d="M1.42 9a16 16 0 0 1 21.16 0"/>` +
+      `<path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>` +
+      `<line x1="12" y1="20" x2="12.01" y2="20"/>`,
+  },
+  {
+    // Share network — message broker, queue, pubsub
+    regex: /queue|kafka|rabbit|broker|mq|pubsub|event/,
+    svg:
+      `<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>` +
+      `<line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>` +
+      `<line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>`,
+  },
+  {
+    // Clock / cog — scheduler, cron, background worker, job, consumer
+    regex: /schedul|cron|worker|job|consumer|processor/,
+    svg: `<circle cx="12" cy="12" r="10"/>` + `<polyline points="12 6 12 12 16 14"/>`,
+  },
+  {
+    // Sliders — config, consul, etcd, feature flag, feature toggle
+    regex: /config|consul|etcd|flag|feature/,
+    svg:
+      `<line x1="4" y1="21" x2="4" y2="14"/>` +
+      `<line x1="4" y1="10" x2="4" y2="3"/>` +
+      `<line x1="12" y1="21" x2="12" y2="12"/>` +
+      `<line x1="12" y1="8" x2="12" y2="3"/>` +
+      `<line x1="20" y1="21" x2="20" y2="16"/>` +
+      `<line x1="20" y1="12" x2="20" y2="3"/>` +
+      `<line x1="1" y1="14" x2="7" y2="14"/>` +
+      `<line x1="9" y1="8" x2="15" y2="8"/>` +
+      `<line x1="17" y1="16" x2="23" y2="16"/>`,
+  },
+  {
+    // Activity pulse — load generator, traffic simulator, telemetry, monitoring
+    regex: /load|generator|traffic|benchmark|prometheus|grafana|otel|telemetry|monitor/,
+    svg: `<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>`,
+  },
+  {
+    // Bell — alert manager, alarm, incident
+    regex: /alert|alarm|incident|pagerduty/,
+    svg:
+      `<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>` +
+      `<path d="M13.73 21a2 2 0 0 1-3.46 0"/>`,
+  },
+  // ── Data / storage ───────────────────────────────────────────────────────
+  {
+    // Database cylinder — any SQL/NoSQL/search engine
+    regex: /database|elastic|opensearch|mongo|mysql|postgres|sqlite|oracle|cassandra|dynamo|\bdb\b/,
+    svg:
+      `<ellipse cx="12" cy="5" rx="9" ry="3"/>` +
+      `<path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/>` +
+      `<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>`,
+  },
+  {
+    // Layers — in-memory cache
+    regex: /cache|redis|memcache/,
+    svg:
+      `<polygon points="12 2 2 7 12 12 22 7 12 2"/>` +
+      `<polyline points="2 17 12 22 22 17"/>` +
+      `<polyline points="2 12 12 17 22 12"/>`,
+  },
+  {
+    // Download arrow — data ingestion, pipeline, ETL, collector
+    regex: /ingest|pipeline|etl|collector/,
+    svg:
+      `<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>` +
+      `<polyline points="7 10 12 15 17 10"/>` +
+      `<line x1="12" y1="15" x2="12" y2="3"/>`,
+  },
+  {
+    // Minimize arrows — compactor, compressor, archiver (data compaction)
+    regex: /compact|compress|archiv/,
+    svg:
+      `<polyline points="4 14 10 14 10 20"/>` +
+      `<polyline points="20 10 14 10 14 4"/>` +
+      `<line x1="10" y1="14" x2="3" y2="21"/>` +
+      `<line x1="21" y1="3" x2="14" y2="10"/>`,
+  },
+  {
+    // Image frame — image, media, asset, object storage
+    regex: /image|photo|media|asset|storage|blob/,
+    svg:
+      `<rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>` +
+      `<circle cx="8.5" cy="8.5" r="1.5"/>` +
+      `<polyline points="21 15 16 10 5 21"/>`,
+  },
+  // ── Auth / security ──────────────────────────────────────────────────────
+  {
+    // Shield — authentication, identity, SSO
+    regex: /auth|sso|identity|login|oauth|keycloak/,
+    svg: `<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>`,
+  },
+  // ── Search ───────────────────────────────────────────────────────────────
+  {
+    // Magnifier — search and query services
+    regex: /search|quer/,
+    svg: `<circle cx="11" cy="11" r="8"/>` + `<line x1="21" y1="21" x2="16.65" y2="16.65"/>`,
+  },
+  // ── AI / ML ──────────────────────────────────────────────────────────────
+  {
+    // CPU chip — ML, AI, inference, recommendation
+    regex: /\bml\b|\bai\b|model|inference|predict|recommend|suggest/,
+    svg:
+      `<rect x="4" y="4" width="16" height="16" rx="2" ry="2"/>` +
+      `<rect x="9" y="9" width="6" height="6"/>` +
+      `<line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/>` +
+      `<line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/>` +
+      `<line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/>` +
+      `<line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/>`,
+  },
+  // ── Domain / business ────────────────────────────────────────────────────
+  {
+    // Envelope — email, mail, notification, newsletter tools (listmonk etc.)
+    regex: /email|mail|smtp|notification|notify|newsletter|listmonk/,
+    svg:
+      `<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>` +
+      `<polyline points="22,6 12,13 2,6"/>`,
+  },
+  {
+    // Credit card — payment, billing, invoice
+    regex: /payment|\bpay\b|billing|invoice|stripe|paypal/,
+    svg:
+      `<rect x="1" y="4" width="22" height="16" rx="2" ry="2"/>` +
+      `<line x1="1" y1="10" x2="23" y2="10"/>`,
+  },
+  {
+    // Shopping cart — cart, basket, checkout, order
+    regex: /cart|basket|checkout|order/,
+    svg:
+      `<circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/>` +
+      `<path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>`,
+  },
+  {
+    // Truck — shipping, delivery, logistics
+    regex: /ship|delivery|courier|logistic/,
+    svg:
+      `<rect x="1" y="3" width="15" height="13"/>` +
+      `<polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>` +
+      `<circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>`,
+  },
+  {
+    // Dollar sign — currency, accounting, finance, exchange
+    regex: /currency|exchange|forex|accounting|finance|ledger/,
+    svg:
+      `<line x1="12" y1="1" x2="12" y2="23"/>` +
+      `<path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>`,
+  },
+  {
+    // File list — product catalog, inventory
+    regex: /catalog|inventory|product|listing/,
+    svg:
+      `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>` +
+      `<polyline points="14 2 14 8 20 8"/>` +
+      `<line x1="16" y1="13" x2="8" y2="13"/>` +
+      `<line x1="16" y1="17" x2="8" y2="17"/>`,
+  },
+  {
+    // Megaphone — ad, advertising, marketing
+    regex: /\bad\b|\bads\b|advert|marketing/,
+    svg:
+      `<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>` +
+      `<path d="M15.54 8.46a5 5 0 0 1 0 7.07"/>` +
+      `<path d="M19.07 4.93a10 10 0 0 1 0 14.14"/>`,
+  },
+  {
+    // Document with plus — quote, pricing service
+    regex: /quote|pricing/,
+    svg:
+      `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>` +
+      `<polyline points="14 2 14 8 20 8"/>` +
+      `<line x1="12" y1="18" x2="12" y2="12"/>` +
+      `<line x1="9" y1="15" x2="15" y2="15"/>`,
+  },
+  {
+    // Bot/person — SRE agent, automation agent, bot
+    regex: /\bagent\b|\bbot\b|sre|automation/,
+    svg:
+      `<path d="M12 2a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/>` +
+      `<path d="M16 8v1a4 4 0 0 1-8 0V8"/>` +
+      `<line x1="8" y1="13" x2="16" y2="13"/>` +
+      `<rect x="8" y="13" width="8" height="8" rx="1"/>` +
+      `<line x1="10" y1="17" x2="10.01" y2="17"/>` +
+      `<line x1="14" y1="17" x2="14.01" y2="17"/>`,
+  },
+  // ── UI / client ──────────────────────────────────────────────────────────
+  {
+    // Monitor — web frontend, client app, browser
+    regex: /frontend|\bweb\b|\bui\b|\bapp\b|client|browser/,
+    svg:
+      `<rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>` +
+      `<line x1="8" y1="21" x2="16" y2="21"/>` +
+      `<line x1="12" y1="17" x2="12" y2="21"/>`,
+  },
+];
+
+// Server SVG — used as fallback when no rule matches
+const SERVER_ICON_SVG =
+  `<rect x="2" y="2" width="20" height="8" rx="2" ry="2"/>` +
+  `<rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>` +
+  `<line x1="6" y1="6" x2="6.01" y2="6"/>` +
+  `<line x1="6" y1="18" x2="6.01" y2="18"/>`;
+
+/**
+ * Builds a `data:image/svg+xml;base64,...` URL for use in `<img src>` or CSS.
+ * The circle border uses `borderColor`; the icon stroke adapts to `isDark`.
+ */
+export function getServiceIconDataUrl(
+  name: string,
+  isDark: boolean,
+  borderColor: string,
+  serviceType?: string | null,
+): string {
+  // Agents are the SUBJECT of the agent graph, so they get an accent treatment
+  // that makes them the primary read WITHOUT touching the health border
+  // (green/amber/red) — the icon disc is washed with an indigo tint and the
+  // glyph is drawn in indigo. Indigo is deliberately outside the health palette
+  // and distinct from the tool/model kind colours. Every other kind keeps the
+  // neutral disc + gray glyph.
+  const isAgent = serviceType === "agent";
+  // Agent accent = indigo design tokens (deliberately outside the health
+  // palette). Resolved from the token layer at runtime because the value is
+  // baked into an SVG data-URI where `var(--…)` can't be used.
+  const AGENT_ACCENT = isDark
+    ? cssToken("--color-indigo-300", "#a5b4fc")
+    : cssToken("--color-indigo-500", "#6366f1");
+  const iconColor = isAgent ? AGENT_ACCENT : isDark ? "#e4e7eb" : "#374151";
+  const bgColor = isAgent
+    ? isDark
+      ? cssToken("--color-indigo-900", "#312e81") // dark indigo disc wash
+      : cssToken("--color-indigo-50", "#eef2ff") // light indigo wash
+    : isDark
+      ? "#1a1f2e"
+      : "#ffffff";
+
+  // Normalize: lowercase and collapse hyphens/underscores to spaces so
+  // "load-generator" and "load_generator" both match /load/ or /generator/.
+  const n = (name || "").toLowerCase().replace(/[-_]/g, " ");
+
+  // Authoritative kind (from backend service_type) wins; else fall back to
+  // name-regex matching.
+  const authoritative = iconSvgForType(serviceType);
+  const matched = SERVICE_ICON_RULES.find(({ regex }) => regex.test(n));
+  const icon = authoritative ?? (matched ? matched.svg : SERVER_ICON_SVG);
+
+  // Agent nodes get an animated "radar ping" halo: concentric rings that expand
+  // out from the disc and fade — the "getting encircled" effect that makes
+  // agents the living focal point of the graph. We bake it into the node's own
+  // symbol SVG (rather than an ECharts `graphic` overlay) so it is ALWAYS
+  // centered on the node and pans/zooms with it — the overlay approach drifted
+  // because `graphic` lives outside the roam-transformed series group. The graph
+  // uses the SVG renderer (render-type="svg"), so SMIL <animate> runs natively.
+  //
+  // Geometry: agents use a padded viewBox (-24..80, 104 wide) so a ring can
+  // expand to r≈46 without clipping while the disc stays r=24 at centre (52,52).
+  // Non-agents keep the tight 56×56 box (disc r=24 at 28,28). Because the disc's
+  // fraction of the box differs, the agent symbolSize is bumped ×~1.86 at the
+  // call sites so the disc renders at the same pixel size as its neighbours.
+  const cx = isAgent ? 52 : 28;
+  const cy = isAgent ? 52 : 28;
+  const viewBox = isAgent ? "0 0 104 104" : "0 0 56 56";
+  const iconTx = isAgent ? 40 : 16; // icon 24×24 top-left so it centres on disc
+
+  // Two staggered rings → a continuous ripple rather than a single strobe.
+  // stroke is the indigo agent accent; opacity + radius animate in lockstep.
+  const pingRings = isAgent
+    ? [0, 1]
+        .map((k) => {
+          const begin = `${k * 1.3}s`;
+          return (
+            `<circle cx="${cx}" cy="${cy}" r="24" fill="none" ` +
+            `stroke="${AGENT_ACCENT}" stroke-width="2.5" opacity="0">` +
+            `<animate attributeName="r" values="24;46" dur="2.6s" ` +
+            `begin="${begin}" repeatCount="indefinite" ` +
+            `calcMode="spline" keySplines="0.25 0.1 0.25 1" keyTimes="0;1"/>` +
+            `<animate attributeName="opacity" values="0.55;0" dur="2.6s" ` +
+            `begin="${begin}" repeatCount="indefinite"/>` +
+            `<animate attributeName="stroke-width" values="2.5;0.5" dur="2.6s" ` +
+            `begin="${begin}" repeatCount="indefinite"/>` +
+            `</circle>`
+          );
+        })
+        .join("")
+    : "";
+
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${viewBox}">` +
+    pingRings +
+    `<circle cx="${cx}" cy="${cy}" r="24" fill="${bgColor}" stroke="${borderColor}" stroke-width="4"/>` +
+    `<g transform="translate(${iconTx},${iconTx})" fill="none" stroke="${iconColor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">` +
+    icon +
+    `</g></svg>`;
+
+  return `data:image/svg+xml;base64,${btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))}`;
+}
+
+/**
+ * Compose a vendor brand logo into the SAME 56×56 circle+border frame the chip
+ * icons use, so a model node with a logo is visually identical in size to every
+ * other node. Without the frame the raw logo fills the whole ECharts symbol box
+ * (~2.3× the glyph area) and drops the border — making e.g. the Anthropic mark
+ * look oversized next to its neighbours. The logo is embedded via <image> in the
+ * same 24×24 inset region as the icons, preserveAspectRatio-contained.
+ */
+function getModelLogoDataUrl(logoUrl: string, borderColor: string): string {
+  // Brand marks are drawn on a WHITE inner disc regardless of theme: vendor
+  // logos are authored for a light ground (many are a dark/mono mark on
+  // transparent), so on a dark node background they'd vanish. The white disc
+  // guarantees contrast for every vendor, light or dark theme.
+  // The logo fills a 34×34 region centered in the 56 box (was 20×20 — too
+  // small next to the stroked chip icons), clipped to the disc so square PNGs
+  // don't spill past the circle.
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56">` +
+    `<defs><clipPath id="c"><circle cx="28" cy="28" r="22"/></clipPath></defs>` +
+    `<circle cx="28" cy="28" r="24" fill="#ffffff" stroke="${borderColor}" stroke-width="4"/>` +
+    `<image href="${logoUrl}" x="11" y="11" width="34" height="34" ` +
+    `preserveAspectRatio="xMidYMid meet" clip-path="url(#c)"/>` +
+    `</svg>`;
+  return `data:image/svg+xml;base64,${btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))}`;
+}
+
+function getServiceIconSvg(
+  name: string,
+  isDark: boolean,
+  borderColor: string,
+  serviceType?: string | null,
+): string {
+  // Model nodes: prefer the provider's brand logo (OpenAI / Anthropic / Gemini
+  // …) so the provider mix reads at a glance, composed into the same frame as
+  // every other node. Falls through to the chip icon for unknown models.
+  if (serviceType === "model") {
+    // Always the light-ground logo variant: the frame draws it on a white disc
+    // (see getModelLogoDataUrl), so the mark designed for light backgrounds is
+    // the correct one regardless of the app theme.
+    const vendorLogo = resolveModelVendorLogo(name, false);
+    if (vendorLogo) {
+      return `image://${getModelLogoDataUrl(vendorLogo, borderColor)}`;
+    }
+  }
+  return `image://${getServiceIconDataUrl(name, isDark, borderColor, serviceType)}`;
+}
+
+/**
+ * Returns a `data:image/svg+xml;base64,...` URL for a span's technology icon
+ * (e.g. db_system, messaging_system, rpc_system) by running the value through
+ * SERVICE_ICON_RULES. Unlike getServiceIconDataUrl, this renders a bare 24×24
+ * icon with no circular border — suitable for small inline span badges.
+ * Returns null when no rule matches (i.e. no specific tech is identifiable).
+ */
+export function getSpanTechIconDataUrl(name: string, isDark: boolean): string | null {
+  const iconColor = isDark ? "#e4e7eb" : "#374151";
+  const n = (name || "").toLowerCase().replace(/[-_]/g, " ");
+  const matched = SERVICE_ICON_RULES.find(({ regex }) => regex.test(n));
+  if (!matched) return null;
+
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" ` +
+    `stroke="${iconColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">` +
+    matched.svg +
+    `</svg>`;
+
+  return `data:image/svg+xml;base64,${btoa(encodeURIComponent(svg).replace(/%([0-9A-F]{2})/g, (_, p1) => String.fromCharCode(parseInt(p1, 16))))}`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Convert service graph data to ECharts Graph format (force-directed network)
  */
 export const convertServiceGraphToNetwork = (
   graphData: { nodes: any[]; edges: any[] },
   layoutType: string = "force",
-  cachedPositions?: Map<string, { x: number; y: number }>
+  cachedPositions?: Map<string, { x: number; y: number }>,
+  isDarkMode: boolean = true,
+  selectedNodeId?: string,
+  canvasWidth: number = 1200,
+  canvasHeight: number = 700,
+  // Agent accent treatment (tint/size/ping) — Agent Graph page only. See
+  // convertServiceGraphToTree for the rationale.
+  agentHighlight: boolean = false,
 ) => {
-  // Validate layout type - graph view only supports 'force' and 'circular'
-  // Tree layouts ('horizontal', 'vertical', 'radial') should use convertServiceGraphToTree instead
-  const validLayouts = ['force', 'circular'];
-  const normalizedLayoutType = validLayouts.includes(layoutType) ? layoutType : 'force';
+  // Graph view supports 'force' (organic) and 'layered' (directed left→right,
+  // dependencies pinned as terminal leaves). Tree layouts ('horizontal',
+  // 'vertical') use convertServiceGraphToTree instead.
+  const normalizedLayoutType = layoutType === "layered" ? "layered" : "force";
 
-  if (layoutType !== normalizedLayoutType) {
-    console.warn(`[convertServiceGraphToNetwork] Invalid layout '${layoutType}' for graph view, defaulting to 'force'`);
+  if (layoutType !== "force" && layoutType !== "layered") {
+    console.warn(
+      `[convertServiceGraphToNetwork] Invalid layout '${layoutType}' for graph view, defaulting to 'force'`,
+    );
   }
 
-  console.log('[convertServiceGraphToNetwork] VERSION: 2025-11-26-v4 - Fixed bidirectional edge overlap');
-  console.log('[convertServiceGraphToNetwork] Input:', {
-    nodeCount: graphData.nodes?.length || 0,
-    edgeCount: graphData.edges?.length || 0,
-    layoutType: normalizedLayoutType
-  });
-  // Build node metrics map (requests, errors, connections)
+  // Build node metrics map using each node's own data from backend (authoritative source)
   const nodeMetrics = new Map<string, { requests: number; errors: number; connections: number }>();
 
-  // Count connections for each node
-  const connectionCount = new Map<string, number>();
+  // Initialize metrics for all nodes using their own backend data
   graphData.nodes.forEach((node: any) => {
-    connectionCount.set(node.id, 0);
-  });
-
-  graphData.edges.forEach((edge: any) => {
-    connectionCount.set(edge.from, (connectionCount.get(edge.from) || 0) + 1);
-    connectionCount.set(edge.to, (connectionCount.get(edge.to) || 0) + 1);
-
-    // Update metrics for both source and target nodes
-    [edge.from, edge.to].forEach((nodeId: string) => {
-      if (!nodeMetrics.has(nodeId)) {
-        nodeMetrics.set(nodeId, { requests: 0, errors: 0, connections: 0 });
-      }
-      const metrics = nodeMetrics.get(nodeId)!;
-      metrics.requests += edge.total_requests || 0;
-      metrics.errors += edge.failed_requests || 0;
+    nodeMetrics.set(node.id, {
+      requests: node.requests || 0,
+      errors: node.errors || 0,
+      connections: 0, // Will be updated below
     });
   });
 
-  // Update connection counts in metrics
-  connectionCount.forEach((count, nodeId) => {
-    if (nodeMetrics.has(nodeId)) {
-      nodeMetrics.get(nodeId)!.connections = count;
-    } else {
-      nodeMetrics.set(nodeId, { requests: 0, errors: 0, connections: count });
+  // Count connections for each node
+  graphData.edges.forEach((edge: any) => {
+    const fromMetrics = nodeMetrics.get(edge.from);
+    const toMetrics = nodeMetrics.get(edge.to);
+
+    if (fromMetrics) {
+      fromMetrics.connections += 1;
+    }
+    if (toMetrics) {
+      toMetrics.connections += 1;
     }
   });
 
   // Validate that all nodes have valid IDs
   const validNodes = graphData.nodes.filter((node: any) => {
     if (!node || !node.id) {
-      console.warn('[convertServiceGraphToNetwork] Skipping node with invalid ID:', node);
+      console.warn("[convertServiceGraphToNetwork] Skipping node with invalid ID:", node);
       return false;
     }
     return true;
   });
 
+  // Layered ranks: rank 0 = no inbound edge; rank = 1 + max(pred ranks).
+  // The `seen` guard breaks cycles.
+  const rank = new Map<string, number>();
+  if (normalizedLayoutType === "layered") {
+    const preds = new Map<string, string[]>();
+    validNodes.forEach((n: any) => preds.set(n.id, []));
+    graphData.edges.forEach((e: any) => {
+      // Skip the entry edge (from == null): it is not a real predecessor, and
+      // counting it would push the true root (the app) to rank 1+, cascading a
+      // wrong depth onto the whole chain.
+      if (e.from != null && preds.has(e.to)) preds.get(e.to)!.push(e.from);
+    });
+    const visit = (id: string, seen: Set<string>): number => {
+      if (rank.has(id)) return rank.get(id)!;
+      if (seen.has(id)) return 0; // cycle guard
+      seen.add(id);
+      const ps = preds.get(id) || [];
+      const r = ps.length ? 1 + Math.max(...ps.map((p) => visit(p, seen))) : 0;
+      rank.set(id, r);
+      return r;
+    };
+    validNodes.forEach((n: any) => visit(n.id, new Set()));
+    // Pin genuine terminal dependencies (databases, queues, external services
+    // with no downstream) to the max rank so they line up as a clean right-hand
+    // leaf column. A node is terminal iff it has NO outgoing edge. We must NOT
+    // pin by "has a service_type" — the root app and agents also carry a
+    // service_type, and pinning them flattened the service→agent→model chain,
+    // dropping a model like gpt-4o into the agent's own column so its edge
+    // looked like it came from the parent app. Out-degree is the right signal:
+    // agents/services that call downstream keep their real BFS depth.
+    const hasOutgoing = new Set<string>();
+    graphData.edges.forEach((e: any) => {
+      if (e.from != null) hasOutgoing.add(e.from);
+    });
+    const maxRank = Math.max(0, ...Array.from(rank.values()));
+    validNodes.forEach((n: any) => {
+      if (n.service_type && !hasOutgoing.has(n.id)) {
+        rank.set(n.id, maxRank); // terminal (leaf) inferred dependency
+      }
+    });
+  }
+
+  // Vertical slot per node within its rank column, so same-rank nodes don't
+  // stack. rankMembers[rank] = ordered node ids; ySlot maps id → index.
+  const ySlot = new Map<string, number>();
+  const rankSize = new Map<number, number>();
+  if (normalizedLayoutType === "layered") {
+    const counter = new Map<number, number>();
+    validNodes.forEach((n: any) => {
+      const r = rank.get(n.id) ?? 0;
+      rankSize.set(r, (rankSize.get(r) ?? 0) + 1);
+    });
+    validNodes.forEach((n: any) => {
+      const r = rank.get(n.id) ?? 0;
+      const idx = counter.get(r) ?? 0;
+      ySlot.set(n.id, idx);
+      counter.set(r, idx + 1);
+    });
+  }
+
   const nodes = validNodes.map((node: any) => {
-    const metrics = nodeMetrics.get(node.id) || { requests: 0, errors: 0 };
+    const metrics = nodeMetrics.get(node.id) || {
+      requests: 0,
+      errors: 0,
+      connections: 0,
+    };
     const errorRate = metrics.requests > 0 ? (metrics.errors / metrics.requests) * 100 : 0;
 
-    // Border color based on error rate
-    let borderColor = "#52c41a"; // Green (healthy)
-    if (errorRate > 10) borderColor = "#f5222d"; // Red (critical)
-    else if (errorRate > 5) borderColor = "#fa8c16"; // Orange (high)
-    else if (errorRate > 1) borderColor = "#faad14"; // Yellow (warning)
+    // Border color based on error rate (theme-aware). Dark-mode red/orange/yellow
+    // resolve from the semantic token layer (exact matches); the healthy green
+    // and all light-mode values are the legacy Ant palette with no exact token.
+    let borderColor: string;
+    if (isDarkMode) {
+      // Dark mode colors
+      borderColor = "#10b981"; // Green (healthy)
+      if (errorRate > 10)
+        borderColor = cssToken("--color-error-500", "#ef4444"); // Red (critical)
+      else if (errorRate > 5)
+        borderColor = cssToken("--color-orange-500", "#f97316"); // Orange (warning)
+      else if (errorRate > 1) borderColor = cssToken("--color-amber-400", "#fbbf24"); // Yellow (degraded)
+    } else {
+      // Light mode colors
+      borderColor = "#52c41a"; // Green (healthy)
+      if (errorRate > 10)
+        borderColor = "#f5222d"; // Red (critical)
+      else if (errorRate > 5)
+        borderColor = "#fa8c16"; // Orange (warning)
+      else if (errorRate > 1) borderColor = "#faad14"; // Yellow (degraded)
+    }
 
-    // Size based on request volume - much smaller nodes
-    const symbolSize = Math.max(40, Math.min(80, Math.log10(metrics.requests + 1) * 20));
+    // Node size: scales with request volume (70–110 px range)
+    const baseSymbolSize = Math.max(70, Math.min(110, Math.log10(metrics.requests + 1) * 28));
+    // Agent accent treatment (tint/size/ping) applies only when the Agent
+    // Graph page asks for it; elsewhere an un-highlighted agent renders like any
+    // other node — downgrade its kind to null so the icon builder skips the
+    // accent (passing raw "agent" would re-trigger it).
+    const isAgentNode = node.service_type === "agent" && agentHighlight;
+    const iconServiceType =
+      node.service_type === "agent" && !agentHighlight ? null : node.service_type;
+
+    // Highlighted agents render ~30% larger so they read as the primary
+    // entities. The 104/56 factor compensates for the agent symbol's padded
+    // viewBox (see getServiceIconDataUrl) so the disc stays ≈1.3× a neighbour
+    // while its radar-ping halo has room to expand.
+    const symbolSize = isAgentNode ? Math.round(baseSymbolSize * 1.3 * (104 / 56)) : baseSymbolSize;
+
+    // SVG symbol: circle with health-colored border + service-type icon
+    const iconDataUrl = getServiceIconSvg(node.id, isDarkMode, borderColor, iconServiceType);
 
     // Use cached position if available
     const cachedPos = cachedPositions?.get(node.id);
     const nodeData: any = {
       id: node.id,
       name: node.label || node.id,
+      // Carry group identity so the click handler can detect collapsed nodes.
+      is_group: node.is_group,
+      service_type: node.service_type,
       value: metrics.requests,
       errors: metrics.errors,
-      symbolSize: symbolSize,
-      itemStyle: {
-        color: '#ffffff', // White background
-        borderColor: borderColor,
-        borderWidth: 4,
-        shadowBlur: 10,
-        shadowColor: 'rgba(0, 0, 0, 0.3)',
-      },
-      label: {
-        show: true,
-      },
+      symbol: iconDataUrl,
+      symbolSize,
+      // itemStyle opacity is needed for emphasis.focus adjacency dimming to work
+      // on images. Agents no longer carry a static indigo glow — their emphasis
+      // is the animated radar-ping halo baked into the symbol (highlight mode).
+      itemStyle: { opacity: 1 },
+      label: { show: true },
       emphasis: {
+        scale: true,
+        scaleSize: 1.12,
         label: {
           show: true,
-          fontSize: 12,
-          fontWeight: 'bold',
+          fontWeight: "bold",
+          fontSize: 13,
+        },
+      },
+      select: {
+        label: {
+          show: true,
+          fontWeight: "bold",
         },
       },
       tooltip: {
         formatter: `
           <strong>${node.label || node.id}</strong><br/>
-          Requests: ${formatNumber(metrics.requests)}<br/>
-          Errors: ${formatNumber(metrics.errors)}<br/>
-          Error Rate: ${errorRate.toFixed(2)}%<br/>
-          Connections: ${connectionCount.get(node.id) || 0}
+          ${gt("traces.graphTooltip.requests", { value: formatNumber(metrics.requests) })}<br/>
+          ${gt("traces.graphTooltip.errors", { value: formatNumber(metrics.errors) })}<br/>
+          ${gt("traces.graphTooltip.errorRate", { value: errorRate.toFixed(2) })}
         `,
       },
     };
@@ -615,6 +1472,17 @@ export const convertServiceGraphToNetwork = (
     if (cachedPos) {
       nodeData.x = cachedPos.x;
       nodeData.y = cachedPos.y;
+      nodeData.fixed = true;
+    } else if (normalizedLayoutType === "layered") {
+      // Layered: x from rank column (left→right); dependencies pinned right.
+      // y spreads same-rank nodes evenly down the column.
+      const r = rank.get(node.id) ?? 0;
+      const maxRank = Math.max(1, ...Array.from(rank.values()));
+      const colGap = canvasWidth / (maxRank + 1);
+      nodeData.x = colGap * (r + 0.5);
+      const count = rankSize.get(r) ?? 1;
+      const rowGap = canvasHeight / (count + 1);
+      nodeData.y = rowGap * ((ySlot.get(node.id) ?? 0) + 1);
       nodeData.fixed = true;
     } else {
       nodeData.fixed = false;
@@ -626,27 +1494,30 @@ export const convertServiceGraphToNetwork = (
   // Create a set of valid node IDs for edge validation
   const validNodeIds = new Set(nodes.map((n: any) => n.id));
 
-  console.log('[convertServiceGraphToNetwork] Valid node IDs:', Array.from(validNodeIds));
-
   // Prepare edges with arrows showing flow direction
-  // For circular layout, use curved lines; for force layout, use straight lines
   // Filter out any invalid edges and ensure all required fields are present
   const edgeMap = new Map<string, any>(); // Deduplicate edges by source-target pair
 
   graphData.edges.forEach((edge: any) => {
     // Validate edge structure and node references
     if (!edge || !edge.from || !edge.to) {
-      console.warn('[convertServiceGraphToNetwork] Skipping edge with missing from/to:', edge);
+      console.warn("[convertServiceGraphToNetwork] Skipping edge with missing from/to:", edge);
       return;
     }
 
     if (!validNodeIds.has(edge.from)) {
-      console.warn('[convertServiceGraphToNetwork] Skipping edge - source node not found:', edge.from);
+      console.warn(
+        "[convertServiceGraphToNetwork] Skipping edge - source node not found:",
+        edge.from,
+      );
       return;
     }
 
     if (!validNodeIds.has(edge.to)) {
-      console.warn('[convertServiceGraphToNetwork] Skipping edge - target node not found:', edge.to);
+      console.warn(
+        "[convertServiceGraphToNetwork] Skipping edge - target node not found:",
+        edge.to,
+      );
       return;
     }
 
@@ -664,8 +1535,6 @@ export const convertServiceGraphToNetwork = (
     }
   });
 
-  console.log('[convertServiceGraphToNetwork] Valid edges after dedup:', edgeMap.size);
-
   // Detect bidirectional edges and assign curvature direction
   // For bidirectional edges, one edge curves left, the other curves right
   const edgeCurvature = new Map<string, number>();
@@ -673,7 +1542,7 @@ export const convertServiceGraphToNetwork = (
 
   edgeMap.forEach((edge, key) => {
     const reverseKey = `${edge.to}|||${edge.from}`;
-    const pairKey = [edge.from, edge.to].sort().join('|||');
+    const pairKey = [edge.from, edge.to].sort().join("|||");
 
     if (edgeMap.has(reverseKey) && !processedPairs.has(pairKey)) {
       // This is a bidirectional edge
@@ -689,219 +1558,154 @@ export const convertServiceGraphToNetwork = (
     }
   });
 
-  console.log('[convertServiceGraphToNetwork] Bidirectional pairs:', processedPairs.size);
-
-  const edges = Array.from(edgeMap.entries()).map(([edgeKey, edge]: [string, any], edgeIndex: number) => {
-    const errorRate = edge.total_requests > 0 ? (edge.failed_requests / edge.total_requests) * 100 : 0;
-
+  const edges = Array.from(edgeMap.entries()).map(([edgeKey, edge]: [string, any]) => {
     // Get the assigned curvature for this edge
-    let curveness = edgeCurvature.get(edgeKey) || 0;
+    const curveness = edgeCurvature.get(edgeKey) || 0;
 
-    // For circular layout, override with circular-specific curveness
-    if (normalizedLayoutType === 'circular') {
-      // Vary curveness based on edge index to create visual separation
-      // Range from 0.3 to 0.6 (positive values should curve inward)
-      curveness = 0.3 + (edgeIndex % 4) * 0.1;
-    }
-
-    // Format latency values
-    const formatLatency = (ns: number) => {
-      if (!ns || ns === 0) return 'N/A';
-      const ms = ns / 1000000;
-      return ms >= 1000 ? (ms / 1000).toFixed(2) + 's' : ms.toFixed(2) + 'ms';
-    };
-
-    const p50 = formatLatency(edge.p50_latency_ns || 0);
-    const p95 = formatLatency(edge.p95_latency_ns || 0);
-    const p99 = formatLatency(edge.p99_latency_ns || 0);
-
-    // Determine color based on error rate AND latency (P95)
-    // Priority: errors first, then latency
-    const p95Ms = (edge.p95_latency_ns || 0) / 1000000;
-    let edgeColor;
-    if (errorRate > 5) {
-      edgeColor = "#f5222d"; // Red for high errors
-    } else if (errorRate > 1) {
-      edgeColor = "#faad14"; // Orange for medium errors
-    } else if (p95Ms > 1000) {
-      edgeColor = "#ff7875"; // Light red for high latency (>1s)
-    } else if (p95Ms > 500) {
-      edgeColor = "#ffc069"; // Light orange for medium latency (>500ms)
-    } else {
-      edgeColor = "#52c41a"; // Green for healthy
-    }
+    const edgeColor = isDarkMode ? "#4a5568" : "#b0b7c3";
 
     return {
       source: edge.from,
       target: edge.to,
       value: edge.total_requests || 0,
-      tooltip: {
-        formatter: edge.from + ' → ' + edge.to + '<br/>' +
-          'Requests: ' + (edge.total_requests || 0) + '<br/>' +
-          'Errors: ' + (edge.failed_requests || 0) + ' (' + errorRate.toFixed(2) + '%)<br/>' +
-          'P50: ' + p50 + '<br/>' +
-          'P95: ' + p95 + '<br/>' +
-          'P99: ' + p99
-      },
-      symbol: ['none', 'arrow'], // Arrow at target end
-      symbolSize: [0, 12], // Smaller arrows for cleaner look
+      // Edge tooltips are handled by the mini chart overlay — disable ECharts native tooltip
+      tooltip: { show: false },
+      symbol: ["none", "arrow"],
+      symbolSize: [0, 10],
       lineStyle: {
-        width: Math.max(1, Math.min(4, 1 + (edge.total_requests || 0) / 150)),
+        width: 4,
         color: edgeColor,
         curveness: curveness,
-        opacity: 0.5, // More transparent for less visual clutter
+        type: "solid", // solid by default — no animation at rest
+        opacity: 0.6,
       },
       label: {
         show: false,
       },
       emphasis: {
         lineStyle: {
-          width: 5,
-          opacity: 0.9,
+          type: "solid",
+          width: 4,
+          opacity: 1,
+          color: edgeColor,
         },
       },
     };
   });
 
-  // Determine if we should use force layout, circular layout, or fixed positions
+  // Determine if we should use force layout or fixed positions
   const hasPositions = cachedPositions && cachedPositions.size > 0;
 
-  // For force layout without cached positions, compute layout with D3-force
-  if (normalizedLayoutType === 'force' && !hasPositions) {
-    console.log('[convertServiceGraphToNetwork] Computing force layout with D3-force');
-    const positionedNodes = computeForceLayout(nodes, graphData.edges, 800, 600);
-
-    // Apply computed positions to nodes and mark them as fixed
-    positionedNodes.forEach((positioned: any) => {
-      const node = nodes.find((n: any) => n.id === positioned.id);
-      if (node) {
-        node.x = positioned.x;
-        node.y = positioned.y;
-        node.fixed = true; // Lock positions so ECharts doesn't re-layout
+  // Compute hierarchical layout when no cached positions exist.
+  // Columns = call depth from root services; rows = nodes within each column.
+  // Positions are mapped directly to canvas pixels so nodes fill the full space.
+  if (normalizedLayoutType === "force" && !hasPositions) {
+    const positions = computeForceLayout(nodes, graphData.edges, canvasWidth, canvasHeight);
+    nodes.forEach((node: any) => {
+      const pos = positions.get(node.id);
+      if (pos) {
+        node.x = pos.x;
+        node.y = pos.y;
+        node.fixed = true;
       }
     });
-
-    console.log('[convertServiceGraphToNetwork] Applied D3-force positions to', positionedNodes.length, 'nodes');
   }
 
-  // For circular layout, calculate positions manually on the periphery
-  if (normalizedLayoutType === 'circular' && !hasPositions) {
-    const nodeCount = nodes.length;
-    const nodeSize = 15; // Node diameter
-    const radius = 280; // Radius where node centers are positioned
-    const centerX = 0;
-    const centerY = 0;
+  // Set per-node label position based on x/y to avoid canvas edge clipping.
+  // Must include all styling props since per-node label does not fully inherit series-level label.
+  const bottomThreshold = canvasHeight * 0.7;
+  const rightThreshold = canvasWidth * 0.72;
+  const baseLabelStyle = {
+    show: true,
+    distance: 8,
+    fontSize: 12,
+    fontWeight: 500,
+    color: isDarkMode ? "#e4e7eb" : "#374151",
+    textBorderColor: isDarkMode ? "rgba(0,0,0,0.85)" : "rgba(255,255,255,0.95)",
+    textBorderWidth: 3,
+  };
+  nodes.forEach((node: any) => {
+    const x = node.x ?? 0;
+    const y = node.y ?? 0;
+    let position: string;
+    if (y >= bottomThreshold) {
+      // Bottom nodes: right side has leftover canvas space; bottom-right corner → right avoids bottom clip
+      position = "bottom";
+    } else if (x >= rightThreshold) {
+      // Right-edge nodes: label goes below the node so it doesn't extend past the canvas right edge
+      position = "bottom";
+    } else {
+      position = "right";
+    }
+    node.label = { ...baseLabelStyle, position };
+  });
 
-    nodes.forEach((node: any, index: number) => {
-      const angle = (2 * Math.PI * index) / nodeCount - Math.PI / 2; // Start from top
-      node.x = centerX + radius * Math.cos(angle);
-      node.y = centerY + radius * Math.sin(angle);
-      node.fixed = true;
-
-      // For circular layout, use small uniform nodes (chord diagram style)
-      node.symbolSize = nodeSize;
-
-      // Simplify styling for chord diagram - use solid colors without gradients
-      node.itemStyle = {
-        color: node.itemStyle.borderColor, // Use the border color as fill
-        borderColor: '#ffffff',
-        borderWidth: 2,
-        shadowBlur: 5,
-        shadowColor: 'rgba(0, 0, 0, 0.2)',
-      };
-    });
-
-    console.log('[convertServiceGraphToNetwork] Using circular layout with', nodeCount, 'nodes on periphery');
-  } else if (hasPositions) {
-    console.log('[convertServiceGraphToNetwork] Using cached positions for', cachedPositions.size, 'nodes');
-  }
-
-  // Use "none" layout when we have fixed positions (D3-force computed, circular, or cached)
-  // Always use "none" since we compute positions manually or use cached ones
+  // Use "none" layout when we have fixed positions (D3-force computed or cached)
   const layoutMode = "none";
 
   const options = {
+    backgroundColor: "transparent", // Make chart background transparent
     tooltip: {
       trigger: "item",
       triggerOn: "mousemove",
-      backgroundColor: 'rgba(50, 50, 50, 0.95)',
-      borderColor: '#777',
+      hideDelay: 0, // Hide immediately when mouse leaves
+      enterable: false, // Prevent mouse from entering tooltip
+      backgroundColor: "rgba(50, 50, 50, 0.95)",
+      borderColor: "#777",
       borderWidth: 1,
       textStyle: {
-        color: '#fff',
+        color: "#fff",
       },
     },
-    animation: hasPositions ? false : true, // Disable animation when using cached positions
+    animation: false, // Disable animation to prevent position jumping
+    animationDuration: 200,
+    animationEasing: "cubicOut", // Smooth easing for hover effect
     series: [
       {
         type: "graph",
         layout: layoutMode,
         data: nodes,
         links: edges,
+        // Pan + bounded wheel-zoom (scaleLimit below tames the extremes).
         roam: true,
-        draggable: true, // Enable dragging to allow manual position adjustments
+        // Nodes + labels scale 1:1 with zoom (default 0.6 makes them grow
+        // sub-linearly, so zooming in spread the layout but barely enlarged the
+        // nodes — they looked static). 1.0 = "focus in and everything gets
+        // bigger", the expected map-like behaviour; bounded by scaleLimit.
+        nodeScaleRatio: 1,
+        draggable: false,
         focusNodeAdjacency: true,
+        selectedMode: "single", // Enable single node selection
         scaleLimit: {
           min: 0.4,
           max: 3,
         },
-        label: normalizedLayoutType === 'circular' ? {
+        animationDurationUpdate: 200,
+        animationEasingUpdate: "cubicOut",
+        label: {
           show: true,
-          position: 'top',
           formatter: (params: any) => params.data.name,
-          fontSize: 11,
-          color: '#333',
-        } : {
-          show: true,
-          formatter: (params: any) => {
-            const requests = params.data.value || 0;
-            const errors = params.data.errors || 0;
-            const errorRate = requests > 0 ? (errors / requests) : 0;
-            const reqPerSec = (requests / 60).toFixed(2);
-            const errorDisplay = (errorRate * 100).toFixed(2);
-            const serviceName = params.data.name;
-
-            // Display metrics inside, name below using rich text
-            return `{metrics|${errorDisplay} ms/r}\n{metrics|${reqPerSec} r/sec}\n{spacer|}\n{name|${serviceName}}`;
-          },
-          rich: {
-            metrics: {
-              fontSize: 10,
-              color: '#333',
-              lineHeight: 14,
-              align: 'center',
-            },
-            spacer: {
-              height: 40,
-              lineHeight: 40,
-            },
-            name: {
-              fontSize: 11,
-              fontWeight: 'normal',
-              color: '#333',
-              align: 'center',
-              lineHeight: 16,
-            },
-          },
         },
         emphasis: {
           focus: "adjacency",
+          scale: true,
+          scaleSize: 1.15,
           label: {
             show: true,
             fontSize: 13,
-            fontWeight: 'bold',
+            fontWeight: "bold",
           },
           itemStyle: {
-            shadowBlur: 15,
-            shadowColor: 'rgba(0, 0, 0, 0.5)',
+            shadowBlur: 20,
+            shadowColor: isDarkMode ? "rgba(0, 0, 0, 0.5)" : "rgba(0, 0, 0, 0.3)",
           },
         },
         lineStyle: {
-          opacity: normalizedLayoutType === 'circular' ? 0.5 : 0.7,
-          curveness: 'auto', // Let individual edges control curveness
+          type: "solid",
+          opacity: 0.6,
         },
-        edgeSymbol: ['none', 'arrow'],
-        edgeSymbolSize: [0, normalizedLayoutType === 'circular' ? 10 : 15],
+        edgeSymbol: ["none", "arrow"],
+        edgeSymbolSize: [0, 15],
       },
     ],
   };

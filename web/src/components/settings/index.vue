@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,364 +14,417 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
-<!-- eslint-disable vue/x-invalid-end-tag -->
 <template>
-  <q-page class="">
-    <!-- <div class="head q-table__title tw:mx-2 tw:mb-2 tw:px-2 q-py-sm o2-management-header">
-      {{ t("settings.header") }}
-    </div> -->
-      <q-splitter
-      class="logs-splitter-smooth tw:overflow-hidden"
-      v-model="splitterModel"
-      :limits="[0, 400]"
-      unit="px"
-    >
-      <template v-slot:before>
-        <div class="tw:w-full tw:h-full tw:pl-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-          <div class="card-container tw:mb-[0.625rem]">
-            <div class="flex tw:h-[calc(100vh-50px)]">
-              <div class="full-width" v-if="showManagementTabs">
-                <q-tabs
-                  class="management-tabs"
-                  v-model="settingsTab"
-                  indicator-color="transparent"
-                  inline-label
-                  vertical
-                >
-                <q-route-tab
-                  default
-                  name="queryManagement"
-                  :to="`/settings/query_management?org_identifier=${store.state.selectedOrganization?.identifier}`"
-                  icon="query_stats"
-                  :label="t('settings.queryManagement')"
-                  content-class="tab_content"
-                  v-if="config.isEnterprise == 'true' && isMetaOrg"
-                />
-                <q-route-tab
-                  v-if="config.isEnterprise == 'true' && isMetaOrg"
-                  data-test="nodes-tab"
-                  name="nodes"
-                  :to="{
-                    name: 'nodes',
-                    query: {
-                      org_identifier: store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  icon="hub"
-                  :label="t('settings.nodes')"
-                  content-class="tab_content"
-                />
-                <q-route-tab
-                  name="general"
-                  :to="`/settings/general?org_identifier=${store.state.selectedOrganization?.identifier}`"
-                  content-class="tab_content"
-                  :icon="outlinedSettings"
-                  :label="t('settings.generalLabel')"
-                >
-                </q-route-tab>
-                <q-route-tab
-                  name="organization"
-                  :to="`/settings/organization?org_identifier=${store.state.selectedOrganization?.identifier}`"
-                  content-class="tab_content"
-                  icon="business"
-                  :label="t('settings.orgLabel')"
-                >
-                </q-route-tab>
-                <q-route-tab
-                  v-if="config.isEnterprise == 'true' && isMetaOrg"
-                  data-test="domain-management-tab"
-                  name="domain_management"
-                  :to="{
-                    name: 'domainManagement',
-                    query: {
-                      org_identifier: store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  icon="domain"
-                  :label="t('settings.ssoDomainRestrictions')"
-                  content-class="tab_content"
-                />
-                <q-route-tab
-                  data-test="alert-destinations-tab"
-                  name="alert_destinations"
-                  :to="{
-                    name: 'alertDestinations',
-                    query: {
-                      org_identifier: store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  content-class="tab_content"
-                  icon="location_on"
-                  :label="t('alert_destinations.header')"
-                >
-                </q-route-tab>
-                <q-route-tab
-                  v-if="config.isEnterprise == 'true'"
-                  data-test="pipeline-destinations-tab"
-                  name="pipeline_destinations"
-                  :to="{
-                    name: 'pipelineDestinations',
-                    query: {
-                      org_identifier: store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  content-class="tab_content"
-                   icon="person_pin_circle"
-                   :label="t('pipeline_destinations.header')"
-                >
-                </q-route-tab>
-                <q-route-tab
-                  data-test="alert-templates-tab"
-                  name="templates"
-                  :to="{
-                    name: 'alertTemplates',
-                    query: {
-                      org_identifier: store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  content-class="tab_content"
-                  icon="description"
-                  :label="t('alert_templates.header')"
-                >
-                </q-route-tab>
-                <q-route-tab
-                  v-if="config.isEnterprise == 'true'"
-                  data-test="management-cipher-key-tab"
-                  name="cipher-keys"
-                  :to="{
-                    name: 'cipherKeys',
-                    query: {
-                      org_identifier: store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  content-class="tab_content"
-                  icon="key"
-                  :label="t('settings.cipherKeys')"
-                >
-                </q-route-tab>
-                <q-route-tab
-                    v-if="config.isEnterprise == 'true' && isMetaOrg"
-                    data-test="license-tab"
-                    name="license"
-                    :to="{
-                      name: 'license',
-                      query: {
-                        org_identifier: store.state.selectedOrganization?.identifier,
-                      },
-                    }"
-                    icon="card_membership"
-                    :label="t('settings.license')"
-                    content-class="tab_content"
-                  />
-                <q-route-tab
-                  v-if="config.isCloud == 'true' && isMetaOrg"
-                  data-test="organization-management-tab"
-                  name="organization_management"
-                  :to="{
-                    name: 'orgnizationManagement',
-                    query: {
-                      org_identifier: store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  icon="lan"
-                  :label="t('settings.organizationManagement')"
-                  content-class="tab_content"
-                />
-                <q-route-tab
-                  v-if="config.isEnterprise == 'true'"
-                  data-test="regex-patterns-tab"
-                  name="regex_patterns"
-                  :to="{
-                    name: 'regexPatterns',
-                    query: {
-                      org_identifier: store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  content-class="tab_content"
-                >
-                <div class="tw:flex tw:items-center tw:w-full">
-                  <img :src="regexIcon" alt="regex" style="width: 24px; height: 24px;" />
-                  <span class="tw:text-sm tw:font-medium tw:ml-2"
-                  :class="store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns'   ? 'tw:text-white' : 'tw:text-black'"
-                  >{{ t('regex_patterns.title') }}</span>
-                </div>
-              </q-route-tab>
-                <q-route-tab
-                  v-if="config.isEnterprise == 'true'"
-                  data-test="correlation-settings-tab"
-                  name="correlation_settings"
-                  :to="{
-                    name: 'correlationSettings',
-                    query: {
-                      org_identifier: store.state.selectedOrganization?.identifier,
-                    },
-                  }"
-                  icon="group_work"
-                  :label="t('settings.correlationSettings')"
-                  content-class="tab_content"
-                />
-                </q-tabs>
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-      <template #separator>
-          <q-btn
-            data-test="logs-search-field-list-collapse-btn-management"
-            :icon="showManagementTabs ? 'chevron_left' : 'chevron_right'"
-            :title="showManagementTabs ? 'Collapse Fields' : 'Open Fields'"
-            :class="showManagementTabs ? 'splitter-icon-collapse' : 'splitter-icon-expand'"
-            color="primary"
-            size="sm"
-            dense
-            round
-            @click="controlManagementTabs"
-          />
-      </template>
+  <!-- Grouped left rail (prototype admin model) — same shell as IAM. The rail is
+       always present; the chosen section renders to the right. -->
+  <OPageLayout bleed :sidebar-width="230">
+    <template #sidebar>
+      <SectionRail
+        :groups="sectionGroups"
+        :active-key="activeSection"
+        :title="t('settings.header')"
+      />
+    </template>
 
-      <template v-slot:after>
-        <div class="tw:w-full tw:h-full tw:pr-[0.625rem] tw:pb-[0.625rem] q-pt-xs">
-            <div
-              class="card-container tw:h-[calc(100vh-50px)] tw:overflow-auto"
-            >
-             <router-view title=""> </router-view>
-          </div>
-          </div>
-      </template>
-    </q-splitter>
-
-  </q-page>
+    <!-- Form-style sections (general, org params, license, domain): a section
+         header above a centered reading column. -->
+    <div v-if="isConstrainedSection" class="flex h-full min-h-0 flex-col">
+      <OPageHeader
+        :title="raw(activeSectionItem?.label || '')"
+        :title-data-test="`settings-${activeSectionItem?.key}-page-title`"
+        :subtitle="raw(activeSectionItem?.description || '')"
+        :icon="activeSectionItem?.icon as any"
+        class="border-border-default shrink-0 border-b"
+      />
+      <ConstrainedPage size="lg" align="left" :padded="false" class="min-h-0 flex-1 px-4 py-3">
+        <router-view title="" />
+      </ConstrainedPage>
+    </div>
+    <!-- Table/list sections render their own header (OPageLayout) inside. Do NOT
+         pass a `title` attr here: these children are OPageLayout-rooted, so a
+         fallthrough `title` would clobber their own `:title` prop and blank the
+         header (regression seen on Query Management / Nodes). -->
+    <section v-else class="h-full min-h-0 min-w-0 overflow-x-hidden overflow-y-auto">
+      <router-view />
+    </section>
+  </OPageLayout>
 </template>
 
 <script lang="ts">
-// @ts-ignore
-import {
-  defineComponent,
-  ref,
-  onBeforeMount,
-  onActivated,
-  onUpdated,
-  watch,
-  computed,
-} from "vue";
-import { useI18n } from "vue-i18n";
+import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
+import ConstrainedPage from "@/components/common/ConstrainedPage.vue";
+import OPageLayout from "@/lib/core/PageLayout/OPageLayout.vue";
+import SectionRail from "@/components/common/SectionRail.vue";
+import { type SectionHubGroup, type SectionHubItem } from "@/components/common/SectionHub.vue";
+import { defineComponent, ref, onBeforeMount, onActivated, onUpdated, computed } from "vue";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
-import { useQuasar } from "quasar";
+import useTheme from "@/composables/useTheme";
+import { useRouter, useRoute } from "vue-router";
 import config from "@/aws-exports";
 import useIsMetaOrg from "@/composables/useIsMetaOrg";
 import { getImageURL } from "@/utils/zincutils";
-import { outlinedSettings } from "@quasar/extras/material-icons-outlined";
+
 export default defineComponent({
   name: "AppSettings",
   components: {
+    OPageHeader,
+    ConstrainedPage,
+    OPageLayout,
+    SectionRail,
   },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const q = useQuasar();
+    const { isDark } = useTheme();
     const router: any = useRouter();
-    const settingsTab = ref("general");
-    const { isMetaOrg } = useIsMetaOrg();
-    const splitterModel = ref(250);
-    const storePreviousStoreModel  = ref(250);
+    const route = useRoute();
 
-    const handleSettingsRouting = () => {
-      if (router.currentRoute.value.name === "settings") {
-        if (isMetaOrg.value && config.isEnterprise === "true") {
-          settingsTab.value = "queryManagement";
-          router.push({
-            path: "/settings/query_management",
-            query: {
-              org_identifier: store.state.selectedOrganization?.identifier,
-            },
-          });
-        } 
-        else {
-          settingsTab.value = "general";
-          router.push({
-            path: "/settings/general",
-            query: {
-              org_identifier: store.state.selectedOrganization?.identifier,
-            },
-          });
-        }
-      }
-      else if (router.currentRoute.value.name === "nodes") {
-        if(!isMetaOrg.value || config.isEnterprise === "false") {
-          settingsTab.value = "general";
-          router.push({
-            path: "/settings/general",
-            query: {
-              org_identifier: store.state.selectedOrganization?.identifier,
-            },
-          });
-        }
-
-      }
-      else if (router.currentRoute.value.name === "license") {
-        if(!isMetaOrg.value || config.isEnterprise === "false") {
-          settingsTab.value = "general";
-          router.push({
-            path: "/settings/general",
-            query: {
-              org_identifier: store.state.selectedOrganization?.identifier,
-            },
-          });
-        }
-
-      }
-
+    // Maps a route name → the section key used by the hub/switcher.
+    const routeToSettingsTab: Record<string, string> = {
+      general: "general",
+      organization: "organization",
+      organizationSettings: "organization",
+      nodes: "nodes",
+      queryManagement: "queryManagement",
+      query_management: "queryManagement",
+      domainManagement: "domain_management",
+      pipelineDestinations: "pipeline_destinations",
+      alertTemplates: "templates",
+      modelPricing: "model_pricing",
+      modelPricingEditor: "model_pricing",
+      llmProviders: "llm_providers",
+      storageSettings: "storageSettings",
+      cipherKeys: "cipher-keys",
+      license: "license",
+      orgnizationManagement: "organization_management",
+      regexPatterns: "regex_patterns",
+      syntheticsLocations: "synthetics_locations",
+      correlationSettings: "correlation_settings",
+      genAiAgentMapping: "gen_ai_agent_mapping",
     };
 
-    onBeforeMount(() => {
-      handleSettingsRouting();
+    const settingsTab = ref(
+      routeToSettingsTab[router.currentRoute.value.name as string] ?? "general",
+    );
+    const { isMetaOrg } = useIsMetaOrg();
+
+    // /settings (name "settings") with no child → show the hub.
+    const isHub = computed(() => route.name === "settings");
+    const hubRoute = computed(() => ({
+      name: "settings",
+      query: { org_identifier: store.state.selectedOrganization?.identifier },
+    }));
+    const activeSection = computed(() => routeToSettingsTab[route.name as string] ?? "");
+
+    // Form-style sections render in a centered reading column (ConstrainedPage);
+    // table/list sections (nodes, destinations, templates, …) stay full-width.
+    const CONSTRAINED_SECTIONS = new Set([
+      "general",
+      "organization",
+      "license",
+      "domain_management",
+    ]);
+    const isConstrainedSection = computed(() => CONSTRAINED_SECTIONS.has(activeSection.value));
+
+    // Full-width sections that still want the shell-owned header (their content
+    // fills the whole width instead of a centered reading column).
+    // The rail is always shown, so the Settings root has no standalone landing —
+    // send it to the first section (General). Also guard meta-only sections.
+    const handleSettingsRouting = () => {
+      const name = router.currentRoute.value.name;
+      if (name === "settings") {
+        // .catch: a rejected navigation (e.g. unit-test router without child
+        // routes) must not surface as an unhandled error.
+        Promise.resolve(
+          router.replace({
+            path: "/settings/general",
+            query: {
+              org_identifier: store.state.selectedOrganization?.identifier,
+            },
+          }),
+        ).catch(() => {});
+        return;
+      }
+      const toGeneral = () => {
+        settingsTab.value = "general";
+        router.push({
+          path: "/settings/general",
+          query: { org_identifier: store.state.selectedOrganization?.identifier },
+        });
+      };
+      // Nodes and License are enterprise-only meta-org pages.
+      const notMeta =
+        store.state.zoConfig.meta_org && (!isMetaOrg.value || config.isEnterprise === "false");
+      if ((name === "nodes" || name === "license") && notMeta) {
+        toGeneral();
+        return;
+      }
+      // Synthetics locations is meta-org-only but NOT enterprise-only: synthetics
+      // ships in OSS, and the public location registry is the one venue an OSS
+      // deployment has — there is no agent-served pool to fall back on. It follows
+      // the same backend flag the rest of synthetics does.
+      const syntheticsBlocked =
+        (store.state.zoConfig.meta_org && !isMetaOrg.value) ||
+        store.state.zoConfig?.synthetics_enabled === false;
+      if (name === "syntheticsLocations" && syntheticsBlocked) {
+        toGeneral();
+      }
+    };
+
+    onBeforeMount(handleSettingsRouting);
+    onActivated(handleSettingsRouting);
+    onUpdated(handleSettingsRouting);
+
+    const regexIcon = computed(() =>
+      getImageURL(
+        isDark.value
+          ? "images/regex_pattern/regex_icon_dark.svg"
+          : "images/regex_pattern/regex_icon_light.svg",
+      ),
+    );
+
+    // Order the section groups appear in (hub + switcher).
+    const settingsGroupOrder = [
+      "General",
+      "Access & Security",
+      "Destinations",
+      "Data & AI",
+      "Operations",
+      "Synthetics",
+      "Account",
+    ];
+
+    // Every section, with its group + a one-line description for the hub cards.
+    // Feature-flag visibility stays declarative here (one array, not per-tab v-ifs).
+    const settingsItems = computed<SectionHubItem[]>(() => {
+      const org = store.state.selectedOrganization?.identifier;
+      const isEnt = config.isEnterprise == "true";
+      const isCloud = config.isCloud == "true";
+      const meta = isMetaOrg.value;
+      const z = store.state.zoConfig;
+      const items: (SectionHubItem & { group: string })[] = [
+        {
+          key: "general",
+          label: t("settings.generalLabel"),
+          description: t("settings.generalDesc"),
+          icon: "settings",
+          to: `/settings/general?org_identifier=${org}`,
+          dataTest: "general-settings-tab",
+          group: "General",
+        },
+        {
+          key: "organization",
+          label: t("settings.orgLabel"),
+          description: t("settings.orgDesc"),
+          icon: "business",
+          to: `/settings/organization?org_identifier=${org}`,
+          dataTest: "organization-settings-tab",
+          group: "General",
+        },
+        {
+          key: "cipher-keys",
+          label: t("settings.cipherKeys"),
+          description: t("settings.cipherKeysDesc"),
+          icon: "key",
+          to: { name: "cipherKeys", query: { org_identifier: org } },
+          visible: isEnt,
+          dataTest: "management-cipher-key-tab",
+          group: "Access & Security",
+        },
+        {
+          key: "regex_patterns",
+          label: t("regex_patterns.title"),
+          description: t("settings.regexPatternsDesc"),
+          icon: `img:${regexIcon.value}`,
+          to: { name: "regexPatterns", query: { org_identifier: org } },
+          visible: isEnt,
+          dataTest: "regex-patterns-tab",
+          group: "Access & Security",
+        },
+        {
+          key: "domain_management",
+          label: t("settings.ssoDomainRestrictions"),
+          description: t("settings.domainManagementDesc"),
+          icon: "dns",
+          to: { name: "domainManagement", query: { org_identifier: org } },
+          visible: isEnt && meta,
+          dataTest: "domain-management-tab",
+          group: "Access & Security",
+        },
+        // Notification Destinations and Templates are alerting configuration and
+        // now live under Reliability (/alert-destinations, /alert-templates).
+        // Pipeline Destinations stays here — it belongs to pipelines, not
+        // alerting — so the group is just "Destinations" now.
+        {
+          key: "pipeline_destinations",
+          label: t("pipeline_destinations.header"),
+          description: t("settings.pipelineDestinationsDesc"),
+          icon: "person-pin-circle",
+          to: { name: "pipelineDestinations", query: { org_identifier: org } },
+          visible: isEnt,
+          dataTest: "pipeline-destinations-tab",
+          group: "Destinations",
+        },
+        {
+          key: "storageSettings",
+          label: t("storage_settings.tabLabel"),
+          description: t("settings.storageSettingsDesc"),
+          icon: "cloud",
+          to: { name: "storageSettings", query: { org_identifier: org } },
+          visible:
+            isEnt &&
+            (!isCloud ||
+              store.state.organizationData.organizationSettings.org_storage_enabled === true),
+          dataTest: "storage-settings-tab",
+          group: "Data & AI",
+        },
+        {
+          key: "model_pricing",
+          label: t("settings.llmModelPricing"),
+          description: t("settings.modelPricingDesc"),
+          icon: "paid",
+          to: { name: "modelPricing", query: { org_identifier: org } },
+          visible: (isEnt || isCloud) && !!z.model_pricing_enabled,
+          dataTest: "model-pricing-tab",
+          group: "Data & AI",
+        },
+        {
+          key: "correlation_settings",
+          label: t("settings.correlationSettings"),
+          description: t("settings.correlationSettingsDesc"),
+          icon: "group-work",
+          to: { name: "correlationSettings", query: { org_identifier: org } },
+          visible: isEnt && z.service_streams_enabled !== false,
+          dataTest: "correlation-settings-tab",
+          group: "Data & AI",
+        },
+        {
+          key: "llm_providers",
+          label: t("llmProviders.tabLabel"),
+          description: t("settings.llmProvidersDesc"),
+          icon: "smart-toy",
+          to: { name: "llmProviders", query: { org_identifier: org } },
+          visible: (isEnt || isCloud) && !!z.online_evals_enabled,
+          dataTest: "llm-providers-tab",
+          group: "Data & AI",
+        },
+        {
+          key: "gen_ai_agent_mapping",
+          label: t("settings.genAiAgentMapping.tabLabel"),
+          description: t("settings.index.genAiAgentMappingDesc"),
+          icon: "smart-toy",
+          to: { name: "genAiAgentMapping", query: { org_identifier: org } },
+          visible: (isEnt || isCloud) && !!z.online_evals_enabled,
+          dataTest: "gen-ai-agent-mapping-tab",
+          group: "Data & AI",
+        },
+        {
+          key: "queryManagement",
+          label: t("settings.queryManagement"),
+          description: t("settings.queryManagementDesc"),
+          icon: "query-stats",
+          to: `/settings/query_management?org_identifier=${org}`,
+          visible: isEnt && meta,
+          dataTest: "query-management-tab",
+          group: "Operations",
+        },
+        {
+          key: "nodes",
+          label: t("settings.nodes"),
+          description: t("settings.nodesDesc"),
+          icon: "hub",
+          to: { name: "nodes", query: { org_identifier: org } },
+          visible: isEnt && meta,
+          dataTest: "nodes-tab",
+          group: "Operations",
+        },
+        {
+          key: "synthetics_locations",
+          label: t("synthetics.locations.title"),
+          description: t("synthetics.locations.description"),
+          icon: "location-on",
+          to: { name: "syntheticsLocations", query: { org_identifier: org } },
+          // Not `isEnt`: synthetics ships in OSS. Meta-org only (public rows are
+          // cluster-wide) and driven by the same `/config` flag as the feature.
+          visible: meta && z?.synthetics_enabled !== false,
+          dataTest: "synthetics-locations-tab",
+          group: "Synthetics",
+        },
+        {
+          key: "license",
+          label: t("settings.license"),
+          description: t("settings.licenseDesc"),
+          icon: "card-membership",
+          to: { name: "license", query: { org_identifier: org } },
+          visible: isEnt && meta,
+          dataTest: "license-tab",
+          group: "Account",
+        },
+        {
+          key: "organization_management",
+          label: t("settings.organizationManagement"),
+          description: t("settings.organizationManagementDesc"),
+          icon: "lan",
+          to: { name: "orgnizationManagement", query: { org_identifier: org } },
+          visible: isCloud && meta,
+          dataTest: "organization-management-tab",
+          group: "Account",
+        },
+      ];
+      return items;
     });
 
-    onActivated(() => {
-      handleSettingsRouting();
-    });
+    // The active section's metadata (label + description) — drives the shell-owned
+    // full-width header for constrained form sections.
+    const activeSectionItem = computed(() =>
+      settingsItems.value.find((i) => i.key === activeSection.value),
+    );
 
-    onUpdated(() => {
-      handleSettingsRouting();
+    // Bucket the sections into ordered groups for SectionHub / the breadcrumb switcher.
+    const sectionGroups = computed<SectionHubGroup[]>(() => {
+      const buckets = new Map<string, SectionHubItem[]>();
+      for (const item of settingsItems.value) {
+        const g = (item as any).group ?? "";
+        if (!buckets.has(g)) buckets.set(g, []);
+        buckets.get(g)!.push(item);
+      }
+      const rank = (label: string) => {
+        const i = settingsGroupOrder.indexOf(label);
+        return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+      };
+      // Internal group keys stay English (used for bucketing + rank); only the
+      // displayed label is translated so sorting/ranking is unaffected.
+      const groupLabels: Record<string, I18nText> = {
+        General: t("settings.groupGeneral"),
+        "Access & Security": t("settings.groupAccessSecurity"),
+        Destinations: t("settings.groupDestinations"),
+        "Data & AI": t("settings.groupDataAI"),
+        Operations: t("settings.groupOperations"),
+        Synthetics: t("settings.groupSynthetics"),
+        Account: t("settings.groupAccount"),
+      };
+      return [...buckets.keys()]
+        .sort((a, b) => rank(a) - rank(b))
+        .map((label) => ({ label: groupLabels[label] ?? raw(label), items: buckets.get(label)! }));
     });
-    const showManagementTabs = ref(true);
-    const controlManagementTabs = () => {
-      if(showManagementTabs.value){
-        const prevVal = splitterModel.value;
-        storePreviousStoreModel.value = prevVal;
-        splitterModel.value = 0;
-        showManagementTabs.value = false;
-      }
-      else{
-        splitterModel.value = storePreviousStoreModel.value || 250;
-        
-        showManagementTabs.value = true;
-      }
-    }
-    const regexIcon = computed(()=>{
-      return getImageURL(store.state.theme === 'dark' && router.currentRoute.value.name !== 'regexPatterns' ? 'images/regex_pattern/regex_icon_dark.svg' : 'images/regex_pattern/regex_icon_light.svg')
-    })
 
     return {
+      raw,
       t,
       store,
       router,
       config,
       settingsTab,
-      splitterModel,
       isMetaOrg,
-      showManagementTabs,
-      controlManagementTabs,
-      regexIcon,
-      // Expose methods for testing
+      isHub,
+      hubRoute,
+      activeSection,
+      isConstrainedSection,
+      activeSectionItem,
+      sectionGroups,
       handleSettingsRouting,
-      storePreviousStoreModel,
-      outlinedSettings,
     };
   },
 });
 </script>
-<style lang="scss">
-</style>

@@ -1,10 +1,8 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
+import { DEFAULT_CAST_TARGET_TYPE, isCastTargetType } from "@/utils/dashboard/castSuggestion";
 
-export function buildSQLQueryFromInput(
-  fields: any,
-  defaultStream: any,
-): string {
+export function buildSQLQueryFromInput(fields: any, defaultStream: any): string {
   // Handle undefined or null fields
   if (!fields) {
     return "";
@@ -37,6 +35,7 @@ export function buildSQLQueryFromInput(
   }
 
   const sqlArgs = [];
+  let castTargetType: string | null = null;
   for (let i = 0; i < args.length; i++) {
     // Skip if arg is undefined or null
     if (!args[i]) {
@@ -66,11 +65,7 @@ export function buildSQLQueryFromInput(
       );
     } else if (argType === "string" || argType === "histogramInterval") {
       // Wrap strings in quotes if they are not already wrapped
-      if (
-        typeof argValue === "string" &&
-        !argValue.startsWith("'") &&
-        !argValue.endsWith("'")
-      ) {
+      if (typeof argValue === "string" && !argValue.startsWith("'") && !argValue.endsWith("'")) {
         sqlArgs.push(`'${argValue}'`);
       } else {
         sqlArgs.push(argValue);
@@ -78,13 +73,15 @@ export function buildSQLQueryFromInput(
     } else if (argType === "number") {
       // Add numbers as-is
       sqlArgs.push(argValue);
+    } else if (argType === "castType") {
+      // A SQL type name, not a value. Held aside rather than pushed so the cast
+      // reads it by kind, not by position, and validated so a hand-edited panel
+      // cannot put arbitrary text where a type name goes.
+      castTargetType = isCastTargetType(argValue) ? argValue : DEFAULT_CAST_TARGET_TYPE;
     } else if (argType === "function") {
       // Recursively build the SQL query for the nested function
       try {
-        const nestedFunctionQuery = buildSQLQueryFromInput(
-          argValue,
-          defaultStream,
-        );
+        const nestedFunctionQuery = buildSQLQueryFromInput(argValue, defaultStream);
         if (nestedFunctionQuery) {
           sqlArgs.push(nestedFunctionQuery);
         }
@@ -115,6 +112,16 @@ export function buildSQLQueryFromInput(
       return `approx_percentile_cont(${sqlArgs.join(", ")}, 0.95)`;
     case "p99":
       return `approx_percentile_cont(${sqlArgs.join(", ")}, 0.99)`;
+    case "try_cast":
+    case "cast": {
+      const castValue = sqlArgs[0];
+      if (!castValue) return "";
+      // A panel saved without the type argument still casts rather than dropping
+      // the column out of SELECT, which would fail silently.
+      return `${functionName.toUpperCase()}(${castValue} AS ${
+        castTargetType ?? DEFAULT_CAST_TARGET_TYPE
+      })`;
+    }
   }
 
   // Construct the SQL query string
@@ -145,7 +152,7 @@ function buildSQLJoinsFromInput(joins: any[], defaultStream: any): string {
     let joinConditionStrings: string[] = [];
 
     for (const condition of conditions) {
-      const { leftField, rightField, operation, logicalOperator } = condition;
+      const { leftField, rightField, operation } = condition;
 
       if (!leftField?.field || !rightField?.field || !operation) {
         // Invalid condition, skip it and continue to the next one
@@ -164,9 +171,7 @@ function buildSQLJoinsFromInput(joins: any[], defaultStream: any): string {
           ? `${defaultStream}.${rightField.field}`
           : rightField.field;
 
-      joinConditionStrings.push(
-        `${leftFieldStr} ${operation} ${rightFieldStr}`,
-      );
+      joinConditionStrings.push(`${leftFieldStr} ${operation} ${rightFieldStr}`);
     }
 
     // Skip joins with no valid conditions
@@ -228,7 +233,6 @@ function buildChartQuery(config: {
 
   // Only use stream alias when joins exist
   const streamAlias = queryData?.joins?.length > 0 ? stream : "";
-
 
   // Build SELECT clause
   const selectExpressions: string[] = [];
@@ -383,16 +387,10 @@ export function buildSQLChartQuery(config: {
   let query = `SELECT ${selectExpressions.join(", ")}`;
 
   // FROM clause with JOIN support
-  query += ` FROM "${stream}" ${buildSQLJoinsFromInput(
-    queryData.joins,
-    streamAlias,
-  )}`;
+  query += ` FROM "${stream}" ${buildSQLJoinsFromInput(queryData.joins, streamAlias)}`;
 
   // WHERE clause
-  const whereClause = buildWhereClause(
-    queryData.fields.filter.conditions,
-    dashboardPanelData,
-  );
+  const whereClause = buildWhereClause(queryData.fields.filter.conditions, dashboardPanelData);
   query += whereClause;
 
   // GROUP BY clause - chart-type-specific logic
@@ -515,11 +513,7 @@ export function addMissingArgs(fields: any): any {
       // If the argument is missing, add it
       const argType = argDef.type[0].value; // Always take the first type
       const defaultValue =
-        argDef.defaultValue !== undefined
-          ? argDef.defaultValue
-          : argType === "field"
-            ? {}
-            : "";
+        argDef.defaultValue !== undefined ? argDef.defaultValue : argType === "field" ? {} : "";
 
       updatedArgs.push({
         type: argType,
@@ -555,9 +549,7 @@ const formatValue = (
         (it: any) => it.stream_alias === null || it.stream_alias === undefined,
       );
 
-  const columnType = streamFields?.schema?.find(
-    (it: any) => it.name == column.field,
-  )?.type;
+  const columnType = streamFields?.schema?.find((it: any) => it.name == column.field)?.type;
   if (value == null) {
     // if value is null or undefined, return it as is
     return value;
@@ -570,11 +562,14 @@ const formatValue = (
   }
   // escape any single quotes in the value
   tempValue = escapeSingleQuotes(tempValue);
-  // add double quotes around the value
-  tempValue =
-    columnType == "Utf8" || columnType === undefined
-      ? `'${tempValue}'`
-      : `${tempValue}`;
+  // Quote string values, leave numeric values unquoted
+  if (columnType === "Utf8") {
+    tempValue = `'${tempValue}'`;
+  } else if (columnType === undefined) {
+    // Schema not loaded — infer from value: quote unless it's purely numeric
+    const isNumeric = tempValue !== "" && !isNaN(Number(tempValue));
+    tempValue = isNumeric ? `${tempValue}` : `'${tempValue}'`;
+  }
 
   return tempValue;
 };
@@ -591,7 +586,7 @@ const formatValue = (
  */
 const formatINValue = (value: any) => {
   // if variable is present, don't want to use splitQuotedString
-  if (value?.includes("$")) {
+  if (value?.includes("$") || value?.includes("{{")) {
     if (value.startsWith("(") && value.endsWith(")")) {
       return value.substring(1, value.length - 1);
     }
@@ -614,19 +609,16 @@ const formatINValue = (value: any) => {
 export const buildCondition = (condition: any, dashboardPanelData: any) => {
   // Check if joins exist to determine whether to use stream alias
   const hasJoins =
-    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
-      ?.joins?.length > 0;
+    dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]?.joins?.length > 0;
 
   const streamAlias = hasJoins
     ? (condition?.column?.streamAlias ??
-      dashboardPanelData.data.queries[
-        dashboardPanelData.layout.currentQueryIndex
-      ].fields.stream)
+      dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex].fields.stream)
     : "";
 
   if (condition.filterType === "group") {
     const groupConditions = condition.conditions
-      .map((condition) => buildCondition(condition, dashboardPanelData))
+      .map((condition: any) => buildCondition(condition, dashboardPanelData))
       .filter(Boolean);
     const logicalOperators = condition.conditions
       .map((c: any) => c.logicalOperator)
@@ -646,9 +638,7 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
       ? `${streamAlias}.${condition.column.field}`
       : condition.column.field;
     return `${fieldRef} IN (${condition.values
-      .map((value: any) =>
-        formatValue(value, condition.column, dashboardPanelData),
-      )
+      .map((value: any) => formatValue(value, condition.column, dashboardPanelData))
       .join(", ")})`;
   } else if (condition.type === "condition" && condition.operator != null) {
     let selectFilter = "";
@@ -677,10 +667,7 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
       selectFilter += `${fieldRef} NOT IN (${formatINValue(condition.value)})`;
     } else if (condition.operator === "match_all") {
       selectFilter += `match_all(${formatValue(condition.value, condition.column, dashboardPanelData)})`;
-    } else if (
-      condition.operator === "str_match" ||
-      condition.operator === "Contains"
-    ) {
+    } else if (condition.operator === "str_match" || condition.operator === "Contains") {
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
         : condition.column.field;
@@ -713,21 +700,6 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
         dashboardPanelData,
       )})`;
     } else if (condition.value != null && condition.value !== "") {
-      // streamAlias can be undefined or null, also, groupedfield will have one entry with streamAlias as null
-      // so we need to handle both cases
-      const streamFields = condition.column.streamAlias
-        ? dashboardPanelData?.meta?.streamFields?.groupedFields.find(
-            (it: any) => it.stream_alias === condition.column.streamAlias,
-          )
-        : dashboardPanelData?.meta?.streamFields?.groupedFields.find(
-            (it: any) =>
-              it.stream_alias === null || it.stream_alias === undefined,
-          );
-
-      const columnType = streamFields?.schema?.find(
-        (it: any) => it.name == condition.column.field,
-      )?.type;
-
       const fieldRef = streamAlias
         ? `${streamAlias}.${condition.column.field}`
         : condition.column.field;
@@ -746,22 +718,13 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
           )}`;
           break;
         case "Not Contains":
-          selectFilter +=
-            columnType === "Utf8"
-              ? `NOT LIKE '%${condition.value}%'`
-              : `NOT LIKE %${condition.value}%`;
+          selectFilter += `NOT LIKE '%${escapeSingleQuotes(condition.value)}%'`;
           break;
         case "Starts With":
-          selectFilter +=
-            columnType === "Utf8"
-              ? `LIKE '${condition.value}%'`
-              : `LIKE ${condition.value}%`;
+          selectFilter += `LIKE '${escapeSingleQuotes(condition.value)}%'`;
           break;
         case "Ends With":
-          selectFilter +=
-            columnType === "Utf8"
-              ? `LIKE '%${condition.value}'`
-              : `LIKE %${condition.value}`;
+          selectFilter += `LIKE '%${escapeSingleQuotes(condition.value)}'`;
           break;
         default:
           selectFilter += `${condition.operator} ${formatValue(
@@ -785,7 +748,7 @@ export const buildCondition = (condition: any, dashboardPanelData: any) => {
  */
 const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
   const whereConditions = filterData
-    ?.map((condition) => buildCondition(condition, dashboardPanelData))
+    ?.map((condition: any) => buildCondition(condition, dashboardPanelData))
     ?.filter(Boolean);
 
   const logicalOperators = filterData.map((it: any) => it.logicalOperator);
@@ -797,9 +760,7 @@ const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
             ? logicalOperators[index + 1]
             : "";
 
-        return index < logicalOperators.length
-          ? `${cond} ${logicalOperator}`
-          : cond;
+        return index < logicalOperators.length ? `${cond} ${logicalOperator}` : cond;
       })
       .join(" ")}`;
   }
@@ -808,10 +769,7 @@ const buildWhereClause = (filterData: any, dashboardPanelData: any) => {
 };
 
 export const mapChart = (dashboardPanelData: any) => {
-  const queryData =
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ];
+  const queryData = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
   const { name, value_for_maps } = queryData.fields;
 
   return buildChartQuery({
@@ -827,10 +785,7 @@ export const mapChart = (dashboardPanelData: any) => {
 };
 
 export const geoMapChart = (dashboardPanelData: any) => {
-  const queryData =
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ];
+  const queryData = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
   const { latitude, longitude, weight } = queryData.fields;
 
   return buildChartQuery({
@@ -847,10 +802,7 @@ export const geoMapChart = (dashboardPanelData: any) => {
 };
 
 export const sankeyChartQuery = (dashboardPanelData: any) => {
-  const queryData =
-    dashboardPanelData.data.queries[
-      dashboardPanelData.layout.currentQueryIndex
-    ];
+  const queryData = dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex];
   const { source, target, value } = queryData.fields;
 
   return buildChartQuery({

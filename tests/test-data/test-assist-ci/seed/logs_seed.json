@@ -1,0 +1,7 @@
+[
+  {"level": "info",  "service": "ci-seed", "message": "user login ok",          "code": 200},
+  {"level": "warn",  "service": "ci-seed", "message": "slow query detected",    "code": 200},
+  {"level": "error", "service": "ci-seed", "message": "upstream connect failed", "code": 502},
+  {"level": "info",  "service": "ci-seed", "message": "cache miss",             "code": 200},
+  {"level": "error", "service": "ci-seed", "message": "auth token expired",     "code": 401}
+]

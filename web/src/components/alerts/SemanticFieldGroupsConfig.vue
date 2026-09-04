@@ -1,4 +1,4 @@
-<!-- Copyright 2025 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,92 +15,91 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="semantic-field-groups-config">
-    <div class="section-header q-mb-md">
-      <div class="text-h6">
-        {{ t("settings.correlation.semanticFieldGroupsTitle") }}
-      </div>
-      <div class="text-caption text-grey-7">
+  <div class="w-full">
+    <!-- Toolbar: caption left, actions right — the module tab already titles the page -->
+    <div class="mb-2 flex items-center justify-between gap-4">
+      <div class="text-text-secondary min-w-0 truncate text-xs">
         {{ t("correlation.semanticFieldGroupsCaption") }}
       </div>
-    </div>
-
-    <!-- Category Filter -->
-    <div class="row q-col-gutter-md q-mb-md">
-      <div class="col-12 col-md-4">
-        <q-select
-          data-test="semantic-group-category-select"
-          v-model="selectedCategory"
-          :options="categoryOptions"
-          :label="t('correlation.category')"
-          :hint="t('correlation.categoryHint')"
-          dense
-          borderless
-          stack-label
-          class="showLabelOnTop"
-          emit-value
-          map-options
-          style="max-width: 100%"
+      <div class="flex shrink-0 items-center gap-2">
+        <OButton
+          data-test="correlation-semanticfieldgroup-export-json-btn"
+          variant="outline"
+          size="sm"
+          :disabled="localGroups.length === 0"
+          @click="exportGroups"
+          >{{ t("correlation.exportToJson") }}</OButton
         >
-          <template v-slot:option="scope">
-            <q-item v-bind="scope.itemProps">
-              <q-item-section>
-                <q-item-label>
-                  <span class="tw:font-medium">{{ scope.opt.label }}</span>
-                  <span class="tw:text-xs tw:text-gray-500 tw:ml-2"
-                    >({{ scope.opt.count }}
-                    {{ t("settings.correlation.groupsLabel") }})</span
-                  >
-                </q-item-label>
-              </q-item-section>
-            </q-item>
-          </template>
-        </q-select>
-      </div>
-      <div class="col-12 col-md-8 flex items-center justify-end q-gutter-sm">
-        <q-btn
+        <OButton
           data-test="correlation-semanticfieldgroup-import-json-btn"
-          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          no-caps
-          flat
-          :label="t('correlation.importFromJson')"
+          variant="outline"
+          size="sm"
           @click="navigateToImport"
-        />
-        <q-btn
+          >{{ t("correlation.importFromJson") }}</OButton
+        >
+        <OButton
           data-test="correlation-semanticfieldgroup-add-custom-group-btn"
-          class="text-bold o2-secondary-button tw:h-[28px] tw:w-[32px] tw:min-w-[32px]!"
-          :class="
-            store.state.theme === 'dark'
-              ? 'o2-secondary-button-dark'
-              : 'o2-secondary-button-light'
-          "
-          no-caps
-          flat
-          color="primary"
-          :label="t('correlation.addCustomGroup')"
+          variant="primary"
+          size="sm"
           @click="addGroup"
-        />
+          >{{ t("correlation.addCustomGroup") }}</OButton
+        >
+        <slot name="header-actions" />
       </div>
     </div>
 
-    <!-- Filtered Semantic Groups List -->
-    <div v-if="filteredGroups.length > 0" class="groups-list q-mb-md">
+    <!-- Category strip + global search -->
+    <div v-if="categoryOptions.length > 0" class="mb-3 flex items-center gap-3">
+      <OTabs
+        :model-value="searchActive ? '' : (selectedCategory ?? '')"
+        dense
+        class="min-w-0 flex-1"
+        @update:model-value="onCategoryTabChange"
+      >
+        <OTab
+          v-for="opt in categoryTabs"
+          :key="opt.value"
+          :name="opt.value"
+          :data-test="`semantic-group-category-tab-${opt.value}`"
+          :class="searchActive && opt.count === 0 ? 'opacity-50' : ''"
+        >
+          <span>{{ opt.label }}</span>
+          <OBadge size="xs" variant="default-soft">{{ opt.count }}</OBadge>
+        </OTab>
+      </OTabs>
+      <OInput
+        data-test="semantic-group-search-input"
+        v-model="searchQuery"
+        type="search"
+        size="sm"
+        width="md"
+        clearable
+        :placeholder="t('correlation.searchGroupsPlaceholder')"
+        class="shrink-0"
+      >
+        <template #icon-left><OIcon name="search" size="sm" /></template>
+      </OInput>
+    </div>
+
+    <!-- Groups list: active category, or cross-category search results -->
+    <div v-if="visibleGroups.length > 0" class="mb-3 w-full overflow-x-hidden">
       <SemanticGroupItem
-        v-for="(group, index) in filteredGroups"
+        v-for="(group, index) in visibleGroups"
         :key="`${group.id}-${index}`"
+        :data-group-id="group.id"
         :group="group"
+        :category-tag="searchActive ? raw(normalizeCategoryName(group.group || '')) : undefined"
+        :highlight-query="searchActive ? normalizedQuery : undefined"
         @update="updateGroupByFilter(index, $event)"
         @delete="removeGroupByFilter(index)"
       />
     </div>
-    <div v-else class="text-center q-pa-lg text-grey-7">
-      <q-icon name="info" size="md" class="q-mb-sm" />
-      <div>
+    <div v-else class="text-text-muted p-4 text-center">
+      <OIcon name="info" size="md" class="mb-2" />
+      <div v-if="searchActive" data-test="semantic-group-search-no-results">
+        {{ t("correlation.noSearchResults", { query: searchQuery.trim() }) }}
+      </div>
+      <div v-else>
         {{
           t("correlation.noSemanticGroupsInCategory", {
             category: selectedCategory || t("correlation.other"),
@@ -110,10 +109,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <!-- Total groups indicator -->
-    <div v-if="localGroups.length > 0" class="text-caption text-grey-6 q-mt-sm">
+    <div v-if="localGroups.length > 0" class="text-text-secondary mt-2 text-xs">
       {{
         t("correlation.showingGroups", {
-          filterGroupLength: filteredGroups.length,
+          filterGroupLength: visibleGroups.length,
           localGroupLength: localGroups.length,
         })
       }}
@@ -122,84 +121,81 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Fingerprint Fields Selection (only for per-alert, not org-level) -->
     <div
       v-if="localGroups.length > 0 && showFingerprintFields"
-      class="fingerprint-section q-mt-lg"
+      class="border-separator mt-4 border-t pt-4"
     >
-      <div class="text-subtitle1 q-mb-sm">
+      <div class="mb-2 text-base font-medium">
         {{ t("correlation.deduplicateFields") }} *
-        <q-tooltip>{{ t("correlation.deduplicateFieldTooltip") }}</q-tooltip>
+        <OTooltip :content="t('correlation.deduplicateFieldTooltip')" />
       </div>
-      <div class="text-caption text-grey-7 q-mb-md">
+      <div class="text-text-secondary mb-3 text-xs">
         {{ t("correlation.alertDeduplicationMessage") }}
       </div>
-      <div class="fingerprint-checkboxes">
-        <q-checkbox
+      <div class="flex flex-wrap gap-3">
+        <OCheckbox
           :data-test="`fingerprint-field-checkbox-${group.id}`"
           v-for="group in localGroups"
           :key="group.id"
           v-model="localFingerprintFields"
-          :val="group.id"
-          :label="group.display"
-          class="fingerprint-checkbox"
+          :value="group.id"
+          :label="raw(group.display)"
+          class="min-w-50"
           @update:model-value="emitUpdate"
         />
       </div>
-      <div
-        v-if="localFingerprintFields.length === 0"
-        class="text-negative text-caption q-mt-sm"
-      >
+      <div v-if="localFingerprintFields.length === 0" class="text-status-error-text mt-2 text-xs">
         {{ t("correlation.atLeastOneDeduplicationField") }}
       </div>
     </div>
 
-    <!-- Import Dialog -->
-    <q-dialog v-model="showImportDrawer" maximized position="right" full-height>
-      <q-card class="import-dialog-card">
-        <ImportSemanticGroupsDrawer
-          :current-groups="localGroups"
-          :org-id="store.state.selectedOrganization.identifier"
-          @apply="handleImportApply"
-          @close="showImportDrawer = false"
-        />
-      </q-card>
-    </q-dialog>
+    <!-- Import Drawer -->
+    <ImportSemanticGroupsDrawer
+      data-test="semantic-field-groups-config-import-drawer"
+      v-model:open="showImportDrawer"
+      :current-groups="localGroups"
+      :org-id="store.state.selectedOrganization.identifier"
+      @apply="handleImportApply"
+    />
   </div>
 </template>
 
 <script lang="ts" setup>
 import { ref, computed, watch, onMounted, nextTick } from "vue";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
+import { raw, useI18nTyped } from "@/types/i18n";
 import { v4 as uuidv4 } from "uuid";
 import SemanticGroupItem from "./SemanticGroupItem.vue";
 import ImportSemanticGroupsDrawer from "./ImportSemanticGroupsDrawer.vue";
+import OBadge from "@/lib/core/Badge/OBadge.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OTab from "@/lib/navigation/Tabs/OTab.vue";
+import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OCheckbox from "@/lib/forms/Checkbox/OCheckbox.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 
 const store = useStore();
-const { t } = useI18n();
+const { t } = useI18nTyped();
 
-interface SemanticGroup {
+export interface SemanticGroup {
   id: string;
   display: string;
   group?: string;
   fields: string[];
-  normalize: boolean;
-  is_stable?: boolean;
-  is_scope?: boolean;
 }
-
-// Reserved IDs that should not be used as semantic groups
-// service-fqn is the OUTPUT of correlation, not an input dimension
-const RESERVED_GROUP_IDS = ["service-fqn", "servicefqn", "fqn"];
 
 interface Props {
   semanticFieldGroups?: SemanticGroup[];
   fingerprintFields?: string[];
   showFingerprintFields?: boolean;
+  scrollToGroupId?: string;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   semanticFieldGroups: () => [],
   fingerprintFields: () => [],
   showFingerprintFields: false,
+  scrollToGroupId: undefined,
 });
 
 const emit = defineEmits<{
@@ -207,24 +203,17 @@ const emit = defineEmits<{
   (e: "update:fingerprintFields", fields: string[]): void;
 }>();
 
-// Filter out reserved IDs like service-fqn (it's the output, not an input)
-const localGroups = ref<SemanticGroup[]>(
-  props.semanticFieldGroups.filter(
-    (g) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()),
-  ),
-);
+const localGroups = ref<SemanticGroup[]>([...props.semanticFieldGroups]);
 const localFingerprintFields = ref<string[]>([...props.fingerprintFields]);
 const selectedCategory = ref<string | null>(null);
+const searchQuery = ref("");
 const showImportDrawer = ref(false);
 
 // Watch for external changes and auto-select first category
 watch(
   () => props.semanticFieldGroups,
   (newGroups) => {
-    // Filter out reserved IDs like service-fqn (it's the output, not an input)
-    localGroups.value = newGroups.filter(
-      (g) => !RESERVED_GROUP_IDS.includes(g.id?.toLowerCase()),
-    );
+    localGroups.value = [...newGroups];
     // Auto-select first category if none selected
     if (!selectedCategory.value && localGroups.value.length > 0) {
       nextTick(() => {
@@ -244,6 +233,29 @@ watch(
   },
 );
 
+// Helper function to normalize category names
+const normalizeCategoryName = (category: string): string => {
+  if (!category) return "Other";
+
+  const normalized = category.toLowerCase();
+
+  // Map common variations to consistent names
+  const categoryMap: Record<string, string> = {
+    kubernetes: "Kubernetes",
+    k8s: "Kubernetes",
+    aws: "AWS",
+    amazon: "AWS",
+    azure: "Azure",
+    gcp: "GCP",
+    google: "GCP",
+    common: "Common",
+    generic: "Common",
+    other: "Other",
+  };
+
+  return categoryMap[normalized] || category;
+};
+
 // Build category options from localGroups (the actual data)
 const categoryOptions = computed(() => {
   if (localGroups.value.length === 0) {
@@ -254,7 +266,7 @@ const categoryOptions = computed(() => {
   const groupsMap = new Map<string, number>();
 
   for (const group of localGroups.value) {
-    const category = group.group || "Other";
+    const category = normalizeCategoryName(group.group || "Other");
     groupsMap.set(category, (groupsMap.get(category) || 0) + 1);
   }
 
@@ -262,7 +274,7 @@ const categoryOptions = computed(() => {
   return Array.from(groupsMap.entries())
     .sort((a, b) => a[0].localeCompare(b[0]))
     .map(([category, count]) => ({
-      label: category,
+      label: raw(category),
       value: category,
       count: count,
     }));
@@ -274,44 +286,80 @@ const filteredGroups = computed(() => {
     return localGroups.value;
   }
   return localGroups.value.filter(
-    (group) => (group.group || "Other") === selectedCategory.value,
+    (group) => normalizeCategoryName(group.group || "Other") === selectedCategory.value,
   );
 });
 
-// Group ID options for fingerprint selection
-const groupIdOptions = computed(() => {
-  return localGroups.value.map((group) => ({
-    label: group.display,
-    value: group.id,
+// ── Global search (name / id / field alias, across ALL categories) ─────────
+const normalizedQuery = computed(() => searchQuery.value.trim().toLowerCase());
+const searchActive = computed(() => normalizedQuery.value.length > 0);
+
+const matchesQuery = (group: SemanticGroup): boolean => {
+  const q = normalizedQuery.value;
+  return (
+    group.display.toLowerCase().includes(q) ||
+    group.id.toLowerCase().includes(q) ||
+    group.fields.some((f) => f.toLowerCase().includes(q))
+  );
+};
+
+// Search results ordered by category (stable sort keeps original order within one)
+const searchResults = computed(() => {
+  if (!searchActive.value) return [];
+  return [...localGroups.value]
+    .filter(matchesQuery)
+    .sort((a, b) =>
+      normalizeCategoryName(a.group || "Other").localeCompare(
+        normalizeCategoryName(b.group || "Other"),
+      ),
+    );
+});
+
+// What the list renders: search results (all categories) or the active category
+const visibleGroups = computed(() =>
+  searchActive.value ? searchResults.value : filteredGroups.value,
+);
+
+// Strip tabs: counts flip to per-category MATCH counts while searching
+const categoryTabs = computed(() => {
+  if (!searchActive.value) return categoryOptions.value;
+  return categoryOptions.value.map((opt) => ({
+    ...opt,
+    count: localGroups.value.filter(
+      (g) => normalizeCategoryName(g.group || "Other") === opt.value && matchesQuery(g),
+    ).length,
   }));
 });
+
+// Tab click exits search mode and resumes category browsing
+const onCategoryTabChange = (name: string | number) => {
+  searchQuery.value = "";
+  selectedCategory.value = String(name);
+};
 
 // Generate a short unique ID for new groups using first 8 chars of UUID
 const generateShortId = (): string => {
   return uuidv4().substring(0, 8);
 };
 
-// Add a new custom group (assign to current category if selected)
+// Add a new custom group (assign to current category if selected).
+// Clears any active search first — a fresh empty group would rarely match the
+// query and would silently vanish from a search-results view.
 const addGroup = () => {
+  searchQuery.value = "";
   const newGroup: SemanticGroup = {
     id: generateShortId(),
     display: "",
     group: selectedCategory.value || "Other",
     fields: [],
-    normalize: true,
-    is_stable: false,
-    is_scope: false,
   };
   localGroups.value.unshift(newGroup);
   emitUpdate();
 };
 
-// Update group by filtered index - find actual index in localGroups
-const updateGroupByFilter = (
-  filteredIndex: number,
-  updatedGroup: SemanticGroup,
-) => {
-  const group = filteredGroups.value[filteredIndex];
+// Update group by visible index - find actual index in localGroups
+const updateGroupByFilter = (filteredIndex: number, updatedGroup: SemanticGroup) => {
+  const group = visibleGroups.value[filteredIndex];
   const actualIndex = localGroups.value.findIndex(
     (g) => g.id === group.id && g.display === group.display,
   );
@@ -321,9 +369,9 @@ const updateGroupByFilter = (
   }
 };
 
-// Remove group by filtered index - find actual index in localGroups
+// Remove group by visible index - find actual index in localGroups
 const removeGroupByFilter = (filteredIndex: number) => {
-  const group = filteredGroups.value[filteredIndex];
+  const group = visibleGroups.value[filteredIndex];
   const actualIndex = localGroups.value.findIndex(
     (g) => g.id === group.id && g.display === group.display,
   );
@@ -332,12 +380,21 @@ const removeGroupByFilter = (filteredIndex: number) => {
     localGroups.value.splice(actualIndex, 1);
 
     // Remove from fingerprint fields if present
-    localFingerprintFields.value = localFingerprintFields.value.filter(
-      (id) => id !== removedId,
-    );
+    localFingerprintFields.value = localFingerprintFields.value.filter((id) => id !== removedId);
 
     emitUpdate();
   }
+};
+
+const exportGroups = () => {
+  const json = JSON.stringify(localGroups.value, null, 2);
+  const blob = new Blob([json], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `semantic-groups-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 };
 
 const navigateToImport = () => {
@@ -365,49 +422,62 @@ const emitUpdate = () => {
   emit("update:fingerprintFields", [...localFingerprintFields.value]);
 };
 
-// Auto-select first category on mount
-onMounted(() => {
-  nextTick(() => {
-    if (categoryOptions.value.length > 0 && !selectedCategory.value) {
-      selectedCategory.value = categoryOptions.value[0].value;
+// Auto-select first category on mount, or navigate to a specific group
+onMounted(async () => {
+  await nextTick();
+
+  if (props.scrollToGroupId) {
+    // Find and switch to the category that contains the requested group
+    const targetGroup = localGroups.value.find((g) => g.id === props.scrollToGroupId);
+    if (targetGroup) {
+      // Normalized to match filteredGroups' comparison — a raw alias like "k8s"
+      // would select a tab that doesn't exist and render an empty list.
+      selectedCategory.value = normalizeCategoryName(targetGroup.group || "Other");
+      await nextTick(); // wait for filteredGroups to re-render
     }
-  });
+  } else if (categoryOptions.value.length > 0 && !selectedCategory.value) {
+    selectedCategory.value = categoryOptions.value[0].value;
+  }
+
+  if (props.scrollToGroupId) {
+    await nextTick();
+    const el = document.querySelector(
+      `[data-group-id="${props.scrollToGroupId}"]`,
+    ) as HTMLElement | null;
+    if (el) {
+      // Scroll within the nearest scrollable parent to avoid pushing
+      // ancestor containers (main page layout) out of view
+      const scrollParent = el.closest(".overflow-y-auto") as HTMLElement | null;
+      if (scrollParent) {
+        const parentRect = scrollParent.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const offset = elRect.top - parentRect.top - parentRect.height / 2 + elRect.height / 2;
+        scrollParent.scrollBy({ top: offset, behavior: "smooth" });
+      } else {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      // Blink the border to draw attention
+      el.classList.add("group-highlight");
+      setTimeout(() => el.classList.remove("group-highlight"), 2000);
+    }
+  }
 });
 </script>
 
-<style lang="scss" scoped>
-.semantic-field-groups-config {
-  width: 100%;
+<style scoped>
+/* keep(keyframes): @keyframes can't be expressed as a utility; applied via JS classList */
+.group-highlight {
+  animation: group-border-blink 0.4s ease-in-out 3;
 }
 
-.section-header {
-  border-bottom: 1px solid var(--q-separator-color);
-  padding-bottom: 12px;
-}
-
-.groups-list {
-  width: 100%;
-  overflow-x: hidden;
-}
-
-.fingerprint-section {
-  border-top: 1px solid var(--q-separator-color);
-  padding-top: 16px;
-}
-
-.fingerprint-checkboxes {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-}
-
-.fingerprint-checkbox {
-  min-width: 200px;
-}
-
-.import-dialog-card {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
+@keyframes group-border-blink {
+  0%,
+  100% {
+    outline: 0.125rem solid transparent;
+  }
+  50% {
+    outline: 0.125rem solid var(--color-theme-accent);
+    border-radius: 0.25rem;
+  }
 }
 </style>

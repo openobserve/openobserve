@@ -16,12 +16,11 @@
 use std::{
     borrow::{Borrow, Cow},
     io::{BufRead, Seek},
-    sync::Arc,
+    sync::{Arc, LazyLock as Lazy},
 };
 
 use arrow_json::reader;
 use arrow_schema::{ArrowError, DataType, Field, Schema};
-use once_cell::sync::Lazy;
 use regex::Regex;
 use serde_json::{Map, Value};
 
@@ -54,8 +53,9 @@ pub fn infer_json_schema_from_seekable<R: BufRead + Seek>(
 }
 
 pub fn infer_json_schema_from_map<I, V>(
-    value_iter: I,
+    stream_name: &str,
     stream_type: impl Into<StreamType>,
+    value_iter: I,
 ) -> Result<Schema, ArrowError>
 where
     I: Iterator<Item = V>,
@@ -69,7 +69,7 @@ where
                 Default::default(),
             ));
         }
-        infer_json_schema_from_object(fields.as_mut().unwrap(), value.borrow())?;
+        infer_json_schema_from_object(stream_name, fields.as_mut().unwrap(), value.borrow())?;
     }
     let fields = fields.unwrap_or_default();
     let fields = fields
@@ -80,8 +80,9 @@ where
 }
 
 pub fn infer_json_schema_from_values<I, V>(
-    value_iter: I,
+    stream_name: &str,
     stream_type: impl Into<StreamType>,
+    value_iter: I,
 ) -> Result<Schema, ArrowError>
 where
     I: Iterator<Item = V>,
@@ -97,7 +98,7 @@ where
                         Default::default(),
                     ));
                 }
-                infer_json_schema_from_object(fields.as_mut().unwrap(), v)?;
+                infer_json_schema_from_object(stream_name, fields.as_mut().unwrap(), v)?;
             }
             _ => {
                 return Err(ArrowError::SchemaError(
@@ -115,6 +116,7 @@ where
 }
 
 fn infer_json_schema_from_object(
+    stream_name: &str,
     fields: &mut FxIndexMap<String, Field>,
     value: &Map<String, Value>,
 ) -> Result<(), ArrowError> {
@@ -131,9 +133,12 @@ fn infer_json_schema_from_object(
                 } else if v.is_f64() {
                     convert_data_type(fields, key, DataType::Float64)?;
                 } else {
-                    return Err(ArrowError::SchemaError(format!(
-                        "Cannot infer schema from non-basic-number type value: {v:?}",
-                    )));
+                    // For numbers that are too large to fit in i64/u64/f64,
+                    // treat them as strings to preserve the data
+                    log::warn!(
+                        "stream: {stream_name}, Number value too large for standard numeric types, treating as string: {key:?} {v:?}"
+                    );
+                    convert_data_type(fields, key, DataType::Utf8)?;
                 }
             }
             Value::Bool(_) => {
@@ -247,8 +252,8 @@ fn fix_schema(schema: Schema, stream_type: StreamType) -> Schema {
                     false,
                 ))
             } else if stream_type == StreamType::Metrics
-                && x.data_type() == &DataType::Int64
                 && x.name() == HASH_LABEL
+                && matches!(x.data_type(), &DataType::Int64 | &DataType::Float64)
             {
                 Arc::new(Field::new(x.name().clone(), DataType::UInt64, false))
             } else {
@@ -317,6 +322,20 @@ pub fn filter_source_by_partition_key(source: &str, filters: &[(String, Vec<Stri
                 find(source, &format!("/{value}/"))
             })
     })
+}
+
+/// compare two schemas, return true if they are equal
+pub fn schema_eq(a: &Schema, b: &Schema) -> bool {
+    // fast path
+    if a.fields.eq(&b.fields) {
+        return true;
+    }
+    // slow path, get all the filelds and sort them by name
+    let mut a_fields = a.fields.iter().collect::<Vec<_>>();
+    let mut b_fields = b.fields.iter().collect::<Vec<_>>();
+    a_fields.sort_by(|a, b| a.name().cmp(b.name()));
+    b_fields.sort_by(|a, b| a.name().cmp(b.name()));
+    a_fields.eq(&b_fields)
 }
 
 #[cfg(test)]
@@ -508,5 +527,163 @@ mod tests {
         for (filter, expected) in filters {
             assert_eq!(filter_source_by_partition_key(path, &filter), expected);
         }
+    }
+
+    #[test]
+    fn test_schema_eq() {
+        let schema1 = Schema::new(vec![
+            Field::new("a", DataType::Int64, true),
+            Field::new("b", DataType::Int64, true),
+        ]);
+        let schema2 = Schema::new(vec![
+            Field::new("b", DataType::Int64, true),
+            Field::new("a", DataType::Int64, true),
+        ]);
+        assert!(schema_eq(&schema1, &schema2));
+    }
+
+    #[test]
+    fn test_schema_eq_with_metadata() {
+        let schema1 = Schema::new(vec![
+            Field::new("a", DataType::Int64, true),
+            Field::new("b", DataType::Int64, true),
+        ]);
+        let mut metadata = std::collections::HashMap::new();
+        metadata.insert("key".to_string(), "value".to_string());
+        let schema2 = Schema::new_with_metadata(
+            vec![
+                Field::new("b", DataType::Int64, true),
+                Field::new("a", DataType::Int64, true),
+            ],
+            metadata,
+        );
+        assert!(schema_eq(&schema1, &schema2));
+    }
+
+    #[test]
+    fn test_schema_eq_with_different_order() {
+        let schema1 = Schema::new(vec![
+            Field::new("a", DataType::Int64, true),
+            Field::new("b", DataType::Int64, true),
+        ]);
+        let schema2 = Schema::new(vec![
+            Field::new("b", DataType::Int64, true),
+            Field::new("a", DataType::Int64, true),
+        ]);
+        assert!(schema_eq(&schema1, &schema2));
+    }
+
+    #[test]
+    fn test_schema_eq_with_different_data_type() {
+        let schema1 = Schema::new(vec![
+            Field::new("a", DataType::Int64, true),
+            Field::new("b", DataType::Int64, true),
+        ]);
+        let schema2 = Schema::new(vec![
+            Field::new("a", DataType::Utf8, true),
+            Field::new("b", DataType::Int64, true),
+        ]);
+        assert!(!schema_eq(&schema1, &schema2));
+    }
+
+    #[test]
+    fn test_format_partition_key_alphanumeric() {
+        assert_eq!(format_partition_key("abc123"), "abc123");
+        assert_eq!(format_partition_key("hello-world"), "hello-world");
+        assert_eq!(format_partition_key("key=value"), "key=value");
+        assert_eq!(format_partition_key("under_score"), "under_score");
+    }
+
+    #[test]
+    fn test_format_partition_key_strips_special_chars() {
+        assert_eq!(format_partition_key("hello world"), "helloworld");
+        assert_eq!(format_partition_key("a/b/c"), "abc");
+        assert_eq!(format_partition_key("foo:bar"), "foobar");
+        assert_eq!(format_partition_key("a.b.c"), "abc");
+        assert_eq!(format_partition_key(""), "");
+    }
+
+    #[test]
+    fn test_format_partition_key_truncates_at_max_length() {
+        let long = "a".repeat(300);
+        let result = format_partition_key(&long);
+        // loop checks > MAX_PARTITION_KEY_LENGTH before push, so max result is MAX+1
+        assert!(result.len() <= super::MAX_PARTITION_KEY_LENGTH + 1);
+        assert!(result.len() < 200);
+    }
+
+    #[test]
+    fn test_infer_json_schema_from_values_non_object_returns_error() {
+        use serde_json::Value;
+        // Passing a non-Object value (Array) should hit the `_` branch → error
+        let vals = [Value::Array(vec![Value::from(1), Value::from(2)])];
+        let result = infer_json_schema_from_values("test_stream", StreamType::Logs, vals.iter());
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("non-object"), "unexpected error: {msg}");
+    }
+
+    #[test]
+    fn test_infer_json_schema_from_values_object_with_array_field_returns_error() {
+        use serde_json::{Map, Value};
+        // An object containing an array field hits `_` in infer_json_schema_from_object
+        let mut obj = Map::new();
+        obj.insert("items".to_string(), Value::Array(vec![Value::from(1)]));
+        let vals = [Value::Object(obj)];
+        let result = infer_json_schema_from_values("test_stream", StreamType::Logs, vals.iter());
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("non-basic type"), "unexpected error: {msg}");
+    }
+
+    #[test]
+    fn test_metrics_hash_above_i64_max_is_uint64() {
+        let json = format!(r#"{{"{HASH_LABEL}":{},"value":1.5}}"#, u64::MAX);
+        let schema =
+            infer_json_schema(std::io::Cursor::new(json), None, StreamType::Metrics).unwrap();
+
+        assert_eq!(
+            schema.field_with_name(HASH_LABEL).unwrap().data_type(),
+            &DataType::UInt64
+        );
+        assert_eq!(
+            schema.field_with_name("value").unwrap().data_type(),
+            &DataType::Float64
+        );
+    }
+
+    #[test]
+    fn test_filter_source_no_filters_returns_true() {
+        assert!(filter_source_by_partition_key(
+            "/org/logs/stream/year=2024/month=01/",
+            &[]
+        ));
+    }
+
+    #[test]
+    fn test_filter_source_matching_value_returns_true() {
+        let filters = vec![("year".to_string(), vec!["2024".to_string()])];
+        assert!(filter_source_by_partition_key(
+            "/org/logs/stream/year=2024/month=01/",
+            &filters
+        ));
+    }
+
+    #[test]
+    fn test_filter_source_non_matching_value_returns_false() {
+        let filters = vec![("year".to_string(), vec!["2023".to_string()])];
+        assert!(!filter_source_by_partition_key(
+            "/org/logs/stream/year=2024/month=01/",
+            &filters
+        ));
+    }
+
+    #[test]
+    fn test_filter_source_key_absent_returns_true() {
+        let filters = vec![("region".to_string(), vec!["us-east".to_string()])];
+        assert!(filter_source_by_partition_key(
+            "/org/logs/stream/year=2024/",
+            &filters
+        ));
     }
 }

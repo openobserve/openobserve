@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -15,14 +15,21 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import RawQueryBuilder from "@/components/dashboards/addPanel/dynamicFunction/RawQueryBuilder.vue";
 import { createStore } from "vuex";
+import { createI18n } from "vue-i18n";
+import enLocaleFull from "@/locales/languages/en-US.json";
 
-installQuasar({
-  plugins: [Dialog, Notify],
+const i18n = createI18n({
+  legacy: false,
+  locale: "en",
+  messages: { en: enLocaleFull },
 });
+
+// OTextarea puts data-test="*" on its root wrapper <div> (via v-bind="$attrs").
+// The actual <textarea> element inside gets data-test="*-field".
+const TEXTAREA_FIELD = '[data-test="dashboard-raw-query-textarea-field"]';
+const TEXTAREA_WRAPPER = '[data-test="dashboard-raw-query-textarea"]';
 
 const mockStore = createStore({
   state: {
@@ -64,7 +71,7 @@ describe("RawQueryBuilder", () => {
         ...props,
       },
       global: {
-        plugins: [store],
+        plugins: [i18n, store],
       },
     });
   };
@@ -77,28 +84,25 @@ describe("RawQueryBuilder", () => {
 
     it("should render query section", () => {
       wrapper = createWrapper();
-      const querySection = wrapper.find(".query-section");
+      const querySection = wrapper.find('[data-test="dashboard-raw-query-section"]');
       expect(querySection.exists()).toBe(true);
     });
 
-    it("should render query label", () => {
+    it("should not render its own query title (moved to the popup header)", () => {
       wrapper = createWrapper();
-      const queryLabel = wrapper.find(".query-label");
-      expect(queryLabel.exists()).toBe(true);
-      expect(queryLabel.text()).toBe("Query");
+      const queryLabel = wrapper.find('[data-test="dashboard-raw-query-title"]');
+      expect(queryLabel.exists()).toBe(false);
     });
 
-    it("should render instruction text", () => {
+    it("should expose the instruction as the textarea placeholder", () => {
       wrapper = createWrapper();
-      const instruction = wrapper.findAll(".query-label")[1];
-      expect(instruction.text()).toContain(
-        "Write a SQL query for complex actions"
-      );
+      const textarea = wrapper.find('[data-test="dashboard-raw-query-textarea"] textarea');
+      expect(textarea.attributes("placeholder")).toContain("Write a SQL query for complex actions");
     });
 
     it("should render textarea", () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find('[data-test="dashboard-raw-query-textarea"]');
       expect(textarea.exists()).toBe(true);
     });
   });
@@ -117,15 +121,13 @@ describe("RawQueryBuilder", () => {
         rawQuery: "SELECT * FROM logs WHERE level = 'error'",
       };
       wrapper = createWrapper({ modelValue: customValue });
-      const textarea = wrapper.find("textarea");
-      expect(textarea.element.value).toBe(
-        "SELECT * FROM logs WHERE level = 'error'"
-      );
+      const textarea = wrapper.find(TEXTAREA_FIELD);
+      expect(textarea.element.value).toBe("SELECT * FROM logs WHERE level = 'error'");
     });
 
     it("should handle empty rawQuery", () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
       expect(textarea.element.value).toBe("");
     });
 
@@ -146,38 +148,35 @@ describe("RawQueryBuilder", () => {
   describe("Textarea Attributes", () => {
     it("should have correct rows attribute", () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
-      expect(textarea.attributes("rows")).toBe("6");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
+      expect(textarea.attributes("rows")).toBe("10");
     });
 
     it("should have data-test attribute", () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
-      expect(textarea.attributes("data-test")).toBe(
-        "dashboard-raw-query-textarea"
-      );
+      const textarea = wrapper.find('[data-test="dashboard-raw-query-textarea"]');
+      expect(textarea.attributes("data-test")).toBe("dashboard-raw-query-textarea");
     });
 
     it("should have correct styling", () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
-      const style = textarea.attributes("style");
-      expect(style).toContain("min-width: 100%");
-      expect(style).toContain("max-width: 100%");
-      expect(style).toContain("resize: vertical");
+      // OTextarea renders the native <textarea> with Tailwind resize and sizing classes
+      const textareaField = wrapper.find(TEXTAREA_FIELD);
+      expect(textareaField.classes()).toContain("resize-y");
+      expect(textareaField.classes()).toContain("flex-1");
     });
 
     it("should be resizable vertically", () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
-      expect(textarea.attributes("style")).toContain("resize: vertical");
+      const textareaField = wrapper.find(TEXTAREA_FIELD);
+      expect(textareaField.classes()).toContain("resize-y");
     });
   });
 
   describe("Query Input", () => {
     it("should update rawQuery on input", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("SELECT count(*) FROM logs");
       await flushPromises();
@@ -187,7 +186,7 @@ describe("RawQueryBuilder", () => {
 
     it("should emit update:modelValue on change", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("SELECT * FROM metrics");
       await flushPromises();
@@ -197,7 +196,7 @@ describe("RawQueryBuilder", () => {
 
     it("should handle multi-line queries", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       const multiLineQuery = `SELECT
   field1,
@@ -213,11 +212,9 @@ WHERE level = 'error'`;
 
     it("should handle SQL keywords", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
-      await textarea.setValue(
-        "SELECT * FROM logs WHERE status = 'active' ORDER BY timestamp DESC"
-      );
+      await textarea.setValue("SELECT * FROM logs WHERE status = 'active' ORDER BY timestamp DESC");
       await flushPromises();
 
       expect(wrapper.vm.fields.rawQuery).toContain("SELECT");
@@ -227,7 +224,7 @@ WHERE level = 'error'`;
 
     it("should handle special characters", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("SELECT * FROM logs WHERE message LIKE '%error%'");
       await flushPromises();
@@ -238,25 +235,26 @@ WHERE level = 'error'`;
 
   describe("Theme Handling", () => {
     it("should apply light theme class", () => {
+      // Component delegates theming to OTextarea; verify it renders with the store
       wrapper = createWrapper({}, mockStore);
-      const textarea = wrapper.find("textarea");
-      expect(textarea.classes()).toContain("bg-white");
+      const textarea = wrapper.find(TEXTAREA_WRAPPER);
+      expect(textarea.exists()).toBe(true);
     });
 
     it("should apply dark theme class", () => {
       wrapper = createWrapper({}, mockStoreDark);
-      const textarea = wrapper.find("textarea");
-      expect(textarea.classes()).toContain("dark-mode");
+      const textarea = wrapper.find(TEXTAREA_WRAPPER);
+      expect(textarea.exists()).toBe(true);
     });
 
     it("should access store theme", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.store.state.theme).toBeDefined();
+      expect(wrapper.vm.$store.state.theme).toBeDefined();
     });
 
     it("should react to theme changes", async () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.store.state.theme).toBe("light");
+      expect(wrapper.vm.$store.state.theme).toBe("light");
     });
   });
 
@@ -284,7 +282,7 @@ WHERE level = 'error'`;
 
     it("should handle rapid changes", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("Query 1");
       await flushPromises();
@@ -314,7 +312,7 @@ WHERE level = 'error'`;
 
     it("should handle very long queries", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       const longQuery = "SELECT * FROM logs WHERE ".repeat(100);
       await textarea.setValue(longQuery);
@@ -327,7 +325,7 @@ WHERE level = 'error'`;
       wrapper = createWrapper({
         modelValue: { rawQuery: "Some query" },
       });
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("");
       await flushPromises();
@@ -337,7 +335,7 @@ WHERE level = 'error'`;
 
     it("should handle query with line breaks", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("SELECT\n*\nFROM\nlogs");
       await flushPromises();
@@ -349,38 +347,31 @@ WHERE level = 'error'`;
   describe("Component Structure", () => {
     it("should have main container", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('div[style*="width: 100%"]');
+      const container = wrapper.find('[data-test="dashboard-raw-query-builder"]');
       expect(container.exists()).toBe(true);
     });
 
     it("should have query section container", () => {
       wrapper = createWrapper();
-      const querySection = wrapper.find(".query-section");
+      const querySection = wrapper.find('[data-test="dashboard-raw-query-section"]');
       expect(querySection.exists()).toBe(true);
-    });
-
-    it("should have two query labels", () => {
-      wrapper = createWrapper();
-      const labels = wrapper.findAll(".query-label");
-      expect(labels.length).toBe(2);
     });
 
     it("should have properly styled textarea", () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
-      const style = textarea.attributes("style");
-
-      // CSS may render as rgb() instead of hex color
-      expect(style).toMatch(/border.*1px.*solid/);
-      expect(style).toContain("border-radius: 4px");
-      expect(style).toContain("padding: 2px");
+      // OTextarea renders border/rounded on its inner wrapper div and resize on the textarea
+      const innerWrapper = wrapper.find(`${TEXTAREA_WRAPPER} > div`);
+      const textareaField = wrapper.find(TEXTAREA_FIELD);
+      expect(innerWrapper.classes()).toContain("rounded-default");
+      expect(innerWrapper.classes()).toContain("border");
+      expect(textareaField.classes()).toContain("resize-y");
     });
   });
 
   describe("SQL Query Examples", () => {
     it("should handle SELECT query", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("SELECT * FROM logs");
       await flushPromises();
@@ -390,7 +381,7 @@ WHERE level = 'error'`;
 
     it("should handle query with WHERE clause", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("SELECT * FROM logs WHERE level = 'error'");
       await flushPromises();
@@ -400,11 +391,9 @@ WHERE level = 'error'`;
 
     it("should handle query with JOIN", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
-      await textarea.setValue(
-        "SELECT * FROM logs JOIN metrics ON logs.id = metrics.log_id"
-      );
+      await textarea.setValue("SELECT * FROM logs JOIN metrics ON logs.id = metrics.log_id");
       await flushPromises();
 
       expect(wrapper.vm.fields.rawQuery).toContain("JOIN");
@@ -412,7 +401,7 @@ WHERE level = 'error'`;
 
     it("should handle query with GROUP BY", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("SELECT count(*) FROM logs GROUP BY level");
       await flushPromises();
@@ -422,7 +411,7 @@ WHERE level = 'error'`;
 
     it("should handle query with ORDER BY", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("SELECT * FROM logs ORDER BY timestamp DESC");
       await flushPromises();
@@ -432,7 +421,7 @@ WHERE level = 'error'`;
 
     it("should handle query with LIMIT", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("SELECT * FROM logs LIMIT 100");
       await flushPromises();
@@ -473,7 +462,7 @@ WHERE level = 'error'`;
       wrapper = createWrapper({
         modelValue: { rawQuery: "SELECT * FROM logs" },
       });
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       expect(textarea.element.value).toBe("SELECT * FROM logs");
     });
@@ -482,7 +471,7 @@ WHERE level = 'error'`;
       wrapper = createWrapper({
         modelValue: { rawQuery: "SELECT * FROM logs" },
       });
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("SELECT count(*) FROM logs");
       await flushPromises();
@@ -492,7 +481,7 @@ WHERE level = 'error'`;
 
     it("should maintain cursor position", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("SELECT * FROM logs");
 
@@ -503,55 +492,54 @@ WHERE level = 'error'`;
   describe("Styling and Layout", () => {
     it("should have full width container", () => {
       wrapper = createWrapper();
-      const container = wrapper.find('div[style*="width: 100%"]');
+      const container = wrapper.find('[data-test="dashboard-raw-query-builder"]');
       expect(container.exists()).toBe(true);
     });
 
-    it("should have proper margins on textarea", () => {
+    it("should stretch the textarea to full width", () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
-      expect(textarea.attributes("style")).toContain("margin-top: 2px");
+      // OTextarea's root wrapper div receives class="w-full" from parent via $attrs
+      const textarea = wrapper.find(TEXTAREA_WRAPPER);
+      expect(textarea.classes()).toContain("w-full");
     });
 
     it("should have border styling", () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
-      const style = textarea.attributes("style");
-      // CSS may render as rgb() instead of hex color
-      expect(style).toMatch(/border.*1px.*solid/);
+      // OTextarea renders border on its inner wrapper div
+      const innerWrapper = wrapper.find(`${TEXTAREA_WRAPPER} > div`);
+      expect(innerWrapper.classes()).toContain("border");
     });
 
     it("should have rounded corners", () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
-      expect(textarea.attributes("style")).toContain("border-radius: 4px");
+      const innerWrapper = wrapper.find(`${TEXTAREA_WRAPPER} > div`);
+      expect(innerWrapper.classes()).toContain("rounded-default");
     });
   });
 
   describe("Store Integration", () => {
     it("should access store state", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.store.state).toBeDefined();
+      expect(wrapper.vm.$store.state).toBeDefined();
     });
 
     it("should read theme from store", () => {
       wrapper = createWrapper();
-      expect(wrapper.vm.store.state.theme).toBe("light");
+      expect(wrapper.vm.$store.state.theme).toBe("light");
     });
 
     it("should handle different store states", () => {
       wrapper = createWrapper({}, mockStoreDark);
-      expect(wrapper.vm.store.state.theme).toBe("dark");
+      expect(wrapper.vm.$store.state.theme).toBe("dark");
     });
   });
 
   describe("Complex Query Scenarios", () => {
     it("should handle query with subqueries", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
-      const subquery =
-        "SELECT * FROM logs WHERE id IN (SELECT log_id FROM errors)";
+      const subquery = "SELECT * FROM logs WHERE id IN (SELECT log_id FROM errors)";
       await textarea.setValue(subquery);
       await flushPromises();
 
@@ -560,10 +548,9 @@ WHERE level = 'error'`;
 
     it("should handle query with UNION", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
-      const unionQuery =
-        "SELECT * FROM logs UNION SELECT * FROM archived_logs";
+      const unionQuery = "SELECT * FROM logs UNION SELECT * FROM archived_logs";
       await textarea.setValue(unionQuery);
       await flushPromises();
 
@@ -572,10 +559,9 @@ WHERE level = 'error'`;
 
     it("should handle query with CASE statements", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
-      const caseQuery =
-        "SELECT CASE WHEN level = 'error' THEN 1 ELSE 0 END FROM logs";
+      const caseQuery = "SELECT CASE WHEN level = 'error' THEN 1 ELSE 0 END FROM logs";
       await textarea.setValue(caseQuery);
       await flushPromises();
 
@@ -584,7 +570,7 @@ WHERE level = 'error'`;
 
     it("should handle query with aggregate functions", async () => {
       wrapper = createWrapper();
-      const textarea = wrapper.find("textarea");
+      const textarea = wrapper.find(TEXTAREA_FIELD);
 
       await textarea.setValue("SELECT COUNT(*), SUM(value), AVG(value) FROM logs");
       await flushPromises();

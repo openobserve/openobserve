@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,8 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { StreamInfo } from "@/services/service_streams";
+import type { StreamInfo, FieldAlias } from "@/services/service_streams";
+import type { TranslateFn } from "@/types/i18n";
 import { SELECT_ALL_VALUE } from "@/utils/dashboard/constants";
+import {
+  buildFieldToGroupIdMap,
+  buildSqlCondition,
+  mergeSubjectOverrides,
+} from "@/utils/telemetryCorrelation";
 
 export interface MetricsCorrelationConfig {
   serviceName: string;
@@ -25,12 +31,13 @@ export interface MetricsCorrelationConfig {
   orgIdentifier: string;
   timeRange: {
     startTime: number; // Timestamp in microseconds (16 digits)
-    endTime: number;   // Timestamp in microseconds (16 digits)
+    endTime: number; // Timestamp in microseconds (16 digits)
   };
   sourceStream?: string; // Original stream being viewed
   sourceType?: string; // Type of source stream
   availableDimensions?: Record<string, string>; // Actual field names (for source stream queries)
   metricSchemas?: Record<string, any>; // Cached metric schemas with metrics_meta
+  semanticGroups?: FieldAlias[]; // For resolving semantic IDs to raw field names in subject filters
 }
 
 /**
@@ -38,24 +45,29 @@ export interface MetricsCorrelationConfig {
  *
  * Creates a time-series dashboard showing correlated metrics
  */
-export function useMetricsCorrelationDashboard() {
+export function useMetricsCorrelationDashboard(t: TranslateFn) {
   /**
    * Generate dashboard JSON for metrics correlation
    */
   const generateDashboard = (
     streams: StreamInfo[],
-    config: MetricsCorrelationConfig
+    config: MetricsCorrelationConfig,
+    _theme: "dark" | "light" = "dark",
+    panelWidth = 64,
+    panelHeight = 14,
   ) => {
     const panels = streams.map((stream, index) => {
-      return createMetricPanel(stream, index, config);
+      return createMetricPanel(stream, index, config, panelWidth, panelHeight);
     });
 
     // No variables in the metrics dashboard - dimensions are managed at the top level
     const dashboard = {
       version: 5,
       dashboardId: ``,
-      title: `Correlated Streams - ${config.serviceName}`,
-      description: `Streams correlated with service ${config.serviceName}`,
+      title: t("correlation.correlatedStreamsFor", { service: config.serviceName }),
+      description: t("correlation.metricsDashboardDescription", {
+        service: config.serviceName,
+      }),
       role: "",
       owner: "",
       created: new Date().toISOString(),
@@ -88,7 +100,9 @@ export function useMetricsCorrelationDashboard() {
   const createMetricPanel = (
     stream: StreamInfo,
     index: number,
-    config: MetricsCorrelationConfig
+    config: MetricsCorrelationConfig,
+    panelWidth = 64,
+    panelHeight = 16,
   ) => {
     // Get schema information for this metric stream
     const schema = config.metricSchemas?.[stream.stream_name];
@@ -98,11 +112,11 @@ export function useMetricsCorrelationDashboard() {
 
     // Map OpenTelemetry/Prometheus units to dashboard units
     const unitMapping: Record<string, string> = {
-      "By": "bytes",
-      "s": "seconds",
-      "ms": "milliseconds",
-      "us": "microseconds",
-      "ns": "nanoseconds",
+      By: "bytes",
+      s: "seconds",
+      ms: "milliseconds",
+      us: "microseconds",
+      ns: "nanoseconds",
       "{cpu}": "percentunit", // CPU as percentage
       "1": "percentunit", // Dimensionless ratio (0-1)
       "%": "percent",
@@ -116,12 +130,42 @@ export function useMetricsCorrelationDashboard() {
     const isCounter = metricType === "counter";
     const aggregationFunc = isCounter ? "sum" : "avg";
 
-    // Build WHERE clause from stream filters
+    // Resolve active subject dimensions (semantic IDs like "k8s-pod-name") to raw
+    // field names that exist on this specific metric stream. Walk each semantic
+    // group's field aliases and pick the first one present in the stream schema.
+    const subjectOverrides: Record<string, string> = {};
+    const semanticGroups = config.semanticGroups ?? [];
+    const streamSchema: Set<string> = new Set(
+      (
+        config.metricSchemas?.[stream.stream_name]?.schema as Array<{ name: string }> | undefined
+      )?.map((c) => c.name) ?? [],
+    );
+    for (const [semanticId, value] of Object.entries(config.matchedDimensions)) {
+      if (!value || value === SELECT_ALL_VALUE) continue;
+      const group = semanticGroups.find((g) => g.id === semanticId);
+      if (!group) continue; // not a semantic ID key — raw field names handled below
+      // F31: only override when the stream schema is loaded AND contains the field.
+      // Guessing a field name here produced `WHERE guessed = 'x' AND real = 'x'`
+      // (nonexistent guess → "No field named …" kills the panel).
+      if (streamSchema.size === 0) continue;
+      const hit = group.fields.find((f) => streamSchema.has(f));
+      if (hit) subjectOverrides[hit] = value;
+    }
+
+    // Build WHERE clause from stream filters merged with active subject overrides.
+    // Overrides REPLACE the stream's own alias of the same semantic group (F31) —
+    // a plain spread would AND two aliases of one concept together and match nothing.
     // Quote field names that contain special characters (hyphens, dots, etc.)
     // Skip filters with SELECT_ALL_VALUE (wildcard - means match all values)
-    
-    const whereConditions = Object.entries(stream.filters)
-      .filter(([field, value]) => {
+    const fieldToGroupId = buildFieldToGroupIdMap(semanticGroups);
+    const effectiveFilters = mergeSubjectOverrides(
+      stream.filters ?? {},
+      subjectOverrides,
+      fieldToGroupId,
+    );
+
+    const whereConditions = Object.entries(effectiveFilters)
+      .filter(([, value]) => {
         const skip = value === SELECT_ALL_VALUE;
         // if (skip) {
         //   console.log(`[useMetricsCorrelationDashboard] Skipping filter ${field}=${value} (SELECT_ALL_VALUE)`);
@@ -129,10 +173,7 @@ export function useMetricsCorrelationDashboard() {
         return !skip;
       })
       .map(([field, value]) => {
-        // Quote field name if it contains special characters
-        const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field}"` : field;
-        const escapedValue = value.replace(/'/g, "''");
-        return `${quotedField} = '${escapedValue}'`;
+        return buildSqlCondition(field, value);
       })
       .join(" AND ");
 
@@ -147,15 +188,23 @@ ${whereClause}
 GROUP BY x_axis_1
 ORDER BY x_axis_1`;
 
-    // Calculate panel position (3 columns)
-    const col = index % 3;
-    const row = Math.floor(index / 3);
+    // Calculate panel position based on panel width
+    const cols = Math.floor(192 / panelWidth);
+    const col = index % cols;
+    const row = Math.floor(index / cols);
 
     return {
       id: `panel_${stream.stream_name}_${index}`,
       type: "line",
       title: stream.stream_name,
-      description: `Time series for ${stream.stream_name}${metricType ? ` (${metricType})` : ""}`,
+      // Two complete messages rather than splicing an optional "(type)" fragment
+      // into one — the clause position differs across languages.
+      description: metricType
+        ? t("correlation.panelTimeSeriesForWithType", {
+            stream: stream.stream_name,
+            type: metricType,
+          })
+        : t("correlation.panelTimeSeriesFor", { stream: stream.stream_name }),
       config: {
         show_legends: false,
         legends_position: "bottom",
@@ -260,10 +309,10 @@ ORDER BY x_axis_1`;
         },
       ],
       layout: {
-        x: col * 64,
-        y: row * 16,
-        w: 64,
-        h: 16,
+        x: col * panelWidth,
+        y: row * panelHeight,
+        w: panelWidth,
+        h: panelHeight,
         i: `${stream.stream_name}_${index}`,
       },
       htmlContent: "",
@@ -277,7 +326,9 @@ ORDER BY x_axis_1`;
    */
   const generateLogsDashboard = (
     streams: StreamInfo[],
-    config: MetricsCorrelationConfig
+    config: MetricsCorrelationConfig,
+    panelWidth = 192,
+    panelHeight = 44,
   ) => {
     // Determine stream and filters based on available data
     let streamName: string;
@@ -287,23 +338,17 @@ ORDER BY x_axis_1`;
       // When viewing from logs page, prefer source stream
       streamName = config.sourceStream;
 
-      // Try to find matching stream in API response
-      const matchingStream = streams?.find(s => s.stream_name === config.sourceStream);
-      if (matchingStream) {
-        // Use filters from API response (best case - backend computed correct field names)
-        filters = matchingStream.filters;
-      } else if (streams && streams.length > 0) {
-        // Source stream not in response, use first available stream's filters
-        filters = streams[0].filters;
-      } else {
-        // No streams from API, fallback to matched dimensions
-        filters = config.matchedDimensions || {};
-      }
+      // F27: only use filters the backend resolved for THIS stream. Another
+      // stream's filters use that stream's own field aliases, and
+      // matchedDimensions are semantic-ID keyed — either guess yields
+      // "No field named X" or a silently-wrong predicate.
+      const matchingStream = streams?.find((s) => s.stream_name === config.sourceStream);
+      filters = matchingStream?.filters ?? {};
     } else if (streams && streams.length > 0) {
       // Use first correlated log stream from API response
       const primaryStream = streams[0];
       streamName = primaryStream.stream_name;
-      filters = primaryStream.filters;
+      filters = primaryStream.filters ?? {};
     } else {
       // No logs available
       return null;
@@ -314,14 +359,10 @@ ORDER BY x_axis_1`;
     const whereConditions = Object.entries(filters)
       .filter(([field, value]) => {
         // Only include string values, skip internal fields, and skip SELECT_ALL_VALUE wildcards
-        return typeof value === 'string' &&
-               !field.startsWith('_') &&
-               value !== SELECT_ALL_VALUE;
+        return typeof value === "string" && !field.startsWith("_") && value !== SELECT_ALL_VALUE;
       })
       .map(([field, value]) => {
-        const quotedField = /[^a-zA-Z0-9_]/.test(field) ? `"${field}"` : field;
-        const escapedValue = value.replace(/'/g, "''");
-        return `${quotedField} = '${escapedValue}'`;
+        return buildSqlCondition(field, value);
       })
       .join(" AND ");
 
@@ -332,8 +373,8 @@ ORDER BY x_axis_1`;
     const panel = {
       id: "logs_table_panel",
       type: "table",
-      title: `Logs - ${streamName}`,
-      description: `Correlated logs for service ${config.serviceName}`,
+      title: t("correlation.logsPanelTitle", { stream: streamName }),
+      description: t("correlation.logsPanelDescription", { service: config.serviceName }),
       config: {
         wrap_table_cells: false,
         table_dynamic_columns: true,
@@ -388,8 +429,8 @@ ORDER BY x_axis_1`;
       layout: {
         x: 0,
         y: 0,
-        w: 192,
-        h: 44,
+        w: panelWidth,
+        h: panelHeight,
         i: 1,
       },
       htmlContent: "",
@@ -400,8 +441,8 @@ ORDER BY x_axis_1`;
     const dashboard = {
       version: 5,
       dashboardId: ``,
-      title: `Correlated Streams - ${config.serviceName}`,
-      description: `Logs correlated with service ${config.serviceName}`,
+      title: t("correlation.correlatedStreamsFor", { service: config.serviceName }),
+      description: t("correlation.logsDashboardDescription", { service: config.serviceName }),
       role: "",
       owner: "",
       created: new Date().toISOString(),

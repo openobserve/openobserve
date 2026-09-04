@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -16,61 +16,43 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <template>
-  <div
-    :class="position === 'bottom' ? 'q-py-sm' : 'q-pt-sm'"
-    class="q-table__control full-width row justify-between"
-  >
+  <div :class="position === 'bottom' ? 'py-2' : 'pt-2'" class="flex w-full justify-between">
     <div
       v-if="position === 'bottom' && maxRecords"
-      class="max-result"
-      style="justify-content: start"
+      class="flex w-50 items-center justify-center justify-start whitespace-nowrap"
     >
-      <span class="q-table__bottom-item">{{ t("search.maxRecords") }}</span>
-      <q-input
-        v-model="maxRecords"
-        filled
-        dense
-        class="max-records-input"
-        @blur="changeMaxRecordToReturn"
-      />
+      <span class="me-4 text-xs font-semibold">{{ t("search.maxRecords") }}</span>
+      <OInput v-model="maxRecords" @blur="changeMaxRecordToReturn" />
     </div>
-    <div
-      v-if="position === 'top' && pageTitle"
-      class="text-bold row items-center"
-    >
-      <q-btn
-        v-if="
-          collapsibleIcon === 'show' &&
-          searchCollapseImage == 'collapse_sidebar_icon'
-        "
-        :icon="'img:' + getImageURL('images/common/collapse_sidebar_icon.svg')"
-        class="q-mr-sm"
-        size="sm"
-        round
-        flat
+    <div v-if="position === 'top' && pageTitle" class="flex items-center font-bold">
+      <OButton
+        v-if="collapsibleIcon === 'show' && searchCollapseImage == 'collapse_sidebar_icon'"
+        variant="ghost"
+        size="icon"
+        class="me-2"
         @click="toggleSidePanel"
-      />
-      <q-btn
-        v-if="
-          collapsibleIcon === 'show' &&
-          searchCollapseImage == 'expand_sidebar_icon'
-        "
-        :icon="'img:' + getImageURL('images/common/expand_sidebar_icon.svg')"
-        class="q-mr-sm"
-        size="sm"
-        round
-        flat
+      >
+        <img :src="getImageURL('images/common/collapse_sidebar_icon.svg')" width="16" height="16" />
+      </OButton>
+      <OButton
+        v-if="collapsibleIcon === 'show' && searchCollapseImage == 'expand_sidebar_icon'"
+        variant="ghost"
+        size="icon"
+        class="me-2"
         @click="toggleSidePanel"
-      />
-      <div class="q-ml-xs">
+      >
+        <img :src="getImageURL('images/common/expand_sidebar_icon.svg')" width="16" height="16" />
+      </OButton>
+      <div class="ms-1">
         {{ resultTotal }}
-        {{ pageTitle.slice(-1) == "s" ? pageTitle.slice(0, -1) : pageTitle }}(s)
+        {{ countedPageTitle }}
       </div>
     </div>
-    <div class="q-table__control q-ml-auto">
-      <span class="q-table__bottom-item">
+    <div class="ms-auto">
+      <span class="me-4 text-xs font-semibold">
         {{ t("search.showing") }}
-        {{ resultTotal > 0 ?  (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1 : 0 }} -
+        {{ resultTotal > 0 ? (scope.pagination.page - 1) * scope.pagination.rowsPerPage + 1 : 0 }}
+        -
         {{
           scope.pagination.page * scope.pagination.rowsPerPage >= resultTotal
             ? resultTotal
@@ -85,60 +67,58 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
 
       <div v-if="position === 'bottom'" class="flex items-center">
-        <q-separator vertical inset class="q-mr-md" />
+        <OSeparator vertical class="my-2 me-4" />
 
-        <span class="q-table__bottom-item">
+        <span class="me-4 text-xs font-semibold">
           {{ t("search.recordsPerPage") }}
         </span>
-        <q-select
+        <OSelect
           v-model="scope.pagination.rowsPerPage"
-          class="q-mr-md"
-          borderless
-          size="sm"
-          dense
+          class="me-3"
           :options="perPageOptions"
           @update:modelValue="changePagination"
         />
       </div>
 
-      <q-btn-group>
-        <q-btn
-          icon="chevron_left"
-          :text-color="scope.isFirstPage ? '$light-text2' : '$dark'"
-          class="pageNav"
-          color="#FAFBFD"
-          size="sm"
-          flat
-          :disable="scope.isFirstPage"
+      <OButtonGroup>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          :disabled="scope.isFirstPage"
           @click="scope.prevPage"
-        />
-        <q-separator vertical />
-        <q-btn
-          icon="chevron_right"
-          :text-color="scope.isLastPage ? '$light-text2' : '$dark'"
-          class="pageNav"
-          color="#FAFBFD"
-          size="sm"
-          flat
-          :disable="scope.isLastPage"
+          icon-left="chevron-left"
+        >
+        </OButton>
+        <OButton
+          variant="outline"
+          size="icon-sm"
+          :disabled="scope.isLastPage"
           @click="scope.nextPage"
-        />
-      </q-btn-group>
+          icon-left="chevron-right"
+        >
+        </OButton>
+      </OButtonGroup>
     </div>
   </div>
 </template>
 
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref } from "vue";
-import { useI18n } from "vue-i18n";
+import { computed, defineComponent, ref } from "vue";
+import OButtonGroup from "@/lib/core/Button/OButtonGroup.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OSeparator from "@/lib/core/Separator/OSeparator.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { getImageURL } from "../../../utils/zincutils";
 
 export default defineComponent({
-  name: "QTablePagination",
-  // eslint-disable-next-line vue/require-prop-types
+  name: "Pagination",
+  components: { OSeparator, OButtonGroup, OButton, OInput, OSelect },
+
   props: [
     "scope",
     "pageTitle",
@@ -151,7 +131,7 @@ export default defineComponent({
   ] as string[],
   emits: ["update", "update:maxRecordToReturn", "update:changeRecordPerPage"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const router = useRouter();
     const maxRecords = ref(props.maxRecordToReturn);
     const store = useStore();
@@ -166,17 +146,23 @@ export default defineComponent({
     };
 
     const toggleSidePanel = () => {
-      store.dispatch(
-        "setSearchCollapseToggle",
-        store.state.searchCollapsibleSection == 0 ? 20 : 0
-      );
+      store.dispatch("setSearchCollapseToggle", store.state.searchCollapsibleSection == 0 ? 20 : 0);
     };
+
+    // `pageTitle` arrives already translated and normally plural ("Dashboards"):
+    // singularize it for one row rather than appending an untranslatable "(s)".
+    const countedPageTitle = computed(() => {
+      const title: string = props.pageTitle ?? "";
+      if (props.resultTotal === 1 && title.slice(-1) === "s") return title.slice(0, -1);
+      return title;
+    });
 
     return {
       t,
       store,
       router,
       maxRecords,
+      countedPageTitle,
       toggleSidePanel,
       searchCollapseImage,
       changePagination,
@@ -202,59 +188,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style lang="scss">
-.footer-text {
-  margin-right: 1rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-.q-table__bottom-item {
-  @extend .footer-text;
-}
-.q-select .q-field {
-  &__native {
-    @extend .footer-text;
-    text-align: center;
-    margin-right: 0;
-  }
-  &__append {
-    padding: 0;
-  }
-}
-
-.pageNav {
-  padding: 0.125rem 0.5rem;
-}
-
-.max-result {
-  justify-content: center;
-  align-items: center;
-  white-space: nowrap;
-  display: flex;
-  width: 200px;
-
-  .q-field {
-    max-width: 3.5rem;
-  }
-
-  .max-records-input {
-    .q-field {
-      &__control {
-        // background-color: #fafbfd !important;
-        max-width: 2.5rem;
-        height: 1.5rem;
-        padding: 0;
-      }
-      &__native {
-        font-size: 0.75rem;
-        text-align: center;
-        font-weight: 600;
-        // color: $dark;
-        padding: 0;
-        width: fit-content;
-      }
-    }
-  }
-}
-</style>

@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -145,4 +145,14 @@ mod organizations {
     }
 
     impl ActiveModelBehavior for ActiveModel {}
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_default_org_constant_value() {
+        assert_eq!(DEFAULT_ORG, "default");
+    }
 }

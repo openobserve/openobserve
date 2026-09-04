@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,35 +15,40 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn rounded flat dense :ripple="false" @click="toggleDarkMode">
-    <q-icon :name="DarkModeIcon" class="header-icon"></q-icon>
-    <q-tooltip anchor="top middle" self="bottom middle">
-      {{ tooltipText }}
-    </q-tooltip>
-  </q-btn>
+  <OButton
+    variant="ghost"
+    size="icon-toolbar"
+    data-test="navbar-theme-toggle-btn"
+    @click="toggleDarkMode"
+  >
+    <Transition name="theme-icon" mode="out-in">
+      <OIcon
+        :key="darkMode ? 'dark' : 'light'"
+        :name="darkMode ? 'dark-mode' : 'light-mode'"
+        size="sm"
+        class="size-5!"
+      />
+    </Transition>
+    <OTooltip side="top" align="center" :content="raw(tooltipText)" />
+  </OButton>
 </template>
 
 <script lang="ts">
 import { ref, watch, onMounted, computed, defineComponent } from "vue";
-import { useQuasar } from "quasar";
 import { useStore } from "vuex";
-import { useI18n } from "vue-i18n";
-import {
-  outlinedDarkMode,
-  outlinedLightMode,
-} from "@quasar/extras/material-icons-outlined";
+import { raw, useI18nTyped } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import { switchThemeMode } from "@/utils/theme";
 
 export default defineComponent({
+  components: { OButton, OIcon, OTooltip },
   setup() {
     const store = useStore();
-    const $q = useQuasar();
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
+    // eslint-disable-next-line no-restricted-syntax -- this component IS the theme seam's UI: darkMode is the toggle's own bound state, not a private copy of the app theme it should be reading from useTheme().
     const darkMode = ref(false);
-
-    const DarkModeIcons = {
-      light: outlinedLightMode,
-      dark: outlinedDarkMode,
-    };
 
     onMounted(() => {
       try {
@@ -63,14 +68,11 @@ export default defineComponent({
       }
     });
 
-    const DarkModeIcon = computed(() => {
-      return darkMode.value ? DarkModeIcons.dark : DarkModeIcons.light;
-    });
-
-    const tooltipText = computed(() => {
-      const mode = darkMode.value ? t("common.lightMode") : t("common.darkMode");
-      return `${t("common.switchTo")} ${mode}`;
-    });
+    // Whole sentence per target theme: "Switch to" + mode glued two translated
+    // fragments together, which breaks wherever the word order differs.
+    const tooltipText = computed(() =>
+      darkMode.value ? t("common.switchToLightMode") : t("common.switchToDarkMode"),
+    );
 
     watch(darkMode, () => {
       setTheme(darkMode.value ? "dark" : "light");
@@ -85,7 +87,7 @@ export default defineComponent({
         if (darkMode.value !== shouldBeDark) {
           darkMode.value = shouldBeDark;
         }
-      }
+      },
     );
 
     const setTheme = (theme: any) => {
@@ -95,8 +97,16 @@ export default defineComponent({
         // Handle localStorage not available
         console.warn("localStorage not available for theme storage:", error);
       }
-      $q.dark.set(theme == "dark");
-      store.dispatch("appTheme", theme);
+      // Toggle .dark on <html> for the O2 component library (Tailwind dark variant).
+      // Wrapped in switchThemeMode so the mode flip animates as one frame
+      // (soft curtain sweep, defined in styles/tailwind.css).
+      // `darkMode` is the component's source of truth and is always set to
+      // match `theme` before setTheme runs, so the html-class toggle reads it
+      // directly rather than re-deriving the boolean from the string arg.
+      switchThemeMode(theme, () => {
+        document.documentElement.classList.toggle("dark", darkMode.value);
+        store.dispatch("appTheme", theme);
+      });
     };
 
     const toggleDarkMode = () => {
@@ -104,37 +114,12 @@ export default defineComponent({
     };
 
     return {
+      raw,
       store,
       darkMode,
-      DarkModeIcon,
       tooltipText,
       toggleDarkMode,
-      outlinedDarkMode,
-      outlinedLightMode,
     };
   },
 });
 </script>
-
-<style>
-.light-mode {
-  background-color: #ffffff;
-  color: #000000;
-}
-
-.dark-mode {
-  background-color: #36383a;
-  color: #ffffff;
-}
-
-.round-button {
-  border: none;
-  border-radius: 50%;
-  box-shadow: none;
-  transition: box-shadow 0.3s ease;
-}
-
-.round-button:hover {
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-</style>

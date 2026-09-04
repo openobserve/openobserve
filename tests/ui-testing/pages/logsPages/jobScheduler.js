@@ -1,27 +1,21 @@
 import { expect } from '@playwright/test';
 import testLogger from '../../playwright-tests/utils/test-logger.js';
-// const { chromium } = require('playwright');
+const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class JobSchedulerPage {
     constructor(page) {
         this.page = page;
-       
     }
 
- 
+
     async submitSearchJob() {
-        const orgId = process.env["ORGNAME"];
+        const orgId = getOrgIdentifier();
         const url = `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`;
-        const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-        
-        const headers = {
-          "Authorization": `Basic ${basicAuthCredentials}`,
-          "Content-Type": "application/json",
-        }
+        const headers = getAuthHeaders();
        // Get current time and one minute ago
        const now = Date.now(); // Current time in milliseconds
        const oneMinuteAgo = now - 60 * 1000; // One minute ago in milliseconds
-      
+
       // Define the request body
       const requestBody = {
           query: {
@@ -34,13 +28,13 @@ export class JobSchedulerPage {
               sql_mode: 'full',
           },
       };
-      
+
         // Make the POST request
         const response = await this.page.request.post(url, {
-            data: requestBody, // Add any necessary payload here
+            data: requestBody,
             headers: headers,
         });
-      
+
         // Check if the response status is 200
         if (response.status() === 200) {
             const responseBody = await response.json();
@@ -49,35 +43,30 @@ export class JobSchedulerPage {
             throw new Error(`Failed to submit job. Status: ${response.status()}`);
         }
       }
-      
+
       extractJobId(message) {
         // Use a regex to extract the Job ID from the message
         const jobIdMatch = message.match(/\[Job_Id: (.+?)\]/);
         return jobIdMatch ? jobIdMatch[1] : null;
       }
-      
+
       async getTraceIdByJobId(jobId) {
-        const orgId = process.env["ORGNAME"];
+        const orgId = getOrgIdentifier();
         const url = `${process.env["ZO_BASE_URL"]}/api/${orgId}/search_jobs?type=logs&search_type=UI&use_cache=true`;
-        const basicAuthCredentials = Buffer.from(`${process.env["ZO_ROOT_USER_EMAIL"]}:${process.env["ZO_ROOT_USER_PASSWORD"]}`).toString('base64');
-        
-        const headers = {
-          "Authorization": `Basic ${basicAuthCredentials}`,
-          "Content-Type": "application/json",
-        }
-       
+        const headers = getAuthHeaders();
+
         // Make the GET request
         const response = await this.page.request.get(url, {
             headers: headers,
         });
-      
+
         // Check if the response status is 200
         if (response.status() === 200) {
             const responseBody = await response.json();
             const job = responseBody.find(job => job.id === jobId);
             if (job) {
                 testLogger.info(`Trace ID for job ID ${jobId}: ${job.trace_id}`);
-                return job.trace_id; // Return the trace_id if needed
+                return job.trace_id;
             } else {
                 testLogger.error(`Job with ID ${jobId} not found.`);
                 return null;
@@ -87,149 +76,201 @@ export class JobSchedulerPage {
             throw new Error(`Failed to fetch jobs. Status: ${response.status()}, Message: ${errorMessage}`);
         }
       }
-      
+
+      // OTable renders rows as [data-test="o2-table-row-{index}"] where index is
+      // the positional integer, NOT the row-key (trace_id). The trace_id column is
+      // not rendered in the table UI, so filter({ hasText: trace_id }) never matches.
+      // Instead: register a waitForResponse listener BEFORE clicking Get Jobs, then
+      // find the trace_id's position in the API response — that position equals the
+      // row's data-test index.
+      /**
+       * Re-open the search-scheduler list view from scratch. The scheduler list is
+       * rendered under `v-show="showSearchScheduler"` (logs Index.vue), and that flag is
+       * driven purely by the `action=search_scheduler` URL query param. Navigating to the
+       * scheduler-list URL re-sets the param → showSearchScheduler=true → the list (and
+       * its Get-Jobs button) becomes visible again.
+       */
+      async _navigateToSchedulerList() {
+        const base = process.env["ZO_BASE_URL_SC_UI"] || process.env["ZO_BASE_URL"];
+        const orgId = getOrgIdentifier();
+        await this.page.goto(
+            `${base}/web/logs?action=search_scheduler&org_identifier=${orgId}&type=search_scheduler_list`,
+        );
+        await this.page.waitForLoadState('domcontentloaded');
+      }
+
+      async _getJobRowIndex(trace_id, timeout = 15000) {
+        // GRACEFUL WORKAROUND for an app-side flake (origin/fix/search-scheduler-job-issue):
+        // the scheduler list lives under `v-show="showSearchScheduler"`, and Index.vue
+        // resets that flag to false whenever the logs page rewrites the URL query WITHOUT
+        // the `action=search_scheduler` param (updateUrlQueryParams strips it after a
+        // search). The Get-Jobs button is then present in the DOM but display:none, and it
+        // never recovers on its own — so waiting alone times out. Recover by re-navigating
+        // to the scheduler-list URL (which restores the param → re-shows the list) and
+        // retrying. Remove once the app preserves the scheduler view across URL updates.
+        const getJobsBtn = this.page.locator('[data-test="search-scheduler-get-jobs-btn"]');
+        let visible = await getJobsBtn
+            .waitFor({ state: 'visible', timeout: 15000 })
+            .then(() => true)
+            .catch(() => false);
+        for (let attempt = 0; attempt < 3 && !visible; attempt++) {
+            testLogger.warn(
+                `_getJobRowIndex: Get-Jobs button hidden (scheduler view reset) — re-opening scheduler list (attempt ${attempt + 1}/3)`,
+            );
+            await this._navigateToSchedulerList();
+            visible = await getJobsBtn
+                .waitFor({ state: 'visible', timeout: 15000 })
+                .then(() => true)
+                .catch(() => false);
+        }
+        // Final gate — if it is still hidden, surface a clear failure.
+        await getJobsBtn.waitFor({ state: 'visible', timeout: 10000 });
+        const responsePromise = this.page.waitForResponse(
+            resp => resp.url().includes('/search_jobs') && resp.request().method() === 'GET',
+            { timeout }
+        );
+        await getJobsBtn.click();
+        const response = await responsePromise;
+        const jobs = await response.json();
+        return jobs.findIndex(job => job.trace_id === trace_id);
+    }
 
 
 async deleteJobSearch(trace_id) {
+      const rowIndex = await this._getJobRowIndex(trace_id);
+      if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
 
-      // Click the "Get Jobs" button
-      await this.page.getByRole('button', { name: 'Get Jobs' }).click();
+      const row = this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`);
+      await row.waitFor({ state: 'visible', timeout: 15000 });
 
-      // Click the delete button for the specified job row
-      await this.page.waitForSelector(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`);
-      await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`).click();
+      // Click delete, cancel (tests the cancel flow), click delete again and confirm
+      await row.locator('[data-test="search-scheduler-delete-btn"]').click();
+      await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-secondary-btn"]').click();
+      await row.locator('[data-test="search-scheduler-delete-btn"]').click();
+      await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
 
-      // Confirm the deletion
-      await this.page.locator('[data-test="cancel-button"]').click();
-
-
-      // Click the delete button for the specified job row
-      await this.page.waitForSelector(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`);
-      await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-delete-btn"]`).click();
-
-      // Confirm the deletion
-      await this.page.locator('[data-test="confirm-button"]').click();
-
-      // Verify the success message
-      await expect(this.page.locator('#q-notify')).toContainText('Search Job has been deleted successfully');
+      await expect(
+          this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Search Job has been deleted successfully' }).first()
+      ).toBeVisible({ timeout: 10000 });
   }
 
   async restartJobSearch(trace_id) {
-    // Click the "Get Jobs" button
-    await this.page.getByRole('button', { name: 'Get Jobs' }).click();
+    // Restart button is only enabled when status_code === 2 (completed) or 3 (failed).
+    // Retry until the button becomes enabled.
+    const maxRetries = 8;
+    let clicked = false;
 
-    // Build the selector for the job row using the trace_id
-    const jobRowSelector = `[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-restart-btn"]`;
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const rowIndex = await this._getJobRowIndex(trace_id, 15000);
+        if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
 
-    // Wait for the job row to be visible
-    try {
-        await this.page.waitForSelector(jobRowSelector, { timeout: 10000 }); // Adjust timeout as necessary
-    } catch (error) {
-        testLogger.error(`Error: Unable to find job row for trace ID ${trace_id}.`, error);
-        throw new Error(`Job row for trace ID ${trace_id} not found.`);
+        const row = this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`);
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+
+        const restartBtn = row.locator('[data-test="search-scheduler-restart-btn"]');
+        const isEnabled = await restartBtn.isEnabled();
+        if (isEnabled) {
+            await restartBtn.click();
+            clicked = true;
+            break;
+        }
+
+        testLogger.warn(`Restart button for trace ID ${trace_id} is not enabled (attempt ${attempt + 1}/${maxRetries}). Retrying...`);
+        if (attempt < maxRetries - 1) await this.page.waitForTimeout(5000);
     }
 
-    // Click the restart button for the specified job row
-    await this.page.locator(jobRowSelector).click();
+    if (!clicked) {
+        throw new Error(`Restart button for trace ID ${trace_id} remained disabled after ${maxRetries} attempts.`);
+    }
 
-    // Verify the success message
-    await expect(this.page.locator('#q-notify')).toContainText('Search Job has been restarted successfully');
+    await expect(
+        this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Search Job has been restarted successfully' }).first()
+    ).toBeVisible({ timeout: 10000 });
 }
 
 
 async cancelJobSearch(trace_id) {
+    const rowIndex = await this._getJobRowIndex(trace_id);
+    if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
 
-    // Click the "Get Jobs" button
-    await this.page.getByRole('button', { name: 'Get Jobs' }).click();
+    const row = this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`);
+    await row.waitFor({ state: 'visible', timeout: 15000 });
+    await row.locator('[data-test="search-scheduler-cancel-btn"]').click();
+    await this.page.locator('[data-test="confirm-dialog"] [data-test="o-dialog-primary-btn"]').click();
 
-    // Click the cancel button for the specified job row
-    await this.page.locator(`[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-cancel-btn"]`).click();
-
-    // Confirm the cancellation
-    await this.page.locator('[data-test="confirm-button"]').click();
-
-    // Verify the success message
-    await expect(this.page.locator('#q-notify')).toContainText('Search Job has been cancelled successfully');   
-
-}     
+    await expect(
+        this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Search Job has been cancelled successfully' }).first()
+    ).toBeVisible({ timeout: 10000 });
+}
 
 async exploreJob(trace_id) {
-    // Click the "Get Jobs" button
-    await this.page.getByRole('button', { name: 'Get Jobs' }).click();
-
-    // Build the selector for the job row using the trace_id
-    const exploreButtonSelector = `[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-explore-btn"]`;
-
-    // Wait for the explore button to be visible
-    try {
-        await this.page.waitForSelector(exploreButtonSelector, { timeout: 10000 });
-    } catch (error) {
-        testLogger.error(`Error: Unable to find explore button for trace ID ${trace_id}.`, error);
-        throw new Error(`Explore button for trace ID ${trace_id} not found.`);
-    }
-
-    // Retry clicking the explore button if it is disabled
+    // The explore button is disabled while the job is pending (status=0) or failed (status=3).
+    // Retry: each attempt re-fetches the list and checks whether the button is enabled.
     const maxRetries = 5;
-    let attempts = 0;
+    let clicked = false;
 
-    while (attempts < maxRetries) {
-        const exploreButton = this.page.locator(exploreButtonSelector);
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+        const rowIndex = await this._getJobRowIndex(trace_id, 15000);
+        if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
 
-        // Check if the button is enabled
+        const row = this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`);
+        await row.waitFor({ state: 'visible', timeout: 10000 });
+
+        const exploreButton = row.locator('[data-test="search-scheduler-explore-btn"]');
         const isEnabled = await exploreButton.isEnabled();
         if (isEnabled) {
             await exploreButton.click();
-            break; // Exit the loop if the button is clicked successfully
-        } else {
-            testLogger.warn(`Explore button for trace ID ${trace_id} is not enabled. Retrying...`);
-            attempts++;
-            await this.page.waitForTimeout(5000); // Wait before retrying
-            await this.page.getByRole('button', { name: 'Get Jobs' }).click();
+            clicked = true;
+            break;
         }
+
+        testLogger.warn(`Explore button for trace ID ${trace_id} is not enabled (attempt ${attempt + 1}/${maxRetries}).`);
+        if (attempt < maxRetries - 1) await this.page.waitForTimeout(5000);
     }
 
-    if (attempts === maxRetries) {
+    if (!clicked) {
         throw new Error(`Explore button for trace ID ${trace_id} remained disabled after ${maxRetries} attempts.`);
     }
 
-    // Verify the success message
-    await expect(this.page.locator('#q-notify')).toContainText('Search Job have been applied successfully');
+    await expect(
+        this.page.locator('[data-test="o-toast-message"]').filter({ hasText: 'Search Job have been applied successfully' }).first()
+    ).toBeVisible({ timeout: 10000 });
 }
 
 
 async viewJobDetails(trace_id) {
-      // Click the "Get Jobs" button
-      await this.page.getByRole('button', { name: 'Get Jobs' }).click();
-    // Build the selector for the expand button
-    const expandButtonSelector = `[data-test="search-scheduler-table-${trace_id}-row"] [data-test="search-scheduler-expand-btn"]`;
-    const moreDetailsTabSelector = '[data-test="tab-more_details"]';
+    // OTableExpandButton renders as [data-test="o2-table-expand-{rowIndex}"]
+    // where rowIndex matches the job's position in the GET /search_jobs response.
+    const rowIndex = await this._getJobRowIndex(trace_id, 15000);
+    if (rowIndex === -1) throw new Error(`Job with trace ID ${trace_id} not found in scheduler list`);
 
-    // Wait for the expand button to be visible and click it
-    try {
-        await this.page.waitForSelector(expandButtonSelector, { timeout: 10000 }); // Adjust timeout as necessary
-        await this.page.locator(expandButtonSelector).click();
-    } catch (error) {
-        testLogger.error(`Error: Unable to find or click expand button for trace ID ${trace_id}.`, error);
-        throw new Error(`Expand button for trace ID ${trace_id} not found or not clickable.`);
-    }
+    const row = this.page.locator(`[data-test="search-scheduler-table"] [data-test="o2-table-row-${rowIndex}"]`);
+    await row.waitFor({ state: 'visible', timeout: 10000 });
 
-    // Wait for the More Details tab to be visible and click it
+    const expandBtn = this.page.locator(`[data-test="o2-table-expand-${rowIndex}"]`);
+    await expandBtn.click();
+
+    // Wait for and click the More Details tab.
+    // Multiple [data-test="tab-more_details"] may exist in DOM (one per expanded row),
+    // so we scope to the first visible one.
     try {
-        await this.page.getByRole('cell', { name: 'Query / Function More Details' }).locator(moreDetailsTabSelector).waitFor({ state: 'visible', timeout: 10000 });
-        await this.page.getByRole('cell', { name: 'Query / Function More Details' }).locator(moreDetailsTabSelector).click();
+        const visibleTab = this.page.locator('[data-test="tab-more_details"]:visible').first();
+        await visibleTab.waitFor({ state: 'visible', timeout: 15000 });
+        await visibleTab.click();
     } catch (error) {
-        testLogger.error(`Error: Unable to find or click More Details tab for trace ID ${trace_id}.`, error);
+        const underlyingMsg = error instanceof Error ? error.message : String(error);
+        testLogger.error(`Unable to click More Details tab for trace ID ${trace_id}: ${underlyingMsg}`);
         throw new Error(`More Details tab for trace ID ${trace_id} not found or not clickable.`);
     }
 
-    // Verify that the expected text is present in the textbox
-    await expect(this.page.getByText(`"${trace_id}"`)).toBeVisible();
+    await expect(
+        this.page.locator('[data-test="expanded-list-tabs"]').first()
+    ).toBeVisible({ timeout: 5000 });
 }
 
-   
 
 
 
-  
+
 
 }

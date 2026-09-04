@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,49 +15,68 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn
+  <OButton
     :data-test="dataTest"
     :class="buttonClass"
-    :size="buttonSize"
+    :variant="variant"
+    :size="size"
     :loading="isLoading"
-    :disable="disabled || !url || isWebUrlNotConfigured"
-    icon="share"
+    :disabled="disabled || !url || isWebUrlNotConfigured"
     @click="handleShareClick"
+    icon-left="share"
   >
-    <span v-if="showLabel" class="q-ml-xs">{{ t("search.shareLink") }}</span>
-    <q-tooltip v-if="isWebUrlNotConfigured">
-     <q-icon color="warning" name="warning" class="q-mr-xs" /> {{ t("search.webUrlNotConfigured") }}
-    </q-tooltip>
-    <q-tooltip v-else-if="tooltip || !showLabel">
-      {{ tooltip || t("search.shareLink") }}
-    </q-tooltip>
-  </q-btn>
+    <span v-if="showLabel" class="ms-1">{{ t("search.shareLink") }}</span>
+    <OTooltip v-if="isWebUrlNotConfigured">
+      <template #content
+        ><OIcon name="warning" size="sm" class="me-1" />{{
+          t("search.webUrlNotConfigured")
+        }}</template
+      >
+    </OTooltip>
+    <OTooltip
+      v-else-if="tooltip || !showLabel"
+      :content="tooltip || t('search.shareLink')"
+      :shortcut="shortcut || undefined"
+      :shortcut-id="shortcutId || undefined"
+    />
+  </OButton>
 </template>
 
 <script lang="ts">
-import { defineComponent, ref, onBeforeUnmount, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, ref, onBeforeUnmount, computed, type PropType } from "vue";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-import { useQuasar, copyToClipboard } from "quasar";
+import { copyToClipboard } from "@/utils/clipboard";
+import OButton from "@/lib/core/Button/OButton.vue";
+import type { ButtonVariant, ButtonSize } from "@/lib/core/Button/OButton.types";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import shortURLService from "@/services/short_url";
+import { toast } from "@/lib/feedback/Toast/useToast";
 
 export default defineComponent({
   name: "ShareButton",
+  components: { OButton, OIcon, OTooltip },
   props: {
     // The long URL to be copied and shortened
     url: {
       type: String,
       required: true,
     },
-    // Custom CSS classes for the button
+    // Custom CSS classes for the button (legacy — for non-dashboard callers)
     buttonClass: {
       type: String,
-      default: "q-mr-xs download-logs-btn q-px-sm element-box-shadow el-border",
+      default: "",
     },
-    // Button size (Quasar sizes: xs, sm, md, lg, xl)
-    buttonSize: {
-      type: String,
-      default: "xs",
+    // OButton variant
+    variant: {
+      type: String as PropType<ButtonVariant>,
+      default: "outline",
+    },
+    // OButton size
+    size: {
+      type: String as PropType<ButtonSize>,
+      default: "icon-xs",
     },
     // Show "Share" label text next to icon
     showLabel: {
@@ -66,6 +85,17 @@ export default defineComponent({
     },
     // Custom tooltip text
     tooltip: {
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
+    },
+    // Optional keyboard-shortcut hint shown in the tooltip (raw key, e.g. "ctrl+shift+c")
+    shortcut: {
+      type: String,
+      default: "",
+    },
+    // Registry shortcut id — resolves the hint key from shortcutRegistry.ts so a
+    // key change there updates this tooltip too. Prefer this over `shortcut`.
+    shortcutId: {
       type: String,
       default: "",
     },
@@ -82,9 +112,8 @@ export default defineComponent({
   },
   emits: ["copy:success", "copy:error", "shorten:success", "shorten:error"],
   setup(props, { emit }) {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
-    const $q = useQuasar();
 
     const isLoading = ref(false);
     let pollIntervalId: number | null = null;
@@ -139,23 +168,18 @@ export default defineComponent({
           isPolling = false;
 
           // Short URL is ready! Copy it to clipboard
-          copyToClipboard(shortURL)
-            .then(() => {
-              $q.notify({
-                type: "positive",
-                message: t("search.linkCopiedSuccessfully"),
-                timeout: 5000,
-              });
-              emit("copy:success", { url: shortURL, type: "short" });
-            })
-            .catch((error) => {
-              console.error("Failed to copy short URL:", error);
-              $q.notify({
-                type: "negative",
-                message: t("search.errorCopyingLink"),
-                timeout: 5000,
-              });
-              emit("copy:error", { error, type: "short" });
+          copyToClipboard(shortURL, t, {
+            successMessage: t("search.linkCopiedSuccessfully"),
+            errorMessage: t("search.errorCopyingLink"),
+            timeout: 5000,
+          })
+            .then((success: boolean) => {
+              if (success) {
+                emit("copy:success", { url: shortURL, type: "short" });
+              } else {
+                console.error("Failed to copy short URL:", shortURL);
+                emit("copy:error", { error: new Error("Copy failed"), type: "short" });
+              }
             })
             .finally(() => {
               // Clean up: clear store
@@ -164,9 +188,7 @@ export default defineComponent({
             });
         } else if (attempts >= MAX_ATTEMPTS) {
           // Timeout: Stop polling after max attempts
-          console.warn(
-            "Polling timeout: Short URL not received within time limit"
-          );
+          console.warn("Polling timeout: Short URL not received within time limit");
           if (pollIntervalId) {
             clearInterval(pollIntervalId);
             pollIntervalId = null;
@@ -176,8 +198,8 @@ export default defineComponent({
           store.commit("clearPendingShortURL");
 
           // Show timeout notification
-          $q.notify({
-            type: "warning",
+          toast({
+            variant: "warning",
             message: t("search.errorShorteningLink"),
             timeout: 5000,
           });
@@ -186,19 +208,22 @@ export default defineComponent({
     };
 
     /**
-     * Handler for share button click
+     * Handler for share button click. Also the entry point for copy-URL keyboard
+     * shortcuts, which call it through a template ref — keep it exposed.
      * Safari: Uses polling mechanism to maintain user gesture context
      * Chrome/Firefox: Copies directly in API response
      */
     const handleShareClick = () => {
       if (!props.url) {
-        $q.notify({
-          type: "warning",
-          message: "No URL to share",
-          timeout: 3000,
+        toast({
+          variant: "warning",
+          message: t("toastMessages.common.noUrlToShare"),
         });
         return;
       }
+
+      // Shortcuts call this directly, so the button's :disabled cannot gate them.
+      if (props.disabled || isWebUrlNotConfigured.value) return;
 
       // Start loading and fetch short URL
       isLoading.value = true;
@@ -220,23 +245,18 @@ export default defineComponent({
               store.commit("setPendingShortURL", shortUrl);
             } else {
               // Chrome/Firefox: Copy directly here
-              copyToClipboard(shortUrl)
-                .then(() => {
-                  $q.notify({
-                    type: "positive",
-                    message: t("search.linkCopiedSuccessfully"),
-                    timeout: 5000,
-                  });
-                  emit("copy:success", { url: shortUrl, type: "short" });
-                })
-                .catch((error) => {
-                  console.error("Failed to copy short URL:", error);
-                  $q.notify({
-                    type: "negative",
-                    message: t("search.errorCopyingLink"),
-                    timeout: 5000,
-                  });
-                  emit("copy:error", { error, type: "short" });
+              copyToClipboard(shortUrl, t, {
+                successMessage: t("search.linkCopiedSuccessfully"),
+                errorMessage: t("search.errorCopyingLink"),
+                timeout: 5000,
+              })
+                .then((success: boolean) => {
+                  if (success) {
+                    emit("copy:success", { url: shortUrl, type: "short" });
+                  } else {
+                    console.error("Failed to copy short URL:", shortUrl);
+                    emit("copy:error", { error: new Error("Copy failed"), type: "short" });
+                  }
                 })
                 .finally(() => {
                   isLoading.value = false;
@@ -255,8 +275,8 @@ export default defineComponent({
               isPolling = false;
             }
             isLoading.value = false;
-            $q.notify({
-              type: "negative",
+            toast({
+              variant: "error",
               message: t("search.errorShorteningLink"),
               timeout: 5000,
             });
@@ -272,8 +292,8 @@ export default defineComponent({
             isPolling = false;
           }
           isLoading.value = false;
-          $q.notify({
-            type: "negative",
+          toast({
+            variant: "error",
             message: t("search.errorShorteningLink"),
             timeout: 5000,
           });
@@ -292,6 +312,7 @@ export default defineComponent({
     });
 
     return {
+      raw,
       t,
       isLoading,
       isWebUrlNotConfigured,
@@ -300,7 +321,3 @@ export default defineComponent({
   },
 });
 </script>
-
-<style scoped>
-/* Add any custom styles here if needed */
-</style>

@@ -11,9 +11,13 @@ node_modules
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+playwright-tests/utils/auth/
 coverage/
 .nyc_output/
 
 # Test output logs
 test-output.log
 *.log
+
+# test-assist-ci throwaway specs (generated per run, deleted after)
+playwright-tests/_ci_tmp/

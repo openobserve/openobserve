@@ -1,0 +1,323 @@
+// Dashboard Legends & Table Cell Copy - Page Object
+// Methods for Show Legends popup and table cell copy functionality
+// PR #9677: feat: dashboard copy legends and table cells
+
+const { expect } = require("@playwright/test");
+const testLogger = require("../../playwright-tests/utils/test-logger.js");
+
+export default class DashboardLegendsCopy {
+  constructor(page) {
+    this.page = page;
+
+    // ShowLegendsPopup selectors (VERIFIED from ShowLegendsPopup.vue)
+    this.legendsPopup = page.locator('[data-test="dashboard-show-legends-popup"]');
+    this.legendsCount = page.locator('[data-test="dashboard-show-legends-count"]');
+    this.copyAllBtn = page.locator('[data-test="dashboard-show-legends-copy-all"]');
+    this.closeBtn = page.locator('[data-test="o-dialog-close-btn"]');
+
+    // Chart renderer selector (VERIFIED from ChartRenderer.vue - data-test="chart-renderer")
+    this.chartRenderer = page.locator('[data-test="chart-renderer"]');
+
+    // Show Legends button. The button now lives in the panel header toolbar:
+    // "dashboard-show-legends-btn" in dashboard view (PanelContainer) and
+    // "panel-editor-show-legends-btn" in the add/edit panel toolbar (PanelEditor).
+    this.showLegendsBtn = page.locator(
+      '[data-test="dashboard-show-legends-btn"], [data-test="panel-editor-show-legends-btn"]'
+    );
+
+    // Table selectors (VERIFIED from TableRenderer.vue)
+    this.dashboardTable = page.locator('[data-test="dashboard-panel-table"]');
+  }
+
+  // ===== SHOW LEGENDS POPUP METHODS =====
+
+  /**
+   * Get the "Show Legends" button on a panel.
+   * Note: The button has no data-test attribute, so we locate it by its icon
+   * and the tooltip text within the panel hover toolbar.
+   * @param {import('@playwright/test').Page} page - optional page override
+   * @returns {import('@playwright/test').Locator}
+   */
+  getShowLegendsButton() {
+    // The button renders icon "format_list_bulleted" as text content via OIcon
+    return this.showLegendsBtn.first();
+  }
+
+  /** Returns the legends popup container locator */
+  getLegendsPopup() {
+    return this.legendsPopup;
+  }
+
+  /** Returns the raw legend-item locator (all items, unfiltered) */
+  getLegendItems() {
+    return this.page.locator('[data-test^="dashboard-legend-item-"]');
+  }
+
+  /**
+   * Hover over a panel to reveal the toolbar, then click Show Legends.
+   * Works both in dashboard view (PanelContainer) and edit panel (AddPanel).
+   * @param {string} [panelSelector] - optional panel container selector to hover
+   */
+  async clickShowLegends(panelSelector) {
+    // If a specific panel selector is given, hover over it; otherwise hover over the chart area
+    if (panelSelector) {
+      await this.page.locator(panelSelector).hover();
+    } else {
+      // Hover over the chart renderer (data-test="chart-renderer" from ChartRenderer.vue)
+      // or the table (data-test="dashboard-panel-table" from TableRenderer.vue)
+      const chartArea = this.chartRenderer.or(this.dashboardTable).first();
+      await chartArea.hover();
+    }
+
+    // Wait for the Show Legends button to appear in hover toolbar
+    const legendsBtn = this.getShowLegendsButton();
+    await legendsBtn.waitFor({ state: 'visible', timeout: 10000 });
+    await legendsBtn.click();
+
+    testLogger.info('Clicked Show Legends button');
+  }
+
+  /**
+   * Wait for the legends popup to be visible
+   */
+  async waitForPopupVisible() {
+    await this.legendsPopup.waitFor({ state: 'visible', timeout: 10000 });
+    testLogger.info('Legends popup is visible');
+  }
+
+  /**
+   * Get the count of legend items in the popup
+   * @returns {Promise<number>}
+   */
+  async getLegendCount() {
+    await this.waitForPopupVisible();
+    // Use :not() to exclude dashboard-legend-item-text which also starts with
+    // "dashboard-legend-item-" and would otherwise double-count each item.
+    // Use .first() to scope to a single popup instance (PanelEditor can render
+    // multiple popup DOM nodes simultaneously).
+    const items = this.legendsPopup.first().locator('[data-test^="dashboard-legend-item-"]:not([data-test="dashboard-legend-item-text"])');
+    // Items are populated asynchronously after the popup opens
+    await items.first().waitFor({ state: 'attached', timeout: 5000 }).catch(() => {});
+    const count = await items.count();
+    testLogger.info(`Found ${count} legend items`);
+    return count;
+  }
+
+  /**
+   * Get a specific legend item by index
+   * @param {number} index - 0-based index
+   * @returns {import('@playwright/test').Locator}
+   */
+  getLegendItem(index) {
+    return this.page.locator(`[data-test="dashboard-legend-item-${index}"]`);
+  }
+
+  /**
+   * Get the text of a legend item
+   * @param {number} index - 0-based index
+   * @returns {Promise<string>}
+   */
+  async getLegendText(index) {
+    const item = this.getLegendItem(index);
+    const text = await item.locator('[data-test="dashboard-legend-item-text"]').textContent();
+    return text.trim();
+  }
+
+  /**
+   * Click copy on a specific legend item
+   * @param {number} index - 0-based index
+   */
+  async copyLegend(index) {
+    const item = this.getLegendItem(index);
+    await item.hover(); // Hover to reveal copy button
+    const copyBtn = item.locator('[data-test="dashboard-legend-copy-btn"]');
+    await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await copyBtn.click();
+    testLogger.info(`Copied legend at index ${index}`);
+  }
+
+  /**
+   * Click the "Copy all" button
+   */
+  async clickCopyAll() {
+    // writeText() stays pending until the page has OS focus; under parallel CI the tab loses it and the "Copied" .then() never fires.
+    await this.page.bringToFront();
+    await this.copyAllBtn.click();
+    testLogger.info('Clicked Copy All legends');
+  }
+
+  /**
+   * Check if the Copy All button shows "Copied" state
+   * @returns {Promise<boolean>}
+   */
+  async isCopyAllInCopiedState() {
+    // The label is set by a clipboard .then() callback, so a single textContent() read races it.
+    try {
+      await expect(this.copyAllBtn).toContainText('Copied', { timeout: 10000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Close the legends popup
+   */
+  async closePopup() {
+    await this.closeBtn.click();
+    await this.legendsPopup.waitFor({ state: 'hidden', timeout: 5000 });
+    testLogger.info('Legends popup closed');
+  }
+
+  /**
+   * Check if the "No legends available" message is shown
+   * @returns {Promise<boolean>}
+   */
+  async isNoLegendsMessageVisible() {
+    const noLegendsEl = this.legendsPopup.locator('[data-test="dashboard-no-legends-message"]');
+    return await noLegendsEl.isVisible();
+  }
+
+  /**
+   * Get the total legends count text from the popup header
+   * @returns {Promise<string>}
+   */
+  async getTotalLegendsText() {
+    return await this.legendsCount.textContent();
+  }
+
+  // ===== TABLE CELL COPY METHODS =====
+
+  /**
+   * Ensure the table's internal scroll container has data rows visible.
+   * TanStack table (dashboard mode) renders regular DOM rows ΓÇö no virtual scroll.
+   * The scroll container is the standard .container.table-container div.
+   */
+  async ensureTableDataVisible() {
+    await this.page.evaluate(() => {
+      // Scroll the TanStack table container to top to show first rows
+      const scrollContainer = document.querySelector(
+        '[data-test="dashboard-panel-table"] .table-container'
+      ) || document.querySelector(
+        '[data-test="dashboard-panel-table"] .container'
+      );
+      if (scrollContainer) {
+        scrollContainer.scrollTop = 0;
+      }
+    });
+    // Wait for data cells to be attached after scroll reset
+    await this.dashboardTable.locator('[data-test^="o2-table-cell-"]').first()
+      .waitFor({ state: 'attached', timeout: 10000 });
+  }
+
+  /**
+   * Get a table cell by row and column index.
+   * Filters out virtual scroll spacer rows by only targeting rows
+   * that contain data-test="o2-table-cell-<columnId>" cells.
+   * @param {number} rowIndex - 0-based row index
+   * @param {number} colIndex - 0-based column index
+   * @returns {import('@playwright/test').Locator}
+   */
+  getTableCell(rowIndex, colIndex) {
+    const dataRows = this.dashboardTable
+      .locator('[data-test^="o2-table-row-"]')
+      .filter({ has: this.page.locator('[data-test^="o2-table-cell-"]') });
+    return dataRows
+      .nth(rowIndex)
+      .locator(
+        '[data-test^="o2-table-cell-"]:not([data-test^="o2-table-cell-copy-"]):not([data-test^="o2-table-cell-hover-actions-"])'
+      )
+      .nth(colIndex);
+  }
+
+  /**
+   * Hover over a table cell to reveal the copy button, then click it
+   * @param {number} rowIndex - 0-based row index
+   * @param {number} colIndex - 0-based column index
+   */
+  async copyTableCell(rowIndex, colIndex) {
+    await this.ensureTableDataVisible();
+    const cell = this.getTableCell(rowIndex, colIndex);
+
+    // Use bounding box to move mouse to exact position (works with absolute-positioned tables)
+    const box = await cell.boundingBox();
+    if (box) {
+      await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    } else {
+      // Fallback: scroll and hover
+      await cell.scrollIntoViewIfNeeded();
+      await cell.hover({ force: true });
+    }
+    const copyBtn = this.page
+      .locator('[data-test^="dashboard-table-cell-copy-"]')
+      .first();
+    await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
+    await copyBtn.click({ force: true });
+
+    testLogger.info(`Copied table cell at row ${rowIndex}, col ${colIndex}`);
+  }
+
+  /**
+   * Check if a table cell copy button shows the "check" (copied) icon
+   * @param {number} rowIndex - 0-based row index
+   * @param {number} colIndex - 0-based column index
+   * @returns {Promise<boolean>}
+   */
+  async isTableCellCopied(rowIndex, colIndex) {
+    const cell = this.getTableCell(rowIndex, colIndex);
+    const box = await cell.boundingBox();
+    if (box) {
+      await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    } else {
+      await cell.hover({ force: true });
+    }
+    const copyBtn = this.page
+      .locator('[data-test^="dashboard-table-cell-copy-"]')
+      .first();
+    await copyBtn.waitFor({ state: 'visible', timeout: 5000 });
+    const copiedAttr = await copyBtn.getAttribute('data-copied');
+    return copiedAttr === 'true';
+  }
+
+  /**
+   * Get the text content of a table cell (excluding copy button text)
+   * @param {number} rowIndex - 0-based row index
+   * @param {number} colIndex - 0-based column index
+   * @returns {Promise<string>}
+   */
+  async getTableCellText(rowIndex, colIndex) {
+    const cell = this.getTableCell(rowIndex, colIndex);
+    const text = await cell.textContent();
+    return text.trim();
+  }
+
+  /**
+   * Check if a copy button is visible on a hovered table cell
+   * @param {number} rowIndex - 0-based row index
+   * @param {number} colIndex - 0-based column index
+   * @returns {Promise<boolean>}
+   */
+  async isTableCellCopyButtonVisible(rowIndex, colIndex) {
+    await this.ensureTableDataVisible();
+    const cell = this.getTableCell(rowIndex, colIndex);
+    await cell.waitFor({ state: 'attached', timeout: 15000 });
+
+    // Use bounding box to move mouse to exact position
+    const box = await cell.boundingBox();
+    if (box) {
+      await this.page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    } else {
+      await cell.scrollIntoViewIfNeeded();
+      await cell.hover({ force: true });
+    }
+    const copyBtn = this.page
+      .locator('[data-test^="dashboard-table-cell-copy-"]')
+      .first();
+    try {
+      await copyBtn.waitFor({ state: 'visible', timeout: 3000 });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}

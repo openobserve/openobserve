@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,4 +21,47 @@ pub struct ResultCacheMeta {
     pub end_time: i64,
     pub is_aggregate: bool,
     pub is_descending: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_result_cache_meta_fields() {
+        let m = ResultCacheMeta {
+            start_time: 1000,
+            end_time: 2000,
+            is_aggregate: true,
+            is_descending: false,
+        };
+        assert_eq!(m.start_time, 1000);
+        assert_eq!(m.end_time, 2000);
+        assert!(m.is_aggregate);
+        assert!(!m.is_descending);
+    }
+
+    #[test]
+    fn test_result_cache_meta_clone() {
+        let m = ResultCacheMeta {
+            start_time: 10,
+            end_time: 20,
+            is_aggregate: false,
+            is_descending: true,
+        };
+        let c = m.clone();
+        assert_eq!(c, m);
+    }
+
+    #[test]
+    fn test_result_cache_meta_eq() {
+        let a = ResultCacheMeta {
+            start_time: 0,
+            end_time: 0,
+            is_aggregate: false,
+            is_descending: false,
+        };
+        let b = a.clone();
+        assert_eq!(a, b);
+    }
 }

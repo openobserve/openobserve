@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -14,87 +14,56 @@ You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
-  <q-card class="o2-side-dialog column full-height">
-    <q-card-section class="q-py-md tw:w-full">
-      <div class="row items-center no-wrap q-py-sm">
-        <div class="col">
-          <div data-test="add-group-section-title" style="font-size: 18px">
-            {{ t("iam.addGroup") }}
-          </div>
-        </div>
-        <div class="col-auto">
-          <q-icon
-            data-test="add-group-close-dialog-btn"
-            name="cancel"
-            class="cursor-pointer"
-            size="20px"
-            @click="emits('cancel:hideform')"
-          />
-        </div>
-      </div>
-
-      <q-separator />
-      <div data-test="add-group-section">
-        <q-input
-          v-model.trim="name"
-          :label="t('common.name') + ' *'"
-          class="showLabelOnTop tw:mt-2"
-          stack-label
-          hide-bottom-space
-          borderless
-          dense
-          :rules="[
-            (val: any, rules: any) =>
-              !!val
-                ? isValidGroupName ||
-                  `Use alphanumeric and '_' characters only, without spaces.`
-                : t('common.nameRequired'),
-          ]"
-          maxlength="100"
+  <ODialog
+    data-test="add-group-dialog"
+    :open="open"
+    size="sm"
+    :title="t('iam.addGroup')"
+    :primaryButtonLabel="t('alerts.save')"
+    :secondaryButtonLabel="t('alerts.cancel')"
+    form-id="add-group-form"
+    @click:secondary="emits('update:open', false)"
+    @update:open="emits('update:open', $event)"
+  >
+    <div data-test="add-group-section">
+      <OForm
+        id="add-group-form"
+        :schema="addGroupSchema"
+        :default-values="addGroupDefaults"
+        @submit="saveGroup"
+      >
+        <OFormInput
+          name="name"
+          :label="t('common.name')"
+          required
+          class="showLabelOnTop mt-2"
+          :maxlength="100"
           data-test="add-group-groupname-input-btn"
-        >
-          <template v-slot:hint>
-            Use alphanumeric and '_' characters only, without spaces.
-          </template>
-        </q-input>
-
-        <div class="flex justify-start tw:mt-6">
-          <q-btn
-            v-close-popup
-            class="q-mr-md o2-secondary-button tw:h-[36px]"
-            :label="t('alerts.cancel')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-secondary-button-dark' : 'o2-secondary-button-light'"
-            @click="$emit('cancel:hideform')"
-            data-test="add-group-cancel-btn"
-          />
-          <q-btn
-            :disable="!name || !isValidGroupName"
-            class="o2-primary-button no-border tw:h-[36px]"
-            :label="t('alerts.save')"
-            no-caps
-            flat
-            :class="store.state.theme === 'dark' ? 'o2-primary-button-dark' : 'o2-primary-button-light'"
-            @click="saveGroup"
-            data-test="add-group-submit-btn"
-          />
-        </div>
-      </div>
-    </q-card-section>
-  </q-card>
+          :help-text="t('iam.nameHelpText')"
+        />
+      </OForm>
+    </div>
+  </ODialog>
 </template>
 
 <script setup lang="ts">
 import { createGroup } from "@/services/iam";
-import { useQuasar } from "quasar";
-import { ref, computed } from "vue";
-import { useI18n } from "vue-i18n";
+import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import { computed } from "vue";
+import { useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useReo } from "@/services/reodotdev_analytics";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { makeAddGroupSchema, type AddGroupForm } from "./AddGroup.schema";
 
-const { t } = useI18n();
+const { t } = useI18nTyped();
 const props = defineProps({
+  open: {
+    type: Boolean,
+    default: false,
+  },
   group: {
     type: Object,
     default: () => null,
@@ -105,51 +74,49 @@ const props = defineProps({
   },
 });
 
-const emits = defineEmits(["cancel:hideform", "added:group"]);
-
-const name = ref(props.group?.name || "");
-
-const q = useQuasar();
+const emits = defineEmits(["update:open", "added:group"]);
 
 const { track } = useReo();
 
 const store = useStore();
 
-const isValidGroupName = computed(() => {
-  const roleNameRegex = /^[a-zA-Z0-9_]+$/;
-  // Check if the role name is valid
-  return roleNameRegex.test(name.value);
-});
+const addGroupSchema = makeAddGroupSchema(t);
 
-const saveGroup = () => {
-  if (!name.value || !isValidGroupName.value) return;
-  createGroup(name.value, store.state.selectedOrganization.identifier)
-    .then((res) => {
-      emits("added:group", res.data);
-      emits("cancel:hideform");
+// The OForm owns `name`. The ODialog unmounts its body on close + remounts fresh
+// on open, so this typed computed re-seeds `:default-values` each open (the
+// optional `group` prop prefills it, otherwise blank). No local model / watch.
+const addGroupDefaults = computed((): AddGroupForm => ({
+  name: props.group?.name ?? "",
+}));
 
-      q.notify({
-        message: `User Group "${name.value}" Created Successfully!`,
-        color: "positive",
-        position: "bottom",
-        timeout: 3000,
-      });
-    })
-    .catch((err) => {
-      if(err.response.status != 403){
-        q.notify({
-        message: "Error while creating group",
-        color: "negative",
-        position: "bottom",
-        timeout: 3000,
-      });
-      }
-      console.log(err);
+// Plain async @submit handler — the validated `value` is the source of truth.
+// The schema validates the trimmed name (so surrounding whitespace doesn't trip
+// the regex, mirroring the old `v-model.trim`); trim again here so the saved
+// value matches. OForm awaits this, so the Save spinner spans the request.
+const saveGroup = async (value: AddGroupForm) => {
+  const name = value.name.trim();
+  try {
+    const res = await createGroup(name, store.state.selectedOrganization.identifier);
+    emits("added:group", { group_name: name, data: res.data });
+    emits("update:open", false);
+
+    toast({
+      message: t("iam.addGroupPage.createdSuccessfully", { name }),
+      variant: "success",
     });
-    track("Button Click", {
-      button: "Save Group",
-      page: "Add Group"
-    });
+  } catch (err: any) {
+    if (err.response?.status != 403) {
+      toast({
+        message: t("iam.addGroupPage.errorCreating"),
+        variant: "error",
+      });
+    }
+    console.log(err);
+  }
+
+  track("Button Click", {
+    button: "Save Group",
+    page: "Add Group",
+  });
 };
 </script>
-

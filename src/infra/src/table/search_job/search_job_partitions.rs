@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -21,11 +21,11 @@ use sea_orm::{
 use serde::{Deserialize, Serialize};
 
 use super::{
-    super::{entity::search_job_partitions::*, get_lock},
+    super::entity::search_job_partitions::*,
     common::{OperatorType, Value},
 };
 use crate::{
-    db::{ORM_CLIENT, connect_to_orm},
+    db::{get_orm_client_ro, get_orm_client_rw},
     errors, orm_err,
 };
 
@@ -127,9 +127,7 @@ pub async fn submit_partitions(job_id: &str, jobs: Vec<Model>) -> Result<(), err
         return orm_err!("partitions array cannot be empty");
     }
 
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
     let tx = match client.begin().await {
         Ok(tx) => tx,
         Err(e) => return orm_err!(format!("submit partition job start transaction error: {e}")),
@@ -139,7 +137,7 @@ pub async fn submit_partitions(job_id: &str, jobs: Vec<Model>) -> Result<(), err
     let status = Entity::find()
         .filter(Column::JobId.eq(job_id))
         .lock(LockType::Update)
-        .one(client)
+        .one(&tx)
         .await;
 
     match status {
@@ -178,7 +176,7 @@ pub async fn submit_partitions(job_id: &str, jobs: Vec<Model>) -> Result<(), err
 }
 
 pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<Model>, errors::Error> {
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_ro().await;
 
     // sql: select * from search_job_partitions where job_id = job_id
     let res = Entity::find()
@@ -194,10 +192,7 @@ pub async fn get_partition_jobs(job_id: &str) -> Result<Vec<Model>, errors::Erro
 }
 
 pub async fn set(operator: SetOperator) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let mut query = Entity::update_many();
 
@@ -229,10 +224,7 @@ pub async fn set(operator: SetOperator) -> Result<(), errors::Error> {
 }
 
 pub async fn clean_deleted_partition_job(job_id: &str) -> Result<(), errors::Error> {
-    // make sure only one client is writing to the database(only for sqlite)
-    let _lock = get_lock().await;
-
-    let client = ORM_CLIENT.get_or_init(connect_to_orm).await;
+    let client = get_orm_client_rw().await;
 
     let res = Entity::delete_many()
         .filter(Column::JobId.eq(job_id))
@@ -244,4 +236,47 @@ pub async fn clean_deleted_partition_job(job_id: &str) -> Result<(), errors::Err
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Filter, MetaColumn};
+    use crate::table::search_job::common::{OperatorType, Value};
+
+    #[test]
+    fn test_filter_new_with_string_value() {
+        let f = Filter::new(
+            MetaColumn::JobId,
+            OperatorType::Equal,
+            Value::string("job-abc"),
+        );
+        assert!(matches!(f.left, MetaColumn::JobId));
+        assert!(matches!(f.operator, OperatorType::Equal));
+        assert!(matches!(&f.right, Value::String(s) if s == "job-abc"));
+    }
+
+    #[test]
+    fn test_filter_new_with_i64_value() {
+        let f = Filter::new(MetaColumn::StartTime, OperatorType::Equal, Value::i64(9999));
+        assert!(matches!(f.left, MetaColumn::StartTime));
+        assert!(matches!(f.right, Value::I64(v) if v == 9999));
+    }
+
+    #[test]
+    fn test_filter_new_partition_id() {
+        let f = Filter::new(
+            MetaColumn::PartitionId,
+            OperatorType::Equal,
+            Value::string("part-1"),
+        );
+        assert!(matches!(f.left, MetaColumn::PartitionId));
+    }
+
+    #[test]
+    fn test_filter_clone() {
+        let f = Filter::new(MetaColumn::Status, OperatorType::Equal, Value::i64(1));
+        let cloned = f.clone();
+        assert!(matches!(cloned.left, MetaColumn::Status));
+        assert!(matches!(cloned.right, Value::I64(v) if v == 1));
+    }
 }

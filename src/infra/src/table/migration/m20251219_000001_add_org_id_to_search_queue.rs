@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -88,4 +88,22 @@ enum SearchQueue {
     OrgId,
     WorkGroup,
     UserId,
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_query::SqliteQueryBuilder;
+
+    use super::*;
+
+    #[test]
+    fn test_org_user_idx_contains_name() {
+        let sql = create_index_org_user_stmt().build(SqliteQueryBuilder);
+        assert!(sql.contains(SEARCH_QUEUE_ORG_USER_IDX));
+    }
+
+    #[test]
+    fn test_org_user_idx_constant_value() {
+        assert_eq!(SEARCH_QUEUE_ORG_USER_IDX, "search_queue_org_user_idx");
+    }
 }

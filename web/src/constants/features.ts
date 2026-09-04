@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -23,22 +23,20 @@
  * 1. Add a new entry to features.json
  * 2. Add corresponding i18n translation keys to all locale files
  * 3. The feature will automatically appear in the UI
- *
- * Benefits of JSON-based configuration:
- * - Non-developers (product managers) can easily update features
- * - No TypeScript knowledge required
- * - Changes are validated by JSON schema
- * - Bundled with UI build automatically
  */
 
-import featuresData from './features.json';
+import featuresData from "./features.json";
+import type { I18nKey } from "@/types/i18n";
 
-export type EditionType = 'opensource' | 'enterprise' | 'cloud';
+export type EditionType = "opensource" | "enterprise" | "cloud";
 
+/** The string arm is an i18n key for a qualifying note (e.g. "Requires HA mode").
+ *  Keep it `I18nKey`, not `string`, or features.json's keys stay invisible to
+ *  every static check and read as dead. */
 export interface FeatureAvailability {
-  opensource: boolean | string;
-  enterprise: boolean | string;
-  cloud: boolean | string;
+  opensource: boolean | I18nKey;
+  enterprise: boolean | I18nKey;
+  cloud: boolean | I18nKey;
 }
 
 export interface FeatureDefinition {
@@ -67,7 +65,7 @@ export interface FeatureDefinition {
   /**
    * Category for grouping features (optional, for future enhancements)
    */
-  category?: 'core' | 'enterprise' | 'support' | 'infrastructure';
+  category?: "core" | "enterprise" | "support" | "infrastructure";
 }
 
 /**
@@ -88,8 +86,8 @@ export function getFeatureNameKey(feature: FeatureDefinition): string {
 /**
  * Helper function to get features by category
  */
-export function getFeaturesByCategory(category: FeatureDefinition['category']) {
-  return FEATURE_REGISTRY.filter(f => f.category === category);
+export function getFeaturesByCategory(category: FeatureDefinition["category"]) {
+  return FEATURE_REGISTRY.filter((f) => f.category === category);
 }
 
 /**

@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -14,41 +14,35 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createApp } from "vue";
-import { Notify, Dialog, Quasar, AppFullscreen } from "quasar";
-import "quasar/src/css/index.sass";
-import "@quasar/extras/roboto-font/roboto-font.css";
-import "@quasar/extras/material-icons/material-icons.css";
-
 import store from "./stores";
 import App from "./App.vue";
 import createRouter from "./router";
-import i18n from "./locales";
-import "./styles/quasar-overrides.scss";
+import i18n, { getLocale, loadLocaleMessages } from "./locales";
 import "./styles/tailwind.css";
+// Global generated-content stylesheet: syntax classes (.log-key, .log-string, …)
+// applied to v-html-highlighted log output across logs/traces/RUM. Loaded once
+// here instead of re-@imported inside each consumer's <style> block.
+import "./assets/styles/log-highlighting.css";
 import config from "./aws-exports";
 import configService from "./services/config";
 
 import { openobserveRum } from "@openobserve/browser-rum";
 import { openobserveLogs } from "@openobserve/browser-logs";
 import { useReo } from "./services/reodotdev_analytics";
-import {
-  contextRegistry,
-  createDefaultContextProvider,
-} from "./composables/contextProviders";
+import { contextRegistry, createDefaultContextProvider } from "./composables/contextProviders";
 import { buildVersionChecker } from "./utils/buildVersionChecker";
+import { toast } from "@/lib/feedback/Toast/useToast";
+import { bootstrapTheme } from "@/utils/themeManager";
+import { raw } from "@/types/i18n";
+
+// Apply the resolved theme synchronously before the app mounts so the first
+// paint already uses the correct colors (no flash of the base stylesheet theme).
+bootstrapTheme();
 
 const app = createApp(App);
 const router = createRouter(store);
 
-app
-  .use(Quasar, {
-    plugins: {
-      Dialog,
-      Notify,
-      AppFullscreen,
-    },
-  })
-  .use(i18n);
+app.use(i18n);
 
 // const router = createRouter(store);
 app.use(store).use(router);
@@ -63,16 +57,44 @@ reoInit();
 
 // app.use(SearchPlugin);
 
+// Unauthenticated bootstrap payload: only what the login page needs. The full
+// configuration is fetched authenticated (per org) once the user is signed in.
+interface ConfigResponse {
+  data?: {
+    telemetry_enabled?: boolean;
+    build_type?: string;
+    commit_hash?: string;
+    rum?: {
+      enabled: boolean;
+      client_token: string;
+      application_id: string;
+      site: string;
+      service: string;
+      env: string;
+      version?: string;
+      organization_identifier: string;
+      insecure_http?: boolean;
+      api_version?: string;
+    };
+  };
+}
+
 const getConfig = async () => {
-  await configService.get_config().then((res: any) => {
-    store.dispatch("setConfig", res.data);
-    config.enableAnalytics = res.data.telemetry_enabled.toString();
+  await configService.get_config().then((res: ConfigResponse) => {
+    if (!res.data) return;
+
+    // Never clobber the authenticated full config with the bootstrap subset if
+    // the full fetch (MainLayout) happens to resolve first.
+    if (!store.state.zoConfig?.version) {
+      store.dispatch("setConfig", res.data);
+    }
+    config.enableAnalytics = res.data.telemetry_enabled?.toString() ?? "false";
 
     // Store initial commit hash for version checking
     if (res.data.commit_hash) {
       buildVersionChecker.setInitialVersion(res.data.commit_hash);
     }
-    if (res.data.rum.enabled) {
+    if (res.data.rum?.enabled) {
       const options = {
         clientToken: res.data.rum.client_token,
         applicationId: res.data.rum.application_id,
@@ -96,6 +118,7 @@ const getConfig = async () => {
         trackResources: true,
         trackLongTasks: true,
         trackUserInteractions: true,
+        actionNameAttribute: "data-test",
         apiVersion: options.apiVersion,
         insecureHTTP: options.insecureHTTP,
         defaultPrivacyLevel: "allow",
@@ -105,6 +128,33 @@ const getConfig = async () => {
             propagatorTypes: ["openobserve", "tracecontext"],
           },
         ],
+        beforeSend: (event) => {
+          // Filter out specific errors before sending to RUM
+          if (event.type === "error") {
+            const errorMessage = event.error?.message || "";
+            const errorStack = event.error?.stack || "";
+
+            // List of error patterns to ignore
+            const ignoredErrorPatterns = [
+              /ResizeObserver loop/i,
+              /RS SDK/i,
+              /reo.dev/i,
+              /Cannot set properties of null \(setting 'innerHTML'\)/,
+            ];
+
+            // Check if error matches any ignored pattern
+            const shouldIgnore = ignoredErrorPatterns.some(
+              (pattern) => pattern.test(errorMessage) || pattern.test(errorStack),
+            );
+
+            if (shouldIgnore) {
+              return false; // Don't send this error
+            }
+          }
+
+          // Allow all other events to be sent
+          return true;
+        },
       });
 
       openobserveLogs.init({
@@ -117,6 +167,23 @@ const getConfig = async () => {
         forwardErrorsToLogs: true,
         insecureHTTP: options.insecureHTTP,
         apiVersion: options.apiVersion,
+        beforeSend: (log) => {
+          // Filter out specific logs before sending
+          const logMessage = log.message || "";
+
+          // List of log patterns to ignore
+          const ignoredLogPatterns = [/ResizeObserver loop/i];
+
+          // Check if log matches any ignored pattern
+          const shouldIgnore = ignoredLogPatterns.some((pattern) => pattern.test(logMessage));
+
+          if (shouldIgnore) {
+            return false; // Don't send this log
+          }
+
+          // Allow all other logs to be sent
+          return true;
+        },
       });
 
       // Don't start session replay automatically - it will be started after login
@@ -141,25 +208,17 @@ function showNewVersionNotification() {
   }
 
   staleNotificationShown = true;
-  Notify.create({
-    type: "negative",
-    message: i18n.global.t("common.chunkLoadErrorMsg"),
-    html: true,
+  toast({
+    variant: "error",
+    message: raw(i18n.global.t("common.chunkLoadErrorMsg")),
     timeout: 0, // Don't auto-dismiss
-    actions: [
-      {
-        label: i18n.global.t("common.refresh"),
-        color: "white",
-        handler: () => {
-          window.location.reload();
-        },
+    action: {
+      label: raw(i18n.global.t("common.refresh")),
+      handler: () => {
+        window.location.reload();
       },
-    ],
-    position: "top",
-    icon: "update",
-    color: "negative",
-    textColor: "white",
-    classes: "stale-build-notification",
+    },
+    position: "top-center",
   });
 }
 
@@ -221,4 +280,12 @@ router.onError(async (error) => {
   }
 });
 
-app.mount("#app");
+// Ensure the active locale's messages are loaded (en-us is bundled; any other
+// language is fetched as a code-split chunk) before the first render.
+loadLocaleMessages(getLocale())
+  // On a locale-chunk load failure, fall back to the bundled en-us messages
+  // (no console noise). The app must mount regardless.
+  .catch(() => {})
+  .finally(() => {
+    app.mount("#app");
+  });

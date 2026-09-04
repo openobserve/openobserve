@@ -1,4 +1,4 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // Licensed under the GNU Affero General Public License, Version 3.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,6 @@
 
 import { describe, expect, it, beforeEach, vi, afterEach } from "vitest";
 import { mount, flushPromises } from "@vue/test-utils";
-import { installQuasar } from "@/test/unit/helpers/install-quasar-plugin";
-import { Dialog, Notify } from "quasar";
 import ChartSelection from "./ChartSelection.vue";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -23,31 +21,27 @@ import router from "@/test/unit/helpers/router";
 
 // Mock the zincutils utilities completely
 vi.mock("@/utils/zincutils", async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
     getImageURL: (path: string) => path,
     useLocalOrganization: vi.fn().mockReturnValue({
       identifier: "test-org",
-      name: "Test Organization"
+      name: "Test Organization",
     }),
     useLocalCurrentUser: vi.fn().mockReturnValue({
       email: "test@example.com",
-      name: "Test User"
+      name: "Test User",
     }),
     useLocalTimezone: vi.fn().mockReturnValue("UTC"),
     b64EncodeUnicode: vi.fn().mockImplementation((str) => btoa(str)),
-    b64DecodeUnicode: vi.fn().mockImplementation((str) => atob(str))
+    b64DecodeUnicode: vi.fn().mockImplementation((str) => atob(str)),
   };
 });
 
 const node = document.createElement("div");
 node.setAttribute("id", "app");
 document.body.appendChild(node);
-
-installQuasar({
-  plugins: [Dialog, Notify],
-});
 
 describe("ChartSelection", () => {
   let wrapper: any;
@@ -78,9 +72,7 @@ describe("ChartSelection", () => {
   });
 
   it("should render chart selection items", () => {
-    const chartItems = wrapper.findAll(
-      "[data-test='dashboard-addpanel-chart-selection-item']",
-    );
+    const chartItems = wrapper.findAll("[data-test='dashboard-addpanel-chart-selection-item']");
     expect(chartItems.length).toBeGreaterThan(0);
   });
 
@@ -115,9 +107,7 @@ describe("ChartSelection", () => {
     });
     await flushPromises();
 
-    const chartItem = wrapper.find(
-      "[data-test='dashboard-addpanel-chart-selection-item']",
-    );
+    const chartItem = wrapper.find("[data-test='dashboard-addpanel-chart-selection-item']");
     expect(chartItem.exists()).toBe(true);
   });
 
@@ -147,7 +137,7 @@ describe("ChartSelection", () => {
     await flushPromises();
 
     expect(promqlWrapper.exists()).toBe(true);
-    
+
     promqlWrapper.unmount();
   });
 
@@ -169,9 +159,11 @@ describe("ChartSelection", () => {
     await flushPromises();
 
     expect(filteredWrapper.exists()).toBe(true);
-    const chartItems = filteredWrapper.findAll("[data-test='dashboard-addpanel-chart-selection-item']");
+    const chartItems = filteredWrapper.findAll(
+      "[data-test='dashboard-addpanel-chart-selection-item']",
+    );
     expect(chartItems.length).toBeGreaterThan(0);
-    
+
     filteredWrapper.unmount();
   });
 });

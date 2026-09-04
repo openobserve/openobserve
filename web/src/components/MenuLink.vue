@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,78 +15,78 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-item
-    :data-test="`menu-link-${link}-item`"
-    v-ripple="true"
-    :to="
-      !external
-        ? {
-            path: link,
-            exact: false,
-            query: {
-              org_identifier: store.state.selectedOrganization?.identifier,
-            },
-          }
-        : ''
-    "
-    clickable
-    :class="{
-      'q-router-link--active':
-        router.currentRoute.value.path.indexOf(link) == 0 && link != '/',
-      'q-link-function': title == 'Functions',
-    }"
-    :target="target"
-    :aria-current="isActive ? 'page' : undefined"
-    :aria-label="ariaLabel"
-    v-on="external ? { click: () => openWebPage(link) } : {}"
-  >
-    <q-item-section v-if="icon" avatar>
-      <div class="icon-wrapper">
-        <q-icon :name="icon" />
+  <!-- Single dynamic root so external links (<a>), internal links (<router-link>)
+       and submenu-group triggers (<button>, used by ONavGroup) all share the
+       exact same tile markup and styling — a group tile is literally a MenuLink. -->
+  <component :is="rootComponent" v-bind="rootProps" :class="rootClass" @click="onRootClick">
+    <div class="nav-menu-item-avatar flex w-full flex-col items-center gap-0.5">
+      <div
+        class="icon-wrapper rounded-default relative inline-flex items-center justify-center p-0.5 transition-colors duration-250"
+        :class="isActive ? activeIconClass : 'text-tabs-inactive-text group-hover:text-accent'"
+      >
+        <!-- Rail icons are a hair smaller than the md (24px) default. -->
+        <OIcon v-if="icon" :name="icon" size="md" class="size-5.5!" />
+        <component v-else-if="hasIconComponent" :is="iconComponent" class="o-icon size-5.5" />
         <div
           v-if="badge && badge > 0"
-          class="menu-badge"
+          class="menu-badge text-3xs text-text-inverse shadow-error-500/50 border-menu-badge-ring bg-gradient-notification absolute -top-1 -right-2 z-1 flex h-4 min-w-4 animate-pulse items-center justify-center rounded-full border-2 px-1 leading-none font-bold shadow-md"
           aria-live="polite"
-          :aria-label="`${badge} notifications`"
+          :aria-label="t('common.notificationsCount', { count: badge })"
         >
-          {{ badge > 99 ? '99+' : badge }}
+          {{ badge > 99 ? "99+" : badge }}
         </div>
       </div>
-      <q-item-label>{{ title }}</q-item-label>
-    </q-item-section>
-    <q-item-section v-else-if="iconComponent" avatar>
-      <div class="icon-wrapper">
-        <q-icon><component :is="iconComponent" /></q-icon>
-        <div
-          v-if="badge && badge > 0"
-          class="menu-badge"
-          aria-live="polite"
-          :aria-label="`${badge} notifications`"
-        >
-          {{ badge > 99 ? '99+' : badge }}
-        </div>
+      <div
+        class="nav-menu-item-label line-clamp-2 w-full text-center text-xs leading-tight tracking-[0.01em] break-normal wrap-normal [hyphens:none] transition-colors duration-250"
+        :class="
+          isActive
+            ? activeLabelClass
+            : 'text-tabs-inactive-text group-hover:text-accent font-medium'
+        "
+      >
+        {{ title }}
       </div>
-      <q-item-label>{{ title }}</q-item-label>
-    </q-item-section>
-  </q-item>
+    </div>
+
+    <!-- Submenu affordance: hidden at rest so a group/link-with-subnav tile is
+         indistinguishable from a plain tile (consistency). It fades in only on
+         hover, or stays lit while the flyout is open / the section is active. -->
+    <span
+      v-if="asTrigger || submenu"
+      class="absolute top-3 right-1 transition-opacity duration-150"
+      :class="
+        isActive || expanded
+          ? 'text-accent opacity-100'
+          : 'text-tabs-inactive-text opacity-70 group-hover:opacity-100'
+      "
+      aria-hidden="true"
+    >
+      <OIcon name="chevron-right" size="xs" />
+    </span>
+  </component>
 </template>
 
 <script lang="ts">
-import { defineComponent, computed } from "vue";
+import { defineComponent, computed, inject, type PropType } from "vue";
 import { useStore } from "vuex";
-import { useRouter } from "vue-router";
+import { useRouter, RouterLink } from "vue-router";
+import { useTheme } from "@/composables/useTheme";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import { RailIndicatorActiveKey } from "@/lib/core/Navbar/ONavbar.types";
 
 export default defineComponent({
   name: "MenuLink",
+  components: { OIcon },
   props: {
     title: {
-      type: String,
+      type: String as unknown as PropType<I18nText>,
       required: true,
     },
 
     caption: {
-      type: String,
-      default: "",
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
     },
 
     link: {
@@ -119,13 +119,37 @@ export default defineComponent({
       default: false,
     },
 
-    // Phase 4: Badge support
     badge: {
       type: Number,
       default: 0,
     },
+
+    // Trigger mode — render as a non-navigating <button> that opens a submenu
+    // (used by ONavGroup for a group header). In this mode `active` is supplied
+    // by the parent (the group is active when any child route is active) and
+    // `expanded` reflects the open flyout for aria + the caret state.
+    asTrigger: {
+      type: Boolean,
+      default: false,
+    },
+    active: {
+      type: Boolean,
+      default: false,
+    },
+    expanded: {
+      type: Boolean,
+      default: false,
+    },
+    // Show the submenu caret on a normal link (it reveals sub-pages on hover but
+    // still navigates on click). `asTrigger` implies this for pure groups.
+    submenu: {
+      type: Boolean,
+      default: false,
+    },
   },
-  setup(props) {
+  emits: ["trigger"],
+  setup(props, { emit }) {
+    const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
 
@@ -133,239 +157,160 @@ export default defineComponent({
       window.open(url, "_blank");
     };
 
-    // Phase 5: Accessibility - compute active state
+    // Compute the tile's active state.
+    // In trigger mode the parent owns the active flag; otherwise we derive it
+    // from the route. Home (link === '/') needs special handling because every
+    // path starts with '/' — match by route name "home". Others prefix-match.
     const isActive = computed(() => {
-      return router.currentRoute.value.path.indexOf(props.link) === 0 && props.link !== '/';
+      if (props.asTrigger) return props.active;
+      // Explicit override — link+subnav group tiles (e.g. Data) pass `active`
+      // computed from "is ANY child route active", since their children live
+      // under different path roots than the tile's own link.
+      if (props.active) return true;
+      const route = router.currentRoute.value;
+      if (props.link === "/") {
+        return route.name === "home" || route.path === "/" || route.path === "";
+      }
+      return route.path.indexOf(props.link) === 0;
     });
 
-    // Phase 5: Accessibility - compute ARIA label with fallback
+    // Active-state styling is theme-aware: LIGHT keeps the classic white pill
+    // with primary-coloured text/icon; DARK uses the tinted "selected" pill
+    // (matching the dashboard-folder selection) with white text/icon — because
+    // surface-base is black in dark mode, a white pill there would vanish.
+    const { isDark } = useTheme();
+
+    // When the rail draws a single sliding pill (ONavbar provides this), an active
+    // tile defers its fill (background + coloured left accent) to that pill and
+    // keeps only its active text colour — the transparent left border stays so
+    // there is no width shift between states. Falls back to the self-painted pill
+    // when the indicator isn't active (default `false` off the rail, or before it
+    // is positioned), so the nav always shows a selection.
+    const railIndicatorActive = inject(RailIndicatorActiveKey, undefined);
+    const slideActive = computed(() => Boolean(railIndicatorActive?.value));
+
+    const activePillClass = computed(() => {
+      if (slideActive.value) {
+        return isDark.value
+          ? "text-tabs-active-text border-s-2 border-transparent"
+          : "text-accent border-s-2 border-transparent";
+      }
+      return isDark.value
+        ? "text-tabs-active-text bg-tabs-active-bg border-s-2 border-accent"
+        : "text-accent bg-surface-base border-s-2 border-accent";
+    });
+    const activeIconClass = computed(() =>
+      isDark.value ? "text-tabs-active-text!" : "text-accent!",
+    );
+    const activeLabelClass = computed(() =>
+      isDark.value ? "font-semibold text-tabs-active-text!" : "font-semibold text-accent!",
+    );
+
+    // Compute ARIA label with fallback
     const ariaLabel = computed(() => {
-      let label = props.title || 'Navigation link';
+      let label: string = props.title || t("menu.navigationLink");
       if (props.badge && props.badge > 0) {
-        label += ` (${props.badge} notifications)`;
+        label = t("menu.ariaWithNotifications", { label, count: props.badge });
       }
       if (isActive.value) {
-        label += ' - Current page';
+        label = t("menu.ariaCurrentPage", { label });
       }
       return label;
     });
 
+    // The default prop is an empty object `{}`; only render a custom icon
+    // component when a real one was passed.
+    const hasIconComponent = computed(() => {
+      const c: any = props.iconComponent;
+      return !!c && (typeof c === "function" || Object.keys(c).length > 0);
+    });
+
+    // Resolve the root element/component for the current mode.
+    const rootComponent = computed(() =>
+      props.external ? "a" : props.asTrigger ? "button" : RouterLink,
+    );
+
+    // Attributes bound to the root, per mode. Kept in one place so the three
+    // modes can never drift apart visually.
+    const rootProps = computed<Record<string, any>>(() => {
+      const common: Record<string, any> = {
+        "data-test": `menu-link-${props.link}-item`,
+        "aria-label": ariaLabel.value,
+      };
+      if (props.external) {
+        return {
+          ...common,
+          href: "#",
+          target: props.target,
+          "aria-current": isActive.value ? "page" : undefined,
+        };
+      }
+      if (props.asTrigger) {
+        return {
+          ...common,
+          type: "button",
+          "aria-haspopup": "menu",
+          "aria-expanded": props.expanded,
+        };
+      }
+      return {
+        ...common,
+        to: {
+          path: props.link,
+          query: { org_identifier: store.state.selectedOrganization?.identifier },
+        },
+        target: props.target,
+        "aria-current": isActive.value ? "page" : undefined,
+      };
+    });
+
+    const rootClass = computed(() => [
+      "nav-menu-item",
+      "group relative block [text-decoration:none]! text-inherit shrink-0 mx-1 px-0 py-1 min-h-0 rounded-surface transition-colors duration-150 ease-out focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-1",
+      // Sit above the rail's sliding pill so icon/label stay readable.
+      slideActive.value ? "z-10" : "",
+      isActive.value
+        ? activePillClass.value
+        : "text-tabs-inactive-text border-s-2 border-transparent bg-transparent hover:bg-tabs-hover-bg",
+      isActive.value ? "nav-menu-item--active" : "",
+      props.title === "Functions" ? "menu-link-function" : "",
+      // Reset native <button> chrome so the trigger looks EXACTLY like a link.
+      // NOTE: do NOT set a background here — the active/inactive branch above owns
+      // it. `appearance-none` clears the native button background; adding
+      // `bg-transparent` here would override the active pill and break the
+      // selected-state highlight. `font:inherit` keeps the label font identical.
+      props.asTrigger
+        ? "w-full appearance-none border-0 cursor-pointer text-left [font-family:inherit] [font-size:inherit] [line-height:inherit] [letter-spacing:inherit]"
+        : "",
+    ]);
+
+    const onRootClick = (event: MouseEvent) => {
+      if (props.external) {
+        event.preventDefault();
+        openWebPage(props.link);
+        return;
+      }
+      if (props.asTrigger) {
+        emit("trigger", event);
+      }
+    };
+
     return {
+      t,
       store,
       router,
       openWebPage,
       isActive,
       ariaLabel,
+      activePillClass,
+      activeIconClass,
+      activeLabelClass,
+      hasIconComponent,
+      rootComponent,
+      rootProps,
+      rootClass,
+      onRootClick,
     };
   },
 });
 </script>
-
-<style scoped lang="scss">
-@import "../styles/menu-variables";
-@import "../styles/menu-animations";
-
-.q-item {
-  padding: 1px 8px;
-  margin: 0px;
-  border-radius: 6px;
-
-  /* Always have a border to prevent layout shift when active */
-  border: 1px solid transparent;
-
-  /* Minimal height to prevent scrollbar */
-  min-height: 24px;
-
-  // Add top margin to first item so border is visible
-  &:first-child {
-    margin-top: 4px;
-  }
-
-  // Phase 2: Enhanced transitions
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
-
-  // Phase 6: Performance optimizations
-  // Use transform and opacity for GPU acceleration
-  will-change: transform;
-  transform: translateZ(0);
-
-  // Phase 2: Enhanced hover state with 3D icon effect
-  &:hover:not(.q-router-link--active) {
-    transform: translateZ(0);
-    // background-color: rgba(30, 41, 59, 0.6);
-
-    .q-icon {
-      color: var(--o2-menu-color);
-      // 3D pop-out effect with slight rotation
-      transform: translateZ(20px) scale(1.15) rotateY(5deg);
-      filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.2));
-    }
-
-    .q-item-label {
-      color: var(--o2-menu-color);
-      transform: translateY(-2px);
-    }
-  }
-
-  // Phase 2 & 3: Enhanced active state with modern UX
-  &.q-router-link--active {
-    transform: translateZ(0) !important;
-    // Rich, vibrant multi-layer gradient background
-    // background:
-    //   linear-gradient(135deg, rgba(168, 85, 247, 0.4) 0%, rgba(236, 72, 153, 0.35) 100%),
-    //   linear-gradient(180deg, rgba(139, 92, 246, 0.15) 0%, rgba(124, 58, 237, 0.25) 100%) !important;
-    // // Stronger border with glow
-    // border: 1px solid rgba(168, 85, 247, 0.6) !important;
-    // // Minimal shadow for subtle depth
-    // box-shadow:
-    //   0 0 8px rgba(168, 85, 247, 0.2),
-    //   0 2px 8px rgba(168, 85, 247, 0.25),
-    //   inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
-    background: linear-gradient(135deg, var(--o2-menu-gradient-start) 0%, var(--o2-menu-gradient-end) 100%) !important;
-
-    box-shadow: 0 4px 12px rgba(89, 155, 174, 0.09) !important;
-    color: var(--o2-menu-color) !important;
-    transition: all 300ms cubic-bezier(0.4, 0, 0.2, 1);
-    // Subtle inner highlight for depth
-    position: relative;
-    backdrop-filter: blur(8px) !important;
-
-    .q-icon {
-      // Minimal icon glow
-      filter: drop-shadow(0 0 4px rgba(168, 85, 247, 0.4));
-      color: var(--o2-menu-color); // Lighter purple for better visibility
-    }
-
-    .q-item-label {
-      font-weight: 700;
-      color: var(--o2-menu-color); // Very light purple/white for contrast
-      text-shadow: 0 0 4px rgba(168, 85, 247, 0.3);
-    }
-
-    // Phase 3: Enhanced active indicator with minimal shadow
-    &::before {
-      content: " ";
-      width: 6px;
-      height: 100%;
-      position: absolute;
-      left: -8px;
-      top: 50%;
-      transform: translateY(-50%);
-      // Brighter gradient
-      background: linear-gradient(180deg, var(--o2-primary-btn-bg) 0%, var(--o2-primary-btn-bg) 50%, var(--o2-primary-btn-bg) 100%);
-      border-radius: 0 2px 2px 0;
-      // Minimal glow
-      box-shadow: 0 0 6px var(--o2-menu-color);
-    }
-
-    // Subtle animated glow overlay
-    &::after {
-      content: "";
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      background: --o2-menu-gradient-start;
-      border-radius: 0 6px 6px 0;
-      pointer-events: none;
-    }
-  }
-
-  // Phase 2: Enhanced focus state for keyboard navigation
-  &:focus-visible {
-    outline: 2px solid #a855f7;
-    outline-offset: 2px;
-  }
-
-  &.ql-item-mini {
-    margin: 0;
-
-    &::before {
-      display: none;
-    }
-  }
-
-  &[aria-label="Billing"] {
-    .q-icon {
-      font-size: 1.3rem;
-    }
-  }
-}
-
-// Phase 3: Enhanced icon container with 3D effects and spring bounce-back
-.q-item__section--avatar {
-  margin: 0;
-  padding: 0;
-  min-width: 40px;
-  perspective: 1000px; // Enable 3D space
-
-  .q-icon {
-    padding: 4px;
-    border-radius: 12px;
-    // Spring bounce-back effect: overshoots and bounces back
-    transition: all 600ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
-    transform-style: preserve-3d;
-  }
-}
-
-// Add spring bounce-back transition to label
-.q-item-label {
-  transition: all 500ms cubic-bezier(0.68, -0.55, 0.265, 1.55);
-  transform-style: preserve-3d;
-}
-
-// Phase 4: Badge support
-.icon-wrapper {
-  position: relative;
-  display: inline-block;
-}
-
-.menu-badge {
-  position: absolute;
-  top: -4px;
-  right: -8px;
-  min-width: 16px;
-  height: 16px;
-  padding: 0 4px;
-  background: linear-gradient(135deg, #ef4444 0%, #ec4899 100%);
-  border: 2px solid #0f172a;
-  border-radius: 50%;
-  font-size: 9px;
-  font-weight: 700;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  box-shadow: 0 4px 8px rgba(239, 68, 68, 0.5);
-  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  z-index: 1;
-
-  // Phase 6: Performance - GPU acceleration
-  will-change: opacity;
-  transform: translateZ(0);
-
-  // Light mode
-  body.body--light & {
-    border-color: #ffffff;
-    box-shadow: 0 4px 8px rgba(239, 68, 68, 0.3);
-  }
-}
-
-// Light mode support - using :deep() to pierce scoped styles
-body.body--light {
-  .q-item {
-
-
-    &.q-router-link--active {
-
-      // &::before {
-      //   // background: linear-gradient(180deg, var(--o2-body-primary-bg) 0%, var(--o2-body-secondary-bg) 100%) !important;
-      //   box-shadow: 4px 0px 0px var(--o2-menu-color) !important;
-      // }
-    }
-  }
-}
-
-</style>

@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+﻿<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,207 +15,237 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <q-btn
-    data-cy="syntax-guide-button"
-    dense
-    flat
-    class="q-ml-xs q-pa-xs"
-    :class="[
-      sqlmode ? 'sql-mode' : 'normal-mode',
-      !store.state.isAiChatEnabled ? 'syntax-guide-button' : '',
-      store.state.theme == 'dark' && !sqlmode ? 'syntax-guide-button-dark' : ''
-    ]"
-    icon="help"
-  >
-    <q-menu :class="store.state.theme == 'dark' ? 'theme-dark' : 'theme-light'">
-      <q-card flat v-if="!sqlmode">
-        <q-card-section class="syntax-guide-title">
-          <div class="label">{{ t("search.syntaxGuideLabel") }}</div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="q-pt-none answers">
-          <div class="syntax-section">
-            <div class="syntax-guide-text">
-              <ul class="guide-list">
+  <ODropdown side="bottom" align="start">
+    <template #trigger>
+      <div>
+        <!-- Menu-item style: full-width, left-aligned, badge icon — used when placed inside a dropdown -->
+        <OButton
+          v-if="menuItem"
+          data-cy="syntax-guide-button"
+          variant="ghost"
+          size="sm"
+          class="rounded-default! h-auto! w-full! justify-start! gap-2! px-3! py-1.5! font-normal!"
+        >
+          <template #icon-left>
+            <span
+              class="rounded-default bg-section-header-bg text-text-secondary inline-flex h-7 w-7 shrink-0 items-center justify-center"
+            >
+              <OIcon name="help" size="sm" />
+            </span>
+          </template>
+          {{ t("search.syntaxGuideLabel") }}
+        </OButton>
+        <!-- Toolbar style: outline button matching sibling toolbar buttons (e.g. Reset) -->
+        <OButton
+          v-else-if="toolbar"
+          data-cy="syntax-guide-button"
+          variant="outline"
+          size="xs"
+          :class="[sqlmode ? 'sql-mode' : 'normal-mode']"
+        >
+          <OIcon name="help" size="sm" />
+          <span v-if="label">{{ label }}</span>
+          <OTooltip :content="t('search.syntaxGuideLabel')" />
+        </OButton>
+        <!-- Default style: compact inline button for toolbar use -->
+        <OButton
+          v-else
+          data-cy="syntax-guide-button"
+          variant="ghost"
+          size="sm"
+          :class="[
+            noBorder ? 'display-none!' : 'ms-1',
+            sqlmode ? 'sql-mode' : 'normal-mode',
+            noBorder
+              ? 'm-0! w-full justify-start border-0! bg-transparent! p-0! hover:bg-transparent!'
+              : '',
+          ]"
+          class="h-4.5!"
+        >
+          <OIcon name="help" size="sm" />
+          <span v-if="label">{{ label }}</span>
+          <span v-else-if="!noBorder" class="ms-1">{{ t("search.syntaxGuideLabel") }}</span>
+          <OTooltip :content="t('search.syntaxGuideLabel')" />
+        </OButton>
+      </div>
+    </template>
+    <div>
+      <div v-if="!sqlmode">
+        <div class="w-105">
+          <div class="label text-sm font-bold">{{ t("search.syntaxGuideLabel") }}</div>
+        </div>
+        <div class="border-dropdown-separator my-1 border-t" />
+        <div class="answers">
+          <div class="mb-1.25">
+            <div class="ms-1.25 text-xs">
+              <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
+                <!-- The prose in each item is translated; the query fragments next to it are
+                     NOT — they are syntax, and a translated match_all() would be a query
+                     that does not run. -->
+                <!-- eslint-disable vue/no-bare-strings-in-template -->
                 <li>
-                  For inverted index search of value 'error' use
-                  <span class="bg-highlight">match_all('error')</span>
-                  in query editor. Search terms are case-insensitive.
+                  {{ t("search.syntaxGuide.invertedIndex") }}
+                  <span class="bg-highlight-bg px-1.25">match_all('error')</span>
+                  {{ t("search.syntaxGuide.invertedIndexHint") }}
                 </li>
                 <li>
-                  For prefix search use
-                  <span class="bg-highlight">match_all('error*')</span>
-                  to find all terms starting with 'error'.
+                  {{ t("search.syntaxGuide.prefix") }}
+                  <span class="bg-highlight-bg px-1.25">match_all('error*')</span>
+                  {{ t("search.syntaxGuide.prefixHint") }}
                 </li>
                 <li>
-                  For phrase prefix search use
-                  <span class="bg-highlight">match_all('error code*')</span>
-                  to find phrases starting with 'error code'.
+                  {{ t("search.syntaxGuide.phrasePrefix") }}
+                  <span class="bg-highlight-bg px-1.25">match_all('error code*')</span>
+                  {{ t("search.syntaxGuide.phrasePrefixHint") }}
                 </li>
                 <li>
-                  For case sensitive search use
-                  <span class="bg-highlight">match_all('traceHits')</span>
-                  with exact case matching.
+                  {{ t("search.syntaxGuide.caseSensitive") }}
+                  <span class="bg-highlight-bg px-1.25">match_all('traceHits')</span>
+                  {{ t("search.syntaxGuide.caseSensitiveHint") }}
                 </li>
                 <li>
-                  For postfix search use
-                  <span class="bg-highlight">match_all('*failed')</span>
-                  to find all terms ending with 'failed'.
+                  {{ t("search.syntaxGuide.postfix") }}
+                  <span class="bg-highlight-bg px-1.25">match_all('*failed')</span>
+                  {{ t("search.syntaxGuide.postfixHint") }}
                 </li>
                 <li>
-                  For column search of value 'error' use
-                  <span class="bg-highlight"
-                    >str_match(<b>fieldname</b>, 'error')</span
-                  >
+                  {{ t("search.syntaxGuide.column") }}
+                  <span class="bg-highlight-bg px-1.25">str_match(<b>fieldname</b>, 'error')</span>
                 </li>
                 <li>
-                  For fuzzy string matching based on Levenshtein distance,
-                  search of value 'error' use
-                  <span class="bg-highlight"
-                    >fuzzy_match(<b>fieldname</b>, 'error', 1)</span
-                  >
-                  OR
-                  <span class="bg-highlight">fuzzy_match_all('error', 1)</span>
-                </li>
-                <li>
-                  For case-insensitive column search of value 'error' use
-                  <span class="bg-highlight"
+                  {{ t("search.syntaxGuide.columnIgnoreCase") }}
+                  <span class="bg-highlight-bg px-1.25"
                     >str_match_ignore_case(<b>fieldname</b>, 'Error')</span
                   >
                 </li>
                 <li>
-                  To search value 200 for code column use
-                  <span class="bg-highlight">code=200</span>
+                  {{ t("search.syntaxGuide.code") }}
+                  <span class="bg-highlight-bg px-1.25">code=200</span>
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
-                  <span class="bg-highlight">stream='stderr'</span>
+                  {{ t("search.syntaxGuide.stream") }}
+                  <span class="bg-highlight-bg px-1.25">stream='stderr'</span>
                 </li>
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
                 <li>
-                  For additional examples,
+                  {{ t("search.syntaxGuide.moreExamples") }}
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:tw:underline text-primary"
-                    >click here</a
+                    class="text-primary hover:underline"
+                    >{{ t("search.syntaxGuide.clickHere") }}</a
                   >.
                 </li>
               </ul>
             </div>
           </div>
-        </q-card-section>
-      </q-card>
-      <q-card flat v-else>
-        <q-card-section class="syntax-guide-title">
-          <div class="label">Syntax Guide: SQL Mode</div>
-        </q-card-section>
-        <q-separator />
-        <q-card-section class="q-pt-none answers">
-          <div class="syntax-section">
-            <div class="syntax-guide-text">
-              <ul class="guide-list">
+        </div>
+      </div>
+      <div v-else>
+        <div class="w-105">
+          <div class="label text-sm font-bold">{{ t("search.syntaxGuide.sqlTitle") }}</div>
+        </div>
+        <div class="border-dropdown-separator my-1 border-t" />
+        <div class="answers">
+          <div class="mb-1.25">
+            <div class="ms-1.25 text-xs">
+              <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
+                <!-- As above: the prose is translated, the SQL samples are left literal. -->
+                <!-- eslint-disable vue/no-bare-strings-in-template -->
                 <li>
-                  For inverted index search of value 'error' use
-                  <span class="bg-highlight"
+                  {{ t("search.syntaxGuide.invertedIndex") }}
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error')</span
                   >
-                  in query editor. Search terms are case-insensitive.
+                  {{ t("search.syntaxGuide.invertedIndexHint") }}
                 </li>
                 <li>
-                  For prefix search use
-                  <span class="bg-highlight"
+                  {{ t("search.syntaxGuide.prefix") }}
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error*')</span
                   >
-                  to find all terms starting with 'error'.
+                  {{ t("search.syntaxGuide.prefixHint") }}
                 </li>
                 <li>
-                  For phrase prefix search use
-                  <span class="bg-highlight"
+                  {{ t("search.syntaxGuide.phrasePrefix") }}
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('error code*')</span
                   >
-                  to find phrases starting with 'error code'.
+                  {{ t("search.syntaxGuide.phrasePrefixHint") }}
                 </li>
                 <li>
-                  For case sensitive search use
-                  <span class="bg-highlight"
+                  {{ t("search.syntaxGuide.caseSensitive") }}
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('traceHits')</span
                   >
-                  with exact case matching.
+                  {{ t("search.syntaxGuide.caseSensitiveHint") }}
                 </li>
                 <li>
-                  For postfix search use
-                  <span class="bg-highlight"
+                  {{ t("search.syntaxGuide.postfix") }}
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE match_all('*failed')</span
                   >
-                  to find all terms ending with 'failed'.
+                  {{ t("search.syntaxGuide.postfixHint") }}
                 </li>
                 <li>
-                  For column search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    str_match(<b>fieldname</b>, 'error')</span
+                  {{ t("search.syntaxGuide.column") }}
+                  <span class="bg-highlight-bg px-1.25"
+                    >SELECT * FROM <b>stream</b> WHERE str_match(<b>fieldname</b>, 'error')</span
                   >
                 </li>
                 <li>
-                  For column search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE
-                    fuzzy_match(<b>fieldname</b>, 'error', 1)</span
-                  >
-                </li>
-                <li>
-                  For all column search of value 'error' use
-                  <span class="bg-highlight"
-                    >SELECT * FROM <b>stream</b> WHERE fuzzy_match_all('error',
-                    1)</span
-                  >
-                </li>
-                <li>
-                  To search value 200 for code column use
-                  <span class="bg-highlight"
+                  {{ t("search.syntaxGuide.code") }}
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE code=200</span
                   >
                 </li>
                 <li>
-                  To search value 'stderr' for stream column use
-                  <span class="bg-highlight"
+                  {{ t("search.syntaxGuide.stream") }}
+                  <span class="bg-highlight-bg px-1.25"
                     >SELECT * FROM <b>stream</b> WHERE stream='stderr'</span
                   >
                 </li>
                 <li>
-                  To search and use query function <i>extract_ip</i> on column
-                  log use
-                  <span class="bg-highlight"
-                    >SELECT extract_ip(log) FROM <b>stream</b> WHERE
-                    code=200</span
-                  >
+                  <!-- Both the function name and the sample are slots, so the sentence can be
+                       reordered by a translator without stranding the <i> or the space. -->
+                  <i18n-t keypath="search.syntaxGuide.queryFunction" tag="span">
+                    <template #fn>
+                      <i>extract_ip</i>
+                    </template>
+                    <template #query>
+                      <span class="bg-highlight-bg px-1.25"
+                        >SELECT extract_ip(log) FROM <b>stream</b> WHERE code=200</span
+                      >
+                    </template>
+                  </i18n-t>
                 </li>
+                <!-- eslint-enable vue/no-bare-strings-in-template -->
                 <li>
-                  For additional examples,
+                  {{ t("search.syntaxGuide.moreExamples") }}
                   <a
                     href="https://openobserve.ai/docs/example-queries/"
                     target="_blank"
-                    class="hover:tw:underline text-primary"
-                    >click here</a
+                    class="text-primary hover:underline"
+                    >{{ t("search.syntaxGuide.clickHere") }}</a
                   >.
                 </li>
               </ul>
             </div>
           </div>
-        </q-card-section>
-      </q-card>
-    </q-menu>
-    <q-tooltip>
-      {{ t('search.syntaxGuideLabel') }}
-    </q-tooltip>
-  </q-btn>
+        </div>
+      </div>
+    </div>
+  </ODropdown>
 </template>
 
 <script lang="ts">
-import { defineComponent } from "vue";
-import { useI18n } from "vue-i18n";
+import { defineComponent, type PropType } from "vue";
+import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
-
+import OButton from "@/lib/core/Button/OButton.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 export default defineComponent({
   name: "ComponentSearchSyntaxGuide",
   props: {
@@ -223,20 +253,32 @@ export default defineComponent({
       type: Boolean,
       default: false,
     },
+    noBorder: {
+      type: Boolean,
+      default: false,
+    },
+    label: {
+      type: String as unknown as PropType<I18nText>,
+      default: raw(""),
+    },
+    menuItem: {
+      type: Boolean,
+      default: false,
+    },
+    toolbar: {
+      type: Boolean,
+      default: false,
+    },
   },
-  components:{
-  },
+  components: { OButton, OTooltip, OIcon, ODropdown },
   setup() {
-    const { t } = useI18n();
+    const { t } = useI18nTyped();
     const store = useStore();
     return {
+      raw,
       t,
       store,
     };
   },
 });
 </script>
-
-<style lang="scss" scoped>
-@import "@/styles/logs/syntax-guide.scss";
-</style>

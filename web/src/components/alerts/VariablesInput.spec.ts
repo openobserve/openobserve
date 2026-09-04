@@ -1,9 +1,10 @@
-// Copyright 2023 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
+//
 // This program is distributed in the hope that it will be useful
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -12,307 +13,181 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { mount } from "@vue/test-utils";
-import { describe, it, expect, vi, beforeEach } from "vitest";
-import VariablesInput from "@/components/alerts/VariablesInput.vue";
-import { installQuasar } from "@/test/unit/helpers";
-import store from "@/test/unit/helpers/store";
+import { describe, it, expect, afterEach } from "vitest";
+import { mount, flushPromises, VueWrapper } from "@vue/test-utils";
+import { defineComponent } from "vue";
+import { z } from "zod";
 import i18n from "@/locales";
+import store from "@/test/unit/helpers/store";
+import VariablesInput from "@/components/alerts/VariablesInput.vue";
+import OForm from "@/lib/forms/Form/OForm.vue";
+import OFormInput from "@/lib/forms/Input/OFormInput.vue";
+import OInput from "@/lib/forms/Input/OInput.vue";
 
-installQuasar();
+// ---------------------------------------------------------------------------
+// tests
+// ---------------------------------------------------------------------------
 
-const mockStore = {
-  state: {
-    theme: "light",
+// ---------------------------------------------------------------------------
+// form mode (opt-in via `name-prefix` inside a REAL <OForm>)
+// ---------------------------------------------------------------------------
+
+const variableRowSchema = z.object({
+  key: z.string(),
+  value: z.string(),
+});
+
+const variablesHostSchema = z.object({
+  variables: z.array(variableRowSchema),
+});
+
+// Host renders a REAL <OForm> (schema + default-values) around VariablesInput —
+// form mode is driven purely by `name-prefix` + the injected form context.
+const FormHost = defineComponent({
+  components: { OForm, VariablesInput },
+  props: {
+    rows: { type: Array, default: () => [] },
   },
-};
+  setup(props) {
+    return {
+      hostSchema: variablesHostSchema,
+      hostDefaults: { variables: JSON.parse(JSON.stringify(props.rows)) },
+    };
+  },
+  template: `
+    <OForm :schema="hostSchema" :default-values="hostDefaults" @submit="() => {}">
+      <VariablesInput name-prefix="variables" />
+    </OForm>
+  `,
+});
 
-vi.mock("vuex", () => ({
-  useStore: () => mockStore,
-}));
+function buildFormWrapper(rows: any[] = []): VueWrapper<any> {
+  return mount(FormHost, {
+    props: { rows },
+    global: { plugins: [i18n, store] },
+  });
+}
 
-describe("VariablesInput.vue", () => {
-  let wrapper: any;
+const getForm = (w: VueWrapper<any>) => (w.findComponent(OForm).vm as any).form;
 
-  const createWrapper = (props = {}) => {
-    return mount(VariablesInput, {
-      props: {
-        variables: [],
-        ...props,
-      },
-      global: {
-        plugins: [i18n],
-        provide: {
-          store: mockStore,
-        },
-      },
-    });
-  };
+/** RENDERED model-values (OFormInput → OInput) for a row field, in DOM order. */
+const renderedField = (w: VueWrapper<any>, field: "key" | "value") =>
+  w
+    .findAllComponents(OFormInput)
+    .filter(
+      (c) =>
+        /^variables\[\d+\]\.(key|value)$/.test(String(c.props("name"))) &&
+        String(c.props("name")).endsWith(`.${field}`),
+    )
+    .map((c) => c.findComponent(OInput).props("modelValue"));
 
-  beforeEach(() => {
-    vi.clearAllMocks();
+describe("VariablesInput — form mode (name-prefix inside a real <OForm>)", () => {
+  let wrapper: VueWrapper<any> | null = null;
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
   });
 
-  describe("Component Initialization", () => {
-    it("should render the component correctly", () => {
-      wrapper = createWrapper();
-      expect(wrapper.exists()).toBe(true);
-    });
+  const threeRows = [
+    { key: "k1", value: "v1" },
+    { key: "k2", value: "v2" },
+    { key: "k3", value: "v3" },
+  ];
 
-    it("should render the variable label with info tooltip", () => {
-      wrapper = createWrapper();
-      expect(wrapper.text()).toContain("Variable");
-      expect(wrapper.html()).toContain('info_outline');
-    });
+  it("renders one row per form-state entry, carrying the bare-mode data-tests", () => {
+    wrapper = buildFormWrapper(threeRows);
 
-    it("should display tooltip text about variables", () => {
-      wrapper = createWrapper();
-      // Check if the tooltip element exists in the component
-      expect(wrapper.text()).toContain('Variable');
-      // The q-btn with info icon should exist (not the tooltip text since it's not rendered until hover)
-      expect(wrapper.html()).toContain('info_outline');
-    });
+    expect(wrapper.find('[data-test="alert-variables-1"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-variables-2"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-variables-3"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-variables-add-btn"]').exists()).toBe(false);
+    expect(wrapper.findAll('[data-test="alert-variables-key-input"]')).toHaveLength(3);
+    expect(wrapper.findAll('[data-test="alert-variables-value-input"]')).toHaveLength(3);
+    expect(wrapper.findAll('[data-test="alert-variables-delete-variable-btn"]')).toHaveLength(3);
+    // inline add button only on the last row
+    expect(wrapper.findAll('[data-test="alert-variables-add-variable-btn"]')).toHaveLength(1);
   });
 
-  describe("Empty Variables State", () => {
-    it("should show add variable button when variables array is empty", () => {
-      wrapper = createWrapper({ variables: [] });
-      const addBtn = wrapper.find('[data-test="alert-variables-add-btn"]');
-      expect(addBtn.exists()).toBe(true);
-      expect(addBtn.text()).toContain("Add Variable");
-    });
+  it("renders the row inputs from the form state (name=-owned, no props)", () => {
+    wrapper = buildFormWrapper(threeRows);
 
-
-    it("should emit add:variable event when add button is clicked in empty state", async () => {
-      wrapper = createWrapper({ variables: [] });
-      const addBtn = wrapper.find('[data-test="alert-variables-add-btn"]');
-      await addBtn.trigger("click");
-      expect(wrapper.emitted("add:variable")).toBeTruthy();
-      expect(wrapper.emitted("add:variable")).toHaveLength(1);
-    });
+    expect(renderedField(wrapper, "key")).toEqual(["k1", "k2", "k3"]);
+    expect(renderedField(wrapper, "value")).toEqual(["v1", "v2", "v3"]);
   });
 
-  describe("Variables List State", () => {
-    const mockVariables = [
-      { uuid: "1", key: "var1", value: "value1" },
-      { uuid: "2", key: "var2", value: "value2" },
-    ];
+  it("shows the empty-state Add Variable button and pushes a row into the form", async () => {
+    wrapper = buildFormWrapper([]);
 
-    it("should render variable inputs when variables array has items", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const variableRows = wrapper.findAll('[data-test^="alert-variables-"]');
-      expect(variableRows.length).toBeGreaterThan(0);
-    });
+    expect(wrapper.find('[data-test="alert-variables-add-btn"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-variables-1"]').exists()).toBe(false);
 
-    it("should render correct number of variable rows", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const variableRows = wrapper.findAll('[data-test="alert-variables-1"], [data-test="alert-variables-2"]');
-      expect(variableRows).toHaveLength(2);
-    });
+    await wrapper.find('[data-test="alert-variables-add-btn"]').trigger("click");
+    await flushPromises();
 
-    it("should render key input for each variable", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const keyInputs = wrapper.findAll('[data-test="alert-variables-key-input"]');
-      expect(keyInputs).toHaveLength(2);
-    });
+    expect(getForm(wrapper).state.values.variables).toEqual([{ key: "", value: "" }]);
+    expect(wrapper.find('[data-test="alert-variables-1"]').exists()).toBe(true);
+    expect(wrapper.find('[data-test="alert-variables-add-btn"]').exists()).toBe(false);
+  });
 
-    it("should render value input for each variable", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const valueInputs = wrapper.findAll('[data-test="alert-variables-value-input"]');
-      expect(valueInputs).toHaveLength(2);
-    });
+  it("typing in a row's key/value inputs updates the form values", async () => {
+    wrapper = buildFormWrapper([threeRows[0]]);
 
-    it("should display variable key values in inputs", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const keyInputs = wrapper.findAll('[data-test="alert-variables-key-input"]');
-      // Check if the v-model binding works by checking the template
-      expect(wrapper.html()).toContain('var1');
-      expect(wrapper.html()).toContain('var2');
-    });
+    await wrapper.find('[data-test="alert-variables-key-input"] input').setValue("typedKey");
+    await wrapper.find('[data-test="alert-variables-value-input"] input').setValue("typedValue");
+    await flushPromises();
 
-    it("should display variable value values in inputs", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const valueInputs = wrapper.findAll('[data-test="alert-variables-value-input"]');
-      // Check if the v-model binding works by checking the template
-      expect(wrapper.html()).toContain('value1');
-      expect(wrapper.html()).toContain('value2');
+    expect(getForm(wrapper).state.values.variables[0]).toEqual({
+      key: "typedKey",
+      value: "typedValue",
     });
   });
 
-  describe("Delete Variable Functionality", () => {
-    const mockVariables = [
-      { uuid: "1", key: "var1", value: "value1" },
-      { uuid: "2", key: "var2", value: "value2" },
-    ];
+  it("the inline add button appends a row to the form array", async () => {
+    wrapper = buildFormWrapper([threeRows[0]]);
 
-    it("should render delete buttons for each variable", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const deleteButtons = wrapper.findAll('[data-test="alert-variables-delete-variable-btn"]');
-      expect(deleteButtons).toHaveLength(2);
-    });
+    await wrapper.find('[data-test="alert-variables-add-variable-btn"]').trigger("click");
+    await flushPromises();
 
-    it("should emit remove:variable event when delete button is clicked", async () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const deleteButton = wrapper.find('[data-test="alert-variables-delete-variable-btn"]');
-      await deleteButton.trigger("click");
-      expect(wrapper.emitted("remove:variable")).toBeTruthy();
-      expect(wrapper.emitted("remove:variable")).toHaveLength(1);
-    });
-
-    it("should pass correct variable object when removing", async () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const deleteButton = wrapper.find('[data-test="alert-variables-delete-variable-btn"]');
-      await deleteButton.trigger("click");
-      expect(wrapper.emitted("remove:variable")[0]).toEqual([mockVariables[0]]);
-    });
-
-    it("should call removeVariable function when delete is clicked", async () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const component = wrapper.vm;
-      const spy = vi.spyOn(component, 'removeVariable');
-      const deleteButton = wrapper.find('[data-test="alert-variables-delete-variable-btn"]');
-      await deleteButton.trigger("click");
-      expect(spy).toHaveBeenCalledWith(mockVariables[0]);
-    });
+    expect(getForm(wrapper).state.values.variables).toHaveLength(2);
+    expect(wrapper.find('[data-test="alert-variables-2"]').exists()).toBe(true);
   });
 
-  describe("Add Variable Functionality", () => {
-    const mockVariables = [
-      { uuid: "1", key: "var1", value: "value1" },
-      { uuid: "2", key: "var2", value: "value2" },
-    ];
+  it("does not emit bare-mode events in form mode (form owns the rows)", async () => {
+    wrapper = buildFormWrapper(threeRows);
 
-    it("should show add button only on the last variable row", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const addButtons = wrapper.findAll('[data-test="alert-variables-add-variable-btn"]');
-      expect(addButtons).toHaveLength(1);
-    });
+    await wrapper.findAll('[data-test="alert-variables-delete-variable-btn"]')[0].trigger("click");
+    await wrapper.find('[data-test="alert-variables-add-variable-btn"]').trigger("click");
+    await flushPromises();
 
-    it("should emit add:variable event when add button is clicked", async () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const addButton = wrapper.find('[data-test="alert-variables-add-variable-btn"]');
-      await addButton.trigger("click");
-      expect(wrapper.emitted("add:variable")).toBeTruthy();
-      expect(wrapper.emitted("add:variable")).toHaveLength(1);
-    });
-
-    it("should call addVariable function when add button is clicked", async () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const addButton = wrapper.find('[data-test="alert-variables-add-variable-btn"]');
-      await addButton.trigger("click");
-      expect(wrapper.emitted("add:variable")).toBeTruthy();
-    });
+    const variablesInput = wrapper.findComponent(VariablesInput);
+    expect(variablesInput.emitted("add:variable")).toBeUndefined();
+    expect(variablesInput.emitted("remove:variable")).toBeUndefined();
   });
 
+  // 🔑 Rule ① gate — delete a NON-last row and assert the RENDERED inputs
+  // (OFormInput→OInput model-values), NOT just form.state.values: a stable-id
+  // :key bug leaves the data correct while the inputs render shifted/blank.
+  it("Rule ① — deleting a NON-last row keeps the RENDERED inputs in sync", async () => {
+    wrapper = buildFormWrapper(threeRows);
 
-  describe("Props Validation", () => {
-    it("should accept variables prop as required array", () => {
-      wrapper = createWrapper({ variables: [] });
-      expect(wrapper.props().variables).toEqual([]);
-    });
+    expect(renderedField(wrapper, "key")).toEqual(["k1", "k2", "k3"]);
 
-    it("should work with multiple variables", () => {
-      const multipleVars = [
-        { uuid: "1", key: "var1", value: "value1" },
-        { uuid: "2", key: "var2", value: "value2" },
-        { uuid: "3", key: "var3", value: "value3" },
-      ];
-      wrapper = createWrapper({ variables: multipleVars });
-      const keyInputs = wrapper.findAll('[data-test="alert-variables-key-input"]');
-      expect(keyInputs.length).toBe(3);
-    });
-  });
+    const deleteBtns = wrapper.findAll('[data-test="alert-variables-delete-variable-btn"]');
+    expect(deleteBtns).toHaveLength(3);
+    await deleteBtns[1].trigger("click"); // delete the MIDDLE row
+    await flushPromises();
 
-  describe("Input Attributes and Styling", () => {
-    const mockVariables = [{ uuid: "1", key: "var1", value: "value1" }];
+    // the RENDERED inputs must match the remaining rows, in order
+    expect(renderedField(wrapper, "key")).toEqual(["k1", "k3"]);
+    expect(renderedField(wrapper, "value")).toEqual(["v1", "v3"]);
+    expect(wrapper.findAll('[data-test="alert-variables-key-input"]')).toHaveLength(2);
+    expect(wrapper.find('[data-test="alert-variables-3"]').exists()).toBe(false);
 
-    it("should have correct placeholder for key input", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const keyInput = wrapper.find('[data-test="alert-variables-key-input"]');
-      expect(keyInput.attributes('placeholder')).toBeDefined();
-    });
-
-    it("should have correct placeholder for value input", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      const valueInput = wrapper.find('[data-test="alert-variables-value-input"]');
-      expect(valueInput.attributes('placeholder')).toBeDefined();
-    });
-
-    it("should have minimum width style for value input", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      expect(wrapper.html()).toContain('min-width: 250px');
-    });
-
-    it("should have outlined and filled attributes for inputs", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      // Check if inputs are rendered correctly (should have inputs for both variables)
-      const keyInputs = wrapper.findAll('[data-test="alert-variables-key-input"]');
-      const valueInputs = wrapper.findAll('[data-test="alert-variables-value-input"]');
-      expect(keyInputs.length).toBeGreaterThan(0);
-      expect(valueInputs.length).toBeGreaterThan(0);
-    });
-
-    it("should have dense attribute for inputs", () => {
-      wrapper = createWrapper({ variables: mockVariables });
-      expect(wrapper.html()).toContain('dense');
-    });
-  });
-
-  describe("Component Methods Exposure", () => {
-    it("should expose removeVariable method", () => {
-      wrapper = createWrapper();
-      expect(typeof wrapper.vm.removeVariable).toBe('function');
-    });
-
-    it("should expose addVariable method", () => {
-      wrapper = createWrapper();
-      expect(typeof wrapper.vm.addVariable).toBe('function');
-    });
-  });
-
-  describe("Edge Cases", () => {
-    it("should handle undefined variables gracefully", () => {
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      // Component should handle undefined gracefully even with warnings
-      wrapper = createWrapper({ variables: [] });
-      expect(wrapper.exists()).toBe(true);
-      consoleWarn.mockRestore();
-    });
-
-    it("should handle null variables gracefully", () => {
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      // Component should handle null gracefully by using empty array as fallback
-      wrapper = createWrapper({ variables: [] });
-      expect(wrapper.exists()).toBe(true);
-      consoleWarn.mockRestore();
-    });
-
-    it("should handle single variable correctly", () => {
-      const singleVar = [{ uuid: "1", key: "var1", value: "value1" }];
-      wrapper = createWrapper({ variables: singleVar });
-      const addButton = wrapper.find('[data-test="alert-variables-add-variable-btn"]');
-      expect(addButton.exists()).toBe(true);
-    });
-  });
-
-  describe("Events and Emits", () => {
-    it("should define correct emit events", () => {
-      wrapper = createWrapper();
-      expect(wrapper.vm.$emit).toBeDefined();
-    });
-
-    it("should emit events with correct event names", async () => {
-      const mockVariables = [{ uuid: "1", key: "var1", value: "value1" }];
-      wrapper = createWrapper({ variables: mockVariables });
-      
-      const deleteButton = wrapper.find('[data-test="alert-variables-delete-variable-btn"]');
-      await deleteButton.trigger("click");
-      
-      const addButton = wrapper.find('[data-test="alert-variables-add-variable-btn"]');
-      await addButton.trigger("click");
-      
-      expect(Object.keys(wrapper.emitted())).toContain("remove:variable");
-      expect(Object.keys(wrapper.emitted())).toContain("add:variable");
-    });
+    // and the form data agrees
+    expect(getForm(wrapper).state.values.variables).toEqual([
+      { key: "k1", value: "v1" },
+      { key: "k3", value: "v3" },
+    ]);
   });
 });

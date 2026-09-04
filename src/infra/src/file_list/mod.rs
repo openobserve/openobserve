@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,33 +13,48 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::collections::HashMap as stdHashMap;
+use std::{collections::HashMap as stdHashMap, sync::LazyLock as Lazy};
 
 use async_trait::async_trait;
 use config::{
     get_config,
     meta::{
         meta_store::MetaStore,
+        search::ScanStats,
         stream::{FileKey, FileListDeleted, FileMeta, PartitionTimeLevel, StreamStats, StreamType},
     },
     utils::time::second_micros,
 };
-use once_cell::sync::Lazy;
 
-use crate::errors::{Error, Result};
+use crate::{
+    errors::{Error, Result},
+    storage,
+};
 
-pub mod mysql;
+pub mod pending_delete;
 pub mod postgres;
 pub mod sqlite;
 
 static CLIENT: Lazy<Box<dyn FileList>> = Lazy::new(connect_default);
 pub static LOCAL_CACHE: Lazy<Box<dyn FileList>> = Lazy::new(connect_local_cache);
 
+#[inline]
+pub async fn calculate_files_size(files: &[FileKey]) -> Result<ScanStats> {
+    let mut stats = ScanStats::new();
+    stats.files = files.len() as i64;
+    for file in files {
+        stats.records += file.meta.records;
+        stats.original_size += file.meta.original_size;
+        stats.compressed_size += file.meta.compressed_size;
+        stats.idx_scan_size += file.meta.index_size;
+    }
+    Ok(stats)
+}
+
 pub fn connect_default() -> Box<dyn FileList> {
     match get_config().common.meta_store.as_str().into() {
         MetaStore::Sqlite => Box::<sqlite::SqliteFileList>::default(),
         MetaStore::Nats => Box::<sqlite::SqliteFileList>::default(),
-        MetaStore::MySQL => Box::<mysql::MysqlFileList>::default(),
         MetaStore::PostgreSQL => Box::<postgres::PostgresFileList>::default(),
     }
 }
@@ -50,6 +65,7 @@ pub fn connect_local_cache() -> Box<dyn FileList> {
 
 #[async_trait]
 pub trait FileList: Sync + Send + 'static {
+    async fn health_check(&self) -> Result<()>;
     async fn create_table(&self) -> Result<()>;
     async fn create_table_index(&self) -> Result<()>;
     async fn add(&self, account: &str, file: &str, meta: &FileMeta) -> Result<i64>;
@@ -58,7 +74,12 @@ pub trait FileList: Sync + Send + 'static {
     async fn batch_add(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_with_id(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_history(&self, files: &[FileKey]) -> Result<()>;
-    async fn update_dump_records(&self, dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()>;
+    /// `dumped_ids` pairs each file_list id with its `date` so partitioned backends can prune.
+    async fn update_dump_records(
+        &self,
+        dump_file: &FileKey,
+        dumped_ids: &[(i64, String)],
+    ) -> Result<()>;
     async fn batch_process(&self, files: &[FileKey]) -> Result<()>;
     async fn batch_add_deleted(
         &self,
@@ -71,6 +92,22 @@ pub trait FileList: Sync + Send + 'static {
     async fn contains(&self, file: &str) -> Result<bool>;
     async fn update_flattened(&self, file: &str, flattened: bool) -> Result<()>;
     async fn update_compressed_size(&self, file: &str, size: i64) -> Result<()>;
+    /// Bulk-set `bloom_ver` for the given file_list ids. Used by the
+    /// post-merge bloom builder (`compaction::bloom::compact`).
+    /// Empty `ids` is a no-op.
+    async fn update_bloom_ver(&self, ids: &[i64], bloom_ver: i64) -> Result<()>;
+    /// Is `bloom_ver` still referenced by at least one live file_list row in
+    /// this `(stream, date)` bucket? Used by the post-merge orphan cleanup to
+    /// decide whether a `.bf` can be retired. `stream` is the combined
+    /// `{org}/{stream_type}/{stream}` key; `date` is the `YYYY/MM/DD/HH` value.
+    async fn bloom_ver_referenced(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+        bloom_ver: i64,
+    ) -> Result<bool>;
     async fn list(&self) -> Result<Vec<FileKey>>;
     async fn query(
         &self,
@@ -81,12 +118,15 @@ pub trait FileList: Sync + Send + 'static {
         time_range: (i64, i64),
         flattened: Option<bool>,
     ) -> Result<Vec<FileKey>>;
+    /// Files of `date_range` with `original_size <= max_original_size`, the
+    /// compactor's merge candidates.
     async fn query_for_merge(
         &self,
         org_id: &str,
         stream_type: StreamType,
         stream_name: &str,
         date_range: (String, String),
+        max_original_size: i64,
     ) -> Result<Vec<FileKey>>;
     async fn query_for_dump(
         &self,
@@ -97,7 +137,18 @@ pub trait FileList: Sync + Send + 'static {
     ) -> Result<Vec<FileRecord>>;
     async fn query_for_dump_by_updated_at(&self, time_range: (i64, i64))
     -> Result<Vec<FileRecord>>;
-    async fn query_by_ids(&self, ids: &[i64]) -> Result<Vec<FileKey>>;
+    async fn query_for_bloom(
+        &self,
+        org_id: &str,
+        stream_type: StreamType,
+        stream_name: &str,
+        date: &str,
+    ) -> Result<Vec<FileKey>>;
+    async fn query_by_ids(
+        &self,
+        ids: &[i64],
+        time_range: Option<(i64, i64)>,
+    ) -> Result<Vec<FileKey>>;
     async fn query_ids(
         &self,
         org_id: &str,
@@ -161,12 +212,6 @@ pub trait FileList: Sync + Send + 'static {
         is_recent: bool,
     ) -> Result<()>;
     async fn reset_stream_stats(&self) -> Result<()>;
-    async fn reset_stream_stats_min_ts(
-        &self,
-        org_id: &str,
-        stream: &str,
-        min_ts: i64,
-    ) -> Result<()>;
     async fn len(&self) -> usize;
     async fn is_empty(&self) -> bool;
     async fn clear(&self) -> Result<()>;
@@ -178,9 +223,15 @@ pub trait FileList: Sync + Send + 'static {
         stream: &str,
         offset: i64,
     ) -> Result<i64>;
-    async fn get_pending_jobs(&self, node: &str, limit: i64) -> Result<Vec<MergeJobRecord>>;
+    async fn get_pending_jobs(
+        &self,
+        node: &str,
+        limit: i64,
+        fast_mode: bool,
+    ) -> Result<Vec<MergeJobRecord>>;
     async fn get_pending_jobs_count(&self) -> Result<stdHashMap<String, stdHashMap<String, i64>>>;
-    async fn set_job_pending(&self, ids: &[i64]) -> Result<()>;
+    async fn set_job_pending(&self, ids: &[i64], offsets: i64, stream: Option<&str>)
+    -> Result<u64>;
     async fn set_job_done(&self, ids: &[i64]) -> Result<()>;
     async fn update_running_jobs(&self, ids: &[i64]) -> Result<()>;
     async fn check_running_jobs(&self, before_date: i64) -> Result<()>;
@@ -202,6 +253,16 @@ pub trait FileList: Sync + Send + 'static {
         stream_name: &str,
         date_range: (String, String),
     ) -> Result<StreamStats>;
+    async fn org_stats_by_account(&self, org_id: &str, account: &str) -> Result<(i64, i64)>;
+    async fn delete_by_org(&self, org_id: &str) -> Result<()>;
+}
+
+pub async fn delete_by_org(org_id: &str) -> Result<()> {
+    CLIENT.delete_by_org(org_id).await
+}
+
+pub async fn health_check() -> Result<()> {
+    CLIENT.health_check().await
 }
 
 pub async fn create_table() -> Result<()> {
@@ -243,7 +304,7 @@ pub async fn batch_process(files: &[FileKey]) -> Result<()> {
 }
 
 #[inline]
-pub async fn update_dump_records(dump_file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
+pub async fn update_dump_records(dump_file: &FileKey, dumped_ids: &[(i64, String)]) -> Result<()> {
     CLIENT.update_dump_records(dump_file, dumped_ids).await
 }
 
@@ -277,8 +338,47 @@ pub async fn update_flattened(file: &str, flattened: bool) -> Result<()> {
 }
 
 #[inline]
+pub async fn update_bloom_ver(ids: &[i64], bloom_ver: i64) -> Result<()> {
+    if ids.is_empty() {
+        return Ok(());
+    }
+    CLIENT.update_bloom_ver(ids, bloom_ver).await
+}
+
+#[inline]
+pub async fn bloom_ver_referenced(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date: &str,
+    bloom_ver: i64,
+) -> Result<bool> {
+    CLIENT
+        .bloom_ver_referenced(org_id, stream_type, stream_name, date, bloom_ver)
+        .await
+}
+
+#[inline]
+#[tracing::instrument(name = "infra:file_list:db:update_compressed_size")]
 pub async fn update_compressed_size(file: &str, size: i64) -> Result<()> {
     CLIENT.update_compressed_size(file, size).await
+}
+
+/// Remove a parquet file from the metastore and optionally from object storage.
+pub async fn delete_parquet_file(account: &str, key: &str, file_list_only: bool) -> Result<()> {
+    batch_process(&[FileKey::new(
+        0,
+        account.to_string(),
+        key.to_string(),
+        Default::default(),
+        true,
+    )])
+    .await?;
+
+    if !file_list_only {
+        _ = storage::del(vec![(account, key)]).await;
+    }
+    Ok(())
 }
 
 #[inline]
@@ -310,15 +410,29 @@ pub async fn query(
 }
 
 #[inline]
+/// Classic upper bound on `original_size` for merge candidates: files at or
+/// above ~95% of `ZO_COMPACT_MAX_FILE_SIZE` are already "big enough" and are
+/// not merged again.
+pub fn merge_max_original_size() -> i64 {
+    get_config().compact.max_file_size as i64 * 95 / 100
+}
+
 #[tracing::instrument(name = "infra:file_list:db:query_for_merge")]
 pub async fn query_for_merge(
     org_id: &str,
     stream_type: StreamType,
     stream_name: &str,
     date_range: (String, String),
+    max_original_size: i64,
 ) -> Result<Vec<FileKey>> {
     CLIENT
-        .query_for_merge(org_id, stream_type, stream_name, date_range)
+        .query_for_merge(
+            org_id,
+            stream_type,
+            stream_name,
+            date_range,
+            max_original_size,
+        )
         .await
 }
 
@@ -343,12 +457,25 @@ pub async fn query_for_dump_by_updated_at(time_range: (i64, i64)) -> Result<Vec<
 }
 
 #[inline]
+#[tracing::instrument(name = "infra:file_list:db:query_for_bloom")]
+pub async fn query_for_bloom(
+    org_id: &str,
+    stream_type: StreamType,
+    stream_name: &str,
+    date: &str,
+) -> Result<Vec<FileKey>> {
+    CLIENT
+        .query_for_bloom(org_id, stream_type, stream_name, date)
+        .await
+}
+
+#[inline]
 #[tracing::instrument(name = "infra:file_list:query_db_by_ids", skip_all)]
-pub async fn query_by_ids(ids: &[i64]) -> Result<Vec<FileKey>> {
+pub async fn query_by_ids(ids: &[i64], time_range: Option<(i64, i64)>) -> Result<Vec<FileKey>> {
     if ids.is_empty() {
         return Ok(Vec::default());
     }
-    CLIENT.query_by_ids(ids).await
+    CLIENT.query_by_ids(ids, time_range).await
 }
 
 #[inline]
@@ -479,13 +606,6 @@ pub async fn reset_stream_stats() -> Result<()> {
 }
 
 #[inline]
-pub async fn reset_stream_stats_min_ts(org_id: &str, stream: &str, min_ts: i64) -> Result<()> {
-    CLIENT
-        .reset_stream_stats_min_ts(org_id, stream, min_ts)
-        .await
-}
-
-#[inline]
 pub async fn len() -> usize {
     CLIENT.len().await
 }
@@ -511,8 +631,12 @@ pub async fn add_job(
 }
 
 #[inline]
-pub async fn get_pending_jobs(node: &str, limit: i64) -> Result<Vec<MergeJobRecord>> {
-    CLIENT.get_pending_jobs(node, limit).await
+pub async fn get_pending_jobs(
+    node: &str,
+    limit: i64,
+    fast_mode: bool,
+) -> Result<Vec<MergeJobRecord>> {
+    CLIENT.get_pending_jobs(node, limit, fast_mode).await
 }
 
 #[inline]
@@ -521,8 +645,8 @@ pub async fn get_pending_jobs_count() -> Result<stdHashMap<String, stdHashMap<St
 }
 
 #[inline]
-pub async fn set_job_pending(ids: &[i64]) -> Result<()> {
-    CLIENT.set_job_pending(ids).await
+pub async fn set_job_pending(ids: &[i64], offsets: i64, stream: Option<&str>) -> Result<u64> {
+    CLIENT.set_job_pending(ids, offsets, stream).await
 }
 
 #[inline]
@@ -577,6 +701,11 @@ pub async fn query_dump_stats_by_date_range(
         .await
 }
 
+#[inline]
+pub async fn org_stats_by_account(org_id: &str, account: &str) -> Result<(i64, i64)> {
+    CLIENT.org_stats_by_account(org_id, account).await
+}
+
 pub async fn local_cache_gc() -> Result<()> {
     tokio::task::spawn(async move {
         let cfg = get_config();
@@ -611,13 +740,13 @@ fn validate_time_range(time_range: (i64, i64)) -> Result<()> {
 }
 
 pub fn calculate_max_ts_upper_bound(time_end: i64, stream_type: StreamType) -> i64 {
-    let mut level = super::schema::unwrap_partition_time_level(None, stream_type);
-    if stream_type == StreamType::Metrics
-        && PartitionTimeLevel::from(get_config().limit.metrics_query_retention.as_str())
-            == PartitionTimeLevel::Daily
-    {
-        level = PartitionTimeLevel::Daily;
-    }
+    let cfg = get_config();
+    let level = match stream_type {
+        StreamType::Logs => PartitionTimeLevel::from(cfg.limit.logs_query_retention.as_str()),
+        StreamType::Traces => PartitionTimeLevel::from(cfg.limit.traces_query_retention.as_str()),
+        StreamType::Metrics => PartitionTimeLevel::from(cfg.limit.metrics_query_retention.as_str()),
+        _ => PartitionTimeLevel::Hourly,
+    };
     let ts = level.duration();
     if ts > 0 {
         time_end + second_micros(ts)
@@ -651,17 +780,22 @@ pub struct FileRecord {
     pub file: String,
     #[sqlx(default)]
     pub deleted: bool,
+    #[sqlx(default)]
     pub min_ts: i64,
+    #[sqlx(default)]
     pub max_ts: i64,
+    #[sqlx(default)]
     pub records: i64,
+    #[sqlx(default)]
     pub original_size: i64,
+    #[sqlx(default)]
     pub compressed_size: i64,
     #[sqlx(default)]
     pub index_size: i64,
     #[sqlx(default)]
-    pub flattened: bool,
+    pub bloom_ver: i64,
     #[sqlx(default)]
-    pub created_at: i64,
+    pub flattened: bool,
     #[sqlx(default)]
     pub updated_at: i64,
 }
@@ -674,7 +808,8 @@ impl From<&FileRecord> for FileKey {
             key: "files/".to_string() + &r.stream + "/" + &r.date + "/" + &r.file,
             meta: r.into(),
             deleted: r.deleted,
-            segment_ids: None,
+            selection: None,
+            row_group_size: None,
         }
     }
 }
@@ -688,6 +823,7 @@ impl From<&FileRecord> for FileMeta {
             original_size: r.original_size,
             compressed_size: r.compressed_size,
             index_size: r.index_size,
+            bloom_ver: r.bloom_ver,
             flattened: r.flattened,
         }
     }
@@ -787,4 +923,366 @@ pub struct FileId {
 pub struct FileIdWithFile {
     pub id: i64,
     pub file: String,
+}
+
+#[cfg(test)]
+mod tests {
+    use config::meta::stream::{StreamStats, StreamType};
+
+    use super::*;
+
+    // ── parse_stream_key ──────────────────────────────────────────────────────
+
+    #[test]
+    fn test_parse_stream_key_valid_logs() {
+        let result = parse_stream_key("myorg/logs/mystream");
+        assert!(result.is_some());
+        let (org, stype, stream) = result.unwrap();
+        assert_eq!(org, "myorg");
+        assert_eq!(stype, StreamType::Logs);
+        assert_eq!(stream, "mystream");
+    }
+
+    #[test]
+    fn test_parse_stream_key_valid_metrics() {
+        let result = parse_stream_key("default/metrics/cpu_usage");
+        assert!(result.is_some());
+        let (org, stype, stream) = result.unwrap();
+        assert_eq!(org, "default");
+        assert_eq!(stype, StreamType::Metrics);
+        assert_eq!(stream, "cpu_usage");
+    }
+
+    #[test]
+    fn test_parse_stream_key_valid_traces() {
+        let result = parse_stream_key("acme/traces/http_spans");
+        assert!(result.is_some());
+        let (org, stype, stream) = result.unwrap();
+        assert_eq!(org, "acme");
+        assert_eq!(stype, StreamType::Traces);
+        assert_eq!(stream, "http_spans");
+    }
+
+    #[test]
+    fn test_parse_stream_key_too_few_parts() {
+        assert!(parse_stream_key("myorg/logs").is_none());
+        assert!(parse_stream_key("myorg").is_none());
+        assert!(parse_stream_key("").is_none());
+    }
+
+    #[test]
+    fn test_parse_stream_key_too_many_parts() {
+        // More than 3 segments → None
+        assert!(parse_stream_key("org/logs/stream/extra").is_none());
+    }
+
+    // ── FileListJobStatus::from(i64) ──────────────────────────────────────────
+
+    #[test]
+    fn test_file_list_job_status_from_i64() {
+        assert_eq!(FileListJobStatus::from(0), FileListJobStatus::Pending);
+        assert_eq!(FileListJobStatus::from(1), FileListJobStatus::Running);
+        assert_eq!(FileListJobStatus::from(2), FileListJobStatus::Done);
+        // Unknown values fall back to Pending
+        assert_eq!(FileListJobStatus::from(99), FileListJobStatus::Pending);
+        assert_eq!(FileListJobStatus::from(-1), FileListJobStatus::Pending);
+    }
+
+    #[test]
+    fn test_file_list_job_status_default() {
+        assert_eq!(FileListJobStatus::default(), FileListJobStatus::Pending);
+    }
+
+    // ── From<&FileRecord> for FileMeta ────────────────────────────────────────
+
+    #[test]
+    fn test_file_meta_from_file_record() {
+        let record = FileRecord {
+            id: 1,
+            account: "acc".to_string(),
+            org: "org1".to_string(),
+            stream: "default/logs/test".to_string(),
+            date: "2024-01-01".to_string(),
+            file: "file1.parquet".to_string(),
+            deleted: false,
+            min_ts: 1000,
+            max_ts: 2000,
+            records: 500,
+            original_size: 102400,
+            compressed_size: 51200,
+            index_size: 1024,
+            bloom_ver: 0,
+            flattened: true,
+            updated_at: 9999,
+        };
+
+        let meta = FileMeta::from(&record);
+        assert_eq!(meta.min_ts, 1000);
+        assert_eq!(meta.max_ts, 2000);
+        assert_eq!(meta.records, 500);
+        assert_eq!(meta.original_size, 102400);
+        assert_eq!(meta.compressed_size, 51200);
+        assert_eq!(meta.index_size, 1024);
+        assert!(meta.flattened);
+    }
+
+    // ── From<&FileRecord> for FileKey ────────────────────────────────────────
+
+    #[test]
+    fn test_file_key_from_file_record() {
+        let record = FileRecord {
+            id: 42,
+            account: "myaccount".to_string(),
+            org: "org1".to_string(),
+            stream: "default/logs/nginx".to_string(),
+            date: "2024-01-15".to_string(),
+            file: "chunk001.parquet".to_string(),
+            deleted: false,
+            min_ts: 100,
+            max_ts: 200,
+            records: 10,
+            original_size: 4096,
+            compressed_size: 2048,
+            index_size: 0,
+            bloom_ver: 0,
+            flattened: false,
+            updated_at: 0,
+        };
+
+        let key = FileKey::from(&record);
+        assert_eq!(key.id, 42);
+        assert_eq!(key.account, "myaccount");
+        assert_eq!(
+            key.key,
+            "files/default/logs/nginx/2024-01-15/chunk001.parquet"
+        );
+        assert!(!key.deleted);
+        assert!(key.selection.is_none());
+        assert_eq!(key.meta.min_ts, 100);
+        assert_eq!(key.meta.max_ts, 200);
+    }
+
+    // ── bloom_ver coverage on FileRecord ─────────────────────────────────────
+
+    #[test]
+    fn test_file_meta_from_file_record_carries_bloom_ver() {
+        let record = FileRecord {
+            id: 1,
+            account: "a".to_string(),
+            org: "o".to_string(),
+            stream: "s/logs/x".to_string(),
+            date: "2026/05/08/00".to_string(),
+            file: "f.parquet".to_string(),
+            deleted: false,
+            min_ts: 1,
+            max_ts: 2,
+            records: 3,
+            original_size: 4,
+            compressed_size: 5,
+            index_size: 6,
+            bloom_ver: 1_715_000_000_000_000,
+            flattened: false,
+            updated_at: 0,
+        };
+        let meta = FileMeta::from(&record);
+        assert_eq!(meta.bloom_ver, record.bloom_ver);
+    }
+
+    #[test]
+    fn test_file_record_bloom_ver_default_is_zero() {
+        // sqlx::FromRow with #[sqlx(default)] should fall back to 0 for missing column.
+        let record = FileRecord {
+            id: 0,
+            account: String::new(),
+            org: String::new(),
+            stream: String::new(),
+            date: String::new(),
+            file: String::new(),
+            deleted: false,
+            min_ts: 0,
+            max_ts: 0,
+            records: 0,
+            original_size: 0,
+            compressed_size: 0,
+            index_size: 0,
+            bloom_ver: 0,
+            flattened: false,
+            updated_at: 0,
+        };
+        // Conversion yields meta.bloom_ver == 0 too, which is the "no .bf" sentinel
+        // that downstream search code uses to fall back to the original tantivy path.
+        let meta = FileMeta::from(&record);
+        assert_eq!(meta.bloom_ver, 0);
+    }
+
+    // ── From<&StatsRecord> for StreamStats ───────────────────────────────────
+
+    #[test]
+    fn test_stream_stats_from_stats_record() {
+        let record = StatsRecord {
+            stream: "default/logs/test".to_string(),
+            file_num: 10,
+            min_ts: Some(1000),
+            max_ts: 9000,
+            records: 5000,
+            original_size: 1_048_576,
+            compressed_size: 524_288,
+            index_size: 8192,
+        };
+
+        let stats = StreamStats::from(&record);
+        assert_eq!(stats.doc_time_min, 1000);
+        assert_eq!(stats.doc_time_max, 9000);
+        assert_eq!(stats.doc_num, 5000);
+        assert_eq!(stats.file_num, 10);
+        assert_eq!(stats.storage_size, 1_048_576.0);
+        assert_eq!(stats.compressed_size, 524_288.0);
+        assert_eq!(stats.index_size, 8192.0);
+        assert_eq!(stats.created_at, 0); // always zero from record conversion
+    }
+
+    #[test]
+    fn test_stream_stats_from_stats_record_min_ts_none() {
+        let record = StatsRecord {
+            stream: "org/metrics/cpu".to_string(),
+            file_num: 1,
+            min_ts: None,
+            max_ts: 5000,
+            records: 100,
+            original_size: 256,
+            compressed_size: 128,
+            index_size: 0,
+        };
+
+        let stats = StreamStats::from(&record);
+        assert_eq!(stats.doc_time_min, 0); // None → default (0)
+        assert_eq!(stats.doc_time_max, 5000);
+    }
+
+    #[test]
+    fn test_stream_stats_from_stats_record_owned() {
+        let record = StatsRecord {
+            stream: "org/logs/app".to_string(),
+            file_num: 3,
+            min_ts: Some(111),
+            max_ts: 999,
+            records: 300,
+            original_size: 512,
+            compressed_size: 256,
+            index_size: 64,
+        };
+
+        // owned conversion should produce the same result as ref conversion
+        let stats_owned = StreamStats::from(record.clone());
+        let stats_ref = StreamStats::from(&record);
+        assert_eq!(stats_owned.doc_time_min, stats_ref.doc_time_min);
+        assert_eq!(stats_owned.doc_num, stats_ref.doc_num);
+        assert_eq!(stats_owned.file_num, stats_ref.file_num);
+    }
+
+    // ── calculate_files_size ──────────────────────────────────────────────────
+
+    fn create_test_file_key(
+        id: i64,
+        key: &str,
+        records: i64,
+        original_size: i64,
+        compressed_size: i64,
+        index_size: i64,
+    ) -> FileKey {
+        FileKey {
+            id,
+            account: "test_account".to_string(),
+            key: key.to_string(),
+            meta: FileMeta {
+                min_ts: 1000,
+                max_ts: 2000,
+                records,
+                original_size,
+                compressed_size,
+                index_size,
+                flattened: false,
+                bloom_ver: 0,
+            },
+            deleted: false,
+            selection: None,
+            row_group_size: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_empty() {
+        let files: Vec<FileKey> = vec![];
+        let stats = calculate_files_size(&files).await.unwrap();
+        assert_eq!(stats.files, 0);
+        assert_eq!(stats.records, 0);
+        assert_eq!(stats.original_size, 0);
+        assert_eq!(stats.compressed_size, 0);
+        assert_eq!(stats.idx_scan_size, 0);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_single_file() {
+        let files = vec![create_test_file_key(
+            1,
+            "file1.parquet",
+            100,
+            10000,
+            5000,
+            500,
+        )];
+        let stats = calculate_files_size(&files).await.unwrap();
+        assert_eq!(stats.files, 1);
+        assert_eq!(stats.records, 100);
+        assert_eq!(stats.original_size, 10000);
+        assert_eq!(stats.compressed_size, 5000);
+        assert_eq!(stats.idx_scan_size, 500);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_multiple_files() {
+        let files = vec![
+            create_test_file_key(1, "file1.parquet", 100, 10000, 5000, 500),
+            create_test_file_key(2, "file2.parquet", 200, 20000, 10000, 1000),
+            create_test_file_key(3, "file3.parquet", 300, 30000, 15000, 1500),
+        ];
+        let stats = calculate_files_size(&files).await.unwrap();
+        assert_eq!(stats.files, 3);
+        assert_eq!(stats.records, 600);
+        assert_eq!(stats.original_size, 60000);
+        assert_eq!(stats.compressed_size, 30000);
+        assert_eq!(stats.idx_scan_size, 3000);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_with_zero_values() {
+        let files = vec![
+            create_test_file_key(1, "file1.parquet", 0, 0, 0, 0),
+            create_test_file_key(2, "file2.parquet", 100, 10000, 5000, 500),
+        ];
+        let stats = calculate_files_size(&files).await.unwrap();
+        assert_eq!(stats.files, 2);
+        assert_eq!(stats.records, 100);
+        assert_eq!(stats.original_size, 10000);
+        assert_eq!(stats.compressed_size, 5000);
+        assert_eq!(stats.idx_scan_size, 500);
+    }
+
+    #[tokio::test]
+    async fn test_calculate_files_size_large_values() {
+        let files = vec![create_test_file_key(
+            1,
+            "large_file.parquet",
+            1000000,
+            10000000000,
+            5000000000,
+            500000000,
+        )];
+        let stats = calculate_files_size(&files).await.unwrap();
+        assert_eq!(stats.files, 1);
+        assert_eq!(stats.records, 1000000);
+        assert_eq!(stats.original_size, 10000000000);
+        assert_eq!(stats.compressed_size, 5000000000);
+        assert_eq!(stats.idx_scan_size, 500000000);
+    }
 }

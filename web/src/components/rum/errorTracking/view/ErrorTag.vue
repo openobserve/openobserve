@@ -1,4 +1,4 @@
-<!-- Copyright 2023 OpenObserve Inc.
+<!-- Copyright 2026 OpenObserve Inc.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Affero General Public License as published by
@@ -15,16 +15,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="tag-block row items-center no-wrap q-mr-sm q-mt-sm">
-    <div class="q-px-md">{{ tag.key }}</div>
-    <q-separator data-test="separator" vertical />
-    <div class="q-px-md tw:bg-[var(--o2-table-header-bg)] tw:break-all">
-      {{ tag.value }}
-    </div>
-  </div>
+  <ODimensionChip :dim-key="tag.key" :value="tag.value" class="me-2 mt-2" />
 </template>
 
 <script setup lang="ts">
+import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 defineProps({
   tag: {
     type: Object,
@@ -32,15 +27,3 @@ defineProps({
   },
 });
 </script>
-
-<style lang="scss" scoped>
-.tag-block {
-  border: 1px solid #e0e0e0;
-  border-radius: 0.25rem;
-}
-
-.tag-bg {
-  background-color: lightgray;
-  color: black;
-}
-</style>

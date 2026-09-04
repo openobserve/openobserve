@@ -1,6 +1,7 @@
 const { test, expect } = require('../utils/enhanced-baseFixtures.js');
 const PageManager = require('../../pages/page-manager.js');
 const testLogger = require('../utils/test-logger.js');
+const { getOrgIdentifier } = require('../utils/cloud-auth.js');
 
 // Test timeout constants (in milliseconds)
 const DEFAULT_TIMEOUT_MS = 60000;
@@ -42,9 +43,10 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     }
 
     // Navigate directly to alert destinations page
-    await page.goto(`${process.env["ZO_BASE_URL"]}/web/settings/alert_destinations?org_identifier=${process.env["ORGNAME"]}`);
+    await page.goto(`${process.env["ZO_BASE_URL"]}/web/alert-destinations?org_identifier=${getOrgIdentifier()}`);
     await page.waitForLoadState('networkidle', { timeout: NETWORK_IDLE_TIMEOUT_MS }).catch(() => {});
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
+    // Anchor on the list title rendering — deterministic signal that the destinations page is ready.
+    await pm.alertDestinationsPage.expectDestinationsListTitleVisible();
 
     testLogger.info('Navigated to Alert Destinations page');
   });
@@ -109,6 +111,8 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.selectDestinationType('slack');
     await pm.alertDestinationsPage.fillWebhookUrl('https://invalid-url.com');
+    // Trigger validation via Save click; PrebuiltDestinationForm only sets fieldErrors on validate()
+    await pm.alertDestinationsPage.clickSave();
     await pm.alertDestinationsPage.expectValidationError();
     testLogger.info('✓ Invalid webhook URL shows validation error');
     await pm.alertDestinationsPage.clickCancel();
@@ -240,8 +244,12 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     // ----- SERVICENOW -----
     testLogger.info('===== Testing ServiceNow Destination =====');
     const servicenowName = `auto_dest_servicenow_${sharedRandomValue}`;
-    const instanceUrl = 'https://dev12345.service-now.com/api/now/table/incident';
-    const instanceUrlUpdated = 'https://dev67890.service-now.com/api/now/table/incident';
+    // Use resolvable ServiceNow hosts: the cloud SSRF guard does a DNS lookup at
+    // create time and rejects unresolvable hosts (the old dev12345/dev67890 dev-instance
+    // subdomains don't exist → "Failed to resolve host"). The other prebuilt types
+    // already use real base domains (discord.com, outlook.office.com) for the same reason.
+    const instanceUrl = 'https://developer.service-now.com/api/now/table/incident';
+    const instanceUrlUpdated = 'https://www.service-now.com/api/now/table/incident';
     const username = 'test_user';
     const password = 'test_password';
 
@@ -249,7 +257,7 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     await pm.alertDestinationsPage.expectDestinationInList(servicenowName);
     testLogger.info('✓ ServiceNow destination created', { servicenowName });
 
-    await pm.alertDestinationsPage.editServiceNowDestination(servicenowName, instanceUrlUpdated);
+    await pm.alertDestinationsPage.editServiceNowDestination(servicenowName, instanceUrlUpdated, null, password);
     await pm.alertDestinationsPage.expectDestinationInList(servicenowName);
     testLogger.info('✓ ServiceNow destination instance URL updated');
 
@@ -269,14 +277,13 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     testLogger.info('===== P1 CUSTOM DESTINATION TEST =====');
 
     const destinationName = `auto_dest_custom_${sharedRandomValue}`;
-    const originalUrl = 'https://webhook.example.com/original';
-    const updatedUrl = 'https://webhook.example.com/updated';
+    const originalUrl = 'https://example.com/webhook/original';
+    const updatedUrl = 'https://example.com/webhook/updated';
 
     // ----- PART 1: Verify Custom option still works -----
     testLogger.info('Part 1: Verifying Custom destination option');
     await pm.alertDestinationsPage.clickNewDestination();
     await pm.alertDestinationsPage.selectDestinationType('custom');
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     await pm.alertDestinationsPage.expectUrlInputVisible();
     testLogger.info('✓ Custom destination form displays correctly');
     await pm.alertDestinationsPage.clickCancel();
@@ -291,7 +298,6 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     await pm.alertDestinationsPage.selectHttpMethod('POST');
     await pm.alertDestinationsPage.clickSave();
     await pm.alertDestinationsPage.expectSuccessNotification();
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     testLogger.info('✓ Custom destination created', { destinationName });
 
     // ----- PART 3: Edit Custom Destination URL -----
@@ -301,7 +307,6 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
     await pm.alertDestinationsPage.updateCustomUrl(updatedUrl);
     await pm.alertDestinationsPage.clickSave();
     await pm.alertDestinationsPage.expectSuccessNotification();
-    await page.waitForTimeout(UI_STABILIZATION_WAIT_MS);
     await pm.alertDestinationsPage.expectDestinationInList(destinationName);
     testLogger.info('✓ Custom destination URL updated successfully');
 
@@ -400,59 +405,21 @@ test.describe("Prebuilt Alert Destinations E2E", () => {
   // ============================================================================
 
   /**
-   * Email Destination Tests - SKIPPED
+   * Email destination coverage lives in dl-email-destinations.spec.js.
    *
-   * NOTE: These tests are currently skipped because:
-   * 1. SMTP is not configured in the test environment
-   * 2. Email destinations require a working mail server to validate
-   * 3. The test environment does not have email infrastructure set up
+   * Two email tests used to sit here, skipped for "the test environment does not
+   * have email infrastructure set up". That over-stated the dependency: creating,
+   * editing, deleting and validating an email destination needs SMTP switched on,
+   * not a readable mailbox. They are now active there, asserting stored state via
+   * the API rather than only the UI:
    *
-   * To enable these tests:
-   * - Configure SMTP settings in the test environment
-   * - Set up a test email server or use a mock SMTP service
-   * - Update environment variables: SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD
+   *   create with a single recipient ....... D-01 (also asserts it appears in the list)
+   *   edit to ADD recipients ............... D-07
+   *   edit to REMOVE recipients ............ ML-08
+   *   delete the destination ............... UI-12
+   *   validate email address format ........ UI-02
    *
-   * Test coverage when enabled:
-   * - Create email destination with single recipient
-   * - Create email destination with multiple recipients
-   * - Edit email destination - add/remove recipients
-   * - Validate email address format
-   * - Verify multiple recipients are preserved in edit mode
+   * That spec also tiers its cases, so only true delivery assertions need a mail
+   * sink; everything above runs anywhere SMTP is enabled.
    */
-  test.skip("Email - Create and edit destination (SMTP not configured)", {
-    tag: ['@prebuiltDestinations', '@email', '@P1', '@skip']
-  }, async ({ page }) => {
-    testLogger.info('===== EMAIL TEST: SKIPPED - SMTP not configured =====');
-
-    const destinationName = `auto_dest_email_${sharedRandomValue}`;
-    const recipients = process.env["ZO_ROOT_USER_EMAIL"];
-    const additionalRecipients = `${process.env["ZO_ROOT_USER_EMAIL"]}, test@example.com`;
-
-    // Create Email destination
-    await pm.alertDestinationsPage.createEmailDestination(destinationName, recipients);
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-    testLogger.info('✓ Email destination created');
-
-    // Edit and add recipients
-    await pm.alertDestinationsPage.editEmailDestination(destinationName, additionalRecipients);
-    await pm.alertDestinationsPage.expectDestinationInList(destinationName);
-    testLogger.info('✓ Email destination recipients updated');
-
-    // Cleanup
-    await pm.alertDestinationsPage.deleteDestination(destinationName);
-    testLogger.info('✓ Email destination deleted');
-  });
-
-  test.skip("Email - Validate email address format (SMTP not configured)", {
-    tag: ['@prebuiltDestinations', '@email', '@validation', '@P1', '@skip']
-  }, async ({ page }) => {
-    testLogger.info('===== EMAIL VALIDATION TEST: SKIPPED - SMTP not configured =====');
-
-    await pm.alertDestinationsPage.clickNewDestination();
-    await pm.alertDestinationsPage.selectDestinationType('email');
-    await pm.alertDestinationsPage.fillEmailRecipients('invalid-email-format');
-    await pm.alertDestinationsPage.expectValidationError();
-    testLogger.info('✓ Email validation working');
-    await pm.alertDestinationsPage.clickCancel();
-  });
 });

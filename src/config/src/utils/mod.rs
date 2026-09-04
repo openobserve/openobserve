@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -18,6 +18,7 @@ pub mod async_file;
 pub mod async_walkdir;
 pub mod base64;
 pub mod download_utils;
+pub mod encryption;
 pub mod enrichment_local_cache;
 pub mod file;
 pub mod flatten;
@@ -26,8 +27,10 @@ pub mod inverted_index;
 pub mod json;
 pub mod md5;
 pub mod parquet;
+pub mod password;
 pub mod pausable_job;
 pub mod prom_json_encoder;
+pub mod query_range;
 pub mod query_select_utils;
 pub mod rand;
 pub mod record_batch_ext;
@@ -36,9 +39,9 @@ pub mod schema_ext;
 pub mod size;
 pub mod sort;
 pub mod sql;
+pub mod ssrf_guard;
 pub mod str;
 pub mod sysinfo;
-pub mod tantivy;
 pub mod time;
 pub mod took_watcher;
 pub mod util;

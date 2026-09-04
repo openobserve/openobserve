@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -20,7 +20,8 @@ export default {
     cachedData: [], // Cache the actual incidents data
     pageBeforeSearch: 1, // Track page number before search starts (for smart restoration)
     isInitialized: false,
-    shouldRefresh: false // Flag to indicate when data should be refreshed (e.g., after updates)
+    shouldRefresh: false, // Flag to indicate when data should be refreshed (e.g., after updates)
+    statusFilter: "all", // Quick filter tab selection: "all" | "open" | "acknowledged" | "resolved"
   },
   getters: {
     getIncidents(state: any) {
@@ -37,6 +38,9 @@ export default {
     },
     getShouldRefresh(state: any) {
       return state.shouldRefresh;
+    },
+    getStatusFilter(state: any) {
+      return state.statusFilter;
     },
   },
   mutations: {
@@ -55,32 +59,39 @@ export default {
     setShouldRefresh(state: any, shouldRefresh: boolean) {
       state.shouldRefresh = shouldRefresh;
     },
+    setStatusFilter(state: any, statusFilter: string) {
+      state.statusFilter = statusFilter;
+    },
     resetIncidents(state: any) {
       state.incidents = {};
       state.cachedData = [];
       state.pageBeforeSearch = 1;
       state.isInitialized = false;
       state.shouldRefresh = false;
+      state.statusFilter = "all";
     },
   },
   actions: {
     setIncidents(context: any, incidents: any) {
-      context.commit('setIncidents', incidents);
+      context.commit("setIncidents", incidents);
     },
     setCachedData(context: any, data: any[]) {
-      context.commit('setCachedData', data);
+      context.commit("setCachedData", data);
     },
     setPageBeforeSearch(context: any, page: number) {
-      context.commit('setPageBeforeSearch', page);
+      context.commit("setPageBeforeSearch", page);
     },
     setIsInitialized(context: any, isInitialized: boolean) {
-      context.commit('setIsInitialized', isInitialized);
+      context.commit("setIsInitialized", isInitialized);
     },
     setShouldRefresh(context: any, shouldRefresh: boolean) {
-      context.commit('setShouldRefresh', shouldRefresh);
+      context.commit("setShouldRefresh", shouldRefresh);
+    },
+    setStatusFilter(context: any, statusFilter: string) {
+      context.commit("setStatusFilter", statusFilter);
     },
     resetIncidents(context: any) {
-      context.commit('resetIncidents');
+      context.commit("resetIncidents");
     },
   },
 };

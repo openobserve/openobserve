@@ -1,4 +1,4 @@
-// Copyright 2025 OpenObserve Inc.
+// Copyright 2026 OpenObserve Inc.
 //
 // This program is free software: you can redistribute it and/or modify
 // it under the terms of the GNU Affero General Public License as published by
@@ -13,15 +13,20 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+#[cfg(unix)]
 use std::ops::Range;
+#[cfg(unix)]
+use std::os::unix::fs::FileExt;
+use std::path::PathBuf;
 
 use async_trait::async_trait;
+#[cfg(unix)]
 use bytes::Bytes;
 use config::metrics;
-use futures::stream::BoxStream;
+use futures::{StreamExt, stream::BoxStream};
 use object_store::{
-    Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta, ObjectStore,
-    PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
+    CopyOptions, Error, GetOptions, GetResult, ListResult, MultipartUpload, ObjectMeta,
+    ObjectStore, PutMultipartOptions, PutOptions, PutPayload, PutResult, Result, limit::LimitStore,
     local::LocalFileSystem, path::Path,
 };
 
@@ -29,15 +34,32 @@ use crate::storage::{CONCURRENT_REQUESTS, format_key};
 
 pub struct Local {
     client: LimitStore<Box<dyn object_store::ObjectStore>>,
+    #[cfg_attr(not(unix), expect(dead_code))]
+    root_dir: PathBuf,
     with_prefix: bool,
 }
 
 impl Local {
+    pub fn name() -> &'static str {
+        "local"
+    }
+
     pub fn new(root_dir: &str, with_prefix: bool) -> Self {
         Self {
             client: LimitStore::new(init_client(root_dir), CONCURRENT_REQUESTS),
+            root_dir: PathBuf::from(root_dir),
             with_prefix,
         }
+    }
+
+    /// Resolve an object-store Path to a filesystem path.
+    /// For local storage format_key is a no-op, so the file lives at
+    /// `root_dir / key`.
+    #[cfg_attr(not(unix), expect(dead_code))]
+    #[inline]
+    fn full_path(&self, location: &Path) -> PathBuf {
+        self.root_dir
+            .join(format_key(location.as_ref(), self.with_prefix))
     }
 }
 
@@ -102,12 +124,6 @@ impl ObjectStore for Local {
         }
     }
 
-    async fn put_multipart(&self, location: &Path) -> Result<Box<dyn MultipartUpload>> {
-        self.client
-            .put_multipart(&(format_key(location.as_ref(), self.with_prefix).into()))
-            .await
-    }
-
     async fn put_multipart_opts(
         &self,
         location: &Path,
@@ -119,37 +135,6 @@ impl ObjectStore for Local {
                 opts,
             )
             .await
-    }
-
-    async fn get(&self, location: &Path) -> Result<GetResult> {
-        let start = std::time::Instant::now();
-        let file = location.to_string();
-        let result = self
-            .client
-            .get(&(format_key(&file, self.with_prefix).into()))
-            .await
-            .map_err(|e| {
-                log::error!("[STORAGE] get local file: {file}, error: {e:?}");
-                e
-            })?;
-
-        // metrics
-        let data_len = result.meta.size;
-        let columns = file.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
-            metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "get", "local"])
-                .inc_by(data_len as u64);
-            metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "get", "local"])
-                .inc();
-            let time = start.elapsed().as_secs_f64();
-            metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get", "local"])
-                .inc_by(time);
-        }
-
-        Ok(result)
     }
 
     async fn get_opts(&self, location: &Path, options: GetOptions) -> Result<GetResult> {
@@ -164,13 +149,18 @@ impl ObjectStore for Local {
                 e
             })?;
 
-        // metrics
-        let data_len = result.meta.size;
+        // metrics — use the actual returned range size, not the full file
+        // size. For range / suffix GETs `result.meta.size` is the total file
+        // length, which would over-count bytes by ~the file size each call.
+        let mut data_len = result.range.end - result.range.start;
+        if data_len == 0 {
+            data_len = result.meta.size;
+        }
         let columns = file.split('/').collect::<Vec<&str>>();
         if columns[0] == "files" {
             metrics::STORAGE_READ_BYTES
                 .with_label_values(&[columns[1], columns[2], "get_opts", "local"])
-                .inc_by(data_len as u64);
+                .inc_by(data_len);
             metrics::STORAGE_READ_REQUESTS
                 .with_label_values(&[columns[1], columns[2], "get_opts", "local"])
                 .inc();
@@ -183,61 +173,76 @@ impl ObjectStore for Local {
         Ok(result)
     }
 
-    async fn get_range(&self, location: &Path, range: Range<u64>) -> Result<Bytes> {
+    /// Read multiple byte ranges using a single file open and N `pread` calls,
+    /// all inside one `block_in_place`.
+    ///
+    /// This is the hot path for Parquet column-chunk reads (DataFusion issues
+    /// multiple ranges per row-group). Opening the file once and batching all
+    /// reads in a single blocking section avoids per-range thread scheduling
+    /// overhead and repeated file-open cost.
+    #[cfg(unix)]
+    async fn get_ranges(&self, location: &Path, ranges: &[Range<u64>]) -> Result<Vec<Bytes>> {
         let start = std::time::Instant::now();
         let file = location.to_string();
-        let data = self
-            .client
-            .get_range(&(format_key(&file, self.with_prefix).into()), range.clone())
-            .await
-            .map_err(|e| {
-                log::error!(
-                    "[STORAGE] get_range local file: {file}, range: {range:?}, error: {e:?}"
-                );
-                e
-            })?;
+        let full_path = self.full_path(location);
+        let ranges_owned: Vec<Range<u64>> = ranges.to_vec();
 
-        // metrics
-        let data_len = data.len();
+        let results = tokio::task::block_in_place(|| -> std::io::Result<Vec<Bytes>> {
+            let f = std::fs::File::open(&full_path)?;
+            let mut out = Vec::with_capacity(ranges_owned.len());
+            for range in &ranges_owned {
+                let len = (range.end - range.start) as usize;
+                let mut buf = vec![0u8; len];
+                f.read_exact_at(&mut buf, range.start)?;
+                out.push(Bytes::from(buf));
+            }
+            Ok(out)
+        })
+        .map_err(|e| {
+            log::error!("[STORAGE] get_ranges local file: {file}, error: {e:?}");
+            if e.kind() == std::io::ErrorKind::NotFound {
+                Error::NotFound {
+                    path: file.clone(),
+                    source: Box::new(e),
+                }
+            } else {
+                Error::Generic {
+                    store: "LocalFileSystem",
+                    source: Box::new(e),
+                }
+            }
+        })?;
+
+        // metrics — count one read per input range so the counter reflects
+        // actual pread calls, not just the outer batched API call.
         let columns = file.split('/').collect::<Vec<&str>>();
-        if columns[0] == "files" {
+        if columns.len() >= 3 && columns[0] == "files" {
+            let total_bytes: u64 = ranges.iter().map(|r| r.end - r.start).sum();
+            let n = ranges.len() as u64;
             metrics::STORAGE_READ_BYTES
-                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
-                .inc_by(data_len as u64);
+                .with_label_values(&[columns[1], columns[2], "get_ranges", "local"])
+                .inc_by(total_bytes);
             metrics::STORAGE_READ_REQUESTS
-                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
-                .inc();
+                .with_label_values(&[columns[1], columns[2], "get_ranges", "local"])
+                .inc_by(n);
             let time = start.elapsed().as_secs_f64();
             metrics::STORAGE_TIME
-                .with_label_values(&[columns[1], columns[2], "get_range", "local"])
+                .with_label_values(&[columns[1], columns[2], "get_ranges", "local"])
                 .inc_by(time);
         }
 
-        Ok(data)
+        Ok(results)
     }
 
-    async fn head(&self, _location: &Path) -> Result<ObjectMeta> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn delete(&self, location: &Path) -> Result<()> {
-        let mut result: Result<()> = Ok(());
-        for _ in 0..3 {
-            result = self
-                .client
-                .delete(&(format_key(location.as_ref(), self.with_prefix).into()))
-                .await;
-            if result.is_ok() {
-                let file = location.to_string();
-                let columns = file.split('/').collect::<Vec<&str>>();
-                metrics::STORAGE_WRITE_REQUESTS
-                    .with_label_values(&[columns[1], columns[2], "local"])
-                    .inc();
-                break;
-            }
-            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        }
-        result
+    fn delete_stream(
+        &self,
+        locations: BoxStream<'static, Result<Path>>,
+    ) -> BoxStream<'static, Result<Path>> {
+        let with_prefix = self.with_prefix;
+        let formatted = locations
+            .map(move |result| result.map(|path| format_key(path.as_ref(), with_prefix).into()))
+            .boxed();
+        self.client.delete_stream(formatted)
     }
 
     fn list(&self, prefix: Option<&Path>) -> BoxStream<'static, Result<ObjectMeta>> {
@@ -247,15 +252,17 @@ impl ObjectStore for Local {
     }
 
     async fn list_with_delimiter(&self, _prefix: Option<&Path>) -> Result<ListResult> {
-        Err(Error::NotImplemented)
+        Err(Error::NotImplemented {
+            operation: "list_with_delimiter".to_string(),
+            implementer: Self::name().to_string(),
+        })
     }
 
-    async fn copy(&self, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
-    }
-
-    async fn copy_if_not_exists(&self, _from: &Path, _to: &Path) -> Result<()> {
-        Err(Error::NotImplemented)
+    async fn copy_opts(&self, _from: &Path, _to: &Path, _options: CopyOptions) -> Result<()> {
+        Err(Error::NotImplemented {
+            operation: "copy_opts".to_string(),
+            implementer: Self::name().to_string(),
+        })
     }
 }
 
@@ -264,4 +271,45 @@ fn init_client(root_dir: &str) -> Box<dyn object_store::ObjectStore> {
         LocalFileSystem::new_with_prefix(std::path::Path::new(root_dir).to_str().unwrap())
             .expect("Error creating local file system"),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_local(root: &str, with_prefix: bool) -> Local {
+        Local::new(root, with_prefix)
+    }
+
+    #[test]
+    fn test_name_returns_local() {
+        assert_eq!(Local::name(), "local");
+    }
+
+    #[test]
+    fn test_display_format() {
+        let l = make_local("/tmp", false);
+        assert_eq!(format!("{l}"), "storage for local disk");
+    }
+
+    #[test]
+    fn test_debug_format() {
+        let l = make_local("/tmp", false);
+        let s = format!("{l:?}");
+        assert!(s.contains("storage for local disk"));
+    }
+
+    #[test]
+    fn test_new_stores_root_dir() {
+        let l = make_local("/tmp", false);
+        assert_eq!(l.root_dir, std::path::PathBuf::from("/tmp"));
+    }
+
+    #[test]
+    fn test_new_stores_with_prefix_flag() {
+        let l_true = make_local("/tmp", true);
+        assert!(l_true.with_prefix);
+        let l_false = make_local("/tmp", false);
+        assert!(!l_false.with_prefix);
+    }
 }
