@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::io::Error;
+use std::{io::Error, time::Instant};
 
 use axum::{
     Json, http,
@@ -245,16 +245,20 @@ async fn test_run_js_function(
     function: String,
     events: Vec<Value>,
 ) -> Result<HttpResponse, anyhow::Error> {
-    // Check if function uses #ResultArray# marker
-    let apply_over_array = RESULT_ARRAY.is_match(&function);
+    let org_id = org_id.to_string();
+    // Synchronous QuickJS evaluation must run off the HTTP worker thread so it cannot starve the
+    // pool.
+    match tokio::task::spawn_blocking(move || run_js_test(&org_id, &function, events)).await? {
+        Ok(results) => Ok(MetaHttpResponse::json(TestVRLResponse { results })),
+        Err(e) => Ok(MetaHttpResponse::bad_request(e)),
+    }
+}
 
-    // Compile the JS function
-    let js_config = match transform::js::compile_js_function(&function, org_id) {
-        Ok(config) => config,
-        Err(e) => {
-            return Ok(MetaHttpResponse::bad_request(e));
-        }
-    };
+fn run_js_test(org_id: &str, function: &str, events: Vec<Value>) -> Result<Vec<VRLResult>, String> {
+    let apply_over_array = RESULT_ARRAY.is_match(function);
+
+    let js_config =
+        transform::js::compile_js_function(function, org_id).map_err(|e| e.to_string())?;
 
     let mut transformed_events = vec![];
 
@@ -286,8 +290,17 @@ async fn test_run_js_function(
             transformed_events.push(VRLResult::new("", transform));
         }
     } else {
+        // Bound the whole request so a big batch can't tie up a thread for N x the per-eval limit.
+        let deadline = Instant::now() + transform::js::exec_timeout();
         // Normal mode: apply function to each event
         for event in events {
+            if Instant::now() >= deadline {
+                transformed_events.push(VRLResult::new(
+                    "Test aborted: exceeded the execution time limit",
+                    event,
+                ));
+                continue;
+            }
             let (ret_val, err) =
                 transform::js::apply_js_fn(&js_config, event.clone(), org_id, &[String::new()]);
 
@@ -304,11 +317,7 @@ async fn test_run_js_function(
         }
     }
 
-    let results = TestVRLResponse {
-        results: transformed_events,
-    };
-
-    Ok(MetaHttpResponse::json(results))
+    Ok(transformed_events)
 }
 
 #[tracing::instrument(skip(func))]
