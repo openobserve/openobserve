@@ -2978,12 +2978,11 @@ mod pool_gate_tests {
             ["try", "_deduct"].concat(),
             ["dead_letter", "_ref", "und"].concat(),
         ];
-        // The bare word is scanned only where the gate lived; the ack has a vocabulary of its own.
         let bare_hook = ["ref", "und"].concat();
         let files: &[(&str, &str, bool)] = &[
             ("alerting", include_str!("alerting.rs"), false),
             ("dispatcher", include_str!("dispatcher.rs"), false),
-            ("job_api", include_str!("job_api.rs"), false),
+            ("job_api", include_str!("job_api.rs"), true),
             ("lib", include_str!("lib.rs"), false),
             ("pool", include_str!("pool.rs"), true),
             ("reaper", include_str!("reaper/mod.rs"), true),
@@ -3001,7 +3000,7 @@ mod pool_gate_tests {
             ("service::tokens", include_str!("service/tokens.rs"), false),
             ("status_pages", include_str!("status_pages.rs"), false),
         ];
-        for (name, source, is_gate_path) in files {
+        for (name, source, scan_bare) in files {
             let source = code_only(source);
             for banned in &banned {
                 assert!(
@@ -3009,8 +3008,9 @@ mod pool_gate_tests {
                     "{name}: `{banned}` belongs to the reservation model this phase deletes",
                 );
             }
+            // Lowercased so a capitalised spelling cannot carry the bare word past the scan.
             assert!(
-                !is_gate_path || !source.contains(&bare_hook),
+                !scan_bare || !source.to_lowercase().contains(&bare_hook),
                 "{name}: `{bare_hook}` belongs to the reservation model this phase deletes",
             );
         }

@@ -1435,4 +1435,34 @@ mod tests {
             );
         }
     }
+
+    /// A gauge outliving its writer scrapes a permanent 0, which A8 reads as healthy forever.
+    #[test]
+    fn no_reconcile_job_remains() {
+        // CODE only: a comment naming what it forbids would fail the guard on prose alone.
+        let code_only = |source: &str| -> String {
+            source
+                .lines()
+                .filter(|line| !line.trim_start().starts_with("//"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        };
+        let source = code_only(include_str!("cloud.rs"));
+        let banned = [
+            ["reconcile_synthetics", "_steps"].concat(),
+            ["run_synthetics_step", "_reconcile"].concat(),
+            ["reconcile", "_steps("].concat(),
+            ["step_usage", "_sql"].concat(),
+            ["step_usage", "_row"].concat(),
+            ["Step", "Reconciliation"].concat(),
+            ["publish_step", "_reconciliation"].concat(),
+            ["SYNTHETICS_STEP", "_RECONCILE"].concat(),
+        ];
+        for banned in banned {
+            assert!(
+                !source.contains(&banned),
+                "`{banned}` belongs to the drift job the neutral ack makes unnecessary",
+            );
+        }
+    }
 }

@@ -41,9 +41,9 @@
 //!   self (source_node check). Deltas are commutative so message ordering doesn't matter.
 
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::HashMap,
     sync::{
-        Arc, LazyLock as Lazy, Mutex, OnceLock, RwLock,
+        Arc, LazyLock as Lazy, OnceLock, RwLock,
         atomic::{AtomicI64, AtomicU64, Ordering},
     },
 };
@@ -74,14 +74,6 @@ static ORG_USAGE: Lazy<RwLock<HashMap<String, AtomicU64>>> =
 /// pool's deployment-wide default ([`TrialQuotaPool::default_limit`]).
 static ORG_LIMITS: Lazy<RwLock<HashMap<String, u64>>> = Lazy::new(|| RwLock::new(HashMap::new()));
 
-/// Pool adjustments already applied in THIS process. See [`IdempotencyLedger`].
-static ADJUSTMENTS: Lazy<IdempotencyLedger> =
-    Lazy::new(|| IdempotencyLedger::new(ADJUSTMENT_LEDGER_CAPACITY));
-
-/// How many adjustment keys the ledger remembers — ~2 h of a busy region's
-/// acks, and bounded so a long-lived scheduler cannot grow it without limit.
-const ADJUSTMENT_LEDGER_CAPACITY: usize = 100_000;
-
 /// Bounded channel for deduction records pending DB flush.
 /// Capacity is generous to avoid backpressure on the hot path.
 static FLUSH_TX: Lazy<mpsc::Sender<FlushRecord>> = Lazy::new(|| {
@@ -109,9 +101,8 @@ static INIT_WATERMARK: AtomicI64 = AtomicI64::new(0);
 /// The checkpoints at which quota notification emails are sent.
 const QUOTA_CHECKPOINTS: &[u8] = &[80, 90, 95, 100];
 
-/// A usage record buffered for periodic DB flush. `cost` is SIGNED: a
-/// reconcile refund must reach `trial_quota_usage`, or the in-memory and
-/// persisted counters diverge at the next restart.
+/// A usage record buffered for periodic DB flush. `cost` is signed to match the
+/// counters it feeds; every producer today passes a non-negative value.
 struct FlushRecord {
     org_id: String,
     feature_key: String,
@@ -289,89 +280,6 @@ impl TrialQuotaFeature {
     }
 }
 
-/// One idempotent pool movement — SPEC §6.3's reconcile.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PoolAdjustment {
-    /// The run executed FEWER steps than reserved: give the difference back.
-    Refund(u64),
-    /// The run executed MORE (retries fired): take the difference. **Never
-    /// refused** (§6.3 / E14) — this can push usage PAST the limit, and the next
-    /// enqueue is where enforcement happens.
-    TopUp(u64),
-}
-
-impl PoolAdjustment {
-    /// The signed movement this applies to the counter.
-    pub fn delta(&self) -> i64 {
-        match self {
-            // A refund cannot exceed i64::MAX; saturating keeps the sign right.
-            PoolAdjustment::Refund(n) => -(i64::try_from(*n).unwrap_or(i64::MAX)),
-            PoolAdjustment::TopUp(n) => i64::try_from(*n).unwrap_or(i64::MAX),
-        }
-    }
-}
-
-/// A bounded, process-local record of the adjustment keys already applied.
-///
-/// SPEC §6.3 keys every adjustment on
-/// `(synthetics_id, location, scheduled_ts, job_id)`; the caller builds it,
-/// this is where it is checked, and [`claim`](Self::claim) returns `true`
-/// exactly once per key in the window. Process-local is enough only because it
-/// is the SECOND gate — `synthetics_jobs::ack_complete` already rejects
-/// duplicate acks cluster-wide (T14/T15) — and the bound stops it leaking.
-struct IdempotencyLedger {
-    inner: Mutex<LedgerInner>,
-    capacity: usize,
-}
-
-struct LedgerInner {
-    seen: HashSet<String>,
-    /// Insertion order, so eviction is FIFO rather than arbitrary — a key
-    /// replayed after `capacity` further adjustments would be applied twice.
-    order: VecDeque<String>,
-}
-
-impl IdempotencyLedger {
-    fn new(capacity: usize) -> Self {
-        Self {
-            inner: Mutex::new(LedgerInner {
-                seen: HashSet::new(),
-                order: VecDeque::new(),
-            }),
-            // A zero capacity would silently disable the guard, so it is floored.
-            capacity: capacity.max(1),
-        }
-    }
-
-    /// `true` the first time this key is seen, `false` for every repeat.
-    ///
-    /// Poisoning is ignored: a panic elsewhere must not panic a billing path.
-    fn claim(&self, key: &str) -> bool {
-        let mut inner = self.inner.lock().unwrap_or_else(|e| e.into_inner());
-        if !inner.seen.insert(key.to_string()) {
-            return false;
-        }
-        inner.order.push_back(key.to_string());
-        while inner.order.len() > self.capacity {
-            if let Some(evicted) = inner.order.pop_front() {
-                inner.seen.remove(&evicted);
-            }
-        }
-        true
-    }
-
-    /// How many keys are remembered. `cfg(test)` because the bound it pins —
-    /// this map cannot grow forever — is not observable any other way.
-    #[cfg(test)]
-    fn len(&self) -> usize {
-        self.inner
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .seen
-            .len()
-    }
-}
-
 impl std::fmt::Display for TrialQuotaFeature {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.feature_key())
@@ -432,9 +340,9 @@ fn ensure_scope_counter(key: &str) {
         .or_insert_with(|| AtomicU64::new(0));
 }
 
-/// Atomically apply a SIGNED delta to one pool's counter, saturating at zero:
-/// a refund larger than the recorded usage must not wrap `u64` into an org that
-/// has used 18 quintillion units and can never run again.
+/// Atomically apply a SIGNED delta to one pool's counter, saturating at zero: the
+/// only negative delta left is one an older node broadcasts over HA, and wrapping
+/// `u64` would leave an org at 18 quintillion units that can never run again.
 fn apply_to_pool_counter(org_id: &str, pool: TrialQuotaPool, delta: i64) -> u64 {
     let key = scope(org_id, pool);
     ensure_scope_counter(&key);
@@ -638,9 +546,6 @@ pub async fn try_deduct(
 
 /// Deduct `units x feature.cost()` from the feature's pool, all or nothing.
 /// Returns the REMAINING units in the pool on success.
-///
-/// Synchronous on purpose: the synthetics enqueue path reaches this through a
-/// function-pointer hook that cannot be `dyn`-safe and async at once.
 pub fn try_deduct_units(
     org_id: &str,
     feature: TrialQuotaFeature,
@@ -693,61 +598,14 @@ pub fn try_deduct_units(
     }
 }
 
-/// Deduct `units` and NEVER refuse — SPEC §6.3 / E14: a top-up that would
-/// exhaust the pool mid-run is still recorded, so `usage_count` can pass
-/// `usage_limit` and the next [`try_deduct_units`] is what fails (T28).
-pub fn force_deduct_units(org_id: &str, feature: TrialQuotaFeature, units: u64) -> u64 {
-    let cost = feature.cost().saturating_mul(units);
-    let signed = i64::try_from(cost).unwrap_or(i64::MAX);
-    let total = apply_to_pool_counter(org_id, feature.pool(), signed);
-    buffer_flush(org_id, feature, signed);
-    broadcast_delta_detached(org_id, feature.pool(), signed);
-    total
-}
-
-/// Give `units` back to the pool, saturating at zero.
-pub fn refund_units(org_id: &str, feature: TrialQuotaFeature, units: u64) -> u64 {
-    let cost = feature.cost().saturating_mul(units);
-    let signed = -i64::try_from(cost).unwrap_or(i64::MAX);
-    let total = apply_to_pool_counter(org_id, feature.pool(), signed);
-    buffer_flush(org_id, feature, signed);
-    broadcast_delta_detached(org_id, feature.pool(), signed);
-    total
-}
-
-/// Apply one [`PoolAdjustment`] AT MOST ONCE for `idempotency_key` — SPEC §6.3.
-///
-/// `false` means this key was already applied in this process (T27). The caller
-/// builds the key and it MUST identify the run:
-/// `(synthetics_id, location, scheduled_ts, job_id)` — see [`IdempotencyLedger`].
-pub fn apply_pool_adjustment(
-    org_id: &str,
-    feature: TrialQuotaFeature,
-    adjustment: PoolAdjustment,
-    idempotency_key: &str,
-) -> bool {
-    if !ADJUSTMENTS.claim(idempotency_key) {
-        log::debug!(
-            "[TRIAL_QUOTA] pool adjustment already applied, skipping: org={org_id} key={idempotency_key}"
-        );
-        return false;
-    }
-    match adjustment {
-        PoolAdjustment::Refund(units) => refund_units(org_id, feature, units),
-        PoolAdjustment::TopUp(units) => force_deduct_units(org_id, feature, units),
-    };
-    true
-}
-
 /// Buffer one SIGNED usage movement for the periodic DB flush.
 ///
 /// ⚠️ §11 **F8**: the channel is bounded at 10,000 and `try_send` DROPS on
 /// overflow. Only the DB half is lost — this node keeps enforcing the right
 /// number until it restarts, when `init_from_db` reloads a total short by the
 /// dropped amount and the org silently gets those units back. Under a one-time
-/// grant that is permanent. Nothing replays it (fire-and-forget, no ack); §9B.3
-/// reconciles `_usage` against `trial_quota_usage.usage_count`, and **A5**/**A8**
-/// page on the drop and on the divergence.
+/// grant that is permanent. Nothing replays it (fire-and-forget, no ack) and
+/// nothing reconciles it; **A5** pages on the drop.
 fn buffer_flush(org_id: &str, feature: TrialQuotaFeature, cost: i64) {
     if let Err(e) = FLUSH_TX.try_send(FlushRecord {
         org_id: org_id.to_string(),
@@ -1011,50 +869,6 @@ pub fn get_used(org_id: &str) -> u64 {
 /// Get the AI pool limit for an org, falling back to the deployment default.
 pub fn get_limit(org_id: &str) -> u64 {
     get_limit_for_pool(org_id, TrialQuotaPool::AiCredits)
-}
-
-// Synthetics free step pool — SPEC §6. Plain `fn`, no async and no trait
-// objects: `openobserve-synthetics` reaches these through a struct of function
-// pointers and must NOT depend on `openobserve-core`; `openobserve-jobs` wires
-// the two together.
-
-/// The grant a check of this kind spends from. Browser and protocol hold separate
-/// one-time pools: a browser step costs ~52x a protocol one, so a shared grant let
-/// the org's mix decide our free-tier cost.
-fn synthetics_pool(is_browser: bool) -> TrialQuotaPool {
-    if is_browser {
-        TrialQuotaPool::SyntheticsBrowserSteps
-    } else {
-        TrialQuotaPool::SyntheticsProtocolSteps
-    }
-}
-
-fn synthetics_feature(is_browser: bool) -> TrialQuotaFeature {
-    if is_browser {
-        TrialQuotaFeature::SyntheticsBrowserSteps
-    } else {
-        TrialQuotaFeature::SyntheticsProtocolSteps
-    }
-}
-
-/// Steps left in the org's one-time synthetics grant for this check kind (§6.1).
-pub fn synthetics_steps_remaining(org_id: &str, is_browser: bool) -> u64 {
-    get_remaining_for_pool(org_id, synthetics_pool(is_browser))
-}
-
-/// Apply one idempotent ack-side reconcile — SPEC §6.3.
-pub fn synthetics_steps_adjust(
-    org_id: &str,
-    is_browser: bool,
-    adjustment: PoolAdjustment,
-    idempotency_key: &str,
-) -> bool {
-    apply_pool_adjustment(
-        org_id,
-        synthetics_feature(is_browser),
-        adjustment,
-        idempotency_key,
-    )
 }
 
 /// Serializable request body for AI usage events.
@@ -1470,7 +1284,7 @@ pub(crate) fn fold_synthetics_remaining(
     org_ids
         .iter()
         .map(|org_id| {
-            // `force_deduct_units` lets usage pass the limit, so a plain subtraction is a panic.
+            // A lowered limit leaves usage above it, so a plain subtraction is a panic.
             let left = |pool| {
                 // The row's override beats `ORG_LIMITS`, which is empty until the first refresh.
                 limits
@@ -1591,171 +1405,6 @@ mod tests {
         assert_eq!(STEPS.cost(), 1);
     }
 
-    #[test]
-    fn t25_ack_billing_less_than_reserved_refunds_the_difference() {
-        let org_id = steps_org("t25", 1_000);
-        assert!(try_deduct_units(&org_id, STEPS, 14).is_ok());
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            14
-        );
-
-        assert!(synthetics_steps_adjust(
-            &org_id,
-            true,
-            PoolAdjustment::Refund(10),
-            "t25|job-1"
-        ));
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            4
-        );
-        assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            996
-        );
-    }
-
-    #[test]
-    fn t25_refund_is_idempotent() {
-        let org_id = steps_org("t25-idem", 1_000);
-        assert!(try_deduct_units(&org_id, STEPS, 14).is_ok());
-
-        assert!(synthetics_steps_adjust(
-            &org_id,
-            true,
-            PoolAdjustment::Refund(10),
-            "t25-idem|job-1"
-        ));
-        assert!(!synthetics_steps_adjust(
-            &org_id,
-            true,
-            PoolAdjustment::Refund(10),
-            "t25-idem|job-1"
-        ));
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            4
-        );
-    }
-
-    #[test]
-    fn t26_ack_billing_more_than_reserved_tops_up_the_difference() {
-        let org_id = steps_org("t26", 1_000);
-        assert!(try_deduct_units(&org_id, STEPS, 14).is_ok());
-
-        assert!(synthetics_steps_adjust(
-            &org_id,
-            true,
-            PoolAdjustment::TopUp(4),
-            "t26|job-1"
-        ));
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            18
-        );
-        assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            982
-        );
-    }
-
-    #[test]
-    fn t26_top_up_is_idempotent() {
-        let org_id = steps_org("t26-idem", 1_000);
-        assert!(try_deduct_units(&org_id, STEPS, 14).is_ok());
-
-        assert!(synthetics_steps_adjust(
-            &org_id,
-            true,
-            PoolAdjustment::TopUp(4),
-            "t26-idem|job-1"
-        ));
-        assert!(!synthetics_steps_adjust(
-            &org_id,
-            true,
-            PoolAdjustment::TopUp(4),
-            "t26-idem|job-1"
-        ));
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            18
-        );
-    }
-
-    /// T27 — a key that swallowed everything would pass the first half and
-    /// silently stop billing, so a DIFFERENT run's adjustment must still apply.
-    #[test]
-    fn t27_the_same_adjustment_twice_has_no_double_effect() {
-        let org_id = steps_org("t27", 1_000);
-        assert!(try_deduct_units(&org_id, STEPS, 28).is_ok());
-
-        let job_a = "chk_1|us-east-1|1787665631000000|job-a";
-        let job_b = "chk_1|us-east-1|1787665631000000|job-b";
-
-        assert!(synthetics_steps_adjust(
-            &org_id,
-            true,
-            PoolAdjustment::Refund(10),
-            job_a
-        ));
-        assert!(!synthetics_steps_adjust(
-            &org_id,
-            true,
-            PoolAdjustment::Refund(10),
-            job_a
-        ));
-        assert!(!synthetics_steps_adjust(
-            &org_id,
-            true,
-            PoolAdjustment::Refund(10),
-            job_a
-        ));
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            18
-        );
-
-        assert!(synthetics_steps_adjust(
-            &org_id,
-            true,
-            PoolAdjustment::Refund(10),
-            job_b
-        ));
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            8
-        );
-    }
-
-    /// T28 / E14 — a top-up past the limit is RECORDED anyway, and enforcement
-    /// lands on the next enqueue.
-    #[test]
-    fn t28_top_up_past_the_limit_records_and_the_next_enqueue_blocks() {
-        let org_id = steps_org("t28", 20);
-        assert!(try_deduct_units(&org_id, STEPS, 14).is_ok());
-
-        assert!(synthetics_steps_adjust(
-            &org_id,
-            true,
-            PoolAdjustment::TopUp(12),
-            "t28|job-1"
-        ));
-        // RECORDED, past the limit. `try_deduct_units` would have refused it.
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            26
-        );
-        assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            0
-        );
-
-        let err = try_deduct_units(&org_id, STEPS, 1).unwrap_err();
-        assert_eq!(err.usage_count, 26);
-        assert_eq!(err.usage_limit, 20);
-    }
-
     /// All or nothing: a partial deduct would start a run the grant cannot pay for.
     #[test]
     fn a_deduct_that_does_not_fit_takes_nothing() {
@@ -1769,22 +1418,6 @@ mod tests {
         assert_eq!(
             get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
-        );
-    }
-
-    /// Saturating, not wrapping: an over-large refund must read as zero used, not 18 quintillion.
-    #[test]
-    fn a_refund_larger_than_the_usage_saturates_at_zero() {
-        let org_id = steps_org("saturate", 1_000);
-        assert!(try_deduct_units(&org_id, STEPS, 14).is_ok());
-        refund_units(&org_id, STEPS, 999_999);
-        assert_eq!(
-            get_used_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            0
-        );
-        assert_eq!(
-            get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
-            1_000
         );
     }
 
@@ -1901,6 +1534,14 @@ mod tests {
             ["synthetics_steps", "_try", "_deduct"].concat(),
             ["synthetics_steps", "_ref", "und"].concat(),
             ["synthetics_steps", "_dead_letter", "_ref", "und"].concat(),
+            ["synthetics_steps", "_adjust"].concat(),
+            ["synthetics_steps", "_remaining"].concat(),
+            ["Pool", "Adjustment"].concat(),
+            ["Idempotency", "Ledger"].concat(),
+            ["ADJUST", "MENTS"].concat(),
+            ["apply_pool", "_adjustment"].concat(),
+            ["force_deduct", "_units"].concat(),
+            ["ref", "und", "_units"].concat(),
         ];
         for banned in banned {
             assert!(
@@ -1908,41 +1549,6 @@ mod tests {
                 "`{banned}` takes from a ONE-TIME grant the gate no longer gives back",
             );
         }
-    }
-
-    #[test]
-    fn the_ledger_claims_a_key_exactly_once() {
-        let ledger = IdempotencyLedger::new(8);
-        assert!(ledger.claim("a"));
-        assert!(!ledger.claim("a"));
-        assert!(ledger.claim("b"));
-        assert_eq!(ledger.len(), 2);
-    }
-
-    #[test]
-    fn the_ledger_evicts_oldest_first_and_stays_bounded() {
-        let ledger = IdempotencyLedger::new(3);
-        for key in ["a", "b", "c"] {
-            assert!(ledger.claim(key));
-        }
-        assert_eq!(ledger.len(), 3);
-        assert!(ledger.claim("d"));
-        assert_eq!(
-            ledger.len(),
-            3,
-            "the ledger must not grow past its capacity"
-        );
-        // "a" was evicted; "b", "c" and "d" are still remembered.
-        assert!(ledger.claim("a"));
-        assert!(!ledger.claim("c"));
-        assert!(!ledger.claim("d"));
-    }
-
-    #[test]
-    fn a_zero_capacity_ledger_still_remembers_one_key() {
-        let ledger = IdempotencyLedger::new(0);
-        assert!(ledger.claim("a"));
-        assert!(!ledger.claim("a"));
     }
 
     fn ha(cost: u64, pool: Option<&str>, delta: i64) -> TrialQuotaHaMsg {
@@ -2392,12 +1998,6 @@ mod tests {
             body[..end].contains(&["record_flush", "_drop("].concat()),
             "the dropped record is no longer counted; A5 has nothing to alert on",
         );
-    }
-
-    #[test]
-    fn pool_adjustment_deltas_carry_the_right_sign() {
-        assert_eq!(PoolAdjustment::Refund(10).delta(), -10);
-        assert_eq!(PoolAdjustment::TopUp(4).delta(), 4);
     }
 
     // --- pending_checkpoint_from ---
