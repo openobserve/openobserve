@@ -5,7 +5,7 @@ name: CI gate
 on:
   # pull_request_target so fork PRs get a status too; no checkout, so nothing untrusted runs.
   pull_request_target:
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   # The queue commit must carry every required check; the gate is already passed by then.
   merge_group:
 
@@ -25,9 +25,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           LABELED: ${{ github.event_name == 'merge_group' || contains(github.event.pull_request.labels.*.name, 'e2e') }}
+          DRAFT: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.draft == true }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ "$LABELED" = "true" ]; then
+          if [ "$DRAFT" = "true" ]; then
+            STATE=pending; DESC="Draft PR: paid CI does not run until it is marked ready for review."
+          elif [ "$LABELED" = "true" ]; then
             STATE=success; DESC="e2e label present; CI runs on every push"
           else
             STATE=pending; DESC="Add the e2e label to run CI. Required before this PR can be queued."

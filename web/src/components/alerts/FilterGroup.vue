@@ -47,7 +47,7 @@
     <div v-if="isOpen" class="group-container overflow-x-auto">
       <!-- Items in group (V2 uses 'conditions' array) -->
       <div
-        class="ml-2 whitespace-nowrap"
+        class="ms-2 whitespace-nowrap"
         v-for="(item, index) in props.group.conditions"
         :key="index"
       >
@@ -70,7 +70,7 @@
         <div
           v-else
           class="mb-2 flex items-center gap-2"
-          :class="store.state.isAiChatEnabled ? 'pl-0' : 'pl-4'"
+          :class="store.state.isAiChatEnabled ? 'ps-0' : 'ps-4'"
         >
           <FilterCondition
             :condition="item"
@@ -97,27 +97,27 @@
       </div>
       <!-- Action buttons -->
 
-      <div class="ml-4 flex items-center justify-start">
+      <div class="ms-4 flex items-center justify-start">
         <OButton
           data-test="alert-conditions-add-condition-btn"
-          class="ml-3"
+          class="ms-3"
           size="sm"
           variant="ghost-primary"
           @click="addCondition(props.group.groupId)"
         >
-          <OIcon class="mr-1 rounded-full border font-bold" size="xs" name="add" />
+          <OIcon class="me-1 rounded-full border font-bold" size="xs" name="add" />
           <span class="text-xs font-bold">{{ t("alerts.conditions.condition") }}</span>
           <OTooltip :delay="300" :content="t('alerts.conditions.addConditionTooltip')" />
         </OButton>
         <OButton
           data-test="alert-conditions-add-condition-group-btn"
-          class="ml-1"
+          class="ms-1"
           size="sm"
           variant="ghost-primary"
           @click="addGroup(props.group.groupId)"
           :disabled="depth >= 2"
         >
-          <OIcon class="mr-1 rounded-full border font-bold" size="xs" name="add" />
+          <OIcon class="me-1 rounded-full border font-bold" size="xs" name="add" />
           <span class="text-xs font-bold">{{ t("alerts.conditions.conditionGroup") }}</span>
           <OTooltip
             v-if="depth < 2"
@@ -128,12 +128,12 @@
         </OButton>
         <OButton
           data-test="alert-conditions-reorder-btn"
-          class="ml-1"
+          class="ms-1"
           size="sm"
           variant="ghost-primary"
           @click="reorderItems()"
         >
-          <OIcon class="mr-1 font-bold" size="xs" name="swap-vert" />
+          <OIcon class="me-1 font-bold" size="xs" name="swap-vert" />
           <span class="text-xs font-bold">{{ t("alerts.filters.reorder") }}</span>
           <OTooltip :delay="300" :content="t('alerts.filters.reorderTooltip')" />
         </OButton>

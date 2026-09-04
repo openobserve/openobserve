@@ -155,11 +155,9 @@ test.describe("Dashboard Table — Column Filtering (PR #12531)", () => {
 
     const panel = await openColumnFilter(page, 0);
     const items = columnFilter.valueItems(panel);
+    // Value <li>s populate a reactive tick after the panel shell becomes visible; poll so count() never snapshots the still-filling list and reads <=1.
+    await expect.poll(async () => items.count(), { timeout: 10000 }).toBeGreaterThan(1);
     const initialCount = await items.count();
-    // Must have more than the eventual 1-item "no matches" placeholder, otherwise a
-    // panel that failed to load any values at all would be indistinguishable from
-    // "search narrowed the list down to nothing".
-    expect(initialCount).toBeGreaterThan(1);
 
     // A search term that matches nothing real should collapse the list to the
     // "no matches" placeholder row.

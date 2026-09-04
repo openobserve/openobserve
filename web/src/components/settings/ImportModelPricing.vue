@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <template #output-content>
       <div
-        class="border-border-default flex h-full w-full flex-col border-l"
+        class="border-border-default flex h-full w-full flex-col border-s"
         style="min-width: 25rem"
       >
         <div

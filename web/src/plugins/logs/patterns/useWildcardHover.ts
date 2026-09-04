@@ -82,11 +82,20 @@ export default function useWildcardHover() {
     }, HIDE_DELAY_MS);
   }
 
+  function cleanup() {
+    if (showTimeout) clearTimeout(showTimeout);
+    if (hideTimeout) clearTimeout(hideTimeout);
+    showTimeout = null;
+    hideTimeout = null;
+    hoveredToken.value = null;
+  }
+
   return {
     hoveredToken,
     onMouseEnter,
     onMouseLeave,
     onPopoverEnter,
     onPopoverLeave,
+    cleanup,
   };
 }

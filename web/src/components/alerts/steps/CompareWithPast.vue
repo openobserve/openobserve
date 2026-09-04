@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
       >
         <div
-          class="section-header-accent rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0"
+          class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
         />
         <span class="section-header-title text-compact text-text-heading font-semibold">{{
           t("alerts.steps.compareWithPast")
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="info"
                   size="sm"
-                  class="ml-1 cursor-pointer"
+                  class="ms-1 cursor-pointer"
                   :class="'text-text-secondary'"
                 />
                 <OTooltip
@@ -131,13 +131,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Time Frame -->
           <div class="flex flex-col items-start gap-2">
             <div class="flex items-center">
-              <span class="mr-1"><OIcon name="schedule" size="sm" /></span>
+              <span class="me-1"><OIcon name="schedule" size="sm" /></span>
               {{ t("alerts.compareWithPast.timeFrame") }}
-              <span class="ml-2 cursor-pointer">
+              <span class="ms-2 cursor-pointer">
                 <OIcon
                   name="info"
                   size="sm"
-                  class="ml-1 cursor-pointer"
+                  class="ms-1 cursor-pointer"
                   :class="'text-text-secondary'"
                 />
                 <OTooltip
@@ -169,7 +169,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OIcon
                   name="info"
                   size="sm"
-                  class="ml-1 cursor-pointer"
+                  class="ms-1 cursor-pointer"
                   :class="'text-text-secondary'"
                 />
                 <OTooltip

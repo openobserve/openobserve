@@ -8,8 +8,8 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so adding or removing 'e2e' starts or resets CI.
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    # labeled/unlabeled so adding or removing 'e2e' starts or resets CI; drafts never run paid CI.
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   merge_group:
 
 concurrency:
@@ -25,7 +25,7 @@ env:
 jobs:
   check_changes:
     # Paid CI runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests on the merged code.
-    if: ${{ github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e') }}
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) }}
     name: check_changes
     runs-on: ubuntu-latest
     permissions:
@@ -41,18 +41,25 @@ jobs:
         with:
           fetch-depth: 0
 
+      # One shared classification for every suite (see .github/actions/classify-changes); a change to
+      # this workflow file re-tests itself on top of it.
+      - uses: ./.github/actions/classify-changes
+        id: classify
       - id: check
+        env:
+          HAS_BACKEND_CHANGES: ${{ steps.classify.outputs.run_unit_backend }}
+          HAS_UI_CHANGES: ${{ steps.classify.outputs.run_unit_ui }}
+          CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
         run: |
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qE '^src/|^proto/|^\.cargo/|^Cargo\.(toml|lock)$|^build\.rs$|^rust-toolchain\.toml$|^coverage\.sh$|^\.github/workflows/unit-tests\.yml$'; then
-            echo "has_backend_changes=true" >> $GITHUB_OUTPUT
+          if [ "$HAS_BACKEND_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' unit-tests.yml '; then
+            echo "has_backend_changes=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_backend_changes=false" >> $GITHUB_OUTPUT
+            echo "has_backend_changes=false" >> "$GITHUB_OUTPUT"
           fi
-          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -q '^web/'; then
-            echo "has_ui_changes=true" >> $GITHUB_OUTPUT
+          if [ "$HAS_UI_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' unit-tests.yml '; then
+            echo "has_ui_changes=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_ui_changes=false" >> $GITHUB_OUTPUT
+            echo "has_ui_changes=false" >> "$GITHUB_OUTPUT"
           fi
 
   backend_static_checks:
@@ -68,6 +75,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -123,6 +131,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -130,6 +139,8 @@ jobs:
           targets: x86_64-unknown-linux-gnu
 
       - uses: taiki-e/install-action@v2.87.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           tool: nextest,cargo-llvm-cov
 
@@ -184,6 +195,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -191,6 +203,8 @@ jobs:
           targets: x86_64-unknown-linux-gnu
 
       - uses: taiki-e/install-action@v2.87.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           tool: nextest,cargo-llvm-cov
 
@@ -252,6 +266,7 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
@@ -306,7 +321,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions: {}
     needs: [check_changes, backend_unit_tests, ui_unit_tests, ui_code_quality]
-    if: always() && (github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'e2e'))
+    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
         run: |

@@ -68,7 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ t("billing.billingGroup.viewUsage") }}
             <template #icon-right>
-              <OIcon name="arrow-forward" size="sm" class="ml-1" />
+              <OIcon name="arrow-forward" size="sm" class="ms-1" />
             </template>
           </OButton>
         </div>
@@ -148,7 +148,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("billing.billingGroup.viewUsage") }}
               <template #icon-right>
-                <OIcon name="arrow-forward" size="sm" class="ml-1" />
+                <OIcon name="arrow-forward" size="sm" class="ms-1" />
               </template>
             </OButton>
           </div>
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OUserCell :value="row.inviter_id" />
             </template>
             <template #cell-actions="{ row }">
-              <div class="flex justify-end gap-2 pr-3">
+              <div class="flex justify-end gap-2 pe-3">
                 <OButton
                   variant="primary"
                   size="sm"

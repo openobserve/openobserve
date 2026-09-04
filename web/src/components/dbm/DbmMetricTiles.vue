@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       v-for="item in items"
       :key="item.id"
-      class="border-border-subtle border-r border-b px-3 py-2 last:border-r-0"
+      class="border-border-subtle border-e border-b px-3 py-2 last:border-e-0"
       :data-test="`${tileDataTest}-${item.id}`"
     >
       <!-- The percentile the plain-English label stands for, alongside it in

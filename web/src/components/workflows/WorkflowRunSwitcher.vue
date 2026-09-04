@@ -72,9 +72,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :empty-label="raw('—')"
               />
             </span>
-            <OBadge :variant="run.error ? 'error-soft' : 'success-soft'" size="xs">
-              {{ run.error ? t("workflow.history.failed") : t("workflow.history.success") }}
-            </OBadge>
+            <span class="flex shrink-0 items-center gap-1">
+              <OBadge v-if="isTestRun(run)" variant="default-soft" size="xs">
+                {{ t("workflow.history.testRun") }}
+              </OBadge>
+              <OBadge :variant="run.error ? 'error-soft' : 'success-soft'" size="xs">
+                {{ run.error ? t("workflow.history.failed") : t("workflow.history.success") }}
+              </OBadge>
+            </span>
           </div>
           <!-- Hover a failed run to read WHY it failed without leaving the menu. -->
           <OTooltip
@@ -91,6 +96,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("workflow.ndv.noRunsList") }}
         </div>
+      </div>
+      <!-- Rows are only ever withheld as a CLASS (test runs), so the menu says so
+           and offers them back rather than shrinking silently. -->
+      <div v-if="testRunCount > 0" class="border-border-default border-t px-2 py-1.5">
+        <OButton
+          variant="ghost"
+          size="sm"
+          class="w-full"
+          data-test="workflow-run-switcher-show-test"
+          @click="showTestRuns = !showTestRuns"
+        >
+          {{
+            showTestRuns
+              ? t("workflow.history.hideTestRuns")
+              : t("workflow.history.showTestRuns", { count: hiddenTestRunCount })
+          }}
+        </OButton>
       </div>
       <!-- Optional footer (e.g. the editor's "Open Full Runs View" link). -->
       <div v-if="$slots.footer" class="border-border-default border-t px-2 py-1.5">
@@ -111,7 +133,9 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import ORefreshButton from "@/lib/core/RefreshButton/ORefreshButton.vue";
+import { isTestRun, useTestRunVisibility } from "@/plugins/workflows/useWorkflowCanvas";
 import { workflowObj, loadRunsHistory } from "@/plugins/workflows/useWorkflowCanvas";
+import OButton from "@/lib/core/Button/OButton.vue";
 
 const props = defineProps<{
   // The run currently loaded on the canvas — check-marked and auto-scrolled to.
@@ -126,12 +150,23 @@ const store = useStore();
 
 const open = ref(false);
 const runsLoading = computed(() => workflowObj.runsHistory.loading);
-// ALL runs (newest first) — the menu scrolls; bounded only by history retention.
+// Shared with the Runs table so the two surfaces cannot disagree about what a
+// published workflow's history should show.
+const { showTestRuns, testRunCount, visibleRuns } = useTestRunVisibility();
+// The run on the canvas stays listed even when hidden as a class, or the
+// check-marked "current" row would vanish from its own menu.
 const sortedRuns = computed(() =>
-  [...workflowObj.runsHistory.list].sort(
-    (a: any, b: any) => (b.start_time || 0) - (a.start_time || 0),
-  ),
+  visibleRuns(workflowObj.runsHistory.list)
+    .concat(
+      workflowObj.runsHistory.list.filter(
+        (r: any) => r.run_id === props.currentRunId && isTestRun(r) && !showTestRuns.value,
+      ),
+    )
+    .sort((a: any, b: any) => (b.start_time || 0) - (a.start_time || 0)),
 );
+// Only offered while runs are actually being withheld — a control that claims to
+// hide something when nothing is hidden is noise.
+const hiddenTestRunCount = computed(() => (showTestRuns.value ? 0 : testRunCount.value));
 
 const fetchRuns = async () => {
   if (!props.workflowId || runsLoading.value) return;

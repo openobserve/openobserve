@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Chart Type Selection Sidebar -->
       <div>
         <div
-          class="scroll bg-surface-panel! border-border-default flex h-full max-w-25 min-w-25 flex-col overflow-x-hidden overflow-y-auto border-r"
+          class="scroll bg-surface-panel! border-border-default flex h-full max-w-25 min-w-25 flex-col overflow-x-hidden overflow-y-auto border-e"
         >
           <ChartSelection
             v-model:selectedChartType="dashboardPanelData.data.type"
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-r"
+          class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-e"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
         >
@@ -131,7 +131,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dashboardPanelData.meta.dateTime.start_time &&
                           dashboardPanelData.meta.dateTime.end_time))
                     "
-                    class="pl-3"
+                    class="ps-3"
                     :variablesConfig="dashboardData?.variables"
                     :showDynamicFilters="dashboardData?.variables?.showDynamicFilters"
                     :selectedTimeDate="dateTimeForVariables || dashboardPanelData.meta.dateTime"
@@ -159,7 +159,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </div>
 
                   <!-- Warning icons and last refreshed time -->
-                  <div class="mr-2 flex items-center justify-end gap-2">
+                  <div class="me-2 flex items-center justify-end gap-2">
                     <!-- Show Legends button (hidden when the chart has no data) -->
                     <OButton
                       v-if="
@@ -398,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Collapsed field list bar for custom chart -->
         <div
           v-if="!dashboardPanelData.layout.showFieldList"
-          class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-r"
+          class="bg-surface-panel! border-border-default flex h-full w-12.5 shrink-0 cursor-pointer flex-col items-center justify-start overflow-y-auto border-e"
           data-test="panel-editor-field-list-sidebar-collapsed"
           @click="collapseFieldList"
         >
@@ -511,7 +511,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <!-- Chart Preview -->
                     <template #after>
                       <div class="flex h-full flex-col">
-                        <div class="mt-1 mr-2 flex items-center justify-end gap-2">
+                        <div class="me-2 mt-1 flex items-center justify-end gap-2">
                           <PanelErrorButtons
                             :error="errorMessage"
                             :maxQueryRangeWarning="maxQueryRangeWarning"

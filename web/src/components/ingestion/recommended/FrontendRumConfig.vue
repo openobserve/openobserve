@@ -182,7 +182,7 @@ const subs = computed<CardSubstitutions>(() => ({
           >
             <OIcon :name="p.icon" size="xs" class="me-1" />
             {{ t(p.labelKey) }}
-            <BetaBadge v-if="p.beta" size="xs" class="ml-1.5" />
+            <BetaBadge v-if="p.beta" size="xs" class="ms-1.5" />
           </OToggleGroupItem>
         </OToggleGroup>
       </template>

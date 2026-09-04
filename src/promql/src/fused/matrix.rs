@@ -13,32 +13,33 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::{
     NAME_LABEL,
     value::{EvalContext, Value},
 };
 use datafusion::error::{DataFusionError, Result};
+use infra::errors::{Error, ErrorCodes};
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
 use super::{
-    fold::{FoldParams, fold_partition, merge_folds, run_folds},
+    fold::{FoldParams, fold_sources},
     op::FusedAggOp,
 };
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
-    series_stream::matrix::matrix_sources,
+    series_source::matrix::matrix_sources,
 };
 
 /// Evaluates a range function over an already-materialized matrix and folds
 /// its values straight into aggregation groups, through the same fold the
-/// streaming path uses.
+/// hash-sorted path uses.
 ///
 /// The engine selects this only for the exact `agg(range_func(...))` shape;
 /// everything else stays on the generic evaluator, the correctness reference.
-pub(crate) async fn fused_range_agg(
+pub(crate) async fn fused_agg(
     param: &Option<LabelModifier>,
     data: Value,
     func: Arc<dyn RangeFunc>,
@@ -84,32 +85,23 @@ pub(crate) async fn fused_range_agg(
         .as_ref()
         .expect("range function input must have a time window")
         .range;
-    let params = Arc::new(FoldParams {
-        op,
-        func: func.clone(),
-        counter_kind: func.counter_extrapolation(),
-        range,
-        eval_ctx: eval_ctx.clone(),
-        timestamps: eval_ctx.timestamps(),
-    });
-    let (matrix, sources) = matrix_sources(matrix, param, config::get_config().limit.cpu_num);
-    let folds = sources
+    let params = FoldParams::new(op, func, range, eval_ctx);
+    let sources = matrix_sources(matrix, param, config::get_config().limit.cpu_num)
         .into_iter()
-        .map(|source| {
-            let params = params.clone();
-            async move { fold_partition(source, params).await }
-        })
-        .collect::<Vec<_>>();
-    let folds = run_folds(folds, timeout).await?;
-    let value = merge_folds(
-        folds.into_iter().map(|(groups, _)| groups).collect(),
-        &params.timestamps,
-    );
+        .map(|source| std::future::ready(Ok(source)))
+        .collect();
+    let (value, _) =
+        tokio::time::timeout(Duration::from_secs(timeout), fold_sources(sources, params))
+            .await
+            .map_err(|_| {
+                DataFusionError::Plan(
+                    Error::ErrorCode(ErrorCodes::SearchTimeout(
+                        "[PromQL] fused agg timeout".to_string(),
+                    ))
+                    .to_string(),
+                )
+            })??;
 
-    if let Ok(matrix) = Arc::try_unwrap(matrix) {
-        // Free the per-series allocations on the rayon pool; dropping them single-threaded is slow.
-        matrix.into_par_iter().for_each(drop);
-    }
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] fused {}({func_name}) completed in {:?}, folded {input_series} series into {} series",
         op.name(),
@@ -128,51 +120,11 @@ mod tests {
 
     use config::meta::promql::value::{Label, RangeValue, Sample, TimeWindow};
 
-    use super::*;
-    use crate::{aggregations, functions, series_stream::matrix::MATRIX_PARTITION_CHUNK};
+    use super::{super::test_support::*, *};
+    use crate::{aggregations, functions, series_source::matrix::MATRIX_PARTITION_CHUNK};
 
-    type CanonicalSeries = (Vec<(String, String)>, Vec<(i64, u64)>);
     type GenericAgg = fn(&Option<LabelModifier>, Value, &EvalContext) -> Result<Value>;
     type GenericRange = fn(Value, &EvalContext) -> Result<Value>;
-
-    const SECOND: i64 = 1_000_000;
-    const BASE: i64 = 1_000 * SECOND;
-
-    fn canonical_matrix(value: Value) -> Vec<CanonicalSeries> {
-        let matrix = match value {
-            Value::Matrix(matrix) => matrix,
-            Value::None => return vec![],
-            value => panic!("expected matrix or none, got {}", value.get_type()),
-        };
-        let mut canonical = matrix
-            .into_iter()
-            .map(|series| {
-                let mut labels = series
-                    .labels
-                    .iter()
-                    .map(|label| (label.name.clone(), label.value.clone()))
-                    .collect::<Vec<_>>();
-                labels.sort();
-                let samples = series
-                    .samples
-                    .iter()
-                    .map(|sample| (sample.timestamp, sample.value.to_bits()))
-                    .collect::<Vec<_>>();
-                (labels, samples)
-            })
-            .collect::<Vec<_>>();
-        canonical.sort_by(|a, b| a.0.cmp(&b.0));
-        canonical
-    }
-
-    fn eval_ctx() -> EvalContext {
-        EvalContext::new(
-            BASE + 60 * SECOND,
-            BASE + 180 * SECOND,
-            60 * SECOND,
-            "test".into(),
-        )
-    }
 
     fn make_series(name: &str, instance: &str, path: &str, points: &[(i64, f64)]) -> RangeValue {
         RangeValue {
@@ -221,18 +173,6 @@ mod tests {
         ]
     }
 
-    fn by(labels: &[&str]) -> Option<LabelModifier> {
-        Some(LabelModifier::Include(promql_parser::label::Labels {
-            labels: labels.iter().map(|label| label.to_string()).collect(),
-        }))
-    }
-
-    fn without(labels: &[&str]) -> Option<LabelModifier> {
-        Some(LabelModifier::Exclude(promql_parser::label::Labels {
-            labels: labels.iter().map(|label| label.to_string()).collect(),
-        }))
-    }
-
     async fn run_fused(
         modifier: &Option<LabelModifier>,
         matrix: Vec<RangeValue>,
@@ -241,7 +181,7 @@ mod tests {
         eval_ctx: &EvalContext,
     ) -> Result<Value> {
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func(func_name).unwrap());
-        fused_range_agg(modifier, Value::Matrix(matrix), func, op, eval_ctx, 30).await
+        fused_agg(modifier, Value::Matrix(matrix), func, op, eval_ctx, 30).await
     }
 
     #[tokio::test]
@@ -430,7 +370,7 @@ mod tests {
     async fn test_fused_range_agg_none_and_invalid_input() {
         let eval_ctx = eval_ctx();
         let func: Arc<dyn RangeFunc> = Arc::from(functions::fusable_range_func("rate").unwrap());
-        let result = fused_range_agg(
+        let result = fused_agg(
             &None,
             Value::None,
             func.clone(),
@@ -442,7 +382,7 @@ mod tests {
         .unwrap();
         assert!(matches!(result, Value::None));
 
-        let result = fused_range_agg(
+        let result = fused_agg(
             &None,
             Value::Float(1.0),
             func.clone(),
@@ -453,7 +393,7 @@ mod tests {
         .await;
         assert!(result.is_err());
 
-        let result = fused_range_agg(
+        let result = fused_agg(
             &None,
             Value::Matrix(vec![]),
             func,

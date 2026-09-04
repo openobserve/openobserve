@@ -45,7 +45,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               />
               <div
                 v-if="!sessionState.data.editorValue && !editorFocused"
-                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start pt-0.75 pr-2 pb-0 pl-[2.15rem] select-none"
+                class="query-editor-placeholder-overlay pointer-events-none absolute top-0 right-0 bottom-0 left-0 z-1 flex items-start ps-[2.15rem] pe-2 pt-0.75 pb-0 select-none"
               >
                 <span class="query-editor-placeholder-typewriter">{{ editorPlaceholder }}</span>
               </div>
@@ -123,7 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :horizontal="false"
       >
         <template #before>
-          <div class="bg-surface-panel border-border-default h-full overflow-auto border-r py-1">
+          <div class="bg-surface-panel border-border-default h-full overflow-auto border-e py-1">
             <SearchFieldList
               :fields="streamFields"
               :time-stamp="{

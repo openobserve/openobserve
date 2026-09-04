@@ -946,7 +946,7 @@ function fireConfetti() {
             >{{ l.label }} {{ t("ingestion.setupCard.arrow") }}</a
           >
         </template>
-        <span v-if="content.slackUrl" class="ml-auto"
+        <span v-if="content.slackUrl" class="ms-auto"
           >{{ t("ingestion.setupCard.stuck") }}
           <a :href="safeHttpUrl(content.slackUrl)" target="_blank" rel="noopener noreferrer">{{
             t("ingestion.setupCard.askOnSlack")
