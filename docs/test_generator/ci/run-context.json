@@ -1,0 +1,21 @@
+{
+  "feature_slug": "trace-genai-parts",
+  "feature_title": "Traces GenAI v5 Parts Rendering",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "traceGenAiParts.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/TraceDetailsSidebar.vue",
+    "web/src/plugins/traces/LLMContentRenderer.vue",
+    "web/src/plugins/traces/TraceTree.vue",
+    "web/src/plugins/traces/ThreadView.vue",
+    "web/src/plugins/traces/Index.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

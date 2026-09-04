@@ -1,0 +1,5 @@
+[
+  { "title": "should render an unknown part type as a [type] marker (never a raw JSON dump)", "action": "append", "verifies": "an unrecognized part type renders a [type] marker derived from its type, never a raw JSON dump of the payload" },
+  { "title": "should prefer the response field over result in tool_call_response", "action": "append", "verifies": "the spec response field wins over the vendor result alias when both are present" },
+  { "title": "should render server_tool_call / server_tool_call_response parts as text", "action": "append", "verifies": "server-side tool call and response part types render as readable text in the preview panes" }
+]

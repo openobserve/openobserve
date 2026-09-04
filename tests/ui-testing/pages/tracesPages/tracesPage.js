@@ -2725,6 +2725,13 @@ export class TracesPage {
   }
 
   /**
+   * Assert the Output pane of the LLM preview does NOT contain `text`.
+   */
+  async expectLlmOutputNotContains(text) {
+    await expect(this.getLlmOutputPane()).not.toContainText(text);
+  }
+
+  /**
    * Assert the tool-observation view (`.tool-content`) is visible for the
    * `execute_tool` span.
    */

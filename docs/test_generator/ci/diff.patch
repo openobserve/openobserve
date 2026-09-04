@@ -1,0 +1,793 @@
+===== COMPLETE LIST OF CHANGED FILES (6 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+tests/ui-testing/ci-matrix/ci_matrix.json
+tests/ui-testing/pages/page-manager.js
+tests/ui-testing/pages/tracesPages/genAiTracesIngestionPage.js
+tests/ui-testing/pages/tracesPages/tracesPage.js
+tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js
+tests/ui-testing/playwright-tests/cleanup.spec.js
+===== END CHANGED FILES =====
+
+diff --git a/tests/ui-testing/ci-matrix/ci_matrix.json b/tests/ui-testing/ci-matrix/ci_matrix.json
+index fc81e288f0b..368a6093d44 100644
+--- a/tests/ui-testing/ci-matrix/ci_matrix.json
++++ b/tests/ui-testing/ci-matrix/ci_matrix.json
+@@ -444,7 +444,8 @@
+       "traceDetails.spec.js",
+       "traceAdvancedFiltering.spec.js",
+       "tracesAnalyzeDimensions.spec.js",
+-      "traces-autocomplete-suggestions.spec.js"
++      "traces-autocomplete-suggestions.spec.js",
++      "traceGenAiParts.spec.js"
+     ],
+     "disabled": []
+   },
+diff --git a/tests/ui-testing/pages/page-manager.js b/tests/ui-testing/pages/page-manager.js
+index 9d0e9a70f4e..475ad8c692f 100644
+--- a/tests/ui-testing/pages/page-manager.js
++++ b/tests/ui-testing/pages/page-manager.js
+@@ -110,6 +110,7 @@ import UnflattenedPage from "./logsPages/unflattened.js";
+ import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
+ import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
+ import { SDRTracesIngestionPage } from "./sdrPages/sdrTracesIngestionPage.js";
++import { GenAiTracesIngestionPage } from "./tracesPages/genAiTracesIngestionPage.js";
+ import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
+ import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationPage.js";
+ 
+@@ -238,6 +239,7 @@ class PageManager {
+     this.sdrPatternsPage = new SDRPatternsPage(page);
+     this.sdrVerificationPage = new SDRVerificationPage(page);
+     this.sdrTracesPage = new SDRTracesIngestionPage(page);
++    this.genAiTracesIngestionPage = new GenAiTracesIngestionPage(page);
+     this.streamAssociationPage = new StreamAssociationPage(page);
+     this.streamsFormValidation = new StreamsFormValidationPage(page);
+ 
+diff --git a/tests/ui-testing/pages/tracesPages/genAiTracesIngestionPage.js b/tests/ui-testing/pages/tracesPages/genAiTracesIngestionPage.js
+new file mode 100644
+index 00000000000..bc70d4e8887
+--- /dev/null
++++ b/tests/ui-testing/pages/tracesPages/genAiTracesIngestionPage.js
+@@ -0,0 +1,175 @@
++const crypto = require('crypto');
++const testLogger = require('../../playwright-tests/utils/test-logger.js');
++const { getAuthHeaders, getOrgIdentifier } = require('../../playwright-tests/utils/cloud-auth.js');
++
++/**
++ * OTLP traces ingestion for the GenAI v5 `parts` rendering tests.
++ *
++ * Mirrors `sdrTracesIngestionPage.ingestMultipleFields` (the SDR traces helper):
++ * one span per call, POSTed to `/api/{org}/v1/traces` with the target stream in
++ * the `stream-name` header. The difference is the attribute payload: instead of a
++ * single field under test, each span carries the OTel GenAI semconv v5 attributes
++ * (`gen_ai.operation.name`, `gen_ai.input.messages`, `gen_ai.tool.call.*`, ...)
++ * as DOTTED keys. OpenObserve flattens `.` → `_` at ingest
++ * (`src/config/src/utils/flatten.rs::format_key`), so the component reads
++ * `gen_ai_input_messages`, `gen_ai_tool_call_id`, etc. Messages/instructions
++ * attribute values are JSON-encoded strings (the caller stringifies them) because
++ * `TraceDetailsSidebar` passes the raw field straight into `LLMContentRenderer`,
++ * which `JSON.parse`s string content.
++ */
++export class GenAiTracesIngestionPage {
++  constructor(page) {
++    this.page = page;
++  }
++
++  static _hexId(bytes) {
++    return crypto.randomBytes(bytes).toString('hex');
++  }
++
++  /**
++   * Ingest ONE OTLP span carrying the given `gen_ai.*` dotted attributes into a
++   * traces stream. Each attribute value must already be a JSON-encoded string.
++   *
++   * @param {string} streamName - target traces stream (set via `stream-name` header)
++   * @param {Object} spec
++   * @param {string} spec.name - span name (unique per test; also the search marker)
++   * @param {number} [spec.kind=2] - OTLP span kind (2 = SERVER)
++   * @param {Object<string, string>} spec.attributes - dotted `gen_ai.*` keys → JSON-string values
++   * @param {number} [maxRetries=5]
++   * @returns {Promise<{ name: string }>} the span name (doubles as the poll marker)
++   */
++  async ingestGenAiSpan(streamName, { name, kind = 2, attributes = {} }, maxRetries = 5) {
++    const orgId = getOrgIdentifier();
++    const headers = { ...getAuthHeaders(), 'stream-name': streamName };
++    const baseUrl = (process.env.INGESTION_URL || process.env.ZO_BASE_URL).replace(/\/$/, '');
++
++    const startNs = Date.now() * 1000000;
++    const attrList = Object.entries(attributes).map(([key, value]) => ({
++      key,
++      value: { stringValue: String(value) },
++    }));
++
++    const span = {
++      traceId: GenAiTracesIngestionPage._hexId(16),
++      spanId: GenAiTracesIngestionPage._hexId(8),
++      name,
++      kind,
++      startTimeUnixNano: String(startNs),
++      endTimeUnixNano: String(startNs + 1000000),
++      attributes: attrList,
++      status: { code: 1 },
++    };
++
++    const traceData = {
++      resourceSpans: [
++        {
++          resource: {
++            attributes: [
++              { key: 'service.name', value: { stringValue: 'genai-test-service' } },
++            ],
++          },
++          scopeSpans: [
++            {
++              scope: { name: 'genai-e2e', version: '1.0.0' },
++              spans: [span],
++            },
++          ],
++        },
++      ],
++    };
++
++    testLogger.info(`Preparing to ingest GenAI span "${name}" to stream ${streamName}`);
++
++    for (let attempt = 1; attempt <= maxRetries; attempt++) {
++      try {
++        const response = await this.page.request.post(`${baseUrl}/api/${orgId}/v1/traces`, {
++          headers,
++          data: traceData,
++        });
++
++        const status = response.status();
++        const responseBody = await response.json().catch(() => ({ error: 'Failed to parse JSON' }));
++        testLogger.info(`GenAI traces ingestion response (attempt ${attempt}/${maxRetries}) - Status: ${status}`);
++
++        if (status === 200 || status === 206) {
++          testLogger.info('GenAI traces ingestion successful');
++          return { name };
++        }
++
++        const errorMessage = responseBody?.message || JSON.stringify(responseBody);
++        if (errorMessage.includes('being deleted') && attempt < maxRetries) {
++          const waitTime = attempt * 5000;
++          testLogger.info(`Stream is being deleted, waiting ${waitTime / 1000}s before retry...`);
++          await this.page.waitForTimeout(waitTime);
++          continue;
++        }
++
++        testLogger.error(`GenAI traces ingestion failed! Status: ${status}, Response:`, responseBody);
++        throw new Error(`GenAI traces ingestion failed with status ${status}: ${JSON.stringify(responseBody)}`);
++      } catch (e) {
++        if (attempt === maxRetries) {
++          testLogger.error(`GenAI traces ingestion failed after ${maxRetries} attempts:`, e.message);
++          throw e;
++        }
++        testLogger.info(`GenAI traces ingestion attempt ${attempt} failed, retrying...`);
++        await this.page.waitForTimeout(attempt * 5000);
++      }
++    }
++  }
++
++  /**
++   * Poll the traces search API until the ingested span (matched by its unique
++   * `operation_name`) is searchable, so the UI never runs a search before the
++   * stream schema/index has hydrated the span.
++   *
++   * @param {string} streamName - traces stream the span was ingested into
++   * @param {string} operationName - the span's unique `name` (the poll marker)
++   * @param {number} [maxAttempts=20]
++   * @returns {Promise<boolean>} true once the span is searchable
++   * @throws if the span is not searchable within maxAttempts
++   */
++  async pollForSpan(streamName, operationName, maxAttempts = 20) {
++    const headers = getAuthHeaders();
++    const baseUrl = process.env['ZO_BASE_URL'];
++    const orgName = getOrgIdentifier();
++    const sql = `SELECT * FROM "${streamName}" WHERE operation_name = '${operationName}' ORDER BY _timestamp DESC`;
++
++    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
++      const endTime = (Date.now() + 60000) * 1000;
++      const startTime = endTime - 60 * 60 * 1000 * 1000;
++      const searchPayload = {
++        query: { sql, start_time: startTime, end_time: endTime, from: 0, size: 1000 },
++      };
++
++      let hits = [];
++      try {
++        const response = await this.page.request.post(
++          `${baseUrl}/api/${orgName}/_search?type=traces`,
++          { headers, data: searchPayload, timeout: 15000 }
++        );
++        if (response.ok()) {
++          const data = await response.json().catch(() => null);
++          hits = data?.hits || [];
++        }
++      } catch (error) {
++        hits = [];
++      }
++
++      if (hits.length >= 1) {
++        testLogger.info(`pollForSpan: span "${operationName}" is searchable in stream ${streamName}`);
++        return true;
++      }
++
++      testLogger.info(`pollForSpan attempt ${attempt}/${maxAttempts}: waiting for span "${operationName}" to index...`);
++      if (attempt < maxAttempts) {
++        // Poll interval between search-API attempts — not a UI-sync sleep; the
++        // terminal condition is the search-API hit count below.
++        await this.page.waitForTimeout(3000);
++      }
++    }
++
++    throw new Error(
++      `pollForSpan: span "${operationName}" not searchable in stream ${streamName} after ${maxAttempts} attempts`
++    );
++  }
++}
+diff --git a/tests/ui-testing/pages/tracesPages/tracesPage.js b/tests/ui-testing/pages/tracesPages/tracesPage.js
+index e9694e91836..56bb0aba9c8 100644
+--- a/tests/ui-testing/pages/tracesPages/tracesPage.js
++++ b/tests/ui-testing/pages/tracesPages/tracesPage.js
+@@ -76,6 +76,24 @@ export class TracesPage {
+     this.traceDetailsSearchInputField = '[data-test="trace-details-search-input-field"]';
+     this.traceDetailsSidebar = '[data-test="trace-details-sidebar"]';
+ 
++    // ===== LLM PREVIEW PANE (GenAI v5 parts) SELECTORS =====
++    // Source: web/src/plugins/traces/TraceDetailsSidebar.vue + LLMContentRenderer.vue
++    // + TraceTree.vue (span rows/select buttons). Preview tab shown v-if=canPreviewSpan;
++    // Input/Output panes render LLMContentRenderer (messages / tool / json views).
++    // `.tool-content` / `.io-section` / `.thread-view` carry NO data-test in the
++    // Vue source (verified); they are scoped under a stable data-test ancestor
++    // where one exists so the layout-coupled class names can't leak outside the
++    // sidebar / thread surfaces.
++    this.llmPreviewTab = '[data-test="trace-details-sidebar-tabs-preview"]';
++    this.llmObservationBadge = '[data-test="trace-details-sidebar-observation-badge"]';
++    this.llmIoSection = '[data-test="trace-details-sidebar"] .io-container .io-section';
++    this.llmToolContent = '[data-test="trace-details-sidebar"] .tool-content';
++    this.llmExpandBtn = '[data-test="traces-llm-content-renderer-expand-btn"]';
++    // ThreadView.vue root div carries only the semantic `thread-view` class (no
++    // data-test); it is the component root, not a framework-generated utility class.
++    this.llmThreadView = '.thread-view';
++    this.traceTreeSpanContainer = '[data-test^="trace-tree-span-container-"]';
++
+     // Service Graph (Enterprise)
+     this.serviceGraphChart = '[data-test="service-graph-chart"]';
+     this.serviceGraphRefreshButton = '[data-test="service-graph-refresh-btn"]';
+@@ -790,6 +808,25 @@ export class TracesPage {
+     }
+   }
+ 
++  /**
++   * Navigate to the traces page carrying a `stream` query param. A full goto
++   * re-fetches the stream list (fetched once on mount), so a stream ingested
++   * AFTER the initial page load becomes selectable, and the `stream` param makes
++   * the page auto-select it (Index.vue loadStreamLists matches queryParams.stream).
++   */
++  async navigateToTracesUrlWithStream(streamName) {
++    const org = process.env["ORGNAME"] || 'default';
++    const baseUrl = (process.env["ZO_BASE_URL"] || '').replace(/\/+$/, '');
++    const tracesUrl = `${baseUrl}/web/traces?org_identifier=${org}&stream=${encodeURIComponent(streamName)}`;
++
++    await this.page.goto(tracesUrl);
++
++    try {
++      await this.page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
++    } catch {
++    }
++  }
++
+   /**
+    * Setup trace search with stream and time range
+    * @param {string} streamName - Stream name to select
+@@ -2608,6 +2645,180 @@ export class TracesPage {
+     return this.page.locator('[data-test="organization-menu-item-label-item-label"]');
+   }
+ 
++  // ===== LLM PREVIEW PANE (GenAI v5 parts) METHODS =====
++
++  /**
++   * Locate the Input pane of the LLM preview (first `.io-section` inside the
++   * sidebar's `.io-container`).
++   */
++  getLlmInputPane() {
++    return this.page.locator(this.llmIoSection).first();
++  }
++
++  /**
++   * Locate the Output pane of the LLM preview (second `.io-section`).
++   */
++  getLlmOutputPane() {
++    return this.page.locator(this.llmIoSection).nth(1);
++  }
++
++  /**
++   * Open the sidebar for the span whose trace-tree operation name contains
++   * `operationName`, by clicking that span row's select button.
++   * @param {string} operationName - span name (e.g. "chat <suffix>")
++   * @returns {Promise<boolean>} true if a matching span was found and clicked
++   */
++  async clickTraceTreeSpanByOperationName(operationName) {
++    // Wait for at least one span row to render before scanning (the tree data
++    // arrives async after the trace result is clicked).
++    await this.page
++      .locator(this.traceTreeSpanContainer)
++      .first()
++      .waitFor({ state: 'visible', timeout: 15000 })
++      .catch(() => {});
++    const containers = this.page.locator(this.traceTreeSpanContainer);
++    const count = await containers.count();
++    for (let i = 0; i < count; i++) {
++      const container = containers.nth(i);
++      const nameEl = container.locator(
++        '[data-test^="trace-tree-span-operation-name-"]:not([data-test*="container"])'
++      );
++      if ((await nameEl.count()) === 0) continue;
++      const txt = (await nameEl.first().textContent().catch(() => '')) || '';
++      if (txt.includes(operationName)) {
++        const selectBtn = container.locator('[data-test^="trace-tree-span-select-btn-"]');
++        await selectBtn.first().waitFor({ state: 'visible', timeout: 10000 });
++        await selectBtn.first().click();
++        return true;
++      }
++    }
++    return false;
++  }
++
++  /**
++   * Assert the LLM Preview tab is present (sidebar open on a span with
++   * `hasTracePreview(span)`).
++   */
++  async expectPreviewTabVisible() {
++    await expect(this.page.locator(this.llmPreviewTab)).toBeVisible({ timeout: 15000 });
++  }
++
++  /**
++   * Assert the Input pane of the LLM preview contains `text`.
++   */
++  async expectLlmInputContains(text) {
++    await expect(this.getLlmInputPane()).toContainText(text, { timeout: 15000 });
++  }
++
++  /**
++   * Assert the Input pane of the LLM preview does NOT contain `text`.
++   */
++  async expectLlmInputNotContains(text) {
++    await expect(this.getLlmInputPane()).not.toContainText(text);
++  }
++
++  /**
++   * Assert the Output pane of the LLM preview contains `text`.
++   */
++  async expectLlmOutputContains(text) {
++    await expect(this.getLlmOutputPane()).toContainText(text, { timeout: 15000 });
++  }
++
++  /**
++   * Assert the tool-observation view (`.tool-content`) is visible for the
++   * `execute_tool` span.
++   */
++  async expectToolContentVisible() {
++    await expect(this.page.locator(this.llmToolContent).first()).toBeVisible({ timeout: 15000 });
++  }
++
++  /**
++   * Assert the tool-observation view contains `text` (e.g. "Tool: calculator").
++   */
++  async expectToolContentContains(text) {
++    await expect(this.page.locator(this.llmToolContent).first()).toContainText(text, { timeout: 15000 });
++  }
++
++  /**
++   * Locate the "System Instructions" collapsible trigger (rendered above the
++   * Input pane when `gen_ai_system_instructions` is present).
++   */
++  getSystemInstructionsTrigger() {
++    return this.page.getByRole('button', { name: /system instructions/i }).first();
++  }
++
++  /**
++   * Assert the "System Instructions" collapsible is present.
++   */
++  async expectSystemInstructionsVisible() {
++    await expect(this.getSystemInstructionsTrigger()).toBeVisible({ timeout: 15000 });
++  }
++
++  /**
++   * Expand the "System Instructions" collapsible.
++   */
++  async expandSystemInstructions() {
++    await this.getSystemInstructionsTrigger().click();
++  }
++
++  /**
++   * Assert the expanded "System Instructions" body shows `text` (visible, not
++   * merely present in the DOM).
++   */
++  async expectSystemInstructionsContains(text) {
++    await expect(this.getLlmInputPane().getByText(text, { exact: false }).first()).toBeVisible({ timeout: 15000 });
++  }
++
++  /**
++   * Locate the truncation "expand" button inside the Input pane.
++   */
++  getLlmExpandButton() {
++    return this.getLlmInputPane().locator(this.llmExpandBtn);
++  }
++
++  /**
++   * Assert the truncation "expand" button is visible (content > 15 lines).
++   */
++  async expectLlmExpandButtonVisible() {
++    await expect(this.getLlmExpandButton()).toBeVisible({ timeout: 15000 });
++  }
++
++  /**
++   * Click the truncation "expand" button to reveal full content.
++   */
++  async clickLlmExpandButton() {
++    await this.getLlmExpandButton().click();
++  }
++
++  /**
++   * Locate the "collapse" button (rendered after expanding; it carries no
++   * data-test, so target by its `traces.lLMContentRenderer.collapse` label).
++   */
++  getLlmCollapseButton() {
++    return this.getLlmInputPane().getByRole('button', { name: /collapse/i });
++  }
++
++  /**
++   * Assert the "collapse" button is visible (full content is shown).
++   */
++  async expectLlmCollapseButtonVisible() {
++    await expect(this.getLlmCollapseButton()).toBeVisible({ timeout: 15000 });
++  }
++
++  /**
++   * Click the "collapse" button to return to the truncated preview.
++   */
++  async clickLlmCollapseButton() {
++    await this.getLlmCollapseButton().click();
++  }
++
++  /**
++   * Assert the Thread tab transcript contains `text`.
++   */
++  async expectThreadViewContains(text) {
++    await expect(this.page.locator(this.llmThreadView)).toContainText(text, { timeout: 15000 });
++  }
++
+ }
+ 
+ 
+diff --git a/tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js b/tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js
+new file mode 100644
+index 00000000000..83fb2916b37
+--- /dev/null
++++ b/tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js
+@@ -0,0 +1,313 @@
++// traceGenAiParts.spec.js
++// Tests for OpenObserve Traces — GenAI v5 `parts` rendering in the trace detail
++// sidebar's Preview pane (and the Thread tab). Verifies that OTel GenAI semconv
++// v5 message parts (text/reasoning/thinking/tool_call/tool_call_response) render
++// as readable text — never raw JSON dumps or base64 payloads — and that the
++// system-instructions collapsible, tool-observation view, and truncation/expand
++// all behave as documented.
++
++const { test, expect, navigateToBase, generateUUID } = require('../utils/enhanced-baseFixtures.js');
++const testLogger = require('../utils/test-logger.js');
++const PageManager = require('../../pages/page-manager.js');
++
++test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
++  test.describe.configure({ mode: 'parallel' });
++  let pm;
++
++  test.beforeEach(async ({ page }, testInfo) => {
++    testLogger.testStart(testInfo.title, testInfo.file);
++    await navigateToBase(page);
++    pm = new PageManager(page);
++    await pm.tracesPage.navigateToTracesUrl();
++    await page.waitForLoadState('networkidle', { timeout: 30000 }).catch(() => {});
++    testLogger.info('Test setup completed');
++  });
++
++  test.afterEach(async ({ page }, testInfo) => {
++    testLogger.testEnd(testInfo.title, testInfo.status);
++  });
++
++  /**
++   * Navigate to the freshly-ingested span and open its LLM Preview pane:
++   * select stream → 15m → run search → open trace → click the LLM span in the
++   * tree → the sidebar defaults to the Preview tab.
++   */
++  async function openGenAiPreview(pm, streamName, spanName) {
++    // The stream-list is fetched once on page load; a stream ingested after that
++    // load is absent from the selector options, so selectTraceStream silently
++    // no-ops. Re-navigate with the stream query param to refresh the list and
++    // auto-select the freshly-ingested stream before searching.
++    await pm.tracesPage.navigateToTracesUrlWithStream(streamName);
++    await pm.tracesPage.setTimeRange('15m');
++    await pm.tracesPage.runTraceSearch();
++    await pm.tracesPage.waitForTraceSearchResults();
++    await pm.tracesPage.clickFirstTraceResult();
++    const clicked = await pm.tracesPage.clickTraceTreeSpanByOperationName(spanName);
++    expect(clicked).toBeTruthy();
++    await pm.tracesPage.expectPreviewTabVisible();
++  }
++
++  test("should render v5 parts conversation in the Preview pane (reasoning / tool_call / tool_call_response)", {
++    tag: ['@genai-v5-parts', '@traces', '@all', '@P0']
++  }, async ({ page }) => {
++    testLogger.info('Testing v5 parts conversation rendering in the Preview pane');
++
++    const suffix = generateUUID();
++    const streamName = `trace_genai_parts_${suffix}`;
++    const spanName = `chat ${suffix}`;
++
++    await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
++      name: spanName,
++      kind: 2,
++      attributes: {
++        'gen_ai.operation.name': 'chat',
++        'gen_ai.input.messages': JSON.stringify([
++          { role: 'user', parts: [{ type: 'text', content: "What's the weather in Boston?" }] },
++          { role: 'assistant', parts: [
++            { type: 'reasoning', content: 'I should check the weather.' },
++            { type: 'tool_call', name: 'get_weather', arguments: { city: 'Boston' } },
++          ] },
++        ]),
++        'gen_ai.output.messages': JSON.stringify([
++          { role: 'tool', parts: [{ type: 'tool_call_response', result: 'rainy, 57F' }] },
++        ]),
++      },
++    });
++    await pm.genAiTracesIngestionPage.pollForSpan(streamName, spanName);
++
++    await openGenAiPreview(pm, streamName, spanName);
++
++    await pm.tracesPage.expectLlmInputContains('I should check the weather.');
++    await pm.tracesPage.expectLlmInputContains('get_weather');
++    await pm.tracesPage.expectLlmOutputContains('rainy, 57F');
++    await pm.tracesPage.expectLlmInputNotContains('"type":"tool_call"');
++
++    testLogger.info('Test completed');
++  });
++
++  test("should render System Instructions via v5 parts as a collapsible", {
++    tag: ['@genai-v5-parts', '@traces', '@all', '@P1']
++  }, async ({ page }) => {
++    testLogger.info('Testing System Instructions rendering via v5 parts');
++
++    const suffix = generateUUID();
++    const streamName = `trace_genai_parts_${suffix}`;
++    const spanName = `chat ${suffix}`;
++
++    await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
++      name: spanName,
++      kind: 2,
++      attributes: {
++        'gen_ai.operation.name': 'chat',
++        'gen_ai.input.messages': JSON.stringify([
++          { role: 'assistant', parts: [{ type: 'reasoning', content: 'I should check the weather.' }] },
++        ]),
++        'gen_ai.output.messages': JSON.stringify([
++          { role: 'tool', parts: [{ type: 'tool_call_response', result: 'rainy, 57F' }] },
++        ]),
++        'gen_ai.system.instructions': JSON.stringify([
++          { type: 'reasoning', content: 'Always be concise.' },
++        ]),
++      },
++    });
++    await pm.genAiTracesIngestionPage.pollForSpan(streamName, spanName);
++
++    await openGenAiPreview(pm, streamName, spanName);
++
++    await pm.tracesPage.expectSystemInstructionsVisible();
++    await pm.tracesPage.expandSystemInstructions();
++    await pm.tracesPage.expectSystemInstructionsContains('Always be concise.');
++
++    testLogger.info('Test completed');
++  });
++
++  test("should render thinking / result real-world aliases", {
++    tag: ['@genai-v5-parts', '@traces', '@all', '@P1']
++  }, async ({ page }) => {
++    testLogger.info('Testing thinking / result real-world aliases');
++
++    const suffix = generateUUID();
++    const streamName = `trace_genai_parts_${suffix}`;
++    const spanName = `chat ${suffix}`;
++
++    await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
++      name: spanName,
++      kind: 2,
++      attributes: {
++        'gen_ai.operation.name': 'chat',
++        'gen_ai.input.messages': JSON.stringify([
++          { role: 'assistant', parts: [{ type: 'thinking', content: 'let me check' }] },
++        ]),
++        'gen_ai.output.messages': JSON.stringify([
++          { role: 'tool', parts: [{ type: 'tool_call_response', result: 'rainy, 57F' }] },
++        ]),
++      },
++    });
++    await pm.genAiTracesIngestionPage.pollForSpan(streamName, spanName);
++
++    await openGenAiPreview(pm, streamName, spanName);
++
++    await pm.tracesPage.expectLlmInputContains('let me check');
++    await pm.tracesPage.expectLlmOutputContains('rainy, 57F');
++
++    testLogger.info('Test completed');
++  });
++
++  test("should render execute_tool span as a tool-observation view", {
++    tag: ['@genai-v5-parts', '@traces', '@all', '@P1']
++  }, async ({ page }) => {
++    testLogger.info('Testing execute_tool span tool-observation rendering');
++
++    const suffix = generateUUID();
++    const streamName = `trace_genai_parts_${suffix}`;
++    const spanName = `execute_tool ${suffix}`;
++
++    await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
++      name: spanName,
++      kind: 2,
++      attributes: {
++        'gen_ai.operation.name': 'execute_tool',
++        'gen_ai.tool.name': 'calculator',
++        'gen_ai.tool.call.id': 'call-123',
++        'gen_ai.tool.call.arguments': '{"operation":"add","numbers":[1,2]}',
++        'gen_ai.tool.call.result': '{"result":3}',
++        // The Preview renderer is v-if="hasContent(previewInput/previewOutput)";
++        // a tool span MUST also carry non-empty messages or it shows "No data".
++        'gen_ai.input.messages': '{"operation":"add","numbers":[1,2]}',
++        'gen_ai.output.messages': '{"result":3}',
++      },
++    });
++    await pm.genAiTracesIngestionPage.pollForSpan(streamName, spanName);
++
++    await openGenAiPreview(pm, streamName, spanName);
++
++    await pm.tracesPage.expectToolContentVisible();
++    await pm.tracesPage.expectToolContentContains('Tool: calculator');
++    await pm.tracesPage.expectToolContentContains('Call ID: call-123');
++
++    testLogger.info('Test completed');
++  });
++
++  test("should render blob / file / uri parts as placeholders (never base64)", {
++    tag: ['@genai-v5-parts', '@traces', '@all', '@P2']
++  }, async ({ page }) => {
++    testLogger.info('Testing blob / file / uri placeholder rendering');
++
++    const suffix = generateUUID();
++    const streamName = `trace_genai_parts_${suffix}`;
++    const spanName = `chat ${suffix}`;
++
++    await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
++      name: spanName,
++      kind: 2,
++      attributes: {
++        'gen_ai.operation.name': 'chat',
++        'gen_ai.input.messages': JSON.stringify([
++          { role: 'assistant', parts: [
++            { type: 'blob', modality: 'image', mime_type: 'image/png', content: 'aGVsbG8=' },
++            { type: 'file', file_id: 'file-abc123', content: 'ZmlsZQ==' },
++            { type: 'uri', uri: 'https://example.com/genai.png' },
++          ] },
++        ]),
++      },
++    });
++    await pm.genAiTracesIngestionPage.pollForSpan(streamName, spanName);
++
++    await openGenAiPreview(pm, streamName, spanName);
++
++    // Each suppressed part type renders its own friendly placeholder...
++    await pm.tracesPage.expectLlmInputContains('[image: image/png]');
++    await pm.tracesPage.expectLlmInputContains('[File: file-abc123]');
++    await pm.tracesPage.expectLlmInputContains('[Uri: https://example.com/genai.png]');
++    // ...and the raw base64 payloads are never exposed.
++    await pm.tracesPage.expectLlmInputNotContains('aGVsbG8=');
++    await pm.tracesPage.expectLlmInputNotContains('ZmlsZQ==');
++
++    testLogger.info('Test completed');
++  });
++
++  test("should truncate long content with an expand/collapse button", {
++    tag: ['@genai-v5-parts', '@traces', '@all', '@P2']
++  }, async ({ page }) => {
++    testLogger.info('Testing truncation and expand/collapse behaviour');
++
++    const suffix = generateUUID();
++    const streamName = `trace_genai_parts_${suffix}`;
++    const spanName = `chat ${suffix}`;
++
++    const textParts = Array.from({ length: 20 }, (_, i) => ({ type: 'text', content: `line ${i} of content` }));
++
++    await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
++      name: spanName,
++      kind: 2,
++      attributes: {
++        'gen_ai.operation.name': 'chat',
++        'gen_ai.input.messages': JSON.stringify([
++          { role: 'assistant', parts: textParts },
++        ]),
++      },
++    });
++    await pm.genAiTracesIngestionPage.pollForSpan(streamName, spanName);
++
++    await openGenAiPreview(pm, streamName, spanName);
++
++    // >15 joined lines → truncated preview with an expand button.
++    await pm.tracesPage.expectLlmExpandButtonVisible();
++
++    // Expand: full content (the late lines are now visible) + collapse button.
++    await pm.tracesPage.clickLlmExpandButton();
++    await pm.tracesPage.expectLlmCollapseButtonVisible();
++    await pm.tracesPage.expectLlmInputContains('line 19 of content');
++
++    // Collapse: back to the truncated preview with the expand button again.
++    await pm.tracesPage.clickLlmCollapseButton();
++    await pm.tracesPage.expectLlmExpandButtonVisible();
++
++    testLogger.info('Test completed');
++  });
++
++  test("should render v5 parts in the Thread tab", {
++    tag: ['@genai-v5-parts', '@traces', '@all', '@P2']
++  }, async ({ page }) => {
++    testLogger.info('Testing v5 parts rendering in the Thread tab');
++
++    const suffix = generateUUID();
++    const streamName = `trace_genai_parts_${suffix}`;
++    const spanName = `chat ${suffix}`;
++
++    await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
++      name: spanName,
++      kind: 2,
++      attributes: {
++        'gen_ai.operation.name': 'chat',
++        'gen_ai.input.messages': JSON.stringify([
++          { role: 'user', parts: [{ type: 'text', content: "What's the weather in Boston?" }] },
++          { role: 'assistant', parts: [
++            { type: 'reasoning', content: 'I should check the weather.' },
++            { type: 'tool_call', name: 'get_weather', arguments: { city: 'Boston' } },
++          ] },
++        ]),
++        'gen_ai.output.messages': JSON.stringify([
++          { role: 'tool', parts: [{ type: 'tool_call_response', result: 'rainy, 57F' }] },
++        ]),
++      },
++    });
++    await pm.genAiTracesIngestionPage.pollForSpan(streamName, spanName);
++
++    await pm.tracesPage.navigateToTracesUrlWithStream(streamName);
++    await pm.tracesPage.setTimeRange('15m');
++    await pm.tracesPage.runTraceSearch();
++    await pm.tracesPage.waitForTraceSearchResults();
++    await pm.tracesPage.clickFirstTraceResult();
++
++    const opened = await pm.tracesPage.openTraceDetailsTab('thread');
++    expect(opened).toBeTruthy();
++    // The Thread tab projects the conversation as user query + assistant output
++    // (buildTraceGroup maps only output messages to the assistant turn). The
++    // reasoning part lives in the INPUT messages, so it is not rendered here —
++    // the v5 tool_call_response part in the OUTPUT messages is.
++    await pm.tracesPage.expectThreadViewContains('rainy, 57F');
++
++    testLogger.info('Test completed');
++  });
++});
+diff --git a/tests/ui-testing/playwright-tests/cleanup.spec.js b/tests/ui-testing/playwright-tests/cleanup.spec.js
+index 32a4cc850f3..e1756a4d54b 100644
+--- a/tests/ui-testing/playwright-tests/cleanup.spec.js
++++ b/tests/ui-testing/playwright-tests/cleanup.spec.js
+@@ -348,6 +348,7 @@ test.describe("Pre-Test Cleanup", () => {
+     await pm.apiCleanup.cleanupStreams(
+       [
+         /^sdr_traces_/,                // sdr_traces_* (traces SDR test streams: redact/drop/hash × ingestion/query)
++        /^trace_genai_parts_/,         // trace_genai_parts_* (GenAI v5 parts rendering test streams)
+       ],
+       ['default'],                     // protect the default traces stream
+       { streamType: 'traces' }

@@ -1,0 +1,11 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/traceDetails.spec.js",
+    "tests/ui-testing/playwright-tests/Traces/traceAdvancedFiltering.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The dev already authored traceGenAiParts.spec.js covering all 7 headline workflows (P0 preview conversation, P1 system-instructions/aliases/execute_tool, P2 suppression/truncation/thread), plus genAiTracesIngestionPage.js, tracesPage.js LLM helpers, ci_matrix.json registration and cleanup.spec.js stream cleanup. Do NOT rewrite or re-register it. Three genuinely distinct, WIRED behaviours from the feature doc's Behavior Reachability table and Edge Cases are still untested and non-duplicative: (1) unknown part type → '[type]' marker fallthrough, (2) 'response' field winning over 'result' in tool_call_response, (3) server_tool_call / server_tool_call_response part types. Append those as new test() cases into the existing spec (reuses its imports, openGenAiPreview helper, and tag set)."
+}

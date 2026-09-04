@@ -1,0 +1,6 @@
+tests/ui-testing/ci-matrix/ci_matrix.json
+tests/ui-testing/pages/page-manager.js
+tests/ui-testing/pages/tracesPages/genAiTracesIngestionPage.js
+tests/ui-testing/pages/tracesPages/tracesPage.js
+tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js
+tests/ui-testing/playwright-tests/cleanup.spec.js

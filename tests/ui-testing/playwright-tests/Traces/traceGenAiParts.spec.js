@@ -310,4 +310,99 @@ test.describe("Traces GenAI v5 Parts Rendering testcases", () => {
 
     testLogger.info('Test completed');
   });
+
+  test("should render an unknown part type as a [type] marker (never a raw JSON dump)", {
+    tag: ['@genai-v5-parts', '@traces', '@all', '@P2']
+  }, async ({ page }) => {
+    testLogger.info('Testing unknown part type fallthrough to [type] marker');
+
+    const suffix = generateUUID();
+    const streamName = `trace_genai_parts_${suffix}`;
+    const spanName = `chat ${suffix}`;
+
+    await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
+      name: spanName,
+      kind: 2,
+      attributes: {
+        'gen_ai.operation.name': 'chat',
+        'gen_ai.input.messages': JSON.stringify([
+          { role: 'assistant', parts: [{ type: 'custom_part', content: 'opaque' }] },
+        ]),
+      },
+    });
+    await pm.genAiTracesIngestionPage.pollForSpan(streamName, spanName);
+
+    await openGenAiPreview(pm, streamName, spanName);
+
+    // The marker is derived from `type`; the un-handled payload is not dumped.
+    await pm.tracesPage.expectLlmInputContains('[custom_part]');
+    await pm.tracesPage.expectLlmInputNotContains('opaque');
+
+    testLogger.info('Test completed');
+  });
+
+  test("should prefer the response field over result in tool_call_response", {
+    tag: ['@genai-v5-parts', '@traces', '@all', '@P2']
+  }, async ({ page }) => {
+    testLogger.info('Testing response-over-result precedence in tool_call_response');
+
+    const suffix = generateUUID();
+    const streamName = `trace_genai_parts_${suffix}`;
+    const spanName = `chat ${suffix}`;
+
+    await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
+      name: spanName,
+      kind: 2,
+      attributes: {
+        'gen_ai.operation.name': 'chat',
+        'gen_ai.output.messages': JSON.stringify([
+          { role: 'tool', parts: [{ type: 'tool_call_response', response: 'SPEC value', result: 'VENDOR value' }] },
+        ]),
+      },
+    });
+    await pm.genAiTracesIngestionPage.pollForSpan(streamName, spanName);
+
+    await openGenAiPreview(pm, streamName, spanName);
+
+    // The spec `response` field wins over the vendor `result` alias.
+    await pm.tracesPage.expectLlmOutputContains('SPEC value');
+    await pm.tracesPage.expectLlmOutputNotContains('VENDOR value');
+
+    testLogger.info('Test completed');
+  });
+
+  test("should render server_tool_call / server_tool_call_response parts as text", {
+    tag: ['@genai-v5-parts', '@traces', '@all', '@P2']
+  }, async ({ page }) => {
+    testLogger.info('Testing server_tool_call / server_tool_call_response rendering');
+
+    const suffix = generateUUID();
+    const streamName = `trace_genai_parts_${suffix}`;
+    const spanName = `chat ${suffix}`;
+
+    await pm.genAiTracesIngestionPage.ingestGenAiSpan(streamName, {
+      name: spanName,
+      kind: 2,
+      attributes: {
+        'gen_ai.operation.name': 'chat',
+        'gen_ai.input.messages': JSON.stringify([
+          { role: 'assistant', parts: [
+            { type: 'server_tool_call', name: 'remote_api', server_tool_call: { op: 'fetch' } },
+          ] },
+        ]),
+        'gen_ai.output.messages': JSON.stringify([
+          { role: 'tool', parts: [{ type: 'server_tool_call_response', server_tool_call_response: 'done' }] },
+        ]),
+      },
+    });
+    await pm.genAiTracesIngestionPage.pollForSpan(streamName, spanName);
+
+    await openGenAiPreview(pm, streamName, spanName);
+
+    // `Called remote_api(...)` includes the tool name; the response renders as text.
+    await pm.tracesPage.expectLlmInputContains('remote_api');
+    await pm.tracesPage.expectLlmOutputContains('done');
+
+    testLogger.info('Test completed');
+  });
 });

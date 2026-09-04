@@ -1,0 +1,29 @@
+{
+  "feature_slug": "trace-genai-parts",
+  "feature_title": "Traces GenAI v5 Parts Rendering",
+  "area": "Traces",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "traceGenAiParts.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Traces/traceGenAiParts.spec.js",
+  "playwright_group": "Traces",
+  "source_files": [
+    "web/src/plugins/traces/TraceDetailsSidebar.vue",
+    "web/src/plugins/traces/LLMContentRenderer.vue",
+    "web/src/plugins/traces/TraceTree.vue",
+    "web/src/plugins/traces/ThreadView.vue",
+    "web/src/plugins/traces/Index.vue"
+  ],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All six changed files live under tests/ui-testing/ (Playwright page objects, one new spec, ci-matrix config, cleanup). No enterprise-owned paths are touched: there are no changes under enterprise/, o2_enterprise/, or src/enterprise/. The tracesPage.js selectors reference Service Graph / SDR (enterprise features), but only as test page-object locators, not enterprise source code. This is pure OSS test infrastructure, so edition = oss.",
+    "skip": "Not skipped. No explicit opt-out exists: trigger_comment.txt is empty and no tests-added label was passed. Although the diff is test-only with no web/src production changes, it adds a dev-authored Playwright E2E spec (traceGenAiParts.spec.js), which the rules explicitly say must NOT be auto-skipped — route = enhance and continue to the Architect.",
+    "e2e": "E2E is warranted. The diff adds a comprehensive Playwright spec covering the Traces GenAI v5 'parts' rendering user-facing UI flow: the Preview pane (text/reasoning/tool_call/tool_call_response), the Thread tab, the system-instructions collapsible, the tool-observation view, and truncation/expand behaviour. No REST endpoint or API contract is added or altered (the ingestion page object only exercises existing /v1/traces and /_search endpoints), so no API tests are needed.",
+    "area": "Traces. The new spec lives under tests/ui-testing/playwright-tests/Traces/, and the page-object additions target the traces page (tracesPage.js) and the trace-details sidebar's LLM preview/thread surfaces, all in the Traces product area.",
+    "group": "Traces. The ci_matrix.json change appends traceGenAiParts.spec.js to the core Traces run_files shard (alongside traceDetails.spec.js, traceAdvancedFiltering.spec.js, tracesAnalyzeDimensions.spec.js), which maps to the Traces testfolder shard group.",
+    "existing_tests": "Yes — traceGenAiParts.spec.js (new) and cleanup.spec.js (modified) are Playwright E2E specs under tests/ui-testing/playwright-tests/. The new spec already covers the NEW feature directly with 7 test cases across the Preview pane and Thread tab, so the dev's tests cover the new behaviour; the Architect should review and extend/append rather than author from scratch."
+  }
+}
