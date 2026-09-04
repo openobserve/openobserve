@@ -980,7 +980,9 @@ function buildPanel(
       duration: durationParts(stale.lastSeenUs, nowUs),
     };
   }
-  if (panel.def.type === "metric") {
+  // An instant table returns a clean empty vector when nothing is unhealthy, so
+  // it can distinguish "nothing is wrong" from a failed query the way tiles do.
+  if (panel.def.type === "metric" || variant.queryMode === "instant") {
     // The resolver cannot know whether a query returned series, only whether a "no data" claim would be honest (§6.3).
     config.curated_no_data_eligible = !stale;
   }
@@ -1005,7 +1007,11 @@ function buildPanel(
         breakdown: [],
         filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
       },
-      config: { promql_legend: built.legend },
+      config: {
+        promql_legend: built.legend,
+        // usePanelPromQLExecutor reads query_type per query and sends start == end for "instant".
+        ...(variant.queryMode ? { query_type: variant.queryMode } : {}),
+      },
     })),
     layout: { ...layout, i: index },
   };
