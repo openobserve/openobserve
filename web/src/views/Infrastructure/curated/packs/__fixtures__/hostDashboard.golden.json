@@ -1,0 +1,414 @@
+{
+  "version": 8,
+  "dashboardId": "",
+  "title": "host-1",
+  "description": "",
+  "role": "",
+  "owner": "",
+  "variables": {
+    "list": [],
+    "showDynamicFilters": false
+  },
+  "tabs": [
+    {
+      "tabId": "host",
+      "name": "Host",
+      "panels": [
+        {
+          "id": "hd_cpu_busy",
+          "type": "line",
+          "title": "CPU busy",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * (1 - avg(irate(system_cpu_time{state=\"idle\",host_name=\"host-1\"}[5m])))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "busy"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 0,
+            "w": 96,
+            "h": 16,
+            "i": 0
+          }
+        },
+        {
+          "id": "hd_cpu_by_state",
+          "type": "line",
+          "title": "CPU by state",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent-1",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "avg by (state)(irate(system_cpu_time{host_name=\"host-1\",state!=\"idle\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{state}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 0,
+            "w": 96,
+            "h": 16,
+            "i": 1
+          }
+        },
+        {
+          "id": "hd_memory_by_state",
+          "type": "area-stacked",
+          "title": "Memory by state",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bytes",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (state)(system_memory_usage{host_name=\"host-1\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{state}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 16,
+            "w": 96,
+            "h": 16,
+            "i": 2
+          }
+        },
+        {
+          "id": "hd_load",
+          "type": "line",
+          "title": "Load 1m / 5m / 15m",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "numbers",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "avg(system_cpu_load_average_1m{host_name=\"host-1\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "1m"
+              }
+            },
+            {
+              "query": "avg(system_cpu_load_average_5m{host_name=\"host-1\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "5m"
+              }
+            },
+            {
+              "query": "avg(system_cpu_load_average_15m{host_name=\"host-1\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "15m"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 16,
+            "w": 96,
+            "h": 16,
+            "i": 3
+          }
+        },
+        {
+          "id": "hd_disk_read",
+          "type": "line",
+          "title": "Disk read",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (device)(irate(system_disk_io{direction=\"read\",host_name=\"host-1\",device!~\"loop.*\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{device}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 32,
+            "w": 96,
+            "h": 16,
+            "i": 4
+          }
+        },
+        {
+          "id": "hd_disk_write",
+          "type": "line",
+          "title": "Disk write",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (device)(irate(system_disk_io{direction=\"write\",host_name=\"host-1\",device!~\"loop.*\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{device}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 32,
+            "w": 96,
+            "h": 16,
+            "i": 5
+          }
+        },
+        {
+          "id": "hd_fs_used_pct",
+          "type": "line",
+          "title": "Filesystem used %",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "percent",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "100 * sum by (mountpoint)(system_filesystem_usage{state=\"used\",host_name=\"host-1\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\"}) / sum by (mountpoint)(system_filesystem_usage{host_name=\"host-1\",device!~\"/dev/loop.*|tmpfs|nsfs|squashfs|overlay\"})",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{mountpoint}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 0,
+            "y": 48,
+            "w": 96,
+            "h": 16,
+            "i": 6
+          }
+        },
+        {
+          "id": "hd_network_by_direction",
+          "type": "line",
+          "title": "Network I/O by direction",
+          "description": "",
+          "config": {
+            "show_legends": true,
+            "legends_position": "bottom",
+            "unit": "bps",
+            "unit_custom": null,
+            "drilldown": []
+          },
+          "queryType": "promql",
+          "queries": [
+            {
+              "query": "sum by (direction)(irate(system_network_io{host_name=\"host-1\"}[5m]))",
+              "vrlFunctionQuery": "",
+              "customQuery": true,
+              "fields": {
+                "stream": "",
+                "stream_type": "metrics",
+                "x": [],
+                "y": [],
+                "z": [],
+                "breakdown": [],
+                "filter": {
+                  "filterType": "group",
+                  "logicalOperator": "AND",
+                  "conditions": []
+                }
+              },
+              "config": {
+                "promql_legend": "{direction}"
+              }
+            }
+          ],
+          "layout": {
+            "x": 96,
+            "y": 48,
+            "w": 96,
+            "h": 16,
+            "i": 7
+          }
+        }
+      ]
+    }
+  ]
+}
