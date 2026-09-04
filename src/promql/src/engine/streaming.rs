@@ -31,9 +31,22 @@ use promql_parser::{
 
 use super::{
     Engine,
-    selector::{equal_matcher_filters, get_offset_modifier, named_selector, plain_selector},
+    selector::{
+        SelectorContexts, equal_matcher_filters, get_offset_modifier, named_selector,
+        plain_selector,
+    },
 };
 use crate::{functions, fused, micros};
+
+static EMPTY_MATCHERS: std::sync::LazyLock<Matchers> = std::sync::LazyLock::new(Matchers::empty);
+
+/// A selector with its contexts created, ready for either streaming consumer.
+struct StreamingTarget {
+    selector: VectorSelector,
+    offset: i64,
+    label_selector: hashbrown::HashSet<String>,
+    ctxs: SelectorContexts,
+}
 
 impl Engine {
     /// Streams the fused aggregation when the layout allows it, otherwise materializes on the
@@ -46,57 +59,19 @@ impl Engine {
         func: Arc<dyn functions::RangeFunc>,
         op: fused::FusedAggOp,
     ) -> Result<Option<Value>> {
-        let query_ctx = &self.ctx.query_ctx;
-        // need_wal bails early: WAL would split series across contexts
-        if !config::get_config()
-            .search
-            .feature_metrics_streaming_agg_enabled
-            || query_ctx.query_exemplars
-            || query_ctx.query_data
-            || query_ctx.is_super_cluster
-            || query_ctx.need_wal
-            || matches!(modifier, Some(LabelModifier::Exclude(_)))
-        {
+        if matches!(modifier, Some(LabelModifier::Exclude(_))) {
             return Ok(None);
         }
-        let selector = named_selector(plain_selector(vs, "MatrixSelector")?, "MatrixSelector")?;
-        let table_name = selector.name.clone().unwrap();
-        let timeout = query_ctx.timeout;
-
-        let offset = get_offset_modifier(selector.offset.clone());
-        let start = self.ctx.start - micros(range) - offset;
-        let end = self.ctx.end - offset;
-        let mut filters = equal_matcher_filters(&selector.matchers);
-        let mut label_selector = self.label_selector.clone();
-        label_selector.extend(self.ctx.label_selector.iter().cloned());
-
-        let ctxs = self
-            .ctx
-            .table_provider
-            .create_context(
-                &query_ctx.org_id,
-                &table_name,
-                (start, end),
-                selector.matchers.clone(),
-                label_selector,
-                &mut filters,
-            )
-            .await?;
+        let Some(target) = self.streaming_target(vs, range).await? else {
+            return Ok(None);
+        };
+        let timeout = self.ctx.query_ctx.timeout;
         // a second context would split series and evaluate rate windows on partial data
-        if let [(ctx, schema, scan_stats, keep_filters)] = ctxs.as_slice() {
-            let matchers = if *keep_filters {
-                selector.matchers.clone()
-            } else {
-                Matchers::empty()
-            };
+        if let [(ctx, schema, scan_stats, keep_filters)] = target.ctxs.as_slice() {
             let run = fused::stream::fused_agg(
                 ctx,
                 schema,
-                fused::stream::StreamingSelector {
-                    table_name: &table_name,
-                    matchers: &matchers,
-                    offset,
-                },
+                target.streaming_selector(*keep_filters),
                 fused::stream::FusedShape {
                     op,
                     func: func.clone(),
@@ -116,7 +91,7 @@ impl Engine {
 
         // the layout cannot stream: materialize on the contexts already created
         let matrix = self
-            .eval_matrix_selector(&selector, range, Some(ctxs))
+            .eval_matrix_selector(&target.selector, range, Some(target.ctxs))
             .await?;
         let input = if matrix.is_empty() {
             Value::None
@@ -126,6 +101,102 @@ impl Engine {
         fused::matrix::fused_agg(modifier, input, func, op, &self.eval_ctx, timeout)
             .await
             .map(Some)
+    }
+
+    /// Streams a range function over a plain matrix selector, emitting each series whole; when
+    /// the layout cannot stream, the generic evaluator runs on the contexts already created.
+    /// `None` only when the query shape rules the streaming path out up front.
+    pub(super) async fn try_streaming_range_func(
+        &mut self,
+        vs: &VectorSelector,
+        range: Duration,
+        func: Arc<dyn functions::RangeFunc>,
+    ) -> Result<Option<Value>> {
+        let Some(target) = self.streaming_target(vs, range).await? else {
+            return Ok(None);
+        };
+        let timeout = self.ctx.query_ctx.timeout;
+        if let [(ctx, schema, scan_stats, keep_filters)] = target.ctxs.as_slice() {
+            let run = fused::stream::range_series(
+                ctx,
+                schema,
+                target.streaming_selector(*keep_filters),
+                func.clone(),
+                range,
+                fused::stream::SeriesLabels {
+                    selector: &target.label_selector,
+                    skip: self.skip_labels,
+                },
+                &self.eval_ctx,
+            );
+            if let Some(value) = self.run_cancellable(run, timeout).await? {
+                self.ctx.scan_stats.write().await.add(scan_stats);
+                if self.result_type.is_none() {
+                    self.result_type = Some("matrix".to_string());
+                }
+                return Ok(Some(value));
+            }
+        }
+
+        // the layout cannot stream: evaluate the generic function on the contexts already created
+        let matrix = self
+            .eval_matrix_selector(&target.selector, range, Some(target.ctxs))
+            .await?;
+        let input = if matrix.is_empty() {
+            Value::None
+        } else {
+            Value::Matrix(matrix)
+        };
+        functions::eval_range(input, func, &self.eval_ctx).map(Some)
+    }
+
+    /// Normalizes the selector and creates its contexts; `None` when a query-level gate rules
+    /// the streaming path out before any context exists.
+    async fn streaming_target(
+        &mut self,
+        vs: &VectorSelector,
+        range: Duration,
+    ) -> Result<Option<StreamingTarget>> {
+        let query_ctx = &self.ctx.query_ctx;
+        // need_wal bails early: WAL would split series across contexts
+        if !config::get_config()
+            .search
+            .feature_metrics_streaming_agg_enabled
+            || query_ctx.query_exemplars
+            || query_ctx.query_data
+            || query_ctx.is_super_cluster
+            || query_ctx.need_wal
+        {
+            return Ok(None);
+        }
+        let selector = named_selector(plain_selector(vs, "MatrixSelector")?, "MatrixSelector")?;
+        let table_name = selector.name.clone().unwrap();
+
+        let offset = get_offset_modifier(selector.offset.clone());
+        let start = self.ctx.start - micros(range) - offset;
+        let end = self.ctx.end - offset;
+        let mut filters = equal_matcher_filters(&selector.matchers);
+        let mut label_selector = self.label_selector.clone();
+        label_selector.extend(self.ctx.label_selector.iter().cloned());
+
+        let ctxs = self
+            .ctx
+            .table_provider
+            .create_context(
+                &query_ctx.org_id,
+                &table_name,
+                (start, end),
+                selector.matchers.clone(),
+                label_selector.clone(),
+                &mut filters,
+            )
+            .await?;
+        Ok(Some(StreamingTarget {
+            selector,
+            offset,
+            label_selector,
+            ctxs,
+        }))
     }
 
     /// Runs the streaming fold under the query timeout and the host's cancel signal; dropping
@@ -171,6 +242,21 @@ impl Engine {
     }
 }
 
+impl StreamingTarget {
+    /// The scan selector; an exact index selection already applied the matchers.
+    fn streaming_selector(&self, keep_filters: bool) -> fused::stream::StreamingSelector<'_> {
+        fused::stream::StreamingSelector {
+            table_name: self.selector.name.as_deref().unwrap_or_default(),
+            matchers: if keep_filters {
+                &self.selector.matchers
+            } else {
+                &EMPTY_MATCHERS
+            },
+            offset: self.offset,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -184,7 +270,7 @@ mod tests {
     };
     use datafusion::{
         arrow::{
-            array::{Float64Array, Int64Array, RecordBatch, UInt64Array},
+            array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
             datatypes::{DataType, Field, Schema},
         },
         datasource::MemTable,
@@ -247,6 +333,7 @@ mod tests {
             Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
             Field::new(HASH_LABEL, DataType::UInt64, false),
             Field::new(VALUE_LABEL, DataType::Float64, false),
+            Field::new("instance", DataType::Utf8, true),
         ]))
     }
 
@@ -264,6 +351,9 @@ mod tests {
                 Arc::new(Int64Array::from_iter_values(rows.iter().map(|row| row.0))),
                 Arc::new(UInt64Array::from_iter_values(rows.iter().map(|row| row.1))),
                 Arc::new(Float64Array::from_iter_values(rows.iter().map(|row| row.2))),
+                Arc::new(StringArray::from_iter_values(
+                    rows.iter().map(|row| if row.1 == 7 { "a" } else { "b" }),
+                )),
             ],
         )
         .unwrap();
@@ -431,6 +521,78 @@ mod tests {
             let materialized = eval_query(provider(false, false), 30, query).await.unwrap();
             assert_same_matrix(expected, materialized, &format!("materialized {query}"));
         }
+    }
+
+    /// The generic range path: `eval_matrix_selector` then `eval_range`.
+    async fn generic_range_func(provider: StreamingProvider, query: &str) -> Value {
+        let mut engine = engine(provider, 30);
+        let promql_parser::parser::Expr::Call(call) = promql_parser::parser::parse(query).unwrap()
+        else {
+            panic!("{query} is not a call");
+        };
+        let promql_parser::parser::Expr::MatrixSelector(promql_parser::parser::MatrixSelector {
+            vs,
+            range,
+        }) = call.args.args[0].as_ref()
+        else {
+            panic!("{query} is not over a matrix selector");
+        };
+        let matrix = engine.eval_matrix_selector(vs, *range, None).await.unwrap();
+        let input = if matrix.is_empty() {
+            Value::None
+        } else {
+            Value::Matrix(matrix)
+        };
+        let func = functions::fusable_range_func(call.func.name).unwrap();
+        functions::eval_range(input, func, &engine.eval_ctx).unwrap()
+    }
+
+    /// A bare range function streams each series whole and must match the generic path, both
+    /// when it streams and when it falls back on the same context.
+    #[tokio::test]
+    async fn test_range_func_matches_generic_streaming_and_materialized() {
+        for query in [
+            "rate(m[1m])",
+            "increase(m[1m] offset 30s)",
+            "last_over_time(m[40s])",
+            "count_over_time(m{instance=\"a\"}[1m])",
+        ] {
+            let expected = generic_range_func(provider(false, false), query).await;
+            let streamed = eval_query(provider(true, false), 30, query).await.unwrap();
+            assert_same_matrix(expected.clone(), streamed, &format!("streamed {query}"));
+            let materialized = eval_query(provider(false, false), 30, query).await.unwrap();
+            assert_same_matrix(expected, materialized, &format!("materialized {query}"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_range_func_keeps_the_series_labels() {
+        let value = eval_query(provider(true, false), 30, "rate(m[1m])")
+            .await
+            .unwrap();
+        let mut instances: Vec<Vec<(String, String)>> = canonical(value)
+            .into_iter()
+            .map(|(labels, _)| labels)
+            .collect();
+        instances.sort();
+        assert_eq!(
+            instances,
+            vec![
+                vec![("instance".to_string(), "a".to_string())],
+                vec![("instance".to_string(), "b".to_string())],
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn test_range_func_takes_the_streaming_path() {
+        let err = eval_query(provider(true, true), 30, "rate(m[1m])")
+            .await
+            .unwrap_err();
+        assert!(matches!(
+            infra::errors::Error::from(err),
+            infra::errors::Error::ErrorCode(ErrorCodes::SearchCancelQuery(_))
+        ));
     }
 
     #[tokio::test]
