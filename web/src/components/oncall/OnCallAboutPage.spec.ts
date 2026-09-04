@@ -92,8 +92,8 @@ describe("OnCallAboutPage", () => {
 
   /// The winning rule was spelled as a path and the team as a ksuid — neither
   /// is read as prose. It now draws as the same key|value dimension chips the
-  /// routing tab uses, pointing at the team NAME rather than the id.
-  it("draws the winning ownership rule as dimension chips pointing at the team", () => {
+  /// routing tab uses.
+  it("draws the winning ownership rule as dimension chips", () => {
     const wrapper = render({
       routingReason: "routed to tm_9 by ownership rule k8s-cluster=introspection/service=search",
       teamName: "Gateway",
@@ -103,9 +103,9 @@ describe("OnCallAboutPage", () => {
     const chips = wrapper.find('[data-test="oncall-about-routing-dimensions"]').text();
     expect(chips).toContain("k8s-cluster=introspection");
     expect(chips).toContain("service=search");
-    expect(reason.text()).toContain("Gateway");
-    // The ksuid belongs to the Team row below, which links; repeating it here
-    // was the noisiest thing on the card.
+    // The team is already the Team row below; repeating it here was the
+    // noisiest thing on the card.
+    expect(reason.text()).not.toContain("Gateway");
     expect(reason.text()).not.toContain("tm_9");
   });
 
@@ -169,36 +169,6 @@ describe("OnCallAboutPage", () => {
     const wrapper = render({ subjectType: "incident" as SubjectType, sourceId: "sig_1" });
     expect(wrapper.find('[data-test="oncall-about-subject-link"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-about-subject-id"]').exists()).toBe(true);
-  });
-
-  /// The first thing worth knowing before starting to look, and it used to be
-  /// a tab away.
-  it("summarises what earlier firings turned out to be", () => {
-    const wrapper = render({
-      priorFirings: 6,
-      priorCauses: [
-        { cause: "noisy_threshold", count: 2, last_response_id: "r1" },
-        { cause: "config_change_or_deploy", count: 4, last_response_id: "r2" },
-      ],
-    });
-    // The dominant cause, not the first one the server happened to list.
-    expect(wrapper.find('[data-test="oncall-about-history"]').text()).toContain("4×");
-    expect(wrapper.find('[data-test="oncall-about-history"]').text()).toContain("Config change");
-  });
-
-  it("says outright when this is the first page from the subject", () => {
-    const text = render().find('[data-test="oncall-about-history"]').text();
-    expect(text).toContain("First page from this subject");
-    expect(text).toContain("No prior causes recorded yet");
-  });
-
-  /// A firing with history but no recorded cause is not the same as no
-  /// history — the count still has to be said.
-  it("counts prior firings even when nobody recorded a cause", () => {
-    const wrapper = render({ priorFirings: 3 });
-    expect(wrapper.find('[data-test="oncall-about-history"]').text()).toContain(
-      "3 earlier firings",
-    );
   });
 
   it("links an incident once the page has been promoted into one, with its own copy control", () => {

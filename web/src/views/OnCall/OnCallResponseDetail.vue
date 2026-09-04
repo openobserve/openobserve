@@ -361,8 +361,6 @@
               :incident-id="response.incident_id"
               :cause="response.cause"
               :cause-note="response.cause_note"
-              :prior-causes="priorCauses"
-              :prior-firings="firingHistory.length"
             />
           </div>
         </div>

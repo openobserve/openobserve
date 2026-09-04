@@ -151,8 +151,6 @@ const stubs = {
       "incidentId",
       "cause",
       "causeNote",
-      "priorCauses",
-      "priorFirings",
     ],
     template: "<div />",
   },

@@ -15,13 +15,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  The provenance rail: why this team, what this has done before, and the ids
-  worth pasting into a channel.
+  The provenance rail: why this team, and the ids worth pasting into a
+  channel.
 
-  It was a bare `<dl>` inside the view, which is why "routed because" and "how
-  often has this fired" ended up on different screens from each other. One card
-  so they can be read in one glance, and so the same block can be reused when
-  an incident grows its own detail page.
+  It was a bare `<dl>` inside the view, which is why "routed because" and the
+  ids ended up on different screens from each other. One card so they can be
+  read in one glance, and so the same block can be reused when an incident
+  grows its own detail page.
 -->
 <template>
   <OCard variant="glass" data-test="oncall-about-page">
@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              dimension reads the same wherever it appears. -->
         <ODescriptionItem v-if="showRoutingReason" :label="t('oncall.routedBy')">
           <span class="flex flex-col items-start gap-1">
-            <span class="text-sm" data-test="oncall-about-routing-reason">
+            <span data-test="oncall-about-routing-reason">
               <!-- A sentence parseRoutingReason doesn't recognise ("...as an
                    impacted caller of the failing service") still opens
                    "routed to <id>" — the id is the one fact worth trusting;
@@ -68,10 +68,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :value="dimension.value"
                   tooltip
                 />
-                <span class="text-text-secondary">→</span>
-                <span class="text-text-body font-medium">{{ raw(teamName) }}</span>
               </span>
-              <span v-else class="text-text-body font-medium">{{ routedByPrimary }}</span>
+              <span v-else>{{ routedByPrimary }}</span>
             </span>
 
             <!-- What routing considered and passed over on the way. Absent from
@@ -100,18 +98,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           >
             {{ raw(teamName) }}
           </router-link>
-        </ODescriptionItem>
-
-        <!-- "Has this happened before, and what was it" — the single most
-             useful thing to know before starting to look, and it used to be a
-             tab away. -->
-        <ODescriptionItem :label="t('oncall.history')">
-          <span class="flex flex-col items-start gap-1" data-test="oncall-about-history">
-            <span class="text-text-body text-sm font-medium">{{ historyPrimary }}</span>
-            <span v-if="historySecondary" class="text-text-secondary text-xs">{{
-              historySecondary
-            }}</span>
-          </span>
         </ODescriptionItem>
 
         <ODescriptionItem v-if="subjectStream" :label="t('oncall.subjectStream')">
@@ -205,7 +191,7 @@ import OCardSection from "@/lib/core/Card/OCardSection.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import ODescriptionList from "@/lib/lists/DescriptionList/ODescriptionList.vue";
 import ODescriptionItem from "@/lib/lists/DescriptionList/ODescriptionItem.vue";
-import type { CauseGroup, ResolutionCause, SubjectType } from "@/ts/interfaces/oncall";
+import type { ResolutionCause, SubjectType } from "@/ts/interfaces/oncall";
 import type { RoutingMechanism } from "@/utils/oncall";
 import { parseRoutingReason } from "@/utils/oncall";
 import { raw, useI18nTyped, type I18nKey, type I18nText } from "@/types/i18n";
@@ -224,10 +210,6 @@ const props = withDefaults(
     incidentId?: string | null;
     cause?: ResolutionCause | null;
     causeNote?: string | null;
-    /** What earlier firings of this subject turned out to be. */
-    priorCauses?: CauseGroup[];
-    /** How many times this subject has paged anybody before, this one aside. */
-    priorFirings?: number;
   }>(),
   {
     routingReason: null,
@@ -235,8 +217,6 @@ const props = withDefaults(
     incidentId: null,
     cause: null,
     causeNote: null,
-    priorCauses: () => [],
-    priorFirings: 0,
   },
 );
 
@@ -270,13 +250,10 @@ const routingDimensions = computed(() =>
 const routingNotes = computed(() => routing.value?.notes ?? []);
 
 /// Text fallback for a recognised mechanism with no dimensions to draw as
-/// chips — `context` naming a team, or the mechanism sentence itself.
+/// chips.
 const routedByPrimary = computed<I18nText>(() => {
   const parsed = routing.value;
   if (!parsed) return raw(props.routingReason);
-  if (parsed.mechanism === "context" && parsed.namedTeam) {
-    return raw(`team = ${parsed.namedTeam} → ${props.teamName}`);
-  }
   return mechanismLine.value;
 });
 
@@ -334,22 +311,4 @@ async function copySubjectId() {
 async function copyIncidentId() {
   if (props.incidentId) await copyToClipboard(props.incidentId, t);
 }
-
-/// The fact, then the detail behind it — "this has fired six times" is the
-/// whole answer on its own; the dominant cause is the clarifying line under
-/// it, not folded into the same sentence.
-const historyPrimary = computed(() => {
-  if (!props.priorFirings) return t("oncall.historyFirstPage");
-  return t("oncall.historyFirings", { count: props.priorFirings }, props.priorFirings);
-});
-
-const historySecondary = computed<I18nText | null>(() => {
-  if (!props.priorFirings) return t("oncall.historyNoCauses");
-  const top = [...props.priorCauses].sort((a, b) => b.count - a.count)[0];
-  if (!top) return null;
-  return t("oncall.historyTopCauseLine", {
-    causeCount: top.count,
-    cause: t(`oncall.cause_${top.cause}`),
-  });
-});
 </script>
