@@ -1931,28 +1931,116 @@ export default defineComponent({
       return 50; // Fixed 50px threshold for all screens
     };
 
+    // scrollTop of the last scroll WE performed. The scroll event fires
+    // asynchronously (next frame), by which time streaming has usually appended
+    // more text, so the handler would see "not at the bottom" for a position we
+    // just pinned there and silently turn auto-scroll off — after which the
+    // answer scrolls out of view for the rest of the turn. Remembering our own
+    // position lets the handler tell "the user scrolled up" apart from "we
+    // pinned to the bottom and the content grew underneath".
+    let lastProgrammaticScrollTop = -1;
+
     const checkIfShouldAutoScroll = () => {
       if (!messagesContainer.value) return;
 
       const { scrollTop, scrollHeight, clientHeight } = messagesContainer.value;
       const threshold = getScrollThreshold();
       const isAtBottom = scrollTop + clientHeight >= scrollHeight - threshold;
+      const isOwnScroll = Math.abs(scrollTop - lastProgrammaticScrollTop) <= 2;
 
-      shouldAutoScroll.value = isAtBottom;
+      // Only a real user scroll away from the bottom disengages auto-scroll.
+      if (isAtBottom) {
+        shouldAutoScroll.value = true;
+      } else if (!isOwnScroll) {
+        shouldAutoScroll.value = false;
+      }
 
       // Show scroll to bottom button when user scrolls up significantly
       // Only show if there's enough content to scroll and user is not at bottom
       const hasScrollableContent = scrollHeight > clientHeight + 100; // At least 100px more content
       const isScrolledUp = scrollTop + clientHeight < scrollHeight - 100; // 100px from bottom
 
-      showScrollToBottom.value = hasScrollableContent && isScrolledUp;
+      showScrollToBottom.value = hasScrollableContent && isScrolledUp && !shouldAutoScroll.value;
     };
+
+    /**
+     * Jump the message list to the bottom, recording where we put it so the
+     * scroll handler can recognise the resulting event as ours.
+     * No-op while the instance is hidden (v-show'd sidebar): scrollHeight is 0
+     * there, and writing 0 would fight the real position once it is shown again.
+     */
+    const pinToBottom = () => {
+      const el = messagesContainer.value;
+      if (!el || !el.clientHeight) return;
+      el.scrollTop = el.scrollHeight;
+      lastProgrammaticScrollTop = el.scrollTop;
+      // We are at the bottom by construction; the button's visibility is
+      // otherwise only recomputed on scroll events, which would leave it
+      // stranded on screen after a programmatic jump.
+      showScrollToBottom.value = false;
+    };
+
+    // The message list grows from two independent sources: stream events (which
+    // call scrollToBottom directly) and the typewriter/markdown re-render, which
+    // keeps appending characters for many frames after the last delta arrived
+    // and used to leave the view stranded mid-answer. A DOM observer covers
+    // both, coalesced to one scroll per frame so per-character ticks don't force
+    // a layout each time.
+    let autoScrollFrame: number | null = null;
+    const scheduleAutoScroll = () => {
+      if (!shouldAutoScroll.value || autoScrollFrame !== null) return;
+      autoScrollFrame = requestAnimationFrame(() => {
+        autoScrollFrame = null;
+        if (shouldAutoScroll.value) pinToBottom();
+      });
+    };
+
+    let contentGrowthObserver: MutationObserver | null = null;
+    let containerResizeObserver: ResizeObserver | null = null;
+
+    const startAutoScrollObservers = () => {
+      const el = messagesContainer.value;
+      if (!el || contentGrowthObserver) return;
+      contentGrowthObserver = new MutationObserver(scheduleAutoScroll);
+      contentGrowthObserver.observe(el, {
+        childList: true,
+        subtree: true,
+        characterData: true,
+      });
+      // Keeps us pinned when the viewport itself changes (panel resize, the
+      // input box growing as the user types, images finishing their load).
+      if (typeof ResizeObserver !== "undefined") {
+        containerResizeObserver = new ResizeObserver(scheduleAutoScroll);
+        containerResizeObserver.observe(el);
+      }
+    };
+
+    const stopAutoScrollObservers = () => {
+      contentGrowthObserver?.disconnect();
+      contentGrowthObserver = null;
+      containerResizeObserver?.disconnect();
+      containerResizeObserver = null;
+      if (autoScrollFrame !== null) {
+        cancelAnimationFrame(autoScrollFrame);
+        autoScrollFrame = null;
+      }
+    };
+
+    // The message list lives behind `v-if="isOpen"`, so it can appear and
+    // disappear well after mount — bind the observers to the element itself
+    // rather than to onMounted.
+    watch(
+      messagesContainer,
+      (el) => {
+        stopAutoScrollObservers();
+        if (el) startAutoScrollObservers();
+      },
+      { flush: "post" },
+    );
 
     const scrollToBottom = async () => {
       await nextTick();
-      if (messagesContainer.value && shouldAutoScroll.value) {
-        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
-      }
+      if (shouldAutoScroll.value) pinToBottom();
     };
 
     const scrollToBottomSmooth = async () => {
@@ -1966,15 +2054,20 @@ export default defineComponent({
         showScrollToBottom.value = false;
         // Reset auto-scroll when user manually scrolls to bottom
         shouldAutoScroll.value = true;
+        // The smooth scroll lands over several frames; treat those intermediate
+        // scroll events as ours so they don't immediately disengage the
+        // auto-scroll we just re-enabled.
+        lastProgrammaticScrollTop = messagesContainer.value.scrollHeight;
       }
     };
 
+    // The loading indicator is the last node in the message list, so pinning to
+    // the bottom brings it into view. (It has no id of its own — and could not
+    // have one, since several O2AIChat instances are mounted at once.)
     const scrollToLoadingIndicator = async () => {
       await nextTick();
-      const loadingElement = document.getElementById("loading-indicator");
-      if (loadingElement) {
-        loadingElement.scrollIntoView({ behavior: "smooth", block: "end" });
-      }
+      shouldAutoScroll.value = true;
+      pinToBottom();
     };
 
     /**
@@ -5140,6 +5233,7 @@ export default defineComponent({
 
     onUnmounted(() => {
       window.removeEventListener("o2:abort-ai-streams", abortAllStreams);
+      stopAutoScrollObservers();
       // Mark unmounting FIRST so any reactive watcher that fires during teardown
       // (e.g. our own chatUpdated watch, triggered by the dispatch below) does
       // not re-attach the just-detached stream back to this dying instance.
