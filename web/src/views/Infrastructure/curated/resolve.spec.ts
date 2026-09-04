@@ -30,6 +30,8 @@ import {
 } from "./resolve";
 import { b64DecodeUnicodeSafe } from "@/utils/formatters";
 import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
+import { buildScopedDependencyGraph } from "@/utils/dashboard/variables/variablesDependencyUtils";
+import hostMetricsDashboard from "@/assets/dashboards/host_metrics.dashboard.json";
 import { GROUP, STALENESS_24H_US } from "./types";
 import { kubernetesPage } from "./packs/kubernetes.page";
 import { hostsPage } from "./packs/hosts.page";
@@ -1633,7 +1635,7 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
     // The rebuild that flips curatedDisabled hands RenderDashboardCharts a new
     // dashboardData identity, which re-runs useVariablesManager.initialize over
     // the freshly built variables. initialize marks an INDEPENDENT query_values
-    // pending only when it has no custom/all default (:472-487), so every
+    // pending only when it has no custom/all default (:479-491), so every
     // all-sentinel picker comes back with options: [] and is never re-fetched.
     // Carrying the loaded options ON the rebuilt variable is what survives that.
     it("a rebuilt picker keeps the options the previous build already loaded", async () => {
@@ -1655,16 +1657,172 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       const namespace = built.variables.list.find((v: any) => v.name === "namespace");
       expect(namespace.options).toEqual(loaded);
 
-      // The REAL seam: the manager clones the built variables on initialize, and
-      // an all-sentinel picker is never marked pending — so whatever options the
-      // rebuilt variable carries are the only ones the dropdown will ever show.
+      // The REAL seam: the manager clones the built variables on initialize, so
+      // the carried options are what the dropdown shows while the refetch is in
+      // flight — without them the rebuild flashes an empty list on every tab switch.
       const manager = useVariablesManager(((key: string) => key) as never);
       await manager.initialize(built.variables.list, built);
       const managed = manager
         .getAllVisibleVariables("workloads")
         .find((v: any) => v.name === "namespace") as any;
-      expect(managed.isVariableLoadingPending).not.toBe(true);
       expect(managed.options).toEqual(loaded);
+    });
+
+    // The cache above only replays options a PREVIOUS build already loaded — it
+    // cannot seed the first one. VariablesValueSelector fires a values query for
+    // exactly one reason: checkAndLoadPendingVariables (:1814-1828) walks the
+    // managed variables and calls loadDependentVariable only where
+    // isVariableLoadingPending === true. useVariablesManager.initialize marks an
+    // independent query_values pending only when it has NO custom/all default
+    // (:479-491), so an all-sentinel picker is born unpending, never fetches, and
+    // renders <ALL> over an empty option list forever. Chained CHILDREN are
+    // fast-tracked at :530, which is why `pod` loads and its parent does not.
+    it("every built picker is marked pending by the real manager, parents included", async () => {
+      const resolution = resolveManifest({
+        manifest: kubernetesPage,
+        streams: fullK8sStreams(),
+        semanticGroups: defaultSemanticGroups as FieldAlias[],
+        range: RANGE,
+        now: NOW_US,
+      });
+      const built: any = buildDashboard(
+        kubernetesPage,
+        resolution,
+        {},
+        { timezone: "UTC", nowUs: NOW_US, activeSectionId: "workloads" },
+      );
+
+      const manager = useVariablesManager(((key: string) => key) as never);
+      await manager.initialize(built.variables.list, built);
+      const managed = manager.getAllVisibleVariables("workloads") as any[];
+      expect(managed.length).toBeGreaterThan(0);
+
+      // Independent pickers are the ones that regressed; assert them by name so a
+      // pack that later drops the chain cannot make this pass vacuously.
+      const independent = managed.filter((v) => !v.query_data?.filter?.length);
+      expect(independent.map((v) => v.name)).toContain("namespace");
+
+      for (const variable of managed) {
+        expect(
+          variable.isVariableLoadingPending,
+          `${variable.name} must be pending or it never fetches its values`,
+        ).toBe(true);
+      }
+    });
+
+    // The dashboards feature is the reference producer for chained variables, and
+    // the bundled host_metrics dashboard is its known-good artifact ($mountpoint
+    // and $device chain on $host_name). Conformance is structural, not literal:
+    // the keys the manager and VariablesValueSelector read must be present and
+    // shaped identically, so a curated picker cannot drift into a shape stored
+    // dashboards never produce.
+    it("emits the same variable shape the bundled host_metrics dashboard uses", () => {
+      const reference: any[] = (hostMetricsDashboard as any).variables.list;
+      const referenceParent = reference.find((v) => v.query_data.filter.length === 0);
+      const referenceChild = reference.find((v) => v.query_data.filter.length > 0);
+      expect(referenceParent && referenceChild).toBeTruthy();
+
+      const resolution = resolveManifest({
+        manifest: kubernetesPage,
+        streams: fullK8sStreams(),
+        semanticGroups: defaultSemanticGroups as FieldAlias[],
+        range: RANGE,
+        now: NOW_US,
+      });
+      const built: any = buildDashboard(
+        kubernetesPage,
+        resolution,
+        {},
+        { timezone: "UTC", nowUs: NOW_US, activeSectionId: "workloads" },
+      );
+
+      const shape = (v: any) => ({
+        keys: Object.keys(v).sort(),
+        queryDataKeys: Object.keys(v.query_data).sort(),
+        type: v.type,
+        scope: v.scope,
+        multiSelect: v.multiSelect,
+        selectAll: v.selectAllValueForMultiSelect,
+        filterShape: v.query_data.filter.map((f: any) => Object.keys(f).sort()),
+        filterOperators: v.query_data.filter.map((f: any) => f.operator),
+        // The parent is referenced as a bare `$name`, never `${name}` or `{{name}}` —
+        // buildScopedDependencyGraph resolves the edge by extracting that token.
+        filterRefsAreBareDollar: v.query_data.filter.every((f: any) =>
+          /^\$[a-zA-Z0-9_-]+$/.test(f.value),
+        ),
+      });
+
+      // Curated adds `curated*` presentation keys on top; the reference key set
+      // must be a strict subset, so nothing the shared code reads is missing.
+      for (const variable of built.variables.list) {
+        const ours = shape(variable);
+        const theirs = shape(variable.query_data.filter.length ? referenceChild : referenceParent);
+        for (const key of theirs.keys) {
+          expect(ours.keys, `${variable.name} is missing key ${key}`).toContain(key);
+        }
+        expect(ours.queryDataKeys).toEqual(theirs.queryDataKeys);
+        expect(ours.type).toBe(theirs.type);
+        expect(ours.scope).toBe(theirs.scope);
+        expect(ours.multiSelect).toBe(theirs.multiSelect);
+        expect(ours.selectAll).toBe(theirs.selectAll);
+        expect(ours.filterShape).toEqual(theirs.filterShape);
+        expect(ours.filterOperators).toEqual(theirs.filterOperators);
+        expect(ours.filterRefsAreBareDollar).toBe(true);
+      }
+
+      // The chain itself, resolved by the same graph builder stored dashboards use.
+      const graph = buildScopedDependencyGraph(
+        built.variables.list.map((v: any) => ({ ...v, scope: "global" })),
+        {},
+      );
+      expect(graph["pod@global"].parents).toEqual(["namespace@global"]);
+      expect(graph["namespace@global"].parents).toEqual([]);
+    });
+
+    // A picker can be dropped after its child declared chainedOn it (the cluster
+    // picker is omitted for values-emptiness). If the child still emitted
+    // `IN $cluster`, buildScopedDependencyGraph would resolve a parent that is not
+    // in the list — so the child must be promoted to independent instead.
+    it("a picker whose chained parent was omitted carries no dangling reference", () => {
+      const resolution = resolveManifest({
+        manifest: kubernetesPage,
+        streams: fullK8sStreams(),
+        semanticGroups: defaultSemanticGroups as FieldAlias[],
+        range: RANGE,
+        now: NOW_US,
+      });
+
+      // Drop the parent the way an omission rule does, leaving the child's
+      // chainedOn declaration untouched.
+      const pruned = {
+        ...resolution,
+        pickers: resolution.pickers.filter((p: any) => p.def.name !== "namespace"),
+      };
+      const built: any = buildDashboard(kubernetesPage, pruned as any, {}, {
+        timezone: "UTC",
+        nowUs: NOW_US,
+        activeSectionId: "workloads",
+      } as any);
+
+      const names = new Set(built.variables.list.map((v: any) => v.name));
+      expect(names.has("namespace")).toBe(false);
+      expect(names.has("pod")).toBe(true);
+
+      for (const variable of built.variables.list) {
+        for (const filter of variable.query_data.filter) {
+          const referenced = /^\$([a-zA-Z0-9_-]+)$/.exec(filter.value)?.[1];
+          expect(referenced && names.has(referenced), `${variable.name} -> ${filter.value}`).toBe(
+            true,
+          );
+        }
+      }
+
+      // And the real graph agrees: pod is independent, not waiting on a ghost.
+      const graph = buildScopedDependencyGraph(
+        built.variables.list.map((v: any) => ({ ...v, scope: "global" })),
+        {},
+      );
+      expect(graph["pod@global"].parents).toEqual([]);
     });
   });
 
