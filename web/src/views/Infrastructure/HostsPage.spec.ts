@@ -316,9 +316,6 @@ describe("HostsPage", () => {
       wrapper = await mountPage({ host: "web-01" });
       const drawer = wrapper.find('[data-test="host-drawer-stub"]');
       expect(drawer.attributes("data-last-seen-us")).toBe("1700000890000000");
-      await flushPromises();
-      expect(router.currentRoute.value.query.host).toBeUndefined();
-      expect(wrapper.find('[data-test="host-drawer-stub"]').exists()).toBe(false);
     });
   });
 

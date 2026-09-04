@@ -447,6 +447,19 @@ describe("CuratedPageView", () => {
       }
     });
 
+    it("the hedge renders the `infra.curated.hiddenFootnote` KEY, not ad-hoc copy", async () => {
+      // Structure alone (one node, on no row) is satisfied by any hardcoded string.
+      // §8.4 authors this as one key so the sentence is translated and edited in one
+      // place; the key idiom follows the pickerNotApplicable pin below.
+      wrapper = await mountView(
+        {},
+        { hiddenGroups: ref([hiddenGroup()]), stripAutoExpand: ref(true) },
+      );
+      const hedge = wrapper.find('[data-test="curated-strip-hedge"]');
+      expect(hedge.exists()).toBe(true);
+      expect(hedge.attributes("data-copy-key")).toBe("infra.curated.hiddenFootnote");
+    });
+
     it("auto-expands when a hidden group owns an OVERVIEW panel; stays collapsed otherwise", async () => {
       wrapper = await mountView(
         {},
@@ -823,12 +836,10 @@ describe("CuratedPageView", () => {
       // Truncation is undetectable (no_count:true), so length===cap is the only
       // inference available and it errs toward disclosure.
       wrapper = await mountView({}, withPickers());
-      wrapper
-        .findComponent({ name: "RenderDashboardCharts" })
-        .vm.$emit("variable-values-loaded", {
-          name: "namespace",
-          values: new Array(100).fill("ns"),
-        });
+      wrapper.findComponent({ name: "RenderDashboardCharts" }).vm.$emit("variable-values-loaded", {
+        name: "namespace",
+        values: new Array(100).fill("ns"),
+      });
       await flushPromises();
       expect(wrapper.find('[data-test="curated-values-capped-namespace"]').exists()).toBe(true);
 

@@ -24,6 +24,7 @@ import { curatedPacks } from "./index";
 import defaultSemanticGroups from "./__fixtures__/semanticGroups.default.json";
 import enLocale from "@/locales/languages/en-US.json";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
+import { b64DecodeUnicodeSafe } from "@/utils/zincutils";
 import { raw } from "@/types/i18n";
 
 const groups = defaultSemanticGroups as FieldAlias[];
@@ -36,7 +37,20 @@ const UNIT_VALUES = new Set(
 );
 
 /** Labels the cardinality rule accepts as enumerable without a topk bound. */
-const ENUMERABLE_LABELS = new Set(["phase", "condition", "direction", "status", "action"]);
+const ENUMERABLE_LABELS = new Set([
+  "phase",
+  "condition",
+  "direction",
+  "status",
+  "action",
+  // §4.1 amendment (cold review loop 2, finding 1): the three host-shaped labels.
+  // Their domains are fixed by the kernel, not by fleet size — CPU states, block
+  // devices and mountpoints are per-host constants — and no registered pack
+  // groups on them unpinned, so they cannot fan out with the fleet.
+  "state",
+  "device",
+  "mountpoint",
+]);
 
 /** Collector tokens a capability-first label must not START with (finding 21). */
 const COLLECTOR_TOKENS = ["kubeletstats", "kube-state", "cluster receiver", "kubelet"];
@@ -331,6 +345,24 @@ describe.each(packs)("generic invariants — %s pack", (packId, manifest) => {
       expect(explorer, `${panel.id} has no byUrl drilldown`).toBeDefined();
       expect(explorer.data.url, panel.id).toContain("query_type=promql");
       expect(explorer.data.url, panel.id).toContain("query=");
+    }
+  });
+
+  it("(b') the drilldown query param is BASE64, decoding back to the panel's own PromQL", () => {
+    // `toContain("query=")` passes on a raw-string URL, which the metrics explorer
+    // then feeds to b64DecodeUnicodeSafe and renders as garbage. METRICS_PARAMS
+    // encodes this key with b64EncodeUnicode (metricsParamRegistry.ts:88-98), so
+    // the pin decodes it — the one assertion a hand-built URL cannot fake.
+    for (const panel of panels) {
+      if (isProbeGroup(manifest, panel.groupId)) continue;
+      const explorer = (panel.drilldown ?? []).find((d: any) => d.type === "byUrl");
+      const encoded = new URL(explorer.data.url, "http://localhost").searchParams.get("query");
+      expect(encoded, `${panel.id} has no query param`).toBeTruthy();
+      const decoded = b64DecodeUnicodeSafe(encoded!);
+      expect(decoded, `${panel.id} query is not base64`).toBeTruthy();
+      // The decoded text is the panel's own query, tokens and all — not a stray
+      // string that merely happens to survive a base64 round trip.
+      expect(queriesOf(panel), panel.id).toContain(decoded);
     }
   });
 

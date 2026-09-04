@@ -208,10 +208,13 @@ describe("§5.4 concept resolution — rung by rung", () => {
     // Discriminating fixture: a schema carrying BOTH `namespace` and
     // `k8s_namespace_name` must resolve to `namespace`, which is the defaults'
     // declared order (§3.3 fact 2). A "sort canonical-first" refactor fails here.
-    const bothSpellings = { ...kubernetesPage };
-    bothSpellings.groups = kubernetesPage.groups.map((g: any) =>
-      g.id === "kubelet-pod" ? { ...g, fieldOverrides: undefined } : g,
-    );
+    //
+    // kubelet-pod declares NO fieldOverrides, so rung 1 cannot fire and the pack is
+    // used as authored — stripping an override it does not have would be a no-op
+    // that only made the fixture look like it was doing something.
+    expect(
+      kubernetesPage.groups.find((g: any) => g.id === "kubelet-pod").fieldOverrides,
+    ).toBeUndefined();
     const streams = fullK8sStreams();
     const podMem = streams.metrics.find((s: any) => s.name === "k8s_pod_memory_usage")!;
     podMem.schema = ["namespace", "k8s_namespace_name", "k8s_pod_name"].map((name) => ({
@@ -219,7 +222,7 @@ describe("§5.4 concept resolution — rung by rung", () => {
       type: "Utf8",
     }));
 
-    const resolution = resolve({ manifest: bothSpellings, streams });
+    const resolution = resolve({ streams });
     const podMemTop = panelById(resolution, "k8s_wl_pod_mem_top");
     expect(podMemTop.resolvedFields[GROUP.namespace]).toBe("namespace");
   });
@@ -465,10 +468,18 @@ describe("token substitution", () => {
   it("an omitted picker leaves no empty {} and no dangling comma", () => {
     // No cluster field anywhere ⇒ the cluster picker is dropped and every
     // ${scope:cluster} token must collapse cleanly.
+    //
+    // BOTH nets have to be cut for the concept to go genuinely unresolved: stripping
+    // the schemas closes rung 2, and dropping kubelet-node's probeFields[k8s-cluster]
+    // — which the pack really does declare — closes rung 4a. Cut only one and the
+    // picker survives, so this fixture tests the collapse, not the ladder.
     const streams = fullK8sStreams();
     for (const entry of streams.metrics) {
       entry.schema = (entry.schema ?? []).filter((f: any) => !f.name.includes("cluster"));
     }
+    expect(
+      kubernetesPage.groups.find((g: any) => g.id === "kubelet-node").probeFields[GROUP.cluster],
+    ).toBeDefined();
     const noClusterProbe = {
       ...kubernetesPage,
       groups: kubernetesPage.groups.map((g: any) =>
@@ -800,6 +811,100 @@ describe("§5.3 staleness — min(range.start, now − STALE_GRACE_US)", () => {
       "k8s_node_cpu_usage",
     ]);
     expect(resolution.staleGroups.some((s: any) => s.group.id === "kubelet-node")).toBe(false);
+  });
+
+  it("stalenessStreams branch 3: a PROBE group's source is the RESOLVED candidate, not probe.streams[0]", () => {
+    // The third branch of the §5.3 source rule, and the only one with two
+    // plausible-looking sources. `probe.streams[0]` is present but lacks the probe
+    // column, so the ladder walks past it to `default` — and the two carry
+    // DIVERGENT doc_time_max, so reading the head of the candidate LIST instead of
+    // the RESOLVED stream badges a group whose actual data source is live.
+    const DEAD = NOW_US - 30 * DAY_US;
+    const probePage = {
+      ...kubernetesPage,
+      id: "probe-staleness",
+      groups: [
+        {
+          id: "probed",
+          labelKey: "synthetic.probed.label",
+          capabilityKey: "synthetic.probed.cap",
+          setupHintKey: "synthetic.probed.hint",
+          setup: { kind: "route", routeName: "syntheticSetup" },
+          streamType: "logs",
+          probe: {
+            streams: ["dedicated", "default"],
+            sqlFilter: "probe_col IS NOT NULL",
+            fields: ["probe_col"],
+          },
+          fieldOverrides: { [GROUP.host]: "host_name" },
+        },
+      ],
+      scopePickers: [],
+      sections: [
+        {
+          id: "overview",
+          titleKey: "synthetic.overview",
+          scopedBy: [],
+          panels: [
+            {
+              id: "probed_p1",
+              groupId: "probed",
+              titleKey: "synthetic.probed.title",
+              type: "line",
+              layout: { w: 96, h: 16 },
+              variants: [
+                {
+                  queryType: "sql",
+                  requiresStreams: [] as string[],
+                  fields: { x: [], y: [], breakdown: [] },
+                  queries: [{ query: `SELECT COUNT(*) FROM "<probe>"`, legend: "" }],
+                },
+              ],
+              drilldown: [],
+            },
+          ],
+        },
+      ],
+    };
+    const streams = streamLists(
+      [],
+      [
+        // Present and live, but WITHOUT the probe column ⇒ the ladder walks past it.
+        { name: "dedicated", docTimeMax: DEAD, schema: ["unrelated_col"] },
+        { name: "default", schema: ["probe_col"] },
+      ],
+    );
+
+    const resolution = resolveManifest({
+      manifest: probePage,
+      streams,
+      semanticGroups: [],
+      range: RANGE,
+      now: NOW_US,
+    });
+
+    expect(resolution.probeStreams?.probed).toBe("default");
+    expect(resolution.staleGroups.some((s: any) => s.group.id === "probed")).toBe(false);
+
+    // Control, same fixture with the dates swapped: when the RESOLVED candidate is
+    // the dead one the verdict flips, so the assertion above is not vacuous.
+    const inverted = streamLists(
+      [],
+      [
+        { name: "dedicated", schema: ["unrelated_col"] },
+        { name: "default", docTimeMax: DEAD, schema: ["probe_col"] },
+      ],
+    );
+    const flipped = resolveManifest({
+      manifest: probePage,
+      streams: inverted,
+      semanticGroups: [],
+      range: { start: NOW_US - 60 * DAY_US, end: NOW_US },
+      now: NOW_US,
+    });
+    const stale = flipped.staleGroups.find((s: any) => s.group.id === "probed");
+    expect(stale).toBeDefined();
+    expect(stale.lastSeenUs).toBe(DEAD);
   });
 });
 
@@ -1198,6 +1303,10 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       delete tab.tabId;
       delete tab.name;
       for (const panel of tab.panels ?? []) {
+        // buildDashboard is pure and i18n-free (§5.5 — every call site passes only
+        // { timezone }), so it emits titleKey and can never reproduce the fixture's
+        // translated copy. Titles are pinned by key in hosts.page.spec.ts instead.
+        delete panel.title;
         delete panel.config?.curated_badge;
         delete panel.config?.drilldown;
       }
