@@ -36,28 +36,6 @@ use tonic::{codec::CompressionEncoding, metadata::MetadataValue};
 /// (trace_id, file_id, account, file, size, cache_type)
 type FileInfo = (String, i64, String, String, usize, file_data::CacheType);
 
-mod processing_files {
-    use hashbrown::HashSet;
-    use parking_lot::RwLock;
-
-    use super::*;
-
-    static PROCESSING_FILES: Lazy<RwLock<HashSet<String>>> =
-        Lazy::new(|| RwLock::new(HashSet::new()));
-
-    pub fn is_processing(file_name: &str) -> bool {
-        PROCESSING_FILES.read().contains(file_name)
-    }
-
-    pub fn add(file_name: &str) {
-        PROCESSING_FILES.write().insert(file_name.to_string());
-    }
-
-    pub fn remove(file_name: &str) {
-        PROCESSING_FILES.write().remove(file_name);
-    }
-}
-
 struct DownloadQueue {
     sender: Sender<FileInfo>,
     receiver: Arc<Mutex<Receiver<FileInfo>>>,
@@ -119,22 +97,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         break;
                     }
                     Some((trace_id, id, account, file, file_size, cache)) => {
-                        // check if the file is already being downloaded
-                        if processing_files::is_processing(&file) {
-                            log::warn!(
-                                "[trace_id {trace_id}] [thread {thread}] search->storage: file {file} is already being downloaded, will skip it"
-                            );
-                            // update metrics
-                            metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
-                                .with_label_values::<&str>(&[])
-                                .dec();
-                            continue;
-                        }
-
-                        // add the file to processing set
-                        processing_files::add(&file);
-
-                        // download the file
                         match download_file(
                             thread, &trace_id, id, &account, &file, file_size, cache,
                         )
@@ -153,9 +115,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                 );
                             }
                         }
-
-                        // remove the file from processing set
-                        processing_files::remove(&file);
 
                         // update metrics
                         metrics::FILE_DOWNLOADER_NORMAL_QUEUE_SIZE
@@ -209,22 +168,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                         let file_info = PRIORITY_FILE_DOWNLOAD_CHANNEL.pop().await;
                         match file_info {
                             Some((trace_id, id, account, file, file_size, cache)) => {
-                                 // check if the file is already being downloaded
-                                if processing_files::is_processing(&file) {
-                                    log::warn!(
-                                        "[trace_id {trace_id}] [thread {thread}] search->storage: file {file} is already being downloaded, will skip it"
-                                    );
-                                    // update metrics
-                                    metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
-                                        .with_label_values::<&str>(&[])
-                                        .dec();
-                                    return;
-                                }
-
-                                // add the file to processing set
-                                processing_files::add(&file);
-
-                                // download the file
                                 match download_file(thread, &trace_id, id, &account, &file, file_size, cache).await {
                                     Ok(data_len) => {
                                         if data_len > 0 && data_len != file_size {
@@ -239,9 +182,6 @@ pub async fn run() -> Result<(), anyhow::Error> {
                                         );
                                     }
                                 }
-
-                                // remove the file from processing set
-                                processing_files::remove(&file);
 
                                 // update metrics
                                 metrics::FILE_DOWNLOADER_PRIORITY_QUEUE_SIZE
@@ -280,30 +220,20 @@ async fn download_file(
         return Ok(file_size);
     }
 
-    // download from object store
+    // download into the cache
     let size = if file_size > 0 { Some(file_size) } else { None };
     let start = std::time::Instant::now();
-    let ret = match cache_type {
-        file_data::CacheType::Memory => {
-            let mut disk_exists = false;
-            let mem_exists = file_data::memory::exist(file_name).await;
-            if !mem_exists && !cfg.memory_cache.skip_disk_check {
-                disk_exists = file_data::disk::exist(file_name).await;
-            }
-            if !mem_exists && (cfg.memory_cache.skip_disk_check || !disk_exists) {
-                file_data::memory::download(account, file_name, size).await
-            } else {
-                Ok(0)
-            }
-        }
-        file_data::CacheType::Disk => {
-            if !file_data::disk::exist(file_name).await {
-                file_data::disk::download(account, file_name, size).await
-            } else {
-                Ok(0)
-            }
-        }
-        _ => Ok(0),
+    let ret = if cache_type == file_data::CacheType::Memory
+        && !cfg.memory_cache.skip_disk_check
+        && !file_data::memory::exist(file_name).await
+        && file_data::disk::exist(file_name).await
+    {
+        Ok(0)
+    } else {
+        file_data::download_to_cache(account, file_name, size, cache_type)
+            .await
+            .map(|(bytes, _)| bytes)
+            .map_err(anyhow::Error::new)
     };
     log::debug!(
         "[FILE_CACHE_DOWNLOAD:JOB:{thread}] [trace_id {trace_id}] download file: {file_name}, ret: {:?}, took: {} ms",

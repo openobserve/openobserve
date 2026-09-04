@@ -26,6 +26,7 @@ hashbrown.workspace = true
 hashlink.workspace = true
 itertools.workspace = true
 log.workspace = true
+moka.workspace = true
 async-nats.workspace = true
 object_store.workspace = true
 once_cell.workspace = true
