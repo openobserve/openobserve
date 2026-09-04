@@ -500,7 +500,7 @@ const useRoutes = () => {
     {
       path: "infra/kubernetes",
       name: "infraKubernetes",
-      component: () => import("@/views/Infrastructure/WorkloadStubPage.vue"),
+      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
       props: { workload: "kubernetes" },
       meta: { titleKey: "menu.kubernetes" },
       beforeEnter: routeGuard,
@@ -508,7 +508,7 @@ const useRoutes = () => {
     {
       path: "infra/aws",
       name: "infraAws",
-      component: () => import("@/views/Infrastructure/WorkloadStubPage.vue"),
+      component: () => import("@/views/Infrastructure/curated/CuratedPageView.vue"),
       props: { workload: "aws" },
       meta: { titleKey: "menu.awsInfra" },
       beforeEnter: routeGuard,

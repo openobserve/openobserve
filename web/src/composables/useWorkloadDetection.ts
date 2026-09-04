@@ -34,6 +34,31 @@ const HOST_SIGNATURE_STREAMS = [
 
 const isAwsName = (name: string) => name.startsWith("aws_") || name.includes("cloudwatch");
 
+/**
+ * The L0 signature applied to already-loaded stream NAMES. Exported so a caller
+ * that has just read the lists itself (the curated engine) derives the same
+ * state without paying for a second read. `null` means "not loaded" ⇒ unknown.
+ */
+export function workloadStateFromNames(
+  workload: WorkloadId,
+  names: { metrics: string[] | null; logs: string[] | null },
+): WorkloadState {
+  const { metrics, logs } = names;
+  const fromMetrics = (matched: boolean): WorkloadState =>
+    metrics == null ? "unknown" : matched ? "detected" : "undetected";
+  if (workload === "hosts") {
+    return fromMetrics(
+      metrics != null && HOST_SIGNATURE_STREAMS.filter((n) => metrics.includes(n)).length >= 2,
+    );
+  }
+  if (workload === "kubernetes") {
+    return fromMetrics(metrics != null && metrics.filter((n) => n.startsWith("k8s_")).length >= 2);
+  }
+  const awsDetected =
+    (metrics != null && metrics.some(isAwsName)) || (logs != null && logs.some(isAwsName));
+  return awsDetected ? "detected" : metrics != null && logs != null ? "undetected" : "unknown";
+}
+
 export function useWorkloadDetection(): {
   states: ComputedRef<Record<WorkloadId, WorkloadState>>;
   refresh: (opts?: { force?: boolean }) => Promise<void>;
@@ -58,20 +83,11 @@ export function useWorkloadDetection(): {
   };
 
   const states = computed<Record<WorkloadId, WorkloadState>>(() => {
-    const metrics = metricsNames.value;
-    const logs = logsNames.value;
-    const fromMetrics = (matched: boolean): WorkloadState =>
-      metrics == null ? "unknown" : matched ? "detected" : "undetected";
-    const awsDetected =
-      (metrics != null && metrics.some(isAwsName)) || (logs != null && logs.some(isAwsName));
+    const names = { metrics: metricsNames.value, logs: logsNames.value };
     return {
-      hosts: fromMetrics(
-        metrics != null && HOST_SIGNATURE_STREAMS.filter((n) => metrics.includes(n)).length >= 2,
-      ),
-      kubernetes: fromMetrics(
-        metrics != null && metrics.filter((n) => n.startsWith("k8s_")).length >= 2,
-      ),
-      aws: awsDetected ? "detected" : metrics != null && logs != null ? "undetected" : "unknown",
+      hosts: workloadStateFromNames("hosts", names),
+      kubernetes: workloadStateFromNames("kubernetes", names),
+      aws: workloadStateFromNames("aws", names),
     };
   });
 

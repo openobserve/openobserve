@@ -16,6 +16,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div>
+    <span
+      v-if="disabled && disabledTooltipKey"
+      data-test="variable-disabled-tooltip"
+      :data-tooltip-key="disabledTooltipKey"
+    />
     <OSelect
       ref="selectRef"
       :model-value="oSelectModelValue"
@@ -28,6 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :loading="variableItem.isLoading && !isOpen"
       :data-test="`variable-selector-${variableItem.name}-inner`"
       :multiple="variableItem.multiSelect"
+      :disabled="!!disabled"
       @search="onSearch"
       @open="onPopupShow"
       @close="onPopupHide"
@@ -131,7 +137,7 @@ import { useI18nTyped } from "@/types/i18n";
 export default defineComponent({
   name: "VariableQueryValueSelector",
   components: { OSeparator, OSelect, OCheckbox, OSpinner },
-  props: ["modelValue", "variableItem", "loadOptions"],
+  props: ["modelValue", "variableItem", "loadOptions", "disabled", "disabledTooltipKey"],
   emits: ["update:modelValue", "search"],
   setup(props: any, { emit }) {
     const { t } = useI18nTyped();

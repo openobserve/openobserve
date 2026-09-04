@@ -44,6 +44,9 @@ export interface HostRow {
   disk: number | null;
   load: number | null;
   lastSeen: string | null;
+  /** The raw µs behind `lastSeen` — the curated drawer badges off THIS host's
+   * own last-seen, which a formatted string cannot be compared against. */
+  lastSeenUs: number | null;
 }
 
 export interface HostsRefreshArgs {
@@ -203,6 +206,7 @@ export function useHostsList() {
           lastSeenRaw != null
             ? timestampToTimezoneDate(lastSeenRaw, timezone, LAST_SEEN_FORMAT)
             : null,
+        lastSeenUs: lastSeenRaw ?? null,
       });
     }
     rows.value = joined;

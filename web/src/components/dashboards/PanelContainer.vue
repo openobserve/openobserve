@@ -54,6 +54,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ props.data.title }}
         </div>
+        <OTag
+          v-if="curatedBadge"
+          variant="amber-soft"
+          size="sm"
+          data-test="dashboard-panel-curated-badge"
+          data-tooltip-key="infra.curated.staleBadgeTooltip"
+          :title="t('infra.curated.staleBadgeTooltip')"
+        >
+          {{ t(curatedBadge.key, { duration: curatedBadge.duration, date: curatedBadge.date }) }}
+        </OTag>
         <div class="flex-1" />
 
         <!-- HOVER-REVEALED CONTROLS (this button through the fullscreen one).
@@ -329,7 +339,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <slot name="panel-variables"></slot>
     </div>
 
-    <div class="min-h-0 flex-1">
+    <div
+      class="min-h-0 flex-1"
+      :class="curatedBadge ? 'opacity-60' : undefined"
+      data-test="dashboard-panel-body"
+      :data-curated-stale="curatedBadge ? 'true' : 'false'"
+    >
       <PanelSchemaRenderer
         :panelSchema="props.data"
         :selectedTimeObj="props.selectedTimeDate"
@@ -431,6 +446,7 @@ import SinglePanelMove from "@/components/dashboards/settings/SinglePanelMove.vu
 import { getUUID, processQueryMetadataErrors } from "@/utils/zincutils";
 import useNotifications from "@/composables/useNotifications";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import ODropdown from "@/lib/overlay/Dropdown/ODropdown.vue";
 import ODropdownItem from "@/lib/overlay/Dropdown/ODropdownItem.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -490,6 +506,7 @@ export default defineComponent({
     "showLegendsButton",
   ],
   components: {
+    OTag,
     PanelSchemaRenderer,
     PanelBar,
     QueryInspector,
@@ -511,6 +528,13 @@ export default defineComponent({
     const router = useRouter();
     const route = useRoute();
     const { t } = useI18nTyped();
+    // Curated pages stamp this; stored dashboards never carry it, so the badge
+    // and the body dimming are both invisible outside them (§6.3).
+    const curatedBadge = computed(
+      () =>
+        props.data?.config?.curated_badge as
+          { key: string; duration: string; date: string } | undefined,
+    );
     const metaData = ref();
     const showViewPanel = ref(false);
     const showLegendsDialog = ref(false);
@@ -965,6 +989,7 @@ export default defineComponent({
 
     return {
       props,
+      curatedBadge,
       alertDisabledReason,
       onEditPanel,
       onLogPanel,
