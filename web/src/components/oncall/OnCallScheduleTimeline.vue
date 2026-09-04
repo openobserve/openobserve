@@ -192,12 +192,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTag>
 
             <OButton
-              variant="outline"
-              size="xs"
+              variant="ghost"
+              size="icon-sm"
+              icon-left="edit"
+              :aria-label="t('oncall.edit')"
               :data-test="`oncall-lane-edit-${track.key}`"
               @click="emit('edit', laneOf(track).id)"
             >
-              {{ t("oncall.edit") }}
+              <OTooltip side="bottom" :content="t('oncall.edit')" />
             </OButton>
 
             <!-- Edit is the one act worth a button of its own; the rest are
