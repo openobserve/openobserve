@@ -5311,6 +5311,7 @@ dependencies = [
  "hashlink",
  "itertools 0.14.0",
  "log",
+ "moka",
  "object_store",
  "once_cell",
  "opentelemetry 0.31.0",
