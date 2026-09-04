@@ -3,7 +3,7 @@ name: CI gate
 # Required check on main: pending without the ready-for-ci label, so an untested PR cannot be queued.
 # A status is needed because skipped jobs count as passing for required checks.
 on:
-  # pull_request_target so fork PRs get a status too; no checkout, so nothing untrusted runs.
+  # pull_request_target so fork PRs get a status too; only base-branch code is checked out, nothing from the PR runs.
   pull_request_target:
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
   # The queue commit must carry every required check; the gate is already passed by then.
@@ -11,6 +11,8 @@ on:
 
 permissions:
   statuses: write
+  contents: read
+  pull-requests: read
 
 concurrency:
   group: ci-gate-${{ github.event.pull_request.number || github.ref }}
@@ -21,27 +23,40 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      # Base-branch checkout only: the classifier script must come from main, never from the PR head.
+      - uses: actions/checkout@v5
       - env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PR: ${{ github.event.pull_request.number }}
+          FORK: ${{ github.event.pull_request.head.repo.fork }}
           LABELED: ${{ github.event_name == 'merge_group' || contains(github.event.pull_request.labels.*.name, 'ready-for-ci') }}
+          SKIP_ENT: ${{ contains(github.event.pull_request.labels.*.name, 'skip-ent-e2e') }}
           DRAFT: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.draft == true }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          set -euo pipefail
+          post() { gh api -X POST "repos/${{ github.repository }}/statuses/$SHA" -f context="$1" -f state="$2" -f description="$3" -f target_url="$RUN_URL" --jq '"\(.context): \(.state)"'; }
           if [ "$DRAFT" = "true" ]; then
-            STATE=pending; DESC="Draft PR: paid CI does not run until it is marked ready for review."
+            post ci-gate pending "Draft PR: paid CI does not run until it is marked ready for review."
           elif [ "$LABELED" = "true" ]; then
-            STATE=success; DESC="ready-for-ci label present; CI runs on every push"
+            post ci-gate success "ready-for-ci label present; CI runs on every push"
           else
-            STATE=pending; DESC="Add the ready-for-ci label to run CI. Required before this PR can be queued."
+            post ci-gate pending "Add the ready-for-ci label to run CI. Required before this PR can be queued."
           fi
-          gh api -X POST "repos/${{ github.repository }}/statuses/$SHA" \
-            -f state="$STATE" -f context=ci-gate -f description="$DESC" -f target_url="$RUN_URL" \
-            --jq '"\(.context): \(.state)"'
-          # o2-enterprise posts ent-build-status-check on PR heads only; a queue commit never gets one, and
-          # a fork PR cannot be built there. Report it as passed in both cases so a required check cannot deadlock the queue.
-          if [ "${{ github.event_name }}" = "merge_group" ] || [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ]; then
-            gh api -X POST "repos/${{ github.repository }}/statuses/$SHA" \
-              -f state=success -f context=ent-build-status-check -f description="gate passed on the PR head; not re-run on this commit" \
-              --jq '"\(.context): \(.state)"'
+          # o2-enterprise posts ent-build-status-check on PR heads it can build. A queue commit never gets one, so
+          # the gate that passed on the PR head is carried over; otherwise a required check would deadlock the queue.
+          if [ "${{ github.event_name }}" = "merge_group" ]; then
+            post ent-build-status-check success "gate passed on the PR head; not re-run on this commit"
+          elif [ "$FORK" = "true" ]; then
+            # A fork head cannot be built in o2-enterprise (no branch there, no token), so code changes must be
+            # re-pushed as a repo branch by a maintainer; skip-ent-e2e is the auditable opt-out. openobserve#13831
+            # merged from a fork with an unpaired Cargo feature and broke every enterprise build on main.
+            FILES=$(gh api "repos/${{ github.repository }}/pulls/$PR/files?per_page=100" --paginate --jq '.[].filename')
+            RUN_ENT=$(printf '%s\n' "$FILES" | .github/actions/classify-changes/classify.sh | sed -n 's/^run_enterprise=//p')
+            if [ "$RUN_ENT" = "true" ] && [ "$SKIP_ENT" != "true" ]; then
+              post ent-build-status-check pending "Fork PR changes backend/frontend: a maintainer must push it as a repo branch and open the PR from there, or add skip-ent-e2e."
+            else
+              post ent-build-status-check success "fork PR without backend or frontend changes; enterprise build not needed"
+            fi
           fi
