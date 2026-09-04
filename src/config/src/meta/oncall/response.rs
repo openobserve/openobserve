@@ -2012,24 +2012,11 @@ mod tests {
         );
     }
 
-    /// The gate is `updates_in_place`, which had no caller until now. Wiring it
-    /// to anything else would let a channel that cannot revise a message post a
-    /// second one.
+    /// The gate is `updates_in_place`. Wiring it to anything else would let a
+    /// channel that cannot revise a message post a second one.
     #[test]
     fn test_the_edit_gate_is_the_channels_own_answer() {
-        for editable in [Channel::Chat, Channel::Push, Channel::InApp] {
-            assert_eq!(
-                channel_post_action(true, super::super::agent::updates_in_place(editable)),
-                ChannelPostAction::Edit,
-                "{editable}"
-            );
-        }
-        for fixed in [
-            Channel::Email,
-            Channel::Sms,
-            Channel::Voice,
-            Channel::Webhook,
-        ] {
+        for fixed in [Channel::Email, Channel::Webhook] {
             assert_eq!(
                 channel_post_action(true, super::super::agent::updates_in_place(fixed)),
                 ChannelPostAction::Skip,

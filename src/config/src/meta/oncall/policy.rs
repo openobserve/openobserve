@@ -58,16 +58,8 @@ pub const DEFAULT_PAGING_PRIORITY: AlertPriority = AlertPriority::P2;
 #[serde(rename_all = "snake_case")]
 pub enum Channel {
     Email,
-    Sms,
-    Voice,
-    /// Slack, Teams, Google Chat — the team's chat destination.
-    Chat,
     /// An existing alert Destination — Slack, Teams, or any HTTP endpoint.
     Webhook,
-    /// Mobile push.
-    Push,
-    /// Shown in the product, never delivered anywhere.
-    InApp,
 }
 
 impl Channel {
@@ -75,11 +67,6 @@ impl Channel {
     pub fn to_i32(&self) -> i32 {
         match self {
             Self::Email => 1,
-            Self::Sms => 2,
-            Self::Voice => 3,
-            Self::Chat => 4,
-            Self::Push => 5,
-            Self::InApp => 6,
             Self::Webhook => 7,
         }
     }
@@ -87,11 +74,6 @@ impl Channel {
     pub fn from_i32(v: i32) -> Option<Self> {
         match v {
             1 => Some(Self::Email),
-            2 => Some(Self::Sms),
-            3 => Some(Self::Voice),
-            4 => Some(Self::Chat),
-            5 => Some(Self::Push),
-            6 => Some(Self::InApp),
             7 => Some(Self::Webhook),
             _ => None,
         }
@@ -100,73 +82,25 @@ impl Channel {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Email => "email",
-            Self::Sms => "sms",
-            Self::Voice => "voice",
-            Self::Chat => "chat",
-            Self::Push => "push",
-            Self::InApp => "in_app",
             Self::Webhook => "webhook",
         }
     }
 
-    /// Channels that interrupt a sleeping person. Used to decide what a
-    /// follow-up update may NOT re-fire: urgent channels are reserved for
-    /// "a human is needed", not "news arrived".
-    pub fn is_interrupting(&self) -> bool {
-        matches!(self, Self::Voice | Self::Sms | Self::Push)
-    }
-
-    /// Whether a `Notifier` can actually deliver this channel today.
-    ///
-    /// The enum carries every channel the design calls for so the stored shape
-    /// does not change when providers land, but only Email has an
-    /// implementation. Offering the rest in the UI, or shipping them as
-    /// defaults, would store a promise that silently delivers nothing — the
-    /// worst possible failure for a paging system.
-    pub fn is_deliverable(&self) -> bool {
-        matches!(self, Self::Email | Self::Webhook)
-    }
-
-    /// Every channel a page can actually reach a person on today.
+    /// Every channel a page can reach a person on.
     pub fn deliverable() -> Vec<Self> {
-        [
-            Self::Email,
-            Self::Webhook,
-            Self::Sms,
-            Self::Voice,
-            Self::Chat,
-            Self::Push,
-            Self::InApp,
-        ]
-        .into_iter()
-        .filter(Self::is_deliverable)
-        .collect()
+        vec![Self::Email, Self::Webhook]
     }
 }
 
 /// 03 §6's fallback chain, in the order it is evaluated.
 ///
-/// Most interrupting first, because the chain stops at the first success and
-/// the point of a page is to reach somebody now: trying email before a phone
-/// call would "succeed" into an inbox nobody is reading at 3am.
-///
-/// The undeliverable half of the list is carried so the order does not have to
-/// be redesigned when a provider lands; [`fallback_chain`] filters it out.
-pub const FALLBACK_ORDER: [Channel; 7] = [
-    Channel::Push,
-    Channel::Sms,
-    Channel::Voice,
-    Channel::Email,
-    Channel::Webhook,
-    Channel::Chat,
-    Channel::InApp,
-];
+/// The chain stops at the first success, so the order decides which channel a
+/// page is tried on first. SMS, voice, push, chat and in-app were removed
+/// because nothing in this build could send them; when a provider lands, the
+/// new channel goes in this list at the position its urgency earns.
+pub const FALLBACK_ORDER: [Channel; 2] = [Channel::Email, Channel::Webhook];
 
 /// The channels one responder is tried on, in order, for a rung.
-///
-/// Deduplicated and restricted to what a `Notifier` can actually send, so a
-/// policy that names SMS today does not put an unreachable rung at the head of
-/// the chain and make every page look like it was attempted.
 ///
 /// §6, verbatim: "On a single-node deployment with just SMTP configured, the
 /// chain collapses to email and everything still works" — that is the baseline,
@@ -174,7 +108,7 @@ pub const FALLBACK_ORDER: [Channel; 7] = [
 pub fn fallback_chain(channels: &[Channel]) -> Vec<Channel> {
     FALLBACK_ORDER
         .into_iter()
-        .filter(|c| c.is_deliverable() && channels.contains(c))
+        .filter(|c| channels.contains(c))
         .collect()
 }
 
@@ -188,12 +122,12 @@ pub fn fallback_chain(channels: &[Channel]) -> Vec<Channel> {
 /// chat` was not expressible at all, and it is the common case.
 ///
 /// So the two kinds are separated by what they address, not by how loud they
-/// are. Chat and Webhook both resolve to a destination the whole team watches;
-/// everything else resolves to one person's inbox, handset or screen.
+/// are. A webhook resolves to a destination the whole team watches; email
+/// resolves to one person's inbox.
 pub fn is_broadcast(channel: Channel) -> bool {
     match channel {
-        Channel::Chat | Channel::Webhook => true,
-        Channel::Email | Channel::Sms | Channel::Voice | Channel::Push | Channel::InApp => false,
+        Channel::Webhook => true,
+        Channel::Email => false,
     }
 }
 
@@ -221,10 +155,6 @@ impl ChannelPlan {
 }
 
 /// Split a rung's channels into the person-reaching chain and the broadcasts.
-///
-/// Both halves are filtered to what a `Notifier` can actually send, for the
-/// same reason [`fallback_chain`] is: a channel nothing can deliver makes a
-/// rung look attempted when nothing left the process.
 pub fn channel_plan(channels: &[Channel]) -> ChannelPlan {
     ChannelPlan {
         chain: fallback_chain(channels)
@@ -233,7 +163,7 @@ pub fn channel_plan(channels: &[Channel]) -> ChannelPlan {
             .collect(),
         broadcast: FALLBACK_ORDER
             .into_iter()
-            .filter(|c| c.is_deliverable() && is_broadcast(*c) && channels.contains(c))
+            .filter(|c| is_broadcast(*c) && channels.contains(c))
             .collect(),
     }
 }
@@ -450,13 +380,6 @@ pub enum PolicyError {
     DuplicatePriority(AlertPriority),
     /// A priority that pages has to page somewhere.
     NoChannels(AlertPriority),
-    /// The policy names a channel no `Notifier` can send on.
-    ///
-    /// Storing one is the worst failure a pager has: the policy reads as
-    /// configured, the rung fires, every recipient lands in `failed`, and
-    /// nobody is woken. Refusing it at write time is the only point at which
-    /// somebody is still looking at the screen.
-    UndeliverableChannels(AlertPriority, Vec<Channel>),
 }
 
 /// What the engine should do right now.
@@ -521,10 +444,9 @@ impl EscalationPolicy {
     /// P4 and P5 page nobody at all: they are recorded and shown in the
     /// product, and the agent still investigates them.
     ///
-    /// Every paging priority defaults to Email because Email is the only
-    /// channel a `Notifier` can deliver ([`Channel::is_deliverable`]). When
-    /// SMS and voice land, THIS is the function that changes — the defaults
-    /// should never promise a channel that does not send.
+    /// Every paging priority defaults to Email. When SMS and voice land, THIS
+    /// is the function that changes — the defaults should never promise a
+    /// channel that does not send.
     pub fn default_for_team(
         id: impl Into<String>,
         org_id: impl Into<String>,
@@ -703,23 +625,6 @@ impl EscalationPolicy {
             if !rung.steps.is_empty() && rung.channels.is_empty() {
                 return Err(PolicyError::NoChannels(rung.priority));
             }
-            // Only for a priority that actually pages: a rung that pages
-            // nobody may carry whatever a team has ticked in anticipation of
-            // SMS landing, because nothing will ever try to send it.
-            if !rung.steps.is_empty() {
-                let undeliverable: Vec<Channel> = rung
-                    .channels
-                    .iter()
-                    .filter(|c| !c.is_deliverable())
-                    .copied()
-                    .collect();
-                if !undeliverable.is_empty() {
-                    return Err(PolicyError::UndeliverableChannels(
-                        rung.priority,
-                        undeliverable,
-                    ));
-                }
-            }
             let mut seen_delay = std::collections::HashSet::new();
             for step in &rung.steps {
                 if step.after_micros < 0 {
@@ -892,22 +797,6 @@ impl std::fmt::Display for PolicyError {
             Self::NoChannels(p) => {
                 write!(f, "priority `{p}` pages somebody but has no channels")
             }
-            Self::UndeliverableChannels(p, channels) => {
-                let named = channels
-                    .iter()
-                    .map(Channel::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                let deliverable = Channel::deliverable()
-                    .iter()
-                    .map(Channel::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                write!(
-                    f,
-                    "priority `{p}` pages over {named}, which nothing can deliver yet, so those pages would reach nobody; the channels available today are {deliverable}"
-                )
-            }
         }
     }
 }
@@ -936,14 +825,7 @@ mod tests {
 
     #[test]
     fn test_channel_storage_ids_are_pinned() {
-        let all = [
-            (Channel::Email, 1),
-            (Channel::Sms, 2),
-            (Channel::Voice, 3),
-            (Channel::Chat, 4),
-            (Channel::Push, 5),
-            (Channel::InApp, 6),
-        ];
+        let all = [(Channel::Email, 1), (Channel::Webhook, 7)];
         for (c, want) in all {
             assert_eq!(c.to_i32(), want, "{c} moved");
             assert_eq!(Channel::from_i32(want), Some(c));
@@ -951,16 +833,6 @@ mod tests {
         assert_eq!(Channel::from_i32(0), None);
         assert_eq!(Channel::from_i32(8), None);
         assert_eq!(Channel::Webhook.to_i32(), 7);
-    }
-
-    #[test]
-    fn test_interrupting_channels_are_the_ones_that_wake_people() {
-        for c in [Channel::Voice, Channel::Sms, Channel::Push] {
-            assert!(c.is_interrupting(), "{c} wakes a sleeping person");
-        }
-        for c in [Channel::Email, Channel::Chat, Channel::InApp] {
-            assert!(!c.is_interrupting(), "{c} does not wake anyone");
-        }
     }
 
     #[test]
@@ -1373,53 +1245,6 @@ mod tests {
         );
     }
 
-    /// A policy that names SMS today stores a promise nothing keeps: the rung
-    /// fires, every recipient lands in `failed`, and the page reaches nobody
-    /// while the screen still says the team is covered. It is refused while
-    /// somebody is still looking at the form, and the message says which
-    /// channels are the problem and what can be used instead.
-    #[test]
-    fn test_a_policy_cannot_promise_a_channel_nothing_can_send() {
-        let mut p = policy();
-        p.rungs[0].channels = vec![Channel::Email, Channel::Sms, Channel::Voice];
-
-        let err = p.validate().unwrap_err();
-        assert_eq!(
-            err,
-            PolicyError::UndeliverableChannels(
-                AlertPriority::P1,
-                vec![Channel::Sms, Channel::Voice]
-            )
-        );
-        let message = err.to_string();
-        assert!(
-            message.contains("sms") && message.contains("voice"),
-            "{message}"
-        );
-        assert!(
-            message.contains("email"),
-            "the message has to say what CAN be used: {message}"
-        );
-
-        // Every channel that can be delivered is accepted.
-        p.rungs[0].channels = Channel::deliverable();
-        p.validate().unwrap();
-    }
-
-    /// A priority that pages nobody may carry whatever a team ticked in
-    /// anticipation of SMS landing: nothing will ever try to send it.
-    #[test]
-    fn test_a_non_paging_priority_may_name_a_channel_that_cannot_send_yet() {
-        let mut p = policy();
-        let idx = p
-            .rungs
-            .iter()
-            .position(|r| r.priority == AlertPriority::P4)
-            .unwrap();
-        p.rungs[idx].channels = vec![Channel::Sms];
-        p.validate().unwrap();
-    }
-
     /// A priority that pages nobody is allowed to have no channels beyond the
     /// in-app surface — that is P4, not a misconfiguration.
     #[test]
@@ -1434,40 +1259,15 @@ mod tests {
         p.validate().unwrap();
     }
 
-    /// A default that names a channel nothing can send stores a promise the
-    /// engine silently drops — the worst failure mode a pager has.
+    /// The vocabulary holds only channels something can send. A variant added
+    /// here without a transport behind it stores a promise the engine silently
+    /// drops — the worst failure mode a pager has.
     #[test]
-    fn test_defaults_only_use_channels_that_can_be_delivered() {
-        let p = policy();
-        for rung in &p.rungs {
-            for channel in &rung.channels {
-                assert!(
-                    channel.is_deliverable(),
-                    "{} defaults to {channel}, which no Notifier can send",
-                    rung.priority
-                );
-            }
-        }
-    }
-
-    /// Only Email has an implementation today. This test is the reminder to
-    /// revisit the defaults when a provider lands, not a statement that the
-    /// other channels are wrong to exist.
-    #[test]
-    fn test_email_is_the_only_deliverable_channel_today() {
+    fn test_every_channel_in_the_vocabulary_can_be_delivered() {
         assert_eq!(
             Channel::deliverable(),
             vec![Channel::Email, Channel::Webhook]
         );
-        for c in [
-            Channel::Sms,
-            Channel::Voice,
-            Channel::Chat,
-            Channel::Push,
-            Channel::InApp,
-        ] {
-            assert!(!c.is_deliverable(), "{c} has no Notifier yet");
-        }
     }
 
     /// A priority that pages nobody needs no delivery channel; its record is
@@ -1501,14 +1301,6 @@ mod tests {
             vec![Channel::Email, Channel::Webhook],
             "the policy's storage order must not decide who is tried first"
         );
-        // Everything a team may have ticked in anticipation of a provider is
-        // dropped: an unreachable channel at the head of the chain would make
-        // every page look attempted and reach nobody.
-        assert_eq!(
-            fallback_chain(&[Channel::Sms, Channel::Voice, Channel::Push, Channel::Email]),
-            vec![Channel::Email]
-        );
-        assert!(fallback_chain(&[Channel::InApp]).is_empty());
         assert!(fallback_chain(&[]).is_empty());
     }
 
@@ -1520,22 +1312,11 @@ mod tests {
         assert_eq!(fallback_chain(&[Channel::Email]), vec![Channel::Email]);
     }
 
-    /// The undeliverable half of the published order is carried so the order
-    /// does not have to be redesigned when a provider lands.
+    /// The order is the whole decision, so it is pinned rather than left to
+    /// whatever order the variants happen to be declared in.
     #[test]
     fn test_the_published_order_is_the_one_the_design_names() {
-        assert_eq!(
-            FALLBACK_ORDER,
-            [
-                Channel::Push,
-                Channel::Sms,
-                Channel::Voice,
-                Channel::Email,
-                Channel::Webhook,
-                Channel::Chat,
-                Channel::InApp,
-            ]
-        );
+        assert_eq!(FALLBACK_ORDER, [Channel::Email, Channel::Webhook]);
     }
 
     // ── Retries and the breaker (03 §9) ─────────────────────────────────────
@@ -1824,20 +1605,11 @@ mod tests {
     /// first success.
     #[test]
     fn test_a_person_reaching_chain_keeps_its_order_and_its_membership() {
-        // Every channel ticked, including the ones no transport can send.
-        let plan = channel_plan(&[
-            Channel::InApp,
-            Channel::Email,
-            Channel::Sms,
-            Channel::Chat,
-            Channel::Webhook,
-            Channel::Voice,
-            Channel::Push,
-        ]);
+        let plan = channel_plan(&[Channel::Webhook, Channel::Email]);
         assert_eq!(
             plan.chain,
             vec![Channel::Email],
-            "only the deliverable person-reaching channels, in FALLBACK_ORDER"
+            "only the person-reaching channels, in FALLBACK_ORDER"
         );
         assert!(
             plan.chain.iter().all(|c| !is_broadcast(*c)),
@@ -1850,24 +1622,13 @@ mod tests {
     /// backwards is how six people on one rung became six identical posts.
     #[test]
     fn test_only_the_room_channels_are_broadcasts() {
-        assert!(is_broadcast(Channel::Chat));
         assert!(is_broadcast(Channel::Webhook));
-        for personal in [
-            Channel::Email,
-            Channel::Sms,
-            Channel::Voice,
-            Channel::Push,
-            Channel::InApp,
-        ] {
-            assert!(!is_broadcast(personal), "{personal} reaches one person");
-        }
+        assert!(!is_broadcast(Channel::Email), "email reaches one person");
     }
 
     /// A rung that pages nobody must not look like it had a plan.
     #[test]
-    fn test_a_rung_with_nothing_deliverable_plans_nothing() {
-        let plan = channel_plan(&[Channel::Sms, Channel::Voice, Channel::Chat]);
-        assert!(plan.is_empty(), "{plan:?}");
+    fn test_a_rung_with_no_channels_plans_nothing() {
         assert!(channel_plan(&[]).is_empty());
     }
 
