@@ -50,7 +50,15 @@ const pack = curatedPacks[props.workload];
 const hasPack = computed(() => pack != null);
 const manifest = computed(() => pack ?? curatedPacks.kubernetes!);
 
-const page = useCuratedPage(manifest.value);
+// A GETTER, not the ref: selectedTabId is declared below, and the composable
+// only reads this at build time.
+const page = useCuratedPage(manifest.value, {
+  activeSectionId: () => selectedTabId.value ?? undefined,
+  drilldownRange: () =>
+    selectedWindow.value.kind === "relative"
+      ? { period: selectedWindow.value.period }
+      : { from: selectedWindow.value.from, to: selectedWindow.value.to },
+});
 const {
   face,
   l0State,
@@ -62,6 +70,7 @@ const {
   warnings,
   lastDataUs,
   stripAutoExpand,
+  presentGroupIds,
   refresh,
 } = page;
 
@@ -117,7 +126,7 @@ const runRefresh = async (force = false) => {
 // ── Faces ───────────────────────────────────────────────────────────────────
 
 /** The manifest's FIRST group's setup door drives the undetected face (§6.1). */
-const setupDoor = computed(() => (page as any).setupDoor?.value ?? manifest.value.groups[0]?.setup);
+const setupDoor = computed(() => manifest.value.groups[0]?.setup);
 const showPartialTelemetry = computed(
   () => face.value === "undetected" && l0State.value === "detected",
 );
@@ -156,7 +165,18 @@ watch(
 // ── Explainer strip ─────────────────────────────────────────────────────────
 
 const stripExpanded = ref(false);
-watch(stripAutoExpand, (expand) => (stripExpanded.value = expand), { immediate: true });
+// SEEDS the expansion once (design pass-4 finding 8b: "first presentation only").
+// Re-syncing on every change discarded a collapse the user had just performed.
+let stripSeeded = false;
+watch(
+  stripAutoExpand,
+  (expand) => {
+    if (stripSeeded) return;
+    stripSeeded = true;
+    stripExpanded.value = expand;
+  },
+  { immediate: true },
+);
 
 const hasStrip = computed(
   () =>
@@ -180,6 +200,18 @@ const staleStreams = (hidden: HiddenGroupInfo) =>
 
 const formatUs = (value: number | null | undefined) =>
   value == null ? "" : timestampToTimezoneDate(Math.floor(value / 1000), timezone.value);
+
+/** Dormant face: every group whose streams exist but stopped reporting. */
+const dormantGroups = computed(() =>
+  hiddenGroups.value
+    .map((hidden) => ({ hidden, stale: staleStreams(hidden) }))
+    .filter((entry) => entry.stale.length > 0)
+    .map(({ hidden, stale }) => ({
+      group: hidden.group,
+      streams: stale.map((entry) => entry.name).join(", "),
+      date: formatUs(Math.max(...stale.map((entry) => entry.lastSeenUs ?? 0))),
+    })),
+);
 
 const expandedSetupSlug = ref<string | null>(null);
 const onStripSetup = (group: HiddenGroupInfo["group"] | StaleGroupInfo["group"]) => {
@@ -238,29 +270,16 @@ const defaultFieldNamesWarning = computed(() =>
 
 const variableList = computed(() => ((dashboard.value as any)?.variables?.list ?? []) as any[]);
 
-const activeScopedBy = computed(
-  () =>
-    manifest.value.sections.find((section) => section.id === selectedTabId.value)?.scopedBy ?? [],
-);
-
-const isPickerApplicable = (name: string) => activeScopedBy.value.includes(name);
-
 /**
- * The renderer owns the pickers, so the disabled state is stamped onto the live
- * variable objects it already renders rather than duplicated into a shadow row.
+ * The disabled flag is stamped INSIDE the built variables (resolve.ts buildVariable)
+ * because useVariablesManager clones every variable on initialize (:141-148, :414)
+ * and re-initializes only on a new dashboardData IDENTITY — so mutating the objects
+ * here would be invisible to the rendered picker on every tab after the first.
+ * Switching sections therefore has to rebuild the dashboard object.
  */
-watch(
-  [variableList, activeScopedBy, selectedTabId],
-  () => {
-    for (const variable of variableList.value) {
-      variable.curatedDisabled = !isPickerApplicable(variable.name);
-      variable.curatedDisabledTooltipKey = variable.curatedDisabled
-        ? "infra.curated.pickerNotApplicable"
-        : undefined;
-    }
-  },
-  { immediate: true, deep: true },
-);
+watch(selectedTabId, (next, previous) => {
+  if (next !== previous) page.rebuild();
+});
 
 /** A single-cluster org loses its picker, so the name renders as static text. */
 const singleClusterName = computed(() => {
@@ -445,6 +464,33 @@ watch(
       </div>
     </div>
 
+    <!-- The streams exist and merely stopped reporting. Rendering the SETUP face
+         here would tell an org to install a collector it already has, so this
+         face names the outage instead and offers no setup CTA. -->
+    <div
+      v-else-if="face === 'dormant'"
+      class="mx-auto flex max-w-3xl flex-col gap-3 py-6"
+      data-test="curated-dormant-state"
+    >
+      <OText tag="h2" class="text-xl font-semibold">{{
+        t("infra.curated.dormantHeadline", { workload: t(manifest.titleKey) })
+      }}</OText>
+      <OText variant="meta">{{ t("infra.curated.dormantBody") }}</OText>
+      <OBanner
+        v-for="hidden in dormantGroups"
+        :key="hidden.group.id"
+        variant="warning"
+        dense
+        data-test="curated-dormant-stream"
+        :content="
+          t('infra.curated.streamsStale', {
+            list: hidden.streams,
+            date: hidden.date,
+          })
+        "
+      />
+    </div>
+
     <div v-else-if="dashboard" class="flex min-h-0 flex-1 flex-col">
       <div v-if="singleClusterName" class="flex flex-wrap items-end gap-3 pb-2">
         <OText variant="meta" data-test="curated-single-cluster">{{
@@ -523,7 +569,11 @@ watch(
                 >
                   <div class="flex items-center justify-between gap-2">
                     <OText>{{ t(hidden.group.capabilityKey) }}</OText>
+                    <!-- A group that is PRESENT (its siblings render) has its
+                         collector installed already; only the field is missing,
+                         so "Set up" would send the user to re-install what works. -->
                     <OButton
+                      v-if="!presentGroupIds.includes(hidden.group.id)"
                       variant="outline"
                       size="sm-action"
                       data-test="curated-strip-setup"

@@ -1206,14 +1206,22 @@ describe("VariableQueryValueSelector", () => {
       expect(oSelect().attributes("data-disabled")).toBe("false");
     });
 
-    it("renders the not-applicable tooltip when disabled with a reason key", () => {
+    it("renders the not-applicable tooltip TEXT when disabled with a reason key", () => {
+      // Asserting the ATTRIBUTE proved nothing: nothing in web/src consumed
+      // data-tooltip-key, so the reason never reached a user. The pin has to
+      // read the rendered copy, with its params interpolated.
       wrapper = createWrapper({
         disabled: true,
         disabledTooltipKey: "infra.curated.pickerNotApplicable",
+        disabledTooltipParams: { picker: "Namespace", section: "Nodes" },
       });
-      const tooltip = wrapper.find('[data-test="variable-disabled-tooltip"]');
+      const tooltip = wrapper.findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
-      expect(tooltip.attributes("data-tooltip-key")).toBe("infra.curated.pickerNotApplicable");
+      const content = tooltip.props("content") as string;
+      expect(content).toBe("Namespace doesn't apply to Nodes");
+      // No unsubstituted placeholder ever reaches the user.
+      expect(content).not.toContain("{picker}");
+      expect(content).not.toContain("{section}");
     });
 
     it("renders NO tooltip when the picker is enabled", () => {

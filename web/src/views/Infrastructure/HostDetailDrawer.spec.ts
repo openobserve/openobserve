@@ -325,6 +325,26 @@ describe("HostDetailDrawer", () => {
       expect(wrapper.find('[data-test="curated-stale-banner"]').exists()).toBe(false);
     });
 
+    it("F6: the stale banner renders the BANNER copy with duration and date, not a capability line", async () => {
+      // It used to print `capabilityKey` — a neutral description of what the group
+      // DOES — under a warning chrome, dropping the duration and date entirely.
+      // Under a warning banner that reads as a non-sequitur.
+      wrapper = await mountDrawer({ status: "INACTIVE", lastSeenUs: STALE_LAST_SEEN });
+      const banner = wrapper.find('[data-test="curated-stale-banner"]');
+      expect(banner.exists()).toBe(true);
+      const text = banner.text();
+      // The banner's own copy: an elapsed duration, a last-seen date and the
+      // "values are from before then" caveat — none of which the capability
+      // sentence alone carried.
+      expect(text).toContain("stopped");
+      expect(text).toMatch(/stopped \d+ (minute|hour|day)s? ago/);
+      expect(text).toContain("last seen");
+      expect(text).toContain("Values below are from before then");
+      expect(text).not.toContain("{duration}");
+      expect(text).not.toContain("{date}");
+      expect(text).not.toContain("{capability}");
+    });
+
     it("the per-host lastSeenUs BEATS a fleet-fresh stream max (§5.3 pin override)", async () => {
       // Stream stats are fleet-wide: a dead host behind a live fleet keeps every
       // system_* doc_time_max fresh, so per-stream staleness is the wrong granularity.

@@ -235,7 +235,17 @@ describe("PanelContainer", () => {
             name: "PanelSchemaRenderer",
             template: '<div data-test="panel-schema-renderer"></div>',
             props: ["panelSchema", "selectedTimeObj", "width", "height"],
-            emits: ["show-legends"],
+            emits: ["show-legends", "series-data-update"],
+            // The real component exposes `noData` as "" | "No Data"
+            // (PanelSchemaRenderer.vue:1448-1480, exposed at :1802). Tests drive
+            // it through setNoData() so the consumer reads the same contract the
+            // real renderer publishes, not a shape invented by the stub.
+            data: () => ({ noData: "" }),
+            methods: {
+              setNoData(this: any, value: string) {
+                this.noData = value;
+              },
+            },
           },
           SinglePanelMove: {
             template: '<div data-test="single-panel-move"></div>',
@@ -1739,7 +1749,11 @@ describe("PanelContainer", () => {
       wrapper = createWrapper({ data: badgedPanel(), viewOnly: true });
       const badge = wrapper.find('[data-test="dashboard-panel-curated-badge"]');
       expect(badge.text()).not.toContain("last stream-list refresh");
-      expect(badge.attributes("data-tooltip-key")).toBe("infra.curated.staleBadgeTooltip");
+      // A REAL tooltip, asserted by its content. `data-tooltip-key` was an
+      // attribute nothing in web/src consumed, so the caveat reached no user.
+      const tooltip = wrapper.findComponent({ name: "OTag" }).findComponent({ name: "OTooltip" });
+      expect(tooltip.exists()).toBe(true);
+      expect(tooltip.props("content")).toBe("As of the last stream-list refresh.");
     });
 
     it("dims the panel BODY wrapper when badged — a full-contrast number reads as current", () => {
@@ -1793,21 +1807,31 @@ describe("PanelContainer", () => {
       config: { curated_no_data_eligible: true, ...over },
     });
 
+    // THE SEAM. PanelSchemaRenderer owns the no-data verdict — a type-aware,
+    // loading-aware computed exposed as `noData` ("" | "No Data",
+    // PanelSchemaRenderer.vue:1448-1480, :1802) — and emits series-data-update
+    // once its conversion settles. Driving BOTH is what exercises the real
+    // contract; a pin that only hand-fires a payload proves nothing, because
+    // the payload never carried the answer.
+    const settle = async (renderer: any, verdict: string) => {
+      renderer.vm.setNoData(verdict);
+      await renderer.vm.$emit("series-data-update", { chartType: "metric", options: {} });
+      await wrapper.vm.$nextTick();
+    };
+
     it("an eligible tile whose series result is EMPTY renders tileNoData ON the tile", async () => {
       // A wrong label value leaves the panel present, fresh and blank, and a blank
       // tile is read as a zero — the engine's worst possible output.
       wrapper = createWrapper({ data: eligible(), viewOnly: true });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
-      await renderer.vm.$emit("series-data-update", []);
-      await wrapper.vm.$nextTick();
+      await settle(renderer, "No Data");
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(true);
     });
 
     it("a tile resolving to a REAL 0 renders no no-data state — the two must look different", async () => {
       wrapper = createWrapper({ data: eligible(), viewOnly: true });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
-      await renderer.vm.$emit("series-data-update", [{ name: "pods", data: [[0, 0]] }]);
-      await wrapper.vm.$nextTick();
+      await settle(renderer, "");
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
     });
 
@@ -1816,12 +1840,70 @@ describe("PanelContainer", () => {
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
     });
 
+    it("a tile that HAD data and later settles empty re-reports no-data", async () => {
+      // The refresh path: watch(loading) true->false re-converts unconditionally
+      // (PanelSchemaRenderer.vue:1299-1301), so an emptied tile does re-emit.
+      wrapper = createWrapper({ data: eligible(), viewOnly: true });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "");
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
+      await settle(renderer, "No Data");
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(true);
+    });
+
     it("a panel WITHOUT curated_no_data_eligible never renders the state", async () => {
       wrapper = createWrapper({ data: mockPanelData, viewOnly: true });
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
-      await renderer.vm.$emit("series-data-update", []);
-      await wrapper.vm.$nextTick();
+      await settle(renderer, "No Data");
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
+    });
+
+    // THE ANTI-DRIFT PIN. Everything above fires at a stub, so it is only
+    // trustworthy while the stub matches reality. This calls the REAL converter
+    // and pins the fact that made the original implementation inert: for a
+    // `metric` panel — the type the curated tiles use — an EMPTY promql result
+    // still produces exactly ONE synthetic rendering series. So counting
+    // `options.series` can never detect an empty metric tile, and any future
+    // "simplification" back to a length check fails here.
+    it("an empty metric result still emits one synthetic series — length cannot detect it", async () => {
+      const { convertPanelData } = await import("@/utils/dashboard/convertPanelData");
+      const panelSchema = {
+        type: "metric",
+        queryType: "promql",
+        queries: [{ query: "count(up)", customQuery: true, fields: { x: [], y: [] } }],
+        config: {},
+      };
+      const convert = (data: any) =>
+        convertPanelData(
+          panelSchema,
+          data,
+          store,
+          { value: { offsetWidth: 100, offsetHeight: 100 } },
+          { value: null },
+          { value: null },
+          { value: null },
+          {},
+          [],
+          false,
+        ) as Promise<any>;
+
+      const now = Math.floor(Date.now() / 1000);
+      const emptyResult = await convert([{ resultType: "matrix", result: [] }]);
+      const populated = await convert([
+        {
+          resultType: "matrix",
+          result: [{ metric: { __name__: "up" }, values: [[now, "5"]] }],
+        },
+      ]);
+
+      // The emitted payload is an object carrying options.series — never an array, never null.
+      expect(Array.isArray(emptyResult)).toBe(false);
+      expect(emptyResult).toHaveProperty("chartType");
+
+      // ...and the empty case is INDISTINGUISHABLE from the populated one by length.
+      expect(emptyResult.options.series.length).toBe(1);
+      expect(populated.options.series.length).toBe(1);
+      expect(emptyResult.options.series.length).toBe(populated.options.series.length);
     });
 
     it("renders curated_subtitle_key beside the title, and nothing when it is absent", () => {

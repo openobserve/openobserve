@@ -44,6 +44,8 @@ import {
   LOGS_PREVIEW_LIMIT,
   sqlEscape,
 } from "./useHostDetail";
+import { timestampToTimezoneDate } from "@/utils/timezone";
+import { durationParts } from "./curated/resolve";
 import { useCuratedPage } from "./curated/useCuratedPage";
 import { hostsPage } from "./curated/packs/hosts.page";
 import { GROUP } from "./curated/types";
@@ -114,6 +116,31 @@ const hostDashboard = computed(() => {
 });
 
 const staleGroups = computed(() => (suppressBadges.value ? [] : curated.staleGroups.value));
+
+/**
+ * The banner's own copy, not the group's capability sentence: under a warning
+ * chrome, a neutral description of what a group DOES says nothing about the
+ * outage. Same key, same params and same clock as the full page's banner.
+ */
+const staleBanners = computed(() =>
+  staleGroups.value.map((stale) => {
+    // Same reference as CuratedPageView.humanDuration — measured against the later
+    // of window-end and wall clock, so one page never shows two different ages.
+    const parts = durationParts(
+      stale.lastSeenUs,
+      Math.max(drawerRange.value.to, Date.now() * 1000),
+    );
+    return {
+      id: stale.group.id,
+      capability: t(stale.group.capabilityKey),
+      duration: t(`infra.curated.${parts.key}` as never, { count: parts.count }),
+      date: timestampToTimezoneDate(
+        Math.floor(stale.lastSeenUs / 1000),
+        store.state.timezone ?? "UTC",
+      ),
+    };
+  }),
+);
 const currentTimeObj = computed(() => ({
   __global: {
     start_time: new Date(drawerRange.value.from / 1000),
@@ -384,12 +411,18 @@ const statusLabel = computed(() =>
                 >
               </div>
               <OBanner
-                v-for="stale in staleGroups"
-                :key="stale.group.id"
+                v-for="stale in staleBanners"
+                :key="stale.id"
                 variant="warning"
                 dense
                 data-test="curated-stale-banner"
-                :content="t(stale.group.capabilityKey)"
+                :content="
+                  t('infra.curated.staleBanner', {
+                    capability: stale.capability,
+                    duration: stale.duration,
+                    date: stale.date,
+                  })
+                "
               />
             </template>
           </RenderDashboardCharts>

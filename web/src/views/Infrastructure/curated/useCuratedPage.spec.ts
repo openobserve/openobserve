@@ -327,6 +327,33 @@ describe("useCuratedPage", () => {
       expect(h.page.l0State.value).toBe("detected");
     });
 
+    it("every group's streams present but DEAD ⇒ `dormant`, never `undetected`", async () => {
+      // The liveness gate hides a >24h-dead group, so presentGroupIds is empty and
+      // the face used to fall through to `undetected` — telling an org to install a
+      // collector it already runs. The streams ARE listed; that is positive evidence.
+      const DEAD = NOW_US - 120 * 60 * 60 * 1_000_000;
+      primeStreams({
+        metrics: [
+          streamEntry("k8s_node_cpu_usage", NODE_SCHEMA, DEAD),
+          streamEntry("k8s_node_memory_rss", NODE_SCHEMA, DEAD),
+          streamEntry("k8s_node_memory_usage", NODE_SCHEMA, DEAD),
+          streamEntry("k8s_node_network_io", NODE_SCHEMA, DEAD),
+        ],
+        logs: [],
+      });
+      const h = withCuratedPage();
+      wrapper = h.wrapper;
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+
+      expect(h.page.face.value).toBe("dormant");
+      // ...and the evidence that justifies it survives to the view.
+      const stale = h.page.hiddenGroups.value.flatMap((hidden: any) =>
+        hidden.missingStreams.filter((entry: any) => entry.state === "stale"),
+      );
+      expect(stale.length).toBeGreaterThan(0);
+    });
+
     it("lists REJECTED ⇒ face stays `unknown` AND loadError flips true — not an infinite spinner", async () => {
       getStreamsMock.mockRejectedValue(new Error("network"));
       const h = withCuratedPage();

@@ -32,6 +32,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :variableItem="item"
           :disabled="!!item.curatedDisabled"
           :disabledTooltipKey="item.curatedDisabledTooltipKey"
+          :disabledTooltipParams="{
+            picker: item.curatedPickerLabel ?? item.label ?? item.name,
+            section: item.curatedSectionLabel ?? '',
+          }"
           @update:model-value="onVariablesValueUpdated(Number(index))"
           :loadOptions="loadVariableOptions"
           @search="onVariableSearch(Number(index), $event)"
@@ -2305,19 +2309,35 @@ export default defineComponent({
       );
     };
 
+    // ACCEPTED, not enforced: the dashboard import path does not strip unknown
+    // config keys, so a hand-edited JSON carrying curated* on a stored dashboard
+    // gets curated behaviour. Import is already a trusted-JSON path (author and
+    // victim are the same person) and filtering it risks dropping legitimate
+    // forward-compatible keys, so the invariant is documented rather than policed.
+    //
     // No truncation signal exists in the response (`no_count: true`), so an
     // exactly-at-cap list is the only inference available and it errs to disclosure.
     const isVariableCapped = (item: any) => {
       const cap = item?.query_data?.max_record_size ?? 0;
-      return Boolean(item?.curatedCapNotice && cap && item?.options?.length === cap);
+      // `>=`, not `===`: options accumulate across paged responses (:505 merges the
+      // previous page in) and the selected value is appended when absent, so a
+      // capped list can exceed the cap — where `===` silently dropped the notice.
+      return Boolean(item?.curatedCapNotice && cap && (item?.options?.length ?? 0) >= cap);
     };
 
     // Schema presence is not resolvability, so a zero-values picker is removed
     // rather than left enabled and blank — but only once its load has settled.
+    // "Settled" is the codebase's own three-flag test (useVariablesManager.ts:221),
+    // not isLoading alone: a parent change clears a chained child's options WITH
+    // isLoading already false (:643/:650, :695-706), so a one-flag test read that
+    // reload window as "genuinely empty" and flickered the Pod picker out of the
+    // DOM on every Namespace change.
     const isVariableOmitted = (item: any) =>
       Boolean(
         item?.curatedOmitWhenValuesEmpty &&
         !item?.isLoading &&
+        !item?.isVariableLoadingPending &&
+        item?.isVariablePartialLoaded &&
         Array.isArray(item?.options) &&
         item.options.length === 0,
       );

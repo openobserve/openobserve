@@ -37,6 +37,20 @@ const HOUR_US = 60 * 60 * 1_000_000;
 let state: any;
 
 const refreshSpy = vi.fn(async () => {});
+const rebuildSpy = vi.fn(() => {});
+
+/**
+ * No shipped pack declares a route door (AWS is deferred), so the route branch
+ * is exercised by swapping the REAL registry entry the view reads. Restored in
+ * afterEach, and it drives the same `setupDoor` computed production uses.
+ */
+const originalFirstGroupSetup = kubernetesPage.groups[0]!.setup;
+const withRouteDoorPack = () => {
+  (kubernetesPage.groups[0] as any).setup = { kind: "route", routeName: "AWSConfig" };
+};
+const restoreRouteDoorPack = () => {
+  (kubernetesPage.groups[0] as any).setup = originalFirstGroupSetup;
+};
 
 const dashboardFixture = (sections = ["overview", "nodes"]) => ({
   version: 8,
@@ -50,6 +64,7 @@ const dashboardFixture = (sections = ["overview", "nodes"]) => ({
 
 const makeState = (over: Record<string, any> = {}) => {
   refreshSpy.mockClear();
+  rebuildSpy.mockClear();
   return {
     face: ref("ready"),
     l0State: ref("detected"),
@@ -61,9 +76,12 @@ const makeState = (over: Record<string, any> = {}) => {
     warnings: ref([]),
     lastDataUs: ref(NOW_US - 12_000_000),
     stripAutoExpand: ref(false),
-    /** The manifest's first group's setup door — card for k8s/hosts, route for AWS. */
-    setupDoor: ref({ kind: "card", slug: "kubernetes" }),
+    // MIRRORS useCuratedPage's real return object exactly. It used to also stub a
+    // `setupDoor` the composable never exposed, so the spec exercised a branch
+    // production could not take; the door is derived from the manifest instead.
+    presentGroupIds: ref([]),
     refresh: refreshSpy,
+    rebuild: rebuildSpy,
     ...over,
   };
 };
@@ -190,6 +208,7 @@ describe("CuratedPageView", () => {
 
   afterEach(() => {
     vi.useRealTimers();
+    restoreRouteDoorPack();
     if (wrapper) wrapper.unmount();
   });
 
@@ -252,16 +271,13 @@ describe("CuratedPageView", () => {
 
     it("a ROUTE-kind undetected face renders a CTA that pushes the route, not an inline card", async () => {
       // Successor to the deleted WorkloadStubPage.spec's AWS route-CTA case. The
-      // undetected face's route-kind branch is engine behavior, so it is driven
-      // through a REGISTERED workload's setupDoor — `aws` has no pack, and a page
-      // with no pack renders the unavailable face, never a setup face.
+      // door is derived from the MANIFEST (useCuratedPage exposes no setupDoor),
+      // so the route branch is driven by a pack whose first group declares one —
+      // stubbing a composable field production never reads proved nothing.
+      withRouteDoorPack();
       wrapper = await mountView(
         { workload: "kubernetes" },
-        {
-          face: ref("undetected"),
-          dashboard: ref(null),
-          setupDoor: ref({ kind: "route", routeName: "AWSConfig" }),
-        },
+        { face: ref("undetected"), dashboard: ref(null) },
       );
 
       expect(wrapper.find('[data-test="setup-card-stub"]').exists()).toBe(false);
@@ -276,13 +292,10 @@ describe("CuratedPageView", () => {
     it("a route-kind setup face has NO @detected hook — the user leaves and comes back", async () => {
       // §6.1: route-kind pages re-check on remount/focus, so wiring a card hook
       // here would be dead code.
+      withRouteDoorPack();
       wrapper = await mountView(
         { workload: "kubernetes" },
-        {
-          face: ref("undetected"),
-          dashboard: ref(null),
-          setupDoor: ref({ kind: "route", routeName: "AWSConfig" }),
-        },
+        { face: ref("undetected"), dashboard: ref(null) },
       );
       expect(wrapper.findComponent({ name: "DataSourceSetupCard" }).exists()).toBe(false);
     });
@@ -890,6 +903,8 @@ describe("CuratedPageView", () => {
         curatedNarrowBy: "",
         options: [],
         isLoading: false,
+        isVariableLoadingPending: false,
+        isVariablePartialLoaded: true,
         value: [],
         query_data: { max_record_size: 100 },
       },
@@ -904,6 +919,8 @@ describe("CuratedPageView", () => {
         curatedNarrowBy: "K8s Cluster",
         options: new Array(100).fill(0).map((_, i) => ({ label: `ns${i}`, value: `ns${i}` })),
         isLoading: false,
+        isVariableLoadingPending: false,
+        isVariablePartialLoaded: true,
         value: [],
         query_data: { max_record_size: 100 },
       },
@@ -940,20 +957,16 @@ describe("CuratedPageView", () => {
       return selector;
     };
 
-    it("the view stamps curatedDisabled on a variable the ACTIVE section's scopedBy omits", async () => {
-      // Overview declares `cluster` only, so `namespace` is inapplicable there.
+    // curatedDisabled is stamped INSIDE the built variables (resolve.ts
+    // buildVariable), NOT mutated onto them afterwards: useVariablesManager
+    // clones every variable on initialize (:141-148, :414) and re-initializes
+    // only on a new dashboardData IDENTITY, so a post-build mutation was
+    // invisible to the rendered picker on every tab after the first. The BUILD
+    // half is pinned in resolve.spec.ts; this is the view's half of the seam.
+    it("a tab switch asks the composable to REBUILD — the flags cannot ride a mutation", async () => {
       const variables = pickerVariables();
       wrapper = await mountView({}, withPickers(variables));
-      const namespace = variables.find((v) => v.name === "namespace") as any;
-      expect(namespace.curatedDisabled).toBe(true);
-      expect(namespace.curatedDisabledTooltipKey).toBe("infra.curated.pickerNotApplicable");
-    });
-
-    it("switching to a section that DECLARES it clears curatedDisabled — selection untouched", async () => {
-      const variables = pickerVariables();
-      wrapper = await mountView({}, withPickers(variables));
-      const namespace = variables.find((v) => v.name === "namespace") as any;
-      namespace.value = ["kube-system"];
+      rebuildSpy.mockClear();
 
       const injected = (wrapper.findComponent({ name: "RenderDashboardCharts" }).vm as any).$
         .provides["selectedTabId"] as Ref<string | null>;
@@ -961,8 +974,7 @@ describe("CuratedPageView", () => {
       injected.value = "workloads";
       await flushPromises();
 
-      expect(namespace.curatedDisabled).toBe(false);
-      expect(namespace.value).toEqual(["kube-system"]);
+      expect(rebuildSpy).toHaveBeenCalled();
     });
 
     it("the REAL selector forwards curatedDisabled + tooltip key to VariableQueryValueSelector", async () => {
@@ -988,6 +1000,23 @@ describe("CuratedPageView", () => {
       selector.unmount();
     });
 
+    it("F4: the cap notice survives a list that EXCEEDS the cap, not only one equal to it", async () => {
+      // Options accumulate across paged responses (:505 merges the previous page
+      // in) and the selected value is appended when absent, so a truncated list
+      // can exceed max_record_size — where `===` silently dropped the notice
+      // exactly when the list was most truncated.
+      const variables = pickerVariables();
+      const namespace = variables[1] as any;
+      namespace.options = [...namespace.options, { label: "extra", value: "extra" }];
+      expect(namespace.options.length).toBeGreaterThan(namespace.query_data.max_record_size);
+
+      const selector = await mountRealSelector(variables);
+      expect((selector.vm as any).isVariableCapped(namespace)).toBe(true);
+      // Paired negative: a genuinely short list still reports nothing.
+      expect((selector.vm as any).isVariableCapped(variables[0])).toBe(false);
+      selector.unmount();
+    });
+
     it("DRY-RUN finding 6: an omitWhenValuesEmpty picker with ZERO values is hidden by the REAL selector", async () => {
       // Not rendered disabled, not rendered with an empty-state string — an enabled
       // empty dropdown reads as a broken page.
@@ -998,6 +1027,13 @@ describe("CuratedPageView", () => {
       expect(vm.isVariableOmitted(variables[1])).toBe(false);
       // A still-loading empty list is NOT an omission — the picker would flicker.
       expect(vm.isVariableOmitted({ ...variables[0], isLoading: true })).toBe(false);
+      // NOR is a chained child mid-reload. useVariablesManager clears a child's
+      // options with isLoading ALREADY false on a parent change (:643/:650) and
+      // leaves both loading flags false while resetting descendants (:695-706),
+      // so a one-flag test read those windows as "genuinely empty" and flickered
+      // the Pod picker out of the DOM on every Namespace change.
+      expect(vm.isVariableOmitted({ ...variables[0], isVariableLoadingPending: true })).toBe(false);
+      expect(vm.isVariableOmitted({ ...variables[0], isVariablePartialLoaded: false })).toBe(false);
       selector.unmount();
     });
 
@@ -1082,5 +1118,87 @@ describe("CuratedPageView", () => {
     await flushPromises();
 
     expect(wrapper.find(".render-stub").exists()).toBe(false);
+  });
+
+  // ── Loop-2 review fixes ────────────────────────────────────────────────────
+  describe("dormant face, strip CTA and strip expansion", () => {
+    const deadGroup = () => ({
+      group: kubernetesPage.groups[0]!,
+      reason: "streams-missing" as const,
+      missingStreams: [
+        { name: "k8s_node_cpu_usage", state: "stale" as const, lastSeenUs: NOW_US - 120 * HOUR_US },
+      ],
+      panelCount: 4,
+    });
+
+    it("B4: an org whose streams all STOPPED renders the dormant face, not the setup face", async () => {
+      // The streams exist; only their data stopped. Rendering the setup face here
+      // told an org to install a collector it already has.
+      wrapper = await mountView(
+        {},
+        {
+          face: ref("dormant"),
+          dashboard: ref(null),
+          hiddenGroups: ref([deadGroup()]),
+        },
+      );
+      expect(wrapper.find('[data-test="curated-dormant-state"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="curated-setup-state"]').exists()).toBe(false);
+      // ...and offers NO setup CTA, since installing is not the fix.
+      expect(wrapper.find('[data-test="setup-card-stub"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="curated-setup-route-cta"]').exists()).toBe(false);
+      // It names what stopped and when.
+      const text = wrapper.find('[data-test="curated-dormant-stream"]').text();
+      expect(text).toContain("k8s_node_cpu_usage");
+      expect(text).toContain("stopped reporting");
+    });
+
+    it("M1: a PRESENT group's strip row offers no Set-up — its collector already works", async () => {
+      const group = kubernetesPage.groups[0]!;
+      wrapper = await mountView(
+        {},
+        {
+          hiddenGroups: ref([
+            {
+              group,
+              reason: "field-unresolved" as const,
+              missingStreams: [],
+              unresolvedConcepts: [{ groupId: "k8s-cluster", display: "K8s Cluster" }],
+              panelCount: 1,
+            },
+          ]),
+          presentGroupIds: ref([group.id]),
+        },
+      );
+      (wrapper.vm as any).stripExpanded = true;
+      await flushPromises();
+      expect(wrapper.find('[data-test="curated-strip-setup"]').exists()).toBe(false);
+    });
+
+    it("M1: an ABSENT group's row still offers Set-up — asserted both ways", async () => {
+      wrapper = await mountView({}, { hiddenGroups: ref([deadGroup()]), presentGroupIds: ref([]) });
+      (wrapper.vm as any).stripExpanded = true;
+      await flushPromises();
+      expect(wrapper.find('[data-test="curated-strip-setup"]').exists()).toBe(true);
+    });
+
+    it("F9: a refresh does not re-expand a strip the user collapsed", async () => {
+      // Auto-expand SEEDS the state once (pass-4 finding 8b). Re-syncing on every
+      // change discarded a collapse the user had just performed.
+      const stripAutoExpand = ref(true);
+      wrapper = await mountView({}, { hiddenGroups: ref([deadGroup()]), stripAutoExpand });
+      expect((wrapper.vm as any).stripExpanded).toBe(true);
+
+      (wrapper.vm as any).stripExpanded = false;
+      await flushPromises();
+
+      // A refresh where the group momentarily resolves and goes missing again.
+      stripAutoExpand.value = false;
+      await flushPromises();
+      stripAutoExpand.value = true;
+      await flushPromises();
+
+      expect((wrapper.vm as any).stripExpanded).toBe(false);
+    });
   });
 });
