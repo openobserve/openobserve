@@ -17,7 +17,7 @@ env:
 jobs:
   initiate_enterprise_build:
     # A pre-merge gate: runs once auto-merge is enabled on a labelled PR, not on every push.
-    if: ${{ github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) && github.event.pull_request.auto_merge != null }}
+    if: ${{ github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) && github.event.pull_request.auto_merge != null }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
