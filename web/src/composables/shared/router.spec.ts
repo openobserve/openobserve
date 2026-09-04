@@ -1713,6 +1713,19 @@ describe("useRoutes (router.ts)", () => {
       },
     );
 
+    it.each(["infraKubernetes", "infraAws"])(
+      "%s resolves to the curated view, NOT WorkloadStubPage (§8.1 step 2)",
+      async (name) => {
+        // The chunk NAME stays unasserted; the resolved MODULE is what changes, and
+        // identity is the only thing that separates the two before and after the
+        // swap. Without this the row above passes unchanged on the stub.
+        const stub = (await import("@/views/Infrastructure/WorkloadStubPage.vue")).default;
+        const { homeChildRoutes } = useRoutes();
+        const resolved = await (findRoute(homeChildRoutes, name).component as any)();
+        expect((resolved as any).default ?? resolved).not.toBe(stub);
+      },
+    );
+
     it("keeps the non-cloud reports route at splice index 13 after the insertion", () => {
       // The infra routes must land past the splice(13) hazard (design 4.7).
       config.isCloud = "false";

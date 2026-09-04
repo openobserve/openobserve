@@ -144,6 +144,10 @@ const stripModuloKeys = (doc: any) => {
     delete tab.tabId;
     delete tab.name;
     for (const panel of tab.panels ?? []) {
+      // buildDashboard is pure and i18n-free (§5.5 — every call site passes only
+      // { timezone }), so it emits titleKey and can never reproduce the fixture's
+      // translated copy. Titles are pinned by key in hosts.page.spec.ts instead.
+      delete panel.title;
       delete panel.config?.curated_badge;
       // The pre-retrofit builder authored no drilldowns (all 8 fixture panels
       // carry `[]`), but §6.6's lint requires every non-probe chart panel to
@@ -311,6 +315,11 @@ describe("HostDetailDrawer", () => {
       // STALE_GRACE_US is an admitted guess; a hair too small would put eight amber
       // badges behind a row labelled ACTIVE and destroy badge trust everywhere.
       // The list's liveness query and the panels agree BY CONSTRUCTION, not by tuning.
+      //
+      // PAIRED GUARD: this is a toHaveLength(0), so it is green today only because
+      // the pre-retrofit builder emits no badges at all. It discriminates ONLY
+      // alongside the two INACTIVE/UNKNOWN rows above, which demand 8 — weaken or
+      // delete either of those and this row silently stops asserting anything.
       wrapper = await mountDrawer({ status: "ACTIVE", lastSeenUs: STALE_LAST_SEEN });
       expect(allDashboardPanels().filter((p: any) => p.config?.curated_badge)).toHaveLength(0);
       expect(wrapper.find('[data-test="curated-stale-banner"]').exists()).toBe(false);

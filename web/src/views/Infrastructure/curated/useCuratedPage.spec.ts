@@ -267,6 +267,9 @@ describe("useCuratedPage", () => {
   });
 
   afterEach(() => {
+    // Restoring inside a test body leaks fake timers over the whole file if that
+    // body throws first — every later case then hangs on a real await.
+    vi.useRealTimers();
     if (wrapper) wrapper.unmount();
   });
 
@@ -299,11 +302,21 @@ describe("useCuratedPage", () => {
       expect(h.page.face.value).toBe("undetected");
     });
 
-    it("L0-detected with zero groups ⇒ `undetected`, and l0State is EXPOSED for the view's line", () => {
-      // The nav's "detected" and the page's setup face must tell one story (§6.1).
+    it("L0-detected with zero groups ⇒ `undetected`, and l0State reads `detected`", async () => {
+      // The nav's "detected" and the page's setup face must tell one story (§6.1):
+      // k8s streams ARE arriving, but none satisfies a pack group, so the face must
+      // claim absence while l0State keeps saying the workload was seen — the exact
+      // pair the partialTelemetry line needs. `toBeDefined()` alone passed on ref(null).
+      primeStreams({
+        metrics: [streamEntry("k8s_ingress_requests_total", NODE_SCHEMA)],
+        logs: [],
+      });
       const h = withCuratedPage();
       wrapper = h.wrapper;
-      expect(h.page.l0State).toBeDefined();
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+      expect(h.page.face.value).toBe("undetected");
+      expect(h.page.l0State.value).toBe("detected");
     });
 
     it("lists REJECTED ⇒ face stays `unknown` AND loadError flips true — not an infinite spinner", async () => {
@@ -514,7 +527,6 @@ describe("useCuratedPage", () => {
 
       expect(presentGroupIds(h.page)).toContain("alpha");
       expect(h.page.warnings.value.some((w: any) => w.kind === "probe")).toBe(true);
-      vi.useRealTimers();
     });
 
     it("COUNTs fire CONCURRENTLY — all in flight before any resolves", async () => {
@@ -573,6 +585,188 @@ describe("useCuratedPage", () => {
       });
       await flushPromises();
       expect(searchMock.mock.calls.length).toBeGreaterThan(0);
+    });
+  });
+
+  // ── Probe CANDIDATE-LIST resolution (§5.2 pass 1b step 1, dry run finding 3) ─
+
+  describe("probe candidate ladder", () => {
+    /** A one-group probe manifest over an explicit candidate list. */
+    const candidatePage = (streams: string[], groupCount = 1): any => ({
+      ...syntheticProbePage,
+      groups: Array.from({ length: groupCount }, (_, i) =>
+        probeGroup(PROBE_IDS[i], streams, PROBE_FIELDS[PROBE_IDS[i]]),
+      ),
+      sections: [
+        {
+          id: "overview",
+          titleKey: "synthetic.overview",
+          scopedBy: [],
+          panels: Array.from({ length: groupCount }, (_, i) =>
+            probePanel(`${PROBE_IDS[i]}_p1`, PROBE_IDS[i]),
+          ),
+        },
+      ],
+    });
+
+    /** Prime the logs list + per-stream schemas from an explicit spec. */
+    const primeCandidates = (spec: Array<[string, string[] | null, number?]>) => {
+      const list = spec
+        .filter(([, schema]) => schema !== null)
+        .map(([name, schema, docTimeMax]) =>
+          logsEntry(name, schema as string[], docTimeMax ?? NOW_US - 60_000_000),
+        );
+      primeStreams({ metrics: [], logs: list });
+      getStreamMock.mockImplementation(async (name: string) => {
+        const found = list.find((s) => s.name === name);
+        if (!found) throw new Error(`no schema for ${name}`);
+        return found;
+      });
+      return list;
+    };
+
+    const schemaNames = () => getStreamMock.mock.calls.map((c: any[]) => c[0]);
+
+    it("(a) the FIRST present+live+schema-matching candidate wins, and no later candidate's schema is read", async () => {
+      // The ladder is ordered evidence, not a scan: once a candidate satisfies all
+      // three conditions the walk STOPS. A pre-fetch-then-choose implementation
+      // passes a naive "resolved to c1" assertion but fails on call-args here.
+      primeCandidates([
+        ["c1", ["alpha_field"]],
+        ["c2", ["alpha_field"]],
+        ["default", ["alpha_field"]],
+      ]);
+      searchMock.mockResolvedValue(countHits(3));
+      const h = withCuratedPage(candidatePage(["c1", "c2", "default"]));
+      wrapper = h.wrapper;
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+
+      expect(presentGroupIds(h.page)).toContain("alpha");
+      expect(schemaNames()).toContain("c1");
+      expect(schemaNames()).not.toContain("c2");
+      expect(schemaNames()).not.toContain("default");
+      expect(JSON.stringify(searchMock.mock.calls)).toContain("c1");
+    });
+
+    it("(b) candidate 1 ABSENT from the list ⇒ the walk falls through to `default`", async () => {
+      primeCandidates([["default", ["alpha_field"]]]);
+      searchMock.mockResolvedValue(countHits(9));
+      const h = withCuratedPage(candidatePage(["c1", "default"]));
+      wrapper = h.wrapper;
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+
+      expect(presentGroupIds(h.page)).toContain("alpha");
+      // An absent candidate is skipped without a schema read — it is not in the list.
+      expect(schemaNames()).not.toContain("c1");
+      expect(JSON.stringify(searchMock.mock.calls)).toContain("default");
+    });
+
+    it("(c) candidate 1 PRESENT but missing the probe column ⇒ the walk CONTINUES; only exhaustion hides", async () => {
+      // The half that makes the ladder a ladder: a column miss on c1 is evidence
+      // about c1, not about the group. A "first present candidate is the target"
+      // implementation hides the group here and this row is what catches it.
+      primeCandidates([
+        ["c1", ["unrelated_col"]],
+        ["default", ["alpha_field"]],
+      ]);
+      searchMock.mockResolvedValue(countHits(4));
+      const h = withCuratedPage(candidatePage(["c1", "default"]));
+      wrapper = h.wrapper;
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+
+      expect(presentGroupIds(h.page)).toContain("alpha");
+      expect(schemaNames()).toContain("c1");
+      expect(schemaNames()).toContain("default");
+      expect(JSON.stringify(searchMock.mock.calls)).toContain("default");
+    });
+
+    it("(c') the probeStream reported on exhaustion is the FURTHEST candidate TRIED, not the first", async () => {
+      // The strip has to name the stream that fell short, or the user is sent to
+      // inspect a stream the engine never reached.
+      primeCandidates([
+        ["c1", ["unrelated_col"]],
+        ["default", ["also_unrelated"]],
+      ]);
+      const h = withCuratedPage(candidatePage(["c1", "default"]));
+      wrapper = h.wrapper;
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+
+      const alpha = h.page.hiddenGroups.value.find((g: any) => g.group.id === "alpha");
+      expect(alpha.reason).toBe("probe-empty");
+      expect(alpha.probeStream).toBe("default");
+    });
+
+    it("(d) the RESOLVED candidate name flows into stalenessStreams AND the strip copy", async () => {
+      // One resolved name, four consumers (§5.2 step 1): the COUNT, the panels'
+      // FROM, the strip copy and stalenessStreams. A divergent doc_time_max makes
+      // the wrong source observable — c1 is dead, so sourcing staleness from the
+      // candidate LIST head instead of the RESOLVED stream badges a healthy group.
+      const DEAD = NOW_US - 30 * 24 * HOUR_US;
+      primeCandidates([
+        ["c1", ["unrelated_col"], DEAD],
+        ["default", ["alpha_field"]],
+      ]);
+      searchMock.mockResolvedValue(countHits(2));
+      const h = withCuratedPage(candidatePage(["c1", "default"]));
+      wrapper = h.wrapper;
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+
+      expect(presentGroupIds(h.page)).toContain("alpha");
+      // Staleness reads the RESOLVED stream (`default`, live), never dead `c1`.
+      expect(h.page.staleGroups.value.some((s: any) => s.group.id === "alpha")).toBe(false);
+    });
+
+    it("(e) NO candidate in the list at all ⇒ hidden `streams-missing`, with ZERO schema reads", async () => {
+      // Nothing to read a schema off — a request here is a request against a
+      // stream the list already proved absent.
+      primeCandidates([["unrelated", ["x"]]]);
+      const h = withCuratedPage(candidatePage(["c1", "default"]));
+      wrapper = h.wrapper;
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+
+      const alpha = h.page.hiddenGroups.value.find((g: any) => g.group.id === "alpha");
+      expect(alpha.reason).toBe("streams-missing");
+      expect(getStreamMock).not.toHaveBeenCalled();
+      expect(searchMock).not.toHaveBeenCalled();
+    });
+
+    it("(f) the column is absent on EVERY candidate ⇒ hidden `probe-empty` + missingFields, and ZERO COUNTs", async () => {
+      // Schema evidence is conclusive before the query channel is touched; firing
+      // a COUNT anyway spends a request to learn what the schema already said.
+      primeCandidates([
+        ["c1", ["unrelated_col"]],
+        ["c2", ["still_unrelated"]],
+        ["default", []],
+      ]);
+      const h = withCuratedPage(candidatePage(["c1", "c2", "default"]));
+      wrapper = h.wrapper;
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+
+      const alpha = h.page.hiddenGroups.value.find((g: any) => g.group.id === "alpha");
+      expect(alpha.reason).toBe("probe-empty");
+      expect(alpha.missingFields).toContain("alpha_field");
+      expect(searchMock).not.toHaveBeenCalled();
+    });
+
+    it("(g) N groups resolving to ONE shared candidate read that schema exactly once", async () => {
+      // §5.2's corrected cost model: `default` is Vuex-cached, so the realistic
+      // ceiling is 5 reads, not one per group. A per-group re-fetch is the
+      // regression this pins.
+      primeCandidates([["default", ["alpha_field", "beta_field", "gamma_field"]]]);
+      searchMock.mockResolvedValue(countHits(1));
+      const h = withCuratedPage(candidatePage(["default"], 3));
+      wrapper = h.wrapper;
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+
+      expect(schemaNames().filter((n: string) => n === "default")).toHaveLength(1);
     });
   });
 
