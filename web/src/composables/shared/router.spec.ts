@@ -1715,14 +1715,18 @@ describe("useRoutes (router.ts)", () => {
 
     it.each(["infraKubernetes", "infraAws"])(
       "%s resolves to the curated view, NOT WorkloadStubPage (§8.1 step 2)",
-      async (name) => {
-        // The chunk NAME stays unasserted; the resolved MODULE is what changes, and
-        // identity is the only thing that separates the two before and after the
-        // swap. Without this the row above passes unchanged on the stub.
-        const stub = (await import("@/views/Infrastructure/WorkloadStubPage.vue")).default;
+      (name) => {
+        // The chunk NAME stays unasserted; which MODULE the loader targets is what
+        // changes, and it is the only thing separating the two across the swap.
+        // Asserted off the loader's source rather than by importing either module:
+        // WorkloadStubPage.vue is DELETED by §8.1, so importing it fails the whole
+        // file, and awaiting the real CuratedPageView pulls RenderDashboardCharts →
+        // logs/constants → useLocalWrapContent, which this spec's closed zincutils
+        // mock does not export. The loader source needs neither.
         const { homeChildRoutes } = useRoutes();
-        const resolved = await (findRoute(homeChildRoutes, name).component as any)();
-        expect((resolved as any).default ?? resolved).not.toBe(stub);
+        const loader = String((findRoute(homeChildRoutes, name) as any).component);
+        expect(loader).not.toMatch(/WorkloadStubPage\.vue/);
+        expect(loader).toMatch(/Infrastructure\/curated\/CuratedPageView\.vue/);
       },
     );
 

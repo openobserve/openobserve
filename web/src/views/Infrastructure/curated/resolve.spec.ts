@@ -423,17 +423,40 @@ describe("§3.3.1 id pinning — the packs name real groups", () => {
 describe("token substitution", () => {
   it("${f:<gid>} resolves per requirement group and legends resolve too", () => {
     const dashboard = build(resolve({}));
-    const nodeQueries = allQueries(dashboard).filter((q) => q.includes("k8s_node_cpu_usage"));
+    // Only the queries that CARRY the token can show its resolution. The pack's
+    // fleet-wide scalar (k8s_ov_fleet_cpu variant 2, `sum(...)` with no by())
+    // authors no ${f:} token at all (§4.2), so a blanket "every query naming the
+    // stream contains the field" would demand a token the manifest never wrote.
+    const nodeQueries = allQueries(dashboard).filter(
+      (q) => q.includes("k8s_node_cpu_usage") && q.includes("by ("),
+    );
     expect(nodeQueries.length).toBeGreaterThan(0);
     for (const q of nodeQueries) expect(q).toContain("k8s_node_name");
+    // …and the untokenized scalar is still built, so this is not a silent skip.
+    expect(allQueries(dashboard)).toContain('sum(k8s_node_cpu_usage{k8s_cluster_name=~"$cluster"})');
     expect(allLegends(dashboard).some((l) => l.includes("{k8s_node_name}"))).toBe(true);
   });
 
   it('${scope:x} inside a matcher emits field=~"$x"', () => {
     const dashboard = build(resolve({}));
     const podCpu = allQueries(dashboard).find((q) => q.includes("k8s_pod_cpu_usage"))!;
-    expect(podCpu).toContain('namespace=~"$namespace"');
-    expect(podCpu).toContain('pod=~"$pod"');
+    // The FIELD is whatever §5.4 resolved for the picker's group on this panel —
+    // k8s_wl_pod_cpu_top sits in kubelet-pod, which authors no fieldOverrides, so
+    // rung 2 walks each group's declaration order against KUBELET_POD_SCHEMA and
+    // lands on the only member present. The bare kube-state spellings are rung-1
+    // output and unreachable here; what this pins is the =~"$<picker>" SHAPE.
+    expect(podCpu).toContain('k8s_namespace_name=~"$namespace"');
+    expect(podCpu).toContain('k8s_pod_name=~"$pod"');
+    // The same token under a group that DOES override resolves to the bare
+    // spelling — so the field really is RESOLVED per group, not hardcoded once.
+    const nonRunning = allQueries(dashboard).find(
+      (q) => q.includes("kube_pod_status_phase") && q.includes('=~"$namespace"'),
+    )!;
+    expect(nonRunning).toContain('namespace=~"$namespace"');
+    expect(nonRunning).not.toContain('k8s_namespace_name=~"$namespace"');
+    // …and the two really are different spellings of the ONE picker, which is
+    // what makes the pair discriminating rather than two readings of one rung.
+    expect(podCpu).not.toContain('{namespace=~"$namespace"');
   });
 
   it("a bare-adjacent ${scope:x} expands to a whole {matcher} block", () => {
@@ -725,7 +748,28 @@ describe("§5.3 staleness — min(range.start, now − STALE_GRACE_US)", () => {
       entry.stats.doc_time_max = Math.floor(NOW_US / 1000);
     }
     const resolution = resolve({ streams });
-    expect(resolution.staleGroups.length).toBeGreaterThan(0);
+    // A ms value read as µs sits ~45 years back, so it is not merely stale — it
+    // trips §5.2's liveness gate first and the group is HIDDEN, exactly as the
+    // 177-day case (c) demands. `staleGroups` only covers PRESENT groups, so the
+    // µs compare is pinned where the verdict actually lands: the hidden rows'
+    // per-stream tag, which reads 'stale' (stopped reporting) and not 'absent'.
+    expect(resolution.staleGroups).toEqual([]);
+    expect(resolution.hiddenGroups.length).toBeGreaterThan(0);
+    // Every stream the fixture actually LISTS is tagged 'stale'; the pack's drift
+    // spellings it never listed stay 'absent', which is the §5.2 distinction.
+    const listed = new Set(streams.metrics.map((entry: any) => entry.name));
+    const tags = resolution.hiddenGroups.flatMap((h: any) =>
+      h.missingStreams.map((m: any) => ({ name: m.name, state: m.state })),
+    );
+    const listedTags = tags.filter((t: any) => listed.has(t.name));
+    expect(listedTags.length).toBeGreaterThan(0);
+    expect(listedTags.every((t: any) => t.state === "stale")).toBe(true);
+    // The control that makes this discriminate: read as MILLISECONDS the same
+    // number is `now`, i.e. perfectly fresh — a resolver that mixed the units
+    // would render every group and this would go green for the wrong reason.
+    const fresh = fullK8sStreams();
+    for (const entry of fresh.metrics) entry.stats.doc_time_max = NOW_US;
+    expect(resolve({ streams: fresh }).hiddenGroups).toEqual([]);
   });
 
   it("doc_time_max === 0 with the stream listed ⇒ 'no data yet' badge variant, NOT hidden", () => {

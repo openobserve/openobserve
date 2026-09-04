@@ -21,7 +21,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import { createRouter, createMemoryHistory } from "vue-router";
-import { defineComponent, ref, inject, watchEffect, type Ref } from "vue";
+import { defineComponent, ref, isRef, inject, watchEffect, type Ref } from "vue";
 import CuratedPageView from "./CuratedPageView.vue";
 import i18n from "@/locales";
 
@@ -648,6 +648,17 @@ describe("CuratedPageView", () => {
 
     it("the banner names the CAPABILITY and leads with the DURATION, not the stream list", async () => {
       wrapper = await mountView({}, staleState());
+      // The duration is measured against the page's OWN window end (or the wall
+      // clock, whichever is later), and the fixture's lastSeenUs is NOW_US-3d on
+      // a NOW_US that is years ahead of real time. Without moving the page onto
+      // that clock the age is negative and clamps to "1 minute", so the "3" is
+      // underivable from anything the view was given. Drive the real seam.
+      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+        startTime: NOW_US - 3 * HOUR_US,
+        endTime: NOW_US,
+        userChangedValue: true,
+      });
+      await flushPromises();
       const banner = wrapper.find('[data-test="curated-stale-banner"]');
       expect(banner.text()).not.toContain("kube_pod_status_phase");
       expect(banner.text()).toMatch(/\b3\b/);
@@ -821,8 +832,15 @@ describe("CuratedPageView", () => {
       await picker.trigger("change");
       const selected = picker.attributes("data-value");
 
-      const injected = wrapper.findComponent({ name: "RenderDashboardCharts" }).vm
-        .selectedTabId as Ref<string | null>;
+      // Read the ref off the renderer's PROVIDES, not off its instance proxy:
+      // Vue unwraps refs returned from setup(), so `vm.selectedTabId` is the
+      // plain string "overview" with no `.value` to read or assign. `$.provides`
+      // hands back the ref the view actually provided — which is what §3.1
+      // requires, so this still fails any implementation that provides a
+      // non-ref or nothing at all.
+      const injected = (wrapper.findComponent({ name: "RenderDashboardCharts" }).vm as any).$
+        .provides["selectedTabId"] as Ref<string | null>;
+      expect(isRef(injected)).toBe(true);
       expect(injected.value).toBe("overview");
       injected.value = "workloads";
       await flushPromises();
