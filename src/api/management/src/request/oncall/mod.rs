@@ -183,21 +183,6 @@ pub struct FromPresetRequest {
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SetPolicyRequest {
     pub rungs: Vec<PriorityRung>,
-    /// How many times the ladder runs before `final_action`. 1..=5.
-    ///
-    /// **Absent leaves it unchanged**, which is why it can be added without
-    /// breaking a client that never sent it. It was missing entirely: the
-    /// engine stored, validated and honoured both this and `final_action`,
-    /// while the write path silently dropped them — so a policy could never
-    /// leave the defaults, `PolicyError::RepeatOutOfRange` could never fire
-    /// from the API, and the editor showing them read-only was correct rather
-    /// than lazy.
-    #[serde(default)]
-    pub repeat_count: Option<i32>,
-    /// What happens once the last pass ends with nobody having answered.
-    /// Absent leaves it unchanged.
-    #[serde(default)]
-    pub final_action: Option<config::meta::oncall::FinalAction>,
     /// Alert Destination names to page through. Absent leaves them unchanged.
     #[serde(default)]
     pub destinations: Option<Vec<String>>,
@@ -1442,8 +1427,6 @@ pub async fn set_policy(
             body.rungs,
             body.destinations,
             body.l0,
-            body.repeat_count,
-            body.final_action,
         )
         .await
         {
@@ -3080,8 +3063,6 @@ pub async fn preview_routing(
             "landed_on_default": routed.landed_on_default(),
             "notes": routed.notes,
             "ladder": context.as_ref().map(|c| &c.ladder),
-            "repeat_count": context.as_ref().map(|c| c.repeat_count),
-            "final_action": context.as_ref().map(|c| c.final_action),
             "current_responder": context.as_ref().and_then(|c| c.current_responder.as_ref()),
             "covered_now": context.as_ref().map(|c| c.covered_now),
             "also_matched": context.as_ref().map(|c| &c.also_matched),
@@ -5541,27 +5522,6 @@ mod tests {
         let q: ResolvedScheduleQuery =
             serde_json::from_str(r#"{"from":1,"to":2,"rotation_id":"rot_2"}"#).unwrap();
         assert_eq!(q.rotation_id.as_deref(), Some("rot_2"));
-    }
-
-    /// Both were stored, validated and honoured by the engine while the write
-    /// path had no field for them — so a policy could never leave the defaults.
-    /// Absent still means "leave unchanged", so a client that never sent them
-    /// keeps working.
-    #[test]
-    fn test_a_policy_body_can_now_set_repeat_count_and_final_action() {
-        let bare: SetPolicyRequest = serde_json::from_str(r#"{"rungs":[]}"#).unwrap();
-        assert_eq!(bare.repeat_count, None);
-        assert_eq!(bare.final_action, None);
-
-        let full: SetPolicyRequest = serde_json::from_str(
-            r#"{"rungs":[],"repeat_count":3,"final_action":"notify_default_team"}"#,
-        )
-        .unwrap();
-        assert_eq!(full.repeat_count, Some(3));
-        assert_eq!(
-            full.final_action,
-            Some(config::meta::oncall::FinalAction::NotifyDefaultTeam)
-        );
     }
 
     /// "I am away" is the common case, and it must not require the caller to

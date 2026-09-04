@@ -10,8 +10,6 @@ pub struct Model {
     pub rungs: String,
     pub destinations: String,
     pub l0_json: String,
-    pub repeat_count: i32,
-    pub final_action: String,
     pub created_at: i64,
     pub updated_at: i64,
 }

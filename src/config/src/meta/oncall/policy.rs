@@ -381,89 +381,6 @@ impl ChannelBreaker {
     }
 }
 
-// ── Repeats and what happens at the end (04 §3) ──────────────────────────────
-
-/// How many times a ladder runs when nobody says otherwise. One — which is
-/// what the engine has always done, so an unset column changes nothing.
-pub const DEFAULT_REPEAT_COUNT: i32 = 1;
-
-/// §7's cap on runaway repeats. Five passes of a P1 ladder is an hour of
-/// paging; past that the answer is not another pass.
-pub const MAX_REPEAT_COUNT: i32 = 5;
-
-fn default_repeat_count() -> i32 {
-    DEFAULT_REPEAT_COUNT
-}
-
-/// What a policy does once its ladder has run for the last time (04 §3).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum FinalAction {
-    /// Record that nobody answered, and drop the job. Today's behaviour, and
-    /// the default, so a policy written before this field existed behaves
-    /// exactly as it did.
-    #[default]
-    Stop,
-    /// Hand the page to the org's nominated catch-all team, which starts their
-    /// ladder from its first rung. Only reachable when the org has nominated
-    /// one; without it there is nowhere to hand it to and this is `Stop`.
-    NotifyDefaultTeam,
-}
-
-impl FinalAction {
-    /// Stable wire value. Persisted, so changing one changes what a stored
-    /// policy means.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Stop => "stop",
-            Self::NotifyDefaultTeam => "notify_default_team",
-        }
-    }
-
-    /// Reads a stored value, **failing to `Stop`**: an unreadable column must
-    /// not invent a handoff to a team nobody nominated.
-    pub fn from_str_or_stop(s: &str) -> Self {
-        match s.trim() {
-            "notify_default_team" => Self::NotifyDefaultTeam,
-            _ => Self::Stop,
-        }
-    }
-}
-
-/// What the engine does when a ladder pass ends with nobody having answered.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LadderEnd {
-    /// Run the ladder again from its first rung; `pass` is which pass that is.
-    Repeat { pass: i32 },
-    /// The org's catch-all team takes it from here.
-    HandToDefaultTeam,
-    /// Say on the record that nobody answered, and stop.
-    Stop,
-}
-
-/// §3's end-of-ladder decision, pure over `(policy, passes so far)`.
-///
-/// `passes_done` counts the pass that has just finished, so the default —
-/// `repeat_count` of 1 — reaches `final_action` immediately and the engine
-/// behaves precisely as it did before repeats existed.
-///
-/// `repeat_count` is clamped rather than refused here: a stored row can arrive
-/// from replication or a hand-edit with nobody at a keyboard, and §7 caps
-/// repeats because a runaway one is a paging storm. The write path refuses
-/// out-of-range values while somebody is still looking at the form.
-pub fn ladder_end(repeat_count: i32, passes_done: i32, final_action: FinalAction) -> LadderEnd {
-    let passes = repeat_count.clamp(DEFAULT_REPEAT_COUNT, MAX_REPEAT_COUNT);
-    if passes_done < passes {
-        return LadderEnd::Repeat {
-            pass: passes_done + 1,
-        };
-    }
-    match final_action {
-        FinalAction::Stop => LadderEnd::Stop,
-        FinalAction::NotifyDefaultTeam => LadderEnd::HandToDefaultTeam,
-    }
-}
-
 /// One rung: when it fires, and everyone it pages.
 ///
 /// The delay identifies the rung. Targets that fire together belong to the
@@ -518,16 +435,6 @@ pub struct EscalationPolicy {
     /// screen — which is most of them.
     #[serde(default = "super::agent::L0Policy::defaults")]
     pub l0: super::agent::L0Policy,
-    /// How many times the ladder runs before `final_action` (04 §3).
-    ///
-    /// One by default, which is the ladder the engine has always run: a policy
-    /// stored before this field existed reads back as one pass and behaves
-    /// identically.
-    #[serde(default = "default_repeat_count")]
-    pub repeat_count: i32,
-    /// What happens once the last pass ends with nobody having answered.
-    #[serde(default)]
-    pub final_action: FinalAction,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -550,9 +457,6 @@ pub enum PolicyError {
     /// nobody is woken. Refusing it at write time is the only point at which
     /// somebody is still looking at the screen.
     UndeliverableChannels(AlertPriority, Vec<Channel>),
-    /// §7 caps repeats because a runaway one is a paging storm, and zero
-    /// passes is a policy that pages nobody while looking configured.
-    RepeatOutOfRange(i32),
 }
 
 /// What the engine should do right now.
@@ -650,8 +554,6 @@ impl EscalationPolicy {
             l0: super::agent::L0Policy::defaults(),
             // One pass, then say on the record that nobody answered. §3 allows
             // more; a team that has not asked for more gets what it always got.
-            repeat_count: DEFAULT_REPEAT_COUNT,
-            final_action: FinalAction::Stop,
             rungs: vec![
                 PriorityRung {
                     priority: P1,
@@ -744,8 +646,6 @@ impl EscalationPolicy {
             team_id: team_id.into(),
             destinations: vec![],
             l0: super::agent::L0Policy::defaults(),
-            repeat_count: DEFAULT_REPEAT_COUNT,
-            final_action: FinalAction::Stop,
             rungs: vec![
                 // Three whole-team steps, not four. There is only one target
                 // a team with no rotations has, so every step of this ladder
@@ -794,15 +694,7 @@ impl EscalationPolicy {
     /// Read through here rather than off the field, because the field can hold
     /// anything a replicated row or a hand-edit put in it and the engine must
     /// not be the place that discovers a ladder repeating four thousand times.
-    pub fn passes(&self) -> i32 {
-        self.repeat_count
-            .clamp(DEFAULT_REPEAT_COUNT, MAX_REPEAT_COUNT)
-    }
-
     pub fn validate(&self) -> Result<(), PolicyError> {
-        if !(DEFAULT_REPEAT_COUNT..=MAX_REPEAT_COUNT).contains(&self.repeat_count) {
-            return Err(PolicyError::RepeatOutOfRange(self.repeat_count));
-        }
         let mut seen_priority = std::collections::HashSet::new();
         for rung in &self.rungs {
             if !seen_priority.insert(rung.priority.to_i32()) {
@@ -1016,10 +908,6 @@ impl std::fmt::Display for PolicyError {
                     "priority `{p}` pages over {named}, which nothing can deliver yet, so those pages would reach nobody; the channels available today are {deliverable}"
                 )
             }
-            Self::RepeatOutOfRange(n) => write!(
-                f,
-                "a ladder runs between {DEFAULT_REPEAT_COUNT} and {MAX_REPEAT_COUNT} times, got {n}"
-            ),
         }
     }
 }
@@ -1726,105 +1614,6 @@ mod tests {
                 "an hourly failure is not a hard-down provider"
             );
         }
-    }
-
-    // ── Repeats and the end of the ladder (04 §3) ───────────────────────────
-
-    /// The whole point of the defaults: a policy nobody has touched behaves
-    /// exactly as it did before repeats existed — one pass, then the record
-    /// says nobody answered.
-    #[test]
-    fn test_an_unset_policy_runs_the_ladder_once_and_stops() {
-        let p = policy();
-        assert_eq!(p.repeat_count, DEFAULT_REPEAT_COUNT);
-        assert_eq!(p.final_action, FinalAction::Stop);
-        assert_eq!(
-            ladder_end(p.repeat_count, 1, p.final_action),
-            LadderEnd::Stop
-        );
-    }
-
-    #[test]
-    fn test_a_repeating_ladder_runs_its_passes_then_reaches_the_final_action() {
-        for pass in 1..3 {
-            assert_eq!(
-                ladder_end(3, pass, FinalAction::NotifyDefaultTeam),
-                LadderEnd::Repeat { pass: pass + 1 }
-            );
-        }
-        assert_eq!(
-            ladder_end(3, 3, FinalAction::NotifyDefaultTeam),
-            LadderEnd::HandToDefaultTeam
-        );
-        assert_eq!(ladder_end(3, 3, FinalAction::Stop), LadderEnd::Stop);
-    }
-
-    /// §7's runaway-repeat control. A stored value can arrive from replication
-    /// or a hand-edit, and the engine must not be where a ladder repeating
-    /// four thousand times is discovered.
-    #[test]
-    fn test_a_stored_repeat_count_is_clamped_rather_than_obeyed() {
-        assert_eq!(
-            ladder_end(4_000, MAX_REPEAT_COUNT, FinalAction::Stop),
-            LadderEnd::Stop
-        );
-        // Zero or negative would be a ladder that pages nobody while looking
-        // configured; it reads as one pass.
-        for bad in [0, -1] {
-            assert_eq!(ladder_end(bad, 1, FinalAction::Stop), LadderEnd::Stop);
-        }
-        let mut p = policy();
-        p.repeat_count = 99;
-        assert_eq!(p.passes(), MAX_REPEAT_COUNT);
-    }
-
-    /// Clamped on read, refused on write: an operator who typed 99 has a
-    /// belief about how long their team is paged for.
-    #[test]
-    fn test_an_out_of_range_repeat_count_is_refused_at_the_form() {
-        for bad in [0, -1, MAX_REPEAT_COUNT + 1, 99] {
-            let mut p = policy();
-            p.repeat_count = bad;
-            let err = p.validate().unwrap_err();
-            assert_eq!(err, PolicyError::RepeatOutOfRange(bad));
-            assert!(err.to_string().contains(&MAX_REPEAT_COUNT.to_string()));
-        }
-        for ok in DEFAULT_REPEAT_COUNT..=MAX_REPEAT_COUNT {
-            let mut p = policy();
-            p.repeat_count = ok;
-            p.validate().unwrap();
-        }
-    }
-
-    /// The stored spelling is durable, and an unreadable one must not invent a
-    /// handoff to a team nobody nominated.
-    #[test]
-    fn test_the_final_action_wire_values_are_pinned_and_fail_to_stop() {
-        assert_eq!(FinalAction::Stop.as_str(), "stop");
-        assert_eq!(
-            FinalAction::NotifyDefaultTeam.as_str(),
-            "notify_default_team"
-        );
-        for s in ["stop", "", "  ", "notify_team", "garbage"] {
-            assert_eq!(FinalAction::from_str_or_stop(s), FinalAction::Stop, "{s}");
-        }
-        assert_eq!(
-            FinalAction::from_str_or_stop(" notify_default_team "),
-            FinalAction::NotifyDefaultTeam
-        );
-        assert_eq!(FinalAction::default(), FinalAction::Stop);
-    }
-
-    /// A policy stored before these fields existed has to read back as the
-    /// ladder it was, not as a ladder that repeats or hands off.
-    #[test]
-    fn test_a_policy_written_before_repeats_existed_reads_back_unchanged() {
-        let mut json = serde_json::to_value(policy()).unwrap();
-        let obj = json.as_object_mut().unwrap();
-        obj.remove("repeat_count");
-        obj.remove("final_action");
-        let back: EscalationPolicy = serde_json::from_value(json).unwrap();
-        assert_eq!(back, policy());
     }
 
     /// The engine's loop, with the dispatching replaced by a fixed outcome:

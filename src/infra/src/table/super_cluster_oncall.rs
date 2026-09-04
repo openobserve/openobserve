@@ -290,7 +290,6 @@ pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> 
     // 04 §3's repeat/final-action pair travels with the policy for the same
     // reason: a failover has to run the ladder the team configured, not the
     // shipped default.
-    let final_action = policy.final_action.as_str().to_string();
     let now = config::utils::time::now_micros();
     // Same reasoning as the schedule: `team_id` is the unique key, and
     // `get_or_create` on the read path means a replica may well have minted a
@@ -306,8 +305,6 @@ pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> 
             active.rungs = Set(rungs);
             active.destinations = Set(destinations);
             active.l0_json = Set(l0_json);
-            active.repeat_count = Set(policy.repeat_count);
-            active.final_action = Set(final_action);
             active.updated_at = Set(now);
             active.update(client).await?;
         }
@@ -319,8 +316,6 @@ pub async fn put_policy(policy: &EscalationPolicy) -> Result<(), errors::Error> 
                 rungs: Set(rungs),
                 destinations: Set(destinations),
                 l0_json: Set(l0_json),
-                repeat_count: Set(policy.repeat_count),
-                final_action: Set(final_action),
                 created_at: Set(now),
                 updated_at: Set(now),
             }

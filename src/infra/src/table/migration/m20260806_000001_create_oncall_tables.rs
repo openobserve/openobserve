@@ -227,22 +227,6 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default("{}"),
                     )
-                    // How many times the ladder runs before it stops, and what
-                    // happens when it does (04-escalation-engine §3). Both
-                    // default to exactly the behaviour that existed before they
-                    // did: climb once, then stop.
-                    .col(
-                        ColumnDef::new(OncallPolicies::RepeatCount)
-                            .integer()
-                            .not_null()
-                            .default(1),
-                    )
-                    .col(
-                        ColumnDef::new(OncallPolicies::FinalAction)
-                            .custom(Alias::new(get_text_type()))
-                            .not_null()
-                            .default("stop"),
-                    )
                     .col(
                         ColumnDef::new(OncallPolicies::CreatedAt)
                             .big_integer()
@@ -543,8 +527,6 @@ enum OncallPolicies {
     Rungs,
     Destinations,
     L0Json,
-    RepeatCount,
-    FinalAction,
     CreatedAt,
     UpdatedAt,
 }
