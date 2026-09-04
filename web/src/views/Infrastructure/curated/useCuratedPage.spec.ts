@@ -99,6 +99,7 @@ const K8S_METRICS = [
   streamEntry("k8s_pod_filesystem_capacity", POD_SCHEMA),
   streamEntry("kube_pod_status_phase", KUBE_SCHEMA),
   streamEntry("kube_node_status_condition", KUBE_SCHEMA),
+  streamEntry("kube_node_status_allocatable", KUBE_SCHEMA),
   streamEntry("kube_pod_container_resource_requests", KUBE_SCHEMA),
   streamEntry("kube_pod_container_status_restarts_total", KUBE_SCHEMA),
 ];

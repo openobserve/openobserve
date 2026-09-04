@@ -16362,6 +16362,7 @@
     "k8s": {
       "section": {
         "overview": "Overview",
+        "overviewNote": "Pod tiles show three of five phases - Succeeded and Unknown pods aren't counted, so the three don't add up to the fleet total.",
         "nodes": "Nodes",
         "workloads": "Workloads"
       },
@@ -16380,12 +16381,9 @@
         "nodes": "Nodes",
         "nodesReady": "Nodes ready (now)",
         "podsRunning": "Pods running (now)",
-        "podsRunningSub": "Three of five phases are shown as tiles - they don't sum to the fleet",
         "podsPending": "Pods pending (now)",
-        "podsPendingSub": "Three of five phases are shown as tiles - they don't sum to the fleet",
         "podsFailed": "Pods failed (now)",
-        "podsFailedSub": "Three of five phases are shown as tiles - they don't sum to the fleet",
-        "fleetCpu": "Fleet CPU (now)",
+        "cpuUsed": "CPU used (now)",
         "podsByPhase": "Pods by phase",
         "nodeCpuTop": "Highest-CPU nodes",
         "unhealthyPods": "Top 20 unhealthy pods",
