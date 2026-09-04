@@ -2153,3 +2153,47 @@ describe("CPU tile reads used-vs-capacity, and both sides carry the scope", () =
     expect(panel.queries[0].query).not.toContain("*");
   });
 });
+
+// The executor reads `query_type` off the PER-QUERY config
+// (usePanelPromQLExecutor.ts:181) and, for "instant", collapses the range by
+// sending start == end (useStreamingSearch.ts:205-207). A pack that declares
+// queryMode but never reaches that key would still run as a 3h range query and
+// keep contradicting the tiles, so this pins the emission, not the manifest.
+describe("instant panels reach the executor's query_type seam", () => {
+  const instantPanelIds = ["k8s_ov_unhealthy_pods", "k8s_nd_conditions", "k8s_nd_not_ready"];
+
+  it("emits query_type 'instant' on every query of an instant panel", () => {
+    const dashboard = build(resolve({}));
+    const panels = (dashboard.tabs ?? []).flatMap((tab: any) => tab.panels ?? []);
+    for (const id of instantPanelIds) {
+      const emitted = panels.find((p: any) => p.id === id);
+      expect(emitted, `${id} was not built`).toBeDefined();
+      for (const query of emitted.queries) {
+        expect(query.config?.query_type, `${id} query_type`).toBe("instant");
+      }
+    }
+  });
+
+  it("leaves time-series panels on the default range execution", () => {
+    const dashboard = build(resolve({}));
+    const panels = (dashboard.tabs ?? []).flatMap((tab: any) => tab.panels ?? []);
+    const line = panels.find((p: any) => p.id === "k8s_ov_pods_by_phase");
+    for (const query of line.queries) {
+      expect(query.config?.query_type).toBeUndefined();
+    }
+  });
+});
+
+// An operator cannot act on a panel that looks the same whether the query failed
+// or nothing is wrong. Tables now return a clean empty vector instead of 500ing,
+// so they can carry the same honest "no data" verdict the tiles already get.
+describe("inventory tables can say 'nothing is wrong' rather than staying blank", () => {
+  it("marks instant tables no-data eligible, like the metric tiles", () => {
+    const dashboard = build(resolve({}));
+    const panels = (dashboard.tabs ?? []).flatMap((tab: any) => tab.panels ?? []);
+    for (const id of ["k8s_ov_unhealthy_pods", "k8s_nd_not_ready"]) {
+      const emitted = panels.find((p: any) => p.id === id);
+      expect(emitted.config.curated_no_data_eligible, `${id} no-data eligibility`).toBe(true);
+    }
+  });
+});

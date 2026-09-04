@@ -60,6 +60,13 @@ export interface PanelVariant {
   fields?: unknown;
   /** Unit override where a variant's semantics differ (cores vs ratio). */
   unit?: string;
+  /**
+   * "instant" collapses the panel's window to a single evaluation (start == end),
+   * so an inventory table lists what is broken NOW rather than one row per series
+   * seen anywhere in the dashboard period — measured, a 3h range topk(20) returned
+   * 450 rows and contradicted the instant tiles above it.
+   */
+  queryMode?: "instant";
 }
 
 export interface CuratedPanelDef {
