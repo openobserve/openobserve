@@ -3680,8 +3680,8 @@
       },
       "credential": {
         "quickStartTitle": "Quick start — your account",
-        "quickStartBody": "Snippets use your own credentials, which carry your full permissions. For production, generate a dedicated read-only credential instead.",
-        "generate": "Generate read-only credential",
+        "quickStartBody": "Snippets use your own credentials, which carry your full permissions. For production, create a dedicated read-only service account in IAM instead.",
+        "creating": "Creating a read-only credential…",
         "created": "Read-only credential created",
         "shownOnce": "For {email}. Copy it now — the token is shown only once and the snippets below now use it.",
         "download": "Download",
@@ -3690,7 +3690,7 @@
         "error": "Couldn't create the credential. Try again, or create a service account manually in IAM."
       },
       "securityTitle": "Use a dedicated, least-privilege credential",
-      "securityBody": "The token defaults to your own account credentials. For production, generate a read-only credential above (or create a scoped service account) and never commit tokens to source control.",
+      "securityBody": "These snippets use your own account credentials, which carry your full permissions. For production, use a scoped read-only service account and never commit tokens to source control.",
       "docsCta": "Read the full MCP documentation",
       "clients": {
         "claudeCode": "Claude Code",
