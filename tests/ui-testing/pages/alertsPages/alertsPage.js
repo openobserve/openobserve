@@ -3483,21 +3483,12 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
-    /**
-     * Wait for the add-alert form to finish mounting before interacting with its
-     * header back button — the submit button only renders once AddAlertView stops
-     * bouncing (it redirects to the list while destinations are empty).
-     */
+    // The submit button only renders once AddAlertView stops redirecting to the list, so wait on it before touching the header.
     async expectAddAlertFormVisible() {
         await expect(this.page.locator(this.locators.alertSubmitButton)).toBeVisible({ timeout: 15000 });
     }
 
-    /**
-     * Click the header back button and assert the redirect to the alerts list
-     * preserves both org_identifier and folder. goBackToAlertsList pushes a fresh
-     * query string; the Cancel button's history-based router.back() would not carry
-     * them, so parsing searchParams (not exact-string URL matching) is the real gate.
-     */
+    // goBackToAlertsList pushes a fresh query string, so assert on parsed searchParams rather than an exact URL match.
     async expectBackRedirectPreservesOrg(org, folder) {
         await this.clickBackButton();
         await expect(this.page).toHaveURL(/\/web\/alerts\/?\?/, { timeout: 15000 });
