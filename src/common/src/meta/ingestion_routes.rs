@@ -130,6 +130,18 @@ static INGESTION_ROUTES: &[IngestionRoute] = &[
         methods: &["POST"],
         kind: IngestionKind::Write,
     },
+    // `/{org}/v1/profiles` (OTLP)
+    IngestionRoute {
+        segments: &[Param, Lit("v1"), Lit("profiles")],
+        methods: &["POST"],
+        kind: IngestionKind::Write,
+    },
+    // `/{org}/v1development/profiles` (OTLP Profiles development path used by otlp_http)
+    IngestionRoute {
+        segments: &[Param, Lit("v1development"), Lit("profiles")],
+        methods: &["POST"],
+        kind: IngestionKind::Write,
+    },
     // `/{org}/traces` (native)
     IngestionRoute {
         segments: &[Param, Lit("traces")],
@@ -314,6 +326,8 @@ mod tests {
             "default/v1/logs",
             "default/v1/metrics",
             "default/v1/traces",
+            "default/v1/profiles",
+            "default/v1development/profiles",
             "default/traces",
             "default/otel/v1/traces",
             "default/ingest/metrics/_json",
