@@ -52,10 +52,7 @@ const pack = curatedPacks[props.workload];
 const hasPack = computed(() => pack != null);
 const manifest = computed(() => pack ?? curatedPacks.kubernetes!);
 
-// A GETTER, not the ref: selectedTabId is declared below, and the composable
-// only reads this at build time.
 const page = useCuratedPage(manifest.value, {
-  activeSectionId: () => selectedTabId.value ?? undefined,
   drilldownRange: () =>
     selectedWindow.value.kind === "relative"
       ? { period: selectedWindow.value.period }
@@ -229,7 +226,9 @@ const onStripSetup = (group: HiddenGroupInfo["group"] | StaleGroupInfo["group"])
 
 /** A caveat about the active section's panels as a SET (§6.3) — never per tile. */
 const sectionNoteKey = computed(
-  () => (dashboard.value as any)?.curatedSectionNoteKey as I18nKey | undefined,
+  () =>
+    visibleTabs.value.find((tab) => tab.tabId === selectedTabId.value)?.curatedNoteKey as
+      I18nKey | undefined,
 );
 
 // ── Stale banner + positive freshness ───────────────────────────────────────
@@ -279,17 +278,6 @@ const defaultFieldNamesWarning = computed(() =>
 // ── Scope pickers ───────────────────────────────────────────────────────────
 
 const variableList = computed(() => ((dashboard.value as any)?.variables?.list ?? []) as any[]);
-
-/**
- * The disabled flag is stamped INSIDE the built variables (resolve.ts buildVariable)
- * because useVariablesManager clones every variable on initialize (:141-148, :414)
- * and re-initializes only on a new dashboardData IDENTITY — so mutating the objects
- * here would be invisible to the rendered picker on every tab after the first.
- * Switching sections therefore has to rebuild the dashboard object.
- */
-watch(selectedTabId, (next, previous) => {
-  if (next !== previous) page.rebuild();
-});
 
 /**
  * Panels query COMMITTED variable state (RenderDashboardCharts

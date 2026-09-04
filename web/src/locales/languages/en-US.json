@@ -16346,7 +16346,6 @@
       "durationMinutes": "{count} minute | {count} minutes",
       "durationHours": "{count} hour | {count} hours",
       "durationDays": "{count} day | {count} days",
-      "pickerNotApplicable": "{picker} doesn't apply to {section}",
       "valuesCapped": "showing first {count}; narrow by {parent}",
       "buildOwnDashboard": "Build your own dashboard",
       "openInMetricsExplorer": "Open in Metrics explorer",

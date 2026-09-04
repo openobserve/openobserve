@@ -70,9 +70,7 @@ export interface UseCuratedPageResult {
   presentGroupIds: Ref<string[]>;
   /** start/end are MICROSECOND epochs — the native unit of stats.doc_time_max. */
   refresh: (args: { orgId: string; start: number; end: number; force?: boolean }) => Promise<void>;
-  /** Re-emits the dashboard from the last resolution (tab switch) — no network. */
-  rebuild: () => void;
-  /** Remember a picker's fetched values so the next rebuild re-emits them. */
+  /** Remember a picker's fetched values so a re-resolve re-emits them. */
   rememberPickerOptions: (variables: unknown) => void;
 }
 
@@ -81,8 +79,6 @@ export function useCuratedPage(
   opts?: {
     pins?: MaybeRefOrGetter<CuratedPagePins | undefined>;
     lastSeenUs?: MaybeRefOrGetter<number | undefined>;
-    /** Drives which pickers the BUILT variables mark disabled — see buildVariable. */
-    activeSectionId?: MaybeRefOrGetter<string | undefined>;
     /** The page's SELECTED window, threaded onto drilldown URLs (§6.6). */
     drilldownRange?: MaybeRefOrGetter<{ period?: string; from?: number; to?: number } | undefined>;
   },
@@ -90,14 +86,13 @@ export function useCuratedPage(
   const store = useStore();
   const { getStreams, getStream } = useStreams(gt);
 
-  // A rebuild re-initializes the variables manager, which never re-fetches an
-  // all-sentinel picker — so the options loaded so far have to ride the rebuild.
+  // A re-resolve re-initializes the variables manager, which never re-fetches an
+  // all-sentinel picker — so the options loaded so far have to ride the new build.
   const pickerOptions: Record<string, PickerOption[]> = {};
 
   // Read per refresh, never snapshotted: the drawer is reused across ?host= switches and lastSeenUs lands after mount.
   const readPins = (): CuratedPagePins => toValue(opts?.pins) ?? {};
   const readLastSeenUs = (): number | undefined => toValue(opts?.lastSeenUs);
-  const readActiveSectionId = (): string | undefined => toValue(opts?.activeSectionId);
   const readDrilldownRange = () => toValue(opts?.drilldownRange);
 
   const loadError = ref(false);
@@ -502,18 +497,6 @@ export function useCuratedPage(
     return { ...collected };
   };
 
-  let lastResolution: CuratedResolution | null = null;
-
-  /**
-   * Re-emits the dashboard from the LAST resolution — no network, no re-resolve.
-   * The built variables carry per-section disabled flags (buildVariable), and the
-   * renderer only re-reads them when dashboardData changes identity, so a tab
-   * switch has to produce a new object.
-   */
-  const rebuild = () => {
-    if (lastResolution) applyResolution(lastResolution);
-  };
-
   /** RenderDashboardCharts emits { isVariablesLoading, values } — see its getMergedVariablesForPanel. */
   const rememberPickerOptions = (variables: unknown) => {
     const values = (variables as { values?: unknown })?.values;
@@ -526,7 +509,6 @@ export function useCuratedPage(
   };
 
   const applyResolution = (resolution: CuratedResolution) => {
-    lastResolution = resolution;
     hiddenGroups.value = resolution.hiddenGroups;
     partialGroups.value = resolution.partialGroups;
     staleGroups.value = resolution.staleGroups;
@@ -539,14 +521,12 @@ export function useCuratedPage(
     warnings.value = merged;
 
     // Swapped only when resolution output changed (the renderer re-inits on ANY new object); pins are hashed because they substitute INTO the queries.
-    const activeSectionId = readActiveSectionId();
-    const key = resolutionHash(resolution, readPins(), activeSectionId);
+    const key = resolutionHash(resolution, readPins());
     if (key !== resolutionKey || dashboard.value === null) {
       resolutionKey = key;
       const built = buildDashboard(manifest, resolution, readPins(), {
         timezone: store.state.timezone ?? "UTC",
         nowUs: Date.now() * 1000,
-        activeSectionId,
         drilldownRange: readDrilldownRange(),
         pickerOptions,
       });
@@ -668,7 +648,6 @@ export function useCuratedPage(
     stripAutoExpand,
     presentGroupIds,
     refresh,
-    rebuild,
     rememberPickerOptions,
   };
 }
@@ -717,15 +696,9 @@ function unknownFieldFrom(error: any): string | null {
 }
 
 /** Selected variants + resolved fields + surviving pickers/sections + badges + pins. */
-function resolutionHash(
-  resolution: CuratedResolution,
-  pins: CuratedPagePins,
-  activeSectionId?: string,
-): string {
+function resolutionHash(resolution: CuratedResolution, pins: CuratedPagePins): string {
   return JSON.stringify({
     pins,
-    // The built variables mark pickers disabled per SECTION, so the section is a build input.
-    activeSectionId,
     panels: resolution.panels
       .filter((panel) => !panel.hidden)
       // subtitleKey and noDataYet both branch what buildPanel emits, so both must move the hash.

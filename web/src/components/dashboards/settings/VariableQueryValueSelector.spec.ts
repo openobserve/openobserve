@@ -1206,29 +1206,29 @@ describe("VariableQueryValueSelector", () => {
       expect(oSelect().attributes("data-disabled")).toBe("false");
     });
 
-    it("renders the not-applicable tooltip TEXT when disabled with a reason key", () => {
+    it("renders the disabled-reason tooltip TEXT, with its params interpolated", () => {
       // Asserting the ATTRIBUTE proved nothing: nothing in web/src consumed
       // data-tooltip-key, so the reason never reached a user. The pin has to
       // read the rendered copy, with its params interpolated.
       wrapper = createWrapper({
         disabled: true,
-        disabledTooltipKey: "infra.curated.pickerNotApplicable",
-        disabledTooltipParams: { picker: "Namespace", section: "Nodes" },
+        disabledTooltipKey: "infra.curated.fieldUnresolved",
+        disabledTooltipParams: { display: "Namespace", stream: "k8s_pod_memory_usage" },
       });
       const tooltip = wrapper.findComponent({ name: "OTooltip" });
       expect(tooltip.exists()).toBe(true);
       const content = tooltip.props("content") as string;
-      expect(content).toBe("Namespace doesn't apply to Nodes");
+      expect(content).toBe("No Namespace field found on k8s_pod_memory_usage.");
       // No unsubstituted placeholder ever reaches the user.
-      expect(content).not.toContain("{picker}");
-      expect(content).not.toContain("{section}");
+      expect(content).not.toContain("{display}");
+      expect(content).not.toContain("{stream}");
     });
 
     it("renders NO tooltip when the picker is enabled", () => {
       // Paired with the positive case above so this cannot pass merely because
       // the affordance does not exist yet — that one must be green for this to
       // mean anything.
-      wrapper = createWrapper({ disabledTooltipKey: "infra.curated.pickerNotApplicable" });
+      wrapper = createWrapper({ disabledTooltipKey: "infra.curated.fieldUnresolved" });
       expect(wrapper.find('[data-test="variable-disabled-tooltip"]').exists()).toBe(false);
     });
   });

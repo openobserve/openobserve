@@ -163,14 +163,10 @@ const resolve = (args: {
     lastSeenUs: args.lastSeenUs,
   });
 
-const build = (
-  resolution: any,
-  opts: { pins?: Record<string, string>; activeSectionId?: string } = {},
-) =>
+const build = (resolution: any, opts: { pins?: Record<string, string> } = {}) =>
   buildDashboard(kubernetesPage, resolution, opts.pins ?? {}, {
     timezone: "UTC",
     nowUs: NOW_US,
-    activeSectionId: opts.activeSectionId,
   });
 
 const allQueries = (dashboard: any): string[] =>
@@ -1637,78 +1633,8 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
     });
   });
 
-  // ── B2: the disabled flag must ride the CLONE (design §6.4) ────────────────
-  describe("scope-picker disabled state is built in, not mutated on", () => {
-    // curatedDisabled is stamped INSIDE the built variables (resolve.ts
-    // buildVariable), NOT mutated onto them afterwards: useVariablesManager
-    // clones every variable on initialize (:141-148, :414) and re-initializes
-    // only on a new dashboardData IDENTITY, so a post-build mutation was
-    // invisible to the rendered picker on every tab after the first. These pins
-    // therefore assert the BUILT object and require a rebuild on tab switch.
-    it("buildDashboard stamps curatedDisabled on a picker the ACTIVE section omits", () => {
-      const resolution = resolveManifest({
-        manifest: kubernetesPage,
-        streams: fullK8sStreams(),
-        semanticGroups: defaultSemanticGroups as FieldAlias[],
-        range: RANGE,
-        now: NOW_US,
-      });
-      const overviewScoped =
-        kubernetesPage.sections.find((s) => s.id === "overview")?.scopedBy ?? [];
-
-      const built: any = buildDashboard(
-        kubernetesPage,
-        resolution,
-        {},
-        { timezone: "UTC", nowUs: NOW_US, activeSectionId: "overview" },
-      );
-      expect(built.variables.list.length).toBeGreaterThan(0);
-      for (const variable of built.variables.list) {
-        const applicable = overviewScoped.includes(variable.name);
-        expect(variable.curatedDisabled).toBe(!applicable);
-        expect(variable.curatedDisabledTooltipKey).toBe(
-          applicable ? undefined : "infra.curated.pickerNotApplicable",
-        );
-      }
-    });
-
-    it("a DIFFERENT active section flips the flag in the built object — the tab-switch case", () => {
-      const resolution = resolveManifest({
-        manifest: kubernetesPage,
-        streams: fullK8sStreams(),
-        semanticGroups: defaultSemanticGroups as FieldAlias[],
-        range: RANGE,
-        now: NOW_US,
-      });
-      const build = (sectionId: string) =>
-        buildDashboard(
-          kubernetesPage,
-          resolution,
-          {},
-          {
-            timezone: "UTC",
-            nowUs: NOW_US,
-            activeSectionId: sectionId,
-          },
-        ) as any;
-
-      // A picker that at least one section scopes and another does not — otherwise
-      // this asserts nothing about the section keying.
-      const sections = kubernetesPage.sections;
-      const flags = (dashboard: any) =>
-        Object.fromEntries(dashboard.variables.list.map((v: any) => [v.name, v.curatedDisabled]));
-      const differing = sections.find(
-        (section) =>
-          JSON.stringify(flags(build(section.id))) !==
-          JSON.stringify(flags(build(sections[0]!.id))),
-      );
-      expect(differing).toBeDefined();
-
-      // ...and the two builds are DIFFERENT OBJECTS, which is what makes the
-      // renderer re-initialize (and therefore re-clone) at all.
-      expect(build(sections[0]!.id)).not.toBe(build(differing!.id));
-    });
-
+  // ── B2: per-tab picker applicability rides the built variable ──────────────
+  describe("scope-picker applicability is declared, not stamped per active tab", () => {
     // The rebuild that flips curatedDisabled hands RenderDashboardCharts a new
     // dashboardData identity, which re-runs useVariablesManager.initialize over
     // the freshly built variables. initialize marks an INDEPENDENT query_values
@@ -1727,7 +1653,6 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       const built: any = buildDashboard(kubernetesPage, resolution, {}, {
         timezone: "UTC",
         nowUs: NOW_US,
-        activeSectionId: "workloads",
         pickerOptions: { namespace: loaded },
       } as any);
 
@@ -1766,7 +1691,7 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
         kubernetesPage,
         resolution,
         {},
-        { timezone: "UTC", nowUs: NOW_US, activeSectionId: "workloads" },
+        { timezone: "UTC", nowUs: NOW_US },
       );
 
       const manager = useVariablesManager(((key: string) => key) as never);
@@ -1810,7 +1735,7 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
         kubernetesPage,
         resolution,
         {},
-        { timezone: "UTC", nowUs: NOW_US, activeSectionId: "workloads" },
+        { timezone: "UTC", nowUs: NOW_US },
       );
 
       const shape = (v: any) => ({
@@ -1878,7 +1803,6 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       const built: any = buildDashboard(kubernetesPage, pruned as any, {}, {
         timezone: "UTC",
         nowUs: NOW_US,
-        activeSectionId: "workloads",
       } as any);
 
       const names = new Set(built.variables.list.map((v: any) => v.name));
@@ -2099,21 +2023,80 @@ describe("inventory tables render label columns", () => {
 // The phase fact is about the TRIO, so it is stated once per section, not three times
 // beside three titles that then truncate to "Pods ru…" (user-reported).
 describe("section-level note replaces the per-tile subtitle", () => {
-  it("buildDashboard puts the ACTIVE section's noteKey on the dashboard", () => {
-    const dashboard: any = build(resolve({}), { activeSectionId: "overview" });
-    expect(dashboard.curatedSectionNoteKey).toBe("infra.k8s.section.overviewNote");
+  // The note travels PER TAB on the tab object, not as one active-section field
+  // on the dashboard: a dashboard-level note would make the built object depend
+  // on the selected tab, which is exactly what forced the rebuild.
+  it("each tab carries its OWN noteKey", () => {
+    const dashboard: any = build(resolve({}));
+    const overview = dashboard.tabs.find((t: any) => t.tabId === "overview");
+    expect(overview.curatedNoteKey).toBe("infra.k8s.section.overviewNote");
   });
 
   it("a section without a noteKey carries none — the line is per-section, not global", () => {
-    const dashboard: any = build(resolve({}), { activeSectionId: "nodes" });
-    expect(dashboard.curatedSectionNoteKey).toBeUndefined();
+    const dashboard: any = build(resolve({}));
+    const nodes = dashboard.tabs.find((t: any) => t.tabId === "nodes");
+    expect(nodes.curatedNoteKey).toBeUndefined();
   });
 
   it("no Overview tile stamps curated_subtitle_key any more", () => {
-    const dashboard: any = build(resolve({}), { activeSectionId: "overview" });
+    const dashboard: any = build(resolve({}));
     const overview = dashboard.tabs.find((t: any) => t.tabId === "overview");
     const withSubtitle = overview.panels.filter((p: any) => p.config.curated_subtitle_key);
     expect(withSubtitle.map((p: any) => p.id)).toEqual([]);
+  });
+});
+
+// ── The restructure (design: conform to the dashboards tab model) ────────────
+// Dashboards never rebuild their dashboard object to change tabs: the tab is a
+// reactive injected ref (ViewDashboard :540-542) and per-tab variables are a
+// COMPUTED FILTER over one stable list (RenderDashboardCharts :528-531). The
+// curated engine used to bake an active-section `curatedDisabled` flag into each
+// built variable, which forced a rebuild per tab switch, which re-initialized the
+// variables manager and re-seeded every picker from `value: ""` — losing the
+// user's selection. These pins hold the build TAB-INDEPENDENT so that cannot
+// return.
+describe("the built dashboard does not depend on the selected tab", () => {
+  it("buildDashboard takes no active section and emits one object for all tabs", () => {
+    const resolution = resolve({});
+    // Deep-equal, not identity: buildDashboard is a pure builder, so two calls
+    // legitimately allocate. What must not vary is the CONTENT.
+    expect(build(resolution)).toEqual(build(resolution));
+  });
+
+  it("no built variable carries a disabled flag — an inapplicable picker is not rendered at all", () => {
+    const dashboard: any = build(resolve({}));
+    expect(dashboard.variables.list.length).toBeGreaterThan(0);
+    for (const variable of dashboard.variables.list) {
+      expect(variable.curatedDisabled, `${variable.name} still carries curatedDisabled`).toBe(
+        undefined,
+      );
+      expect(variable.curatedDisabledTooltipKey).toBe(undefined);
+    }
+  });
+
+  // Which tabs a picker applies to is DECLARED on the variable, exactly as the
+  // dashboards model declares `tabs` for a tab-scoped variable — the difference
+  // being that curated pickers stay global-scoped so they still load (an
+  // all-sentinel variable at tab scope is skipped by setTabVisibility :756-765
+  // and would never fetch its options at all).
+  it("each built picker declares the sections that scope it", () => {
+    const dashboard: any = build(resolve({}));
+    const byName = Object.fromEntries(
+      dashboard.variables.list.map((v: any) => [v.name, v.curatedTabs]),
+    );
+    expect(byName.cluster).toEqual(["overview", "nodes"]);
+    expect(byName.namespace).toEqual(["workloads"]);
+    expect(byName.pod).toEqual(["workloads"]);
+  });
+
+  it("the declared sections match the manifest's scopedBy exactly", () => {
+    const dashboard: any = build(resolve({}));
+    for (const variable of dashboard.variables.list) {
+      const expected = kubernetesPage.sections
+        .filter((section) => (section.scopedBy ?? []).includes(variable.name))
+        .map((section) => section.id);
+      expect(variable.curatedTabs, variable.name).toEqual(expected);
+    }
   });
 });
 

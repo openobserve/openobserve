@@ -410,6 +410,55 @@ describe("RenderDashboardCharts", () => {
       wrapper = createWrapper();
       expect(wrapper.exists()).toBe(true);
     });
+
+    // A global variable that names the tabs it applies to renders only on those
+    // tabs. Curated pages need per-tab picker applicability but must stay
+    // global-scoped to load at all (setTabVisibility skips all-sentinel
+    // variables), so the applicability travels as `curatedTabs` and is honoured
+    // by the same reactive filter that already serves tab-scoped variables —
+    // never by rebuilding the dashboard object.
+    describe("curatedTabs restricts a global variable to named tabs", () => {
+      const withCuratedTabs = () => ({
+        ...defaultProps.dashboardData,
+        variables: {
+          showDynamicFilters: false,
+          list: [
+            { name: "cluster", type: "query_values", scope: "global", curatedTabs: ["overview"] },
+            { name: "pod", type: "query_values", scope: "global", curatedTabs: ["workloads"] },
+            { name: "always", type: "query_values", scope: "global" },
+          ],
+        },
+        tabs: [
+          { tabId: "overview", name: "Overview", panels: [] },
+          { tabId: "workloads", name: "Workloads", panels: [] },
+        ],
+      });
+
+      const namesFor = (tabId: string) => {
+        wrapper = shallowMount(RenderDashboardCharts, {
+          props: { ...defaultProps, dashboardData: withCuratedTabs() },
+          global: {
+            plugins: [i18n, store, router],
+            provide: { selectedTabId: ref(tabId) },
+            mocks: {
+              $t: (key) => key,
+              $route: { params: {}, query: {} },
+              $router: { push: vi.fn(), replace: vi.fn() },
+            },
+            stubs: { ODialog: ODialogStub },
+          },
+        });
+        return wrapper.vm.globalVariables.map((v: any) => v.name);
+      };
+
+      it("shows only the pickers the ACTIVE tab is scoped by", () => {
+        expect(namesFor("overview")).toEqual(["cluster", "always"]);
+      });
+
+      it("shows a different set on another tab — the tab-switch case", () => {
+        expect(namesFor("workloads")).toEqual(["pod", "always"]);
+      });
+    });
   });
 
   describe("Tab Management", () => {
