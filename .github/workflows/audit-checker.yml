@@ -1,10 +1,16 @@
 name: Security audit
 on:
-  push:
-    paths-ignore:
-      - "**.md"
-      - "**.yml"
-      - "**.yaml"
+  # Advisories only matter when the dependency set changes, so PR runs are path-filtered to the
+  # Cargo manifests; the weekly run catches advisories published against unchanged deps.
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
+    paths:
+      - "**/Cargo.toml"
+      - "**/Cargo.lock"
+      - ".github/workflows/audit-checker.yml"
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -15,10 +21,15 @@ concurrency:
 
 jobs:
   security_audit:
+    # Nothing runs on a PR without the 'e2e' label, or on a draft; ci-gate alone reports the state.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/github-auth
       - uses: taiki-e/install-action@v2.87.0
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         with:
           tool: cargo-audit
       - name: run cargo audit

@@ -224,6 +224,34 @@ describe("SearchResult Component", () => {
     });
   });
 
+  describe("showLogCellActions", () => {
+    // The default grid (no fields selected) is timestamp + one `source` column
+    // holding the whole row as JSON, and `source` is not closable.
+    it("shows actions on the source column even though it is not closable", () => {
+      expect(
+        wrapper.vm.showLogCellActions({ id: "source", meta: { closable: false } }, { a: 1 }),
+      ).toBe(true);
+    });
+
+    it("shows actions on a closable field column that has a value", () => {
+      expect(
+        wrapper.vm.showLogCellActions({ id: "level", meta: { closable: true } }, { level: "info" }),
+      ).toBe(true);
+    });
+
+    it("hides actions on a closable field column with no value in this row", () => {
+      expect(
+        wrapper.vm.showLogCellActions({ id: "level", meta: { closable: true } }, { level: null }),
+      ).toBe(false);
+    });
+
+    it("hides actions on other non-closable columns", () => {
+      expect(
+        wrapper.vm.showLogCellActions({ id: "index", meta: { closable: false } }, { a: 1 }),
+      ).toBe(false);
+    });
+  });
+
   describe("Computed Properties", () => {
     it("should compute toggleWrapFlag", () => {
       wrapper.vm.searchObj.meta.toggleSourceWrap = true;

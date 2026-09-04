@@ -219,7 +219,7 @@ impl Sql {
                 &columns,
                 has_original_column,
                 query.quick_mode || cfg.limit.quick_mode_force_enabled,
-                cfg.limit.quick_mode_num_fields,
+                stream_type,
                 &search_event_type,
                 match_visitor.has_match_all,
             );

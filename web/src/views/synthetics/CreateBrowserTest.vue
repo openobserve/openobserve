@@ -633,6 +633,7 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);
+  recorder.cleanup();
 });
 
 onBeforeRouteLeave((to, from, next) => {

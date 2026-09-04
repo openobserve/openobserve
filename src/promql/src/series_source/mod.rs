@@ -14,19 +14,18 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 //! Sources that deliver a query's series one at a time, so a consumer can
-//! evaluate and drop each series without holding the full set: the matrix
-//! producer adapts an already-materialized matrix, and ordered-scan producers
-//! plug in behind the same contract.
+//! evaluate and drop each series without materializing the full set: the
+//! hash-sorted producer streams hash-ordered scans, the matrix producer adapts an
+//! already-materialized matrix behind the same contract.
 
 pub(crate) mod matrix;
+pub(crate) mod stream;
 
 use config::meta::promql::value::{Labels, Sample};
 use datafusion::error::Result;
 
-/// One partition's series, delivered whole and grouped under a signature.
-///
-/// Protocol per series: `advance` yields the group signature, `labels` may be
-/// read while the series is current, `consume` takes its samples and moves on.
+/// One partition's series delivered whole: `advance` yields the group signature, then
+/// `labels`/`consume` read the current one.
 pub(crate) trait SeriesSource: Send {
     fn advance(&mut self) -> impl Future<Output = Result<Option<u64>>> + Send;
     /// Group labels of the current series; valid only before `consume`.
