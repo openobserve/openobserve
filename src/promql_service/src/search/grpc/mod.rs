@@ -104,14 +104,10 @@ impl TableProvider for StorageProvider {
             .is_err()
         {
             log::info!("[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan");
-            return Err(DataFusionError::Plan(
-                infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::SearchCancelQuery(
-                    format!(
-                        "[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan"
-                    ),
-                ))
-                .to_string(),
-            ));
+            return Err(infra::errors::ErrorCodes::SearchCancelQuery(format!(
+                "[trace_id {trace_id}] [PromQL] grpc search canceled before execution plan"
+            ))
+            .into());
         }
         Ok(Some(abort_receiver))
     }

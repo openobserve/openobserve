@@ -75,7 +75,7 @@ fn split_legacy_metrics(files: Vec<FileKey>, mode: &MergeMode) -> (Vec<FileKey>,
     }
     files
         .into_iter()
-        .partition(|f| MetricsFileLayout::of(&f.key).is_some())
+        .partition(|f| MetricsFileLayout::is_hash_ordered(&f.key))
 }
 
 /// What a closed indexed metrics hour merges, see [`MetricsIndexMergeScope`].
@@ -85,7 +85,7 @@ fn indexed_hour_scope(
     max_file_size: usize,
     stream: &str,
 ) -> Vec<FileKey> {
-    if !mode.is_metrics_indexed() {
+    if mode.metrics_file_layout() != Some(MetricsFileLayout::Indexed) {
         return files;
     }
     match metrics_index_merge_scope(&files, max_file_size) {

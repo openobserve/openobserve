@@ -15,16 +15,11 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 
 use crate::functions::RangeFunc;
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#resets
-pub(crate) fn resets(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, ResetsFunc::new(), eval_ctx)
-}
-
 pub struct ResetsFunc;
 
 impl ResetsFunc {
