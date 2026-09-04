@@ -99,6 +99,7 @@ export const kubernetesPage: CuratedPageManifest = {
       group: GROUP.namespace,
       valuesFrom: { groupId: "kubelet-pod", stream: "k8s_pod_memory_usage", streamType: "metrics" },
       multiSelect: true,
+      chainedOn: [{ picker: "cluster" }],
       omitWhenValuesEmpty: true,
     },
     {
@@ -533,7 +534,7 @@ export const kubernetesPage: CuratedPageManifest = {
     {
       id: "workloads",
       titleKey: "infra.k8s.section.workloads",
-      scopedBy: ["namespace", "pod"],
+      scopedBy: ["cluster", "namespace", "pod"],
       panels: [
         panel(
           {
@@ -549,7 +550,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `topk(10, sum by (${NS}, ${POD}) (k8s_pod_cpu_usage{\${scope:namespace},\${scope:pod}}))`,
+                    query: `topk(10, sum by (${NS}, ${POD}) (k8s_pod_cpu_usage{\${scope:cluster},\${scope:namespace},\${scope:pod}}))`,
                     legend: `{${NS}}/{${POD}}`,
                   },
                 ],
@@ -560,7 +561,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 unit: "percent-1",
                 queries: [
                   {
-                    query: `topk(10, avg by (${NS}, ${POD}) (k8s_pod_cpu_utilization{\${scope:namespace},\${scope:pod}}))`,
+                    query: `topk(10, avg by (${NS}, ${POD}) (k8s_pod_cpu_utilization{\${scope:cluster},\${scope:namespace},\${scope:pod}}))`,
                     legend: `{${NS}}/{${POD}}`,
                   },
                 ],
@@ -584,7 +585,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `topk(10, sum by (${NS}, ${POD}) (k8s_pod_memory_usage{\${scope:namespace},\${scope:pod}}))`,
+                    query: `topk(10, sum by (${NS}, ${POD}) (k8s_pod_memory_usage{\${scope:cluster},\${scope:namespace},\${scope:pod}}))`,
                     legend: `{${NS}}/{${POD}}`,
                   },
                 ],
@@ -610,7 +611,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `topk(20, sum by (${NS}) (kube_pod_status_phase{phase=~"Pending|Failed|Unknown",\${scope:namespace}}))`,
+                    query: `topk(20, sum by (${NS}) (kube_pod_status_phase{\${scope:cluster},phase=~"Pending|Failed|Unknown",\${scope:namespace}}))`,
                     legend: `{${NS}}`,
                   },
                 ],
@@ -636,7 +637,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `topk(20, sum by (${NS}) (kube_pod_container_resource_requests{resource="cpu",\${scope:namespace}}))`,
+                    query: `topk(20, sum by (${NS}) (kube_pod_container_resource_requests{\${scope:cluster},resource="cpu",\${scope:namespace}}))`,
                     legend: `{${NS}}`,
                   },
                 ],
@@ -662,7 +663,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `topk(20, sum by (${NS}) (irate(k8s_pod_network_io{\${scope:namespace}}[5m])))`,
+                    query: `topk(20, sum by (${NS}) (irate(k8s_pod_network_io{\${scope:cluster},\${scope:namespace}}[5m])))`,
                     legend: `{${NS}}`,
                   },
                 ],
@@ -686,7 +687,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `topk(10, 100 * sum by (${NS}, ${POD}) (k8s_pod_filesystem_usage{\${scope:namespace},\${scope:pod}}) / sum by (${NS}, ${POD}) (k8s_pod_filesystem_capacity{\${scope:namespace},\${scope:pod}}))`,
+                    query: `topk(10, 100 * sum by (${NS}, ${POD}) (k8s_pod_filesystem_usage{\${scope:cluster},\${scope:namespace},\${scope:pod}}) / sum by (${NS}, ${POD}) (k8s_pod_filesystem_capacity{\${scope:cluster},\${scope:namespace},\${scope:pod}}))`,
                     legend: `{${NS}}/{${POD}}`,
                   },
                 ],
@@ -710,7 +711,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `topk(10, avg by (${NS}, ${POD}) (k8s_pod_memory_limit_utilization{\${scope:namespace},\${scope:pod}}))`,
+                    query: `topk(10, avg by (${NS}, ${POD}) (k8s_pod_memory_limit_utilization{\${scope:cluster},\${scope:namespace},\${scope:pod}}))`,
                     legend: `{${NS}}/{${POD}}`,
                   },
                 ],
@@ -735,7 +736,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryMode: "instant",
                 queries: [
                   {
-                    query: `topk(20, sum by (${NS}, ${POD}) (increase(kube_pod_container_status_restarts_total{\${scope:namespace},\${scope:pod}}[1h])))`,
+                    query: `topk(20, sum by (${NS}, ${POD}) (increase(kube_pod_container_status_restarts_total{\${scope:cluster},\${scope:namespace},\${scope:pod}}[1h])))`,
                     legend: `{${NS}}/{${POD}}`,
                   },
                 ],
