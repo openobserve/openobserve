@@ -254,16 +254,13 @@ const providerTypeOptions = computed(() => [
   { label: t("ingestion.otherLabel"), value: "other" },
 ]);
 
-// Default API endpoint for each provider type, shown as a placeholder to hint
-// the expected URL. Providers without a canonical public endpoint (self-hosted
-// or generic) fall back to the static i18n placeholder.
 const DEFAULT_ENDPOINTS: Record<string, string> = {
-  openai: "https://api.openai.com/v1",
-  deepseek: "https://api.deepseek.com/v1",
-  anthropic: "https://api.anthropic.com/v1",
+  openai: "https://api.openai.com/v1/chat/completions",
+  deepseek: "https://api.deepseek.com/chat/completions",
+  anthropic: "https://api.anthropic.com/v1/messages",
   azure_openai: "https://{resource}.openai.azure.com/openai/deployments/{deployment}",
-  ollama: "http://localhost:11434/v1",
-  vllm: "http://localhost:8000/v1",
+  ollama: "http://localhost:11434/api/generate",
+  vllm: "http://localhost:8000/v1/chat/completions",
 };
 
 const endpointPlaceholder = computed(
@@ -344,29 +341,14 @@ async function save(value: ProviderForm) {
 const testState = ref<"idle" | "running" | "passed" | "failed">("idle");
 const testMessage = ref<string | null>(null);
 
-// Runs OUTSIDE the form's own submit/validation — Test Connection is not a
-// save, so it never needs the whole schema to pass first (an incomplete
-// config just fails the test with a clear reason from the backend).
-//
-// The API key is write-only and never re-populated on edit, so a blank key
-// while editing a provider that needs one means "keep the stored secret" —
-// there is no client-side value to test with. That ONE case tests the
-// persisted provider by id instead (the only way to exercise a stored key
-// without ever exposing it to the browser); every other case — create mode,
-// a freshly typed/rotated key, or a provider type that needs no key at all —
-// tests the current, possibly-unsaved form values directly.
+// The backend validates test settings independently of the save form.
 async function testConnection() {
   if (!props.orgId) return;
   testState.value = "running";
   testMessage.value = null;
   const value = formValues.value;
-  const usesStoredSecret =
-    props.mode === "edit" && !!props.row && apiKeyRequired.value && !value.apiKey.trim();
-
   try {
-    const message = usesStoredSecret
-      ? await onlineEvalsService.providers.test(props.orgId, props.row!.id)
-      : await onlineEvalsService.providers.testConfig(props.orgId, buildPayload(value));
+    const message = await onlineEvalsService.providers.testConfig(props.orgId, buildPayload(value));
     testState.value = "passed";
     testMessage.value = raw(message);
   } catch (err: any) {

@@ -19,7 +19,6 @@ vi.mock("@/services/online-evals.service", () => ({
     providers: {
       create: vi.fn(),
       update: vi.fn(),
-      test: vi.fn(),
       testConfig: vi.fn(),
     },
   },
@@ -63,7 +62,6 @@ describe("ProviderFormPage", () => {
     vi.clearAllMocks();
     (onlineEvalsService.providers.create as any).mockResolvedValue({});
     (onlineEvalsService.providers.update as any).mockResolvedValue({});
-    (onlineEvalsService.providers.test as any).mockResolvedValue("Connection OK");
     (onlineEvalsService.providers.testConfig as any).mockResolvedValue("Connection OK");
   });
 
@@ -208,7 +206,6 @@ describe("ProviderFormPage", () => {
         expect.objectContaining({ name: "Prod OpenAI", authConfig: { api_key: "sk-secret" } }),
       );
       expect(onlineEvalsService.providers.create).not.toHaveBeenCalled();
-      expect(onlineEvalsService.providers.test).not.toHaveBeenCalled();
     });
 
     it("shows the backend's message once the test passes", async () => {
@@ -241,13 +238,20 @@ describe("ProviderFormPage", () => {
         available_models: ["claude-3", "claude-3-haiku"],
       };
 
-      it("tests the STORED provider by id when the (required) API key is left blank", async () => {
+      it("tests unsaved edits inline even when the API key is left blank", async () => {
         wrapper = createWrapper({ mode: "edit", row });
+        setField(wrapper, "endpoint", "https://proxy.example.com/v1/messages");
         await testBtn(wrapper).trigger("click");
         await flushPromises();
 
-        expect(onlineEvalsService.providers.test).toHaveBeenCalledWith("test-org", "prov-1");
-        expect(onlineEvalsService.providers.testConfig).not.toHaveBeenCalled();
+        expect(onlineEvalsService.providers.testConfig).toHaveBeenCalledWith(
+          "test-org",
+          expect.objectContaining({
+            endpoint: "https://proxy.example.com/v1/messages",
+            authConfig: { api_key: "" },
+          }),
+        );
+        expect(onlineEvalsService.providers.update).not.toHaveBeenCalled();
       });
 
       it("tests the current form values (including the rotated key) once a new API key is typed", async () => {
@@ -260,7 +264,6 @@ describe("ProviderFormPage", () => {
           "test-org",
           expect.objectContaining({ authConfig: { api_key: "sk-new-secret" } }),
         );
-        expect(onlineEvalsService.providers.test).not.toHaveBeenCalled();
       });
     });
   });
