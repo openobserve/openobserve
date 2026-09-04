@@ -236,10 +236,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :sets="sets"
       :signals="openSignals"
       :conflict="conflict"
+      :ladder="ladder"
       :saving="saving"
       @update:open="(v: boolean) => (dialogOpen = v)"
       @save="saveRule"
       @preview="previewConflict"
+      @team-change="fetchLadderForTeam"
     />
 
     <ConfirmDialog
@@ -297,6 +299,7 @@ import type {
   OnCallTeam,
   OwnershipRuleStats,
   RoutingPreview,
+  TeamRungSummary,
   UnroutedSignal,
 } from "@/ts/interfaces/oncall";
 import type { I18nText } from "@/types/i18n";
@@ -322,6 +325,12 @@ const preview = ref<RoutingPreview | null>(null);
 /// Who holds the path the rule editor is drafting, as opposed to `preview`,
 /// which belongs to the tester and answers a question the reader asked.
 const conflict = ref<RoutingPreview | null>(null);
+/// The ladder for whichever team is currently picked in the rule editor's own
+/// dropdown — see `fetchLadderForTeam`. Unlike `conflict`, and unlike the
+/// team-scoped Routing tab's `ladder` (fetched once, fixed to one team), this
+/// has to change every time the dialog's in-dialog selection changes, since
+/// one editor instance here serves every team in the org.
+const ladder = ref<TeamRungSummary[]>([]);
 
 const loaded = ref(false);
 const loadError = ref("");
@@ -520,6 +529,34 @@ async function previewConflict(dimensions: Record<string, string>) {
     conflict.value = res.data ?? null;
   } catch {
     conflict.value = null;
+  }
+}
+
+/// What paging the currently-picked team runs, answered fresh per pick. There
+/// is no batched/bulk endpoint for this — `teamOverview` takes exactly one
+/// team_id — so this fires once per distinct team the user actually selects,
+/// not once per team in the org on dialog mount.
+///
+/// Guarded against out-of-order responses: a fast team A → team B pick could
+/// see A's request resolve after B's, which would otherwise show A's ladder
+/// under B's now-selected name.
+///
+/// Never surfaces an error, for the same reason `previewConflict` doesn't: a
+/// ladder note that fails to load is missing context under a select, not a
+/// reason to block the form.
+let ladderRequest = 0;
+async function fetchLadderForTeam(teamId: string) {
+  const requestId = ++ladderRequest;
+  if (!teamId) {
+    ladder.value = [];
+    return;
+  }
+  try {
+    const res = await oncallService.teamOverview({ org_identifier: orgId.value, team_id: teamId });
+    if (requestId !== ladderRequest) return;
+    ladder.value = res.data?.rungs ?? [];
+  } catch {
+    if (requestId === ladderRequest) ladder.value = [];
   }
 }
 

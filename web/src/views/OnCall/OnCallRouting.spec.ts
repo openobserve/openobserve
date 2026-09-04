@@ -38,6 +38,7 @@ vi.mock("@/services/oncall", () => ({
     testPage: vi.fn(),
     getRoutingConfig: vi.fn(),
     setRoutingConfig: vi.fn(),
+    teamOverview: vi.fn(),
   },
 }));
 // Hoisted so every useRouter() call shares ONE spy — a fresh vi.fn() per call
@@ -72,7 +73,19 @@ const stubs = {
   },
   OnCallRuleEditor: {
     name: "OnCallRuleEditor",
-    props: ["open", "rule", "initialDimensions", "teams", "aliases", "catalogue", "services", "signals", "saving"],
+    props: [
+      "open",
+      "rule",
+      "initialDimensions",
+      "teams",
+      "aliases",
+      "catalogue",
+      "services",
+      "signals",
+      "saving",
+      "ladder",
+    ],
+    emits: ["team-change"],
     template: "<div />",
   },
   OnCallUnroutedQueue: {
@@ -189,6 +202,7 @@ describe("OnCallRouting", () => {
     service.unroutedSignals.mockResolvedValue({ data: [] } as any);
     service.createOwnershipRule.mockResolvedValue({ data: {} } as any);
     service.updateOwnershipRule.mockResolvedValue({ data: {} } as any);
+    service.teamOverview.mockResolvedValue({ data: { rungs: [] } } as any);
     alerts.getSemanticGroups.mockResolvedValue({ data: [] } as any);
   });
 
@@ -293,6 +307,56 @@ describe("OnCallRouting", () => {
 
     await showSignals(wrapper);
     expect(wrapper.find('[data-test="oncall-routing-add-rule"]').exists()).toBe(false);
+  });
+
+  /// The dialog serves every team in the org from one editor instance, so the
+  /// team it should describe is whatever the editor's own picker reports —
+  /// not a team fixed by this page. Regression: this page used to never pass
+  /// a ladder at all, so the "page this team" note always read "no
+  /// escalation ladder yet", for every team.
+  it("fetches the picked team's ladder and feeds it back to the editor", async () => {
+    service.teamOverview.mockResolvedValue({
+      data: { rungs: [{ priority: "P1", rungs: 2, pages_anyone: true, ends_with_whole_team: false }] },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-routing-add-rule"]').trigger("click");
+
+    editor(wrapper).vm.$emit("team-change", "team_2");
+    await flushPromises();
+
+    expect(service.teamOverview).toHaveBeenCalledWith({ org_identifier: ORG, team_id: "team_2" });
+    expect(editor(wrapper).props("ladder")).toEqual([
+      { priority: "P1", rungs: 2, pages_anyone: true, ends_with_whole_team: false },
+    ]);
+  });
+
+  it("clears the ladder when the picker reports no team chosen", async () => {
+    service.teamOverview.mockResolvedValue({
+      data: { rungs: [{ priority: "P1", rungs: 2, pages_anyone: true, ends_with_whole_team: false }] },
+    } as any);
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-routing-add-rule"]').trigger("click");
+    editor(wrapper).vm.$emit("team-change", "team_2");
+    await flushPromises();
+    expect(editor(wrapper).props("ladder")).not.toEqual([]);
+
+    editor(wrapper).vm.$emit("team-change", "");
+    await flushPromises();
+    expect(editor(wrapper).props("ladder")).toEqual([]);
+  });
+
+  it("falls back to an empty ladder when the fetch fails", async () => {
+    service.teamOverview.mockRejectedValue(new Error("network"));
+    const wrapper = render();
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-routing-add-rule"]').trigger("click");
+
+    editor(wrapper).vm.$emit("team-change", "team_2");
+    await flushPromises();
+
+    expect(editor(wrapper).props("ladder")).toEqual([]);
   });
 
   /// One list at a time: rules are what the org owns, the queue is what it

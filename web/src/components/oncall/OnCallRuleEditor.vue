@@ -490,12 +490,20 @@ const emit = defineEmits<{
   (e: "preview", dimensions: Record<string, string>): void;
   /** Removal lives here so a row keeps one button; the host confirms it. */
   (e: "remove"): void;
+  /** The in-dialog team picker changed — including the value it's seeded with
+   *  on open. Fired immediately, no debounce: a discrete pick, not a
+   *  keystroke stream. Fires with "" too, so a host serving more than one
+   *  team can clear a stale ladder. A host with one fixed team (the
+   *  team-scoped Routing tab) can ignore this — it already drives `ladder`
+   *  from a static prop. */
+  (e: "team-change", teamId: string): void;
 }>();
 
 const { t } = useI18nTyped();
 
 const pairs = ref<{ name: string; value: string }[]>([]);
 const team = ref("");
+watch(team, (id) => emit("team-change", id));
 const adding = ref(false);
 const draftName = ref("");
 const draftValue = ref("");

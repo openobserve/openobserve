@@ -449,6 +449,38 @@ describe("OnCallRuleEditor", () => {
     ).toContain("no escalation ladder yet");
   });
 
+  /// A host serving more than one team (the org-level dialog) cannot ship a
+  /// static `ladder` prop — it has to be told which team is picked so it can
+  /// fetch that team's own ladder.
+  it("emits team-change with the seeded team when it opens", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.emitted("team-change")?.[0]).toEqual(["team_1"]);
+  });
+
+  it("emits an empty team-change when it reopens with no team chosen", async () => {
+    const wrapper = render();
+    await flushPromises();
+    expect(wrapper.emitted("team-change")?.[0]).toEqual(["team_1"]);
+
+    // Same long-lived editor instance, closed and reopened for a fresh rule
+    // with no team pre-selected — the host must be told to drop the
+    // previous team's ladder rather than keep showing it under the new form.
+    await wrapper.setProps({ open: false });
+    await wrapper.setProps({ open: true, teamId: "", rule: null });
+    await flushPromises();
+    expect(wrapper.emitted("team-change")?.at(-1)).toEqual([""]);
+  });
+
+  it("emits team-change when a different team is picked from the dropdown", async () => {
+    const wrapper = render();
+    await flushPromises();
+    await wrapper
+      .findComponent('[data-test="oncall-rule-editor-team"]')
+      .vm.$emit("update:modelValue", "team_2");
+    expect(wrapper.emitted("team-change")?.at(-1)).toEqual(["team_2"]);
+  });
+
   /// The row is Edit and nothing else, so removing a rule is a decision made
   /// about the one already open — and only ever about an existing one.
   describe("removing the rule", () => {
