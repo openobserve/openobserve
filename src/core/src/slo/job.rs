@@ -173,7 +173,10 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
 
     write_slices(&slo.org, &result.slices, now_secs).await?;
 
-    let outcome = commit_status(db, slo, &result, range.end, now_secs).await?;
+    // `slo_status` is written here, so use the read-write client: the read-only
+    // pool is opened read_only on SQLite and rejects the update.
+    let db_rw = get_orm_client_rw().await;
+    let outcome = commit_status(db_rw, slo, &result, range.end, now_secs).await?;
     if let slo_table::WriteOutcome::FencedByGeneration { expected, found } = outcome {
         return Ok(PassOutcome::Fenced { expected, found });
     }
