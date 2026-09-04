@@ -312,4 +312,41 @@ mod tests {
         let back: SubjectRef = serde_json::from_str(&serde_json::to_string(&s).unwrap()).unwrap();
         assert_eq!(back, s);
     }
+
+    /// The key a record is stored under, and the key its dedup guard looks up,
+    /// have to be the same string.
+    ///
+    /// They were not. A firing that fanned out to several teams stores one
+    /// record per team under `<alert>:group:<team>`, while the guard asked
+    /// about the bare `<alert>`. Lookups are a `"{source_id}#"` prefix match,
+    /// and `alert#` does not prefix `alert:group:team#` — so the guard saw
+    /// nothing, every evaluation answered "page", and each one opened a fresh
+    /// record with the next firing number. For ever.
+    ///
+    /// Pinning the prefix relationship here because it is the whole mechanism:
+    /// any producer that scopes a source id has to run its guard on the scoped
+    /// id, not the bare one.
+    #[test]
+    fn test_a_scoped_source_id_is_not_found_under_the_bare_one() {
+        let bare = "3Ig9JbtfNHuzykvEjIDl6ayIeGo";
+        let scoped = format!("{bare}:group:3Ig8bQcoF42GgNdm7IcAcoO5HMZ");
+
+        let stored = SubjectRef::new(SubjectType::Alert, &scoped, 1).subject_id();
+        assert_eq!(stored, format!("{scoped}#1"));
+
+        // What a lookup does: prefix-match on `"{source_id}#"`.
+        assert!(
+            !stored.starts_with(&format!("{bare}#")),
+            "the bare id must not find the scoped record — this is the bug",
+        );
+        assert!(
+            stored.starts_with(&format!("{scoped}#")),
+            "the scoped id must find its own record",
+        );
+
+        // And the bare id keeps finding its own, so a single-team firing is
+        // unaffected by the fix.
+        let single = SubjectRef::new(SubjectType::Alert, bare, 1).subject_id();
+        assert!(single.starts_with(&format!("{bare}#")));
+    }
 }
