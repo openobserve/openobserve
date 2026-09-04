@@ -42,9 +42,12 @@ Cost Comparison: OpenObserve Vs Elasticsearch
   ![OpenObserve Vs Elasticsearch](./screenshots/zo_vs_es.png)
 
 
-## 🎥 Introduction Video
+## 🎥 Videos
 
-[![OpenObserve Introduction](./screenshots/o2_intro.webp)](https://www.youtube.com/watch?v=4VwuC1tpRP4)
+| What is OpenObserve? | Quickstart: 5-Minute Setup |
+| --- | --- |
+| [![What is OpenObserve?](https://img.youtube.com/vi/C0GH5Ox8NnY/hqdefault.jpg)](https://youtu.be/C0GH5Ox8NnY) | [![OpenObserve Quickstart](https://img.youtube.com/vi/Lxudy5XcAUI/hqdefault.jpg)](https://youtu.be/Lxudy5XcAUI) |
+| See what OpenObserve is and how it delivers petabyte-scale observability at up to 90% lower cost. | Go from zero to ingesting data and building dashboards in about 5 minutes. |
 
 ## 🏗️ Architecture
 
@@ -117,6 +120,34 @@ Enrich, redact, reduce, or normalize data on ingest. Stream processing for logs-
 [Read more →](https://openobserve.ai/pipelines/)
 
 <img width="3018" height="1714" alt="image" src="https://github.com/user-attachments/assets/6e51b374-cf1c-4e76-b494-fdd933015b78" />
+
+### SLOs (Service Level Objectives)
+Define reliability targets as queries and track them continuously across logs, metrics, and traces. Supports count-based and time-slice SLIs over rolling 7/30/90-day windows, with multi-window burn-rate alerting that fires on sustained error-budget burn instead of transient spikes—all on the same backend as the rest of your observability data. [Read more →](https://openobserve.ai/slo/)
+
+<img width="3024" height="1714" alt="SLOs with error budgets and burn-rate alerting" src="https://openobserve.ai/assets/platform/slo/slo_hero_06fff70ff9.png" />
+
+### Synthetic Monitoring
+Proactively catch outages before your users do. Run scripted browser journeys (Playwright) and HTTP, TCP, TLS, and SSH checks on a schedule, from public locations around the world or your own private network. Results land in the same native stream as your other telemetry, so you can query them with SQL and correlate failures with logs and traces. [Read more →](https://openobserve.ai/synthetic-monitoring/)
+
+<img width="3024" height="1714" alt="Synthetic monitoring dashboard" src="https://openobserve.ai/assets/platform/synthetic-monitoring/synthetic-monitoring-hero.gif" />
+
+### Incidents & AI-Powered Root Cause Analysis
+Automatically correlate logs, metrics, and traces to detect and investigate problems the moment they happen. Semantic alert grouping cuts noise, AI-generated root cause analysis and documentation cut MTTR by up to 90%, and every resolved incident builds institutional knowledge for next time. [Read more →](https://openobserve.ai/incidents/)
+
+<img width="3024" height="1714" alt="Incident correlation and root cause analysis" src="https://openobserve.ai/assets/platform/incidents/incidents-hero.gif" />
+
+### AI SRE
+An AI agent that investigates alerts the instant they fire—analyzing logs, metrics, and traces, mapping dependencies across services, and linking anomalies to historical incidents to produce a root-cause analysis and remediation plan with a full, transparent evidence chain. Works with any LLM provider, including self-hosted models, so sensitive data stays under your control. [Read more →](https://openobserve.ai/ai-sre/)
+
+<img width="3024" height="1714" alt="AI SRE agentic investigation" src="https://openobserve.ai/assets/platform/ai-sre/systemic-intelligence.png" />
+
+### AI Assistant
+Explore data, build dashboards, and configure alerts using plain English instead of SQL or PromQL. The assistant generates ready-to-run queries, spots patterns and anomalies in your logs, and turns natural-language descriptions straight into dashboards and alerts. [Read more →](https://openobserve.ai/ai-assistant/)
+
+<img width="3024" height="1714" alt="AI Assistant natural language queries" src="https://openobserve.ai/assets/platform/ai-assistant/Screenshot_2026_04_23_at_6_43_06_PM_a8aaf64444.png" />
+
+### LLM Observability
+Purpose-built observability for AI applications and agents. Every prompt, tool call, and agent response is captured as OpenTelemetry spans with token cost and quality scores attached, correlated with your infrastructure logs, metrics, and traces in one store—so you can tell whether an issue is the model or the infrastructure. Supports multi-agent systems, session tracking, and self-hosting to keep prompts on your own infrastructure. [Read more →](https://openobserve.ai/llm-observability/)
 
 ## Getting Started
 
