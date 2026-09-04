@@ -49,27 +49,20 @@ jobs:
         with:
           fetch-depth: 0
 
+      # One shared classification for every suite (see .github/actions/classify-changes); a change to
+      # this workflow file re-tests itself on top of it.
+      - uses: ./.github/actions/classify-changes
+        id: classify
       - id: check
+        env:
+          HAS_CHANGES: ${{ steps.classify.outputs.run_api }}
+          CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
         run: |
-          # Skip when a PR touches only docs, images, frontend/UI-test files, or unrelated
-          # workflow files (e.g. a dependabot bump to another workflow) — none affect the API.
-          # Source and this workflow (api-testing.yml) still run the suite.
-          IGNORE_RE='(\.md$|^docs/|^web/|^tests/ui-testing/|^tests/playwright-tests/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          # Files not matching IGNORE_RE. Captured (not `grep -qv`) so the check doesn't depend
-          # on grep -qv exit semantics, which differ across grep builds; the `|| true` keeps
-          # `set -e` from aborting when grep matches nothing (exit 1). The `grep -qE` below is a
-          # loop-safe `if`-condition term (`set -e` doesn't fire there), so it needs no `|| true`.
-          RELEVANT=$(printf '%s' "$CHANGED" | grep -vE "$IGNORE_RE" || true)
-          if [ -z "$CHANGED" ] || [ -n "$RELEVANT" ] || printf '%s' "$CHANGED" | grep -qE '^\.github/workflows/api-testing\.yml$'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+          if [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' api-testing.yml '; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
           fi
-
-  # Build the exact PR/merge-group binary once, then fan it out to every API
-  # test shard. The artifact is scoped to this workflow run and SHA; Rust cache
-  # remains an input to this single build, not a substitute for the binary.
   build_api_binary:
     name: build_api_binary
     needs: [check_changes]

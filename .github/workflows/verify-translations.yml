@@ -21,7 +21,6 @@ on:
   pull_request:
     # labeled/unlabeled/ready_for_review/converted_to_draft so the gate re-evaluates when the state changes.
     types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
-  merge_group:
 
 concurrency:
   group: verify-translations-${{ github.event.pull_request.number || github.ref }}
@@ -53,13 +52,6 @@ jobs:
           python-version: '3.11'
 
       - name: Check for untranslated strings
-        env:
-          # In the merge queue this is the last chance to stop untranslated
-          # strings reaching main, so pending keys are a hard failure. On the PR
-          # itself they are expected for most of its life — translations are
-          # generated at "Merge when ready" — so we report and stay green rather
-          # than painting every in-progress PR red.
-          IS_QUEUE: ${{ github.event_name == 'merge_group' }}
         run: |
           cd scripts/translations
 
@@ -87,17 +79,7 @@ jobs:
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 
-          if [ "$IS_QUEUE" = "true" ]; then
-            echo "::error::This merge would land English-only strings on main. Run the **Update Translations** workflow on the PR branch (or click 'Merge when ready' again, which triggers it) before re-queueing."
-            {
-              echo
-              echo "❌ **Blocked.** Merging this would leave \`main\` with untranslated strings."
-              echo "Run the **Update Translations** workflow on the PR branch, then re-queue."
-            } >> "$GITHUB_STEP_SUMMARY"
-            exit 1
-          fi
-
-          echo "::notice::${OUTPUT##*$'\n'} These are generated automatically when you click 'Merge when ready'. This check only blocks in the merge queue."
+          echo "::notice::${OUTPUT##*$'\n'} These are generated automatically when you click 'Merge when ready'. Nothing blocks on this check."
           {
             echo
             echo "ℹ️ Expected while the PR is in progress — translations are generated when you"

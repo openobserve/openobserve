@@ -124,6 +124,9 @@ jobs:
         with:
           cache-on-failure: true
           prefix-key: release-${{ matrix.arch }}
+          # Release target directories are multi-GB and have low cross-tag
+          # reuse. Keep Cargo registry/git inputs without crowding PR caches.
+          cache-targets: false
 
       - name: Install cross-rs
         if: contains(matrix.arch, 'linux-musl')

@@ -41,18 +41,25 @@ jobs:
         with:
           fetch-depth: 0
 
+      # One shared classification for every suite (see .github/actions/classify-changes); a change to
+      # this workflow file re-tests itself on top of it.
+      - uses: ./.github/actions/classify-changes
+        id: classify
       - id: check
+        env:
+          HAS_BACKEND_CHANGES: ${{ steps.classify.outputs.run_unit_backend }}
+          HAS_UI_CHANGES: ${{ steps.classify.outputs.run_unit_ui }}
+          CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
         run: |
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -qE '^src/|^proto/|^\.cargo/|^Cargo\.(toml|lock)$|^build\.rs$|^rust-toolchain\.toml$|^coverage\.sh$|^\.github/workflows/unit-tests\.yml$'; then
-            echo "has_backend_changes=true" >> $GITHUB_OUTPUT
+          if [ "$HAS_BACKEND_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' unit-tests.yml '; then
+            echo "has_backend_changes=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_backend_changes=false" >> $GITHUB_OUTPUT
+            echo "has_backend_changes=false" >> "$GITHUB_OUTPUT"
           fi
-          if [ -z "$CHANGED" ] || echo "$CHANGED" | grep -q '^web/'; then
-            echo "has_ui_changes=true" >> $GITHUB_OUTPUT
+          if [ "$HAS_UI_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' unit-tests.yml '; then
+            echo "has_ui_changes=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_ui_changes=false" >> $GITHUB_OUTPUT
+            echo "has_ui_changes=false" >> "$GITHUB_OUTPUT"
           fi
 
   backend_static_checks:

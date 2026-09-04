@@ -113,8 +113,6 @@ jobs:
 
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -213,8 +211,6 @@ jobs:
 
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Download binary artifact
         uses: actions/download-artifact@v5

@@ -93,7 +93,7 @@ const mockRelatedResources = [createMockResource(), createMockError()];
 // caller window; tests override for custom streams and ranges.
 const mockResolveTraceLocation = vi.fn().mockResolvedValue({ stream: "default" });
 vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
-  default: () => ({ resolveTraceLocation: mockResolveTraceLocation }),
+  default: () => ({ resolveTraceLocation: mockResolveTraceLocation, cancel: vi.fn() }),
 }));
 
 // ============================================================================
