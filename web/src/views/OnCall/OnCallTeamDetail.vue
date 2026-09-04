@@ -317,6 +317,7 @@
               :preview="preview"
               :loading="previewLoading"
               @edit="editingPolicy = true"
+              @open-members="activeTab = 'members'"
             />
 
             <!-- Same move as the schedule tab: the editor is a drawer, so the

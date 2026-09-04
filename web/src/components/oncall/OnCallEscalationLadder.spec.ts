@@ -35,7 +35,8 @@ const stubs = {
   OTimelineItem: {
     name: "OTimelineItem",
     props: { label: null, title: null, subtitle: null, variant: null, framed: Boolean },
-    template: "<li>{{ label }} {{ title }} {{ subtitle }}<slot /></li>",
+    template:
+      "<li>{{ label }} {{ title }} {{ subtitle }}<slot name=\"subtitle\" /><slot /></li>",
   },
   OInnerLoading: { name: "OInnerLoading", template: "<div />" },
   OButton: {
@@ -275,6 +276,31 @@ describe("OnCallEscalationLadder", () => {
     });
 
     expect(wrapper.text()).toContain("all 3 people right now");
+  });
+
+  /// The count is an answer to "who" — it must lead to the tab that names
+  /// them, not sit there as inert text nobody can act on.
+  it("opens the members tab from a whole-team rung's people count", async () => {
+    const wrapper = render({
+      preview: preview({
+        rungs: [
+          {
+            after_micros: 0,
+            targets: ["the whole team"],
+            recipients: [
+              person({ user_email: "a@o2.ai" }),
+              person({ user_email: "b@o2.ai" }),
+              person({ user_email: "c@o2.ai" }),
+            ],
+            resolves_to_nobody: false,
+          },
+        ],
+      }),
+    });
+
+    await wrapper.find('[data-test="oncall-ladder-open-members-0"]').trigger("click");
+
+    expect(wrapper.emitted("open-members")).toHaveLength(1);
   });
 
   /// A healthy ladder is read for its SHAPE — nothing about delivery is said

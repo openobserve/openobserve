@@ -87,8 +87,11 @@ const isOIcon = computed<boolean>(() =>
       <p v-if="title" class="text-text-heading m-0 text-sm leading-snug font-medium">
         {{ title }}
       </p>
-      <p v-if="subtitle" class="text-text-secondary m-0 mt-0.5 text-xs leading-normal">
-        {{ subtitle }}
+      <p
+        v-if="subtitle || $slots.subtitle"
+        class="text-text-secondary m-0 mt-0.5 text-xs leading-normal"
+      >
+        <slot name="subtitle">{{ subtitle }}</slot>
       </p>
       <slot />
     </div>

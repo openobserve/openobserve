@@ -47,4 +47,6 @@ export interface TimelineItemProps {
 export interface TimelineItemSlots {
   /** Optional extra content rendered below the subtitle row. */
   default?: () => unknown;
+  /** Overrides the `subtitle` prop's text — same row, for a subtitle that needs a link or other markup inline. */
+  subtitle?: () => unknown;
 }

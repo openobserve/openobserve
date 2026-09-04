@@ -102,10 +102,28 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :key="group.key"
           :label="rungLabel(group)"
           :title="raw(saidTargets(group.rung.targets))"
-          :subtitle="subtitleFor(group)"
+          :subtitle="isWholeTeamRung(group.rung) ? undefined : subtitleFor(group)"
           variant="muted"
           :data-test="`oncall-ladder-rung-${group.firstMicros}`"
         >
+          <!-- A whole-team target resolves to the roster this instant — the
+             count is an answer to "who", so it opens the tab that names them
+             rather than sitting there as inert text. -->
+          <template v-if="isWholeTeamRung(group.rung)" #subtitle>
+            <button
+              v-if="resolvesTo(group.rung)"
+              type="button"
+              class="underline hover:text-text-heading"
+              :data-test="`oncall-ladder-open-members-${group.firstMicros}`"
+              @click="emit('open-members')"
+            >
+              {{ resolvesTo(group.rung) }}
+            </button>
+            <template v-if="group.count > 1">
+              · {{ t("oncall.reachRungs", { count: group.count }, group.count) }}
+            </template>
+          </template>
+
           <!-- Only when something is wrong, and as a badge: the server's reason
              is a full sentence, which is a paragraph on a rail. The sentence
              itself is one hover away, so nothing is hidden. -->
@@ -208,7 +226,11 @@ const props = withDefaults(
   },
 );
 
-const emit = defineEmits<{ (e: "update:selected", priority: string): void; (e: "edit"): void }>();
+const emit = defineEmits<{
+  (e: "update:selected", priority: string): void;
+  (e: "edit"): void;
+  (e: "open-members"): void;
+}>();
 
 const { t } = useI18nTyped();
 
@@ -216,6 +238,12 @@ const { t } = useI18nTyped();
 /// for one concept, rather than two a click apart.
 const saidTargets = (targets: string[]) =>
   targets.map((target) => speakTarget(target, t)).join(", ");
+
+/// The one target string `speakTarget` maps to "the whole team" — checked
+/// against the engine's own words, not against `EscalationTarget.kind`, since
+/// `PreviewRung.targets` never carries the kind, only the rendered sentence.
+const isWholeTeamRung = (rung: PreviewRung) =>
+  rung.targets.some((target) => target.trim().toLowerCase() === "the whole team");
 
 const numberOf = (entry: TeamRungSummary) => Number(entry.priority.slice(1));
 
