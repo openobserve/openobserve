@@ -1186,6 +1186,8 @@ export class MetricsPage {
     async closeConfigSidebar() {
         const btn = this.dashboardSidebarCollapseButton;
         if (await btn.isVisible({ timeout: 500 }).catch(() => false)) {
+            // A config-control toggle can leave an OSelect popover open over the header, intercepting this click.
+            await this.dismissOverlay();
             await btn.click();
             await this.panelSidebarExpandedHeader.waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
         }
