@@ -63,6 +63,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Only meaningful once a run is selected — it is the run that gets
              carried over. Without one there is nothing to debug, so it stays
              hidden rather than rendering as a dead control. -->
+        <!-- Replaying is only possible for a run the backend persisted input for,
+             so a Test/Retry run offers no button rather than a failing one. -->
+        <OButton
+          v-if="isRetryableRun(selectedRun)"
+          variant="outline"
+          :loading="retrying"
+          data-test="workflow-runs-retry"
+          @click="onRetryRun"
+        >
+          {{ t("workflow.history.retry") }}
+        </OButton>
         <OButton
           v-if="selectedRunId"
           variant="primary"
@@ -74,7 +85,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
     </OPageHeader>
 
-    <div class="flex min-h-0 flex-1 gap-2 px-2 pt-3">
+    <div class="relative flex min-h-0 flex-1 gap-2 px-2 pt-3">
       <!-- Read-only canvas (per-node run status overlay). Clicking a node's ✓/✗ badge
            opens its NDV (read-only here) with the step's Input · Config · Output — the
            SAME panel the editor uses, so results read identically in both places. -->
@@ -84,11 +95,34 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <WorkflowCanvas />
       </div>
 
+      <!-- Collapsible so a wide graph can be read whole; the panel is a fixed 27.5rem
+           of this master-detail page and there is nowhere else for the canvas to grow. -->
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        class="absolute top-2 right-2 z-10"
+        data-test="workflow-runs-panel-collapse"
+        :aria-label="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
+        @click="togglePanel"
+      >
+        <OIcon
+          :name="panelCollapsed ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
+          size="sm"
+        />
+        <OTooltip
+          :content="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
+          side="left"
+        />
+      </OButton>
+
       <!-- Persistent runs list (master-detail). -->
       <div
+        v-if="!panelCollapsed"
+        data-test="workflow-runs-panel"
         class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 w-[27.5rem] max-w-[46%] shrink-0 flex-col overflow-hidden border"
       >
         <WorkflowRunsPanel
+          ref="runsPanelRef"
           :org-id="orgId"
           :workflow-id="workflowId"
           :workflow-name="workflowName"
@@ -118,6 +152,8 @@ import { useStore } from "vuex";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
@@ -128,6 +164,8 @@ import useWorkflowCanvas, {
   workflowObj,
   hydrateWorkflow,
   loadWorkflowRun,
+  isRetryableRun,
+  retryWorkflowRun,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
 
@@ -146,9 +184,33 @@ const selectedRunId = ref<string>("");
 // Steps this run executed that no longer exist in the workflow (deleted/edited
 // since). Their badges can't render, so the canvas alone would under-report the
 // run — the banner tells the user the graph has moved on.
+// The history row for the loaded run — retryability is decided from its
+// event_type, which only the list carries (the run detail has no trigger type).
+const selectedRun = computed(
+  () =>
+    (workflowObj.runsHistory?.list || []).find((r: any) => r.run_id === selectedRunId.value) ||
+    null,
+);
+
 const ghostNodeCount = computed(
   () => (workflowObj.testRun.result as any)?.ghostNodeIds?.length ?? 0,
 );
+
+const PANEL_COLLAPSED_KEY = "workflows:runsPanelCollapsed";
+const panelCollapsed = ref(false);
+try {
+  panelCollapsed.value = localStorage.getItem(PANEL_COLLAPSED_KEY) === "1";
+} catch {
+  /* localStorage unavailable (private mode) — default expanded */
+}
+const togglePanel = () => {
+  panelCollapsed.value = !panelCollapsed.value;
+  try {
+    localStorage.setItem(PANEL_COLLAPSED_KEY, panelCollapsed.value ? "1" : "0");
+  } catch {
+    /* nothing to persist to — the choice still holds for this view */
+  }
+};
 
 const goBack = () => {
   router.push({ name: "workflows", query: { org_identifier: orgId.value } });
@@ -202,6 +264,32 @@ const onDebugInEditor = () => {
       run_id: selectedRunId.value,
     },
   });
+};
+
+// Replay this run server-side. It produces a NEW run, so the list is re-pulled
+// through the panel rather than mutating the row in place.
+const retrying = ref(false);
+const runsPanelRef = ref<any>(null);
+const onRetryRun = async () => {
+  const run = selectedRun.value;
+  if (!run || retrying.value) return;
+  retrying.value = true;
+  const r = await retryWorkflowRun({
+    orgId: orgId.value,
+    workflowId: workflowId.value,
+    runId: run.run_id,
+    run,
+  });
+  retrying.value = false;
+  if (!r.ok) {
+    toast({
+      message: raw(r.error || t("workflow.history.retryError")),
+      variant: "error",
+    });
+    return;
+  }
+  toast({ message: t("workflow.history.retryStarted"), variant: "success" });
+  await runsPanelRef.value?.fetchHistory?.();
 };
 
 // Cold-load hydrate (deep link / refresh): the list hydrates synchronously, so

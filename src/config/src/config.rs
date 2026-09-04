@@ -208,8 +208,19 @@ pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
-// Losing these silently degrades sourcemap translation, breadcrumbs and session replay.
-const _DEFAULT_QUICK_MODE_FIELDS: [&str; 4] = ["service", "version", "session_id", "view_url"];
+const _DEFAULT_QUICK_MODE_FIELDS: [&str; 9] = [
+    // Losing these silently degrades sourcemap translation, breadcrumbs and session replay.
+    "service",
+    "version",
+    "session_id",
+    "view_url",
+    // Losing these leaves the trace detail page without spans to build a waterfall from.
+    "service_name",
+    "operation_name",
+    "trace_id",
+    "span_id",
+    "duration",
+];
 pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     let mut fields = chain(
         _DEFAULT_QUICK_MODE_FIELDS.iter().map(|s| s.to_string()),
@@ -1539,7 +1550,7 @@ pub struct Search {
     #[env_config(
         name = "ZO_FEATURE_METRICS_STREAMING_AGG_ENABLED",
         default = false,
-        help = "Register the hash-sorted metrics table for streaming PromQL aggregation over hash-sorted metrics files; off by default until the streaming evaluator lands"
+        help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series, instead of materializing all samples; falls back to the fused evaluator when the file layout or query shape does not allow it"
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
     #[env_config(

@@ -15,18 +15,35 @@
 
 /**
  * A destination's type is stored as `destination_type_name` (backend) and mirrored
- * to `destination_type` in the frontend form. "custom" is a plain HTTP webhook;
- * every other value — and an unset one, which the edit form defaults to
- * "openobserve" — is a prebuilt provider (Splunk, Datadog, Elasticsearch, …).
+ * to `destination_type` in the frontend form. It names a PREBUILT provider — Splunk,
+ * Datadog, Elasticsearch, … — whose payload a workflow node cannot produce; anything
+ * else is a plain HTTP webhook a workflow executes as-is.
  *
- * Workflow destination nodes can only execute custom webhooks, so both the picker
- * (which offers destinations) and the read-only node summary (which flags an
- * already-saved one) decide from this single rule.
+ * The field is `Option<String>` with `skip_serializing_if` on the backend, so it is
+ * ABSENT from the JSON unless it was explicitly set at create time — every destination
+ * made through the plain API is untyped. Untyped therefore means "plain webhook", not
+ * "some other provider", and an unrecognised value is not assumed to be prebuilt
+ * either: the authoritative gate is the server's `is_pipeline_destination()`
+ * (module = pipeline), which both callers already satisfy by listing with
+ * `module: "pipeline"`. This check only removes the provider shapes on top of that.
  */
-export const isCustomDestination = (destination: {
-  destination_type_name?: string;
-  destination_type?: string;
-}): boolean =>
-  (destination?.destination_type_name || destination?.destination_type || "")
-    .trim()
-    .toLowerCase() === "custom";
+const PREBUILT_DESTINATION_PROVIDERS = new Set([
+  "openobserve",
+  "splunk",
+  "elasticsearch",
+  "datadog",
+  "dynatrace",
+  "newrelic",
+]);
+
+export const isCustomDestination = (
+  destination?: {
+    destination_type_name?: string;
+    destination_type?: string;
+  } | null,
+): boolean =>
+  !PREBUILT_DESTINATION_PROVIDERS.has(
+    (destination?.destination_type_name || destination?.destination_type || "")
+      .trim()
+      .toLowerCase(),
+  );

@@ -524,7 +524,10 @@ export default defineComponent({
 
     // Embedded (workflow): the host's bottom Save reads the live editor code from here,
     // then drives its own Update|Create dialog. Exposed for the parent ref.
-    expose({ getCode: () => formData.value.function });
+    // Live buffer (formData lags by the debounce), trimmed like the debounced commit.
+    expose({
+      getCode: () => (editorRef.value?.getValue?.() ?? formData.value.function ?? "").trim(),
+    });
 
     const handleFunctionError = (err: string) => {
       vrlFunctionError.value = err;

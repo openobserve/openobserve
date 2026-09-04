@@ -1051,7 +1051,7 @@ import OCard from "@/lib/core/Card/OCard.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { ref, computed, watch, defineAsyncComponent, provide, nextTick } from "vue";
+import { ref, computed, watch, defineAsyncComponent, provide, nextTick, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { useI18nTyped, raw, type I18nText } from "@/types/i18n";
@@ -1168,6 +1168,17 @@ const { fetchQueryDataWithHttpStream, cancelStreamQueryBasedOnRequestId } = useH
 
 // Track in-flight dimension-based trace stream so it can be cancelled on re-fetch
 let currentTracesStreamTraceId: string | null = null;
+
+// The in-flight traces stream outlives this component otherwise; cancel it on unmount.
+onUnmounted(() => {
+  if (currentTracesStreamTraceId) {
+    cancelStreamQueryBasedOnRequestId({
+      trace_id: currentTracesStreamTraceId,
+      org_id: currentOrgIdentifier.value,
+    });
+    currentTracesStreamTraceId = null;
+  }
+});
 
 // Resolved group definitions and their ids (reactive to prop changes)
 const groupDefs = computed(() => {
