@@ -29,6 +29,7 @@ import {
   STALE_GRACE_US,
 } from "./resolve";
 import { b64DecodeUnicodeSafe } from "@/utils/formatters";
+import { useVariablesManager } from "@/composables/dashboard/useVariablesManager";
 import { GROUP, STALENESS_24H_US } from "./types";
 import { kubernetesPage } from "./packs/kubernetes.page";
 import { hostsPage } from "./packs/hosts.page";
@@ -1628,6 +1629,43 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       // renderer re-initialize (and therefore re-clone) at all.
       expect(build(sections[0]!.id)).not.toBe(build(differing!.id));
     });
+
+    // The rebuild that flips curatedDisabled hands RenderDashboardCharts a new
+    // dashboardData identity, which re-runs useVariablesManager.initialize over
+    // the freshly built variables. initialize marks an INDEPENDENT query_values
+    // pending only when it has no custom/all default (:472-487), so every
+    // all-sentinel picker comes back with options: [] and is never re-fetched.
+    // Carrying the loaded options ON the rebuilt variable is what survives that.
+    it("a rebuilt picker keeps the options the previous build already loaded", async () => {
+      const resolution = resolveManifest({
+        manifest: kubernetesPage,
+        streams: fullK8sStreams(),
+        semanticGroups: defaultSemanticGroups as FieldAlias[],
+        range: RANGE,
+        now: NOW_US,
+      });
+      const loaded = [{ label: "argocd", value: "argocd" }];
+      const built: any = buildDashboard(kubernetesPage, resolution, {}, {
+        timezone: "UTC",
+        nowUs: NOW_US,
+        activeSectionId: "workloads",
+        pickerOptions: { namespace: loaded },
+      } as any);
+
+      const namespace = built.variables.list.find((v: any) => v.name === "namespace");
+      expect(namespace.options).toEqual(loaded);
+
+      // The REAL seam: the manager clones the built variables on initialize, and
+      // an all-sentinel picker is never marked pending — so whatever options the
+      // rebuilt variable carries are the only ones the dropdown will ever show.
+      const manager = useVariablesManager(((key: string) => key) as never);
+      await manager.initialize(built.variables.list, built);
+      const managed = manager
+        .getAllVisibleVariables("workloads")
+        .find((v: any) => v.name === "namespace") as any;
+      expect(managed.isVariableLoadingPending).not.toBe(true);
+      expect(managed.options).toEqual(loaded);
+    });
   });
 
   // ── B4: a dead group is "stopped reporting", never "not found" ─────────────
@@ -1734,5 +1772,90 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       expect(typeof badge.lastSeenUs).toBe("number");
       expect(badge.lastSeenUs).toBe(NOW_US - 30 * 60_000_000);
     }
+  });
+});
+
+// ── Inventory tables must name the object, not the clock ───────────────────
+
+describe("inventory tables render label columns", () => {
+  // Verbatim from the live deployment (o2.introspect, org default, 2026-09-04):
+  // GET /api/default/prometheus/api/v1/query_range with the k8s_ov_unhealthy_pods
+  // query returned resultType "matrix", 467 series, 3163 total points.
+  const liveRangeResponse = {
+    status: "success",
+    data: {
+      resultType: "matrix",
+      result: [
+        {
+          metric: {
+            namespace: "trivy-system",
+            pod: "scan-vulnerabilityreport-7fd6d87c89-4pdt6",
+            phase: "Pending",
+          },
+          values: [
+            [1788513360, "1"],
+            [1788513420, "1"],
+          ],
+        },
+        {
+          metric: {
+            namespace: "monitor",
+            pod: "monitor-openobserve-actions-0",
+            phase: "Pending",
+          },
+          values: [[1788513360, "1"]],
+        },
+      ],
+    },
+  };
+
+  const tablePanels = (dashboard: any) =>
+    (dashboard.tabs ?? [])
+      .flatMap((tab: any) => tab.panels ?? [])
+      .filter((p: any) => p.type === "table");
+
+  it("every table panel asks for the label-column mode, not the timestamp mode", () => {
+    // convertPromQLTableChart.ts:86 defaults `promql_table_mode` to "single",
+    // and :154-155 makes that mode emit exactly [Timestamp, Value] — no labels.
+    // The Metrics Explorer sets "all" for precisely this reason at
+    // utils/metrics/metricsHandoff.ts:180-183.
+    const dashboard: any = build(resolve({}));
+    const tables = tablePanels(dashboard);
+    expect(tables.length).toBeGreaterThan(0);
+    for (const p of tables) {
+      expect(p.config.promql_table_mode, p.id).toBe("all");
+    }
+  });
+
+  it("the REAL converter turns the live response into namespace/pod/phase columns", async () => {
+    const { convertPromQLChartData } =
+      await import("@/utils/dashboard/promql/convertPromQLChartData");
+    const dashboard: any = build(resolve({}));
+    const unhealthy = tablePanels(dashboard).find((p: any) => p.id === "k8s_ov_unhealthy_pods");
+    expect(unhealthy).toBeTruthy();
+
+    const result: any = await convertPromQLChartData([liveRangeResponse], {
+      panelSchema: unhealthy,
+      store: { state: { timezone: "UTC", theme: "light" } },
+      chartPanelRef: { value: null },
+      hoveredSeriesState: null,
+      annotations: null,
+      metadata: null,
+    } as any);
+
+    // convertPromQLChartData returns { options, extras }; the TableConverter's
+    // rows/columns ride on `options` (convertPromQLChartData.ts:105-118, :150).
+    const columnNames = (result.options.columns ?? []).map((c: any) => c.name);
+    expect(columnNames).toContain("namespace");
+    expect(columnNames).toContain("pod");
+    expect(columnNames).toContain("phase");
+    // The bug: a timestamp column instead of the labels.
+    expect(columnNames).not.toContain("timestamp");
+
+    // One row PER SERIES, not per data point — 2 series, not 3 points.
+    expect(result.options.rows).toHaveLength(2);
+    const byPod = Object.fromEntries(result.options.rows.map((r: any) => [r.pod, r]));
+    expect(byPod["scan-vulnerabilityreport-7fd6d87c89-4pdt6"].namespace).toBe("trivy-system");
+    expect(byPod["monitor-openobserve-actions-0"].namespace).toBe("monitor");
   });
 });

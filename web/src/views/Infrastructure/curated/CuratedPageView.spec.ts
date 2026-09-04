@@ -38,6 +38,7 @@ let state: any;
 
 const refreshSpy = vi.fn(async () => {});
 const rebuildSpy = vi.fn(() => {});
+const rememberSpy = vi.fn((_variables: unknown) => {});
 
 /**
  * No shipped pack declares a route door (AWS is deferred), so the route branch
@@ -65,6 +66,7 @@ const dashboardFixture = (sections = ["overview", "nodes"]) => ({
 const makeState = (over: Record<string, any> = {}) => {
   refreshSpy.mockClear();
   rebuildSpy.mockClear();
+  rememberSpy.mockClear();
   return {
     face: ref("ready"),
     l0State: ref("detected"),
@@ -82,6 +84,7 @@ const makeState = (over: Record<string, any> = {}) => {
     presentGroupIds: ref([]),
     refresh: refreshSpy,
     rebuild: rebuildSpy,
+    rememberPickerOptions: rememberSpy,
     ...over,
   };
 };
@@ -437,9 +440,11 @@ describe("CuratedPageView", () => {
 
   describe("the window a refresh queries", () => {
     const globalOf = () => captured.currentTimeObj.__global;
+    // The Dates carry the MICROSECOND epoch, so getTime() is already µs — the
+    // same magnitude usePanelDataLoader:418 derives and executePromQL consumes.
     const boundsUs = () => ({
-      from: globalOf().start_time.getTime() * 1000,
-      to: globalOf().end_time.getTime() * 1000,
+      from: globalOf().start_time.getTime(),
+      to: globalOf().end_time.getTime(),
     });
 
     it("a RELATIVE selection re-anchors its window to NOW on every refresh", async () => {
@@ -516,6 +521,41 @@ describe("CuratedPageView", () => {
 
       expect(captured.dashboardData).toBe(dashboardBefore);
       expect(boundsUs().to).toBeGreaterThan(before.to);
+    });
+
+    it("hands the renderer Dates on the MICROSECOND epoch the panel loader reads back", async () => {
+      // The live bug: `new Date(us / 1000)` built a millisecond-epoch Date, so
+      // `usePanelDataLoader` (:418 `new Date(start_time.toISOString()).getTime()`)
+      // handed executePromQL a number 1000x too small. The gap-fill in
+      // convertPromQLData (:241 `startTime / 1_000_000`) then snapped the axis
+      // floor back to 1970 while real data sat in 2026 — a ~56-year x-axis.
+      // Every other producer of this prop feeds `new Date(getConsumableDateTime()
+      // .startTime)` UNDIVIDED: plugins/metrics/Index.vue:425 and
+      // views/Dashboards/ViewDashboard.vue:1002.
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date(NOW_US / 1000));
+      wrapper = await mountView();
+      wrapper.findComponent({ name: "DateTime" }).vm.$emit("on:date-change", {
+        startTime: NOW_US - 3 * HOUR_US,
+        endTime: NOW_US,
+        relativeTimePeriod: "3h",
+        valueType: "relative",
+        userChangedValue: false,
+      });
+      await flushPromises();
+
+      // Exactly what usePanelDataLoader:418-419 derives from this prop.
+      const global = captured.currentTimeObj.__global;
+      const startISOTimestamp = new Date(global.start_time.toISOString()).getTime();
+      const endISOTimestamp = new Date(global.end_time.toISOString()).getTime();
+      expect(startISOTimestamp).toBe(NOW_US - 3 * HOUR_US);
+      expect(endISOTimestamp).toBe(NOW_US);
+
+      // And what convertPromQLData:241-242 makes of it — must be real unix seconds.
+      const queryStartSec = startISOTimestamp / 1_000_000;
+      expect(new Date(queryStartSec * 1000).getUTCFullYear()).toBe(
+        new Date(NOW_US / 1000).getUTCFullYear(),
+      );
     });
 
     it("the mount replay sets the window without fetching — mount's own refresh carries it", async () => {
@@ -975,6 +1015,25 @@ describe("CuratedPageView", () => {
       await flushPromises();
 
       expect(rebuildSpy).toHaveBeenCalled();
+    });
+
+    // The rebuild above re-initializes the variables manager, which never
+    // re-fetches an all-sentinel picker — so the view has to hand the loaded
+    // options back to the composable before the next build drops them.
+    it("forwards loaded variable options to the composable so a rebuild keeps them", async () => {
+      wrapper = await mountView({}, withPickers(pickerVariables()));
+      rememberSpy.mockClear();
+
+      // The REAL payload RenderDashboardCharts emits — see its
+      // getMergedVariablesForPanel: { isVariablesLoading, values }.
+      const payload = {
+        isVariablesLoading: false,
+        values: [{ name: "namespace", options: [{ label: "argocd", value: "argocd" }] }],
+      };
+      wrapper.findComponent({ name: "RenderDashboardCharts" }).vm.$emit("variablesData", payload);
+      await flushPromises();
+
+      expect(rememberSpy).toHaveBeenCalledWith(payload);
     });
 
     it("the REAL selector forwards curatedDisabled + tooltip key to VariableQueryValueSelector", async () => {

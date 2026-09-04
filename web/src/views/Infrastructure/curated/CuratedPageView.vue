@@ -93,10 +93,13 @@ const selectedWindow = ref<CuratedWindow>({
 const range = ref(materialize(selectedWindow.value));
 const checkedAtUs = ref<number | null>(null);
 
+// MICROSECOND epoch, undivided: usePanelDataLoader reads these back with
+// `new Date(start_time.toISOString()).getTime()` and hands the result to
+// executePromQL as µs, so a ms-epoch Date lands the x-axis in 1970.
 const currentTimeObj = computed(() => ({
   __global: {
-    start_time: new Date(range.value.from / 1000),
-    end_time: new Date(range.value.to / 1000),
+    start_time: new Date(range.value.from),
+    end_time: new Date(range.value.to),
   },
 }));
 
@@ -505,6 +508,7 @@ watch(
         searchType="dashboards"
         :showTabs="showTabs"
         :frame="false"
+        @variablesData="page.rememberPickerOptions"
       >
         <template #before_panels>
           <div class="flex flex-col gap-2 pb-2">
