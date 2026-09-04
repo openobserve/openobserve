@@ -1,0 +1,2 @@
+tests/ui-testing/pages/pipelinesPages/pipelinesPage.js
+tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js

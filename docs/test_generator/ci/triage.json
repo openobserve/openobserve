@@ -1,0 +1,23 @@
+{
+  "feature_slug": "pipeline-condition-null-empty-operators",
+  "feature_title": "Pipeline Conditions - Null/Empty (Unary) Operators",
+  "area": "Pipelines",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "pipeline-conditions.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js",
+  "playwright_group": "Pipelines",
+  "source_files": [],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The changed paths are exclusively under tests/ui-testing/ (tests/ui-testing/pages/pipelinesPages/pipelinesPage.js and tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js), which is the OSS E2E test suite. No enterprise-owned paths (o2_enterprise/, enterprise/, src/enterprise/, etc.) appear in changed_files.txt, and no enterprise keywords (SSO/SAML/RBAC/SDR/cipher) are present in the paths or code. Pipeline conditions are an OSS feature, so edition is 'oss'.",
+    "skip": "Not skipping. The diff is test-only (a page-object helper plus a Playwright spec) with no product-code change, but the 'dev-authored tests are NOT an automatic skip' rule applies because a Playwright E2E spec under tests/ui-testing/playwright-tests/ was modified. There is no explicit opt-out label (tests-added) or skip comment in trigger_comment.txt, so the pipeline proceeds in enhance mode rather than skipping.",
+    "e2e": "E2E is warranted. The modified spec and its page object add coverage for user-facing pipeline condition UI behavior - unary operators (is_null / is_not_null / is_empty / is_not_empty), value-input hiding for unary operators, round-trip on edit, and binary-operator value validation. No web/src diff exists because the PR is test-only, but the dev-authored E2E specs are the evidence of user-facing behavior to verify, so the route is enhance.",
+    "area": "Pipelines - the changed files live under tests/ui-testing/playwright-tests/Pipelines/ and tests/ui-testing/pages/pipelinesPages/, and the ci matrix shards this folder under the 'Pipelines' testfolder, which is where sibling pipeline-condition specs reside.",
+    "group": "The 'Pipelines' testfolder group in tests/ui-testing/ci-matrix/ci_matrix_env.json already lists pipeline-conditions.spec.js in its run_files, so the enhanced spec joins that existing group with no new shard required.",
+    "existing_tests": "Yes - the diff modifies the Playwright E2E spec tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js (plus its page-object helper tests/ui-testing/pages/pipelinesPages/pipelinesPage.js). These specs directly cover the new feature: five new test cases exercise unary null/empty operators, value-input hiding, edit round-trip, and binary-operator validation. No Vitest/unit or Rust tests are present in the diff, and the changed files are Playwright E2E coverage."
+  }
+}

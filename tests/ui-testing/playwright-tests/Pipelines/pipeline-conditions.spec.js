@@ -516,4 +516,35 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.verifyValueInputCount(1);
     await pageManager.pipelinesPage.verifyConditionValueInputValue("", 0);
   });
+
+  test("should make is_not_null, is_empty, and is_not_empty behave as unary operators (hide the value input and save as complete conditions)", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@condition-null-empty-operators']
+  }, async ({ page }) => {
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_operators${streamSuffix}`);
+    await pageManager.pipelinesPage.verifyConditionDialogOpen();
+
+    const unaryOperators = ["is_not_null", "is_empty", "is_not_empty"];
+
+    for (let i = 0; i < unaryOperators.length; i++) {
+      if (i > 0) {
+        await pageManager.pipelinesPage.addNewCondition();
+      }
+
+      await pageManager.pipelinesPage.fillUnaryCondition("kubernetes_container_name", unaryOperators[i], i);
+
+      // Each row is unary: its value input is v-if-removed, so the total value
+      // input count stays 0 (none of the three rows render a value field).
+      await pageManager.pipelinesPage.verifyValueInputCount(0);
+
+      // The operator trigger shows the display label, proving each operator took
+      // effect on its own row (and that a row exists at index i).
+      await pageManager.pipelinesPage.verifyOperatorSelected(unaryOperators[i], i);
+    }
+
+    // All three rows are unary and complete: saving closes the drawer with no
+    // inline schema error (the unary completeness exemption applies to every row).
+    await pageManager.pipelinesPage.saveCondition();
+    await pageManager.pipelinesPage.verifyNoConditionError();
+    await pageManager.pipelinesPage.verifyConditionDialogClosed();
+  });
 });

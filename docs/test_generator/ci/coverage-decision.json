@@ -1,0 +1,9 @@
+{
+  "action": "append",
+  "target_spec": "tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js"
+  ],
+  "needs_registration": false,
+  "rationale": "The dev's in-diff changes already add 5 tests covering all 5 workflows (is_null hide+save, round-trip on edit, all four offered, binary still validated, stale value cleared) plus the page-object helpers (fillUnaryCondition, verifyValueInputCount, verifyOperatorSelected, verifyUnaryOperatorsOffered, verifyNoConditionError). One genuine gap remains: is_not_null / is_empty / is_not_empty are only asserted to be *offered* in the dropdown, never asserted to *behave* as unary (hide the value input and save as a complete condition). The feature is 'Null/Empty (Unary) Operators' (plural) and Edge Case 2 flags distinct empty-vs-null semantics, so append ONE new test() exercising the remaining three operators' unary behavior. File is already registered in ci_matrix.json, so no registration needed."
+}

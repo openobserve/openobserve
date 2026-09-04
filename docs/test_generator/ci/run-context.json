@@ -1,0 +1,15 @@
+{
+  "feature_slug": "pipeline-condition-null-empty-operators",
+  "feature_title": "Pipeline Conditions - Null/Empty (Unary) Operators",
+  "area": "Pipelines",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "pipeline-conditions.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Pipelines/pipeline-conditions.spec.js",
+  "playwright_group": "Pipelines",
+  "source_files": [],
+  "existing_tests_in_diff": true,
+  "skip": false,
+  "skip_reason": ""
+}

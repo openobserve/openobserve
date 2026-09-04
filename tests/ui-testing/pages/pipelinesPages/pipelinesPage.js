@@ -1646,7 +1646,16 @@ export class PipelinesPage {
         await this.columnOptionByName(columnName).click();
         await this.page.waitForTimeout(300);
 
-        await this.selectOperatorFromMenu(operator);
+        // Operator at the same row — use .nth(index), not selectOperatorFromMenu's
+        // .first(), so rows beyond the first are filled on the correct condition.
+        await this.operatorSelectTrigger.nth(index).click();
+        await this.operatorSelectPopover.first().waitFor({ state: 'visible', timeout: 5000 }).catch(() => {});
+        const option = this.page.locator(
+            `[data-test="alert-conditions-operator-select-option"][data-test-value="${operator}"]`,
+        ).first();
+        await option.waitFor({ state: 'visible' });
+        await option.click();
+        await this.operatorSelectPopover.waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
     }
 
     async addNewCondition() {

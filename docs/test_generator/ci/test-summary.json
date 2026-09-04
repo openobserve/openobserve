@@ -1,0 +1,7 @@
+[
+  {
+    "title": "should make is_not_null, is_empty, and is_not_empty behave as unary operators (hide the value input and save as complete conditions)",
+    "action": "append",
+    "verifies": "the remaining three unary operators each hide the value input and save as a complete condition with no inline error"
+  }
+]
