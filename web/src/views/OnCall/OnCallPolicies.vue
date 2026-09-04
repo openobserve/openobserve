@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ priorityLabel(priority) }}
           </OTag>
         </span>
-        <span v-else class="text-text-muted text-sm">{{ ABSENT }}</span>
+        <span v-else class="text-text-muted">{{ ABSENT }}</span>
       </template>
 
       <!-- Configured and useless: the rung names somebody the rotation cannot
@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             {{ priorityLabel(priority) }}
           </OTag>
         </span>
-        <span v-else class="text-text-muted text-sm">{{ ABSENT }}</span>
+        <span v-else class="text-text-muted">{{ ABSENT }}</span>
       </template>
 
       <template #empty>

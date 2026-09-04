@@ -33,7 +33,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          row's own priority rail for the same glance. One line, not two: the
          detail sentence is the "why" behind the headline, not a second fact —
          it lives in the hover, not stacked under it. -->
-    <span class="truncate text-sm" :class="toneClass" data-test="oncall-escalation-cell-level">
+    <span class="truncate" :class="toneClass" data-test="oncall-escalation-cell-level">
       {{ headline }}
       <OTooltip :content="tooltipContent" />
     </span>

@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            secondary in one box read as one long address, and neither could be
            sorted or scanned down the page on its own. -->
       <template #cell-primary="{ row }">
-        <span v-if="onCallByTeam[row.id] === undefined" class="text-text-muted text-sm">
+        <span v-if="onCallByTeam[row.id] === undefined" class="text-text-muted">
           {{ t("oncall.loadingShort") }}
         </span>
         <!-- Nobody in the primary pool is this page's one alarm, and it was
@@ -108,7 +108,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #cell-secondary="{ row }">
-        <span v-if="onCallByTeam[row.id] === undefined" class="text-text-muted text-sm">
+        <span v-if="onCallByTeam[row.id] === undefined" class="text-text-muted">
           {{ t("oncall.loadingShort") }}
         </span>
         <!-- A team with no second pool is ordinary, not a gap: a muted dash,

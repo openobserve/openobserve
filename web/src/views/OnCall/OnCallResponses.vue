@@ -361,7 +361,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             params: { teamId: row.latest.team_id },
             query: { org_identifier: orgId },
           }"
-          class="text-text-body inline-block max-w-full truncate text-sm underline"
+          class="text-text-body inline-block max-w-full truncate underline"
           :data-test="`oncall-row-team-${row.rowKey}`"
           @click.stop
         >
@@ -375,7 +375,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-subject="{ row }">
         <span class="flex min-w-0 flex-col gap-0.5">
           <span class="flex items-center gap-1.5">
-            <span class="text-text-heading truncate text-sm">
+            <span class="text-text-body truncate">
               {{ raw(row.latest.title || row.latest.subject.source_id) }}
               <OTooltip :content="raw(row.latest.title || row.latest.subject.source_id)" />
             </span>
@@ -447,9 +447,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-responder="{ row }">
         <OUserCell
           v-if="row.latest.acked_by"
-          class="text-sm"
           :value="row.latest.acked_by"
           :name="row.latest.acked_by === viewerEmail ? youLabel : undefined"
+          local-part
+          copy
+          :copy-label="t('oncall.copyEmail')"
         />
         <!-- Same text color as the P2 priority tag, so an unanswered page
              reads as the same order of urgency the priority column already
@@ -474,13 +476,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #cell-on_call_now="{ row }">
         <OUserCell
           v-if="positionsByTeam[row.latest.team_id ?? '']?.[0]"
-          class="text-sm"
           :value="positionsByTeam[row.latest.team_id ?? '']![0].user_email"
           :name="
             positionsByTeam[row.latest.team_id ?? '']![0].user_email === viewerEmail
               ? youLabel
               : undefined
           "
+          local-part
+          copy
+          :copy-label="t('oncall.copyEmail')"
         />
         <OText
           v-else-if="row.latest.team_id && positionsByTeam[row.latest.team_id] !== undefined"
@@ -488,7 +492,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="text-status-warning-text"
           data-test="oncall-oncallnow-gap"
         >
-          {{ t("oncall.coverage_gap") }}
+          {{ raw("—") }}
         </OText>
       </template>
 
@@ -572,7 +576,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            one visible button to a menu. Everything else sits behind the
            more-menu, as it does on every other list in the app. -->
       <template #cell-actions="{ row }">
-        <span class="flex items-center justify-center gap-0.5">
+        <!-- The slot's wrapper is inline-flex and shrinks to content by design, so pin to the column's resolved width directly instead of `w-full`. -->
+        <span class="flex w-[var(--header-actions-size)] items-center justify-between">
           <OButton
             v-if="!row.latest.team_id"
             variant="outline"
@@ -590,6 +595,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="primaryAction(row) === 'acknowledge'"
               variant="primary"
               size="xs"
+              class="w-28"
               :loading="busyId === row.rowKey"
               :data-test="`oncall-row-ack-${row.rowKey}`"
               @click.stop="acknowledgeRow(row)"
@@ -600,6 +606,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else-if="primaryAction(row) === 'resolve'"
               variant="outline"
               size="xs"
+              class="w-28"
               :loading="busyId === row.rowKey"
               :data-test="`oncall-row-resolve-${row.rowKey}`"
               @click.stop="resolveRow(row)"
@@ -610,6 +617,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-else
               variant="outline"
               size="xs"
+              class="w-28"
               :data-test="`oncall-row-timeline-${row.rowKey}`"
               @click.stop="openResponse(row)"
             >
