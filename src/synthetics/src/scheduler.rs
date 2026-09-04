@@ -609,6 +609,11 @@ pub async fn run() {
                     // is `steps_configured x (retries + 1)`, and a journey edited
                     // mid-flight must not reprice dispatched work (§4.4.1, E5).
                     steps_configured: synthetic.steps_configured,
+                    // What gate 3 took, frozen with it: a refused deduct writes
+                    // 0, and the ack bills that run as overage instead of
+                    // re-deriving "was it funded?" from a pool that has moved
+                    // since (E16/T31).
+                    steps_reserved: i32::try_from(slot.reserved).unwrap_or(i32::MAX),
                     metadata: &metadata_json,
                 };
                 match synthetics_jobs::enqueue(db, p).await {
@@ -2389,12 +2394,8 @@ mod pool_gate_tests {
         REFUNDED.fetch_add(steps, Ordering::Relaxed);
     }
 
-    /// The enqueue path never reads these — they are the REAPER's (§6.3 / E10).
-    /// Unreachable, so a new dependency on them fails loudly, not quietly.
-    fn fake_remaining(_org_id: &str, _is_browser: bool) -> u64 {
-        unreachable!("gate 3 asks `try_deduct`, never the balance")
-    }
-
+    /// The enqueue path never reads this — it is the REAPER's (§6.3 / E10).
+    /// Unreachable, so a new dependency on it fails loudly, not quietly.
     fn fake_dead_letter_refund(_org_id: &str, _is_browser: bool, _steps: u64, _key: &str) -> bool {
         unreachable!("the keyed refund belongs to the reaper, not to the enqueue")
     }
@@ -2402,7 +2403,6 @@ mod pool_gate_tests {
     const FAKE: StepPoolHooks = StepPoolHooks {
         try_deduct: fake_try_deduct,
         refund: fake_refund,
-        remaining: fake_remaining,
         dead_letter_refund: fake_dead_letter_refund,
     };
 

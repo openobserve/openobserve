@@ -276,65 +276,39 @@ enum DeadLetterRefund {
     /// The enqueue took nothing: unmetered node, private agent (§7.1 gate 2,
     /// E13), external contract (§7.3, E18), or a grant already spent (E16).
     NothingReserved,
-    /// The registry could not say whose hardware ran this job, so whether
-    /// anything was reserved is unknowable — see [`ReservationVerdict`].
-    VenueUnknown,
     Refunded(u64),
     /// This key had already been applied — not a failure, the grant has it back.
     AlreadyRefunded(u64),
 }
 
 /// Whether the ENQUEUE took anything out of the grant for a job that has now
-/// been dead-lettered, and how much — SPEC §7.1 gate 2 / §7.3, as pure
-/// arithmetic.
+/// been dead-lettered, and how much — SPEC §6.3, E10, item 2.3.
 ///
-/// Mirrors `scheduler::reserve_for_slot`, the only place a job is enqueued, and
-/// must keep mirroring it: the number refunded here has to be the number
-/// reserved there, computed the same way, or the grant drifts. The one input it
-/// cannot mirror is whether `try_deduct` succeeded — no column records it — so
-/// it reads the pool's state now, exactly as the ack does: `remaining == 0` is
-/// the ack's [`crate::job_api::StepPoolView::Spent`]. A job must not be treated
-/// as funded by one path and unfunded by the other.
+/// One column, read verbatim: `steps_reserved` is what
+/// `scheduler::reserve_for_slot` deducted, written by the same statement that
+/// enqueued the job. It replaces a mirror of that arithmetic that had to guess
+/// the one input it could not see — whether `try_deduct` succeeded — from the
+/// pool's balance now, which refunded `configured x combos` for jobs whose
+/// reservation had been REFUSED and drove `usage_count` negative.
 #[cfg(feature = "cloud")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReservationVerdict {
-    /// `configured x combos` came out of the grant and must go back.
+    /// This many steps came out of the grant and must go back.
     Reserved(u32),
     Nothing,
-    /// The registry could not answer. That failure is FLEET-WIDE, so refunding
-    /// on it would hand every free org steps back at once. Declining loses one
-    /// run's reservation, permanently under a one-time grant (§11 **F8**) —
-    /// hence the caller's `error` log (§9B.2 A5).
-    VenueUnknown,
 }
 
 #[cfg(feature = "cloud")]
 fn dead_letter_reservation(
     policy: crate::scheduler::PoolExhaustionPolicy,
-    venue: crate::job_api::billing::Venue,
-    remaining: u64,
-    steps_configured: i32,
-    combos: Option<u32>,
+    steps_reserved: i32,
 ) -> ReservationVerdict {
-    use crate::job_api::billing::Venue;
-
-    // §7.3 first, venue-independent: a contract org never attempts a reservation
-    // (E18/T36) and a spent grant means `try_deduct` failed at enqueue (E16/T31).
-    // Ahead of the registry, so an unreadable one is not a reported lost refund.
-    if !crate::scheduler::pool_reserves(policy) || remaining == 0 {
+    // A policy that never reserves cannot have reserved here either, whatever
+    // the column says (§7.3, E18/T36 — a contract org is never pool-gated).
+    if !crate::scheduler::pool_reserves(policy) || steps_reserved <= 0 {
         return ReservationVerdict::Nothing;
     }
-    match venue {
-        // §6.3's `configured x combos`, from the columns FROZEN on this job's
-        // row — never the live check, which may have been edited since (E5).
-        Venue::Public => ReservationVerdict::Reserved(crate::job_api::enqueue_reservation(
-            steps_configured,
-            combos,
-        )),
-        // §7.1 gate 2, E13/T17 — customer hardware: no deduct, so nothing back.
-        Venue::Private => ReservationVerdict::Nothing,
-        Venue::Unresolved => ReservationVerdict::VenueUnknown,
-    }
+    ReservationVerdict::Reserved(u32::try_from(steps_reserved).unwrap_or(u32::MAX))
 }
 
 /// The refund for one dead letter, with every read already done — SPEC §6.3,
@@ -356,8 +330,6 @@ fn refund_dead_letter_with(
         crate::pool::StepPoolHooks,
         crate::scheduler::PoolExhaustionPolicy,
     )>,
-    venue: crate::job_api::billing::Venue,
-    remaining: u64,
     row: &synthetics_jobs::DeadLetteredRow,
 ) -> DeadLetterRefund {
     // No pool on this node: an OSS build, `O2_SYNTHETICS_BILLING_ENABLED` off,
@@ -366,16 +338,9 @@ fn refund_dead_letter_with(
         return DeadLetterRefund::NothingReserved;
     };
 
-    let steps = match dead_letter_reservation(
-        policy,
-        venue,
-        remaining,
-        row.steps_configured,
-        crate::job_api::billing::frozen_combos(row.browser_devices.as_deref()),
-    ) {
+    let steps = match dead_letter_reservation(policy, row.steps_reserved) {
         ReservationVerdict::Reserved(steps) => u64::from(steps),
         ReservationVerdict::Nothing => return DeadLetterRefund::NothingReserved,
-        ReservationVerdict::VenueUnknown => return DeadLetterRefund::VenueUnknown,
     };
 
     // SPEC §6.3's MUST, and the SAME key the ack would have built: all four
@@ -400,30 +365,14 @@ fn refund_dead_letter_with(
 /// batch. See [`refund_dead_letter_with`] for the decision.
 #[cfg(feature = "cloud")]
 async fn refund_dead_letter(row: &synthetics_jobs::DeadLetteredRow) {
-    // Before the registry read, so an unmetered node — the default, since
-    // `O2_SYNTHETICS_BILLING_ENABLED` ships off — does no extra work here.
     let gate = crate::scheduler::resolve_pool_gate(&row.org_id).await;
-    let Some((hooks, _)) = gate else {
+    if gate.is_none() {
         return;
-    };
-    let venue = crate::job_api::billing::resolve_venue(&row.location).await;
-    let remaining = (hooks.remaining)(&row.org_id, row.browser_devices.is_some());
+    }
 
-    match refund_dead_letter_with(gate, venue, remaining, row) {
+    match refund_dead_letter_with(gate, row) {
         // The steady state for every paid, contract and private-venue job.
         DeadLetterRefund::NothingReserved => {}
-        DeadLetterRefund::VenueUnknown => {
-            // §9B.2 **A5** — an unappliable adjustment is an ERROR: under a
-            // one-time grant (§6.1) the loss is permanent and invisible.
-            tracing::error!(
-                synthetics_id = %row.synthetics_id,
-                org_id = %row.org_id,
-                job_id = %row.id,
-                location = %row.location,
-                "[synthetics reaper] dead letter: location is not in the registry, so its \
-                 free-pool reservation cannot be refunded — the grant keeps it permanently"
-            );
-        }
         DeadLetterRefund::Refunded(steps) => {
             tracing::info!(
                 synthetics_id = %row.synthetics_id,
@@ -549,7 +498,6 @@ mod pool_refund_tests {
         DeadLetterRefund, ReservationVerdict, dead_letter_reservation, refund_dead_letter_with,
     };
     use crate::{
-        job_api::billing::Venue,
         pool::StepPoolHooks,
         scheduler::{PoolExhaustionPolicy, PoolGate, reserve_for_slot},
     };
@@ -563,16 +511,15 @@ mod pool_refund_tests {
     static LAST_ORG: Mutex<String> = Mutex::new(String::new());
     static SEEN_KEYS: Mutex<Vec<String>> = Mutex::new(Vec::new());
     static POOL_ACCEPTS: AtomicBool = AtomicBool::new(true);
+    /// Gate 3 refusing — the state that made every later reservation fail while
+    /// the grant still reported a remainder.
+    static POOL_REFUSES_DEDUCT: AtomicBool = AtomicBool::new(false);
 
     fn fake_try_deduct(_org_id: &str, _is_browser: bool, _steps: u64) -> bool {
-        true
+        !POOL_REFUSES_DEDUCT.load(Ordering::Relaxed)
     }
 
     fn fake_refund(_org_id: &str, _is_browser: bool, _steps: u64) {}
-
-    fn fake_remaining(_org_id: &str, _is_browser: bool) -> u64 {
-        unreachable!("the pure decision takes `remaining` as data; the hook is only wiring")
-    }
 
     /// The real contract: apply at most once per key, report whether it moved.
     fn fake_dead_letter_refund(
@@ -599,7 +546,6 @@ mod pool_refund_tests {
     const FAKE: StepPoolHooks = StepPoolHooks {
         try_deduct: fake_try_deduct,
         refund: fake_refund,
-        remaining: fake_remaining,
         dead_letter_refund: fake_dead_letter_refund,
     };
 
@@ -608,6 +554,7 @@ mod pool_refund_tests {
         REFUNDED.store(0, Ordering::Relaxed);
         REFUND_CALLS.store(0, Ordering::Relaxed);
         POOL_ACCEPTS.store(true, Ordering::Relaxed);
+        POOL_REFUSES_DEDUCT.store(false, Ordering::Relaxed);
         LAST_KEY.lock().unwrap_or_else(|e| e.into_inner()).clear();
         LAST_ORG.lock().unwrap_or_else(|e| e.into_inner()).clear();
         SEEN_KEYS.lock().unwrap_or_else(|e| e.into_inner()).clear();
@@ -638,6 +585,7 @@ mod pool_refund_tests {
             location: "aws-us-east-1".to_string(),
             scheduled_ts: SLOT_TS,
             steps_configured: 14,
+            steps_reserved: 28,
             browser_devices: Some(TWO_COMBOS.to_string()),
             dispatch_attempts: 3,
             run_id: "3Fzn001XXXXXXXXXXXXXXXX".to_string(),
@@ -672,22 +620,16 @@ mod pool_refund_tests {
 
     /// **E10.** What a funded public slot reserved is what comes back.
     #[test]
-    fn a_reaped_job_gives_back_configured_times_combos() {
+    fn a_reaped_job_gives_back_what_the_enqueue_reserved() {
         assert_eq!(
-            dead_letter_reservation(
-                PoolExhaustionPolicy::SubscriptionRequired,
-                Venue::Public,
-                10_000,
-                14,
-                Some(2),
-            ),
+            dead_letter_reservation(PoolExhaustionPolicy::SubscriptionRequired, 28),
             ReservationVerdict::Reserved(28),
         );
     }
 
-    /// Not "28 == 28" twice: the enqueue's own `reserve_for_slot` runs over the
-    /// same inputs, so changing one formula and not the other fails here rather
-    /// than becoming a silent partial credit.
+    /// Not "28 == 28" twice: the enqueue's own `reserve_for_slot` produces the
+    /// number, and the reaper gives back the column it wrote, so a change to one
+    /// side fails here rather than becoming a silent partial credit.
     #[test]
     fn the_refund_is_the_same_number_the_enqueue_reserved() {
         let _guard = fake_pool();
@@ -709,10 +651,7 @@ mod pool_refund_tests {
             assert_eq!(
                 dead_letter_reservation(
                     PoolExhaustionPolicy::SubscriptionRequired,
-                    Venue::Public,
-                    10_000,
-                    steps_configured,
-                    combos,
+                    reserved as i32,
                 ),
                 ReservationVerdict::Reserved(reserved),
                 "the reaper must give back exactly what gate 3 took for \
@@ -721,84 +660,79 @@ mod pool_refund_tests {
         }
     }
 
-    /// **T17 / E13.** §7.1 gate 2 gives a private agent no deduct, so a refund
-    /// here would credit a grant the org never spent.
+    /// **T17 / E13.** §7.1 gate 2 gives a private agent no deduct, so its row
+    /// froze a zero reservation and a refund here would credit a grant the org
+    /// never spent.
     #[test]
     fn t17_a_private_venue_job_reserved_nothing_and_is_not_refunded() {
+        let _guard = fake_pool();
+        let (verdict, reserved) = reserve_for_slot(
+            gate(PoolExhaustionPolicy::SubscriptionRequired),
+            "acme",
+            14,
+            Some(2),
+            true,
+        );
+        assert_eq!(verdict, PoolGate::Run);
+        assert_eq!(reserved, 0);
         assert_eq!(
-            dead_letter_reservation(
-                PoolExhaustionPolicy::SubscriptionRequired,
-                Venue::Private,
-                10_000,
-                14,
-                Some(2),
-            ),
+            dead_letter_reservation(PoolExhaustionPolicy::SubscriptionRequired, reserved as i32),
             ReservationVerdict::Nothing,
         );
     }
 
     /// **T36 / E18.** A contract org is never pool-gated, so its enqueue never
-    /// reserved, whatever its grant looked like.
+    /// reserved — refused by the policy even if a row somehow carried a count.
     #[test]
     fn t36_a_contract_org_job_reserved_nothing_and_is_not_refunded() {
         assert_eq!(
-            dead_letter_reservation(
-                PoolExhaustionPolicy::AdditionalCreditsRequired,
-                Venue::Public,
-                10_000,
-                14,
-                Some(2),
-            ),
+            dead_letter_reservation(PoolExhaustionPolicy::AdditionalCreditsRequired, 28),
             ReservationVerdict::Nothing,
         );
     }
 
-    /// **T31 / E16.** A spent grant means `try_deduct` failed and the run went
-    /// out as metered overage holding nothing. The ack reads that state as
+    /// **T31 / E16.** An overage run's deduct was REFUSED, so its row froze 0
+    /// and the run went out holding nothing. The ack reads the same column as
     /// `StepPoolView::Spent` and does not reconcile; nor may the reaper refund.
     #[test]
     fn t31_an_overage_run_reserved_nothing_and_is_not_refunded() {
         assert_eq!(
-            dead_letter_reservation(
-                PoolExhaustionPolicy::MeteredOverage,
-                Venue::Public,
-                0,
-                14,
-                Some(2),
-            ),
+            dead_letter_reservation(PoolExhaustionPolicy::MeteredOverage, 0),
             ReservationVerdict::Nothing,
         );
     }
 
-    /// A registry that cannot answer is NOT a refund: the failure is fleet-wide,
-    /// so refunding on it would hand every free org steps back at once.
+    /// **The bug this column exists for.** A grant holding a remainder SMALLER
+    /// than one run reserves nothing and still reads as "room left". Sizing the
+    /// refund from the definition — as a mirror of the enqueue arithmetic had to
+    /// — gave back steps that were never taken, and drove `usage_count` below
+    /// zero, which the next restart read as a fresh grant.
     #[test]
-    fn an_unresolved_venue_is_not_refunded_and_is_reported() {
-        assert_eq!(
-            dead_letter_reservation(
-                PoolExhaustionPolicy::SubscriptionRequired,
-                Venue::Unresolved,
-                10_000,
-                14,
-                Some(2),
-            ),
-            ReservationVerdict::VenueUnknown,
+    fn a_run_the_grant_could_not_cover_is_not_refunded() {
+        let _guard = fake_pool();
+        POOL_REFUSES_DEDUCT.store(true, Ordering::Relaxed);
+        let (verdict, reserved) = reserve_for_slot(
+            gate(PoolExhaustionPolicy::MeteredOverage),
+            "acme",
+            14,
+            Some(2),
+            false,
         );
-    }
+        assert_eq!(
+            verdict,
+            PoolGate::RunAsOverage,
+            "an overage run still goes out"
+        );
+        assert_eq!(reserved, 0, "but it holds nothing");
 
-    /// …but §9B.2 **A5** pages on `VenueUnknown`, so an org that reserved
-    /// nothing anyway must not be reported as a lost refund.
-    #[test]
-    fn an_unresolved_venue_for_an_org_that_never_reserves_is_silent() {
-        for (policy, remaining) in [
-            (PoolExhaustionPolicy::AdditionalCreditsRequired, 10_000),
-            (PoolExhaustionPolicy::MeteredOverage, 0),
-        ] {
-            assert_eq!(
-                dead_letter_reservation(policy, Venue::Unresolved, remaining, 14, Some(2)),
-                ReservationVerdict::Nothing,
-            );
-        }
+        let mut row = dead_row(DeadLetterReason::Expired);
+        row.steps_reserved = reserved as i32;
+        assert_eq!(
+            refund_dead_letter_with(gate(PoolExhaustionPolicy::MeteredOverage), &row),
+            DeadLetterRefund::NothingReserved,
+        );
+        assert_eq!(REFUND_CALLS.load(Ordering::Relaxed), 0);
+        assert_eq!(REFUNDED.load(Ordering::Relaxed), 0);
     }
 
     /// All three reasons differ only in the message written to the results
@@ -809,12 +743,7 @@ mod pool_refund_tests {
             let _guard = fake_pool();
             let row = dead_row(reason);
             assert_eq!(
-                refund_dead_letter_with(
-                    gate(PoolExhaustionPolicy::SubscriptionRequired),
-                    Venue::Public,
-                    10_000,
-                    &row,
-                ),
+                refund_dead_letter_with(gate(PoolExhaustionPolicy::SubscriptionRequired), &row),
                 DeadLetterRefund::Refunded(28),
                 "{reason:?} terminates the job without an ack and must refund",
             );
@@ -834,12 +763,7 @@ mod pool_refund_tests {
     fn the_refund_key_is_the_key_the_ack_would_have_used() {
         let _guard = fake_pool();
         let row = dead_row(DeadLetterReason::Expired);
-        refund_dead_letter_with(
-            gate(PoolExhaustionPolicy::SubscriptionRequired),
-            Venue::Public,
-            10_000,
-            &row,
-        );
+        refund_dead_letter_with(gate(PoolExhaustionPolicy::SubscriptionRequired), &row);
         assert_eq!(
             last_key(),
             crate::job_api::adjustment_key("chk_1", "aws-us-east-1", SLOT_TS, &row.id),
@@ -848,12 +772,7 @@ mod pool_refund_tests {
         // a row scheduled for a different slot keys differently.
         let mut other = dead_row(DeadLetterReason::Expired);
         other.scheduled_ts = SLOT_TS + 300_000_000;
-        refund_dead_letter_with(
-            gate(PoolExhaustionPolicy::SubscriptionRequired),
-            Venue::Public,
-            10_000,
-            &other,
-        );
+        refund_dead_letter_with(gate(PoolExhaustionPolicy::SubscriptionRequired), &other);
         assert_ne!(
             last_key(),
             crate::job_api::adjustment_key("chk_1", "aws-us-east-1", SLOT_TS, &row.id)
@@ -868,15 +787,15 @@ mod pool_refund_tests {
         let row = dead_row(DeadLetterReason::AttemptsExhausted);
         let g = gate(PoolExhaustionPolicy::SubscriptionRequired);
         assert_eq!(
-            refund_dead_letter_with(g, Venue::Public, 10_000, &row),
+            refund_dead_letter_with(g, &row),
             DeadLetterRefund::Refunded(28),
         );
         assert_eq!(
-            refund_dead_letter_with(g, Venue::Public, 10_000, &row),
+            refund_dead_letter_with(g, &row),
             DeadLetterRefund::AlreadyRefunded(28),
         );
         assert_eq!(
-            refund_dead_letter_with(g, Venue::Public, 10_000, &row),
+            refund_dead_letter_with(g, &row),
             DeadLetterRefund::AlreadyRefunded(28),
         );
         assert_eq!(
@@ -891,7 +810,7 @@ mod pool_refund_tests {
         sibling.id = "2MNfNTxePfZ1pnY5gKVLkwsVRXw".to_string();
         sibling.location = "aws-eu-west-1".to_string();
         assert_eq!(
-            refund_dead_letter_with(g, Venue::Public, 10_000, &sibling),
+            refund_dead_letter_with(g, &sibling),
             DeadLetterRefund::Refunded(28),
         );
         assert_eq!(REFUNDED.load(Ordering::Relaxed), 56);
@@ -900,44 +819,23 @@ mod pool_refund_tests {
     /// The hook is not called at all, so it cannot burn an idempotency key.
     #[test]
     fn a_job_that_reserved_nothing_never_touches_the_pool() {
-        for (policy, venue, remaining) in [
-            (
-                PoolExhaustionPolicy::SubscriptionRequired,
-                Venue::Private,
-                10_000,
-            ),
-            (
-                PoolExhaustionPolicy::AdditionalCreditsRequired,
-                Venue::Public,
-                10_000,
-            ),
-            (PoolExhaustionPolicy::MeteredOverage, Venue::Public, 0),
+        for (policy, steps_reserved) in [
+            // A private agent (§7.1 gate 2) and a refused deduct (E16) both
+            // froze 0; a contract org is refused by the policy (E18).
+            (PoolExhaustionPolicy::SubscriptionRequired, 0),
+            (PoolExhaustionPolicy::MeteredOverage, 0),
+            (PoolExhaustionPolicy::AdditionalCreditsRequired, 28),
         ] {
             let _guard = fake_pool();
-            let row = dead_row(DeadLetterReason::Expired);
+            let mut row = dead_row(DeadLetterReason::Expired);
+            row.steps_reserved = steps_reserved;
             assert_eq!(
-                refund_dead_letter_with(gate(policy), venue, remaining, &row),
+                refund_dead_letter_with(gate(policy), &row),
                 DeadLetterRefund::NothingReserved,
             );
             assert_eq!(REFUND_CALLS.load(Ordering::Relaxed), 0);
             assert_eq!(REFUNDED.load(Ordering::Relaxed), 0);
         }
-    }
-
-    #[test]
-    fn an_unresolved_venue_reports_without_touching_the_pool() {
-        let _guard = fake_pool();
-        let row = dead_row(DeadLetterReason::NeverDispatched);
-        assert_eq!(
-            refund_dead_letter_with(
-                gate(PoolExhaustionPolicy::SubscriptionRequired),
-                Venue::Unresolved,
-                10_000,
-                &row,
-            ),
-            DeadLetterRefund::VenueUnknown,
-        );
-        assert_eq!(REFUND_CALLS.load(Ordering::Relaxed), 0);
     }
 
     /// FAIL OPEN. No pool resolved — an OSS build, the master switch off, or a
@@ -947,7 +845,7 @@ mod pool_refund_tests {
         let _guard = fake_pool();
         let row = dead_row(DeadLetterReason::Expired);
         assert_eq!(
-            refund_dead_letter_with(None, Venue::Public, 10_000, &row),
+            refund_dead_letter_with(None, &row),
             DeadLetterRefund::NothingReserved,
         );
         assert_eq!(REFUND_CALLS.load(Ordering::Relaxed), 0);
@@ -961,13 +859,9 @@ mod pool_refund_tests {
         let mut row = dead_row(DeadLetterReason::Expired);
         row.browser_devices = None;
         row.steps_configured = 1;
+        row.steps_reserved = 1;
         assert_eq!(
-            refund_dead_letter_with(
-                gate(PoolExhaustionPolicy::SubscriptionRequired),
-                Venue::Public,
-                10_000,
-                &row,
-            ),
+            refund_dead_letter_with(gate(PoolExhaustionPolicy::SubscriptionRequired), &row),
             DeadLetterRefund::Refunded(1),
         );
     }
@@ -981,12 +875,7 @@ mod pool_refund_tests {
         POOL_ACCEPTS.store(false, Ordering::Relaxed);
         let row = dead_row(DeadLetterReason::Expired);
         assert_eq!(
-            refund_dead_letter_with(
-                gate(PoolExhaustionPolicy::SubscriptionRequired),
-                Venue::Public,
-                10_000,
-                &row,
-            ),
+            refund_dead_letter_with(gate(PoolExhaustionPolicy::SubscriptionRequired), &row),
             DeadLetterRefund::AlreadyRefunded(28),
         );
         assert_eq!(REFUNDED.load(Ordering::Relaxed), 0);
@@ -995,42 +884,7 @@ mod pool_refund_tests {
         let mut next = dead_row(DeadLetterReason::Expired);
         next.id = "2MNfNTxePfZ1pnY5gKVLkwsVRXx".to_string();
         assert_eq!(
-            refund_dead_letter_with(
-                gate(PoolExhaustionPolicy::SubscriptionRequired),
-                Venue::Public,
-                10_000,
-                &next,
-            ),
-            DeadLetterRefund::Refunded(28),
-        );
-        assert_eq!(REFUNDED.load(Ordering::Relaxed), 28);
-    }
-
-    /// The registry read is the one input that can fail outright, and it fails
-    /// FLEET-WIDE: a database outage must not turn one lost refund into a batch.
-    #[test]
-    fn a_refund_that_cannot_be_worked_out_does_not_stop_the_batch() {
-        let _guard = fake_pool();
-        let unknown = dead_row(DeadLetterReason::Expired);
-        assert_eq!(
-            refund_dead_letter_with(
-                gate(PoolExhaustionPolicy::SubscriptionRequired),
-                Venue::Unresolved,
-                10_000,
-                &unknown,
-            ),
-            DeadLetterRefund::VenueUnknown,
-        );
-
-        let mut next = dead_row(DeadLetterReason::Expired);
-        next.id = "2MNfNTxePfZ1pnY5gKVLkwsVRXy".to_string();
-        assert_eq!(
-            refund_dead_letter_with(
-                gate(PoolExhaustionPolicy::SubscriptionRequired),
-                Venue::Public,
-                10_000,
-                &next,
-            ),
+            refund_dead_letter_with(gate(PoolExhaustionPolicy::SubscriptionRequired), &next),
             DeadLetterRefund::Refunded(28),
         );
         assert_eq!(REFUNDED.load(Ordering::Relaxed), 28);
@@ -1158,7 +1012,9 @@ mod pool_refund_tests {
         let whole = include_str!("mod.rs");
         let src = &whole[..whole.find("\n#[cfg(all(test,").unwrap()];
         assert_eq!(src.matches("(hooks.dead_letter_refund)(").count(), 1);
-        assert_eq!(src.matches("(hooks.remaining)(").count(), 1);
+        // And the size of that refund comes from the row, never from a pool read
+        // that would have to guess whether the enqueue reserved at all.
+        assert_eq!(src.matches("row.steps_reserved").count(), 1);
         // And the key is built once, from the row's own four columns.
         assert_eq!(src.matches("adjustment_key(").count(), 1);
         for field in [

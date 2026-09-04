@@ -83,6 +83,11 @@ pub(crate) mod billing {
         /// FROZEN at enqueue. Per combo: the scheduler freezes
         /// `steps.len().max(1)` (`DueCheck::try_from`), not the fan-out product.
         pub steps_configured: i32,
+        /// FROZEN at enqueue: the steps gate 3 actually took out of the grant,
+        /// 0 when it took none. The reconcile gives back against THIS, never a
+        /// number recomputed from the definition — the two agree only while the
+        /// reservation succeeded.
+        pub steps_reserved: u32,
         /// FROZEN at enqueue — the engine+device combinations this one job runs
         /// sequentially. `None` for a protocol check.
         pub combos: Option<u32>,
@@ -315,6 +320,7 @@ pub(crate) mod billing {
             steps_defined: req.steps_defined,
             browser_ms: req.browser_ms,
             steps_configured: row.steps_configured,
+            steps_reserved: u32::try_from(row.steps_reserved).unwrap_or(0),
             combos: frozen_combos(row.browser_devices.as_deref()),
             retries: live_retries,
             now_us,
@@ -516,11 +522,10 @@ pub(crate) mod billing {
     /// input: an `error_source = "queue"` ack emits NOTHING **and** refunds the
     /// WHOLE reservation — no step ran, so none may be held against the grant.
     ///
-    /// Nothing records what the enqueue reserved, so "was this run pool-funded?"
-    /// is answered by the pool's state NOW. Both boundary cases are bounded by
-    /// one run and err towards leaving the pool alone: a grant exhausted between
-    /// enqueue and ack leaves an over-deduct unrefunded, and a limit raised
-    /// mid-run reconciles against a reservation that never happened.
+    /// "Was this run pool-funded?" is answered by `steps_reserved`, frozen by
+    /// the enqueue that deducted it, so a pool that moved between enqueue and
+    /// ack — exhausted by another check, or raised by an operator — cannot make
+    /// this ack reconcile against a reservation that never happened.
     pub(crate) fn pool_adjustment_for_ack(
         flags: BillingFlags,
         i: &BillingInputs<'_>,
@@ -541,7 +546,7 @@ pub(crate) mod billing {
             return None;
         }
 
-        let reserved = i.frozen_definition();
+        let reserved = i.steps_reserved;
 
         // The job never ran, so the whole reservation goes back. Checked BEFORE
         // `resolve_billable`: a queue-errored ack carries `steps_executed = 0`,
@@ -1095,33 +1100,36 @@ pub enum StepPoolView {
     Spent,
 }
 
-/// Both step grants as the caller resolved them. Two, because the caller cannot
-/// know a job's check type — that is frozen on the row `ack` itself reads — and
-/// browser and protocol draw on independent pools.
+/// Whether a pool gates this org's acks at all — the ONE thing the caller can
+/// answer and the job row cannot.
+///
+/// The free/billable split itself is NOT here: it is `steps_reserved`, frozen on
+/// the row by the enqueue that did or did not deduct. Asking the live pool
+/// instead billed a run as free whenever the grant still held a remainder too
+/// small to reserve — the reservation failed, the run went out as overage, and
+/// the ack called it funded anyway, forever, because a pool nothing deducts from
+/// never reaches zero.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct StepPoolViews {
-    pub browser: StepPoolView,
-    pub protocol: StepPoolView,
+pub enum StepPoolGate {
+    /// A one-time grant gates this org: the row's reservation decides.
+    PoolGated,
+    /// No pool is consulted — a build without `cloud`, a node with
+    /// `O2_SYNTHETICS_BILLING_ENABLED` off, or an **ExternalContract** org
+    /// (§7.3), whose acks must stay billable for the true-up.
+    ///
+    /// The default, so a build that never sets it bills rather than silently
+    /// consuming a grant it is not tracking.
+    #[default]
+    NotApplicable,
 }
 
-impl StepPoolViews {
-    /// Both sides the same — a build or node that consults no pool at all.
-    pub fn uniform(view: StepPoolView) -> Self {
-        Self {
-            browser: view,
-            protocol: view,
-        }
-    }
-
-    /// The grant this job spends from. `browser_devices` is written iff the check
-    /// is a browser check, and unlike the live `check_type` it cannot change under
-    /// an in-flight job.
-    #[cfg(feature = "cloud")]
-    fn for_job(&self, browser_devices: Option<&str>) -> StepPoolView {
-        if browser_devices.is_some() {
-            self.browser
-        } else {
-            self.protocol
+impl StepPoolGate {
+    /// How this ack bills, from the steps its enqueue actually reserved.
+    pub fn view_for(self, steps_reserved: i32) -> StepPoolView {
+        match self {
+            Self::NotApplicable => StepPoolView::NotApplicable,
+            Self::PoolGated if steps_reserved > 0 => StepPoolView::Funded,
+            Self::PoolGated => StepPoolView::Spent,
         }
     }
 }
@@ -1563,14 +1571,15 @@ fn stale_lease_response(
 /// notifications. Returns `run_complete = true` when all jobs in the run have
 /// acked.
 ///
-/// `pools` carries BOTH free step grants as the CALLER resolved them. Parameters
-/// rather than a global because a `OnceCell` installed from `init()` would be
-/// unset on the API nodes that serve acks; a required argument cannot be unset.
-/// Both, because only the row read below says which grant this job spends from.
+/// `gate` says only whether a pool gates this org. A parameter rather than a
+/// global because a `OnceCell` installed from `init()` would be unset on the API
+/// nodes that serve acks; a required argument cannot be unset. WHICH way the ack
+/// bills comes from the row's frozen `steps_reserved`, not from the pool's state
+/// now — see [`StepPoolGate`].
 pub async fn ack(
     req: AckRequest,
     token_org: &str,
-    pools: StepPoolViews,
+    gate: StepPoolGate,
 ) -> anyhow::Result<AckResponse> {
     let conn = get_orm_client_rw().await;
 
@@ -1733,9 +1742,9 @@ pub async fn ack(
         // number of super-cluster PUBLISHES, and this is a read.
         let sc = &ent.super_cluster;
         let region = (sc.enabled && !sc.region.is_empty()).then(|| sc.region.clone());
-        // The grant is chosen from the FROZEN row, so the reserve, the reconcile
-        // and this ack cannot disagree about which pool the job spends from.
-        let pool = pools.for_job(check.browser_devices.as_deref());
+        // Read from the FROZEN row, so the reserve, the reconcile and this ack
+        // cannot disagree about what the enqueue took.
+        let pool = gate.view_for(check.steps_reserved);
         let inputs =
             billing::inputs_from(&check, &req, synthetic.retries, venue, now_us, region, pool);
         // Built BEFORE `events_for_ack` consumes `inputs`. The two read the same
@@ -1758,8 +1767,8 @@ pub async fn ack(
     // `enterprise` would write usage rows onto every customer's own cluster.
     #[cfg(not(feature = "cloud"))]
     let (usage_events, pool_adjustment) = {
-        // `pools` is the caller's answer for grants this build does not have.
-        let _ = pools;
+        // `gate` is the caller's answer for a grant this build does not have.
+        let _ = gate;
         (Vec::new(), None)
     };
 
@@ -2108,6 +2117,10 @@ mod tests {
                 steps_defined: 0,
                 browser_ms: 0,
                 steps_configured: configured,
+                // The reservation gate 3 took for this run — `browser()` is the
+                // funded shape, and the tests that need a refused deduct set it
+                // to 0 themselves.
+                steps_reserved: super::enqueue_reservation(configured, Some(combos)),
                 combos: Some(combos),
                 retries,
                 now_us: NOW_US,
@@ -3409,6 +3422,7 @@ mod tests {
                 run_id: "run_1".to_string(),
                 browser_devices: Some("[]".to_string()),
                 steps_configured: 14,
+                steps_reserved: 14,
                 metadata: "{}".to_string(),
             }
         }

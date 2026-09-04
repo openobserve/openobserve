@@ -322,7 +322,6 @@ fn synthetics_step_pool() -> Option<openobserve_synthetics::pool::StepPoolHooks>
     Some(openobserve_synthetics::pool::StepPoolHooks {
         try_deduct: openobserve_core::trial_quota::synthetics_steps_try_deduct,
         refund: openobserve_core::trial_quota::synthetics_steps_refund,
-        remaining: openobserve_core::trial_quota::synthetics_steps_remaining,
         dead_letter_refund: openobserve_core::trial_quota::synthetics_steps_dead_letter_refund,
     })
 }
@@ -1390,7 +1389,6 @@ mod tests {
         for hook in [
             "synthetics_steps_try_deduct",
             "synthetics_steps_refund",
-            "synthetics_steps_remaining",
             "synthetics_steps_dead_letter_refund",
         ] {
             assert_eq!(

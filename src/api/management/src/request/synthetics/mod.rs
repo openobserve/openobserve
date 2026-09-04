@@ -1014,62 +1014,33 @@ fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::Usage
     }
 }
 
-/// The org's one-time free step grant as it stands right now — SPEC §6.1, item
-/// 2.3. Handed to `job_api::ack`, which decides §4.2's free/billable split.
+/// Whether a free step grant gates this org at all — SPEC §6.1 / §7.3, item
+/// 2.3. Handed to `job_api::ack`, which reads the job row's frozen
+/// `steps_reserved` for §4.2's free/billable split.
 ///
-/// Ordering matters: the `customer_billings` read (the only way to spot an
-/// ExternalContract org, which §7.3 says to never pool-gate) is issued ONLY while
-/// the org still has grant left, so past that a request costs one counter read.
+/// It deliberately does NOT read the pool's balance. The balance answers "is
+/// there room now", and the ack needs "did THIS enqueue reserve": an org with a
+/// remainder too small for one run fails every reservation, so its balance never
+/// reaches zero and every run it makes as overage was billed as free.
 #[cfg(feature = "cloud")]
-async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::StepPoolViews {
-    // Both grants: this runs before `ack` reads the row that says which one the
-    // job spends from. Two in-memory counter reads, not two DB round trips.
-    let browser = openobserve_core::trial_quota::synthetics_steps_remaining(org_id, true);
-    let protocol = openobserve_core::trial_quota::synthetics_steps_remaining(org_id, false);
-    // Each grant decides for itself — summing would report an org whose browser
-    // pool is spent as still funded, and bill its browser steps as free.
-    //
-    // `> 0` first: a spent grant is billable whatever the plan says, so the
-    // `customer_billings` read is skipped once BOTH are gone.
-    let is_contract = (browser > 0 || protocol > 0)
-        && o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
-            org_id,
-        )
+async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::StepPoolGate {
+    use openobserve_synthetics::job_api::StepPoolGate;
+
+    // §7.3, E18/T36 — *"never pool-gate"* an ExternalContract org. §7.4 needs its
+    // acks billable so the NoOp provider advances a step-denominated true-up.
+    if o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(org_id)
         .await
-        .requires_additional_credits();
-    openobserve_synthetics::job_api::StepPoolViews {
-        browser: step_pool_view(browser, is_contract),
-        protocol: step_pool_view(protocol, is_contract),
+        .requires_additional_credits()
+    {
+        return StepPoolGate::NotApplicable;
     }
-}
-
-/// SPEC §6.1 / §7.3 — the free/billable decision for one ack, as arithmetic.
-#[cfg(feature = "cloud")]
-fn step_pool_view(
-    remaining: u64,
-    is_contract: bool,
-) -> openobserve_synthetics::job_api::StepPoolView {
-    use openobserve_synthetics::job_api::StepPoolView;
-
-    if remaining == 0 {
-        // §7.3, E16/T31 — grant gone, so metered overage. A Free org never got
-        // here; its slot was skipped at the enqueue.
-        return StepPoolView::Spent;
-    }
-    if is_contract {
-        // §7.3, E18/T36 — *"never pool-gate"*. §7.4 needs the ack billable so
-        // the NoOp provider advances a step-denominated true-up.
-        return StepPoolView::NotApplicable;
-    }
-    StepPoolView::Funded
+    StepPoolGate::PoolGated
 }
 
 /// §8.1: a build without `cloud` has no pool, so every ack is `NotApplicable`.
 #[cfg(not(feature = "cloud"))]
-async fn resolve_step_pool(_org_id: &str) -> openobserve_synthetics::job_api::StepPoolViews {
-    openobserve_synthetics::job_api::StepPoolViews::uniform(
-        openobserve_synthetics::job_api::StepPoolView::NotApplicable,
-    )
+async fn resolve_step_pool(_org_id: &str) -> openobserve_synthetics::job_api::StepPoolGate {
+    openobserve_synthetics::job_api::StepPoolGate::NotApplicable
 }
 
 /// Applies the free-pool movement one ack owes — SPEC §6.3, item 2.3.
@@ -2056,26 +2027,36 @@ mod tests {
     }
 
     /// SPEC §6.1 / §7.3 — every grant state maps to exactly one answer, and the
-    /// wrong answer is invisible: `Funded` with the grant gone is free service;
-    /// `Spent`/`NotApplicable` with grant left invoices work §6.1 gave away.
+    /// wrong answer is invisible: `Funded` with nothing reserved is free
+    /// service; `Spent`/`NotApplicable` on a reserved run invoices work §6.1
+    /// gave away.
+    ///
+    /// The input is the job row's frozen reservation, NOT the pool's balance: a
+    /// grant holding a remainder smaller than one run reserves nothing and still
+    /// reads as "room left", which billed every such run free forever.
     #[cfg(feature = "cloud")]
     #[test]
     fn the_step_pool_view_is_spec_6_1_and_7_3() {
-        use openobserve_synthetics::job_api::StepPoolView;
+        use openobserve_synthetics::job_api::{StepPoolGate, StepPoolView};
 
-        use super::step_pool_view;
+        // The enqueue reserved, so the grant already paid for this run.
+        assert_eq!(StepPoolGate::PoolGated.view_for(1), StepPoolView::Funded);
+        assert_eq!(StepPoolGate::PoolGated.view_for(36), StepPoolView::Funded);
 
-        // The grant still has room.
-        assert_eq!(step_pool_view(1, false), StepPoolView::Funded);
-        assert_eq!(step_pool_view(10_000, false), StepPoolView::Funded);
+        // Reserved nothing ⇒ metered overage (E16/T31), whatever the pool's
+        // balance says now.
+        assert_eq!(StepPoolGate::PoolGated.view_for(0), StepPoolView::Spent);
+        assert_eq!(StepPoolGate::PoolGated.view_for(-1), StepPoolView::Spent);
 
-        // Spent ⇒ metered overage (E16/T31).
-        assert_eq!(step_pool_view(0, false), StepPoolView::Spent);
-
-        // A contract org with grant left is never pool-gated (E18/T36). It cannot
-        // be asked about a SPENT grant: `resolve_step_pool` short-circuits at
-        // `remaining == 0`, so `is_contract` is never computed there.
-        assert_eq!(step_pool_view(10_000, true), StepPoolView::NotApplicable);
+        // A contract org is never pool-gated (E18/T36), reservation or not.
+        assert_eq!(
+            StepPoolGate::NotApplicable.view_for(36),
+            StepPoolView::NotApplicable
+        );
+        assert_eq!(
+            StepPoolGate::NotApplicable.view_for(0),
+            StepPoolView::NotApplicable
+        );
     }
 
     /// No compiler checks that the two crates' directions map the right way
