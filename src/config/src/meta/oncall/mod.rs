@@ -71,9 +71,9 @@ pub use rotation::{
     resolve_window,
 };
 pub use routing::{
-    ContextTeam, DimensionDepth, OwnershipError, OwnershipRule, Routed, RoutingConfig,
-    RoutingDecision, RoutingInputs, SERVICE_DIMENSION, UnroutedSignal, canonical_path, outstanding,
-    resolve_owner, resolve_owner_ranked, route,
+    DimensionDepth, OwnershipError, OwnershipRule, Routed, RoutingConfig, RoutingDecision,
+    RoutingInputs, SERVICE_DIMENSION, UnroutedSignal, canonical_path, outstanding, resolve_owner,
+    resolve_owner_ranked, route,
 };
 pub use subject::{SubjectError, SubjectRef, SubjectType};
 pub use target::{EscalationTarget, RotationMode, TargetError};

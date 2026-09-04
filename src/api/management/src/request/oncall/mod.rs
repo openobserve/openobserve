@@ -406,12 +406,6 @@ pub struct HistoryQuery {
 pub struct PreviewRoutingRequest {
     #[serde(default)]
     pub oncall_team: Option<String>,
-    /// What the source object's `context_attributes.team` would say. Accepted
-    /// here so "test routing" can answer for an alert that carries one — the
-    /// attribute is a routing input, and a preview that ignored it would tell
-    /// people the wrong team.
-    #[serde(default)]
-    pub context_team: Option<String>,
     #[serde(default)]
     pub dimensions: std::collections::HashMap<String, String>,
 }
@@ -3020,7 +3014,6 @@ pub async fn preview_routing(
         let routed = match o2_enterprise::enterprise::oncall::routing::decide(
             &org_id,
             body.oncall_team.as_deref(),
-            body.context_team.as_deref(),
             &body.dimensions,
         )
         .await
@@ -5004,21 +4997,18 @@ mod tests {
         }
     }
 
-    /// The preview has to see every level-1 source, or "test routing" reports a
+    /// The preview has to see the level-1 source, or "test routing" reports a
     /// team the real page would not go to — which is worse than no preview.
     #[test]
-    fn test_preview_accepts_both_level_one_sources() {
-        let full: PreviewRoutingRequest = serde_json::from_str(
-            r#"{"oncall_team":"t1","context_team":"Payments","dimensions":{"k8s-cluster":"prod"}}"#,
-        )
-        .unwrap();
+    fn test_preview_accepts_the_level_one_source() {
+        let full: PreviewRoutingRequest =
+            serde_json::from_str(r#"{"oncall_team":"t1","dimensions":{"k8s-cluster":"prod"}}"#)
+                .unwrap();
         assert_eq!(full.oncall_team.as_deref(), Some("t1"));
-        assert_eq!(full.context_team.as_deref(), Some("Payments"));
         assert_eq!(full.dimensions.get("k8s-cluster").unwrap(), "prod");
 
         let bare: PreviewRoutingRequest = serde_json::from_str("{}").unwrap();
         assert_eq!(bare.oncall_team, None);
-        assert_eq!(bare.context_team, None);
         assert!(bare.dimensions.is_empty());
     }
 

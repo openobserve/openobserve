@@ -361,13 +361,6 @@ impl OwnershipRule {
 pub enum RoutingDecision {
     /// The alert names its team directly, in its own `oncall_team` field.
     Explicit { team_id: String },
-    /// The alert's `context_attributes.team` named a team, and it exists.
-    Context {
-        team_id: String,
-        /// What the attribute actually said, which may be the team's name
-        /// rather than its id. Kept so the timeline can quote the alert.
-        named: String,
-    },
     /// A longest-prefix ownership match.
     Ownership {
         team_id: String,
@@ -387,7 +380,6 @@ impl RoutingDecision {
     pub fn team_id(&self) -> Option<&str> {
         match self {
             Self::Explicit { team_id }
-            | Self::Context { team_id, .. }
             | Self::Ownership { team_id, .. }
             | Self::Default { team_id } => Some(team_id),
             Self::Unrouted => None,
@@ -410,9 +402,6 @@ impl RoutingDecision {
     pub fn reason(&self) -> String {
         match self {
             Self::Explicit { team_id } => format!("routed to {team_id} by the alert's own setting"),
-            Self::Context { team_id, named } => {
-                format!("routed to {team_id} by the alert's context attribute team=`{named}`")
-            }
             Self::Ownership { team_id, path, .. } => {
                 format!("routed to {team_id} by ownership rule {path}")
             }
@@ -426,30 +415,13 @@ impl RoutingDecision {
     }
 }
 
-/// What `context_attributes.team` said, once somebody has checked whether it
-/// names a real team.
-///
-/// The check needs the database, so it cannot happen in here; what happens in
-/// here is deciding what to do with the answer. Splitting it this way is what
-/// keeps a level-1 source that names a deleted team from failing the page.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ContextTeam<'a> {
-    /// The attribute named a team that exists in this org.
-    Known { team_id: &'a str, named: &'a str },
-    /// It named something that is not a team here — a typo, or a team that has
-    /// since been deleted.
-    Unknown { named: &'a str },
-}
-
 /// Everything the decision is made from. A struct rather than five positional
 /// arguments because the *order* of these is the design, and a caller that
 /// swapped two `Option<&str>`s would compile.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct RoutingInputs<'a> {
-    /// Level 1a — `alerts.oncall_team`, the field on the object itself.
+    /// Level 1 — `alerts.oncall_team`, the field on the object itself.
     pub explicit_team_id: Option<&'a str>,
-    /// Level 1b — `context_attributes.team`, already resolved against the org.
-    pub context_team: Option<ContextTeam<'a>>,
     /// Level 2 — the org's ownership rules.
     pub rules: &'a [OwnershipRule],
     /// The identity dimensions the signal carried.
@@ -678,46 +650,24 @@ pub fn resolve_owner_ranked<'a>(
 /// The full routing decision, in the order §5 specifies.
 ///
 /// ```text
-/// 1. the source object's own metadata  (oncall_team, then context_attributes.team)
+/// 1. the source object's own `oncall_team`
 /// 2. longest-prefix ownership
 /// 3. the nominated default team
 /// ```
 ///
 /// Explicit beats discovered: a team that has deliberately set the alert's
 /// owner is stating something the dimensions cannot express, and must not be
-/// overruled by a rule someone else added later. Within level 1 the object's
-/// own field beats the context attribute, because the field is a control
-/// somebody chose on purpose and the attribute is free-form KV that travels
-/// with the payload.
+/// overruled by a rule someone else added later.
 ///
 /// The default tier is last and optional. It is safe to have precisely because
 /// nothing creates it: a fresh org has none, and a signal that reaches this
 /// point with none configured stays unrouted and visible rather than being
 /// handed to a team who never agreed to hold the pager for it.
 pub fn route(inputs: &RoutingInputs<'_>) -> Routed {
-    let mut notes = Vec::new();
-
     if let Some(team_id) = inputs.explicit_team_id.filter(|t| !t.trim().is_empty()) {
         return Routed::plain(RoutingDecision::Explicit {
             team_id: team_id.to_string(),
         });
-    }
-
-    match inputs.context_team {
-        Some(ContextTeam::Known { team_id, named }) if !team_id.trim().is_empty() => {
-            return Routed::plain(RoutingDecision::Context {
-                team_id: team_id.to_string(),
-                named: named.to_string(),
-            });
-        }
-        // A page must not fail because somebody mistyped a label. The signal
-        // carries on down the chain, and the timeline says why the attribute
-        // was not honoured — otherwise the alert looks routed to whoever wrote
-        // the label and pages someone else entirely, with nothing to explain it.
-        Some(ContextTeam::Unknown { named }) => notes.push(format!(
-            "the alert's context attribute team=`{named}` names no team in this org, so it was ignored"
-        )),
-        _ => {}
     }
 
     let empty = HashMap::new();
@@ -725,16 +675,14 @@ pub fn route(inputs: &RoutingInputs<'_>) -> Routed {
     let no_depths = DimensionDepth::default();
     let depths = inputs.depths.unwrap_or(&no_depths);
     if let Some(rule) = resolve_owner_ranked(inputs.rules, dims, depths) {
-        return Routed {
-            decision: RoutingDecision::Ownership {
-                team_id: rule.team_id.clone(),
-                rule_id: rule.id.clone(),
-                path: rule.path(),
-            },
-            notes,
-        };
+        return Routed::plain(RoutingDecision::Ownership {
+            team_id: rule.team_id.clone(),
+            rule_id: rule.id.clone(),
+            path: rule.path(),
+        });
     }
 
+    let notes = vec![uncovered_note(dims)];
     if let Some(team_id) = inputs.default_team_id.filter(|t| !t.trim().is_empty()) {
         return Routed {
             decision: RoutingDecision::Default {
@@ -748,6 +696,21 @@ pub fn route(inputs: &RoutingInputs<'_>) -> Routed {
         decision: RoutingDecision::Unrouted,
         notes,
     }
+}
+
+/// What nobody claimed, named — so "why did this land on the catch-all" is a
+/// task rather than a mystery.
+///
+/// Sorted because the note goes on a timeline that people compare across
+/// firings, and a `HashMap`'s order would make one identity read as several.
+fn uncovered_note(dims: &HashMap<String, String>) -> String {
+    if dims.is_empty() {
+        return "this signal carried no dimensions, so no ownership rule could match it"
+            .to_string();
+    }
+    let mut named: Vec<String> = dims.iter().map(|(k, v)| format!("{k}={v}")).collect();
+    named.sort();
+    format!("no ownership rule covers {}", named.join(", "))
 }
 
 #[cfg(test)]
@@ -1300,7 +1263,6 @@ mod tests {
             let dimensions = if owned { &matching } else { &missing };
             let routed = route(&RoutingInputs {
                 explicit_team_id: explicit.then_some("chosen"),
-                context_team: None,
                 rules: &rules,
                 dimensions: Some(dimensions),
                 default_team_id: defaulted.then_some("catch-all"),
@@ -1415,86 +1377,6 @@ mod tests {
         assert_eq!(routed.team_id(), Some("catch-all"));
     }
 
-    /// §5 names both level-1 sources. The object's own field is the deliberate
-    /// control and wins; the context attribute is the one Alertmanager and
-    /// Datadog users arrive with muscle memory for, and it beats ownership.
-    #[test]
-    fn test_the_context_attribute_sits_below_the_field_and_above_ownership() {
-        let rules = vec![rule("r", "platform", &[("k8s-cluster", "prod")])];
-        let matching = dims(&[("k8s-cluster", "prod")]);
-        let context = Some(ContextTeam::Known {
-            team_id: "payments",
-            named: "Payments",
-        });
-
-        let both = route(&RoutingInputs {
-            explicit_team_id: Some("chosen"),
-            context_team: context,
-            rules: &rules,
-            dimensions: Some(&matching),
-            default_team_id: Some("catch-all"),
-            depths: None,
-        });
-        assert_eq!(both.team_id(), Some("chosen"));
-
-        let attribute_only = route(&RoutingInputs {
-            context_team: context,
-            rules: &rules,
-            dimensions: Some(&matching),
-            default_team_id: Some("catch-all"),
-            ..Default::default()
-        });
-        assert_eq!(
-            attribute_only.decision,
-            RoutingDecision::Context {
-                team_id: "payments".into(),
-                named: "Payments".into(),
-            }
-        );
-        assert!(attribute_only.reason().contains("context attribute"));
-        assert!(attribute_only.reason().contains("Payments"));
-    }
-
-    /// A typo in a label must not cost somebody a page. The signal falls
-    /// through to the tiers below, and the timeline says why the attribute was
-    /// not honoured — otherwise the page arrives at a team nobody can explain.
-    #[test]
-    fn test_an_unknown_context_team_falls_through_and_says_so() {
-        let rules = vec![rule("r", "platform", &[("k8s-cluster", "prod")])];
-        let unknown = Some(ContextTeam::Unknown { named: "paymnets" });
-
-        let to_ownership = route(&RoutingInputs {
-            context_team: unknown,
-            rules: &rules,
-            dimensions: Some(&dims(&[("k8s-cluster", "prod")])),
-            default_team_id: Some("catch-all"),
-            ..Default::default()
-        });
-        assert_eq!(to_ownership.team_id(), Some("platform"));
-        assert!(to_ownership.reason().contains("paymnets"));
-        assert!(to_ownership.reason().contains("names no team in this org"));
-        assert!(to_ownership.reason().contains("ownership rule"));
-
-        let to_default = route(&RoutingInputs {
-            context_team: unknown,
-            rules: &rules,
-            dimensions: Some(&dims(&[("k8s-cluster", "staging")])),
-            default_team_id: Some("catch-all"),
-            ..Default::default()
-        });
-        assert_eq!(to_default.team_id(), Some("catch-all"));
-        assert!(to_default.reason().contains("paymnets"));
-        assert!(to_default.reason().contains("default team catch-all"));
-
-        // Nothing below it either: still a fall-through, never an error.
-        let to_queue = route(&RoutingInputs {
-            context_team: unknown,
-            ..Default::default()
-        });
-        assert!(!to_queue.is_routed());
-        assert!(to_queue.reason().contains("paymnets"));
-    }
-
     /// An unroutable signal must be a visible outcome, not a silent drop — and
     /// its reason must say that the absence of a default team is part of why.
     #[test]
@@ -1504,6 +1386,47 @@ mod tests {
         assert_eq!(routed.team_id(), None);
         assert!(routed.reason().contains("no team was paged"));
         assert!(routed.reason().contains("no default team is set"));
+    }
+
+    /// "Nothing owns this" is a task somebody can act on only if the note says
+    /// what nothing owns. Landing on the catch-all says it too: otherwise the
+    /// gap disappears the moment an org nominates one.
+    #[test]
+    fn test_an_uncovered_signal_names_what_nothing_covers() {
+        let uncovered = dims(&[("k8s-cluster", "prod"), ("service", "zxporter")]);
+
+        let queued = route(&RoutingInputs {
+            dimensions: Some(&uncovered),
+            ..Default::default()
+        });
+        assert_eq!(
+            queued.notes,
+            vec!["no ownership rule covers k8s-cluster=prod, service=zxporter"],
+            "sorted, so one identity reads the same on every firing"
+        );
+
+        let defaulted = route(&RoutingInputs {
+            dimensions: Some(&uncovered),
+            default_team_id: Some("catch-all"),
+            ..Default::default()
+        });
+        assert_eq!(defaulted.notes, queued.notes);
+        assert!(defaulted.reason().contains("service=zxporter"));
+
+        assert_eq!(
+            route(&RoutingInputs::default()).notes,
+            vec!["this signal carried no dimensions, so no ownership rule could match it"]
+        );
+
+        let owned = route(&RoutingInputs {
+            rules: &[rule("r", "platform", &[("k8s-cluster", "prod")])],
+            dimensions: Some(&uncovered),
+            ..Default::default()
+        });
+        assert!(
+            owned.notes.is_empty(),
+            "a rule matched; nothing is uncovered"
+        );
     }
 
     /// The reason is written to the timeline, so "why was I paged" is
@@ -1541,7 +1464,7 @@ mod tests {
             ..Default::default()
         });
         assert_eq!(
-            defaulted.reason(),
+            defaulted.decision.reason(),
             "no ownership rule matched, so it went to the default team Platform"
         );
         assert!(!defaulted.reason().contains("rule_id"));
@@ -1795,10 +1718,6 @@ mod tests {
         let decisions = [
             RoutingDecision::Explicit {
                 team_id: "t".into(),
-            },
-            RoutingDecision::Context {
-                team_id: "t".into(),
-                named: "Payments".into(),
             },
             RoutingDecision::Ownership {
                 team_id: "t".into(),

@@ -260,25 +260,6 @@ impl Default for Alert {
 }
 
 impl Alert {
-    /// The team named by `context_attributes.team`, if the alert carries one.
-    ///
-    /// §5 of the routing design names this alongside `oncall_team` as a level-1
-    /// source, and it is the one Alertmanager and Datadog users arrive with
-    /// muscle memory for — their rules already carry a `team:` label, and this
-    /// is where such a label lands. Lower precedence than `oncall_team`: that
-    /// field is a control somebody chose deliberately, this is free-form KV
-    /// travelling with the payload.
-    ///
-    /// Returns the string as written. Whether it names a real team is a
-    /// question about the org, answered where the teams live.
-    pub fn context_team(&self) -> Option<&str> {
-        self.context_attributes
-            .as_ref()?
-            .get("team")
-            .map(|t| t.trim())
-            .filter(|t| !t.is_empty())
-    }
-
     /// Get the unique identifier of the alert.
     /// For now it ruturns the `stream_type` and `stream_name` concatenated
     /// along with alert name. In future, once the migration to v2 alerts
@@ -940,34 +921,6 @@ mod tests {
         assert!(obj.contains_key("context_attributes"));
         assert!(obj.contains_key("updated_at"));
         assert!(obj.contains_key("deduplication"));
-    }
-
-    /// §5's second level-1 source. An alert imported from Alertmanager or
-    /// Datadog carries its team as a label, and that label lands in
-    /// `context_attributes` — so routing has to be able to read it out of
-    /// there, whitespace and all, without confusing an empty one for a name.
-    #[test]
-    fn test_the_context_team_is_read_out_of_the_context_attributes() {
-        let with = |value: &str| Alert {
-            context_attributes: Some(HashMap::from([("team".to_string(), value.to_string())])),
-            ..Default::default()
-        };
-        assert_eq!(with("Payments").context_team(), Some("Payments"));
-        assert_eq!(with("  Payments  ").context_team(), Some("Payments"));
-
-        // An empty or whitespace-only value is an unset attribute, not a team
-        // named "" — otherwise routing would look one up and report it missing.
-        for blank in ["", "   "] {
-            assert_eq!(with(blank).context_team(), None, "blank={blank:?}");
-        }
-
-        // No attributes at all, and attributes with no `team` key.
-        assert_eq!(Alert::default().context_team(), None);
-        let other = Alert {
-            context_attributes: Some(HashMap::from([("env".to_string(), "prod".to_string())])),
-            ..Default::default()
-        };
-        assert_eq!(other.context_team(), None);
     }
 
     // ── Feature 2: list params (PT-3, PT-8) ─────────────────────────────────

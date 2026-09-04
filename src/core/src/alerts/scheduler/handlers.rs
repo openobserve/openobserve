@@ -1713,7 +1713,6 @@ async fn page_for_alert_firing(
         &alert.name,
         priority,
         alert.oncall_team.as_deref(),
-        alert.context_team(),
         &group_dimensions,
     )
     .await
