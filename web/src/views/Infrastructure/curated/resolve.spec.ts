@@ -20,13 +20,7 @@
 import { describe, it, expect } from "vitest";
 import type { FieldAlias } from "@/services/service_streams";
 import defaultSemanticGroups from "./packs/__fixtures__/semanticGroups.default.json";
-import {
-  resolveManifest,
-  buildDashboard,
-  promEscape,
-  sqlEscape,
-  STALE_GRACE_US,
-} from "./resolve";
+import { resolveManifest, buildDashboard, promEscape, sqlEscape, STALE_GRACE_US } from "./resolve";
 import { GROUP, STALENESS_24H_US } from "./types";
 import { kubernetesPage } from "./packs/kubernetes.page";
 import { hostsPage } from "./packs/hosts.page";
@@ -164,8 +158,7 @@ const allLegends = (dashboard: any): string[] =>
     ),
   );
 
-const panelById = (resolution: any, id: string) =>
-  resolution.panels.find((p: any) => p.id === id);
+const panelById = (resolution: any, id: string) => resolution.panels.find((p: any) => p.id === id);
 
 const hiddenFor = (resolution: any, groupId: string) =>
   resolution.hiddenGroups.find((h: any) => h.group.id === groupId);
@@ -433,7 +426,7 @@ describe("token substitution", () => {
     expect(allLegends(dashboard).some((l) => l.includes("{k8s_node_name}"))).toBe(true);
   });
 
-  it("${scope:x} inside a matcher emits field=~\"$x\"", () => {
+  it('${scope:x} inside a matcher emits field=~"$x"', () => {
     const dashboard = build(resolve({}));
     const podCpu = allQueries(dashboard).find((q) => q.includes("k8s_pod_cpu_usage"))!;
     expect(podCpu).toContain('namespace=~"$namespace"');
@@ -487,9 +480,7 @@ describe("token substitution", () => {
     const resolution = resolve({ manifest: noClusterProbe, streams });
     const dashboard = buildDashboard(noClusterProbe, resolution, {}, { timezone: "UTC" });
 
-    expect(
-      (dashboard.variables?.list ?? []).some((v: any) => v.name === "cluster"),
-    ).toBe(false);
+    expect((dashboard.variables?.list ?? []).some((v: any) => v.name === "cluster")).toBe(false);
     for (const q of allQueries(dashboard)) {
       expect(q).not.toContain("{}");
       expect(q).not.toMatch(/\{\s*,/);
@@ -530,8 +521,16 @@ describe("§5.2 variant satisfiability — presence AND liveness", () => {
     // The headline measured case. Presence-only selection rendered four blank
     // hero panels inside a group nothing badged.
     const streams = streamLists([
-      { name: "k8s_node_cpu_utilization", docTimeMax: NOW_US - 177 * DAY_US, schema: KUBELET_NODE_SCHEMA },
-      { name: "k8s_node_cpu_usage", docTimeMax: NOW_US - 6 * 60 * 1_000_000, schema: KUBELET_NODE_SCHEMA },
+      {
+        name: "k8s_node_cpu_utilization",
+        docTimeMax: NOW_US - 177 * DAY_US,
+        schema: KUBELET_NODE_SCHEMA,
+      },
+      {
+        name: "k8s_node_cpu_usage",
+        docTimeMax: NOW_US - 6 * 60 * 1_000_000,
+        schema: KUBELET_NODE_SCHEMA,
+      },
       { name: "k8s_node_memory_usage", schema: KUBELET_NODE_SCHEMA },
     ]);
     const resolution = resolve({ streams });
@@ -648,7 +647,10 @@ describe("§5.2 variant satisfiability — presence AND liveness", () => {
   });
 
   it("presence matches EXACTLY, per stream type — a logs stream of the same name does not count", () => {
-    const wrongType = streamLists([], [{ name: "k8s_node_cpu_usage", schema: KUBELET_NODE_SCHEMA }]);
+    const wrongType = streamLists(
+      [],
+      [{ name: "k8s_node_cpu_usage", schema: KUBELET_NODE_SCHEMA }],
+    );
     expect(hiddenFor(resolve({ streams: wrongType }), "kubelet-node")).toBeDefined();
   });
 
@@ -766,9 +768,9 @@ describe("§5.3 staleness — min(range.start, now − STALE_GRACE_US)", () => {
       STALE_AT;
 
     // Control: without the declaration the union's max is fresh ⇒ NOT stale.
-    expect(
-      resolve({ streams }).staleGroups.some((s: any) => s.group.id === "kubelet-node"),
-    ).toBe(false);
+    expect(resolve({ streams }).staleGroups.some((s: any) => s.group.id === "kubelet-node")).toBe(
+      false,
+    );
 
     const stale = resolve({ manifest: declared, streams }).staleGroups.find(
       (s: any) => s.group.id === "kubelet-node",
@@ -974,7 +976,9 @@ describe("§5.5 buildDashboard", () => {
     const streams = fullK8sStreams();
     for (const entry of streams.metrics) entry.stats.doc_time_max = NOW_US - 3 * DAY_US;
     const dashboard = build(resolve({ streams, range: longRange }));
-    const badged = dashboard.tabs.flatMap((t: any) => t.panels).filter((p: any) => p.config.curated_badge);
+    const badged = dashboard.tabs
+      .flatMap((t: any) => t.panels)
+      .filter((p: any) => p.config.curated_badge);
     expect(badged.length).toBeGreaterThan(0);
     for (const panel of badged) {
       expect(panel.config.curated_badge.key).toBe("infra.curated.staleBadge");
@@ -1046,7 +1050,9 @@ describe("layout flow — 192-col rows", () => {
 
 describe("strip model", () => {
   it("hidden and stale group info both surface capabilityKey — the collapsed line's source", () => {
-    const resolution = resolve({ streams: streamLists([{ name: "kube_pod_status_phase", schema: KUBE_POD_PHASE_SCHEMA }]) });
+    const resolution = resolve({
+      streams: streamLists([{ name: "kube_pod_status_phase", schema: KUBE_POD_PHASE_SCHEMA }]),
+    });
     expect(resolution.hiddenGroups.length).toBeGreaterThan(0);
     for (const hidden of resolution.hiddenGroups) {
       expect(hidden.group.capabilityKey).toBeTruthy();
@@ -1178,12 +1184,31 @@ describe("hosts pack resolution (§7.3, pass-4 finding 17)", () => {
 // ── §8.2 parity: the engine reproduces the frozen pre-retrofit builder ──────
 
 describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard output", () => {
+  /**
+   * Delete EXACTLY the §8.2 modulo set from both sides, so any new divergence
+   * fails instead of silently widening the tolerance. `config.drilldown` is in
+   * the set because the frozen builder authored none while §6.6's lint requires
+   * one on every non-probe chart panel — see the §8.2 note.
+   */
+  const strip = (doc: any) => {
+    const copy = JSON.parse(JSON.stringify(doc));
+    delete copy.created;
+    delete copy.title;
+    for (const tab of copy.tabs ?? []) {
+      delete tab.tabId;
+      delete tab.name;
+      for (const panel of tab.panels ?? []) {
+        delete panel.config?.curated_badge;
+        delete panel.config?.drilldown;
+      }
+    }
+    return copy;
+  };
+
   it("builds a dashboard deep-equal to the committed fixture modulo the enumerated key set", async () => {
     // The fixture was generated from the pre-retrofit builder BEFORE its deletion;
     // this spec never imports buildHostDashboard, so it outlives the migration.
-    const golden = (
-      await import("./packs/__fixtures__/hostDashboard.golden.json")
-    ).default as any;
+    const golden = (await import("./packs/__fixtures__/hostDashboard.golden.json")).default as any;
 
     const resolution = resolveManifest({
       manifest: hostsPage,
@@ -1200,29 +1225,33 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       { timezone: "UTC" },
     );
 
-    // Delete EXACTLY the §8.2 modulo set from both sides, so any new divergence
-    // fails instead of silently widening the tolerance.
-    const strip = (doc: any) => {
-      const copy = JSON.parse(JSON.stringify(doc));
-      delete copy.created;
-      delete copy.title;
-      for (const tab of copy.tabs ?? []) {
-        delete tab.tabId;
-        delete tab.name;
-        for (const panel of tab.panels ?? []) delete panel.config?.curated_badge;
-      }
-      return copy;
-    };
-
     expect(strip(engine)).toEqual(strip(golden));
   });
 
-  it("every golden query pins host_name=\"host-1\" — the escape contract survived the move", async () => {
-    const golden = (
-      await import("./packs/__fixtures__/hostDashboard.golden.json")
-    ).default as any;
-    const queries = allQueries(golden);
+  it('every ENGINE-BUILT query pins host_name="host-1" — the escape contract survived the move', () => {
+    // Asserted against buildDashboard output, not the fixture: a spec that reads
+    // the fixture and asserts facts about the fixture touches no engine code and
+    // can never go red.
+    const resolution = resolveManifest({
+      manifest: hostsPage,
+      streams: fullHostsStreams(),
+      semanticGroups: dictionary(GROUP.host),
+      range: RANGE,
+      now: NOW_US,
+      pins: { [GROUP.host]: "host-1" },
+    });
+    const engine = buildDashboard(
+      hostsPage,
+      resolution,
+      { [GROUP.host]: "host-1" },
+      { timezone: "UTC" },
+    );
+    const queries = allQueries(engine);
     expect(queries).toHaveLength(10);
-    for (const query of queries) expect(query).toContain('host_name="host-1"');
+    for (const query of queries) {
+      expect(query).toContain('host_name="host-1"');
+      expect(query).not.toContain("${f:");
+      expect(query).not.toContain("${scope:");
+    }
   });
 });

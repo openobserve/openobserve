@@ -143,7 +143,14 @@ const stripModuloKeys = (doc: any) => {
   for (const tab of copy.tabs ?? []) {
     delete tab.tabId;
     delete tab.name;
-    for (const panel of tab.panels ?? []) delete panel.config?.curated_badge;
+    for (const panel of tab.panels ?? []) {
+      delete panel.config?.curated_badge;
+      // The pre-retrofit builder authored no drilldowns (all 8 fixture panels
+      // carry `[]`), but §6.6's lint requires every non-probe chart panel to
+      // declare one — without this key in the set the two rules are mutually
+      // unsatisfiable. §8.2 records the widening.
+      delete panel.config?.drilldown;
+    }
   }
   return copy;
 };
@@ -216,22 +223,15 @@ describe("HostDetailDrawer", () => {
   // ── §8.2 golden parity — the red-first bridge across the builder's deletion ─
 
   describe("golden parity with the pre-retrofit builder", () => {
-    it("the dashboard is built by the ENGINE, off the hosts pack registry", async () => {
-      // Red until the retrofit lands: today's builder is synchronous and reads no
-      // stream list at all, so it cannot have consulted the resolution inputs.
-      // Without this the parity case below is a tautology — the fixture was
-      // generated FROM the builder, so the builder trivially matches it.
+    it("the ENGINE builds it AND it deep-equals the FROZEN fixture, modulo the enumerated keys", async () => {
+      // Provenance and parity are ONE case on purpose. The fixture was generated
+      // from buildHostDashboard("host-1") (§8.2 step 1), so parity alone is a
+      // tautology the pre-retrofit builder passes today: it would accept any
+      // implementation that emits the right JSON without going through the
+      // engine. Asserting the resolution input was actually read in the same
+      // case is what makes the deep-equal discriminate.
       wrapper = await mountDrawer({ hostName: "host-1" });
       expect(getStreamsMock).toHaveBeenCalledWith("metrics", false, false, expect.anything());
-    });
-
-    it("the engine-built dashboard deep-equals the FROZEN fixture, modulo the enumerated keys", async () => {
-      // The fixture was generated from buildHostDashboard("host-1") BEFORE its
-      // deletion (§8.2 step 1); this spec never imports the builder, so it
-      // outlives the migration rather than self-destructing with it. Deleting
-      // EXACTLY the §8.2 key set means a new divergence fails here instead of
-      // silently widening the tolerance.
-      wrapper = await mountDrawer({ hostName: "host-1" });
       expect(lastDashboardData).toBeTruthy();
       expect(stripModuloKeys(lastDashboardData)).toEqual(stripModuloKeys(goldenDashboard));
     });

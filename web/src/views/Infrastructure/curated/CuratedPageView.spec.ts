@@ -59,6 +59,8 @@ const makeState = (over: Record<string, any> = {}) => {
     warnings: ref([]),
     lastDataUs: ref(NOW_US - 12_000_000),
     stripAutoExpand: ref(false),
+    /** The manifest's first group's setup door — card for k8s/hosts, route for AWS. */
+    setupDoor: ref({ kind: "card", slug: "kubernetes" }),
     refresh: refreshSpy,
     ...over,
   };
@@ -111,8 +113,16 @@ describe("CuratedPageView", () => {
   const mountView = async (props: Record<string, any> = {}, over: Record<string, any> = {}) => {
     state = makeState(over);
     useCuratedPageMock.mockReturnValue(state);
+    // A real mutation, not a plain-object assignment: mutating store.state
+    // directly fires no watcher, which makes an org-switch pin pass against a
+    // view that has no org watcher at all.
     const store = createStore({
       state: { selectedOrganization: { identifier: "test-org" }, timezone: "UTC", theme: "light" },
+      mutations: {
+        setOrganization(state: any, org: any) {
+          state.selectedOrganization = org;
+        },
+      },
     });
     router = createRouter({
       history: createMemoryHistory(),
@@ -213,6 +223,44 @@ describe("CuratedPageView", () => {
       expect(wrapper.find('[data-test="curated-partial-telemetry"]').exists()).toBe(false);
     });
 
+    it("a ROUTE-kind undetected face renders a CTA that pushes the route, not an inline card", async () => {
+      // Successor to the deleted WorkloadStubPage.spec's AWS route-CTA case. The
+      // AWS pack CONTENT is deferred, but the undetected face's route-kind branch
+      // is engine behavior, so it is pinned against a minimal route-kind manifest
+      // rather than left uncovered until the pack lands. The strip's Set-up button
+      // is a different code path and does not cover this one.
+      wrapper = await mountView(
+        { workload: "aws" },
+        {
+          face: ref("undetected"),
+          dashboard: ref(null),
+          setupDoor: ref({ kind: "route", routeName: "AWSConfig" }),
+        },
+      );
+
+      expect(wrapper.find('[data-test="setup-card-stub"]').exists()).toBe(false);
+      const cta = wrapper.find('[data-test="curated-setup-route-cta"]');
+      expect(cta.exists()).toBe(true);
+
+      await cta.trigger("click");
+      await flushPromises();
+      expect(router.push).toHaveBeenCalledWith(expect.objectContaining({ name: "AWSConfig" }));
+    });
+
+    it("a route-kind setup face has NO @detected hook — the user leaves and comes back", async () => {
+      // §6.1: route-kind pages re-check on remount/focus, so wiring a card hook
+      // here would be dead code.
+      wrapper = await mountView(
+        { workload: "aws" },
+        {
+          face: ref("undetected"),
+          dashboard: ref(null),
+          setupDoor: ref({ kind: "route", routeName: "AWSConfig" }),
+        },
+      );
+      expect(wrapper.findComponent({ name: "DataSourceSetupCard" }).exists()).toBe(false);
+    });
+
     it("`ready` renders viewOnly, frameless, searchType=dashboards charts", async () => {
       wrapper = await mountView();
       expect(captured.viewOnly).toBe(true);
@@ -241,7 +289,10 @@ describe("CuratedPageView", () => {
   describe("refresh triggers", () => {
     it("the header Refresh renders on EVERY face and forces", async () => {
       for (const face of ["undetected", "ready"]) {
-        wrapper = await mountView({}, { face: ref(face), dashboard: ref(face === "ready" ? dashboardFixture() : null) });
+        wrapper = await mountView(
+          {},
+          { face: ref(face), dashboard: ref(face === "ready" ? dashboardFixture() : null) },
+        );
         const button = wrapper.find('[data-test="curated-refresh"]');
         expect(button.exists(), face).toBe(true);
         refreshSpy.mockClear();
@@ -418,7 +469,9 @@ describe("CuratedPageView", () => {
       );
       const html = wrapper.find('[data-test="curated-strip-group-kube-state"]').html();
       expect(html.indexOf("curated-strip-setup")).toBeGreaterThan(-1);
-      expect(html.indexOf("curated-strip-setup")).toBeLessThan(html.indexOf("kube_pod_status_phase"));
+      expect(html.indexOf("curated-strip-setup")).toBeLessThan(
+        html.indexOf("kube_pod_status_phase"),
+      );
     });
 
     it("a card-kind Set-up expands the DataSourceSetupCard inline in an accordion", async () => {
@@ -460,7 +513,11 @@ describe("CuratedPageView", () => {
           hiddenGroups: ref([
             hiddenGroup({
               missingStreams: [
-                { name: "k8s_node_cpu_usage", state: "stale", lastSeenUs: NOW_US - 177 * 24 * HOUR_US },
+                {
+                  name: "k8s_node_cpu_usage",
+                  state: "stale",
+                  lastSeenUs: NOW_US - 177 * 24 * HOUR_US,
+                },
               ],
             }),
           ]),
@@ -516,9 +573,7 @@ describe("CuratedPageView", () => {
           stripAutoExpand: ref(true),
         },
       );
-      expect(wrapper.find('[data-test="curated-strip"]').text()).toContain(
-        "k8s_node_memory_usage",
-      );
+      expect(wrapper.find('[data-test="curated-strip"]').text()).toContain("k8s_node_memory_usage");
     });
 
     it("STALE rows render setupHintKey too — 'what do I restart?' is the next question", async () => {
@@ -673,10 +728,7 @@ describe("CuratedPageView", () => {
 
   describe("warnings", () => {
     it("`probe` renders the user-situation wording, not the engine's verification step", async () => {
-      wrapper = await mountView(
-        {},
-        { warnings: ref([{ kind: "probe", message: "CloudTrail" }]) },
-      );
+      wrapper = await mountView({}, { warnings: ref([{ kind: "probe", message: "CloudTrail" }]) });
       const banner = wrapper.find('[data-test="curated-warning-probe"]');
       expect(banner.exists()).toBe(true);
       expect(banner.text().toLowerCase()).toContain("showing its panels anyway");
@@ -746,32 +798,43 @@ describe("CuratedPageView", () => {
     });
 
     it("switching to a section that DECLARES it re-enables it with the SELECTION PRESERVED", async () => {
-      // The preservation half is the reason dim beat vanish.
+      // The preservation half is the reason dim beat vanish. The section change is
+      // driven through the INJECTED selectedTabId — the design puts the tab bar
+      // inside RenderDashboardCharts (showTabs + provide), so clicking a
+      // `curated-tab-*` element in the view would fail a conformant
+      // implementation that correctly delegates tabs to the renderer.
       wrapper = await mountView({}, withPickers());
       const picker = wrapper.find('[data-test="curated-picker-namespace"]');
       await picker.trigger("change");
-      await wrapper.find('[data-test="curated-tab-workloads"]').trigger("click");
+      const selected = picker.attributes("data-value");
+
+      const injected = wrapper.findComponent({ name: "RenderDashboardCharts" }).vm
+        .selectedTabId as Ref<string | null>;
+      expect(injected.value).toBe("overview");
+      injected.value = "workloads";
       await flushPromises();
+
       const after = wrapper.find('[data-test="curated-picker-namespace"]');
       expect(after.attributes("data-disabled")).toBe("false");
-      expect(after.attributes("data-value")).toBe(picker.attributes("data-value"));
+      expect(after.attributes("data-value")).toBe(selected);
     });
 
     it("values length === cap renders the valuesCapped copy; below the cap it is absent", async () => {
       // Truncation is undetectable (no_count:true), so length===cap is the only
       // inference available and it errs toward disclosure.
       wrapper = await mountView({}, withPickers());
-      wrapper.findComponent({ name: "RenderDashboardCharts" }).vm.$emit(
-        "variable-values-loaded",
-        { name: "namespace", values: new Array(100).fill("ns") },
-      );
+      wrapper
+        .findComponent({ name: "RenderDashboardCharts" })
+        .vm.$emit("variable-values-loaded", {
+          name: "namespace",
+          values: new Array(100).fill("ns"),
+        });
       await flushPromises();
       expect(wrapper.find('[data-test="curated-values-capped-namespace"]').exists()).toBe(true);
 
-      wrapper.findComponent({ name: "RenderDashboardCharts" }).vm.$emit(
-        "variable-values-loaded",
-        { name: "cluster", values: new Array(3).fill("c") },
-      );
+      wrapper
+        .findComponent({ name: "RenderDashboardCharts" })
+        .vm.$emit("variable-values-loaded", { name: "cluster", values: new Array(3).fill("c") });
       await flushPromises();
       expect(wrapper.find('[data-test="curated-values-capped-cluster"]').exists()).toBe(false);
     });
@@ -834,13 +897,33 @@ describe("CuratedPageView", () => {
 
   // ── Org switch (§5.6) ────────────────────────────────────────────────────
 
-  it("an org switch refreshes with force:true and resets picker URL params", async () => {
+  it("an org switch refreshes EXACTLY ONCE with force:true and resets the picker URL params", async () => {
+    // Driven through a real reactive store commit: assigning onto a plain object
+    // fires no watcher, so the previous shape passed on a view with no org
+    // watcher at all. The call count is asserted because "refresh ran" is also
+    // true of a mount, and only a count attributes it to the org change.
     wrapper = await mountView();
-    refreshSpy.mockClear();
     await router.replace({ path: "/infra/kubernetes", query: { "var-namespace": "default" } });
-    (wrapper.vm as any).$store.state.selectedOrganization = { identifier: "other-org" };
     await flushPromises();
+    refreshSpy.mockClear();
+
+    (wrapper.vm as any).$store.commit("setOrganization", { identifier: "other-org" });
+    await flushPromises();
+
+    expect(refreshSpy).toHaveBeenCalledTimes(1);
     expect(refreshSpy).toHaveBeenCalledWith(expect.objectContaining({ force: true }));
     expect(router.currentRoute.value.query["var-namespace"]).toBeUndefined();
+  });
+
+  it("an org switch RESETS the dashboards list — the stale org's panels never survive it", async () => {
+    // §9's other half: the reset was only weakly implied by the refresh call.
+    wrapper = await mountView();
+    expect(captured.dashboardData).toBeTruthy();
+
+    state.dashboard.value = null;
+    (wrapper.vm as any).$store.commit("setOrganization", { identifier: "other-org" });
+    await flushPromises();
+
+    expect(wrapper.find(".render-stub").exists()).toBe(false);
   });
 });
