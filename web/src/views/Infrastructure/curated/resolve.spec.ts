@@ -98,8 +98,16 @@ const K8S_FULL_DICT = dictionary(
 // Schema sets measured on the live enterprise org (dry run findings 5, 12).
 const KUBELET_NODE_SCHEMA = ["k8s_node_name", "k8s_cluster_name", "_timestamp", "value"];
 const KUBELET_POD_SCHEMA = ["k8s_namespace_name", "k8s_pod_name", "_timestamp", "value"];
-const KUBE_POD_PHASE_SCHEMA = ["namespace", "pod", "phase", "_timestamp", "value"];
-const KUBE_NODE_COND_SCHEMA = ["node", "condition", "status", "_timestamp", "value"];
+// kube-state carries the UNSUFFIXED k8s_cluster where kubeletstats carries
+// k8s_cluster_name — measured on the live org, and the reason the cluster token
+// must resolve per panel stream rather than once per pack.
+const KUBE_POD_PHASE_SCHEMA = ["namespace", "pod", "phase", "k8s_cluster", "_timestamp", "value"];
+const KUBE_NODE_COND_SCHEMA = ["node", "condition", "status", "k8s_cluster", "_timestamp", "value"];
+
+// Live schema, fetched 2026-09-04: capacity is a NODE property, so there is no
+// `namespace` here — a namespace matcher on it is silently dropped and returns
+// the whole fleet (addendum §2.7c).
+const KUBE_NODE_ALLOC_SCHEMA = ["node", "resource", "k8s_cluster", "_timestamp", "value"];
 
 /** A full, live k8s org: every pack stream present and fresh. */
 const fullK8sStreams = () =>
@@ -116,6 +124,7 @@ const fullK8sStreams = () =>
     { name: "k8s_pod_filesystem_capacity", schema: KUBELET_POD_SCHEMA },
     { name: "kube_pod_status_phase", schema: KUBE_POD_PHASE_SCHEMA },
     { name: "kube_node_status_condition", schema: KUBE_NODE_COND_SCHEMA },
+    { name: "kube_node_status_allocatable", schema: KUBE_NODE_ALLOC_SCHEMA },
     { name: "kube_pod_container_resource_requests", schema: KUBE_POD_PHASE_SCHEMA },
     { name: "kube_pod_container_status_restarts_total", schema: KUBE_POD_PHASE_SCHEMA },
   ]);
@@ -154,8 +163,15 @@ const resolve = (args: {
     lastSeenUs: args.lastSeenUs,
   });
 
-const build = (resolution: any, opts: { pins?: Record<string, string> } = {}) =>
-  buildDashboard(kubernetesPage, resolution, opts.pins ?? {}, { timezone: "UTC", nowUs: NOW_US });
+const build = (
+  resolution: any,
+  opts: { pins?: Record<string, string>; activeSectionId?: string } = {},
+) =>
+  buildDashboard(kubernetesPage, resolution, opts.pins ?? {}, {
+    timezone: "UTC",
+    nowUs: NOW_US,
+    activeSectionId: opts.activeSectionId,
+  });
 
 const allQueries = (dashboard: any): string[] =>
   (dashboard.tabs ?? []).flatMap((tab: any) =>
@@ -435,18 +451,20 @@ describe("token substitution", () => {
   it("${f:<gid>} resolves per requirement group and legends resolve too", () => {
     const dashboard = build(resolve({}));
     // Only the queries that CARRY the token can show its resolution. The pack's
-    // fleet-wide scalar (k8s_ov_fleet_cpu variant 2, `sum(...)` with no by())
-    // authors no ${f:} token at all (§4.2), so a blanket "every query naming the
-    // stream contains the field" would demand a token the manifest never wrote.
+    // fleet-wide scalars (k8s_ov_cpu_used, `sum(...)` with no by()) author no
+    // ${f:} token at all (§4.2), so a blanket "every query naming the stream
+    // contains the field" would demand a token the manifest never wrote.
     const nodeQueries = allQueries(dashboard).filter(
       (q) => q.includes("k8s_node_cpu_usage") && q.includes("by ("),
     );
     expect(nodeQueries.length).toBeGreaterThan(0);
     for (const q of nodeQueries) expect(q).toContain("k8s_node_name");
     // …and the untokenized scalar is still built, so this is not a silent skip.
-    expect(allQueries(dashboard)).toContain(
-      'sum(k8s_node_cpu_usage{k8s_cluster_name=~"$cluster"})',
-    );
+    expect(
+      allQueries(dashboard).some((q) =>
+        q.startsWith('sum(k8s_node_cpu_usage{k8s_cluster_name=~"$cluster"})'),
+      ),
+    ).toBe(true);
     expect(allLegends(dashboard).some((l) => l.includes("{k8s_node_name}"))).toBe(true);
   });
 
@@ -546,7 +564,7 @@ describe("token substitution", () => {
     // — a cluster-less org is a normal org, and its node charts are fleet-wide,
     // not missing.
     const scopeOnly = [
-      "k8s_ov_fleet_cpu",
+      "k8s_ov_cpu_used",
       "k8s_ov_node_cpu_top",
       "k8s_nd_cpu",
       "k8s_nd_memory",
@@ -612,14 +630,16 @@ describe("§5.2 variant satisfiability — presence AND liveness", () => {
     ]);
     const resolution = resolve({ streams });
 
-    for (const id of ["k8s_ov_nodes", "k8s_ov_fleet_cpu", "k8s_ov_node_cpu_top", "k8s_nd_cpu"]) {
+    for (const id of ["k8s_ov_nodes", "k8s_ov_cpu_used", "k8s_ov_node_cpu_top", "k8s_nd_cpu"]) {
       const panel = panelById(resolution, id);
       expect(panel.hidden, id).toBe(false);
       expect(panel.selectedVariant.requiresStreams, id).toEqual(["k8s_node_cpu_usage"]);
     }
     // Variant 2 carries `unit: "numbers"` (cores in use, not a ratio).
     expect(panelById(resolution, "k8s_nd_cpu").unit).toBe("numbers");
-    expect(panelById(resolution, "k8s_ov_fleet_cpu").unit).toBe("numbers");
+    // No allocatable stream here, so the ratio variant is unsatisfiable and the
+    // tile falls to bare cores rather than a percentage of a missing denominator.
+    expect(panelById(resolution, "k8s_ov_cpu_used").unit).toBe("numbers");
 
     expect(hiddenFor(resolution, "kubelet-node")).toBeUndefined();
     expect(resolution.staleGroups.some((s: any) => s.group.id === "kubelet-node")).toBe(false);
@@ -651,11 +671,27 @@ describe("§5.2 variant satisfiability — presence AND liveness", () => {
     expect(hidden.reason).toBe("streams-missing");
     expect(hidden.missingStreams.length).toBeGreaterThan(0);
     // "not found" sends the user to install a collector; "stopped reporting"
-    // sends them to restart one. The tag is what keeps those apart.
-    for (const entry of hidden.missingStreams) {
-      expect(entry.state).toBe("stale");
-      expect(entry.state).not.toBe("absent");
-      expect(entry.lastSeenUs).toBe(dead);
+    // sends them to restart one. The tag is what keeps those apart — asserted
+    // per stream, since a group can legitimately mix the two (the CPU tile's
+    // ratio variant wants an allocatable stream this fixture never lists).
+    const listed = new Set([
+      "k8s_node_cpu_utilization",
+      "k8s_node_cpu_usage",
+      "k8s_node_memory_usage",
+      "k8s_node_memory_rss",
+      "k8s_node_network_io",
+    ]);
+    const deadEntries = hidden.missingStreams.filter((entry: any) => listed.has(entry.name));
+    expect(deadEntries.length).toBeGreaterThan(0);
+    for (const entry of deadEntries) {
+      expect(entry.state, entry.name).toBe("stale");
+      expect(entry.state, entry.name).not.toBe("absent");
+      expect(entry.lastSeenUs, entry.name).toBe(dead);
+    }
+    // A stream that was never listed stays "absent" — the two are never merged.
+    for (const entry of hidden.missingStreams.filter((e: any) => !listed.has(e.name))) {
+      expect(entry.state, entry.name).toBe("absent");
+      expect(entry.lastSeenUs, entry.name).toBeUndefined();
     }
   });
 
@@ -1560,6 +1596,47 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
     }
   });
 
+  describe("every Overview/Nodes panel emits a REAL cluster matcher after substitution", () => {
+    // The shipped bug read as "the picker does nothing" because the built query
+    // had no matcher in it. Asserted on buildDashboard output — the same text
+    // that reaches the query API — so a token that fails to substitute is caught
+    // here rather than by a user watching a tile not move.
+    it("substitutes a cluster matcher into all nine Overview panels", () => {
+      const built = build(resolve({}));
+      const overview = (built.tabs ?? []).find((t: any) => t.tabId === "overview");
+      expect(overview.panels.length).toBe(9);
+      for (const p of overview.panels) {
+        for (const q of p.queries) {
+          // The SPELLING is per-panel-stream (§5.4): the fixture's kubelet-node
+          // streams carry k8s_cluster_name while kube-state carries k8s_cluster,
+          // so the pin is "a resolved cluster matcher", not one literal name.
+          expect(q.query, p.id).toMatch(/k8s_cluster(_name)?=~"\$cluster"/);
+          expect(q.query, `${p.id} left a token unsubstituted`).not.toContain("${scope:");
+        }
+      }
+    });
+
+    it("both spellings appear across the section — proof it resolved per stream", () => {
+      const built = build(resolve({}));
+      const overview = (built.tabs ?? []).find((t: any) => t.tabId === "overview");
+      const queries = overview.panels.flatMap((p: any) => p.queries.map((q: any) => q.query));
+      expect(queries.some((q: string) => q.includes('k8s_cluster_name=~"$cluster"'))).toBe(true);
+      expect(queries.some((q: string) => /[^_]k8s_cluster=~"\$cluster"/.test(q))).toBe(true);
+    });
+
+    it("pins collapse the same token to an exact-match literal, braces intact", () => {
+      const built = build(resolve({}), { pins: { [GROUP.cluster]: "ap1cloud" } });
+      const overview = (built.tabs ?? []).find((t: any) => t.tabId === "overview");
+      for (const p of overview.panels) {
+        for (const q of p.queries) {
+          expect(q.query, p.id).toMatch(/k8s_cluster(_name)?="ap1cloud"/);
+          expect(q.query, `${p.id} empty matcher`).not.toMatch(/\{\s*\}/);
+          expect(q.query, `${p.id} dangling comma`).not.toMatch(/[{,]\s*[,}]/);
+        }
+      }
+    });
+  });
+
   // ── B2: the disabled flag must ride the CLONE (design §6.4) ────────────────
   describe("scope-picker disabled state is built in, not mutated on", () => {
     // curatedDisabled is stamped INSIDE the built variables (resolve.ts
@@ -2015,5 +2092,68 @@ describe("inventory tables render label columns", () => {
     const byPod = Object.fromEntries(result.options.rows.map((r: any) => [r.pod, r]));
     expect(byPod["scan-vulnerabilityreport-7fd6d87c89-4pdt6"].namespace).toBe("trivy-system");
     expect(byPod["monitor-openobserve-actions-0"].namespace).toBe("monitor");
+  });
+});
+
+// A disclosure that eats the title it qualifies has destroyed the thing it discloses.
+// The phase fact is about the TRIO, so it is stated once per section, not three times
+// beside three titles that then truncate to "Pods ru…" (user-reported).
+describe("section-level note replaces the per-tile subtitle", () => {
+  it("buildDashboard puts the ACTIVE section's noteKey on the dashboard", () => {
+    const dashboard: any = build(resolve({}), { activeSectionId: "overview" });
+    expect(dashboard.curatedSectionNoteKey).toBe("infra.k8s.section.overviewNote");
+  });
+
+  it("a section without a noteKey carries none — the line is per-section, not global", () => {
+    const dashboard: any = build(resolve({}), { activeSectionId: "nodes" });
+    expect(dashboard.curatedSectionNoteKey).toBeUndefined();
+  });
+
+  it("no Overview tile stamps curated_subtitle_key any more", () => {
+    const dashboard: any = build(resolve({}), { activeSectionId: "overview" });
+    const overview = dashboard.tabs.find((t: any) => t.tabId === "overview");
+    const withSubtitle = overview.panels.filter((p: any) => p.config.curated_subtitle_key);
+    expect(withSubtitle.map((p: any) => p.id)).toEqual([]);
+  });
+});
+
+// "Fleet CPU" was jargon AND ambiguous — a bare core count answers neither
+// "how much" nor "out of what". Measured live 2026-09-04 on the introspect org:
+// used 57.87 / allocatable 457.27 = 13.04% fleet-wide; production alone is
+// 15.37 / 63.94 = 24.15%. Scoping ONLY the numerator returns 3.76% — the
+// "lying gauge" of the addendum §2.7c, a 6.4x understatement that no runtime
+// check can catch because the query succeeds and returns exactly one series.
+describe("CPU tile reads used-vs-capacity, and both sides carry the scope", () => {
+  const cpuPanel = (dashboard: any) =>
+    dashboard.tabs
+      .find((t: any) => t.tabId === "overview")
+      .panels.find((p: any) => p.id === "k8s_ov_cpu_used");
+
+  it("the ratio variant divides usage by ALLOCATABLE and reads as a percentage", () => {
+    const panel = cpuPanel(build(resolve({})));
+    expect(panel).toBeTruthy();
+    expect(panel.config.unit).toBe("percent");
+    expect(panel.queries[0].query).toContain("kube_node_status_allocatable");
+    expect(panel.queries[0].query).toContain('resource="cpu"');
+  });
+
+  it("BOTH numerator and denominator carry a cluster matcher — a one-sided ratio lies", () => {
+    const panel = cpuPanel(build(resolve({})));
+    const [numerator, denominator] = panel.queries[0].query.split("/");
+    expect(numerator, "numerator unscoped").toMatch(/k8s_cluster(_name)?=~"\$cluster"/);
+    expect(denominator, "denominator unscoped").toMatch(/k8s_cluster(_name)?=~"\$cluster"/);
+  });
+
+  it("degrades to bare cores when the allocatable denominator is absent", () => {
+    // kube-state present but WITHOUT allocatable: never a percentage of nothing.
+    const streams = streamLists([
+      { name: "k8s_node_cpu_usage", schema: KUBELET_NODE_SCHEMA },
+      { name: "k8s_node_memory_usage", schema: KUBELET_NODE_SCHEMA },
+    ]);
+    const panel = cpuPanel(build(resolve({ streams })));
+    expect(panel).toBeTruthy();
+    expect(panel.config.unit).toBe("numbers");
+    expect(panel.queries[0].query).not.toContain("kube_node_status_allocatable");
+    expect(panel.queries[0].query).not.toContain("*");
   });
 });

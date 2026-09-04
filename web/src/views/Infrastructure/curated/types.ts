@@ -65,8 +65,6 @@ export interface PanelVariant {
 export interface CuratedPanelDef {
   id: string;
   titleKey: I18nKey;
-  /** Disclosure line under a hero tile — e.g. "three of five pod phases". */
-  subtitleKey?: I18nKey;
   type: "line" | "area-stacked" | "bar" | "metric" | "gauge" | "table";
   unit: string;
   groupId: string;
@@ -74,6 +72,12 @@ export interface CuratedPanelDef {
   /** 192-col grid cell; x/y flow-computed per section (§5.5). */
   layout: { w: number; h: number };
   drilldown?: unknown[];
+  /**
+   * Pickers this panel deliberately ignores though its section declares them —
+   * a fleet-wide reading is the panel's POINT, not an oversight. Lint requires
+   * every omitted scope token to appear here, so silence is never a decision.
+   */
+  fleetWide?: string[];
 }
 
 export interface CuratedSection {
@@ -81,6 +85,12 @@ export interface CuratedSection {
   titleKey: I18nKey;
   /** Pickers that apply within this section — scoping is declared, never implicit. */
   scopedBy?: string[];
+  /**
+   * A caveat about the section's panels TAKEN TOGETHER — e.g. that three phase
+   * tiles are not a partition. It belongs to the set, not to any one tile, so it
+   * renders once above the grid; inlining it per tile ate the titles it qualified.
+   */
+  noteKey?: I18nKey;
   panels: CuratedPanelDef[];
 }
 

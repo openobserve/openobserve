@@ -668,8 +668,15 @@ export function buildDashboard(
     })
     .filter((tab): tab is NonNullable<typeof tab> => tab !== null);
 
+  // The note belongs to the ACTIVE section only: a caveat about the Overview
+  // trio is not true of the Nodes tab, and one line for all sections would be
+  // read as a page-wide disclaimer.
+  const noteSectionId = opts.activeSectionId ?? tabs[0]?.tabId;
+  const noteKey = manifest.sections.find((section) => section.id === noteSectionId)?.noteKey;
+
   return {
     version: 8,
+    ...(noteKey ? { curatedSectionNoteKey: noteKey } : {}),
     dashboardId: "",
     title: "",
     description: "",
@@ -768,6 +775,38 @@ export function lintManifest(manifest: CuratedPageManifest): Violation[] {
         ),
       );
       if (!used) add("scoped-by-unused", `${section.id}.scopedBy: ${name}`);
+    }
+
+    // A picker the user can operate must move every panel beside it, or the panel must SAY it opts out.
+    for (const panel of section.panels) {
+      const declared = new Set(panel.fleetWide ?? []);
+      for (const name of section.scopedBy ?? []) {
+        const carries = panel.variants.every((variant) =>
+          variant.queries.every((query) => query.query.includes(`\${scope:${name}}`)),
+        );
+        if (carries) {
+          if (declared.has(name)) {
+            add("scope-coverage", `${panel.id} marks ${name} fleetWide yet carries its token`);
+          }
+          continue;
+        }
+        const partial = panel.variants.some((variant) =>
+          variant.queries.some((query) => query.query.includes(`\${scope:${name}}`)),
+        );
+        if (partial) {
+          add("scope-coverage", `${panel.id} carries ${name} on only SOME queries`);
+        } else if (!declared.has(name)) {
+          add("scope-coverage", `${panel.id} omits \${scope:${name}} declared by ${section.id}`);
+        }
+      }
+      for (const name of declared) {
+        if (!(section.scopedBy ?? []).includes(name)) {
+          add(
+            "scope-coverage",
+            `${panel.id}.fleetWide names ${name}, not in ${section.id}.scopedBy`,
+          );
+        }
+      }
     }
   }
 
@@ -956,8 +995,6 @@ function buildPanel(
     // The resolver cannot know whether a query returned series, only whether a "no data" claim would be honest (§6.3).
     config.curated_no_data_eligible = !stale;
   }
-  if (panel.def.subtitleKey) config.curated_subtitle_key = panel.def.subtitleKey;
-
   return {
     id: panel.id,
     type: panel.def.type,
