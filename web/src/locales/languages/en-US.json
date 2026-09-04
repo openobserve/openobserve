@@ -18167,6 +18167,8 @@
     "ruleAlsoClaimedBy": "Also claimed by {team}",
     "simulatorTitle": "Where would this page go?",
     "simulatorHint": "Describe an alert and see the whole path — team, rung, person — without firing one.",
+    "simulatorEmptyTitle": "Nothing simulated yet",
+    "simulatorEmptyDescription": "Add at least one dimension and a priority, then Test, to see the whole path — team, rung, person.",
     "simulatorTest": "Test",
     "simulatorMatchedRule": "Matched rule",
     "simulatorDefaultTeam": "No rule matched",
