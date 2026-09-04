@@ -36,6 +36,8 @@ use db::{self, user::is_root_user};
 use hashbrown::HashMap;
 use infra::table::org_users::OrgUserRecord;
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::password_policy;
+#[cfg(feature = "enterprise")]
 use o2_openfga::{
     authorizer::authz::delete_service_account_from_org, config::get_config as get_openfga_config,
 };
@@ -55,7 +57,7 @@ use crate::{
             },
         },
     },
-    organization, password_history,
+    organization,
 };
 
 fn redact_token(token: &str) -> String {
@@ -397,18 +399,19 @@ pub async fn update_user(
             if let Err(msg) = validate_password_strength_with_policy(new_pass, &policy) {
                 return Ok(MetaHttpResponse::bad_request(msg));
             }
-            match password_history::check_reuse_and_record(
+            let new_hash = get_hash(new_pass, &local_user.salt);
+            #[cfg(feature = "enterprise")]
+            if let Err(msg) = password_policy::history::check_reuse_and_record(
                 email,
-                &local_user.salt,
-                new_pass,
+                &new_hash,
                 &local_user.password,
                 &policy,
             )
             .await
             {
-                Ok(hash) => new_user.password = hash,
-                Err(msg) => return Ok(MetaHttpResponse::bad_request(msg)),
+                return Ok(MetaHttpResponse::bad_request(msg));
             }
+            new_user.password = new_hash;
             new_user.password_ext = Some(get_hash(new_pass, password_ext_salt));
             log::info!("Password self updated for user: {email}");
             is_updated = true;
@@ -431,18 +434,19 @@ pub async fn update_user(
         if let Err(msg) = validate_password_strength_with_policy(&new_pass, &policy) {
             return Ok(MetaHttpResponse::bad_request(msg));
         }
-        match password_history::check_reuse_and_record(
+        let new_hash = get_hash(&new_pass, &local_user.salt);
+        #[cfg(feature = "enterprise")]
+        if let Err(msg) = password_policy::history::check_reuse_and_record(
             email,
-            &local_user.salt,
-            &new_pass,
+            &new_hash,
             &local_user.password,
             &policy,
         )
         .await
         {
-            Ok(hash) => new_user.password = hash,
-            Err(msg) => return Ok(MetaHttpResponse::bad_request(msg)),
+            return Ok(MetaHttpResponse::bad_request(msg));
         }
+        new_user.password = new_hash;
         new_user.password_ext = Some(get_hash(&new_pass, password_ext_salt));
         log::info!("Password by root updated for user: {email}");
 
@@ -1433,10 +1437,9 @@ pub async fn create_service_account_if_not_exists(email: &str) -> Result<(), any
 #[cfg(test)]
 mod tests {
     use common::{infra::config::USERS, meta::user::get_default_user_role};
-    use config::meta::{
-        password_policy::PasswordPolicy,
-        user::{UserRole, UserType},
-    };
+    #[cfg(feature = "enterprise")]
+    use config::meta::password_policy::PasswordPolicy;
+    use config::meta::user::{UserRole, UserType};
     use infra::{
         db::{self as infra_db, get_orm_client_rw},
         table as infra_table,
@@ -2044,6 +2047,7 @@ mod tests {
     /// The reuse check belongs to `update_user`, not to the HTTP layer: the handlers validate
     /// strength only, so a change routed through the CLI or any other caller would otherwise skip
     /// it entirely.
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_password_change_is_rejected_when_it_repeats_a_recent_password() {
         let _guard = set_up().await;
@@ -2104,6 +2108,7 @@ mod tests {
             .unwrap();
     }
 
+    #[cfg(feature = "enterprise")]
     async fn self_change_password(email: &str, old: &str, new: &str) -> Response {
         update_user(
             "dummy",
