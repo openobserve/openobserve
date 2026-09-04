@@ -86,13 +86,16 @@
         {{ t("aiObservability.experiments.comparePage.loading") }}
       </div>
       <ExperimentComparisonPanel
-        v-else-if="comparison"
+        v-if="comparison"
         :comparison="comparison"
+        :outcome-dimensions="outcomeDimensions"
+        :loading="loading"
         @apply-threshold="applyThreshold"
+        @select-outcome-dimensions="applyOutcomeDimensions"
         @inspect="inspectRow"
       />
       <div
-        v-else
+        v-else-if="!loading"
         class="border-border-default text-text-secondary rounded-default m-page-edge border border-dashed p-6 text-center"
         data-test="ai-experiment-compare-empty"
       >
@@ -154,6 +157,9 @@ const candidateId = computed(() => String(route.params.candidateId ?? ""));
 
 const comparison = ref<ExperimentComparison | null>(null);
 const loading = ref(false);
+const comparisonThreshold = ref<number>();
+const outcomeDimensions = ref<string[]>();
+let comparisonRequest = 0;
 const rowDrawerOpen = ref(false);
 const selectedRow = ref<ExperimentComparisonRow | null>(null);
 /** The filtered order the panel is showing, so paging follows what's on screen. */
@@ -248,21 +254,32 @@ function swapSides() {
   comparePair(candidateId.value, baselineId.value);
 }
 
-async function loadComparison(threshold?: number) {
+async function loadComparison(
+  threshold = comparisonThreshold.value,
+  dimensions = outcomeDimensions.value,
+) {
+  const request = ++comparisonRequest;
   if (!orgId.value || !baselineId.value || !candidateId.value) {
     comparison.value = null;
+    loading.value = false;
     return;
   }
   loading.value = true;
+  outcomeDimensions.value = dimensions;
   try {
-    comparison.value = await llmExperimentsService.compare(
+    const result = await llmExperimentsService.compare(
       orgId.value,
       baselineId.value,
       candidateId.value,
       threshold,
+      dimensions,
     );
+    if (request !== comparisonRequest) return;
+    comparison.value = result;
+    comparisonThreshold.value = result.threshold;
   } catch (error: any) {
-    comparison.value = null;
+    if (request !== comparisonRequest) return;
+    outcomeDimensions.value = comparison.value?.outcomeDimensions;
     toast({
       variant: "error",
       message:
@@ -270,12 +287,16 @@ async function loadComparison(threshold?: number) {
         t("aiObservability.experiments.comparePage.loadError"),
     });
   } finally {
-    loading.value = false;
+    if (request === comparisonRequest) loading.value = false;
   }
 }
 
 function applyThreshold(threshold: number) {
   void loadComparison(threshold);
+}
+
+function applyOutcomeDimensions(dimensions: string[]) {
+  void loadComparison(comparisonThreshold.value, dimensions);
 }
 
 const rowIndex = computed(() =>
@@ -317,5 +338,10 @@ async function inspectRow(row: ExperimentComparisonRow, siblings?: ExperimentCom
 }
 
 watch(orgId, () => void loadExperiments(), { immediate: true });
-watch([orgId, baselineId, candidateId], () => loadComparison(), { immediate: true });
+watch([orgId, baselineId, candidateId], () => {
+  comparison.value = null;
+  outcomeDimensions.value = undefined;
+  rowDrawerOpen.value = false;
+  void loadComparison();
+}, { immediate: true });
 </script>

@@ -743,7 +743,7 @@ pub async fn get_experiment(
     ),
     responses(
         (status = 200, description = "Baseline/candidate comparison", body = ExperimentComparisonResponseBody),
-        (status = 400, description = "Invalid threshold or cross-dataset comparison"),
+        (status = 400, description = "Invalid threshold, outcome dimensions, or cross-dataset comparison"),
         (status = 403, description = "One or both Experiments are not accessible"),
         (status = 404, description = "One or both Experiments were not found"),
     )
@@ -837,11 +837,13 @@ pub async fn compare_experiments(
         }
     };
     let policy = ComparisonPolicy::from_configs(&score_configs);
-    let comparison = compare_experiments(CompareExperimentsInput {
+    let outcome_dimensions = query.selected_dimensions();
+    let comparison = match compare_experiments(CompareExperimentsInput {
         baseline_id: baseline.id,
         candidate_id: candidate.id,
         dataset_id: baseline.dataset_id,
         threshold,
+        outcome_dimensions: outcome_dimensions.as_ref(),
         policy: &policy,
         scoring: ComparisonScoringState {
             baseline: baseline_scoring,
@@ -857,7 +859,14 @@ pub async fn compare_experiments(
             executions: &candidate_results.executions,
             scores: &candidate_results.scores,
         },
-    });
+    }) {
+        Ok(comparison) => comparison,
+        Err(_) => {
+            return MetaHttpResponse::bad_request(
+                "Selected outcome dimensions are unavailable or have no comparison policy",
+            );
+        }
+    };
     let response = ExperimentComparisonResponseBody::from(comparison)
         .with_trial_outputs(&baseline_results.executions, &candidate_results.executions);
     MetaHttpResponse::json(response)

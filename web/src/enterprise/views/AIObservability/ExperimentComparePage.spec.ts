@@ -61,7 +61,7 @@ const comparisonRow = {
   dimensions: [],
 };
 
-function mountPage() {
+function mountPage(realPanel = false) {
   return mount(ExperimentComparePage, {
     global: {
       stubs: {
@@ -77,11 +77,13 @@ function mountPage() {
           props: ["modelValue", "options"],
           template: `<button :data-options="options.map((o) => o.value).join(',')"></button>`,
         },
-        ExperimentComparisonPanel: {
+        ExperimentComparisonPanel: realPanel ? false : {
           props: ["comparison"],
           template: `<div>
             <button data-test="inspect-comparison" @click="$emit('inspect', comparison.rows[0])">Inspect</button>
             <button data-test="pick-threshold" @click="$emit('apply-threshold', 0.15)">Threshold</button>
+            <button data-test="select-columns" @click="$emit('select-outcome-dimensions', ['cost'])">Select</button>
+            <button data-test="clear-columns" @click="$emit('select-outcome-dimensions', [])">Clear</button>
           </div>`,
         },
         ExperimentComparisonRowDrawer: true,
@@ -107,6 +109,7 @@ beforeEach(() => {
     candidateId: "two",
     datasetId: "dataset-1",
     threshold: 0,
+    outcomeDimensions: ["cost", "latency"],
     assignmentRule: "Any regression wins",
     counts: {
       baselineRows: 1,
@@ -135,13 +138,69 @@ beforeEach(() => {
 });
 
 describe("ExperimentComparePage", () => {
+  it("requests selected columns, retains them across threshold changes, and allows none", async () => {
+    const wrapper = mountPage();
+    await flushPromises();
+    const initial = await compare.mock.results[0].value;
+    compare.mockImplementation(async (_org, _baseline, _candidate, threshold, dimensions) => ({
+      ...initial, threshold, outcomeDimensions: dimensions ?? initial.outcomeDimensions,
+    }));
+
+    await wrapper.get('[data-test="pick-threshold"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-test="select-columns"]').trigger("click");
+    await flushPromises();
+    expect(compare).toHaveBeenLastCalledWith("acme", "one", "two", 0.15, ["cost"]);
+
+    await wrapper.get('[data-test="pick-threshold"]').trigger("click");
+    await flushPromises();
+    expect(compare).toHaveBeenLastCalledWith("acme", "one", "two", 0.15, ["cost"]);
+
+    await wrapper.get('[data-test="clear-columns"]').trigger("click");
+    await flushPromises();
+    expect(compare).toHaveBeenLastCalledWith("acme", "one", "two", 0.15, []);
+  });
+
+  it("restores the rendered selection after a failed request", async () => {
+    const wrapper = mountPage(true);
+    await flushPromises();
+    const selector = wrapper.getComponent('[data-test="ai-experiment-comparison-outcome-dimensions"]');
+    expect(selector.props("modelValue")).toEqual(["cost", "latency"]);
+    compare.mockRejectedValueOnce(new Error("Comparison unavailable"));
+    selector.vm.$emit("update:modelValue", ["cost"]);
+    await flushPromises();
+    expect(compare).toHaveBeenLastCalledWith("acme", "one", "two", 0, ["cost"]);
+    expect(selector.props("modelValue")).toEqual(["cost", "latency"]);
+    expect(wrapper.find('[data-test="ai-experiment-compare-loading"]').exists()).toBe(false);
+  });
+
+  it("restores the last result when overlapping selection requests fail", async () => {
+    const wrapper = mountPage(true);
+    await flushPromises();
+    const initial = await compare.mock.results[0].value;
+    const selector = wrapper.getComponent('[data-test="ai-experiment-comparison-outcome-dimensions"]');
+    let resolveEarlier!: (value: unknown) => void;
+    compare.mockImplementationOnce(() => new Promise((resolve) => { resolveEarlier = resolve; }));
+    selector.vm.$emit("update:modelValue", ["cost"]);
+    await flushPromises();
+
+    compare.mockRejectedValueOnce(new Error("Comparison unavailable"));
+    selector.vm.$emit("update:modelValue", []);
+    await flushPromises();
+    expect(selector.props("modelValue")).toEqual(["cost", "latency"]);
+
+    resolveEarlier({ ...initial, outcomeDimensions: ["cost"] });
+    await flushPromises();
+    expect(selector.props("modelValue")).toEqual(["cost", "latency"]);
+  });
+
   it("compares the two experiments named in the route params", async () => {
     mountPage();
     await flushPromises();
 
     // Undefined threshold on first load: the SERVER's neutral default governs.
     // Sending a client-side 0 would make every movement a regression.
-    expect(compare).toHaveBeenCalledWith("acme", "one", "two", undefined);
+    expect(compare).toHaveBeenCalledWith("acme", "one", "two", undefined, undefined);
   });
 
   it("offers each side only the other dataset-matched runs it isn't already showing", async () => {
@@ -249,7 +308,7 @@ describe("ExperimentComparePage", () => {
     await wrapper.get('[data-test="pick-threshold"]').trigger("click");
     await flushPromises();
 
-    expect(compare).toHaveBeenCalledWith("acme", "one", "two", 0.15);
+    expect(compare).toHaveBeenCalledWith("acme", "one", "two", 0.15, undefined);
   });
 
   it("fetches each side of an inspected row with its retained row ID", async () => {
