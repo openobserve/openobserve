@@ -207,7 +207,7 @@ limitations under the License.
               {{ raw("🚨 Alert Notification") }}
             </div>
           </div>
-          <div class="email-alert-info border-brand-msg-error bg-brand-msg-bg my-4 border-l-4 p-4">
+          <div class="email-alert-info border-brand-msg-error bg-brand-msg-bg my-4 border-s-4 p-4">
             <div class="text-brand-msg-error m-0 mb-2 text-lg font-bold">
               {{ raw("High CPU Usage") }}
             </div>

@@ -52,7 +52,7 @@ Usage:
         size="sm-action"
         @click="handleLoadMore"
       >
-        <OIcon name="expand-more" size="xs" class="mr-1" />
+        <OIcon name="expand-more" size="xs" class="me-1" />
         {{
           t("logs.chunkedContent.loadMore", {
             loaded: chunkInfo.loadedSizeKB,

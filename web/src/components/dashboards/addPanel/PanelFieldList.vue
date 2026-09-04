@@ -1,7 +1,7 @@
 <!-- Copyright 2026 OpenObserve Inc. -->
 
 <template>
-  <div class="bg-surface-panel border-border-default flex h-full w-full flex-col border-r">
+  <div class="bg-surface-panel border-border-default flex h-full w-full flex-col border-e">
     <div class="px-page-edge my-3 flex shrink-0 items-center justify-between">
       <span class="text-base font-bold">{{ t("panel.fields") }}</span>
       <OButton
@@ -71,7 +71,7 @@
       <!-- Group header -->
       <template #group-header="{ row }">
         <div
-          class="-ml-page-edge px-page-edge bg-section-header-bg text-text-secondary flex h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-default items-center justify-between text-xs font-semibold select-none"
+          class="-ms-page-edge px-page-edge bg-section-header-bg text-text-secondary flex h-7! w-[calc(100%+2*var(--spacing-page-edge))] shrink-0 cursor-default items-center justify-between text-xs font-semibold select-none"
           :title="row.groupName"
         >
           <div class="min-w-0 flex-1">{{ row.groupName }}</div>
@@ -343,7 +343,7 @@
       <template #empty>
         <div class="flex items-center justify-center py-[0.725rem] text-center">
           <OIcon name="info" size="xs" />
-          <span class="pl-1.5">{{ t("search.noFieldFound") }}</span>
+          <span class="ps-1.5">{{ t("search.noFieldFound") }}</span>
         </div>
       </template>
 

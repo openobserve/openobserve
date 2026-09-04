@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="section-header border-border-default flex items-center gap-0 border-b px-3 py-2.5"
         >
           <div
-            class="section-header-accent rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0"
+            class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
           />
           <span class="section-header-title text-compact text-text-heading font-semibold">{{
             t("alerts.steps.deduplication")
@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="mb-4">
             <div class="flex items-center pb-2 font-semibold">
               {{ t("alerts.deduplication.fingerprintFields") }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer">
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer">
                 <OTooltip
                   :content="t('alerts.deduplication.fingerprintFieldsTooltip')"
                   side="right"
@@ -74,7 +74,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="mb-4">
             <div class="flex items-center pb-2 font-semibold">
               {{ t("alerts.deduplication.timeWindow") }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer">
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer">
                 <OTooltip :content="t('alerts.deduplication.timeWindowTooltip')" side="right" />
               </OIcon>
             </div>
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               {{ t("alerts.deduplication.timeWindowHint") }}
             </div>
             <div class="flex items-center">
-              <div class="ml-0 w-52.5">
+              <div class="ms-0 w-52.5">
                 <OFormInput
                   name="deduplication.time_window_minutes"
                   type="number"

@@ -1,6 +1,6 @@
 name: CI gate
 
-# Required check on main: pending without the e2e label, so an untested PR cannot be queued.
+# Required check on main: pending without the ready-for-ci label, so an untested PR cannot be queued.
 # A status is needed because skipped jobs count as passing for required checks.
 on:
   # pull_request_target so fork PRs get a status too; no checkout, so nothing untrusted runs.
@@ -24,16 +24,16 @@ jobs:
       - env:
           GH_TOKEN: ${{ github.token }}
           SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          LABELED: ${{ github.event_name == 'merge_group' || contains(github.event.pull_request.labels.*.name, 'e2e') }}
+          LABELED: ${{ github.event_name == 'merge_group' || contains(github.event.pull_request.labels.*.name, 'ready-for-ci') }}
           DRAFT: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.draft == true }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ "$DRAFT" = "true" ]; then
             STATE=pending; DESC="Draft PR: paid CI does not run until it is marked ready for review."
           elif [ "$LABELED" = "true" ]; then
-            STATE=success; DESC="e2e label present; CI runs on every push"
+            STATE=success; DESC="ready-for-ci label present; CI runs on every push"
           else
-            STATE=pending; DESC="Add the e2e label to run CI. Required before this PR can be queued."
+            STATE=pending; DESC="Add the ready-for-ci label to run CI. Required before this PR can be queued."
           fi
           gh api -X POST "repos/${{ github.repository }}/statuses/$SHA" \
             -f state="$STATE" -f context=ci-gate -f description="$DESC" -f target_url="$RUN_URL" \

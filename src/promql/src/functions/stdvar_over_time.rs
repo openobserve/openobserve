@@ -15,16 +15,11 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 
 use crate::{common::std_variance, functions::RangeFunc};
 
 /// https://prometheus.io/docs/prometheus/latest/querying/functions/#stdvar_over_time
-pub(crate) fn stdvar_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, StdvarOverTimeFunc::new(), eval_ctx)
-}
-
 pub struct StdvarOverTimeFunc;
 
 impl StdvarOverTimeFunc {

@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="activeCount"
             :label="raw(String(activeCount))"
             size="xs"
-            class="ml-1"
+            class="ms-1"
             data-test="dbm-queries-scope-count"
           />
         </OButton>

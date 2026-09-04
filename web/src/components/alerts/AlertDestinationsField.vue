@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
       {{ required ? labelText + " *" : labelText }}
       <template v-if="tooltipText">
-        <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+        <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
         <OTooltip :content="tooltipText" side="right" />
       </template>
     </div>

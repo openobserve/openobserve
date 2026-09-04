@@ -141,7 +141,7 @@ const onCopy = () => {
     :data-test="dataTest"
   >
     <div
-      class="o2-code-toolbar border-border-default flex items-center justify-between border-b py-1 pr-1.5 pl-3"
+      class="o2-code-toolbar border-border-default flex items-center justify-between border-b py-1 ps-3 pe-1.5"
     >
       <span
         v-if="chrome === 'terminal'"

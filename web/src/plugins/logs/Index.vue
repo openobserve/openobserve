@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:before>
           <!-- px-1 (4px), not 10px: the search bar's own content already carries
-               a 6px internal inset (toolbar p-1.5 + editor ml-1.5), so 4+6=10px
+               a 6px internal inset (toolbar p-1.5 + editor ms-1.5), so 4+6=10px
                lines the toolbar/editor up with the 10px field-list & results
                panels below. -->
           <div class="h-full w-full">
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      OFieldList) so they line up — they're controls, not scrolling
                      surfaces. -->
                 <div
-                  class="relative-position border-border-default bg-surface-panel h-full border-r pt-2.5"
+                  class="relative-position border-border-default bg-surface-panel h-full border-e pt-2.5"
                 >
                   <IndexList
                     v-if="searchObj.meta.showFields"

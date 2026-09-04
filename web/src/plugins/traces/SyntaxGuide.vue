@@ -55,7 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">
           <div class="mb-1.25">
-            <div class="ml-1.25 text-xs">
+            <div class="ms-1.25 text-xs">
               <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
                 <!-- The prose in each item is translated; the query fragments next to it are
                      NOT — they are syntax, and a translated str_match() would be a query
@@ -107,7 +107,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="border-dropdown-separator my-1 border-t" />
         <div class="answers">
           <div class="mb-1.25">
-            <div class="ml-1.25 text-xs">
+            <div class="ms-1.25 text-xs">
               <ul class="mt-2.5 mb-0 px-2.5 text-sm leading-[1.4375rem]">
                 <!-- As above: the prose is translated, the SQL samples are left literal. -->
                 <!-- eslint-disable vue/no-bare-strings-in-template -->

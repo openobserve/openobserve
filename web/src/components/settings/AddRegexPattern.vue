@@ -62,7 +62,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex h-full w-full">
       <div
         :class="
-          store.state.isAiChatEnabled ? (isFullScreen ? 'w-[75%] pl-2' : 'w-[65%] pl-2') : 'w-full'
+          store.state.isAiChatEnabled ? (isFullScreen ? 'w-[75%] ps-2' : 'w-[65%] ps-2') : 'w-full'
         "
       >
         <OForm
@@ -116,11 +116,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="sm"
                   @click="toggleAIChat"
                 >
-                  <img :src="goToAILogo" class="mr-1 h-5 w-5" />
+                  <img :src="goToAILogo" class="me-1 h-5 w-5" />
                   <span class="text-brand-indigo flex items-center gap-1 text-sm">
                     {{ t("settings.addRegexPattern.tryAiAssistant") }}
                   </span>
-                  <OIcon size="sm" name="arrow-right-alt" class="text-brand-indigo ml-1 h-5 w-5" />
+                  <OIcon size="sm" name="arrow-right-alt" class="text-brand-indigo ms-1 h-5 w-5" />
                 </OButton>
               </div>
               <div class="regex-pattern-input">
@@ -162,7 +162,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:is-expanded="expandState.regexTestString"
                 :label="t('settings.addRegexPattern.inputStringLabel')"
                 class="py-md mt-1 h-6"
-                labelClass="text-text-secondary font-medium text-xs leading-5.25 -ml-1"
+                labelClass="text-text-secondary font-medium text-xs leading-5.25 -ms-1"
               >
                 <template #right> </template>
               </FullViewContainer>
@@ -184,7 +184,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-model:is-expanded="expandState.outputString"
                 :label="t('settings.addRegexPattern.outputLabel')"
                 class="py-md mt-1 h-6"
-                labelClass="text-text-secondary font-medium text-xs leading-5.25 -ml-1"
+                labelClass="text-text-secondary font-medium text-xs leading-5.25 -ms-1"
               >
               </FullViewContainer>
               <div v-if="expandState.outputString" class="regex-pattern-input">
@@ -222,7 +222,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
       <!-- eslint-disable local/no-hardcoded-px -- mixed with vh/vw — vh tracks the window while rem tracks font-size; keep the expression unit-consistent -->
       <div
-        class="ml-2 max-w-full"
+        class="ms-2 max-w-full"
         v-if="store.state.isAiChatEnabled"
         style="width: 35%; min-width: 4.6875rem; height: calc(100vh - 90px) !important"
       >

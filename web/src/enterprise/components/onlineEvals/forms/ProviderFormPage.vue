@@ -25,7 +25,7 @@
           data-test="provider-form-identity-section"
         >
           <div class="border-border-default flex items-center border-b px-3 py-2.5">
-            <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
             <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
               t("onlineEvals.provider.sectionTitle")
             }}</span>
@@ -100,7 +100,7 @@
           data-test="provider-form-auth-section"
         >
           <div class="border-border-default flex items-center border-b px-3 py-2.5">
-            <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+            <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
             <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
               t("onlineEvals.provider.authSection")
             }}</span>

@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm"
           @click="$emit('trigger-rca')"
         >
-          <OIcon name="refresh" size="sm" class="mr-1" />
+          <OIcon name="refresh" size="sm" class="me-1" />
           {{ t("alerts.incidents.rcaRetry") }}
         </OButton>
       </template>
@@ -138,9 +138,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODropdown v-if="rcaHistory.length" align="start">
         <template #trigger>
           <OButton data-test="rca-history-btn" variant="ghost-muted" size="sm">
-            <OIcon name="history" size="sm" class="mr-1" />
+            <OIcon name="history" size="sm" class="me-1" />
             {{ t("alerts.incidents.rcaHistory") }}
-            <OIcon name="keyboard-arrow-down" size="xs" class="ml-1" />
+            <OIcon name="keyboard-arrow-down" size="xs" class="ms-1" />
           </OButton>
         </template>
 
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="$emit('copy-report')"
       >
-        <OIcon name="content-copy" size="sm" class="mr-1" />
+        <OIcon name="content-copy" size="sm" class="me-1" />
         {{ t("alerts.incidents.rcaCopy") }}
       </OButton>
       <OButton
@@ -179,7 +179,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         @click="$emit('download-report')"
       >
-        <OIcon name="download" size="sm" class="mr-1" />
+        <OIcon name="download" size="sm" class="me-1" />
         {{ t("alerts.incidents.rcaDownload") }}
       </OButton>
 
@@ -187,9 +187,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <ODropdown v-if="!isRunning" align="end">
         <template #trigger>
           <OButton data-test="rca-reanalyze-btn" variant="outline" size="sm">
-            <OIcon name="refresh" size="sm" class="mr-1" />
+            <OIcon name="refresh" size="sm" class="me-1" />
             {{ t("alerts.incidents.rcaReanalyze") }}
-            <OIcon name="keyboard-arrow-down" size="xs" class="ml-1" />
+            <OIcon name="keyboard-arrow-down" size="xs" class="ms-1" />
           </OButton>
         </template>
 
