@@ -603,7 +603,9 @@ pub struct OwnershipStatsQuery {
 fn to_response(e: anyhow::Error) -> Response {
     use o2_enterprise::enterprise::oncall::service::OncallError;
     let status = match e.downcast_ref::<OncallError>() {
-        Some(OncallError::TeamNotFound(_)) => StatusCode::NOT_FOUND,
+        Some(OncallError::TeamNotFound(_)) | Some(OncallError::ResponseNotFound(_)) => {
+            StatusCode::NOT_FOUND
+        }
         // A conflict, not a 400: the request is well-formed and the state of
         // the org is what refuses it, and the caller fixes it by changing that
         // state rather than by changing the request.
