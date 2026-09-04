@@ -79,6 +79,7 @@ describe("VariableQueryValueSelector", () => {
       <div
         data-test="dashboard-variable-query-value-selector"
         class="o-select"
+        :data-disabled="String(!!disabled)"
       >
         <input
           :value="modelValue"
@@ -103,6 +104,7 @@ describe("VariableQueryValueSelector", () => {
       "labelPosition",
       "labelKey",
       "valueKey",
+      "disabled",
     ],
     emits: ["update:modelValue", "search", "open", "close", "keydown"],
     methods: {
@@ -1172,6 +1174,49 @@ describe("VariableQueryValueSelector", () => {
 
       // Should not throw errors when accessing refs after unmount
       expect(() => wrapper.vm.selectRef).not.toThrow();
+    });
+  });
+  // ── Not-applicable picker (curated-pages design §6.4, pass-4 finding 5) ────
+  // A page-level picker whose active section does not scope on it accepts a
+  // selection and changes nothing — a declared no-op is still a no-op to the
+  // person operating it. Additive prop, default false, so stored dashboards are
+  // unaffected (same posture as the PanelContainer badge).
+  describe("disabled prop forwarding", () => {
+    it("forwards disabled:true to OSelect", () => {
+      wrapper = createWrapper({ disabled: true });
+      const select = wrapper.find('[data-test="dashboard-variable-query-value-selector"]');
+      expect(select.attributes("data-disabled")).toBe("true");
+    });
+
+    it("defaults to NOT disabled when the prop is omitted — the stored-dashboard guard", () => {
+      wrapper = createWrapper();
+      const select = wrapper.find('[data-test="dashboard-variable-query-value-selector"]');
+      expect(select.attributes("data-disabled")).toBe("false");
+    });
+
+    it("forwards disabled:false explicitly", () => {
+      wrapper = createWrapper({ disabled: false });
+      expect(
+        wrapper.find('[data-test="dashboard-variable-query-value-selector"]').attributes("data-disabled"),
+      ).toBe("false");
+    });
+
+    it("renders the not-applicable tooltip when disabled with a reason key", () => {
+      wrapper = createWrapper({
+        disabled: true,
+        disabledTooltipKey: "infra.curated.pickerNotApplicable",
+      });
+      const tooltip = wrapper.find('[data-test="variable-disabled-tooltip"]');
+      expect(tooltip.exists()).toBe(true);
+      expect(tooltip.attributes("data-tooltip-key")).toBe("infra.curated.pickerNotApplicable");
+    });
+
+    it("renders NO tooltip when the picker is enabled", () => {
+      // Paired with the positive case above so this cannot pass merely because
+      // the affordance does not exist yet — that one must be green for this to
+      // mean anything.
+      wrapper = createWrapper({ disabledTooltipKey: "infra.curated.pickerNotApplicable" });
+      expect(wrapper.find('[data-test="variable-disabled-tooltip"]').exists()).toBe(false);
     });
   });
 });

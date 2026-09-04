@@ -218,6 +218,32 @@ describe("useHostsList — join & window anchoring", () => {
     expect(db01.lastSeen).toMatch(/^TZ:.*:America\/Los_Angeles$/);
   });
 
+  // The curated drawer badges off the row's OWN last-seen, not the fleet-wide
+  // stream doc_time_max — a dead host behind a live fleet must still badge
+  // (curated-pages design §5.3/§7.3). The raw µs was fetched and then discarded.
+  it("carries the raw µs last-seen in lastSeenUs ALONGSIDE the formatted string", async () => {
+    const h = withHostsList();
+    wrapper = h.wrapper;
+    await h.list.refresh(refreshArgs);
+    await flushPromises();
+    const db01 = rowByName(h.list, "db-01");
+    expect(db01.lastSeenUs).toBe(1_700_000_100_000_000);
+    // Both, off one row — the formatted string is not replaced by the raw value.
+    expect(db01.lastSeen).toMatch(/^TZ:.*:America\/Los_Angeles$/);
+    expect(rowByName(h.list, "web-01").lastSeenUs).toBe(1_700_000_890_000_000);
+  });
+
+  it("a host with no last-seen hit blanks BOTH lastSeen and lastSeenUs", async () => {
+    primeFleet({ lastSeen: sqlHits([{ host_name: "web-01", last_seen: 1_700_000_890_000_000 }]) });
+    const h = withHostsList();
+    wrapper = h.wrapper;
+    await h.list.refresh(refreshArgs);
+    await flushPromises();
+    const web02 = rowByName(h.list, "web-02");
+    expect(web02.lastSeen).toBeNull();
+    expect(web02.lastSeenUs).toBeNull();
+  });
+
   it("encodes every PromQL string passed to metrics_query", async () => {
     // metrics_query interpolates query=${query} RAW into the URL (search.ts).
     const h = withHostsList();
@@ -324,7 +350,10 @@ describe("useHostsList — tri-state status & failure isolation", () => {
     await flushPromises();
     const active = h.list.rows.value.filter((r: any) => r.status === "ACTIVE");
     expect(active.length).toBeGreaterThan(0);
-    for (const row of h.list.rows.value) expect(row.lastSeen).toBeNull();
+    for (const row of h.list.rows.value) {
+      expect(row.lastSeen).toBeNull();
+      expect(row.lastSeenUs).toBeNull();
+    }
     expect(h.list.banners.value.lastSeen).toBe(true);
   });
 

@@ -45,6 +45,9 @@ const makeRow = (over: any = {}) => ({
   disk: 45,
   load: 1.5,
   lastSeen: "2026-09-03 10:00:00",
+  // The raw µs the curated drawer badges off (design §7.3) — the formatted
+  // string above cannot be compared against a doc_time_max.
+  lastSeenUs: 1_700_000_890_000_000,
   ...over,
 });
 
@@ -108,9 +111,10 @@ const dateTimeStub = {
 
 const drawerStub = {
   name: "HostDetailDrawer",
-  props: ["hostName", "status", "osType", "range"],
+  props: ["hostName", "status", "osType", "range", "lastSeenUs"],
   emits: ["close"],
-  template: "<div data-test='host-drawer-stub' :data-host='hostName' :data-os='osType' />",
+  template:
+    "<div data-test='host-drawer-stub' :data-host='hostName' :data-os='osType' :data-last-seen-us='lastSeenUs' />",
 };
 
 const setupCardStub = {
@@ -301,6 +305,17 @@ describe("HostsPage", () => {
       // The row's os_type rides along so the drawer header can chip it (design 4.8).
       expect(drawer.attributes("data-os")).toBe("linux");
       wrapper.findComponent({ name: "HostDetailDrawer" }).vm.$emit("close");
+      await flushPromises();
+      expect(router.currentRoute.value.query.host).toBeUndefined();
+      expect(wrapper.find('[data-test="host-drawer-stub"]').exists()).toBe(false);
+    });
+
+    it("passes the row's RAW µs last-seen through to the drawer, unchanged", async () => {
+      // Stream-level doc_time_max is fleet-wide and would leave a dead host's
+      // panels un-badged behind a row that says offline (curated-pages §5.3/§7.3).
+      wrapper = await mountPage({ host: "web-01" });
+      const drawer = wrapper.find('[data-test="host-drawer-stub"]');
+      expect(drawer.attributes("data-last-seen-us")).toBe("1700000890000000");
       await flushPromises();
       expect(router.currentRoute.value.query.host).toBeUndefined();
       expect(wrapper.find('[data-test="host-drawer-stub"]').exists()).toBe(false);

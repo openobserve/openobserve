@@ -13,7 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// Host detail drawer (design 4.8/§6) — assertions run on the captured dashboard object, never ECharts.
+// Host detail drawer (design 4.8/§6) — assertions run on the captured dashboard
+// object, never ECharts. The Metrics tab is now the curated engine driven by the
+// hosts pack (curated-pages design §7.3/§8.2); the Logs/Traces/footer cases below
+// must stay green through that retrofit — they are its safety net.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
@@ -24,6 +27,7 @@ import HostDetailDrawer from "./HostDetailDrawer.vue";
 import searchService from "@/services/search";
 import { b64DecodeUnicode } from "@/utils/zincutils";
 import i18n from "@/locales";
+import goldenDashboard from "./curated/packs/__fixtures__/hostDashboard.golden.json";
 
 const { importHostMetricsDashboard, toastMock } = vi.hoisted(() => ({
   importHostMetricsDashboard: vi.fn(),
@@ -35,6 +39,22 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: toastMock }));
 
 vi.mock("@/services/search", () => ({
   default: { search: vi.fn(), metrics_query: vi.fn(), metrics_query_range: vi.fn() },
+}));
+
+const { getStreamsMock, getStreamMock, loadSemanticGroupsMock } = vi.hoisted(() => ({
+  getStreamsMock: vi.fn(),
+  getStreamMock: vi.fn(),
+  loadSemanticGroupsMock: vi.fn(),
+}));
+
+vi.mock("@/composables/useStreams", () => ({
+  default: () => ({ getStreams: getStreamsMock, getStream: getStreamMock }),
+}));
+
+vi.mock("@/utils/semanticGroupsCache", () => ({
+  loadSemanticGroups: loadSemanticGroupsMock,
+  clearSemanticGroupsCacheForOrg: vi.fn(),
+  getCachedSemanticGroups: vi.fn(() => null),
 }));
 
 const searchMock = vi.mocked(searchService.search);
@@ -49,7 +69,7 @@ const renderChartsStub = defineComponent({
   updated() {
     lastDashboardData = (this as any).dashboardData;
   },
-  template: "<div class='render-stub' />",
+  template: "<div class='render-stub'><slot name='before_panels' /></div>",
 });
 
 // Captures all picker attrs so the init-from-page-range pin needn't hardcode the prop name.
@@ -64,6 +84,44 @@ const dateTimeStub = defineComponent({
 });
 
 const RANGE = { from: 1_700_000_000_000_000, to: 1_700_000_900_000_000 };
+const NOW_US = RANGE.to;
+const DAY_US = 24 * 60 * 60 * 1_000_000;
+
+const HOST_STREAMS = [
+  "system_cpu_time",
+  "system_memory_usage",
+  "system_cpu_load_average_1m",
+  "system_cpu_load_average_5m",
+  "system_cpu_load_average_15m",
+  "system_disk_io",
+  "system_filesystem_usage",
+  "system_network_io",
+];
+
+const streamEntry = (name: string, docTimeMax = NOW_US - 60_000_000) => ({
+  name,
+  stream_type: "metrics",
+  stats: {
+    created_at: 0,
+    doc_time_min: 0,
+    doc_time_max: docTimeMax,
+    doc_num: 1,
+    file_num: 1,
+    storage_size: 1,
+    compressed_size: 1,
+    index_size: 0,
+  },
+  schema: [{ name: "host_name", type: "Utf8" }],
+});
+
+/** A live fleet: every system_* stream present and fresh. */
+const primeStreams = (names: string[] = HOST_STREAMS, docTimeMax?: number) => {
+  getStreamsMock.mockImplementation(async (type: string) => ({
+    name: type,
+    schema: false,
+    list: type === "metrics" ? names.map((n) => streamEntry(n, docTimeMax)) : [],
+  }));
+};
 
 const allDashboardQueries = (): string[] => {
   const tabs = lastDashboardData?.tabs ?? [];
@@ -72,7 +130,23 @@ const allDashboardQueries = (): string[] => {
   );
 };
 
+const allDashboardPanels = (): any[] =>
+  (lastDashboardData?.tabs ?? []).flatMap((t: any) => t.panels ?? []);
+
 const t = (key: string) => i18n.global.t(key);
+
+/** Delete exactly the §8.2 modulo set, so a new divergence fails loudly. */
+const stripModuloKeys = (doc: any) => {
+  const copy = JSON.parse(JSON.stringify(doc));
+  delete copy.created;
+  delete copy.title;
+  for (const tab of copy.tabs ?? []) {
+    delete tab.tabId;
+    delete tab.name;
+    for (const panel of tab.panels ?? []) delete panel.config?.curated_badge;
+  }
+  return copy;
+};
 
 describe("HostDetailDrawer", () => {
   let wrapper: VueWrapper<any>;
@@ -123,6 +197,9 @@ describe("HostDetailDrawer", () => {
       dashboardId: "dash-1",
       folderId: "default",
     });
+    primeStreams();
+    getStreamMock.mockResolvedValue(streamEntry("system_cpu_time"));
+    loadSemanticGroupsMock.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -136,18 +213,41 @@ describe("HostDetailDrawer", () => {
     expect(wrapper.find('[data-test="host-drawer-tab-traces"]').exists()).toBe(true);
   });
 
-  describe("built inline dashboard", () => {
+  // ── §8.2 golden parity — the red-first bridge across the builder's deletion ─
+
+  describe("golden parity with the pre-retrofit builder", () => {
+    it("the dashboard is built by the ENGINE, off the hosts pack registry", async () => {
+      // Red until the retrofit lands: today's builder is synchronous and reads no
+      // stream list at all, so it cannot have consulted the resolution inputs.
+      // Without this the parity case below is a tautology — the fixture was
+      // generated FROM the builder, so the builder trivially matches it.
+      wrapper = await mountDrawer({ hostName: "host-1" });
+      expect(getStreamsMock).toHaveBeenCalledWith("metrics", false, false, expect.anything());
+    });
+
+    it("the engine-built dashboard deep-equals the FROZEN fixture, modulo the enumerated keys", async () => {
+      // The fixture was generated from buildHostDashboard("host-1") BEFORE its
+      // deletion (§8.2 step 1); this spec never imports the builder, so it
+      // outlives the migration rather than self-destructing with it. Deleting
+      // EXACTLY the §8.2 key set means a new divergence fails here instead of
+      // silently widening the tolerance.
+      wrapper = await mountDrawer({ hostName: "host-1" });
+      expect(lastDashboardData).toBeTruthy();
+      expect(stripModuloKeys(lastDashboardData)).toEqual(stripModuloKeys(goldenDashboard));
+    });
+
     it("is a v8 document with no variables, every query pinned to the literal host", async () => {
       wrapper = await mountDrawer();
-      expect(lastDashboardData).toBeTruthy();
       expect(lastDashboardData.version).toBe(8);
-      // Single host is fixed — a variables block would render dead selectors.
+      // A single pinned host needs no selectors — a variables block renders dead ones.
       expect(lastDashboardData.variables?.list ?? []).toHaveLength(0);
       const queries = allDashboardQueries();
       expect(queries.length).toBeGreaterThan(0);
       for (const q of queries) {
         expect(q).toContain('host_name="web-01"');
         expect(q).not.toContain("$host_name");
+        expect(q).not.toContain("${scope:");
+        expect(q).not.toContain("${f:");
       }
     });
 
@@ -170,6 +270,111 @@ describe("HostDetailDrawer", () => {
       }
     });
   });
+
+  // ── pass-4 finding 17 — the no-new-spinner guarantee ───────────────────────
+
+  describe("synchronous open", () => {
+    it("resolves the Metrics tab WITHOUT awaiting any getStream or dictionary load", async () => {
+      // Routing the drawer through the engine must not add a cold round trip its
+      // synchronous builder never had. `getStreams` hard-forces schema=false, so
+      // no list entry ever carries a schema and getStream(…, true) ALWAYS hits the
+      // network. fieldOverrides is §5.4 rung 1 — authored certainty, no group
+      // lookup and no schema fetch — which is what keeps that call from firing.
+      wrapper = await mountDrawer();
+      // The engine ran (red today — the builder reads no lists)…
+      expect(getStreamsMock).toHaveBeenCalled();
+      // …and it resolved entirely off the warm list.
+      expect(getStreamMock).not.toHaveBeenCalled();
+      expect(loadSemanticGroupsMock).not.toHaveBeenCalled();
+      // The dashboard is available on the first tick — no new spinner.
+      expect(lastDashboardData).toBeTruthy();
+    });
+  });
+
+  // ── Stale badges (§6.3, §5.3, pass-4 finding 18) ───────────────────────────
+
+  describe("stale badges", () => {
+    const STALE_LAST_SEEN = NOW_US - 3 * DAY_US;
+
+    it("an INACTIVE row with an old lastSeenUs badges all 8 panels", async () => {
+      wrapper = await mountDrawer({ status: "INACTIVE", lastSeenUs: STALE_LAST_SEEN });
+      const badged = allDashboardPanels().filter((p: any) => p.config?.curated_badge);
+      expect(badged).toHaveLength(8);
+    });
+
+    it("an UNKNOWN row badges too — that is exactly the case the badge exists for", async () => {
+      wrapper = await mountDrawer({ status: "UNKNOWN", lastSeenUs: STALE_LAST_SEEN });
+      expect(allDashboardPanels().filter((p: any) => p.config?.curated_badge)).toHaveLength(8);
+    });
+
+    it("an ACTIVE row SUPPRESSES every badge and the stale banner (finding 18)", async () => {
+      // STALE_GRACE_US is an admitted guess; a hair too small would put eight amber
+      // badges behind a row labelled ACTIVE and destroy badge trust everywhere.
+      // The list's liveness query and the panels agree BY CONSTRUCTION, not by tuning.
+      wrapper = await mountDrawer({ status: "ACTIVE", lastSeenUs: STALE_LAST_SEEN });
+      expect(allDashboardPanels().filter((p: any) => p.config?.curated_badge)).toHaveLength(0);
+      expect(wrapper.find('[data-test="curated-stale-banner"]').exists()).toBe(false);
+    });
+
+    it("the per-host lastSeenUs BEATS a fleet-fresh stream max (§5.3 pin override)", async () => {
+      // Stream stats are fleet-wide: a dead host behind a live fleet keeps every
+      // system_* doc_time_max fresh, so per-stream staleness is the wrong granularity.
+      primeStreams(HOST_STREAMS, NOW_US - 60_000_000);
+      wrapper = await mountDrawer({ status: "INACTIVE", lastSeenUs: NOW_US - 5 * DAY_US });
+      expect(allDashboardPanels().filter((p: any) => p.config?.curated_badge).length).toBe(8);
+    });
+  });
+
+  // ── Hide+explain in the drawer (§7.3) ──────────────────────────────────────
+
+  describe("partial installs", () => {
+    it("a missing system_filesystem_usage hides that panel and adds a strip row", async () => {
+      primeStreams(HOST_STREAMS.filter((n) => n !== "system_filesystem_usage"));
+      wrapper = await mountDrawer();
+      expect(allDashboardPanels().map((p: any) => p.id)).not.toContain("hd_fs_used_pct");
+      expect(wrapper.find('[data-test="curated-strip"]').exists()).toBe(true);
+    });
+  });
+
+  // ── Non-ready faces, sized for a drawer tab (§7.3) ─────────────────────────
+
+  describe("non-ready faces", () => {
+    it("`unknown` renders an inline spinner in the METRICS TAB BODY only", async () => {
+      let release!: (v: any) => void;
+      getStreamsMock.mockImplementation(() => new Promise((resolve) => (release = resolve)));
+      wrapper = await mountDrawer();
+      expect(wrapper.find('[data-test="host-drawer-metrics-spinner"]').exists()).toBe(true);
+      release({ name: "metrics", schema: false, list: HOST_STREAMS.map((n) => streamEntry(n)) });
+      await flushPromises();
+      expect(wrapper.find('[data-test="host-drawer-metrics-spinner"]').exists()).toBe(false);
+    });
+
+    it("a lists failure renders an inline Retry that fires refresh({force:true})", async () => {
+      getStreamsMock.mockRejectedValue(new Error("network"));
+      wrapper = await mountDrawer();
+      const retry = wrapper.find('[data-test="host-drawer-metrics-retry"]');
+      expect(retry.exists()).toBe(true);
+      getStreamsMock.mockClear();
+      primeStreams();
+      await retry.trigger("click");
+      await flushPromises();
+      expect(getStreamsMock).toHaveBeenCalledWith("metrics", false, false, true);
+    });
+
+    it("the Logs and Traces tabs render normally in BOTH non-ready states", async () => {
+      // They never wait on metrics resolution.
+      getStreamsMock.mockRejectedValue(new Error("network"));
+      wrapper = await mountDrawer();
+      await wrapper.find('[data-test="host-drawer-tab-logs"]').trigger("click");
+      await flushPromises();
+      expect(searchMock).toHaveBeenCalled();
+      await wrapper.find('[data-test="host-drawer-tab-traces"]').trigger("click");
+      await flushPromises();
+      expect(wrapper.find('[data-test="host-drawer-traces-link"]').exists()).toBe(true);
+    });
+  });
+
+  // ── Everything below is UNCHANGED by the retrofit — the safety net ─────────
 
   // The Logs/Traces panes may render lazily — open the tab before asserting.
   const openTab = async (tab: string) => {

@@ -1,0 +1,1099 @@
+[
+  {
+    "id": "host",
+    "display": "Host",
+    "group": "Common",
+    "fields": [
+      "host",
+      "hostname",
+      "node",
+      "node_name",
+      "host_name",
+      "attributes_host_name",
+      "resource_host_name",
+      "resource_attributes_host_name",
+      "host_hostname",
+      "syslog_hostname",
+      "_HOSTNAME",
+      "gcp_gce_instance_hostname",
+      "gcp_gce_instance_name",
+      "azure_vm_name",
+      "ec2_hostname",
+      "machine",
+      "server",
+      "server_name",
+      "service_host_name"
+    ]
+  },
+  {
+    "id": "host-id",
+    "display": "Host ID",
+    "group": "Common",
+    "fields": [
+      "host_id",
+      "attributes_host_id",
+      "resource_host_id",
+      "resource_attributes_host_id",
+      "ec2_instance_id",
+      "instance_id",
+      "aws_instance_id",
+      "azure_vm_id",
+      "vm_id",
+      "gce_instance_id",
+      "gcp_instance_id",
+      "machine_id",
+      "server_id"
+    ]
+  },
+  {
+    "id": "host-type",
+    "display": "Host Type",
+    "group": "Common",
+    "fields": [
+      "host_type",
+      "attributes_host_type",
+      "resource_host_type",
+      "resource_attributes_host_type",
+      "ec2_instance_type",
+      "instance_type",
+      "aws_instance_type",
+      "azure_vm_size",
+      "vm_size",
+      "gce_machine_type",
+      "machine_type",
+      "instance_size",
+      "flavor"
+    ]
+  },
+  {
+    "id": "host-arch",
+    "display": "Host Architecture",
+    "group": "Common",
+    "fields": [
+      "host_arch",
+      "attributes_host_arch",
+      "resource_host_arch",
+      "resource_attributes_host_arch",
+      "architecture",
+      "arch",
+      "cpu_arch",
+      "processor_architecture",
+      "service_host_arch"
+    ]
+  },
+  {
+    "id": "service",
+    "display": "Service",
+    "group": "Common",
+    "fields": [
+      "service",
+      "service_name",
+      "svc",
+      "app",
+      "application",
+      "app_name",
+      "attributes_service_name",
+      "resource_service_name",
+      "resource_attributes_service_name",
+      "service_service_name",
+      "job",
+      "service_instance",
+      "__name__",
+      "kubernetes_labels_app",
+      "kubernetes_labels_app_kubernetes_io_name",
+      "k8s_labels_app",
+      "k8s_app",
+      "app_kubernetes_io_name",
+      "kubernetes_io_app",
+      "kubernetes_app",
+      "ecs_task_family",
+      "ecs_service_name",
+      "ecs_container_name",
+      "lambda_function_name",
+      "aws_lambda_function_name",
+      "resource_labels_service_name",
+      "cloud_run_service_name",
+      "resource_labels_function_name",
+      "ServiceName",
+      "ContainerName",
+      "azure_service_name",
+      "cloud_RoleName",
+      "ai_cloud_role",
+      "_SYSTEMD_UNIT",
+      "appname",
+      "syslog_identifier",
+      "_COMM",
+      "docker_container_name",
+      "com_docker_compose_service",
+      "program",
+      "daemon",
+      "workload"
+    ]
+  },
+  {
+    "id": "service-instance",
+    "display": "Service Instance",
+    "group": "Common",
+    "fields": [
+      "service_instance_id",
+      "attributes_service_instance_id",
+      "resource_service_instance_id",
+      "resource_attributes_service_instance_id",
+      "instance",
+      "cloud_RoleInstance",
+      "ai_cloud_roleInstance",
+      "instance_id",
+      "pod_uid",
+      "replica_id"
+    ]
+  },
+  {
+    "id": "service-namespace",
+    "display": "Service Namespace",
+    "group": "Common",
+    "fields": [
+      "service_namespace",
+      "attributes_service_namespace",
+      "resource_service_namespace",
+      "resource_attributes_service_namespace",
+      "namespace",
+      "team",
+      "organization",
+      "business_unit",
+      "department"
+    ]
+  },
+  {
+    "id": "k8s-cluster",
+    "display": "K8s Cluster",
+    "group": "Kubernetes",
+    "is_workload_type": true,
+    "fields": [
+      "k8s_cluster",
+      "k8s_cluster_name",
+      "k8s_cluster_uid",
+      "cluster",
+      "cluster_name",
+      "cluster_id",
+      "attributes_k8s_cluster_name",
+      "resource_k8s_cluster_name",
+      "resource_attributes_k8s_cluster_name",
+      "service_k8s_cluster_name",
+      "kubernetes_cluster",
+      "kubernetes_cluster_name",
+      "kube_cluster",
+      "eks_cluster_name",
+      "aws_eks_cluster_name",
+      "gke_cluster_name",
+      "gcp_gke_cluster_name",
+      "aks_cluster_name",
+      "azure_aks_cluster_name"
+    ]
+  },
+  {
+    "id": "k8s-namespace",
+    "display": "K8s Namespace",
+    "group": "Kubernetes",
+    "is_workload_type": true,
+    "fields": [
+      "k8s_namespace",
+      "namespace",
+      "k8s_ns",
+      "ns",
+      "attributes_k8s_namespace_name",
+      "resource_k8s_namespace_name",
+      "resource_attributes_k8s_namespace_name",
+      "kubernetes_namespace",
+      "kubernetes_namespace_name",
+      "k8s_namespace_name",
+      "kube_namespace",
+      "kubernetes_labels_namespace",
+      "k8s_labels_namespace",
+      "service_k8s_namespace_name"
+    ]
+  },
+  {
+    "id": "k8s-pod-name",
+    "display": "K8s Pod Name",
+    "group": "Kubernetes",
+    "fields": [
+      "k8s_pod",
+      "k8s_pod_name",
+      "pod",
+      "pod_name",
+      "attributes_k8s_pod_name",
+      "resource_k8s_pod_name",
+      "resource_attributes_k8s_pod_name",
+      "kubernetes_pod",
+      "kubernetes_pod_name",
+      "kube_pod",
+      "kube_pod_name",
+      "POD_NAME",
+      "MY_POD_NAME",
+      "service_k8s_pod_name"
+    ]
+  },
+  {
+    "id": "k8s-pod-id",
+    "display": "K8s Pod ID",
+    "group": "Kubernetes",
+    "fields": [
+      "pod_id",
+      "pod_uid",
+      "attributes_k8s_pod_uid",
+      "resource_k8s_pod_uid",
+      "resource_attributes_k8s_pod_uid",
+      "k8s_pod_uid",
+      "kubernetes_pod_uid",
+      "kube_pod_uid",
+      "kube_pod_id",
+      "service_k8s_pod_uid"
+    ]
+  },
+  {
+    "id": "k8s-node-name",
+    "display": "K8s Node Name",
+    "group": "Kubernetes",
+    "fields": [
+      "k8s_node",
+      "node",
+      "node_name",
+      "kubernetes_node",
+      "attributes_k8s_node_name",
+      "resource_k8s_node_name",
+      "resource_attributes_k8s_node_name",
+      "k8s_node_name",
+      "kubernetes_node_name",
+      "kube_node",
+      "kube_node_name",
+      "kubernetes_node_labels_kubernetes_io_hostname",
+      "NODE_NAME",
+      "MY_NODE_NAME",
+      "service_k8s_node_name"
+    ]
+  },
+  {
+    "id": "k8s-node-id",
+    "display": "K8s Node ID",
+    "group": "Kubernetes",
+    "fields": [
+      "node_id",
+      "node_uid",
+      "attributes_k8s_node_uid",
+      "resource_k8s_node_uid",
+      "resource_attributes_k8s_node_uid",
+      "k8s_node_uid",
+      "kubernetes_node_uid",
+      "kube_node_uid",
+      "kube_node_id"
+    ]
+  },
+  {
+    "id": "k8s-container-name",
+    "display": "K8s Container Name",
+    "group": "Kubernetes",
+    "fields": [
+      "container",
+      "container_name",
+      "k8s_container",
+      "k8s_container_name",
+      "container_image_name",
+      "container_image_tag",
+      "attributes_container_name",
+      "resource_container_name",
+      "resource_attributes_container_name",
+      "container_image",
+      "attributes_k8s_container_name",
+      "resource_k8s_container_name",
+      "kubernetes_container_name",
+      "kubernetes_container",
+      "kube_container",
+      "docker_container",
+      "docker_name",
+      "ecs_container",
+      "CONTAINER_NAME"
+    ]
+  },
+  {
+    "id": "k8s-container-id",
+    "display": "K8s Container ID",
+    "group": "Kubernetes",
+    "fields": [
+      "container_id",
+      "attributes_container_id",
+      "resource_container_id",
+      "resource_attributes_container_id",
+      "docker_container_id",
+      "aws_ecs_container_arn",
+      "CONTAINER_ID",
+      "service_container_id"
+    ]
+  },
+  {
+    "id": "k8s-deployment",
+    "display": "K8s Deployment",
+    "group": "Kubernetes",
+    "is_workload_type": true,
+    "fields": [
+      "k8s_deployment",
+      "attributes_k8s_deployment_name",
+      "resource_k8s_deployment_name",
+      "resource_attributes_k8s_deployment_name",
+      "k8s_deployment_name",
+      "deployment",
+      "deployment_name",
+      "kubernetes_deployment",
+      "kubernetes_deployment_name",
+      "kubernetes_labels_deployment",
+      "k8s_labels_deployment",
+      "service_k8s_deployment_name"
+    ]
+  },
+  {
+    "id": "k8s-statefulset",
+    "display": "K8s StatefulSet",
+    "group": "Kubernetes",
+    "is_workload_type": true,
+    "fields": [
+      "k8s_statefulset",
+      "attributes_k8s_statefulset_name",
+      "resource_k8s_statefulset_name",
+      "resource_attributes_k8s_statefulset_name",
+      "k8s_statefulset_name",
+      "service_k8s_statefulset_name",
+      "statefulset",
+      "statefulset_name",
+      "kubernetes_statefulset",
+      "kubernetes_statefulset_name"
+    ]
+  },
+  {
+    "id": "k8s-daemonset",
+    "display": "K8s DaemonSet",
+    "group": "Kubernetes",
+    "is_workload_type": true,
+    "fields": [
+      "k8s_daemonset",
+      "attributes_k8s_daemonset_name",
+      "resource_k8s_daemonset_name",
+      "resource_attributes_k8s_daemonset_name",
+      "k8s_daemonset_name",
+      "daemonset",
+      "daemonset_name",
+      "kubernetes_daemonset",
+      "kubernetes_daemonset_name"
+    ]
+  },
+  {
+    "id": "k8s-job",
+    "display": "K8s Job",
+    "group": "Kubernetes",
+    "is_workload_type": true,
+    "fields": [
+      "k8s_job",
+      "attributes_k8s_job_name",
+      "resource_k8s_job_name",
+      "resource_attributes_k8s_job_name",
+      "k8s_job_name",
+      "job_name",
+      "kubernetes_job",
+      "kubernetes_job_name"
+    ]
+  },
+  {
+    "id": "k8s-pod-ip",
+    "display": "K8s Pod IP",
+    "group": "Kubernetes",
+    "fields": [
+      "pod_ip",
+      "k8s_pod_ip",
+      "attributes_k8s_pod_ip",
+      "resource_k8s_pod_ip",
+      "resource_attributes_k8s_pod_ip",
+      "kubernetes_pod_ip",
+      "pod_address",
+      "service_k8s_pod_ip"
+    ]
+  },
+  {
+    "id": "k8s-pod-start-time",
+    "display": "K8s Pod Start Time",
+    "group": "Kubernetes",
+    "fields": [
+      "pod_start_time",
+      "k8s_pod_start_time",
+      "attributes_k8s_pod_start_time",
+      "resource_k8s_pod_start_time",
+      "resource_attributes_k8s_pod_start_time",
+      "kubernetes_pod_start_time",
+      "service_k8s_pod_start_time"
+    ]
+  },
+  {
+    "id": "cloud-provider",
+    "display": "Cloud Provider",
+    "group": "Cloud",
+    "fields": [
+      "cloud_provider",
+      "attributes_cloud_provider",
+      "resource_cloud_provider",
+      "resource_attributes_cloud_provider",
+      "aws",
+      "azure",
+      "gcp",
+      "alibaba_cloud",
+      "ibm_cloud",
+      "tencent_cloud",
+      "oracle_cloud",
+      "heroku",
+      "provider",
+      "cloud"
+    ]
+  },
+  {
+    "id": "cloud-platform",
+    "display": "Cloud Platform",
+    "group": "Cloud",
+    "fields": [
+      "cloud_platform",
+      "attributes_cloud_platform",
+      "resource_cloud_platform",
+      "resource_attributes_cloud_platform",
+      "aws_ec2",
+      "aws_ecs",
+      "aws_eks",
+      "aws_lambda",
+      "aws_elastic_beanstalk",
+      "aws_app_runner",
+      "azure_vm",
+      "azure_container_instances",
+      "azure_aks",
+      "azure_functions",
+      "azure_app_service",
+      "gcp_compute_engine",
+      "gcp_cloud_run",
+      "gcp_kubernetes_engine",
+      "gcp_cloud_functions",
+      "gcp_app_engine",
+      "platform"
+    ]
+  },
+  {
+    "id": "cloud-account",
+    "display": "Cloud Account",
+    "group": "Cloud",
+    "is_workload_type": true,
+    "fields": [
+      "attributes_cloud_account_id",
+      "resource_cloud_account_id",
+      "resource_attributes_cloud_account_id",
+      "cloud_account_id",
+      "account_id",
+      "subscription_id",
+      "aws_account_id",
+      "azure_subscription_id",
+      "gcp_project_id",
+      "project_id"
+    ]
+  },
+  {
+    "id": "region",
+    "display": "Region",
+    "group": "Cloud",
+    "is_workload_type": true,
+    "fields": [
+      "region",
+      "aws_region",
+      "gcp_region",
+      "azure_region",
+      "resource_labels_location",
+      "kubernetes_node_labels_topology_kubernetes_io_region",
+      "kubernetes_node_labels_region",
+      "datacenter",
+      "location",
+      "attributes_cloud_region",
+      "resource_cloud_region",
+      "resource_attributes_cloud_region",
+      "cloud_region",
+      "aws_default_region",
+      "azure_location",
+      "gcp_location",
+      "topology_kubernetes_io_region",
+      "failure_domain_beta_kubernetes_io_region",
+      "kubernetes_node_labels_failure_domain_beta_kubernetes_io_region",
+      "cloud_location",
+      "availability_region",
+      "geo_region",
+      "data_center",
+      "dc"
+    ]
+  },
+  {
+    "id": "availability-zone",
+    "display": "Availability Zone",
+    "group": "AWS",
+    "is_workload_type": true,
+    "fields": [
+      "cloud_availability_zone",
+      "attributes_cloud_availability_zone",
+      "resource_cloud_availability_zone",
+      "resource_attributes_cloud_availability_zone",
+      "availability_zone",
+      "zone",
+      "az",
+      "aws_availability_zone",
+      "gcp_zone",
+      "azure_zone",
+      "topology_kubernetes_io_zone",
+      "failure_domain_beta_kubernetes_io_zone",
+      "kubernetes_node_labels_topology_kubernetes_io_zone"
+    ]
+  },
+  {
+    "id": "aws-ecs-cluster",
+    "display": "ECS Cluster",
+    "group": "AWS",
+    "is_workload_type": true,
+    "fields": [
+      "aws_ecs_cluster_arn",
+      "attributes_aws_ecs_cluster_arn",
+      "resource_aws_ecs_cluster_arn",
+      "resource_attributes_aws_ecs_cluster_arn",
+      "ecs_cluster",
+      "ecs_cluster_name",
+      "ecs_cluster_arn"
+    ]
+  },
+  {
+    "id": "aws-ecs-task",
+    "display": "ECS Task",
+    "group": "AWS",
+    "is_workload_type": true,
+    "fields": [
+      "aws_ecs_task_arn",
+      "aws_ecs_task_id",
+      "aws_ecs_task_family",
+      "aws_ecs_task_revision",
+      "attributes_aws_ecs_task_arn",
+      "attributes_aws_ecs_task_id",
+      "attributes_aws_ecs_task_family",
+      "resource_aws_ecs_task_arn",
+      "resource_aws_ecs_task_id",
+      "resource_aws_ecs_task_family",
+      "resource_aws_ecs_task_revision",
+      "ecs_task_id",
+      "ecs_task_arn",
+      "task_id",
+      "task_arn",
+      "task_family"
+    ]
+  },
+  {
+    "id": "aws-ecs-launch-type",
+    "display": "ECS Launch Type",
+    "group": "AWS",
+    "fields": [
+      "aws_ecs_launchtype",
+      "attributes_aws_ecs_launchtype",
+      "resource_aws_ecs_launchtype",
+      "resource_attributes_aws_ecs_launchtype",
+      "ecs_launch_type",
+      "launch_type"
+    ]
+  },
+  {
+    "id": "faas-name",
+    "display": "Function Name",
+    "group": "AWS",
+    "is_workload_type": true,
+    "fields": [
+      "faas_name",
+      "attributes_faas_name",
+      "resource_faas_name",
+      "resource_attributes_faas_name",
+      "function_name",
+      "lambda_function_name",
+      "aws_lambda_function_name",
+      "azure_function_name",
+      "gcp_function_name",
+      "cloud_function_name"
+    ]
+  },
+  {
+    "id": "faas-version",
+    "display": "Function Version",
+    "group": "AWS",
+    "fields": [
+      "faas_version",
+      "attributes_faas_version",
+      "resource_faas_version",
+      "resource_attributes_faas_version",
+      "lambda_version",
+      "function_version",
+      "aws_lambda_version"
+    ]
+  },
+  {
+    "id": "faas-instance",
+    "display": "Function Instance",
+    "group": "AWS",
+    "fields": [
+      "faas_instance",
+      "attributes_faas_instance",
+      "resource_faas_instance",
+      "resource_attributes_faas_instance",
+      "function_instance"
+    ]
+  },
+  {
+    "id": "gcp-instance",
+    "display": "GCP Instance",
+    "group": "GCP",
+    "is_workload_type": true,
+    "fields": [
+      "gcp_gce_instance_name",
+      "gcp_gce_instance_hostname",
+      "attributes_gcp_gce_instance_name",
+      "attributes_gcp_gce_instance_hostname",
+      "resource_gcp_gce_instance_name",
+      "resource_attributes_gcp_gce_instance_name",
+      "gce_instance",
+      "gcp_instance",
+      "gce_instance_name"
+    ]
+  },
+  {
+    "id": "gcp-cloud-run",
+    "display": "Cloud Run",
+    "group": "GCP",
+    "is_workload_type": true,
+    "fields": [
+      "gcp_cloud_run_job_execution",
+      "gcp_cloud_run_job_task_index",
+      "attributes_gcp_cloud_run_job_execution",
+      "attributes_gcp_cloud_run_job_task_index",
+      "resource_gcp_cloud_run_job_execution",
+      "resource_gcp_cloud_run_job_task_index",
+      "cloud_run_execution",
+      "cloud_run_service",
+      "cloud_run_job"
+    ]
+  },
+  {
+    "id": "azure-resource-group",
+    "display": "Azure Resource Group",
+    "group": "Azure",
+    "is_workload_type": true,
+    "fields": [
+      "azure_resource_group",
+      "resource_group",
+      "resourcegroup",
+      "resource_group_name",
+      "azure_rg"
+    ]
+  },
+  {
+    "id": "azure-cloud-role",
+    "display": "Azure Cloud Role",
+    "group": "Azure",
+    "is_workload_type": true,
+    "fields": [
+      "cloud_RoleName",
+      "cloud_RoleInstance",
+      "ai_cloud_role",
+      "ai_cloud_roleInstance",
+      "appinsights_role",
+      "appinsights_roleinstance"
+    ]
+  },
+  {
+    "id": "environment",
+    "display": "Environment",
+    "group": "Common",
+    "fields": [
+      "environment",
+      "env",
+      "stage",
+      "tier",
+      "deployment_environment",
+      "service_deployment_environment",
+      "attributes_deployment_environment",
+      "resource_deployment_environment",
+      "resource_attributes_deployment_environment",
+      "kubernetes_labels_environment",
+      "kubernetes_labels_env",
+      "k8s_labels_environment",
+      "ecs_task_definition_tags_environment",
+      "labels_environment",
+      "deploy_env",
+      "runtime_environment",
+      "deploy_environment",
+      "k8s_labels_env",
+      "kubernetes_labels_environment_name",
+      "aws_tags_environment",
+      "azure_tags_environment",
+      "gcp_labels_environment"
+    ]
+  },
+  {
+    "id": "version",
+    "display": "Version",
+    "group": "Common",
+    "fields": [
+      "version",
+      "app_version",
+      "service_version",
+      "release",
+      "service_service_version",
+      "attributes_service_version",
+      "resource_service_version",
+      "resource_attributes_service_version",
+      "kubernetes_labels_version",
+      "k8s_labels_version",
+      "aws_lambda_version",
+      "build_version",
+      "image_tag",
+      "container_tag",
+      "kubernetes_labels_app_version",
+      "k8s_labels_app_version",
+      "app_kubernetes_io_version",
+      "container_image_tag",
+      "lambda_version",
+      "function_version",
+      "faas_version",
+      "git_commit",
+      "git_sha",
+      "commit_sha",
+      "git_version",
+      "semver",
+      "build_number",
+      "build_id"
+    ]
+  },
+  {
+    "id": "http-method",
+    "display": "HTTP Method",
+    "group": "HTTP",
+    "fields": [
+      "http_request_method",
+      "attributes_http_request_method",
+      "http_method",
+      "attributes_http_method",
+      "requestMethod",
+      "method",
+      "request_method",
+      "verb"
+    ]
+  },
+  {
+    "id": "http-status",
+    "display": "HTTP Status",
+    "group": "HTTP",
+    "fields": [
+      "http_response_status_code",
+      "attributes_http_response_status_code",
+      "http_status_code",
+      "attributes_http_status_code",
+      "status",
+      "status_code",
+      "response_status",
+      "response_code"
+    ]
+  },
+  {
+    "id": "http-route",
+    "display": "HTTP Route",
+    "group": "HTTP",
+    "fields": [
+      "http_route",
+      "attributes_http_route",
+      "route",
+      "endpoint",
+      "path_template"
+    ]
+  },
+  {
+    "id": "db-system",
+    "display": "Database System",
+    "group": "Database",
+    "fields": [
+      "db_system",
+      "attributes_db_system",
+      "database_type",
+      "db_type",
+      "dbms"
+    ]
+  },
+  {
+    "id": "db-name",
+    "display": "Database Name",
+    "group": "Database",
+    "fields": [
+      "db_name",
+      "attributes_db_name",
+      "database",
+      "database_name",
+      "schema",
+      "db"
+    ]
+  },
+  {
+    "id": "db-operation",
+    "display": "Database Operation",
+    "group": "Database",
+    "fields": [
+      "db_operation",
+      "attributes_db_operation",
+      "operation",
+      "query_type",
+      "db_op"
+    ]
+  },
+  {
+    "id": "db-user",
+    "display": "Database User",
+    "group": "Database",
+    "fields": [
+      "db_user",
+      "attributes_db_user",
+      "database_user",
+      "db_username"
+    ]
+  },
+  {
+    "id": "process-name",
+    "display": "Process Name",
+    "group": "System",
+    "fields": [
+      "process_executable_name",
+      "attributes_process_executable_name",
+      "resource_process_executable_name",
+      "resource_attributes_process_executable_name",
+      "process_name",
+      "process",
+      "executable",
+      "proc_name",
+      "service_process_executable_path"
+    ]
+  },
+  {
+    "id": "process-command-line",
+    "display": "Process Command Line",
+    "group": "System",
+    "fields": [
+      "process_command_line",
+      "attributes_process_command_line",
+      "resource_process_command_line",
+      "resource_attributes_process_command_line",
+      "command_line",
+      "cmdline",
+      "process_args",
+      "service_process_command_line"
+    ]
+  },
+  {
+    "id": "process-pid",
+    "display": "Process PID",
+    "group": "System",
+    "fields": [
+      "process_pid",
+      "attributes_process_pid",
+      "resource_process_pid",
+      "resource_attributes_process_pid",
+      "pid",
+      "process_id",
+      "service_process_pid"
+    ]
+  },
+  {
+    "id": "process-runtime-name",
+    "display": "Process Runtime Name",
+    "group": "System",
+    "fields": [
+      "process_runtime_name",
+      "attributes_process_runtime_name",
+      "resource_process_runtime_name",
+      "resource_attributes_process_runtime_name",
+      "runtime_name",
+      "runtime",
+      "service_process_runtime_name"
+    ]
+  },
+  {
+    "id": "process-runtime-version",
+    "display": "Process Runtime Version",
+    "group": "System",
+    "fields": [
+      "process_runtime_version",
+      "attributes_process_runtime_version",
+      "resource_process_runtime_version",
+      "resource_attributes_process_runtime_version",
+      "runtime_version",
+      "service_process_runtime_version"
+    ]
+  },
+  {
+    "id": "process-runtime-description",
+    "display": "Process Runtime Description",
+    "group": "System",
+    "fields": [
+      "process_runtime_description",
+      "attributes_process_runtime_description",
+      "resource_process_runtime_description",
+      "resource_attributes_process_runtime_description",
+      "runtime_description",
+      "service_process_runtime_description"
+    ]
+  },
+  {
+    "id": "os-type",
+    "display": "OS Type",
+    "group": "System",
+    "fields": [
+      "os_type",
+      "attributes_os_type",
+      "resource_os_type",
+      "resource_attributes_os_type",
+      "host_os_type",
+      "platform",
+      "operating_system",
+      "service_os_type"
+    ]
+  },
+  {
+    "id": "os-name",
+    "display": "OS Name",
+    "group": "System",
+    "fields": [
+      "os_name",
+      "attributes_os_name",
+      "resource_os_name",
+      "resource_attributes_os_name",
+      "host_os_name",
+      "os"
+    ]
+  },
+  {
+    "id": "os-description",
+    "display": "OS Description",
+    "group": "System",
+    "fields": [
+      "os_description",
+      "attributes_os_description",
+      "resource_os_description",
+      "resource_attributes_os_description",
+      "host_os_description",
+      "os_full_name",
+      "operating_system_description",
+      "service_os_description"
+    ]
+  },
+  {
+    "id": "os-version",
+    "display": "OS Version",
+    "group": "System",
+    "fields": [
+      "os_version",
+      "attributes_os_version",
+      "resource_os_version",
+      "resource_attributes_os_version",
+      "host_os_version",
+      "kernel_version",
+      "os_release"
+    ]
+  },
+  {
+    "id": "telemetry-sdk",
+    "display": "Telemetry SDK",
+    "group": "Observability",
+    "fields": [
+      "telemetry_sdk_name",
+      "telemetry_sdk_language",
+      "telemetry_sdk_version",
+      "attributes_telemetry_sdk_name",
+      "attributes_telemetry_sdk_language",
+      "attributes_telemetry_sdk_version",
+      "resource_telemetry_sdk_name",
+      "resource_telemetry_sdk_language",
+      "resource_telemetry_sdk_version",
+      "resource_attributes_telemetry_sdk_name"
+    ]
+  },
+  {
+    "id": "instrumentation-scope",
+    "display": "Instrumentation Scope",
+    "group": "Observability",
+    "fields": [
+      "instrumentation_scope_name",
+      "instrumentation_scope_version",
+      "instrumentation_library_name",
+      "instrumentation_library_version",
+      "scope_name",
+      "scope_version",
+      "log_logger",
+      "logger",
+      "logger_name"
+    ]
+  },
+  {
+    "id": "log-level",
+    "display": "Log Level",
+    "group": "Observability",
+    "fields": [
+      "severity_text",
+      "severity_number",
+      "severityText",
+      "severityNumber",
+      "attributes_severity_text",
+      "log_level",
+      "severity",
+      "syslog_severity",
+      "_PRIORITY",
+      "level",
+      "loglevel",
+      "log_severity"
+    ]
+  },
+  {
+    "id": "k8s-replicaset",
+    "display": "K8s ReplicaSet",
+    "group": "Kubernetes",
+    "is_workload_type": true,
+    "fields": [
+      "k8s_replicaset_name",
+      "k8s_replicaset_uid",
+      "service_k8s_replicaset_name",
+      "service_k8s_replicaset_uid",
+      "kubernetes_labels_pod_template_hash",
+      "replicaset",
+      "replicaset_name",
+      "kubernetes_replicaset"
+    ]
+  },
+  {
+    "id": "server-endpoint",
+    "display": "Server Endpoint",
+    "group": "Network",
+    "fields": [
+      "server_address",
+      "server_port",
+      "net_host_name",
+      "net_host_port",
+      "peer_service",
+      "network_peer_address",
+      "network_peer_port"
+    ]
+  },
+  {
+    "id": "url-scheme",
+    "display": "URL Scheme",
+    "group": "HTTP",
+    "fields": [
+      "url_scheme",
+      "http_scheme",
+      "url_path",
+      "http_url",
+      "url_full"
+    ]
+  }
+]

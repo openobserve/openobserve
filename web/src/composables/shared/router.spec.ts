@@ -1692,13 +1692,26 @@ describe("useRoutes (router.ts)", () => {
       },
     );
 
-    it("passes the workload prop to the kubernetes and aws stub pages", () => {
+    it("passes the workload prop to the kubernetes and aws pages", () => {
       const { homeChildRoutes } = useRoutes();
       expect(findRoute(homeChildRoutes, "infraKubernetes").props).toEqual({
         workload: "kubernetes",
       });
       expect(findRoute(homeChildRoutes, "infraAws").props).toEqual({ workload: "aws" });
     });
+
+    // The curated-page migration (design §8.1) swaps only the `component` on these
+    // two rows. Which chunk they load is an implementation detail and deliberately
+    // NOT asserted; what must survive is the deep-link contract below.
+    it.each(["infraKubernetes", "infraAws"])(
+      "%s keeps its titleKey and a lazily-imported component across the component swap",
+      (name) => {
+        const { homeChildRoutes } = useRoutes();
+        const route = findRoute(homeChildRoutes, name);
+        expect(typeof route.component).toBe("function");
+        expect(route.meta?.titleKey).toBeTruthy();
+      },
+    );
 
     it("keeps the non-cloud reports route at splice index 13 after the insertion", () => {
       // The infra routes must land past the splice(13) hazard (design 4.7).
