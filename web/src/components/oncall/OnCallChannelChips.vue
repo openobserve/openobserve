@@ -100,30 +100,37 @@ interface Chip {
   tip: I18nText;
 }
 
+// voice, push, and sms have no backing provider yet (see
+// Channel::is_deliverable on the server) — hide their icons here rather than
+// show a promise nothing can fulfil.
+const HIDDEN_CHANNELS: ReadonlySet<Channel> = new Set(["voice", "push", "sms"]);
+
 const chips = computed<Chip[]>(() =>
-  props.channels.map((c) => {
-    const label = channelLabel(c.channel);
-    if (c.deliverable) {
-      return {
-        channel: c.channel,
-        icon: CHANNEL_ICON[c.channel],
-        tone: "border-transparent bg-icon-chip-success-bg text-icon-chip-success-text",
-        tip: t("oncall.channelDelivers", { channel: label }),
-      };
-    }
-    // The server's own sentence when it has one — this component must not
-    // invent a reason a page would fail.
-    const tip = c.blocked_because
-      ? raw(c.blocked_because)
-      : c.configured_but_unverified
-        ? t("oncall.channelUnverified", { channel: label })
-        : t("oncall.channelUnavailable", { channel: label });
-    // Red is spent once, on the person nothing reaches. Everyone else's dead
-    // channels are drawn as absent, because a fallback covered them.
-    const tone = props.wouldLand
-      ? "border-border-subtle border-dashed text-text-muted"
-      : "border-transparent bg-icon-chip-error-bg text-icon-chip-error-text";
-    return { channel: c.channel, icon: CHANNEL_ICON[c.channel], tone, tip };
-  }),
+  props.channels
+    .filter((c) => !HIDDEN_CHANNELS.has(c.channel))
+    .map((c) => {
+      const label = channelLabel(c.channel);
+      if (c.deliverable) {
+        return {
+          channel: c.channel,
+          icon: CHANNEL_ICON[c.channel],
+          tone: "border-transparent bg-icon-chip-success-bg text-icon-chip-success-text",
+          tip: t("oncall.channelDelivers", { channel: label }),
+        };
+      }
+      // The server's own sentence when it has one — this component must not
+      // invent a reason a page would fail.
+      const tip = c.blocked_because
+        ? raw(c.blocked_because)
+        : c.configured_but_unverified
+          ? t("oncall.channelUnverified", { channel: label })
+          : t("oncall.channelUnavailable", { channel: label });
+      // Red is spent once, on the person nothing reaches. Everyone else's dead
+      // channels are drawn as absent, because a fallback covered them.
+      const tone = props.wouldLand
+        ? "border-border-subtle border-dashed text-text-muted"
+        : "border-transparent bg-icon-chip-error-bg text-icon-chip-error-text";
+      return { channel: c.channel, icon: CHANNEL_ICON[c.channel], tone, tip };
+    }),
 );
 </script>
