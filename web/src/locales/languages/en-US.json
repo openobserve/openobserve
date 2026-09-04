@@ -16300,18 +16300,105 @@
         "diskWrite": "Disk write",
         "filesystemUsedPct": "Filesystem used %",
         "networkByDirection": "Network I/O by direction"
+      },
+      "section": {
+        "host": "Host"
+      },
+      "group": {
+        "hostMetrics": "CPU, memory, disk & network (hostmetrics receiver)",
+        "hostMetricsCap": "Host CPU, memory, disk and network are unavailable",
+        "hostMetricsHint": "Install the OpenObserve collector on this host - its hostmetrics receiver reports these system metrics."
       }
     },
     "workload": {
       "kubernetesTitle": "Kubernetes",
       "awsTitle": "AWS",
       "setupHeadline": "Connect this workload to see it here",
-      "awsSetupCta": "Open AWS data sources",
-      "detectedChipKubernetes": "Detected: k8s_* metric streams",
-      "detectedChipAws": "Detected: aws_/cloudwatch streams",
-      "dashboardsHeading": "Dashboards for this workload",
-      "noDashboards": "No matching dashboards yet — import a template to get started.",
-      "importTemplates": "Import templates"
+      "awsSetupCta": "Open AWS data sources"
+    },
+    "curated": {
+      "checking": "Checking which {workload} data is arriving...",
+      "retry": "Retry",
+      "pageError": "Couldn't load the stream list for this page.",
+      "partialTelemetryKubernetes": "We found Kubernetes streams, but not the metrics this page needs (kubeletstats or cluster receiver). Check your collector's receivers.",
+      "partialTelemetryAws": "We found AWS streams, but not the events this page needs. Check that your Firehose delivery stream is running.",
+      "partialTelemetryHosts": "We found host streams, but not the metrics this page needs. Check your collector's hostmetrics receiver.",
+      "hiddenSummary": "{capabilities}",
+      "hiddenSummaryMore": "{first}, and {count} more",
+      "hiddenFootnote": "Data sources you don't have access to also appear here.",
+      "streamsMissing": "{count} data sources not found: {list}",
+      "streamsStale": "{list} stopped reporting - last data {date}",
+      "probeEmpty": "No matching events in stream \"{stream}\" for the selected time range.",
+      "probeFieldsMissing": "Stream \"{stream}\" has no {list} columns.",
+      "fieldUnresolved": "No {display} field found on {stream}.",
+      "hiddenPanelCount": "{count} panel hidden | {count} panels hidden",
+      "setUp": "Set up",
+      "staleBanner": "{capability} stopped {duration} ago (last seen {date}). Values below are from before then.",
+      "staleBadge": "no data for {duration} (last seen {date})",
+      "staleNoDataBadge": "no data yet",
+      "staleBadgeTooltip": "As of the last stream-list refresh.",
+      "tileNoData": "- no data",
+      "lastData": "Last data: {duration} ago",
+      "durationMinutes": "{count} minute | {count} minutes",
+      "durationHours": "{count} hour | {count} hours",
+      "durationDays": "{count} day | {count} days",
+      "pickerNotApplicable": "{picker} doesn't apply to {section}",
+      "valuesCapped": "showing first {count}; narrow by {parent}",
+      "buildOwnDashboard": "Build your own dashboard",
+      "openInMetricsExplorer": "Open in Metrics explorer",
+      "footer": "Data checked at {time}",
+      "footerVersionTooltip": "Content version {version}",
+      "refresh": "Refresh",
+      "warnBanner": {
+        "stats": "Stream statistics are unavailable, so freshness isn't shown.",
+        "probe": "Couldn't check whether {label} data is arriving - showing its panels anyway.",
+        "defaultFieldNames": "Some fields were resolved using default names."
+      }
+    },
+    "k8s": {
+      "section": {
+        "overview": "Overview",
+        "nodes": "Nodes",
+        "workloads": "Workloads"
+      },
+      "group": {
+        "nodeMetrics": "Node CPU & memory (kubeletstats receiver)",
+        "nodeMetricsCap": "Node CPU and memory are unavailable",
+        "nodeMetricsHint": "Install the OpenObserve collector - its kubeletstats receiver reports node CPU and memory.",
+        "podMetrics": "Pod CPU, memory & network (kubeletstats receiver)",
+        "podMetricsCap": "Per-pod CPU, memory and network are unavailable",
+        "podMetricsHint": "Enable the kubeletstats receiver in your collector to report per-pod resource usage.",
+        "kubeState": "Pod health & node readiness (cluster receiver)",
+        "kubeStateCap": "Pod health and node readiness are unavailable - cluster state metrics aren't arriving",
+        "kubeStateHint": "Pod phases and node conditions come from kube-state metrics - enable the cluster receiver in the collector."
+      },
+      "panel": {
+        "nodes": "Nodes",
+        "nodesReady": "Nodes ready (now)",
+        "podsRunning": "Pods running (now)",
+        "podsRunningSub": "One of five pod phases",
+        "podsPending": "Pods pending (now)",
+        "podsPendingSub": "One of five pod phases",
+        "podsFailed": "Pods failed (now)",
+        "podsFailedSub": "One of five pod phases",
+        "fleetCpu": "Fleet CPU (now)",
+        "podsByPhase": "Pods by phase",
+        "nodeCpuTop": "Highest-CPU nodes",
+        "unhealthyPods": "Top 20 unhealthy pods",
+        "nodeCpu": "Highest-CPU nodes by average",
+        "nodeMemory": "Highest-memory nodes",
+        "nodeConditions": "Top 20 node conditions",
+        "nodeNetwork": "Highest-throughput node network I/O",
+        "nodesNotReady": "Top 20 nodes not ready",
+        "podCpuTop": "Highest-CPU pods",
+        "podMemTop": "Highest-memory pods",
+        "nonRunningByNs": "Non-running pods by namespace",
+        "cpuRequestsByNs": "CPU requests by namespace",
+        "podNetwork": "Pod network I/O by namespace",
+        "podFilesystem": "Highest filesystem use by pod",
+        "podMemLimitPct": "Highest memory-limit use by pod",
+        "podRestarts": "Top 20 restarting containers"
+      }
     }
   },
   "dbm": {

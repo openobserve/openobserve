@@ -177,6 +177,11 @@ const drawerStatus = computed(
 const drawerOs = computed(
   () => list.rows.value.find((r) => r.host_name === drawerHost.value)?.os_type ?? null,
 );
+// The row's OWN last-seen: stream stats are fleet-wide, so a dead host behind a
+// live fleet would leave the drawer's panels un-badged (§5.3, §7.3).
+const drawerLastSeenUs = computed(
+  () => list.rows.value.find((r) => r.host_name === drawerHost.value)?.lastSeenUs ?? null,
+);
 const openDrawer = (host: string) => {
   router.replace({ query: { ...route.query, host } });
 };
@@ -526,6 +531,7 @@ const osToggleLabel = (slug: string) =>
       :host-name="drawerHost"
       :status="drawerStatus"
       :os-type="drawerOs"
+      :last-seen-us="drawerLastSeenUs"
       :range="{ from: range.start, to: range.end }"
       @close="closeDrawer"
     />

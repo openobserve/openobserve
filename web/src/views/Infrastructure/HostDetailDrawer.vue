@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   Traces (scoped handoff) tabs. Opens from the Hosts page's ?host= param.
 -->
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { raw, useI18nTyped } from "@/types/i18n";
@@ -35,15 +35,18 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
+import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import DateTime from "@/components/DateTime.vue";
 import RenderDashboardCharts from "@/views/Dashboards/RenderDashboardCharts.vue";
 import {
-  buildHostDashboard,
   buildLogsPreviewSql,
   HOST_LOGS_STREAM,
   LOGS_PREVIEW_LIMIT,
   sqlEscape,
 } from "./useHostDetail";
+import { useCuratedPage } from "./curated/useCuratedPage";
+import { hostsPage } from "./curated/packs/hosts.page";
+import { GROUP } from "./curated/types";
 
 const props = defineProps<{
   hostName: string;
@@ -52,6 +55,11 @@ const props = defineProps<{
   osType?: string | null;
   /** Time range (microseconds) the Hosts page picker held when the row opened. */
   range: { from: number; to: number };
+  /**
+   * This host's OWN last-seen, µs. Stream stats are fleet-wide, so a dead host
+   * behind a live fleet would otherwise render un-badged (§5.3, §7.3).
+   */
+  lastSeenUs?: number | null;
 }>();
 
 const emit = defineEmits<{
@@ -68,7 +76,43 @@ const activeTab = ref<string | number>("metrics");
 // Seeded from the page picker — the drawer opens on the window the row was computed over.
 const drawerRange = ref({ ...props.range });
 
-const hostDashboard = computed(() => buildHostDashboard(props.hostName));
+const curated = useCuratedPage(hostsPage, {
+  pins: { [GROUP.host]: props.hostName },
+  lastSeenUs: props.lastSeenUs ?? undefined,
+});
+
+const resolveMetrics = (force = false) =>
+  curated.refresh({
+    orgId: org.value,
+    start: drawerRange.value.from,
+    end: drawerRange.value.to,
+    force,
+  });
+
+/**
+ * A row the list reports ACTIVE is live by an independent liveness query, so
+ * the panels must not contradict it: eight amber badges behind an ACTIVE row
+ * would destroy badge trust everywhere (§7.3, pass-4 finding 18).
+ */
+const suppressBadges = computed(() => props.status === "ACTIVE");
+
+const hostDashboard = computed(() => {
+  const built = curated.dashboard.value as any;
+  if (!built || !suppressBadges.value) return built;
+  return {
+    ...built,
+    tabs: (built.tabs ?? []).map((tab: any) => ({
+      ...tab,
+      panels: (tab.panels ?? []).map((panel: any) => {
+        if (!panel.config?.curated_badge) return panel;
+        const { curated_badge: _dropped, ...config } = panel.config;
+        return { ...panel, config };
+      }),
+    })),
+  };
+});
+
+const staleGroups = computed(() => (suppressBadges.value ? [] : curated.staleGroups.value));
 const currentTimeObj = computed(() => ({
   __global: {
     start_time: new Date(drawerRange.value.from / 1000),
@@ -80,6 +124,7 @@ const onDateChange = (date: { startTime: number; endTime: number; userChangedVal
   // DateTime replays on mount with userChangedValue:false — "do not fetch" (DateTime.vue contract).
   if (date.userChangedValue === false) return;
   drawerRange.value = { from: date.startTime, to: date.endTime };
+  void resolveMetrics(false);
   if (logsLoaded.value) fetchLogs();
 };
 
@@ -126,12 +171,15 @@ watch(activeTab, (tab) => {
   if (tab === "logs" && !logsLoaded.value) fetchLogs();
 });
 
+onMounted(() => void resolveMetrics(false));
+
 // A ?host= edit while open reuses this instance — the previous host's logs must not linger.
 watch(
   () => props.hostName,
   () => {
     logsHits.value = [];
     logsLoaded.value = false;
+    void resolveMetrics(true);
     if (activeTab.value === "logs") fetchLogs();
   },
 );
@@ -273,12 +321,68 @@ const statusLabel = computed(() =>
 
       <div class="min-h-0 flex-1 overflow-y-auto pt-2">
         <div v-if="activeTab === 'metrics'">
+          <div
+            v-if="curated.face.value === 'unknown' && curated.loadError.value"
+            class="flex flex-col items-center gap-2 py-6"
+          >
+            <OText variant="meta">{{ t("infra.curated.pageError") }}</OText>
+            <OButton
+              variant="outline"
+              size="sm-action"
+              data-test="host-drawer-metrics-retry"
+              @click="resolveMetrics(true)"
+            >
+              {{ t("infra.curated.retry") }}
+            </OButton>
+          </div>
+          <div
+            v-else-if="curated.face.value === 'unknown'"
+            class="flex justify-center py-6"
+            data-test="host-drawer-metrics-spinner"
+          >
+            <OSpinner size="md" />
+          </div>
           <RenderDashboardCharts
+            v-else-if="hostDashboard"
             :dashboardData="hostDashboard"
             :currentTimeObj="currentTimeObj"
             :viewOnly="true"
             searchType="dashboards"
-          />
+          >
+            <template #before_panels>
+              <div
+                v-if="curated.hiddenGroups.value.length || curated.partialGroups.value.length"
+                class="border-border-default rounded-surface mb-2 flex flex-col gap-1 border p-2"
+                data-test="curated-strip"
+              >
+                <OText
+                  v-for="hidden in curated.hiddenGroups.value"
+                  :key="hidden.group.id"
+                  variant="meta"
+                  >{{ t(hidden.group.capabilityKey) }}</OText
+                >
+                <OText
+                  v-for="partial in curated.partialGroups.value"
+                  :key="`partial-${partial.group.id}`"
+                  variant="meta"
+                  >{{
+                    t("infra.curated.streamsMissing", {
+                      count: partial.missingStreams.length,
+                      list: raw(partial.missingStreams.map((s) => s.name).join(", ")),
+                    })
+                  }}</OText
+                >
+              </div>
+              <OBanner
+                v-for="stale in staleGroups"
+                :key="stale.group.id"
+                variant="warning"
+                dense
+                data-test="curated-stale-banner"
+                :content="t(stale.group.capabilityKey)"
+              />
+            </template>
+          </RenderDashboardCharts>
         </div>
 
         <div v-else-if="activeTab === 'logs'" class="flex flex-col gap-2">
