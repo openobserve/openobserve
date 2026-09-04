@@ -27,7 +27,7 @@ use object_store::{
 use once_cell::sync::Lazy;
 
 use crate::{
-    cache::file_data,
+    cache::{block_cache, file_data},
     storage::{self, ObjectStoreExt},
 };
 
@@ -119,14 +119,22 @@ impl ObjectStoreExt for CacheFS {
         if range.start > range.end {
             return Err(crate::storage::Error::BadRange(location.to_string()).into());
         }
+        let path = location.to_string();
+        // Serve from the whole-file memory and disk caches first, so the block cache spends its
+        // memory budget only on bytes that would otherwise cost a remote round trip.
         let options = GetOptions {
-            range: Some(range.into()),
+            range: Some(range.clone().into()),
             ..Default::default()
         };
-        self.get_opts(account, location, options)
-            .await?
-            .bytes()
-            .await
+        if let Ok(res) = file_data::get_opts(account, &path, options, false).await
+            && let Ok(bytes) = res.bytes().await
+        {
+            return Ok(bytes);
+        }
+        block_cache::get_range(account, &path, range, |block_range| {
+            storage::get_range(account, &path, block_range)
+        })
+        .await
     }
 
     async fn get_ranges(

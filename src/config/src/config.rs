@@ -482,6 +482,7 @@ pub struct Config {
     pub compact: Compact,
     pub cache_latest_files: CacheLatestFiles,
     pub memory_cache: MemoryCache,
+    pub block_cache: BlockCache,
     pub disk_cache: DiskCache,
     pub log: Log,
     pub nats: Nats,
@@ -1792,6 +1793,36 @@ pub struct MemoryCache {
 }
 
 #[derive(Serialize, EnvConfig, Default)]
+pub struct BlockCache {
+    #[env_config(name = "ZO_BLOCK_CACHE_ENABLED", default = false)]
+    pub enabled: bool,
+    #[env_config(
+        name = "ZO_BLOCK_CACHE_BLOCK_SIZE",
+        default = 1024,
+        help = "Block size in KiB"
+    )]
+    pub block_size: usize,
+    #[env_config(
+        name = "ZO_BLOCK_CACHE_RETENTION",
+        default = 15,
+        help = "Retention in seconds; zero uses the 15 second default"
+    )]
+    pub retention: u64,
+    #[env_config(
+        name = "ZO_BLOCK_CACHE_BYPASS_THRESHOLD",
+        default = 8,
+        help = "Bypass threshold in MiB"
+    )]
+    pub bypass_threshold: usize,
+    #[env_config(
+        name = "ZO_BLOCK_CACHE_MAX_SIZE",
+        default = 512,
+        help = "Memory budget in MiB; requires a restart"
+    )]
+    pub max_size: usize,
+}
+
+#[derive(Serialize, EnvConfig, Default)]
 pub struct DiskCache {
     #[env_config(name = "ZO_DISK_CACHE_ENABLED", default = true)]
     pub enabled: bool,
@@ -1820,6 +1851,10 @@ pub struct DiskCache {
     pub gc_size: usize,
     #[env_config(name = "ZO_DISK_CACHE_GC_INTERVAL", default = 60)] // seconds
     pub gc_interval: u64,
+    // Bytes, files at or below this size are downloaded synchronously before a query starts.
+    // Set to 0 to disable inline downloading.
+    #[env_config(name = "ZO_DISK_CACHE_INLINE_DOWNLOAD_MAX_SIZE", default = 2097152)]
+    pub inline_download_max_size: usize,
     // Days, files with data older than this will not be downloaded into the cache,
     // queries read them directly from object storage. default 0 means no limit
     #[env_config(name = "ZO_DISK_CACHE_MAX_AGE_DAYS", default = 0)]
@@ -2322,6 +2357,8 @@ pub fn init() -> Config {
     if let Err(e) = check_memory_config(&mut cfg) {
         panic!("memory cache config error: {e}");
     }
+
+    check_block_cache_config(&mut cfg);
 
     // check disk cache
     if let Err(e) = check_disk_cache_config(&mut cfg) {
@@ -2846,6 +2883,33 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn check_block_cache_config(cfg: &mut Config) {
+    const KIB: usize = 1024;
+    const MIB: usize = 1024 * 1024;
+
+    cfg.block_cache.block_size = cfg.block_cache.block_size.saturating_mul(KIB);
+    cfg.block_cache.bypass_threshold = cfg.block_cache.bypass_threshold.saturating_mul(MIB);
+    let requested = cfg.block_cache.max_size.saturating_mul(MIB);
+    let memory_cache_size = cfg
+        .memory_cache
+        .max_size
+        .saturating_mul(cfg.memory_cache.bucket_num);
+    let effective = if memory_cache_size.saturating_add(requested) >= cfg.limit.mem_total {
+        cfg.limit
+            .mem_total
+            .saturating_sub(memory_cache_size)
+            .saturating_sub(1)
+    } else {
+        requested
+    };
+    if effective != requested {
+        log::warn!(
+            "ZO_BLOCK_CACHE_MAX_SIZE reduced from {requested} to {effective} bytes to stay below the memory limit"
+        );
+    }
+    cfg.block_cache.max_size = effective;
+}
+
 fn check_disk_cache_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     std::fs::create_dir_all(&cfg.common.data_cache_dir).expect("create cache dir success");
     let cache_dir = Path::new(&cfg.common.data_cache_dir)
@@ -3310,6 +3374,25 @@ mod tests {
 
         cfg.route.dispatch_strategy = RouteDispatchStrategy::Other;
         assert!(check_route_config(&cfg).is_err());
+    }
+
+    #[test]
+    fn block_cache_budget_accounts_for_each_memory_cache_bucket() {
+        const MIB: usize = 1024 * 1024;
+
+        let mut cfg = Config::init().unwrap();
+        cfg.limit.mem_total = 10 * MIB;
+        cfg.memory_cache.max_size = 4 * MIB;
+        cfg.memory_cache.bucket_num = 2;
+        cfg.block_cache.block_size = 256;
+        cfg.block_cache.bypass_threshold = 8;
+        cfg.block_cache.max_size = 4;
+
+        check_block_cache_config(&mut cfg);
+
+        assert_eq!(cfg.block_cache.block_size, 256 * 1024);
+        assert_eq!(cfg.block_cache.bypass_threshold, 8 * MIB);
+        assert_eq!(cfg.block_cache.max_size, 2 * MIB - 1);
     }
 
     #[test]

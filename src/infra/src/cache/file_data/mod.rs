@@ -19,17 +19,23 @@ pub mod memory;
 
 use std::{
     collections::{BTreeMap, VecDeque},
+    future::Future,
     ops::Range,
+    time::Duration,
 };
 
 use bytes::Bytes;
 use config::utils::time::get_ymdh_from_micros;
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
+use moka::future::Cache;
 use object_store::{GetOptions, GetResult};
+use once_cell::sync::Lazy;
 
 const DOWNLOAD_RETRY_TIMES: usize = 3;
 const INITIAL_CACHE_SIZE: usize = 128;
+const DOWNLOAD_GATE_CAPACITY: u64 = 1_024;
+const DOWNLOAD_GATE_TTL: Duration = Duration::from_secs(30);
 pub const TRACE_ID_FOR_CACHE_LATEST_FILE: &str = "cache_latest_file";
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
@@ -37,6 +43,45 @@ pub enum CacheType {
     Disk,
     Memory,
     None,
+}
+
+#[derive(Clone, Eq, Hash, PartialEq)]
+struct DownloadKey {
+    account: String,
+    file: String,
+    cache_type: CacheType,
+}
+
+// This stores only completed download byte counts, not file data.
+static DOWNLOAD_GATE: Lazy<Cache<DownloadKey, usize>> = Lazy::new(|| {
+    Cache::builder()
+        .max_capacity(DOWNLOAD_GATE_CAPACITY)
+        .time_to_live(DOWNLOAD_GATE_TTL)
+        .build()
+});
+
+#[derive(Debug)]
+pub struct DownloadToCacheError {
+    caller_ran_fetch: bool,
+    source: std::sync::Arc<anyhow::Error>,
+}
+
+impl DownloadToCacheError {
+    pub fn caller_ran_fetch(&self) -> bool {
+        self.caller_ran_fetch
+    }
+}
+
+impl std::fmt::Display for DownloadToCacheError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.source.fmt(formatter)
+    }
+}
+
+impl std::error::Error for DownloadToCacheError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.source.root_cause())
+    }
 }
 
 enum CacheStrategy {
@@ -133,7 +178,7 @@ impl CacheStrategy {
                 let mut index = 0;
                 while index < queue.len() {
                     if queue[index].0 == key {
-                        let (k, v) = queue.remove(index).unwrap();
+                        let (k, v) = queue.remove(index)?;
                         set.remove(&k);
                         return Some((k, v));
                     }
@@ -200,6 +245,68 @@ pub async fn download(
     }
 }
 
+pub async fn download_to_cache(
+    account: &str,
+    file: &str,
+    size: Option<usize>,
+    cache_type: CacheType,
+) -> Result<(usize, bool), DownloadToCacheError> {
+    if cache_type == CacheType::None {
+        return Ok((0, false));
+    }
+
+    let fetched = std::sync::atomic::AtomicBool::new(false);
+    let key = DownloadKey {
+        account: account.to_owned(),
+        file: file.to_owned(),
+        cache_type,
+    };
+    let result = download_with_gate(&DOWNLOAD_GATE, key, || async {
+        match cache_type {
+            CacheType::Memory => {
+                if memory::exist(file).await {
+                    Ok(0)
+                } else {
+                    fetched.store(true, std::sync::atomic::Ordering::SeqCst);
+                    memory::download(account, file, size).await
+                }
+            }
+            CacheType::Disk => {
+                if disk::exist(file).await {
+                    Ok(0)
+                } else {
+                    fetched.store(true, std::sync::atomic::Ordering::SeqCst);
+                    disk::download(account, file, size).await
+                }
+            }
+            CacheType::None => Ok(0),
+        }
+    })
+    .await;
+    let caller_ran_fetch = fetched.load(std::sync::atomic::Ordering::SeqCst);
+
+    match result {
+        Ok(bytes) => Ok((bytes, caller_ran_fetch)),
+        Err(source) => Err(DownloadToCacheError {
+            caller_ran_fetch,
+            source,
+        }),
+    }
+}
+
+async fn download_with_gate<F, Fut, E>(
+    gate: &Cache<DownloadKey, usize>,
+    key: DownloadKey,
+    download: F,
+) -> Result<usize, std::sync::Arc<E>>
+where
+    F: FnOnce() -> Fut,
+    Fut: Future<Output = Result<usize, E>>,
+    E: Send + Sync + 'static,
+{
+    gate.try_get_with(key, download()).await
+}
+
 async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Error> {
     match ftype {
         FileType::Parquet => {
@@ -215,7 +322,7 @@ async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Erro
             if footer[8..12] != [0x50, 0x46, 0x41, 0x31] {
                 return Err(anyhow::anyhow!("puffin footer magic mismatch"));
             }
-            let payload_size = i32::from_le_bytes(footer[0..4].try_into().unwrap());
+            let payload_size = i32::from_le_bytes(footer[0..4].try_into()?);
             if bytes.len() < 12 + payload_size as usize {
                 return Err(anyhow::anyhow!("payload size mismatch"));
             }
@@ -454,7 +561,69 @@ fn get_file_time(file: &str) -> Option<u64> {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+
     use super::*;
+
+    #[tokio::test]
+    async fn download_gate_collapses_concurrent_downloads() {
+        let cache = Cache::new(1_024);
+        let key = DownloadKey {
+            account: "default".to_owned(),
+            file: "file".to_owned(),
+            cache_type: CacheType::Memory,
+        };
+        let fetches = Arc::new(AtomicUsize::new(0));
+        let starts = Arc::new(AtomicUsize::new(0));
+        let barrier = Arc::new(tokio::sync::Barrier::new(32));
+        let (ready, fetch_ready) = tokio::sync::watch::channel(false);
+        let mut downloads = Vec::new();
+
+        for _ in 0..32 {
+            let cache = cache.clone();
+            let key = key.clone();
+            let fetches = fetches.clone();
+            let starts = starts.clone();
+            let barrier = barrier.clone();
+            let ready = ready.clone();
+            let fetch_ready = fetch_ready.clone();
+            downloads.push(tokio::spawn(async move {
+                barrier.wait().await;
+                if starts.fetch_add(1, Ordering::SeqCst) == 31 {
+                    ready.send_replace(true);
+                }
+                let fetched = std::sync::atomic::AtomicBool::new(false);
+                download_with_gate(&cache, key, || async {
+                    fetched.store(true, std::sync::atomic::Ordering::SeqCst);
+                    fetches.fetch_add(1, Ordering::SeqCst);
+                    let mut fetch_ready = fetch_ready.clone();
+                    if !*fetch_ready.borrow_and_update() {
+                        assert!(fetch_ready.changed().await.is_ok());
+                    }
+                    Ok::<_, &'static str>(42)
+                })
+                .await
+                .map(|bytes| (bytes, fetched.load(std::sync::atomic::Ordering::SeqCst)))
+            }));
+        }
+
+        let mut callers_that_fetched = 0;
+        for download in downloads {
+            match download.await {
+                Ok(Ok((bytes, fetched))) => {
+                    assert_eq!(bytes, 42);
+                    callers_that_fetched += usize::from(fetched);
+                }
+                Ok(Err(error)) => assert!(false, "download gate failed: {error}"),
+                Err(error) => assert!(false, "download task failed: {error}"),
+            }
+        }
+        assert_eq!(callers_that_fetched, 1);
+        assert_eq!(fetches.load(Ordering::SeqCst), 1);
+    }
 
     #[test]
     fn test_file_data_lru_cache_miss() {
