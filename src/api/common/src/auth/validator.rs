@@ -28,6 +28,8 @@ use db::{self, user::is_root_user};
 #[cfg(feature = "enterprise")]
 use o2_dex::config::get_config as get_dex_config;
 #[cfg(feature = "enterprise")]
+use o2_enterprise::enterprise::password_policy::lockout::{self, LoginAttemptOutcome};
+#[cfg(feature = "enterprise")]
 pub use openobserve_core::auth::get_user_email_from_auth_str;
 pub use openobserve_core::authz::{check_permissions, list_objects_for_user};
 use openobserve_core::{
@@ -35,19 +37,16 @@ use openobserve_core::{
     users,
 };
 
-use crate::{
-    auth::login_lockout::{self, LoginAttemptOutcome},
-    common::{
-        infra::config::ORG_INGESTION_TOKENS,
-        meta::{
-            ingestion_routes,
-            user::{
-                AuthTokensExt, TokenValidationResponse, TokenValidationResponseBuilder,
-                get_default_user_role,
-            },
+use crate::common::{
+    infra::config::ORG_INGESTION_TOKENS,
+    meta::{
+        ingestion_routes,
+        user::{
+            AuthTokensExt, TokenValidationResponse, TokenValidationResponseBuilder,
+            get_default_user_role,
         },
-        utils::redirect_response::RedirectResponseBuilder,
     },
+    utils::redirect_response::RedirectResponseBuilder,
 };
 
 pub const PKCE_STATE_ORG: &str = "o2_pkce_state";
@@ -155,7 +154,10 @@ pub struct AuthValidationResult {
 enum PasswordCheck {
     Matched,
     Mismatch,
-    Locked { retry_after_secs: i64 },
+    #[cfg(feature = "enterprise")]
+    Locked {
+        retry_after_secs: i64,
+    },
 }
 
 impl PasswordCheck {
@@ -332,38 +334,46 @@ async fn enforce_lockout_and_compare_password<F>(
 where
     F: FnOnce() -> bool,
 {
-    let policy = db::password_policy::get_effective_policy().await;
-    let lockout = policy.lockout;
-    let root_exempt = is_root_user(user_email) && !policy.apply_to_root;
-    if !lockout.is_enabled() || !is_internal || root_exempt {
-        return PasswordCheck::from_comparison(compare());
+    #[cfg(not(feature = "enterprise"))]
+    {
+        let _ = (user_email, is_internal);
+        PasswordCheck::from_comparison(compare())
     }
-
-    match login_lockout::check_lockout(user_email, &lockout).await {
-        LoginAttemptOutcome::Locked { retry_after_secs } => {
-            log::warn!(
-                "Rejected a login for locked-out account {user_email}, {retry_after_secs}s remaining"
-            );
-            PasswordCheck::Locked { retry_after_secs }
+    #[cfg(feature = "enterprise")]
+    {
+        let policy = db::password_policy::get_effective_policy().await;
+        let lockout = policy.lockout;
+        let root_exempt = is_root_user(user_email) && !policy.apply_to_root;
+        if !lockout.is_enabled() || !is_internal || root_exempt {
+            return PasswordCheck::from_comparison(compare());
         }
-        outcome => {
-            if !compare() {
-                // The failure that trips the lock reports it immediately, rather than leaving the
-                // user to discover it on an attempt they have no reason to expect to fail.
-                return match login_lockout::record_failed_attempt(user_email, &lockout).await {
-                    LoginAttemptOutcome::Locked { retry_after_secs } => {
-                        PasswordCheck::Locked { retry_after_secs }
-                    }
-                    _ => PasswordCheck::Mismatch,
-                };
+
+        match lockout::check_lockout(user_email, &lockout).await {
+            LoginAttemptOutcome::Locked { retry_after_secs } => {
+                log::warn!(
+                    "Rejected a login for locked-out account {user_email}, {retry_after_secs}s remaining"
+                );
+                PasswordCheck::Locked { retry_after_secs }
             }
-            // Only a user with failures needs the write; the steady state stays read-only.
-            if outcome == LoginAttemptOutcome::AllowedWithFailures
-                && let Err(e) = login_lockout::record_successful_login(user_email).await
-            {
-                log::error!("{e}");
+            outcome => {
+                if !compare() {
+                    // The failure that trips the lock reports it immediately, rather than leaving
+                    // the user to discover it on an attempt they have no reason to expect to fail.
+                    return match lockout::record_failed_attempt(user_email, &lockout).await {
+                        LoginAttemptOutcome::Locked { retry_after_secs } => {
+                            PasswordCheck::Locked { retry_after_secs }
+                        }
+                        _ => PasswordCheck::Mismatch,
+                    };
+                }
+                // Only a user with failures needs the write; the steady state stays read-only.
+                if outcome == LoginAttemptOutcome::AllowedWithFailures
+                    && let Err(e) = lockout::record_successful_login(user_email).await
+                {
+                    log::error!("{e}");
+                }
+                PasswordCheck::Matched
             }
-            PasswordCheck::Matched
         }
     }
 }
@@ -719,6 +729,7 @@ pub async fn validate_credentials(
         .await;
     // A lockout is the one refusal that carries an answer, so it is the one that does not collapse
     // into the shared invalid-credentials response.
+    #[cfg(feature = "enterprise")]
     if let PasswordCheck::Locked { retry_after_secs } = password_check {
         return Err(AuthError::Locked { retry_after_secs });
     }
@@ -978,6 +989,7 @@ async fn validate_user_from_db(
             } else {
                 PasswordCheck::Mismatch
             };
+            #[cfg(feature = "enterprise")]
             if let PasswordCheck::Locked { retry_after_secs } = password_check {
                 return Err(AuthError::Locked { retry_after_secs });
             }
@@ -1425,6 +1437,7 @@ fn _extract_full_url(req: &Request) -> String {
 #[cfg(test)]
 mod tests {
     use chrono::Utc;
+    #[cfg(feature = "enterprise")]
     use config::meta::password_policy::{LockoutPolicy, PasswordPolicy};
     use infra::{
         db as infra_db,
@@ -1934,6 +1947,7 @@ mod tests {
         );
         assert!(validate_user(init_user, pwd).await.unwrap().is_valid);
 
+        #[cfg(feature = "enterprise")]
         exercise_lockout(org_id, init_user, pwd).await;
     }
 
@@ -1942,6 +1956,7 @@ mod tests {
     ///
     /// Folded into `test_validate` rather than standing alone: it needs that fixture's root user
     /// and caches, and a second test clearing the same tables would race with it.
+    #[cfg(feature = "enterprise")]
     async fn exercise_lockout(org_id: &str, root_user: &str, root_pwd: &str) {
         let locked_user = "lockme@example.com";
         let pwd = "Complexpass#123";
@@ -2048,6 +2063,7 @@ mod tests {
     ///
     /// Nothing clears the lockout early — a password change does not touch it — so a locked root
     /// waits out `locked_until` unless an admin clears the row.
+    #[cfg(feature = "enterprise")]
     async fn exercise_root_lockout(root_user: &str, root_pwd: &str) {
         db::password_policy::set_policy(&PasswordPolicy {
             lockout: LockoutPolicy {
@@ -2082,6 +2098,7 @@ mod tests {
 
     /// The seconds a refused login is told to wait, or `None` when it was refused as a plain
     /// mismatch. Panics if the credentials are accepted.
+    #[cfg(feature = "enterprise")]
     async fn refuse(user: &str, password: &str) -> Option<i64> {
         match validate_credentials(user, password, "default/_bulk", &Method::POST, false).await {
             Ok(response) => {

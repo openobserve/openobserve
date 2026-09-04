@@ -14,6 +14,5 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 pub mod jwt;
-pub mod login_lockout;
 pub mod token;
 pub mod validator;

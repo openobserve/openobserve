@@ -782,8 +782,14 @@ pub fn service_routes() -> Router {
     // `/config` bootstrap in config_routes()
     router = router.route("/{org_id}/config", get(status::zo_config));
     // Users
+    // Reading one member returns their lockout counters, which only an enterprise build has.
+    let user_record = post(users::add_user_to_org)
+        .put(users::update)
+        .delete(users::delete);
+    #[cfg(feature = "enterprise")]
+    let user_record = user_record.get(users::get);
     router = router.route("/{org_id}/users", get(users::list).post(users::save))
-        .route("/{org_id}/users/{email_id}", get(users::get).post(users::add_user_to_org).put(users::update).delete(users::delete))
+        .route("/{org_id}/users/{email_id}", user_record)
         .route("/{org_id}/users/bulk", delete(users::delete_bulk))
         .route("/{org_id}/users/roles", get(users::list_roles))
         .route("/invites", get(users::list_invitations))
@@ -2110,6 +2116,7 @@ mod tests {
     /// The caller is seeded as a real member of both organizations, holding a role that is not an
     /// administrator's. An unseeded caller would be refused for having no row to read a role from,
     /// which would pass this test against a check that admitted every user it could find.
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn user_read_refuses_a_caller_who_administers_nothing() {
         use common::infra::config::{ORG_USERS, USERS};

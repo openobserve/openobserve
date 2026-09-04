@@ -37,7 +37,6 @@ use crate::{
     paths(
         status::healthz,
         openobserve_api_management::request::users::list,
-        openobserve_api_management::request::users::get,
         openobserve_api_management::request::users::save,
         openobserve_api_management::request::users::update,
         openobserve_api_management::request::users::delete,
@@ -441,8 +440,6 @@ use crate::{
             meta::user::UserList,
             meta::user::UserResponse,
             meta::user::SignInResponse,
-            openobserve_api_common::auth::login_lockout::LockoutState,
-            openobserve_api_management::request::users::UserDetailsResponse,
             meta::organization::OrgSummary,
             meta::organization::StreamSummary,
             meta::organization::PipelineSummary,
@@ -576,9 +573,12 @@ pub struct ApiDoc;
     openobserve_api_management::request::remote_tasks::activate_remote_task_signing_candidate,
     openobserve_api_management::request::remote_tasks::end_remote_task_signing_grace,
     openobserve_api_management::request::remote_tasks::revoke_remote_task_signing_secret,
+    openobserve_api_management::request::users::get,
 ))]
 #[openapi(components(schemas(
     openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
+    o2_enterprise::enterprise::password_policy::lockout::LockoutState,
+    openobserve_api_management::request::users::UserDetailsResponse,
 )))]
 struct EnterpriseExperimentApiDoc;
 

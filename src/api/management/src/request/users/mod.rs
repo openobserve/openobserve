@@ -29,18 +29,13 @@ use config::{
     meta::user::UserRole,
     utils::{base64, json, password::validate_password_strength_with_policy},
 };
-use openobserve_api_common::{
-    auth::{
-        login_lockout::{self, LockoutState},
-        validator::AuthError,
-    },
-    extractors::Headers,
-};
+use openobserve_api_common::{auth::validator::AuthError, extractors::Headers};
 use openobserve_core::{
     auth::{UserEmail, generate_presigned_url, is_valid_email},
     users,
 };
 use serde::Serialize;
+#[cfg(feature = "enterprise")]
 use utoipa::ToSchema;
 #[cfg(feature = "enterprise")]
 use {
@@ -48,17 +43,20 @@ use {
     config::utils::time::now_micros,
     o2_dex::config::get_config as get_dex_config,
     o2_enterprise::enterprise::common::auditor::{AuditMessage, Protocol, ResponseMeta},
+    o2_enterprise::enterprise::password_policy::lockout::{self, LockoutState},
     o2_openfga::config::get_config as get_openfga_config,
     openobserve_core::auth::check_permissions,
 };
 
+#[cfg(feature = "enterprise")]
+use crate::common::meta::user::UserResponse;
 use crate::{
     common::meta::{
         self,
         http::HttpResponse as MetaHttpResponse,
         user::{
             AuthTokens, PostUserRequest, RolesResponse, SignInResponse, SignInUser, UpdateUser,
-            UserOrgRole, UserRequest, UserResponse, UserRoleRequest, UserUpdateMode, get_roles,
+            UserOrgRole, UserRequest, UserRoleRequest, UserUpdateMode, get_roles,
         },
     },
     request::{BulkDeleteRequest, BulkDeleteResponse, password_policy::password_rotation},
@@ -71,6 +69,7 @@ pub mod service_accounts;
 /// The counters are an administrator's view and must not be handed to the user they describe:
 /// someone who can read the escalation level and the remaining seconds can derive the thresholds
 /// behind them and pace attempts to stay underneath.
+#[cfg(feature = "enterprise")]
 #[derive(Serialize, ToSchema)]
 pub struct UserDetailsResponse {
     #[serde(flatten)]
@@ -154,6 +153,7 @@ pub async fn list(
 }
 
 /// GetUser
+#[cfg(feature = "enterprise")]
 #[utoipa::path(
     get,
     path = "/{org_id}/users/{email_id}",
@@ -197,7 +197,7 @@ pub async fn get(
         return MetaHttpResponse::not_found("User not found");
     };
 
-    match login_lockout::lockout_state(&email_id).await {
+    match lockout::lockout_state(&email_id).await {
         Ok(lockout) => MetaHttpResponse::json(UserDetailsResponse { user, lockout }),
         Err(e) => {
             log::error!("{e}");
@@ -212,6 +212,7 @@ pub async fn get(
 /// administers the instance, everyone else must administer the organization named in the path.
 /// Whether the *target* belongs to that organization is not decided here — the record lookup is
 /// org-scoped, so a user outside it is simply not found.
+#[cfg(feature = "enterprise")]
 async fn validate_user_admin(org_id: &str, initiator_id: &str) -> Result<(), String> {
     if db::user::is_root_user(initiator_id) {
         return Ok(());
@@ -1159,7 +1160,7 @@ fn locked_error(mut resp: SignInResponse, retry_after_secs: i64) -> Response {
 }
 
 #[cfg(feature = "enterprise")]
-async fn audit_unauthorized_error(mut audit_message: AuditMessage) {
+async fn audit_unauthorized_error(audit_message: AuditMessage) {
     audit_login_failure(audit_message, 401).await;
 }
 
@@ -1380,6 +1381,7 @@ mod tests {
     /// Seeds the caches a running node fills from the coordinator watcher. Nothing watches under
     /// test, and every allow path below is answered from these two alone — a miss would reach for
     /// the database.
+    #[cfg(feature = "enterprise")]
     fn join(org_id: &str, email: &str, role: UserRole) {
         common::infra::config::USERS.insert(
             email.to_string(),
@@ -1414,6 +1416,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn an_org_admin_reads_its_own_org() {
         let org = "user-get-acme";
@@ -1423,6 +1426,7 @@ mod tests {
         assert!(validate_user_admin(org, admin).await.is_ok());
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn a_non_admin_is_refused_its_own_org() {
         let org = "user-get-viewer";
@@ -1433,6 +1437,7 @@ mod tests {
     }
 
     /// The org boundary is the whole point: administering one tenant must not reach into another.
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn administering_one_org_does_not_reach_another() {
         let (mine, theirs) = ("user-get-mine", "user-get-theirs");
@@ -1442,6 +1447,7 @@ mod tests {
         assert!(validate_user_admin(theirs, admin).await.is_err());
     }
 
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn root_reads_any_org() {
         let root = "root@user-get-root.test";

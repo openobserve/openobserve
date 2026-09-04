@@ -371,7 +371,12 @@ pub async fn update_user(
     // gate as replacing the password outright: root, or an administrator of this org. Never the
     // locked-out user themselves, which `allow_password_update` already excludes by staying false
     // on a self-update.
+    #[cfg(feature = "enterprise")]
     let remove_lockout = user.remove_lockout;
+    // The request field stays on the OSS wire so a mixed fleet agrees on the shape; without the
+    // lockout there is simply nothing to clear.
+    #[cfg(not(feature = "enterprise"))]
+    let remove_lockout = false;
     if remove_lockout && !allow_password_update {
         return Ok(MetaHttpResponse::unauthorized("Not Allowed"));
     }
@@ -2122,6 +2127,7 @@ mod tests {
 
     /// Clearing a lockout is the one administrative act that leaves no trace on the user record,
     /// so it has to be gated on its own: nothing else in the request tells the caller apart.
+    #[cfg(feature = "enterprise")]
     #[tokio::test]
     async fn test_only_an_administrator_can_clear_a_lockout() {
         let _guard = set_up().await;
@@ -2190,6 +2196,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "enterprise")]
     async fn clear_lockout(email: &str, mode: UserUpdateMode, initiator: &str) -> Response {
         update_user(
             "dummy",
