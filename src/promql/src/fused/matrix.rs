@@ -20,7 +20,7 @@ use config::meta::promql::{
     value::{EvalContext, Value},
 };
 use datafusion::error::{DataFusionError, Result};
-use infra::errors::{Error, ErrorCodes};
+use infra::errors::ErrorCodes;
 use promql_parser::parser::LabelModifier;
 use rayon::prelude::*;
 
@@ -94,12 +94,9 @@ pub(crate) async fn fused_agg(
         tokio::time::timeout(Duration::from_secs(timeout), fold_sources(sources, params))
             .await
             .map_err(|_| {
-                DataFusionError::Plan(
-                    Error::ErrorCode(ErrorCodes::SearchTimeout(
-                        "[PromQL] fused agg timeout".to_string(),
-                    ))
-                    .to_string(),
-                )
+                DataFusionError::from(ErrorCodes::SearchTimeout(
+                    "[PromQL] fused agg timeout".to_string(),
+                ))
             })??;
 
     log::info!(
