@@ -89,6 +89,8 @@ vi.mock("@/utils/zincutils", async (importOriginal) => {
 
 // --- Component import (sees the mocks above) ---
 import SessionViewer from "./SessionViewer.vue";
+import store from "@/test/unit/helpers/store";
+import ShareButton from "@/components/common/ShareButton.vue";
 
 // ---------------------------------------------------------------------------
 // Mount factory — centralises stub config; update in one place when the
@@ -111,7 +113,7 @@ function createTestRouter() {
 function mountSessionViewer(router = createTestRouter()) {
   return mount(SessionViewer, {
     global: {
-      plugins: [router],
+      plugins: [store, router],
       stubs: {
         // Stub heavyweight child components — not the subjects of these tests
         VideoPlayer: { template: '<div data-test="stub-video-player" />' },
@@ -207,6 +209,18 @@ describe("SessionViewer.vue", () => {
       expect(backBtn.exists()).toBe(true);
       await backBtn.trigger("click");
       expect(backSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  describe("share link", () => {
+    it("shares a URL carrying the session id and its replay time window", () => {
+      const shareButton = wrapper.findComponent(ShareButton);
+
+      expect(shareButton.exists()).toBe(true);
+      expect(shareButton.props("url")).toBe(
+        `${window.location.origin}/rum/sessions/session-abc?start_time=1692884313968000&end_time=1692884769270000`,
+      );
     });
   });
 

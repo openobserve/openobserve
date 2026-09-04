@@ -52,6 +52,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           @on:date-change="updateDateTime"
         />
         <OButton
+          v-if="testRunCount > 0"
+          variant="outline"
+          size="sm"
+          data-test="workflow-runs-show-test"
+          @click="showTestRuns = !showTestRuns"
+        >
+          {{
+            showTestRuns
+              ? t("workflow.history.hideTestRuns")
+              : t("workflow.history.showTestRuns", { count: testRunCount })
+          }}
+        </OButton>
+        <OButton
           variant="outline"
           size="icon-sm"
           icon-left="refresh"
@@ -120,32 +133,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             />
           </template>
 
-          <template #cell-end_time="{ value }">
-            <OTimeCell
-              :value="value"
-              unit="us"
-              mode="absolute"
-              :timezone="store.state.timezone"
-              :empty-label="raw('—')"
-            />
-          </template>
-
           <template #cell-duration="{ row }">
             {{ formatDuration(row.end_time - row.start_time) }}
           </template>
 
+          <!-- The reason rides on the Failed badge (as in the run switcher) rather
+               than a column: in a 27.5rem panel a dedicated Error column is blank
+               on every healthy run and still too narrow to read a message in. -->
           <template #cell-status="{ row }">
             <OBadge :variant="getStatusVariant(row.error ? 'failed' : 'success')" size="sm">
               {{ row.error ? t("workflow.history.failed") : t("workflow.history.success") }}
+              <OTooltip
+                v-if="row.error"
+                side="left"
+                max-width="22rem"
+                :content="raw(String(humanizeNodeIds(row.error, t)))"
+              />
             </OBadge>
           </template>
 
-          <template #cell-error="{ value }">
-            <span :title="value || ''">{{ value || "—" }}</span>
+          <!-- A dot, not a badge: at 44px a worded badge is what clipped to "T".
+               The label stays reachable via the tooltip and the screen-reader text. -->
+          <template #cell-event_type="{ row }">
+            <OTooltip
+              v-if="isTestRun(row)"
+              :content="t('workflow.history.testRunTooltip')"
+              class="inline-flex"
+            >
+              <span
+                class="bg-text-secondary inline-block size-2 rounded-full align-middle"
+                data-test="workflow-run-test-marker"
+              >
+                <span class="sr-only">{{ t("workflow.history.testRun") }}</span>
+              </span>
+            </OTooltip>
+            <span v-else class="text-text-secondary">—</span>
+          </template>
+
+          <!-- Retry is offered ONLY where the backend can honour it: a failed run
+               whose errors were persisted. Test and Retry runs record no input, so
+               the row simply has no button rather than a dead one. -->
+          <template #cell-actions="{ row }">
+            <OButton
+              v-if="isRetryableRun(row)"
+              variant="ghost"
+              size="icon-sm"
+              icon-left="refresh"
+              :loading="retryingRunId === row.run_id"
+              :data-test="`workflow-run-retry-${row.run_id}`"
+              @click.stop="askRetry(row)"
+            >
+              <OTooltip side="left" :content="t('workflow.history.retryTooltip')" />
+            </OButton>
           </template>
         </OTable>
       </div>
     </div>
+
+    <ConfirmDialog
+      v-model="retryConfirm.show"
+      :title="t('workflow.history.retryTitle')"
+      :message="t('workflow.history.retryMessage')"
+      :ok-label="t('workflow.history.retry')"
+      @update:ok="doRetry"
+      @update:cancel="retryConfirm.show = false"
+    />
   </div>
 </template>
 
@@ -163,8 +215,17 @@ import DateTime from "@/components/DateTime.vue";
 import WorkflowExecutionTimeline from "@/components/alerts/AlertHistoryTimeline.vue";
 import NoData from "@/components/shared/grid/NoData.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import workflowService from "@/services/workflows";
+import {
+  workflowObj,
+  loadRunsHistory,
+  isTestRun,
+  useTestRunVisibility,
+  humanizeNodeIds,
+  isRetryableRun,
+  retryWorkflowRun,
+} from "@/plugins/workflows/useWorkflowCanvas";
 
 const props = defineProps<{
   orgId: string;
@@ -180,11 +241,12 @@ const emit = defineEmits<{
 const { t } = useI18nTyped();
 const store = useStore();
 
-const loading = ref(false);
+// Loading + the runs list live in SHARED state (workflowObj.runsHistory) so the
+// NDV run switcher reuses the same fetch instead of re-hitting /history.
+const loading = computed(() => workflowObj.runsHistory.loading);
 // Distinguishes "the fetch failed" from "there are no runs" — the table's empty
 // slot renders a retryable error state for the former.
 const loadError = ref(false);
-const runs = ref<any[]>([]);
 
 // Default range: last 24 hours (user can widen it via the picker). Same shape as
 // AlertHistory — startTime/endTime are microseconds.
@@ -235,7 +297,11 @@ const getStatusVariant = (status: string) => {
   }
 };
 
-const rows = computed(() => runs.value);
+// Shared with the editor's History dropdown so the two run-history surfaces cannot
+// disagree about what a published workflow should show.
+const { showTestRuns, testRunCount, visibleRuns } = useTestRunVisibility();
+
+const rows = computed(() => visibleRuns(workflowObj.runsHistory.list));
 
 // Highlight the run currently loaded on the canvas. `!` (important) so the tint
 // wins over OTable's default/hover row background — keeping the list and canvas
@@ -245,85 +311,117 @@ const rowClass = (row: any) =>
 
 // Feed the shared timeline: one bar per run, coloured by success/error.
 const timelineHistory = computed(() =>
-  runs.value.map((r: any) => ({
+  workflowObj.runsHistory.list.map((r: any) => ({
     status: r.error ? "error" : "success",
     timestamp: r.start_time,
   })),
 );
 
-// Column order surfaces the run outcome first: Status, then the Error message,
-// then Duration, then the Started / Ended timestamps.
+// The panel is a fixed 27.5rem column, so these sizes are a budget: anything over
+// it silently pushes a column out of reach (the panel has no horizontal scroll).
+// Scanning order — when it ran, how long, whether it passed, was it a rehearsal —
+// comes first; Error is the diagnostic you open a row for, so it goes last and no
+// longer flexes, and Ended is derivable from Started + Duration so it is dropped.
 const columns = computed<OTableColumnDef[]>(() => [
   {
-    id: "status",
-    header: t("workflow.history.status"),
-    accessorFn: (row: any) => (row.error ? "failed" : "success"),
+    id: "start_time",
+    header: t("workflow.history.started"),
+    accessorKey: "start_time",
     sortable: true,
-    size: 100,
-    maxSize: 100,
+    size: 132,
+    maxSize: 132,
     meta: { align: "left" },
-  },
-  {
-    id: "error",
-    header: t("workflow.history.error"),
-    accessorKey: "error",
-    size: 280,
-    minSize: 220,
-    resizable: true,
-    meta: { align: "left", flex: true },
   },
   {
     id: "duration",
     header: t("workflow.history.duration"),
     accessorFn: (row: any) => row.end_time - row.start_time,
     sortable: true,
-    size: 96,
-    maxSize: 96,
+    size: 72,
+    maxSize: 72,
     meta: { align: "left" },
   },
   {
-    id: "start_time",
-    header: t("workflow.history.started"),
-    accessorKey: "start_time",
+    id: "status",
+    header: t("workflow.history.status"),
+    accessorFn: (row: any) => (row.error ? "failed" : "success"),
     sortable: true,
-    size: 165,
-    maxSize: 165,
+    size: 80,
+    maxSize: 80,
     meta: { align: "left" },
   },
+  // Its own column: crowded into the status cell it was clipped to a stray "T".
   {
-    id: "end_time",
-    header: t("workflow.history.ended"),
-    accessorKey: "end_time",
+    id: "event_type",
+    header: t("workflow.history.runType"),
+    accessorFn: (row: any) => (isTestRun(row) ? "test" : "live"),
     sortable: true,
-    size: 165,
-    maxSize: 165,
-    meta: { align: "left" },
+    size: 44,
+    maxSize: 44,
+    meta: { align: "center" },
+  },
+  {
+    id: "actions",
+    header: t("workflow.actions"),
+    isAction: true,
+    pinned: "right",
+    size: 56,
+    maxSize: 56,
+    meta: { align: "center" },
   },
 ]);
 
 const fetchHistory = async () => {
   if (!props.workflowId) return;
-  loading.value = true;
-  try {
-    const res = await workflowService.getWorkflowHistory({
-      org_identifier: props.orgId,
-      id: props.workflowId,
-      start_time: dateTimeValues.value.startTime,
-      end_time: dateTimeValues.value.endTime,
-    });
-    runs.value = Array.isArray(res.data) ? res.data : [];
+  const res = await loadRunsHistory({
+    orgId: props.orgId,
+    workflowId: props.workflowId,
+    start: dateTimeValues.value.startTime,
+    end: dateTimeValues.value.endTime,
+  });
+  if (res.ok) {
     loadError.value = false;
-  } catch (e: any) {
-    // 403 is "no permission", not a failure to load — keep the plain empty
-    // state for it rather than offering a retry that cannot succeed.
-    loadError.value = e?.response?.status !== 403;
-    if (loadError.value) {
-      toast({ variant: "error", message: t("workflow.history.loadError") });
-    }
-    runs.value = [];
-  } finally {
-    loading.value = false;
+    return;
   }
+  // 403 is "no permission", not a failure to load — keep the plain empty state
+  // for it rather than offering a retry that cannot succeed.
+  loadError.value = res.status !== 403;
+  if (loadError.value) {
+    toast({ variant: "error", message: t("workflow.history.loadError") });
+  }
+};
+
+// Replaying dispatches destination steps for real, so it is confirmed first.
+const retryConfirm = ref<{ show: boolean; row: any }>({ show: false, row: null });
+const retryingRunId = ref("");
+
+const askRetry = (row: any) => {
+  if (!isRetryableRun(row)) return;
+  retryConfirm.value = { show: true, row };
+};
+
+const doRetry = async () => {
+  const row = retryConfirm.value.row;
+  retryConfirm.value = { show: false, row: null };
+  if (!row?.run_id) return;
+  retryingRunId.value = row.run_id;
+  const r = await retryWorkflowRun({
+    orgId: props.orgId,
+    workflowId: props.workflowId,
+    runId: row.run_id,
+    run: row,
+  });
+  retryingRunId.value = "";
+  if (!r.ok) {
+    toast({
+      message: raw(r.error || t("workflow.history.retryError")),
+      variant: "error",
+    });
+    return;
+  }
+  toast({ message: t("workflow.history.retryStarted"), variant: "success" });
+  // The retry is a separate run — the list is stale until it is re-pulled.
+  await fetchHistory();
 };
 
 const updateDateTime = (value: any) => {

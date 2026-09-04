@@ -19,11 +19,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-#[cfg(feature = "enterprise")]
-use axum::http::HeaderMap;
 use chrono::{Duration, Local, TimeZone, Timelike, Utc};
-#[cfg(feature = "enterprise")]
-use common::utils::http::get_or_create_trace_id;
 use config::{
     SMTP_CLIENT, TIMESTAMP_COL_NAME, get_config,
     meta::{
@@ -62,17 +58,17 @@ use lettre::{
     message::{Attachment, MultiPart, SinglePart},
 };
 #[cfg(feature = "enterprise")]
-use o2_enterprise::enterprise::actions::meta::{TriggerActionRequest, TriggerSource};
-#[cfg(feature = "enterprise")]
 use o2_openfga::{
     authorizer::authz::{get_ofga_type, remove_parent_relation, set_parent_relation},
     config::get_config as get_openfga_config,
 };
+use proto::cluster_rpc::SearchQuery;
 use sea_orm::{ConnectionTrait, TransactionTrait};
-use search::sql::RE_ONLY_SELECT;
+use search::{
+    datafusion::plan::projections::get_result_schema,
+    sql::{RE_ONLY_SELECT, Sql},
+};
 use svix_ksuid::Ksuid;
-#[cfg(feature = "enterprise")]
-use tracing::{Level, span};
 
 #[cfg(feature = "enterprise")]
 use crate::auth::check_permissions;
@@ -208,6 +204,11 @@ pub enum AlertError {
     #[error("Alert with PromQL mode should have a query")]
     PromqlMissingQuery,
 
+    /// SQL generation is defined only for the SQL and Custom families; the
+    /// others run no SQL, so falling through would emit a bogus `SELECT *`.
+    #[error("SQL generation is not supported for {query_type} alerts")]
+    SqlUnsupportedQueryType { query_type: &'static str },
+
     #[error("{error_message}")]
     SendNotificationError { error_message: String },
 
@@ -292,6 +293,12 @@ pub enum AlertError {
     /// and a shared reason would name the wrong fix for one of them.
     #[error("this edit breaks the SLOs measuring from this alert — {breakages}")]
     AlertSourceEditBreaksSlos { breakages: String },
+    #[error("Realtime alerts cannot have non-zero pending period")]
+    PendingPeriodOnRealtimeAlert,
+    #[error("Alert pending period must be >= 0")]
+    NegativePendingPeriod,
+    #[error("Error in multi alert grouping: {0}")]
+    MultiAlertGroupingError(String),
 }
 
 pub async fn save(
@@ -658,6 +665,14 @@ async fn prepare_alert(
         return Err(AlertError::RealtimeMissingCustomQuery);
     }
 
+    if alert.is_real_time && alert.pending_period_sec != 0 {
+        return Err(AlertError::PendingPeriodOnRealtimeAlert);
+    }
+
+    if alert.pending_period_sec < 0 {
+        return Err(AlertError::NegativePendingPeriod);
+    }
+
     // Multi-level thresholds (alerts_2.md Feature 1). Rejected at write time so
     // an unreachable warning level can never reach the evaluator.
     //
@@ -704,9 +719,68 @@ async fn prepare_alert(
     // `warning_value`. Validate whenever an aggregation is present, so a
     // non-numeric `having.value` is caught at write time rather than failing
     // every evaluation.
-    if let Some(agg) = alert.query_condition.aggregation.as_ref() {
+    if let Some(agg) = alert.query_condition.aggregation.as_mut() {
         config::meta::alerts::aggregation_level::validate_aggregation_thresholds(agg)
             .map_err(AlertError::InvalidAggregationThreshold)?;
+
+        if let Some(sql) = alert.query_condition.sql.as_ref()
+            && alert.query_condition.query_type == QueryType::SQL
+            && agg.multi_alert
+        {
+            // FE has a gate, this is mostly API check
+            if agg.having.column.is_empty() {
+                return Err(AlertError::MultiAlertGroupingError(
+                    "group by column must not be empty for sql multi alert having field"
+                        .to_string(),
+                ));
+            }
+            let query = SearchQuery {
+                sql: sql.to_owned(),
+                ..Default::default()
+            };
+            let sql = Sql::new(&query, &alert.org_id, alert.stream_type, None)
+                .await
+                .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
+            let schema = get_result_schema(sql, false, true)
+                .await
+                .map_err(|e| AlertError::MultiAlertGroupingError(e.to_string()))?;
+
+            // this is mostly API check, FE already has a restriction
+            if !schema.projections.contains(&agg.having.column) {
+                return Err(AlertError::MultiAlertGroupingError(format!(
+                    "SQL Multi alert query having column must be in the group by clause, '{}' column not in group by fields",
+                    agg.having.column
+                )));
+            }
+
+            if schema.group_by.is_empty() {
+                return Err(AlertError::MultiAlertGroupingError(
+                    "SQL Multi alert query Must have at least one group by field".to_string(),
+                ));
+            }
+
+            for group in &schema.group_by {
+                if !schema.projections.contains(group) {
+                    return Err(AlertError::MultiAlertGroupingError(format!(
+                        "SQL query projections must contain all group by fields, missing field '{group}'"
+                    )));
+                }
+                if let Some(v) = schema.field_alias_map.get(group)
+                    && v != group
+                {
+                    return Err(AlertError::MultiAlertGroupingError(format!(
+                        "SQL query projections must contain all group by fields without alias, field '{group}' is aliased"
+                    )));
+                }
+            }
+            let mut groups = Vec::with_capacity(schema.group_by.len());
+            for p in schema.projections {
+                if schema.group_by.contains(&p) {
+                    groups.push(p);
+                }
+            }
+            agg.group_by = Some(groups);
+        }
     }
 
     validate_multi_alert_config(alert)?;
@@ -1835,7 +1909,37 @@ pub async fn enable_by_name(
     Ok(())
 }
 
+/// The synthetic row a manual trigger notifies with. Manual triggers evaluate
+/// nothing, so without it `alert_count` is 0 and templates render no data.
+pub fn manual_trigger_row(alert: &Alert) -> Map<String, Value> {
+    let mut row = Map::new();
+    row.insert("stream_name".into(), alert.stream_name.clone().into());
+    row.insert("stream_type".into(), alert.stream_type.to_string().into());
+    row.insert("alert_name".into(), alert.name.clone().into());
+    row.insert("trigger_type".into(), "manual".into());
+    // Incident correlation labels rows by alert_id; a row without it groups wrong.
+    if let Some(id) = alert.id {
+        row.insert("alert_id".into(), id.to_string().into());
+    }
+    row
+}
+
 /// Triggers an alert.
+/// ExistingAlertRepeated is suppressed by design and notifies nobody, so treating it as
+/// "notified" would skip every destination and leave the trigger silent.
+#[cfg(feature = "enterprise")]
+fn incident_path_notified(
+    outcome: &config::meta::alerts::incidents::IncidentCorrelationOutcome,
+) -> bool {
+    use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+    match outcome {
+        Outcome::NewIncidentCreated { .. }
+        | Outcome::NewAlertTypeJoined { .. }
+        | Outcome::SeverityEscalated { .. } => true,
+        Outcome::ExistingAlertRepeated { .. } => false,
+    }
+}
+
 pub async fn trigger_by_id<C: ConnectionTrait>(
     conn: &C,
     org_id: &str,
@@ -1849,24 +1953,17 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let incident_routed = if alert.creates_incident
+    let incident_notified = if alert.creates_incident
         && o2_enterprise::enterprise::common::config::get_config()
             .incidents
             .enabled
     {
-        let synthetic_row = config::utils::json::json!({
-            "stream_name": alert.stream_name,
-            "stream_type": alert.stream_type.to_string(),
-            "alert_name": alert.name,
-            "alert_id": alert_id.to_string(),
-            "trigger_type": "manual"
-        });
-        let synthetic_row = synthetic_row.as_object().unwrap();
-        let notify = std::slice::from_ref(synthetic_row);
+        let synthetic_row = manual_trigger_row(&alert);
+        let notify = std::slice::from_ref(&synthetic_row);
 
         match crate::alerts::incidents::correlate_alert_to_incident(
             &alert,
-            synthetic_row,
+            &synthetic_row,
             notify,
             now,
             // Manual triggers evaluate nothing; no level to map.
@@ -1881,7 +1978,7 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
                     outcome.incident_id(),
                     outcome.service_name(),
                 );
-                true
+                incident_path_notified(&outcome)
             }
             Ok(None) => {
                 log::debug!(
@@ -1902,18 +1999,33 @@ pub async fn trigger_by_id<C: ConnectionTrait>(
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let incident_routed = false;
+    let incident_notified = false;
 
     let trace_id = config::ider::generate_trace_id();
     let trace_id = format!("trig_id_{trace_id}");
-    let (success_message, err_message) = if !incident_routed {
-        let outcome = alert
-            .send_notification(&trace_id, &[], now, None, now, None, None, None, &[])
-            .await?;
-        (outcome.success_message, outcome.error_message)
+    // Always sent: alert-attached workflows dispatch only from here. When the
+    // incident path already notified the destinations, they are skipped so the
+    // same manual trigger cannot page them twice.
+    let skip_destinations: &[String] = if incident_notified {
+        &alert.destinations
     } else {
-        (String::new(), String::new())
+        &[]
     };
+    let rows = vec![manual_trigger_row(&alert)];
+    let outcome = alert
+        .send_notification(
+            &trace_id,
+            &rows,
+            now,
+            None,
+            now,
+            None,
+            None,
+            None,
+            skip_destinations,
+        )
+        .await?;
+    let (success_message, err_message) = (outcome.success_message, outcome.error_message);
 
     Ok((success_message, err_message))
 }
@@ -1935,23 +2047,17 @@ pub async fn trigger_by_name(
     // For creates_incident=true alerts the incident correlation path handles
     // the notification. For all other cases send the direct notification.
     #[cfg(feature = "enterprise")]
-    let incident_routed = if alert.creates_incident
+    let incident_notified = if alert.creates_incident
         && o2_enterprise::enterprise::common::config::get_config()
             .incidents
             .enabled
     {
-        let synthetic_row = config::utils::json::json!({
-            "stream_name": alert.stream_name,
-            "stream_type": alert.stream_type.to_string(),
-            "alert_name": alert.name,
-            "trigger_type": "manual"
-        });
-        let synthetic_row = synthetic_row.as_object().unwrap();
-        let notify = std::slice::from_ref(synthetic_row);
+        let synthetic_row = manual_trigger_row(&alert);
+        let notify = std::slice::from_ref(&synthetic_row);
 
         match crate::alerts::incidents::correlate_alert_to_incident(
             &alert,
-            synthetic_row,
+            &synthetic_row,
             notify,
             now,
             // Manual triggers evaluate nothing; no level to map.
@@ -1966,7 +2072,7 @@ pub async fn trigger_by_name(
                     outcome.incident_id(),
                     outcome.service_name(),
                 );
-                true
+                incident_path_notified(&outcome)
             }
             Ok(None) => {
                 log::debug!(
@@ -1987,18 +2093,33 @@ pub async fn trigger_by_name(
     };
 
     #[cfg(not(feature = "enterprise"))]
-    let incident_routed = false;
+    let incident_notified = false;
 
     let trace_id = config::ider::generate_trace_id();
     let trace_id = format!("trig_name_{trace_id}");
-    let (success_message, err_message) = if !incident_routed {
-        let outcome = alert
-            .send_notification(&trace_id, &[], now, None, now, None, None, None, &[])
-            .await?;
-        (outcome.success_message, outcome.error_message)
+    // Always sent: alert-attached workflows dispatch only from here. When the
+    // incident path already notified the destinations, they are skipped so the
+    // same manual trigger cannot page them twice.
+    let skip_destinations: &[String] = if incident_notified {
+        &alert.destinations
     } else {
-        (String::new(), String::new())
+        &[]
     };
+    let rows = vec![manual_trigger_row(&alert)];
+    let outcome = alert
+        .send_notification(
+            &trace_id,
+            &rows,
+            now,
+            None,
+            now,
+            None,
+            None,
+            None,
+            skip_destinations,
+        )
+        .await?;
+    let (success_message, err_message) = (outcome.success_message, outcome.error_message);
 
     Ok((success_message, err_message))
 }
@@ -2369,7 +2490,10 @@ impl AlertExt for Alert {
                     self.trigger_condition.operator.to_string().into(),
                 ),
                 ("alert_threshold", self.trigger_condition.threshold.into()),
-                ("alert_count", rows.len().into()),
+                (
+                    "alert_count",
+                    workflow_alert_count(self, rows.len(), actual_value),
+                ),
                 (
                     "alert_start_time",
                     start_time
@@ -2593,10 +2717,8 @@ async fn send_to_destination(
                 (RenderedMessage::Http { body }, DestinationType::Http(endpoint)) => {
                     // Discord with a rendered chart: upload the PNG in the
                     // same webhook POST (the embed references it as
-                    // `attachment://`). Actions destinations keep the plain
-                    // JSON path — their payload is rewritten server-side.
+                    // `attachment://`).
                     if matches!(format, ChannelFormat::Discord)
-                        && endpoint.action_id.is_none()
                         && let Some(png) = ctx.chart_png.clone()
                     {
                         send_discord_with_attachment(endpoint, body, png).await
@@ -2706,37 +2828,6 @@ pub(crate) async fn dispatch_test_message(
 }
 
 async fn send_http_notification(endpoint: &Endpoint, msg: String) -> Result<String, anyhow::Error> {
-    #[cfg(feature = "enterprise")]
-    let msg = if endpoint.action_id.is_some() {
-        let incoming_msg = serde_json::from_str::<serde_json::Value>(&msg)
-            .map_err(|e| anyhow::anyhow!("Message should be valid JSON for actions: {e}"))?;
-        let inputs = if incoming_msg.is_object() {
-            vec![incoming_msg]
-        } else if incoming_msg.is_array() {
-            incoming_msg.as_array().unwrap().to_vec()
-        } else {
-            return Err(anyhow::anyhow!(
-                "Unsupported message format for actions: {}",
-                msg
-            ));
-        };
-
-        let trace_id = get_or_create_trace_id(
-            &HeaderMap::new(),
-            &span!(Level::TRACE, "action_destinations"),
-        );
-
-        let req = TriggerActionRequest {
-            inputs,
-            trigger_source: TriggerSource::Alerts,
-            trace_id,
-        };
-        serde_json::to_string(&req)
-            .map_err(|e| anyhow::anyhow!("Request should be valid JSON for actions: {e}"))?
-    } else {
-        msg
-    };
-
     // Block SSRF: validate the destination URL (including DNS resolution) before
     // making any outbound request. The client is built through `build_safe_client`
     // so that redirect targets and per-connect DNS resolution are re-validated.
@@ -3175,6 +3266,24 @@ struct ProcessTemplateOptions {
     pub level: Option<config::meta::alerts::level::AlertLevel>,
     /// Exact evaluated observation (T-9); `{alert_count}` for count alerts.
     pub actual_value: Option<f64>,
+}
+
+/// Numeric `alert_count` for workflow metadata; a workflow Branch compares it
+/// numerically, so it must stay a JSON number and never a formatted string.
+#[cfg_attr(not(feature = "enterprise"), allow(dead_code))]
+fn workflow_alert_count(alert: &Alert, rows_len: usize, actual_value: Option<f64>) -> Value {
+    // Hybrid count evaluation samples only PAYLOAD_SAMPLE_ROWS rows, so
+    // `rows_len` caps at 100 and any Branch above it is a dead path.
+    // Aggregation/PromQL payloads are groups/series; their length stands.
+    let is_count_family = alert.query_condition.aggregation.is_none()
+        && alert.query_condition.promql_condition.is_none();
+    match actual_value {
+        Some(v) if is_count_family && v.is_finite() && v.fract() == 0.0 && v >= 0.0 => {
+            Value::from(v as u64)
+        }
+        Some(v) if is_count_family && v.is_finite() => Value::from(v),
+        _ => Value::from(rows_len),
+    }
 }
 
 /// Render an f64 that is usually an integral count without a trailing `.0`.
@@ -4061,6 +4170,8 @@ mod threshold_validation_tests {
 mod send_path_tests {
     use config::meta::destinations::{Template, TemplateKind};
 
+    #[cfg(feature = "enterprise")]
+    use super::incident_path_notified;
     use super::{NotificationOutcome, choose_template};
 
     fn tpl(name: &str) -> Template {
@@ -4154,6 +4265,45 @@ mod send_path_tests {
         let outcome = NotificationOutcome::default();
         assert!(outcome.succeeded.is_empty());
         assert!(outcome.failed.is_empty());
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn a_repeated_alert_does_not_suppress_the_direct_notification() {
+        use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+
+        // the incident path sends NOTHING for this outcome, so skipping the alert's
+        // destinations here would mean nobody is notified at all
+        assert!(!incident_path_notified(&Outcome::ExistingAlertRepeated {
+            incident_id: "i1".to_string(),
+            service_name: "svc".to_string(),
+        }));
+    }
+
+    #[cfg(feature = "enterprise")]
+    #[test]
+    fn outcomes_that_really_notify_still_suppress_the_duplicate() {
+        use config::meta::alerts::incidents::IncidentCorrelationOutcome as Outcome;
+
+        for outcome in [
+            Outcome::NewIncidentCreated {
+                incident_id: "i1".to_string(),
+                service_name: "svc".to_string(),
+            },
+            Outcome::NewAlertTypeJoined {
+                incident_id: "i1".to_string(),
+                service_name: "svc".to_string(),
+            },
+            Outcome::SeverityEscalated {
+                incident_id: "i1".to_string(),
+                service_name: "svc".to_string(),
+            },
+        ] {
+            assert!(
+                incident_path_notified(&outcome),
+                "{outcome:?} notifies, so its destinations must be skipped"
+            );
+        }
     }
 }
 
@@ -6848,6 +6998,112 @@ mod tests {
             !row.contains_key("group"),
             "an ungrouped evaluation must not emit a group variable"
         );
+    }
+
+    // Field assignment, not `..Default::default()`: Alert has private fields, so a struct
+    // literal from outside the `config` crate is E0451. Matches the other fixtures here.
+    fn manual_alert(name: &str, workflows: Vec<String>) -> Alert {
+        let mut alert = Alert::default();
+        alert.name = name.to_string();
+        alert.org_id = "org1".to_string();
+        alert.stream_name = "stream1".to_string();
+        alert.stream_type = StreamType::Logs;
+        alert.workflows = workflows;
+        alert
+    }
+
+    #[test]
+    fn manual_trigger_row_carries_stream_alert_and_manual_marker() {
+        let alert = manual_alert("my_alert", vec![]);
+        let row = manual_trigger_row(&alert);
+        assert_eq!(row.get("stream_name").unwrap(), "stream1");
+        assert_eq!(row.get("alert_name").unwrap(), "my_alert");
+        assert_eq!(row.get("trigger_type").unwrap(), "manual");
+    }
+
+    #[test]
+    fn manual_trigger_row_marks_the_trigger_as_manual_not_scheduled() {
+        let alert = manual_alert("my_alert", vec![]);
+        let row = manual_trigger_row(&alert);
+        assert_ne!(row.get("trigger_type").unwrap(), "scheduled");
+        assert_ne!(row.get("trigger_type").unwrap(), "realtime");
+    }
+
+    #[test]
+    fn manual_trigger_row_carries_alert_id_so_incident_correlation_can_label_it() {
+        let mut alert = manual_alert("my_alert", vec![]);
+        let id = <Ksuid as svix_ksuid::KsuidLike>::new(None, None);
+        alert.id = Some(id);
+        let row = manual_trigger_row(&alert);
+        assert_eq!(row.get("alert_id").unwrap(), &id.to_string());
+    }
+
+    #[test]
+    fn manual_trigger_row_omits_alert_id_for_an_unsaved_alert() {
+        let alert = manual_alert("my_alert", vec![]);
+        let row = manual_trigger_row(&alert);
+        assert!(!row.contains_key("alert_id"));
+    }
+
+    #[test]
+    fn manual_trigger_row_is_non_empty_so_alert_count_is_not_zero() {
+        // send_notification is called with an empty row slice today, so metadata
+        // alert_count is 0 and `data` is empty for every manual run.
+        let alert = manual_alert("my_alert", vec!["wf1".to_string()]);
+        let rows = [manual_trigger_row(&alert)];
+        assert_eq!(rows.len(), 1);
+        assert!(!rows[0].is_empty());
+    }
+
+    /// A Branch on `meta_alert_count >= 500` is a dead path unless the workflow
+    /// receives the exact evaluated count instead of the 100-row payload sample.
+    #[test]
+    fn test_workflow_alert_count_uses_exact_count_for_count_alerts() {
+        let alert = Alert::default();
+        assert_eq!(
+            workflow_alert_count(&alert, 100, Some(600.0)),
+            json!(600u64)
+        );
+    }
+
+    /// The workflow compares numerically, so the value must be a JSON number —
+    /// a string would send `"1000" >= "500"` down the lexicographic path.
+    #[test]
+    fn test_workflow_alert_count_is_a_json_number_not_a_string() {
+        let alert = Alert::default();
+        let v = workflow_alert_count(&alert, 100, Some(1000.0));
+        assert!(v.is_number(), "expected a JSON number, got {v:?}");
+        assert_eq!(v.as_f64(), Some(1000.0));
+        let v = workflow_alert_count(&alert, 25, None);
+        assert!(v.is_number(), "expected a JSON number, got {v:?}");
+    }
+
+    /// Aggregation payloads are groups, not sampled rows, so their length is
+    /// already the right answer and must not be replaced by `actual_value`.
+    #[test]
+    fn test_workflow_alert_count_keeps_rows_len_for_aggregation_alerts() {
+        let mut alert = Alert::default();
+        alert.query_condition.aggregation = Some(config::meta::alerts::Aggregation {
+            group_by: None,
+            function: config::meta::alerts::AggFunction::Avg,
+            having: config::meta::alerts::Condition {
+                column: "value".into(),
+                operator: config::meta::alerts::Operator::GreaterThanEquals,
+                value: json!(85.5),
+                ignore_case: false,
+            },
+            warning_value: None,
+            multi_alert: false,
+        });
+        assert_eq!(workflow_alert_count(&alert, 4, Some(91.2)), json!(4u64));
+    }
+
+    /// Without an exact count the payload length stands, matching the
+    /// notification path's fallback.
+    #[test]
+    fn test_workflow_alert_count_falls_back_to_rows_len() {
+        let alert = Alert::default();
+        assert_eq!(workflow_alert_count(&alert, 25, None), json!(25u64));
     }
 }
 

@@ -123,6 +123,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
               selectable
               :selected-key="statusFilter"
+              default-key="all"
               @select="onStatSelect"
             />
           </div>

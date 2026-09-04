@@ -13,7 +13,12 @@
 // limitations under the License.
 
 import { describe, it, expect } from "vitest";
-import { slackTemplate, slackConfig, slackDestinationType } from "@/utils/prebuilt-templates/slack";
+import {
+  isValidSlackWebhookUrl,
+  slackTemplate,
+  slackConfig,
+  slackDestinationType,
+} from "@/utils/prebuilt-templates/slack";
 
 describe("slack template", () => {
   describe("slackTemplate", () => {
@@ -62,17 +67,40 @@ describe("slack template", () => {
       expect(typeof slackConfig.urlValidator).toBe("function");
     });
 
-    it("URL validator accepts valid Slack webhook URLs", () => {
-      const validUrl = "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX";
-      expect(slackConfig.urlValidator(validUrl)).toBe(true);
-      expect(slackConfig.urlValidator("https://hooks.slack.com/services/xxx")).toBe(true);
+    it.each([
+      "https://hooks.slack.com/services/T00000000/B00000000/XXXXXXXXXXXXXXXXXXXX",
+      "https://hooks.slack.com/services/T000/B000/secret/",
+      "https://hooks.slack-gov.com/services/T000/B000/secret",
+    ])("accepts a complete Slack webhook URL: %s", (url) => {
+      expect(isValidSlackWebhookUrl(url)).toBe(true);
+      expect(slackConfig.urlValidator(url)).toBe(true);
     });
 
-    it("URL validator rejects invalid URLs", () => {
-      expect(slackConfig.urlValidator("https://example.com/webhook")).toBe(false);
-      expect(slackConfig.urlValidator("http://hooks.slack.com/services/xxx")).toBe(false);
-      expect(slackConfig.urlValidator("https://evil.com?hooks.slack.com=fake")).toBe(false);
-      expect(slackConfig.urlValidator("invalid-url")).toBe(false);
+    it.each([
+      "http://hooks.slack.com/services/T000/B000/secret",
+      "https://foo.hooks.slack.com/services/T000/B000/secret",
+      "https://foo.hooks.slack-gov.com/services/T000/B000/secret",
+      "https://example.com/services/T000/B000/secret",
+      "https://hooks.slack.com/services/xxx",
+      "https://hooks.slack.com/services//B000/secret",
+      "https://hooks.slack.com/services/T000//secret",
+      "https://hooks.slack.com/services/T000/B000",
+      "https://hooks.slack.com/services/T000/B000/",
+      "https://hooks.slack.com/services/T000/B000/secret/extra",
+      "https://user@hooks.slack.com/services/T000/B000/secret",
+      "https://hooks.slack.com:8443/services/T000/B000/secret",
+      "https://hooks.slack.com/services/T000/B000/secret?debug=1",
+      "https://hooks.slack.com/services/T000/B000/secret?",
+      "https://hooks.slack.com/services/T000/B000/secret#fragment",
+      "https://hooks.slack.com/services/T000/B000/secret#",
+      " https://hooks.slack.com/services/T000/B000/secret",
+      "https://hooks.slack.com/services/T000/B000/secret ",
+      "https://hooks.slack.com/serv\nices/T000/B000/secret",
+      "https://hooks.slack.com/serv\tices/T000/B000/secret",
+      "invalid-url",
+    ])("rejects an incomplete or unsafe Slack webhook URL: %s", (url) => {
+      expect(isValidSlackWebhookUrl(url)).toBe(false);
+      expect(slackConfig.urlValidator(url)).toBe(false);
     });
 
     it("has credential fields", () => {
@@ -85,6 +113,15 @@ describe("slack template", () => {
       expect(webhookField).toBeDefined();
       expect(webhookField?.required).toBe(true);
       expect(webhookField?.type).toBe("text");
+      expect(webhookField?.persistInMetadata).not.toBe(true);
+    });
+
+    it("persists only the optional channel in destination metadata", () => {
+      const persistentFields = slackConfig.credentialFields
+        .filter((field) => field.persistInMetadata)
+        .map((field) => field.key);
+
+      expect(persistentFields).toEqual(["channel"]);
     });
 
     it("webhook URL validator validates Slack URLs", () => {
@@ -94,12 +131,13 @@ describe("slack template", () => {
 
       if (validator) {
         // Valid URLs
-        expect(validator("https://hooks.slack.com/services/xxx")).toBe(true);
         expect(validator("https://hooks.slack.com/services/T00000000/B00000000/XXXX")).toBe(true);
+        expect(validator("https://hooks.slack-gov.com/services/T000/B000/XXXX")).toBe(true);
 
         // Invalid URLs
         expect(validator("https://example.com")).not.toBe(true);
-        expect(validator("http://hooks.slack.com/services/xxx")).not.toBe(true);
+        expect(validator("https://hooks.slack.com/services/xxx")).not.toBe(true);
+        expect(validator("https://foo.hooks.slack.com/services/T/B/S")).not.toBe(true);
         expect(validator("https://evil.com?hooks.slack.com=fake")).not.toBe(true);
         expect(validator("invalid-url")).not.toBe(true);
       }

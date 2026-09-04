@@ -54,7 +54,7 @@ on:
   pull_request:
     # `labeled` so adding the 'mobile-e2e' label re-fires the run and turns the device jobs on
     # (lets you validate the full Android + iOS suite on a PR before merging).
-    types: [opened, reopened, synchronize, labeled]
+    types: [opened, reopened, synchronize, labeled, ready_for_review, converted_to_draft]
     paths:
       - "tests/mobile-testing/**"
       - ".github/workflows/mobile-sdk-e2e.yml"
@@ -78,6 +78,7 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 env:
   # Non-secret defaults for a fresh local OpenObserve (identical to the other test workflows).
@@ -106,6 +107,8 @@ jobs:
   # Self-contained model → no secrets to check.
   # -------------------------------------------------------------------------------------------
   preflight:
+    # Paid CI runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests on the merged code.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) }}
     name: Preflight & readiness
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -176,7 +179,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Which platform's files changed in this PR? (only evaluated for pull_request events)
-      - uses: dorny/paths-filter@v3
+      - uses: dorny/paths-filter@v4
         id: filter
         if: github.event_name == 'pull_request'
         with:
@@ -243,25 +246,109 @@ jobs:
           echo "run_ios=$I"     >> "$GITHUB_OUTPUT"
           echo "Decision (event=$EV): run_android=$A  run_ios=$I"
 
+  # Reuse the exact Playwright release-ci Linux binary and frontend when that
+  # workflow has already built this same merge SHA. Mobile-only/manual/SDK-release
+  # runs may not have a matching Playwright artifact, so keep a local build fallback.
+  resolve_oo_linux:
+    name: Find reusable OpenObserve Linux artifact
+    needs: [preflight, decide]
+    if: needs.decide.outputs.run_android == 'true'
+    runs-on: ubuntu-latest
+    # Allow 15 minutes of artifact polling plus setup/API overhead. A recent
+    # cold Playwright build published its pair 55 seconds after the old
+    # 40-attempt window expired, which forced a redundant 36-minute fallback.
+    timeout-minutes: 18
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      reuse: ${{ steps.find.outputs.reuse }}
+      run_id: ${{ steps.find.outputs.run_id }}
+    steps:
+      - name: Find exact-SHA Playwright artifacts
+        id: find
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BINARY_ARTIFACT: release-ci-binary-${{ github.sha }}
+          FRONTEND_ARTIFACT: frontend-dist-${{ github.sha }}
+          SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          artifacts_ready() {
+            local run_id="$1"
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
+              --jq "[.artifacts[] | select(.expired == false and (.name == \"${BINARY_ARTIFACT}\" or .name == \"${FRONTEND_ARTIFACT}\"))] | length" \
+              2>/dev/null || echo 0
+          }
+
+          RUN_ID=$(gh api --method GET \
+            "repos/${GITHUB_REPOSITORY}/actions/artifacts?name=${BINARY_ARTIFACT}&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | .workflow_run.id // empty' \
+            2>/dev/null || true)
+
+          if [ -n "$RUN_ID" ]; then
+            READY=$(artifacts_ready "$RUN_ID")
+            [ "$READY" -ge 2 ] || RUN_ID=''
+          fi
+
+          # When both workflows started for the same PR update, Mobile reaches this
+          # resolver before Playwright publishes its artifact pair. Wait up to
+          # 15 minutes for that active run instead of starting a duplicate
+          # ~35 minute cold build; completed producers still exit early.
+          if [ -z "$RUN_ID" ]; then
+            PLAYWRIGHT_RUN_ID=$(gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/playwright.yml/runs?head_sha=${SOURCE_HEAD_SHA}&per_page=20" \
+              --jq '[.workflow_runs[] | select(.status != "completed")] | first | .id // empty' \
+              2>/dev/null || true)
+
+            if [ -n "$PLAYWRIGHT_RUN_ID" ]; then
+              echo "Waiting for Playwright run $PLAYWRIGHT_RUN_ID to publish exact-SHA artifacts"
+              for _ in $(seq 1 60); do
+                READY=$(artifacts_ready "$PLAYWRIGHT_RUN_ID")
+                if [ "$READY" -ge 2 ]; then
+                  RUN_ID="$PLAYWRIGHT_RUN_ID"
+                  break
+                fi
+
+                STATUS=$(gh api --method GET \
+                  "repos/${GITHUB_REPOSITORY}/actions/runs/${PLAYWRIGHT_RUN_ID}" \
+                  --jq '.status' 2>/dev/null || true)
+                [ "$STATUS" = "completed" ] && break
+                sleep 15
+              done
+            fi
+          fi
+
+          if [ -n "$RUN_ID" ]; then
+            echo "reuse=true" >> "$GITHUB_OUTPUT"
+            echo "run_id=$RUN_ID" >> "$GITHUB_OUTPUT"
+            echo "Reusing Playwright artifacts from run $RUN_ID for $GITHUB_SHA"
+          else
+            echo "reuse=false" >> "$GITHUB_OUTPUT"
+            echo "run_id=" >> "$GITHUB_OUTPUT"
+            echo "No exact-SHA Playwright artifact found; Mobile will build locally"
+          fi
+
   # -------------------------------------------------------------------------------------------
-  # BUILD OO (linux) — compile OpenObserve from THIS PR's source (like playwright.yml build_binary),
-  # so the mobile suite tests the current code, not a prebuilt image. rust-cache makes reruns fast.
+  # BUILD OO (linux fallback) — only compile when no exact-SHA Playwright artifact exists.
+  # This keeps Mobile standalone for SDK-release/manual runs without duplicating a build when the
+  # normal Playwright workflow has already produced the compatible release-ci binary + frontend.
   # The Android job runs this binary NATIVELY (not Docker): the CI emulator can't reach a Docker-
   # published port via 10.0.2.2 (proven — EMUPROBE UNREACHABLE), but reaches a native host process
   # through the adb-reverse/localhost tunnel.
   # -------------------------------------------------------------------------------------------
   build_oo_linux:
-    name: Build OpenObserve (linux, from source)
-    needs: [preflight, decide]
-    if: needs.decide.outputs.run_android == 'true'
+    name: Build OpenObserve (linux fallback)
+    needs: [preflight, decide, resolve_oo_linux]
+    if: >-
+      needs.decide.outputs.run_android == 'true' &&
+      needs.resolve_oo_linux.outputs.reuse != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/github-auth
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: mobile-e2e-linux-oo-v2
       - name: Install Protoc
         run: bash ./.github/protoc.sh
       - uses: actions/setup-node@v4
@@ -308,10 +395,8 @@ jobs:
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
+      - uses: ./.github/actions/github-auth
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: mobile-e2e-macos-oo-v2
       - name: Install Protoc (macOS)
         run: brew install protobuf || true
       - uses: actions/setup-node@v4
@@ -349,8 +434,14 @@ jobs:
     # matrix split was tried for observability but exposed emulator first-render flakiness; revisit only
     # with emulator hardening (disable-animations + app warm-up + launch retries).
     name: Android (rn-android + android-native)
-    needs: [decide, build_oo_linux]
-    if: needs.decide.outputs.run_android == 'true'
+    needs: [decide, resolve_oo_linux, build_oo_linux]
+    if: >-
+      always() &&
+      needs.decide.result == 'success' &&
+      needs.decide.outputs.run_android == 'true' &&
+      needs.resolve_oo_linux.result == 'success' &&
+      (needs.resolve_oo_linux.outputs.reuse == 'true' ||
+       needs.build_oo_linux.result == 'success')
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
@@ -387,23 +478,43 @@ jobs:
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules && sudo udevadm trigger --name-match=kvm
 
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@v6
         with: { distribution: temurin, java-version: "17" }
       - uses: actions/setup-node@v4
         with: { node-version: "20" }
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
 
       - name: Install Maestro
         run: |
           curl -Ls "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
 
-      - name: Download OpenObserve binary (built from PR source)
+      - name: Download shared Playwright OpenObserve binary
+        if: needs.resolve_oo_linux.outputs.reuse == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: release-ci-binary-${{ github.sha }}
+          path: oo-bin
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_oo_linux.outputs.run_id }}
+      - name: Download fallback OpenObserve binary
+        if: needs.resolve_oo_linux.outputs.reuse != 'true'
         uses: actions/download-artifact@v4
         with:
           name: oo-linux-binary
           path: oo-bin
-      - name: Download OpenObserve web UI (so /web serves for the dashboard tests)
+      - name: Download shared Playwright web UI
+        if: needs.resolve_oo_linux.outputs.reuse == 'true'
+        uses: actions/download-artifact@v5
+        with:
+          name: frontend-dist-${{ github.sha }}
+          path: /tmp/dist
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_oo_linux.outputs.run_id }}
+      - name: Download fallback OpenObserve web UI
+        if: needs.resolve_oo_linux.outputs.reuse != 'true'
         uses: actions/download-artifact@v4
         with:
           name: oo-linux-frontend
@@ -448,11 +559,16 @@ jobs:
         working-directory: tests/mobile-testing/apps/o2-rum-tester
         run: |
           if [ -n "$O2_RN_SDK_VERSION" ]; then
-            npm install "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
+            npm install --legacy-peer-deps \
+                        "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
                         "@openobserve/mobile-react-native-session-replay@$O2_RN_SDK_VERSION"
           else
-            npm ci || npm install
+            npm ci --legacy-peer-deps || npm install --legacy-peer-deps
           fi
+          # The merged RN 0.87 dependency bump did not migrate this fixture's React 18 / RN 0.75
+          # native template. Keep the committed dependency fix, but test the existing template with
+          # its compatible RN version until that migration lands as a separate change.
+          npm install --no-save --package-lock=false --legacy-peer-deps react-native@0.75.4
           # Release build: embeds the JS bundle (Debug loads it from the Metro dev server, which
           # isn't running in CI → blank screen). The release buildType is debug-signed in the RN
           # template, so it installs on the emulator without a real keystore.
@@ -641,11 +757,15 @@ jobs:
         working-directory: tests/mobile-testing/apps/o2-rum-tester
         run: |
           if [ -n "$O2_RN_SDK_VERSION" ]; then
-            npm install "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
+            npm install --legacy-peer-deps \
+                        "@openobserve/mobile-react-native@$O2_RN_SDK_VERSION" \
                         "@openobserve/mobile-react-native-session-replay@$O2_RN_SDK_VERSION"
           else
-            npm ci || npm install
+            npm ci --legacy-peer-deps || npm install --legacy-peer-deps
           fi
+          # See the Android step above: exercise the committed RN 0.75 native template without
+          # reverting the repository's RN 0.87 dependency/security update.
+          npm install --no-save --package-lock=false --legacy-peer-deps react-native@0.75.4
           /usr/libexec/PlistBuddy -c "Add :NSAppTransportSecurity:NSAllowsLocalNetworking bool true" ios/O2RumTester/Info.plist || true
           (cd ios && pod install)
           # Release: embeds the JS bundle (Debug expects the Metro dev server → blank screen in CI).
@@ -701,7 +821,7 @@ jobs:
   merge_reports:
     name: Merge Reports
     needs: [android, ios]
-    if: always()
+    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

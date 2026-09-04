@@ -32,12 +32,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
     isNonAggregatedSQLMode,
   } = logsUtils();
 
-  const {
-    resetHistogramWithError,
-    generateHistogramSkeleton,
-    setMultiStreamHistogramQuery,
-    isHistogramEnabled,
-  } = useHistogram();
+  const { resetHistogramWithError, generateHistogramSkeleton, isHistogramEnabled } = useHistogram();
 
   const { searchObj, searchObjDebug, resetHistogramError } = searchState();
 
@@ -47,8 +42,7 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
         isHistogramEnabled(searchObj) &&
         (!searchObj.meta.sqlMode || isNonAggregatedSQLMode(searchObj, parsedSQL))) ||
         (isHistogramEnabled(searchObj) && !searchObj.meta.sqlMode)) &&
-      (searchObj.data.stream.selectedStream.length === 1 ||
-        (searchObj.data.stream.selectedStream.length > 1 && !searchObj.meta.sqlMode))
+      searchObj.data.stream.selectedStream.length === 1
     );
   };
 
@@ -68,9 +62,9 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
   ) => {
     const parsedSQL: any = fnParsedSQL();
 
-    if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == true) {
-      const errMsg = t("search.histogramNotAvailableMultiStream");
-      resetHistogramWithError(errMsg, 0);
+    if (searchObj.data.stream.selectedStream.length > 1) {
+      const errMsg = t("search.histogramUnavailableForQueries");
+      resetHistogramWithError(errMsg, -1);
     }
 
     if (!searchObj.data.queryResults?.hits?.length) {
@@ -112,16 +106,10 @@ export const useSearchHistogramManager = (t: TranslateFn) => {
           payload.onReset = callbacks.onReset;
         }
 
-        if (searchObj.data.stream.selectedStream.length > 1 && searchObj.meta.sqlMode == false) {
-          payload.queryReq.query.sql = setMultiStreamHistogramQuery(
-            searchObj.data.histogramQuery.query,
-          );
-        } else {
-          payload.queryReq.query.sql = searchObj.data.histogramQuery.query.sql.replace(
-            "[INTERVAL]",
-            searchObj.meta.resultGrid.chartInterval,
-          );
-        }
+        payload.queryReq.query.sql = searchObj.data.histogramQuery.query.sql.replace(
+          "[INTERVAL]",
+          searchObj.meta.resultGrid.chartInterval,
+        );
 
         payload.meta = {
           isHistogramOnly: searchObj.meta.histogramDirtyFlag,

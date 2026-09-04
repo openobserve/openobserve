@@ -37,6 +37,7 @@ test.describe(
       // Enterprise-only feature: these specs run ONLY in the ENT playwright matrix (never wired into
       // OSS), where Workflows is enabled by default. No runtime availability skip — if the feature is
       // missing where this runs, the test must fail loudly rather than silently pass as skipped.
+      await pm.workflowsPage.assertEnabled();
     });
 
     // =====================================================================
@@ -143,10 +144,10 @@ test.describe(
         });
         await pm.workflowsPage.goToList();
         await pm.workflowsPage.openEdit(name);
-        await pm.workflowsPage.testRunFromEditor();
+        await pm.workflowsPage.testRunFromEditor({ liveSend: true });
         // The destination step fails to send; the trigger step still succeeds.
         await pm.workflowsPage.expectNodeTestError('destination');
-        await pm.workflowsPage.expectNodeTestOk('workflow_trigger');
+        await pm.workflowsPage.expectNodeTestPassed('workflow_trigger');
       }
     );
 
@@ -225,7 +226,14 @@ test.describe(
         const serverErrors = [];
 
         page.on('console', (msg) => {
-          if (msg.type() === 'error') consoleErrors.push(msg.text());
+          if (msg.type() !== 'error') return;
+          const text = msg.text();
+          // Chrome logs a "Failed to load resource: … status of 4xx" for every
+          // 4xx asset fetch. The test's contract (see header) is that 4xx from
+          // expected validation is tolerated; only real JS errors and 5xx
+          // matter. Drop resource-load 4xx noise; keep everything else.
+          if (/Failed to load resource: the server responded with a status of 4\d\d/.test(text)) return;
+          consoleErrors.push(text);
         });
         page.on('pageerror', (err) => {
           consoleErrors.push(`pageerror: ${err.message}`);

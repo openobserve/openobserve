@@ -41,7 +41,8 @@ test.describe("Pre-Test Cleanup", () => {
         'test_fv_alerts_slack_',   // alerts-form-validation.spec.js (slack destination created by the test cases)
         /^destination\d{1,3}$/,    // destination4, destination44, destination444, etc.
         'wf_auto_dest_',           // Workflows v1 test destinations
-        'wf_auto_'                 // Workflows v1 generic test destinations
+        'wf_auto_',                // Workflows v1 generic test destinations
+        'pw_lib_dest_'             // alert-library.spec.js (Alert Library e2e destinations)
       ],
       // Template prefixes to clean up
       [
@@ -65,7 +66,8 @@ test.describe("Pre-Test Cleanup", () => {
         'e2e_sched_',              // alerts-scheduled-features.spec.js (scheduled alert tests)
         'e2e_metrics_',            // alerts-metrics-notification.spec.js (metrics notification tests)
         'e2e_alertfv_',            // alerts-form-validation.spec.js (seeded prerequisite templates)
-        'test_fv_alerts_tmpl_'     // alerts-form-validation.spec.js (templates created by the test cases)
+        'test_fv_alerts_tmpl_',    // alerts-form-validation.spec.js (templates created by the test cases)
+        'pw_lib_tmpl_'             // alert-library.spec.js (Alert Library e2e templates)
       ],
       // Folder prefixes to clean up
       ['auto_', 'incident_e2e_folder_', 'E2E Incidents ', 'E2E Scheduled ', 'wf_auto_']
@@ -333,7 +335,8 @@ test.describe("Pre-Test Cleanup", () => {
         /^backfill_source_\d+$/,                       // Backfill source streams (backfill_source_<number>)
         /^backfill_dest_\d+$/,                         // Backfill dest streams (backfill_dest_<number>)
         /^e2e_backfill_dest_\d+$/,                     // e2e_backfill_dest_<timestamp> (pipeline-backfill.spec.js)
-        /^e2e_time_test_\d+$/                       // e2e_time_test_<timestamp>
+        /^e2e_time_test_\d+$/,                      // e2e_time_test_<timestamp>
+        /^pw_lib_(ready|absent)_/                   // alert-library.spec.js (Alert Library e2e readiness streams)
       ],
       // Protected streams to never delete
       ['default', 'sensitive', 'important', 'critical', 'production', 'staging', 'automation', 'e2e_automate', 'k8s_json']

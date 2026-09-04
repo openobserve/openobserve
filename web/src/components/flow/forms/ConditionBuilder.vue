@@ -52,7 +52,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :group="conditionGroup"
           :depth="0"
           name-prefix="conditions"
-          condition-input-width="w-[8.125rem]"
+          condition-input-width="w-[11.25rem]"
           :allow-custom-columns="allowCustomColumns"
           :indent-rem="0.625"
           :module="module"
@@ -84,6 +84,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ conditionsError }}
       </div>
 
+      <!-- Warning, never a block: runtime-only fields the static list lacks are legitimate. -->
+      <div
+        v-for="w in columnWarnings"
+        :key="w.column"
+        class="text-status-warning-text mt-1 text-xs"
+        data-test="condition-builder-unknown-column-warning"
+      >
+        {{ t("flow.condition.unknownColumn", { column: w.column }) }}
+        <template v-if="w.suggestion">
+          {{ t("flow.condition.unknownColumnSuggestion", { suggestion: w.suggestion }) }}
+        </template>
+      </div>
+
       <slot name="guidelines" />
     </OForm>
   </div>
@@ -102,6 +115,7 @@ import {
   makeConditionSchema,
   type ConditionForm,
 } from "@/components/pipeline/NodeForm/Condition.schema";
+import { findUnresolvableColumns } from "./conditionColumnCheck";
 import {
   detectConditionsVersion,
   convertV0ToV2,
@@ -120,6 +134,7 @@ const props = withDefaults(
     allowCustomColumns?: boolean;
     normalizeOperators?: boolean;
     normalizeColumnNames?: boolean;
+    optional?: boolean;
   }>(),
   {
     fields: () => [],
@@ -128,6 +143,7 @@ const props = withDefaults(
     allowCustomColumns: true,
     normalizeOperators: false,
     normalizeColumnNames: false,
+    optional: false,
   },
 );
 
@@ -232,6 +248,13 @@ const conditionsError = computed(() =>
   conditionsErrors.value.length ? String(firstFieldError(conditionsErrors.value)) : "",
 );
 
+// Only workflow callers pass normalizeColumnNames — exactly where the payload shape is known.
+const columnWarnings = computed(() =>
+  props.normalizeColumnNames && props.fields.length
+    ? findUnresolvableColumns(conditionGroupStore.value, props.fields)
+    : [],
+);
+
 // FilterGroup edits flow through the shared alert utilities, which expect a
 // context shaped like { formData: { query_condition: { conditions } } }.
 // The transform utils MUTATE their context in place and the form store is
@@ -269,16 +292,24 @@ const normalizeConditionColumns = (node: any): void => {
   if (Array.isArray(node.conditions)) node.conditions.forEach(normalizeConditionColumns);
 };
 
-// Host bridge: validate through the schema and return { version, conditions },
-// or null when invalid (the error renders inline under the FilterGroup).
+// Host bridge: validate through the schema and return { version, conditions }.
 // Detach from the readonly form read-view before handing the tree to the host.
+//
+// `optional` splits the two callers:
+//  - Pipelines (default): an incomplete rule BLOCKS — return null, error shown
+//    inline under the FilterGroup.
+//  - Workflows (optional=true, dummy-node model): never block. Return the rule
+//    anyway with a `complete` flag so the host can save an incomplete rule as a
+//    placeholder (and flag the node incomplete). The `complete` field is only added
+//    in optional mode, so the pipeline payload shape is unchanged.
 const submit = async () => {
   validated.value = null;
   await form.handleSubmit();
-  if (!validated.value) return null;
+  const complete = !!validated.value;
+  if (!complete && !props.optional) return null;
   const conditions = cloneDeep((form.state.values as any).conditions);
   if (props.normalizeColumnNames) normalizeConditionColumns(conditions);
-  return { version: 2, conditions };
+  return props.optional ? { version: 2, conditions, complete } : { version: 2, conditions };
 };
 
 defineExpose({ submit, conditionGroup, form });

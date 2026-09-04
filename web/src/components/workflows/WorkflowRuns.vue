@@ -60,24 +60,69 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton variant="outline" data-test="workflow-runs-edit" @click="onEditWorkflow">
           {{ t("workflow.runs.edit") }}
         </OButton>
+        <!-- Only meaningful once a run is selected — it is the run that gets
+             carried over. Without one there is nothing to debug, so it stays
+             hidden rather than rendering as a dead control. -->
+        <!-- Replaying is only possible for a run the backend persisted input for,
+             so a Test/Retry run offers no button rather than a failing one. -->
+        <OButton
+          v-if="isRetryableRun(selectedRun)"
+          variant="outline"
+          :loading="retrying"
+          data-test="workflow-runs-retry"
+          @click="onRetryRun"
+        >
+          {{ t("workflow.history.retry") }}
+        </OButton>
+        <OButton
+          v-if="selectedRunId"
+          variant="primary"
+          data-test="workflow-runs-debug"
+          @click="onDebugInEditor"
+        >
+          {{ t("workflow.runs.debugInEditor") }}
+        </OButton>
       </template>
     </OPageHeader>
 
-    <div class="flex min-h-0 flex-1 gap-2 px-2 pt-3">
-      <!-- Read-only canvas (per-node run status overlay). The SAME results dock as
-           the editor docks the step Input/Output below the canvas once a run is
-           loaded (read-only here) — instead of the old overlay drawer. -->
-      <div class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden">
-        <WorkflowResultsDock>
-          <WorkflowCanvas />
-        </WorkflowResultsDock>
+    <div class="relative flex min-h-0 flex-1 gap-2 px-2 pt-3">
+      <!-- Read-only canvas (per-node run status overlay). Clicking a node's ✓/✗ badge
+           opens its NDV (read-only here) with the step's Input · Config · Output — the
+           SAME panel the editor uses, so results read identically in both places. -->
+      <div
+        class="rounded-surface bg-surface-subtle relative mb-3 min-w-0 flex-1 overflow-hidden dark:bg-transparent"
+      >
+        <WorkflowCanvas />
       </div>
+
+      <!-- Collapsible so a wide graph can be read whole; the panel is a fixed 27.5rem
+           of this master-detail page and there is nowhere else for the canvas to grow. -->
+      <OButton
+        variant="outline"
+        size="icon-sm"
+        class="absolute top-2 right-2 z-10"
+        data-test="workflow-runs-panel-collapse"
+        :aria-label="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
+        @click="togglePanel"
+      >
+        <OIcon
+          :name="panelCollapsed ? 'keyboard-double-arrow-left' : 'keyboard-double-arrow-right'"
+          size="sm"
+        />
+        <OTooltip
+          :content="t(panelCollapsed ? 'workflow.runs.showList' : 'workflow.runs.hideList')"
+          side="left"
+        />
+      </OButton>
 
       <!-- Persistent runs list (master-detail). -->
       <div
+        v-if="!panelCollapsed"
+        data-test="workflow-runs-panel"
         class="rounded-surface border-border-default bg-surface-base mb-3 flex min-h-0 w-[27.5rem] max-w-[46%] shrink-0 flex-col overflow-hidden border"
       >
         <WorkflowRunsPanel
+          ref="runsPanelRef"
           :org-id="orgId"
           :workflow-id="workflowId"
           :workflow-name="workflowName"
@@ -87,9 +132,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
+    <!-- Node NDV (read-only here) — opened by a node's ✓/✗ badge to inspect that
+         step's Input · Config · Output for the loaded run. -->
+    <WorkflowNodeDrawer v-if="workflowObj.dialog.show" />
+
     <!-- Test input popup — a fresh dry-run of the current graph, launched from the
          header. Results paint on the read-only canvas (switching it out of the
-         selected historical run) and open in the results dock above. -->
+         selected historical run) and the node NDV shows each step's I/O. -->
     <WorkflowTestDialog v-if="workflowObj.testRun.show" />
   </div>
 </template>
@@ -103,16 +152,20 @@ import { useStore } from "vuex";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
-import WorkflowResultsDock from "./WorkflowResultsDock.vue";
+import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
 import WorkflowRunsPanel from "./WorkflowRunsPanel.vue";
 import useWorkflowCanvas, {
   workflowObj,
   hydrateWorkflow,
   loadWorkflowRun,
+  isRetryableRun,
+  retryWorkflowRun,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
 
@@ -131,9 +184,33 @@ const selectedRunId = ref<string>("");
 // Steps this run executed that no longer exist in the workflow (deleted/edited
 // since). Their badges can't render, so the canvas alone would under-report the
 // run — the banner tells the user the graph has moved on.
+// The history row for the loaded run — retryability is decided from its
+// event_type, which only the list carries (the run detail has no trigger type).
+const selectedRun = computed(
+  () =>
+    (workflowObj.runsHistory?.list || []).find((r: any) => r.run_id === selectedRunId.value) ||
+    null,
+);
+
 const ghostNodeCount = computed(
   () => (workflowObj.testRun.result as any)?.ghostNodeIds?.length ?? 0,
 );
+
+const PANEL_COLLAPSED_KEY = "workflows:runsPanelCollapsed";
+const panelCollapsed = ref(false);
+try {
+  panelCollapsed.value = localStorage.getItem(PANEL_COLLAPSED_KEY) === "1";
+} catch {
+  /* localStorage unavailable (private mode) — default expanded */
+}
+const togglePanel = () => {
+  panelCollapsed.value = !panelCollapsed.value;
+  try {
+    localStorage.setItem(PANEL_COLLAPSED_KEY, panelCollapsed.value ? "1" : "0");
+  } catch {
+    /* nothing to persist to — the choice still holds for this view */
+  }
+};
 
 const goBack = () => {
   router.push({ name: "workflows", query: { org_identifier: orgId.value } });
@@ -160,6 +237,8 @@ watch(
 );
 
 // Deliberate switch to the editor — the only bridge between inspect and build.
+// Deliberately WITHOUT the run: this is "go build", and arriving with a past
+// run's badges still painted would be surprising.
 const onEditWorkflow = () => {
   router.push({
     name: "workflowEditor",
@@ -169,6 +248,48 @@ const onEditWorkflow = () => {
       org_identifier: orgId.value,
     },
   });
+};
+
+// The other half of that pair: "go fix THIS run". Same destination, but the run
+// travels along, so the editor reloads it onto the canvas — identical badges and
+// per-node data, now editable. The run itself is only ever read; fixing edits the
+// definition, and re-testing produces a new test run.
+const onDebugInEditor = () => {
+  router.push({
+    name: "workflowEditor",
+    query: {
+      id: workflowId.value,
+      name: workflowName.value,
+      org_identifier: orgId.value,
+      run_id: selectedRunId.value,
+    },
+  });
+};
+
+// Replay this run server-side. It produces a NEW run, so the list is re-pulled
+// through the panel rather than mutating the row in place.
+const retrying = ref(false);
+const runsPanelRef = ref<any>(null);
+const onRetryRun = async () => {
+  const run = selectedRun.value;
+  if (!run || retrying.value) return;
+  retrying.value = true;
+  const r = await retryWorkflowRun({
+    orgId: orgId.value,
+    workflowId: workflowId.value,
+    runId: run.run_id,
+    run,
+  });
+  retrying.value = false;
+  if (!r.ok) {
+    toast({
+      message: raw(r.error || t("workflow.history.retryError")),
+      variant: "error",
+    });
+    return;
+  }
+  toast({ message: t("workflow.history.retryStarted"), variant: "success" });
+  await runsPanelRef.value?.fetchHistory?.();
 };
 
 // Cold-load hydrate (deep link / refresh): the list hydrates synchronously, so

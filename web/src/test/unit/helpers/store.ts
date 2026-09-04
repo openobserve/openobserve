@@ -14,6 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 import { createStore } from "vuex";
+import type { TraceTimeRange } from "@/ts/interfaces/traces/traceTimeRange.types";
 
 // Mirror of the initial organizationData below; used by resetOrganizationData.
 const organizationObj = {
@@ -24,7 +25,7 @@ const organizationObj = {
   },
   // Mirror of the production organizationObj — see src/stores/index.ts.
   correlatedTracesStreams: {
-    byTraceId: {} as Record<string, string>,
+    byTraceId: {} as Record<string, { stream: string; range?: TraceTimeRange }>,
     knownStreams: [] as string[],
   },
   quotaThresholdMsg: "",
@@ -166,7 +167,6 @@ const store = createStore({
       },
       quotaThresholdMsg: "",
       functions: [],
-      actions: [],
       streams: {} as Record<string, unknown>,
       folders: [],
       organizationSettings: {
@@ -244,10 +244,13 @@ const store = createStore({
     setRUMToken(state, payload) {
       state.organizationData.rumToken = payload;
     },
-    setCorrelatedTracesStream(state, payload: { traceId: string; stream: string }) {
+    setCorrelatedTracesStream(
+      state,
+      payload: { traceId: string; stream: string; range?: TraceTimeRange },
+    ) {
       const cache = state.organizationData.correlatedTracesStreams;
       if (Object.keys(cache.byTraceId).length >= 1000) cache.byTraceId = {};
-      cache.byTraceId[payload.traceId] = payload.stream;
+      cache.byTraceId[payload.traceId] = { stream: payload.stream, range: payload.range };
       if (!cache.knownStreams.includes(payload.stream)) cache.knownStreams.push(payload.stream);
     },
     // setAllCurrentDashboards(state, payload) {
@@ -279,9 +282,6 @@ const store = createStore({
     },
     setFunctions(state, payload) {
       state.organizationData.functions = payload;
-    },
-    setActions(state, payload) {
-      state.organizationData.actions = payload;
     },
     setStreams(state, payload) {
       state.organizationData.streams[payload.name] = payload;
@@ -535,9 +535,6 @@ const store = createStore({
     },
     setFunctions(context, payload) {
       context.commit("setFunctions", payload);
-    },
-    setActions(context, payload) {
-      context.commit("setActions", payload);
     },
     setStreams(context, payload) {
       context.commit("setStreams", payload);

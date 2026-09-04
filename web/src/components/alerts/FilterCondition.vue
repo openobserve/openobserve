@@ -59,7 +59,7 @@
       <!-- Reveal-on-hover: the column select is narrow and long field names
            (e.g. `gen_ai_system`) truncate. Show the full value on hover
            regardless of AI-chat mode — truncation happens in every mode. -->
-      <OTooltip v-if="condition.column" :content="condition.column" />
+      <OTooltip v-if="condition.column" :content="columnDisplay" />
     </div>
     <div class="ml-0">
       <OFormSelect
@@ -71,11 +71,11 @@
         ]"
         :searchable="false"
         data-test="alert-conditions-operator-select"
-        @update:model-value="() => emits('input:update', 'conditions', condition)"
+        @update:model-value="onOperatorChange"
       />
       <OTooltip v-if="condition.operator" :content="condition.operator" />
     </div>
-    <div class="ml-0">
+    <div v-if="!isUnaryOperator(condition.operator)" class="ml-0">
       <OFormInput
         :name="`${namePrefix}.value`"
         :placeholder="t('common.value')"
@@ -160,8 +160,9 @@ import { ref, computed, watch, inject, type PropType } from "vue";
 import { raw, type I18nText, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import type { SelectOptionInput } from "@/lib/forms/Select/OSelect.types";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 
-var triggerOperators: any = ref(["=", "!=", ">=", "<=", ">", "<", "Contains", "NotContains"]);
 const emits = defineEmits(["input:update"]);
 
 const filteredFields = ref<any[]>(props.streamFields as any[]);
@@ -186,6 +187,31 @@ const { t } = useI18nTyped();
 // only mode now); also used to write the AND/OR toggle below.
 const form = inject(FORM_CONTEXT_KEY, null);
 
+// Operator `value`s are the backend wire format (serde renames); labels stay
+// raw English like the rest of the list.
+const triggerOperators: SelectOptionInput[] = [
+  "=",
+  "!=",
+  ">=",
+  "<=",
+  ">",
+  "<",
+  "Contains",
+  "NotContains",
+  { label: raw("Is Null"), value: "is_null" },
+  { label: raw("Is Not Null"), value: "is_not_null" },
+  { label: raw("Is Empty"), value: "is_empty" },
+  { label: raw("Is Not Empty"), value: "is_not_empty" },
+];
+
+// Null checks take no value; drop a stale one so it can't leak into the payload.
+const onOperatorChange = (operator: unknown) => {
+  if (isUnaryOperator(operator)) {
+    form?.setFieldValue(`${props.namePrefix}.value`, "");
+  }
+  emits("input:update", "conditions", props.condition);
+};
+
 const computedLabel = computed(() => {
   // First condition in any group should not show AND/OR operator;
   // only subsequent conditions show the operator
@@ -209,6 +235,13 @@ const toggleOperator = () => {
   emits("input:update", "conditions", props.condition);
 };
 
+// Show the option's display label (e.g. `meta.alert_name`) in the tooltip, not the
+// stored/flattened value (`meta_alert_name`); fall back to the raw value for custom columns.
+const columnDisplay = computed(() => {
+  const match = allColumns().find((c: any) => c.value === props.condition.column);
+  return match?.label || props.condition.column;
+});
+
 const computedInputWidth = computed(() => {
   return (
     props.inputWidth || (store.state.isAiChatEnabled ? "" : "xl:min-w-50 lg:min-w-22.5 lg:w-fit")
@@ -228,8 +261,14 @@ const filterColumns = (val: string) => {
     filteredFields.value = base;
   } else {
     const value = val.toLowerCase();
+    // Match the label too: workflow fields display dotted (`meta.alert_name`) but store
+    // flattened (`meta_alert_name`), so value-only matching finds nothing for what's shown.
     filteredFields.value = base.filter(
-      (column: any) => column.value.toLowerCase().indexOf(value) > -1,
+      (column: any) =>
+        column.value.toLowerCase().indexOf(value) > -1 ||
+        String(column.label ?? "")
+          .toLowerCase()
+          .indexOf(value) > -1,
     );
   }
 };

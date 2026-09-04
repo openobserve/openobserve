@@ -31,7 +31,8 @@ use openobserve_core::llm_evaluations::{
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// The configuration a registration or edit submits.
+/// The configuration an edit submits. Omitted write-only credential fields
+/// retain the references stored on the source version or existing draft.
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct RemoteTaskRequestBody {
@@ -545,7 +546,8 @@ pub struct PublishRemoteTaskResponseBody {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     pub task: RemoteTaskResponseBody,
-    pub report: VerificationReportBody,
+    /// Absent when a description-only update skipped the connection test.
+    pub report: Option<VerificationReportBody>,
 }
 
 /// Result of testing an inline Remote Task candidate. Unlike publication,

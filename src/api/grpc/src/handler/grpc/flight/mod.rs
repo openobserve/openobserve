@@ -36,7 +36,6 @@ use search::inspector::{SearchInspectorFieldsBuilder, search_inspector_fields};
 use search_service::{grpc::flight as grpcFlight, work_group::DeferredLock};
 use tonic::{Request, Response, Status, Streaming};
 use tracing::Instrument;
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     o2_enterprise::enterprise::{common::config::get_config as get_o2_config, search::TaskStatus},
@@ -89,7 +88,6 @@ impl FlightService for FlightServiceImpl {
             prop.extract(&MetadataMap(request.metadata()))
         });
         let span = tracing::info_span!("grpc:search:flight:do_get");
-        let _ = span.set_parent(parent_cx);
 
         // decode ticket to RemoteExecNode
         let ticket = request.into_inner();
@@ -99,6 +97,11 @@ impl FlightService for FlightServiceImpl {
             .map_err(|e| Status::internal(e.to_string()))?;
 
         let req: FlightSearchRequest = req.into();
+        common::meta::grpc::set_parent_or_trace_id(
+            &span,
+            parent_cx,
+            &req.query_identifier.trace_id,
+        );
         let trace_id = format!(
             "{}-{}",
             req.query_identifier.trace_id, req.query_identifier.job_id
@@ -121,22 +124,25 @@ impl FlightService for FlightServiceImpl {
         .instrument(span.clone())
         .await;
 
-        log::info!(
-            "{}",
-            search_inspector_fields(
-                format!(
-                    "[trace_id {trace_id}] flight->do_get: get_ctx_and_physical_plan took: {} ms",
-                    _start.elapsed().as_millis(),
-                ),
-                SearchInspectorFieldsBuilder::new()
-                    .trace_id(trace_id.to_string())
-                    .node_name(LOCAL_NODE.name.clone())
-                    .component("flight::do_get get_ctx_and_physical_plan".to_string())
-                    .search_role("follower".to_string())
-                    .duration(_start.elapsed().as_millis() as usize)
-                    .build()
-            )
-        );
+        // runs after the instrumented future: without in_scope the event has no current span
+        span.in_scope(|| {
+            log::info!(
+                "{}",
+                search_inspector_fields(
+                    format!(
+                        "[trace_id {trace_id}] flight->do_get: get_ctx_and_physical_plan took: {} ms",
+                        _start.elapsed().as_millis(),
+                    ),
+                    SearchInspectorFieldsBuilder::new()
+                        .trace_id(trace_id.to_string())
+                        .node_name(LOCAL_NODE.name.clone())
+                        .component("flight::do_get get_ctx_and_physical_plan".to_string())
+                        .search_role("follower".to_string())
+                        .duration(_start.elapsed().as_millis() as usize)
+                        .build()
+                )
+            );
+        });
 
         // prepare dataufion context
         let (ctx, plan, lock, scan_stats) = match result {

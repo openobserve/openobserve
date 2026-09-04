@@ -8,9 +8,9 @@ on:
   pull_request:
     branches:
       - "**"
-    # labeled/unlabeled so adding or removing the 'e2e' label re-fires the run and
-    # re-evaluates the gate in playwright_summary.
-    types: [opened, reopened, synchronize, labeled, unlabeled]
+    # labeled/unlabeled so adding or removing 'e2e' starts or resets CI; drafts never run paid CI.
+    # auto_merge_enabled: the one full-matrix run per PR, at merge time (see generate_matrix).
+    types: [opened, reopened, synchronize, labeled, unlabeled, auto_merge_enabled, ready_for_review, converted_to_draft]
   merge_group:
 
 concurrency:
@@ -70,6 +70,8 @@ env:
 
 jobs:
   check_changes:
+    # Runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests only (see docs/ci).
+    if: ${{ github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false)) }}
     timeout-minutes: 5
     name: check_changes
     runs-on: ubuntu-latest
@@ -78,39 +80,104 @@ jobs:
     outputs:
       has_changes: ${{ steps.check.outputs.has_changes }}
     steps:
+      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      - if: github.event_name == 'pull_request'
+        run: sleep 60
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
+      # One shared classification for every suite (see .github/actions/classify-changes); a change to
+      # this workflow file re-tests itself on top of it.
+      - uses: ./.github/actions/classify-changes
+        id: classify
       - id: check
+        env:
+          HAS_CHANGES: ${{ steps.classify.outputs.run_playwright }}
+          CHANGED_WORKFLOWS: ${{ steps.classify.outputs.changed_workflows }}
         run: |
-          # Skip when a PR touches only docs, images, or unrelated workflow files (e.g. a
-          # dependabot bump to another workflow) — none can affect the app. Source, web/, and
-          # this workflow (playwright.yml) still run the suite.
-          IGNORE_RE='(\.md$|^docs/|\.(png|jpe?g|gif|svg|webp)$|^\.github/workflows/)'
-          CHANGED=$(git diff --name-only origin/${{ github.base_ref || 'main' }} ${{ github.sha }})
-          # Files not matching IGNORE_RE. Captured (not `grep -qv`) so the check doesn't depend
-          # on grep -qv exit semantics, which differ across grep builds; the `|| true` keeps
-          # `set -e` from aborting when grep matches nothing (exit 1). The `grep -qE` below is a
-          # loop-safe `if`-condition term (`set -e` doesn't fire there), so it needs no `|| true`.
-          RELEVANT=$(printf '%s' "$CHANGED" | grep -vE "$IGNORE_RE" || true)
-          if [ -z "$CHANGED" ] || [ -n "$RELEVANT" ] || printf '%s' "$CHANGED" | grep -qE '^\.github/workflows/playwright\.yml$'; then
-            echo "has_changes=true" >> $GITHUB_OUTPUT
+          if [ "$HAS_CHANGES" = "true" ] || echo " $CHANGED_WORKFLOWS " | grep -q ' playwright.yml '; then
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
           else
-            echo "has_changes=false" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  resolve_binary:
+    timeout-minutes: 5
+    name: resolve_binary
+    needs: [check_changes]
+    if: needs.check_changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      reuse: ${{ steps.resolve.outputs.reuse }}
+      run_id: ${{ steps.resolve.outputs.run_id }}
+      binary_artifact_name: ${{ steps.resolve.outputs.binary_artifact_name }}
+      frontend_artifact_name: ${{ steps.resolve.outputs.frontend_artifact_name }}
+    steps:
+      - name: Find exact-SHA Playwright runtime
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          ARTIFACT_SHA: ${{ github.sha }}
+          CURRENT_RUN_ID: ${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          binary_artifact="release-ci-binary-${ARTIFACT_SHA}"
+          frontend_artifact="frontend-dist-${ARTIFACT_SHA}"
+          selected_run_id="$CURRENT_RUN_ID"
+          reuse=false
+
+          # Scope candidates to this workflow and source head. ARTIFACT_SHA is
+          # the exact tested merge/commit SHA, so a base-branch update cannot
+          # reuse a binary built from an older synthetic merge commit.
+          run_ids="$(
+            gh api --method GET \
+              "repos/${GITHUB_REPOSITORY}/actions/workflows/playwright.yml/runs?head_sha=${SOURCE_HEAD_SHA}&per_page=100" \
+              --jq '.workflow_runs | sort_by(.created_at) | reverse | .[].id' \
+              2>/dev/null || true
+          )"
+          while IFS= read -r run_id; do
+            [ -n "$run_id" ] || continue
+            artifact_names="$(
+              gh api --method GET \
+                "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?per_page=100" \
+                --jq '.artifacts[] | select(.expired == false) | .name' \
+                2>/dev/null || true
+            )"
+            if grep -Fxq "$binary_artifact" <<< "$artifact_names" &&
+               grep -Fxq "$frontend_artifact" <<< "$artifact_names"; then
+              selected_run_id="$run_id"
+              reuse=true
+              break
+            fi
+          done <<< "$run_ids"
+
+          {
+            echo "reuse=$reuse"
+            echo "run_id=$selected_run_id"
+            echo "binary_artifact_name=$binary_artifact"
+            echo "frontend_artifact_name=$frontend_artifact"
+          } >> "$GITHUB_OUTPUT"
+          if [ "$reuse" = "true" ]; then
+            echo "Reusing exact-SHA Playwright runtime from run $selected_run_id"
+          else
+            echo "No reusable exact-SHA Playwright runtime found; build_binary will run"
           fi
 
   build_binary:
     timeout-minutes: 45
     name: build_binary
-    needs: [check_changes]
-    # Run when there are e2e-relevant changes AND either this is not a pull_request
-    # (push to main / merge_group always run) or the PR carries the 'e2e' label.
+    needs: [check_changes, resolve_binary]
     if: >-
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'e2e')) ||
-      (github.event_name != 'pull_request' &&
-       needs.check_changes.outputs.has_changes == 'true')
+      always() &&
+      needs.check_changes.result == 'success' &&
+      needs.check_changes.outputs.has_changes == 'true' &&
+      needs.resolve_binary.result == 'success' &&
+      needs.resolve_binary.outputs.reuse != 'true'
     runs-on:
       labels: ubicloud-standard-16
     permissions:
@@ -126,9 +193,8 @@ jobs:
 
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
+      - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -181,14 +247,14 @@ jobs:
       - name: Upload binary artifact
         uses: actions/upload-artifact@v4
         with:
-          name: release-ci-binary
+          name: release-ci-binary-${{ github.sha }}
           path: target/x86_64-unknown-linux-gnu/release-ci/openobserve
           retention-days: 1
 
       - name: Upload frontend artifact
         uses: actions/upload-artifact@v4
         with:
-          name: frontend-dist
+          name: frontend-dist-${{ github.sha }}
           path: /tmp/dist
           retention-days: 1
           if-no-files-found: error
@@ -200,30 +266,72 @@ jobs:
     timeout-minutes: 5
     name: generate_matrix
     needs: [check_changes]
-    if: >-
-      (github.event_name == 'pull_request' &&
-       contains(github.event.pull_request.labels.*.name, 'e2e')) ||
-      (github.event_name != 'pull_request' &&
-       needs.check_changes.outputs.has_changes == 'true')
+    if: needs.check_changes.outputs.has_changes == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
     outputs:
       matrix: ${{ steps.gen.outputs.matrix }}
+      smoke_active: ${{ steps.gen.outputs.smoke_active }}
+      shards_selected: ${{ steps.gen.outputs.shards_selected }}
     steps:
       - uses: actions/checkout@v5
+        with:
+          # Full history only where the selection diff needs it; merge_group never diffs.
+          fetch-depth: ${{ github.event_name == 'pull_request' && '0' || '1' }}
+      - name: Selection contract tests
+        run: node --test .github/scripts/build-ci-matrix.test.js
       - id: gen
+        env:
+          # Smoke selection runs on PR pushes; the merge queue no longer runs Playwright, so the
+          # full matrix runs once per PR when auto-merge is enabled ("Merge when ready").
+          # Escape hatches: the 'e2e-full' PR label forces the full matrix on every push; the
+          # PW_SMOKE_DISABLED repo variable ('true') turns smoke off everywhere without a code change.
+          IS_PR: ${{ github.event_name == 'pull_request' }}
+          HAS_FULL_LABEL: ${{ contains(github.event.pull_request.labels.*.name, 'e2e-full') || github.event.pull_request.auto_merge != null }}
+          SMOKE_DISABLED: ${{ vars.PW_SMOKE_DISABLED }}
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json)
-          if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (build-ci-matrix produced no output)"; exit 1; fi
+          SMOKE_DISABLED=$(echo "$SMOKE_DISABLED" | tr '[:upper:]' '[:lower:]')
+          SELECT_ARGS=""
+          if [ "$IS_PR" == "true" ] && [ "$HAS_FULL_LABEL" != "true" ] && [ "$SMOKE_DISABLED" != "true" ]; then
+            # Three-dot: diff from the merge base, so commits that landed on the base branch
+            # after this PR's merge commit was cut never leak into the selection.
+            # --no-renames lists a moved file under BOTH paths, so the shard owning the old
+            # location still runs; quotepath off keeps non-ASCII names matchable.
+            if git -c core.quotepath=false diff --no-renames --name-only "origin/${BASE_REF:-main}...${{ github.sha }}" > /tmp/pw-changed-files.txt; then
+              SELECT_ARGS="--select-for-changes /tmp/pw-changed-files.txt"
+            else
+              echo "::warning::changed-file diff failed — running the full matrix"
+            fi
+          fi
+          # || true: under bash -e a die() would abort before the log below ever prints.
+          MATRIX=$(node .github/scripts/build-ci-matrix.js tests/ui-testing/ci-matrix/ci_matrix.json $SELECT_ARGS 2> /tmp/pw-select-log.txt) || true
+          cat /tmp/pw-select-log.txt >&2
+          if [ -z "$MATRIX" ]; then echo "::error::matrix generation failed (see build-ci-matrix log above)"; exit 1; fi
           echo "matrix=$MATRIX" >> "$GITHUB_OUTPUT"
-          echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', '))"
+          COUNT=$(echo "$MATRIX" | node -e "const m=JSON.parse(require('fs').readFileSync(0,'utf8')); console.log('generated',m.include.length,'shards:', m.include.map(s=>s.testfolder).join(', ')); require('fs').appendFileSync(process.env.GITHUB_OUTPUT, 'shards_selected='+m.include.length+'\n')")
+          echo "smoke_active=$([ -n "$SELECT_ARGS" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          # Durable record of what ran and why, visible from the PR checks page.
+          {
+            echo "### Playwright shard selection"
+            echo "Mode: $([ -n "$SELECT_ARGS" ] && echo "smoke (changed-path selection)" || echo "full matrix")"
+            echo '```'
+            echo "$COUNT"
+            cat /tmp/pw-select-log.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
 
   ui_integration_tests:
     timeout-minutes: 45
     name: e2e / ${{ matrix.testfolder }}
-    needs: [build_binary, generate_matrix]
-    if: ${{ !cancelled() && needs.build_binary.result == 'success' }}
+    needs: [resolve_binary, build_binary, generate_matrix]
+    if: >-
+      always() &&
+      !cancelled() &&
+      needs.resolve_binary.result == 'success' &&
+      needs.generate_matrix.result == 'success' &&
+      (needs.resolve_binary.outputs.reuse == 'true' || needs.build_binary.result == 'success')
     runs-on:
       labels: eks-openobserve-standard-8
     permissions:
@@ -248,20 +356,24 @@ jobs:
 
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Download binary artifact
         uses: actions/download-artifact@v5
         with:
-          name: release-ci-binary
+          name: ${{ needs.resolve_binary.outputs.binary_artifact_name }}
           path: release-ci-binary
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_binary.outputs.run_id }}
 
       - name: Download frontend artifact
         uses: actions/download-artifact@v5
         with:
-          name: frontend-dist
+          name: ${{ needs.resolve_binary.outputs.frontend_artifact_name }}
           path: /tmp/dist
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ needs.resolve_binary.outputs.run_id }}
 
       - name: Start mail sink (Mailpit)
         # A local SMTP server the tests can also READ. Runs as a static binary
@@ -721,7 +833,7 @@ jobs:
   report_openobserve:
     timeout-minutes: 10
     name: Report to OpenObserve
-    needs: [ui_integration_tests, merge_reports]
+    needs: [generate_matrix, ui_integration_tests, merge_reports]
     if: ${{ !cancelled() && needs.ui_integration_tests.result != 'skipped' }}
     runs-on:
       labels: eks-openobserve-standard-4
@@ -739,6 +851,9 @@ jobs:
           O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
           O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
           O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
+          # Track lightweight readiness separately from a successful fresh
+          # build; skipped reuse-path builds are reported as null.
+          RUNTIME_READY_JOB_NAME: resolve_binary
           TESTS: ${{ needs.ui_integration_tests.result }}
           MERGE_STATS: ${{ needs.merge_reports.outputs.stats }}
           MERGE_FLAKY: ${{ needs.merge_reports.outputs.flaky }}
@@ -747,6 +862,8 @@ jobs:
           # merge_group (gh-readonly-queue/main/pr-<n>-<sha>). PR empty on merge_group/push.
           REPORT_BRANCH: ${{ github.head_ref || github.ref_name }}
           REPORT_PR: ${{ github.event.pull_request.number }}
+          SMOKE_ACTIVE: ${{ needs.generate_matrix.outputs.smoke_active }}
+          SHARDS_SELECTED: ${{ needs.generate_matrix.outputs.shards_selected }}
         run: |
           # This job runs only when tests actually ran (merge `if:` gates on !cancelled &&
           # ui != skipped), so TESTS is success|failure here.
@@ -754,8 +871,17 @@ jobs:
           # Per-test counts from the merged report.json (tests_total includes skipped).
           if [ -n "${MERGE_STATS:-}" ] && [ "$MERGE_STATS" != "null" ] && [ "$MERGE_STATS" != "{}" ]; then
             EXTRA_JSON=$(printf '%s' "$MERGE_STATS" | jq -c '{tests_total:((.expected//0)+(.unexpected//0)+(.flaky//0)+(.skipped//0)), tests_passed:(.expected//0), tests_failed:(.unexpected//0), tests_flaky:(.flaky//0), tests_skipped:(.skipped//0)}' 2>/dev/null || echo "")
-            [ -n "$EXTRA_JSON" ] && export EXTRA_JSON
           fi
+          # smoke_active/shards_selected let dashboards separate smoke rows from full runs,
+          # since shards_total now varies by selection instead of always being the full set.
+          SMOKE_JSON=$(jq -nc --arg a "${SMOKE_ACTIVE:-false}" --arg n "${SHARDS_SELECTED:-}" \
+            '{smoke_active:($a=="true"), shards_selected:(($n|tonumber?)//null)}')
+          if [ -n "${EXTRA_JSON:-}" ]; then
+            EXTRA_JSON=$(jq -nc --argjson a "$EXTRA_JSON" --argjson b "$SMOKE_JSON" '$a * $b')
+          else
+            EXTRA_JSON="$SMOKE_JSON"
+          fi
+          export EXTRA_JSON
           export CONCLUSION STREAM=ci_test_runs SUITE=ui
           bash .github/scripts/o2-run-report.sh
           # One row per flaky-or-failed test -> ci_test_results (status flaky|failed; suite/
@@ -781,10 +907,11 @@ jobs:
     needs:
       [
         check_changes,
+        resolve_binary,
         build_binary,
         ui_integration_tests,
       ]
-    if: always()
+    if: always() && github.event_name != 'merge_group' && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false))
     steps:
       - name: Check test results
         run: |
@@ -795,34 +922,31 @@ jobs:
             exit 1
           fi
 
-          # 2. On a pull_request WITHOUT the 'e2e' label the suite did not run: block (fail)
-          #    when the change is Playwright-relevant so the author opts in, else bypass (pass).
-          #    Adding the 'e2e' label always runs the suite (see build_binary's if).
-          if [ "${{ github.event_name }}" == "pull_request" ] && \
-             [ "${{ contains(github.event.pull_request.labels.*.name, 'e2e') }}" != "true" ]; then
-            if [ "${{ needs.check_changes.outputs.has_changes }}" == "true" ]; then
-              echo "::error::This PR changes Playwright-relevant files but has no 'e2e' label, so the suite did not run."
-              echo "::error::Add the 'e2e' label to the PR to run the full Playwright suite before merging."
-              exit 1
-            fi
-            echo "✅ No Playwright-relevant changes and no 'e2e' label — suite not required for this PR."
-            exit 0
-          fi
-
-          # 3. Non-PR event (push / merge queue) with nothing relevant → nothing ran → allow.
-          if [ "${{ github.event_name }}" != "pull_request" ] && \
-             [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
+          # 2. Nothing Playwright-relevant changed → nothing ran → allow.
+          if [ "${{ needs.check_changes.outputs.has_changes }}" != "true" ]; then
             echo "✅ No Playwright-relevant changes — suite not required."
             exit 0
           fi
 
-          # 4. Suite was expected to run — pass only if build + tests actually succeeded.
-          if [ "${{ needs.build_binary.result }}" == "success" ] && \
-             [ "${{ needs.ui_integration_tests.result }}" == "success" ]; then
+          # 3. Suite was expected to run. The resolver must succeed, and either
+          #    an exact-SHA pair was reused or this run built a fresh pair.
+          if [ "${{ needs.resolve_binary.result }}" != "success" ]; then
+            echo "resolve_binary job did not succeed: ${{ needs.resolve_binary.result }}"
+            exit 1
+          fi
+          if [ "${{ needs.resolve_binary.outputs.reuse }}" != "true" ] && \
+             [ "${{ needs.build_binary.result }}" != "success" ]; then
+            echo "No reusable artifact and build_binary did not succeed: ${{ needs.build_binary.result }}"
+            exit 1
+          fi
+
+          # 4. Runtime readiness alone is not enough; all selected shards must pass.
+          if [ "${{ needs.ui_integration_tests.result }}" == "success" ]; then
             echo "All Playwright tests completed successfully"
             exit 0
           else
             echo "Playwright tests failed:"
+            echo "  resolve_binary: ${{ needs.resolve_binary.result }} (reuse=${{ needs.resolve_binary.outputs.reuse }})"
             echo "  build_binary: ${{ needs.build_binary.result }}"
             echo "  ui_integration_tests: ${{ needs.ui_integration_tests.result }}"
             exit 1

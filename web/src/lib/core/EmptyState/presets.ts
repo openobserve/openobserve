@@ -813,6 +813,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-remote-tasks": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noRemoteTasks.title",
+    descriptionKey: "emptyState.noRemoteTasks.description",
+    actions: [
+      {
+        id: "create",
+        icon: "add",
+        titleKey: "emptyState.noRemoteTasks.action",
+        descriptionKey: "emptyState.noRemoteTasks.actionDesc",
+      },
+    ],
+  },
   "no-eval-jobs": {
     illustration: "schedule",
     variant: "create",

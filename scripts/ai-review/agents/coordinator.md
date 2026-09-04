@@ -60,7 +60,7 @@ line, not a heading. Each finding is exactly **one line**: no separate descripti
 the concrete fix inline in parentheses, terse — not a "Fix:" sub-bullet.
 
 Prefix each finding line with its **category glyph**:
-🔒 Security · 🧩 Code Quality · ⚡ Performance · 📝 Documentation · 📦 Release.
+🔒 Security · 🧩 Code Quality · ⚡ Performance · 📝 Documentation · 📦 Release · 🎨 Frontend.
 
 Line format: `- <glyph> \`file:line\` **[Category]** One-sentence summary of the bug/risk (→ concrete fix).`
 
@@ -139,7 +139,7 @@ Add a `#### ✅ Previously Flagged (resolved)` section (inside the same `<detail
 ## Rules
 
 - Do NOT include any commentary about how the review was produced
-- Do NOT mention which model generated which finding
+- Do NOT name, hint at, or identify the model or provider behind the review — yours or any other
 - Do NOT include XML tags in your output
 - Keep the review tone direct, professional, and helpful
 - Do NOT flatter the author

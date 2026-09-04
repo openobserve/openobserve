@@ -18,8 +18,7 @@ use config::{get_config, meta::stream::StreamType};
 use o2_ratelimit::dataresource::default_rules::OpenapiInfo;
 use openobserve_api_ingest::request::{clusters, logs, metrics, rum};
 use openobserve_api_management::request::{
-    actions, gen_ai, keys, kv, service_accounts, service_streams, short_url, status, stream,
-    synthetics,
+    gen_ai, keys, kv, service_accounts, service_streams, short_url, status, stream, synthetics,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::search::patterns;
@@ -225,12 +224,6 @@ use crate::{
         openobserve_api_management::request::dashboards::reports::enable_report_v2,
         openobserve_api_management::request::dashboards::reports::trigger_report_v2,
         openobserve_api_management::request::dashboards::reports::move_reports,
-        actions::action::upload_zipped_action,
-        actions::action::delete_action,
-        actions::action::serve_action_zip,
-        actions::action::update_action_details,
-        actions::action::list_actions,
-        actions::action::get_action_from_id,
         openobserve_api_management::request::authz::fga::create_role,
         openobserve_api_management::request::authz::fga::delete_role,
         openobserve_api_management::request::authz::fga::get_roles,
@@ -542,6 +535,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::experiments::list_experiments,
     openobserve_api_management::request::experiments::compare_experiments,
     openobserve_api_management::request::experiments::get_experiment,
+    openobserve_api_management::request::experiments::list_experiment_result_rows,
     openobserve_api_management::request::experiments::get_experiment_row,
     openobserve_api_management::request::experiments::retry_experiment_slot,
     openobserve_api_management::request::experiments::cancel_experiment,
@@ -550,6 +544,10 @@ pub struct ApiDoc;
     openobserve_api_management::request::experiments::delete_experiment,
     openobserve_api_management::request::experiments::set_experiment_baseline,
     openobserve_api_management::request::experiments::clear_experiment_baseline,
+    openobserve_api_management::request::playground::share_playground_snapshot,
+    openobserve_api_management::request::playground::get_playground_snapshot,
+    openobserve_api_management::request::playground::run_playground_cell,
+    openobserve_api_management::request::playground::score_playground_cell,
     openobserve_api_management::request::remote_tasks::list_remote_tasks,
     openobserve_api_management::request::remote_tasks::create_remote_task,
     openobserve_api_management::request::remote_tasks::test_remote_task,
@@ -573,6 +571,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::remote_tasks::end_remote_task_signing_grace,
     openobserve_api_management::request::remote_tasks::revoke_remote_task_signing_secret,
 ))]
+#[openapi(components(schemas(
+    openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
+)))]
 struct EnterpriseExperimentApiDoc;
 
 pub struct SecurityAddon;

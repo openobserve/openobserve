@@ -184,6 +184,16 @@ pub struct AllOrgListDetails {
     pub credits_used: u64,
     #[cfg(feature = "cloud")]
     pub credits_limit: u64,
+    /// Separate allowances from the AI pool, in a different unit. Browser and
+    /// protocol hold independent grants — a browser step costs ~52x a protocol one.
+    #[cfg(feature = "cloud")]
+    pub browser_steps_used: u64,
+    #[cfg(feature = "cloud")]
+    pub browser_steps_limit: u64,
+    #[cfg(feature = "cloud")]
+    pub protocol_steps_used: u64,
+    #[cfg(feature = "cloud")]
+    pub protocol_steps_limit: u64,
     pub trial_expires_at: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub contract_end_date: Option<i64>,
@@ -217,11 +227,12 @@ pub struct ExtendTrialPeriodRequest {
     pub new_end_date: i64,
 }
 
+/// `limit` is the pool's new ceiling, not an increment (spent 40 of 50, +20 => 70).
 #[cfg(feature = "cloud")]
 #[derive(Serialize, Deserialize, ToSchema)]
-pub struct SetAiUsageLimitRequest {
+pub struct SetQuotaUsageLimitRequest {
     pub org_id: String,
-    pub credits_limit: u64,
+    pub limit: u64,
 }
 
 #[cfg(feature = "cloud")]
@@ -306,7 +317,8 @@ impl TriggerStatus {
                     // is a healthy trigger; a failed delivery is not.
                     usage::RunOutcome::Firing
                     | usage::RunOutcome::Normal
-                    | usage::RunOutcome::Succeeded => status.healthy += 1,
+                    | usage::RunOutcome::Succeeded
+                    | usage::RunOutcome::Pending => status.healthy += 1,
                     usage::RunOutcome::Error | usage::RunOutcome::NotifyFailed => {
                         status.failed += 1
                     }
@@ -810,6 +822,14 @@ mod tests {
             credits_used: 125,
             #[cfg(feature = "cloud")]
             credits_limit: 1_000,
+            #[cfg(feature = "cloud")]
+            browser_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -866,6 +886,14 @@ mod tests {
             credits_used: 0,
             #[cfg(feature = "cloud")]
             credits_limit: 1_000,
+            #[cfg(feature = "cloud")]
+            browser_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
             trial_expires_at: None,
             contract_end_date: None,
             billing_provider: String::new(),
@@ -887,6 +915,14 @@ mod tests {
             credits_used: 250,
             #[cfg(feature = "cloud")]
             credits_limit: 2_500,
+            #[cfg(feature = "cloud")]
+            browser_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),
@@ -915,17 +951,6 @@ mod tests {
 
         assert_eq!(request.org_id, "org-trial");
         assert_eq!(request.new_end_date, 1641081600);
-    }
-
-    #[cfg(feature = "cloud")]
-    #[test]
-    fn test_set_ai_usage_limit_request_roundtrip() {
-        let json = r#"{"org_id":"org-ai","credits_limit":2500}"#;
-        let request: SetAiUsageLimitRequest = serde_json::from_str(json).unwrap();
-
-        assert_eq!(request.org_id, "org-ai");
-        assert_eq!(request.credits_limit, 2_500);
-        assert_eq!(serde_json::to_string(&request).unwrap(), json);
     }
 
     #[cfg(feature = "cloud")]
@@ -974,6 +999,14 @@ mod tests {
             credits_used: 400,
             #[cfg(feature = "cloud")]
             credits_limit: 5_000,
+            #[cfg(feature = "cloud")]
+            browser_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: Some(1893456000000000),
             billing_provider: "no_op".to_string(),
@@ -1005,6 +1038,14 @@ mod tests {
             credits_used: 0,
             #[cfg(feature = "cloud")]
             credits_limit: 1_000,
+            #[cfg(feature = "cloud")]
+            browser_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            browser_steps_limit: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_used: 0,
+            #[cfg(feature = "cloud")]
+            protocol_steps_limit: 0,
             trial_expires_at: Some(1641081600),
             contract_end_date: None,
             billing_provider: String::new(),

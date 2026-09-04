@@ -185,26 +185,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-for="card in kpiCards"
             :key="card.label"
-            class="bg-card-glass-bg rounded-default border-border-default flex min-h-32.5 flex-col gap-1 border px-3.5 py-2.5"
+            class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5"
           >
             <!-- P95 rides its own (slower) query — skeleton the WHOLE card while
                it loads, matching the initial strip skeleton tile (see
                LLMInsightsSkeleton). Its sparkline comes from the histogram, but
                showing a chart before the number reads as ready, so we hold both. -->
             <template v-if="card.loading">
-              <div class="flex flex-col gap-1">
+              <div class="mb-1 flex items-center justify-between gap-2">
                 <OSkeleton type="text" class="h-3 w-[60%]" />
-                <OSkeleton type="text" class="h-5.5 w-[55%]" />
+                <OSkeleton type="text" class="h-6 w-6 shrink-0" />
               </div>
-              <div class="mt-auto flex h-8 items-end gap-[0.15rem]">
-                <OSkeleton
-                  type="text"
-                  v-for="bar in 16"
-                  :key="bar"
-                  :style="{ height: `${30 + ((bar * 23) % 65)}%` }"
-                  class="w-full"
-                />
-              </div>
+              <OSkeleton type="text" class="h-6 w-[55%]" />
             </template>
             <template v-else>
               <div class="flex flex-col gap-1">
@@ -1000,5 +992,6 @@ onMounted(() => {
 // the user pays for work they don't see.
 onUnmounted(() => {
   cancelAll();
+  versionCompare.cancel();
 });
 </script>

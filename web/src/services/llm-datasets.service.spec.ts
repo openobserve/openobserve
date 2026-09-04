@@ -261,6 +261,27 @@ describe("llmDatasetsService item writes", () => {
   });
 });
 
+describe("llmDatasetsService.importItems", () => {
+  it("uploads the CSV in the backend's multipart file field", async () => {
+    mockPost.mockResolvedValue({
+      data: { filename: "goldens.csv", imported_count: 2, skipped_count: 1 },
+    });
+    const file = new File(["input,expected_output\nquestion,answer"], "goldens.csv", {
+      type: "text/csv",
+    });
+
+    const result = await llmDatasetsService.importItems("acme", "dataset-1", file);
+
+    expect(mockPost).toHaveBeenCalledWith(
+      "/api/acme/datasets/dataset-1/items/import",
+      expect.any(FormData),
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    expect((mockPost.mock.calls[0][1] as FormData).get("file")).toBe(file);
+    expect(result).toEqual({ filename: "goldens.csv", importedCount: 2, skippedCount: 1 });
+  });
+});
+
 describe("llmDatasetsService.getItemVersions", () => {
   it("returns every immutable version of one logical item", async () => {
     mockGet.mockResolvedValue({

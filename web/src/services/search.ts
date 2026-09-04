@@ -16,6 +16,10 @@
 import { generateTraceContext } from "@/utils/zincutils";
 import { patchNsFieldsInJson } from "@/utils/nsFieldsPatch";
 import http from "./http";
+import type {
+  OrgTraceTimeRangeResponse,
+  TraceTimeRangeOptions,
+} from "@/ts/interfaces/traces/traceTimeRange.types";
 
 const search = {
   search: (
@@ -176,7 +180,6 @@ const search = {
     is_multistream,
     traceparent,
     body,
-    action_id,
   }: {
     org_identifier: string;
     index: string;
@@ -190,7 +193,6 @@ const search = {
     is_multistream: boolean;
     traceparent: string;
     body: any;
-    action_id: string;
   }) => {
     // let url = `/api/${org_identifier}/${index}/_around?key=${key}&size=${size}&sql=${query_context}&type=${stream_type}`;
     let url: string = "";
@@ -201,10 +203,6 @@ const search = {
     }
     if (query_fn.trim() != "") {
       url = url + `&query_fn=${query_fn}`;
-    }
-
-    if (action_id.trim() != "") {
-      url = url + `&action_id=${action_id}`;
     }
 
     if (regions.trim() != "") {
@@ -342,6 +340,26 @@ const search = {
     const url = `/api/${org_identifier}/${stream_name}/traces/${encodeURIComponent(trace_id)}/details${query ? `?${query}` : ""}`;
     return http().get(url);
   },
+  /** Which stream holds each trace id, and the time range it actually ran in. */
+  get_trace_time_ranges: ({
+    org_identifier,
+    trace_ids,
+    start_time,
+    end_time,
+    hint_ts,
+    streams,
+  }: TraceTimeRangeOptions) => {
+    const params = new URLSearchParams({ trace_id: trace_ids.join(",") });
+    if (start_time != null && end_time != null) {
+      params.set("start_time", String(start_time));
+      params.set("end_time", String(end_time));
+    }
+    if (hint_ts != null) params.set("hint_ts", String(hint_ts));
+    if (streams?.length) params.set("streams", streams.join(","));
+    return http().get<OrgTraceTimeRangeResponse>(
+      `/api/${org_identifier}/traces/time_range?${params.toString()}`,
+    );
+  },
   getTraceDAG: (
     org_identifier: string,
     stream_name: string,
@@ -389,9 +407,16 @@ const search = {
     const url = `/api/clusters`;
     return http().get(url);
   },
-  get_history: (org_identifier: string, startTime = null, endTime = null) => {
+  /** A null/empty stream_type defaults to "logs"; a falsy stream_name is omitted, scoping history to all streams of that type. */
+  get_history: (
+    org_identifier: string,
+    startTime = null,
+    endTime = null,
+    stream_type: string | null = null,
+    stream_name: string | null = null,
+  ) => {
     const payload: any = {
-      stream_type: "logs",
+      stream_type: stream_type || "logs",
       org_identifier,
       user_email: null,
     };
@@ -402,6 +427,10 @@ const search = {
 
     if (endTime) {
       payload.end_time = endTime;
+    }
+
+    if (stream_name) {
+      payload.stream_name = stream_name;
     }
 
     return http().post(

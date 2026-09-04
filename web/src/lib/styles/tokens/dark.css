@@ -90,6 +90,9 @@
   --color-text-code: var(--color-grey-300); /* inline code, monospace */
   --color-text-inverse: var(--color-grey-900); /* text on light/colored bg */
   --color-accent: var(--color-primary-400); /* brand accent — lighter shade for dark surfaces */
+  /* Only accent + warning need a dark step; danger/success hold their light value. */
+  --color-focus-ring-accent: var(--color-primary-400);
+  --color-focus-ring-warning: var(--color-warning-500);
   --color-sql-accent: #a78bfa; /* SQL/query violet — lighter for dark surfaces */
   --color-function-accent: var(
     --color-blue-400
@@ -139,6 +142,9 @@
   --color-surface-overlay: var(--d-overlay); /* dropdowns, dialogs, selects, popovers */
   --color-surface-subtle: var(--d-well); /* recessed fills, segmented track */
   --color-surface-subtle-hover: var(--d-panel); /* hover on a recessed fill (one step up) */
+  /* Floating chip on a dark panel — a lighter grey so it lifts off the surface. */
+  --color-surface-chip: var(--color-grey-700);
+  --color-surface-chip-hover: var(--color-grey-600);
   /* Accent-tinted interaction surfaces — dark accent hover/active values. */
   --color-surface-accent-hover: var(--color-primary-900);
   --color-surface-accent-active: var(--color-primary-800);
@@ -211,9 +217,6 @@
   /* ghost-subtle */
   --color-button-ghost-subtle-hover-bg: var(--color-surface-accent-hover);
   --color-button-ghost-subtle-active-bg: var(--color-surface-accent-active);
-
-  /* destructive */
-  --color-button-destructive-focus-ring: var(--color-error-300);
 
   /* Dropdown */
   --color-dropdown-item-hover-bg: var(--color-surface-accent-hover);
@@ -376,10 +379,10 @@
        a distinct lighter gray; disabled-bg uses --d-well so disabled fields
        still read as a clearly different, inert surface. */
   --color-input-bg: var(--color-surface-base);
-  /* Matched to the outline button's border (--color-border-default) so a text
-     field and a button side by side share one border weight — product decision
-     for visual uniformity, below the WCAG 2.1 SC 1.4.11 3:1 target. */
-  --color-input-border: var(--color-border-default);
+  /* Matched to the outline button's border (--color-border-control) so a text
+     field and a button side by side share one border weight — now the
+     already-passing control-border value instead of border-default. */
+  --color-input-border: var(--color-border-control);
   --color-input-disabled-bg: var(--d-well);
   --color-input-disabled-text: var(--color-text-secondary);
   --color-input-placeholder: var(--color-text-placeholder);
@@ -634,8 +637,8 @@
   --color-chart-table-23: rgba(255, 180, 180, 0.15);
   --color-chart-table-24: rgba(180, 225, 245, 0.15);
 
-  /* Chart grid line — dark override */
-  --color-chart-gridline: rgba(255, 255, 255, 0.12);
+  /* Chart grid line — dark override, raised for perceptibility (see base.css) */
+  --color-chart-gridline: rgba(255, 255, 255, 0.25);
 
   /* Crosshair axis-pointer label chip — dark-only. Light leaves this undefined so
      chartColor() resolves to "" and ECharts uses its auto default (see base.css). */
@@ -695,6 +698,9 @@
   --color-status-error-bg: #402929;
   --color-status-success-text: #a0dba5;
   --color-status-success-bg: #253627;
+  /* Explicit override: component.css's light value darkened for text legibility
+     there, so dark keeps the original orange-600 it already clears 4.5:1 with. */
+  --color-status-flaky-text: #ea580c;
   /* Favorite (filled star) — lighter yellow (yellow-400) so it reads clearly on
      dark surfaces without vibrating the way a saturated yellow-500 would. */
   --color-favorite: #facc15;

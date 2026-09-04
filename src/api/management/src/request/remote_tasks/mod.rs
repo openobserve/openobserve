@@ -975,11 +975,11 @@ pub async fn discard_remote_task_draft(
     context_path = "/api",
     tag = "RemoteTasks",
     operation_id = "PublishRemoteTask",
-    summary = "Test connection and publish",
-    description = "Calls the endpoint using the draft's own contract. A failure records \
-                   why and publishes nothing; a success publishes the next immutable \
-                   version, which becomes referenceable. This is the only way a version \
-                   is published.",
+    summary = "Publish an edited remote task",
+    description = "Description-only edits update their source version without calling the \
+                   endpoint. Structural edits call the endpoint using the draft's own \
+                   contract; a failure records why and publishes nothing, while a success \
+                   publishes the next immutable version.",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Organization name"),
@@ -1009,7 +1009,7 @@ pub async fn publish_remote_task(
                 version_bumped: plan.bumps_version(),
                 error: None,
                 task: task.into(),
-                report: report.into(),
+                report: report.map(Into::into),
             })
         }
         Ok(PublishOutcome::TestFailed {
@@ -1021,7 +1021,7 @@ pub async fn publish_remote_task(
             version_bumped: false,
             error: Some(error),
             task: draft.into(),
-            report: report.into(),
+            report: Some(report.into()),
         }),
         Err(err) => remote_task_error_response(err),
     }

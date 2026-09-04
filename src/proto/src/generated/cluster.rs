@@ -1063,8 +1063,6 @@ pub struct SearchQuery {
     pub query_fn: ::prost::alloc::string::String,
     #[prost(bool, tag = "14")]
     pub skip_wal: bool,
-    #[prost(string, tag = "15")]
-    pub action_id: ::prost::alloc::string::String,
     #[prost(int64, tag = "16")]
     pub histogram_interval: i64,
     #[prost(string, optional, tag = "17")]
@@ -3589,7 +3587,6 @@ pub enum Role {
     Router = 4,
     Scheduler = 5,
     FlattenCompactor = 6,
-    ScriptServer = 7,
 }
 impl Role {
     /// String value of the enum field names used in the ProtoBuf definition.
@@ -3605,7 +3602,6 @@ impl Role {
             Self::Router => "ROUTER",
             Self::Scheduler => "SCHEDULER",
             Self::FlattenCompactor => "FLATTEN_COMPACTOR",
-            Self::ScriptServer => "SCRIPT_SERVER",
         }
     }
     /// Creates an enum from field names used in the ProtoBuf definition.
@@ -3618,7 +3614,6 @@ impl Role {
             "ROUTER" => Some(Self::Router),
             "SCHEDULER" => Some(Self::Scheduler),
             "FLATTEN_COMPACTOR" => Some(Self::FlattenCompactor),
-            "SCRIPT_SERVER" => Some(Self::ScriptServer),
             _ => None,
         }
     }

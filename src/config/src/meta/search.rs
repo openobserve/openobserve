@@ -172,8 +172,6 @@ pub struct Query {
     #[serde(default)]
     pub query_fn: Option<String>,
     #[serde(default)]
-    pub action_id: Option<String>,
-    #[serde(default)]
     pub skip_wal: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Object>)]
@@ -212,7 +210,6 @@ impl Default for Query {
             track_total_hits: false,
             uses_zo_fn: false,
             query_fn: None,
-            action_id: None,
             skip_wal: false,
             sampling_config: None,
             sampling_ratio: None,
@@ -763,7 +760,6 @@ impl SearchHistoryRequest {
                 track_total_hits: false,
                 uses_zo_fn: false,
                 query_fn: None,
-                action_id: None,
                 skip_wal: false,
                 sampling_config: None,
                 sampling_ratio: None,
@@ -986,7 +982,6 @@ impl From<Query> for cluster_rpc::SearchQuery {
             track_total_hits: query.track_total_hits,
             uses_zo_fn: query.uses_zo_fn,
             query_fn: query.query_fn.unwrap_or_default(),
-            action_id: query.action_id.unwrap_or_default(),
             skip_wal: query.skip_wal,
             histogram_interval: query.histogram_interval,
             timezone: query.timezone,
@@ -1382,7 +1377,6 @@ impl MultiStreamRequest {
                     track_total_hits: self.track_total_hits,
                     uses_zo_fn: self.uses_zo_fn,
                     query_fn,
-                    action_id: None,
                     skip_wal: self.skip_wal,
                     sampling_config: None,
                     sampling_ratio: None,
@@ -1659,23 +1653,38 @@ mod search_history_utils {
             let mut query = format!("SELECT * FROM {search_stream_name} WHERE event='Search'");
 
             if let Some(org_id) = self.org_id.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND org_id = '{org_id}'"));
+                query.push_str(&format!(" AND org_id = {}", quote_sql_literal(&org_id)));
             }
             if let Some(stream_type) = self.stream_type.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND stream_type = '{stream_type}'"));
+                query.push_str(&format!(
+                    " AND stream_type = {}",
+                    quote_sql_literal(&stream_type)
+                ));
             }
             if let Some(stream_name) = self.stream_name.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND stream_name = '{stream_name}'"));
+                query.push_str(&format!(
+                    " AND stream_name = {}",
+                    quote_sql_literal(&stream_name)
+                ));
             }
             if let Some(user_email) = self.user_email.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND user_email = '{user_email}'"));
+                query.push_str(&format!(
+                    " AND user_email = {}",
+                    quote_sql_literal(&user_email)
+                ));
             }
             if let Some(trace_id) = self.trace_id.filter(|s| !s.is_empty()) {
-                query.push_str(&format!(" AND trace_id = '{trace_id}'"));
+                query.push_str(&format!(" AND trace_id = {}", quote_sql_literal(&trace_id)));
             }
 
             query
         }
+    }
+
+    // Escapes single quotes so a value cannot break out of the SQL string literal it is
+    // interpolated into (these fields come from client-controlled request params).
+    fn quote_sql_literal(value: &str) -> String {
+        format!("'{}'", value.replace('\'', "''"))
     }
 
     #[cfg(test)]
@@ -1776,6 +1785,17 @@ mod search_history_utils {
             AND user_email = 'user123@gmail.com'";
 
             assert_eq!(query, expected_query);
+        }
+
+        #[test]
+        fn test_escapes_single_quotes_in_values() {
+            let query = SearchHistoryQueryBuilder::new()
+                .with_stream_name(&Some("x' OR '1'='1".to_string()))
+                .build(SEARCH_STREAM_NAME);
+            assert_eq!(
+                query,
+                "SELECT * FROM usage WHERE event='Search' AND stream_name = 'x'' OR ''1''=''1'"
+            );
         }
     }
 }
@@ -2123,7 +2143,6 @@ mod tests {
         assert!(!query.track_total_hits);
         assert!(!query.uses_zo_fn);
         assert!(query.query_fn.is_none());
-        assert!(query.action_id.is_none());
         assert!(!query.skip_wal);
         assert!(!query.streaming_output);
         assert!(query.streaming_id.is_none());
@@ -2566,7 +2585,6 @@ mod tests {
             track_total_hits: true,
             uses_zo_fn: true,
             query_fn: Some("test_fn".to_string()),
-            action_id: Some("action123".to_string()),
             skip_wal: true,
             histogram_interval: 3600,
             ..Default::default()
@@ -2583,7 +2601,6 @@ mod tests {
         assert!(cluster_query.track_total_hits);
         assert!(cluster_query.uses_zo_fn);
         assert_eq!(cluster_query.query_fn, "test_fn");
-        assert_eq!(cluster_query.action_id, "action123");
         assert!(cluster_query.skip_wal);
         assert_eq!(cluster_query.histogram_interval, 3600);
     }

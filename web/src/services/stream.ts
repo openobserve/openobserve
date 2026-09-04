@@ -90,7 +90,6 @@ const stream = {
     regions,
     clusters,
     no_count,
-    action_id,
     traceparent,
   }: any) => {
     const fieldsString = fields.join(",");
@@ -98,7 +97,6 @@ const stream = {
     if (query_context) url = url + `&sql=${query_context}`;
     if (no_count) url = url + `&no_count=${no_count}`;
     if (query_fn?.trim()) url = url + `&query_fn=${query_fn}`;
-    if (action_id?.trim()) url = url + `&action_id=${action_id}`;
     if (type) url += "&type=" + type;
     if (regions) url += "&regions=" + regions;
     if (clusters) url += "&clusters=" + clusters;

@@ -348,6 +348,19 @@ describe("SessionDetails — not found state", () => {
 });
 
 describe("SessionDetails — KPI strip", () => {
+  it("shows the selected session user ID in the header", async () => {
+    mockFetchSession.mockResolvedValue({
+      detail: makeDetail({ userId: "user-a" }),
+      traces: [makeTrace()],
+    });
+
+    const wrapper = await mountComponent();
+    const userId = wrapper.find('[data-test="session-detail-user-id"]');
+
+    expect(userId.exists()).toBe(true);
+    expect(userId.text()).toBe("user-a");
+  });
+
   it("renders KPI strip with Turns value", async () => {
     mockFetchSession.mockResolvedValue({
       detail: makeDetail({ turns: 5 }),

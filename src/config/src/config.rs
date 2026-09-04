@@ -52,7 +52,17 @@ pub type RwAHashSet<K> = tokio::sync::RwLock<HashSet<K>>;
 pub type RwBTreeMap<K, V> = tokio::sync::RwLock<BTreeMap<K, V>>;
 
 // for DDL commands and migrations
-pub const DB_SCHEMA_VERSION: u64 = 73;
+// Bump on every new sea-orm migration: `init_db` returns early when the stored
+// version matches, so an un-bumped migration never runs on an existing
+// deployment. Fresh installs still get it, which hides the omission locally.
+//
+// 74: create llm_playground_snapshots for Phase 3.1 shared Playground
+// snapshots.
+// 75: drop action_scripts, the actions feature is removed.
+// 76: add steps_configured to synthetics_jobs.
+// 77: create status_pages tables and status_page_custom_domains.
+// 78: alert pending period cols
+pub const DB_SCHEMA_VERSION: u64 = 78;
 pub const DB_SCHEMA_KEY: &str = "/db_schema_version/";
 
 // global version variables
@@ -198,20 +208,36 @@ pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+const _DEFAULT_QUICK_MODE_FIELDS: [&str; 9] = [
+    // Losing these silently degrades sourcemap translation, breadcrumbs and session replay.
+    "service",
+    "version",
+    "session_id",
+    "view_url",
+    // Losing these leaves the trace detail page without spans to build a waterfall from.
+    "service_name",
+    "operation_name",
+    "trace_id",
+    "span_id",
+    "duration",
+];
 pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = get_config()
-        .common
-        .feature_quick_mode_fields
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
+    let mut fields = chain(
+        _DEFAULT_QUICK_MODE_FIELDS.iter().map(|s| s.to_string()),
+        get_config()
+            .common
+            .feature_quick_mode_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -446,6 +472,9 @@ pub(crate) fn synthetics_restart_required_changes(
     // compiling here until someone decides whether a reload can carry it.
     let Synthetics {
         enabled,
+        status_page_rebuild_interval,
+        status_page_domain_verify_interval,
+        status_page_public_rpm,
         lambda_browser: _,
         lambda_net: _,
         api_endpoint: _,
@@ -467,6 +496,16 @@ pub(crate) fn synthetics_restart_required_changes(
     if old.enabled != *enabled {
         changed.push("ZO_SYNTHETICS_ENABLED");
     }
+    // Read once when the rebuilder loop starts.
+    if old.status_page_rebuild_interval != *status_page_rebuild_interval {
+        changed.push("ZO_STATUS_PAGE_REBUILD_INTERVAL");
+    }
+    // Read once when the domain-verify loop starts.
+    if old.status_page_domain_verify_interval != *status_page_domain_verify_interval {
+        changed.push("ZO_STATUS_PAGE_DOMAIN_VERIFY_INTERVAL");
+    }
+    // Read live per request; no restart needed, so not reported here.
+    let _ = status_page_public_rpm;
     changed
 }
 
@@ -890,6 +929,33 @@ pub struct Synthetics {
         help = "Master switch for synthetic monitoring. Off by default; the background workers and HTTP routes only exist when this is true."
     )]
     pub enabled: bool,
+    /// Seconds between status-page snapshot rebuild ticks.
+    #[env_config(
+        name = "ZO_STATUS_PAGE_REBUILD_INTERVAL",
+        default = 60,
+        help = "Seconds between status-page snapshot rebuild ticks."
+    )]
+    pub status_page_rebuild_interval: u64,
+    /// Seconds between custom-domain DNS ownership verification ticks. Kept
+    /// far tighter than the snapshot rebuild interval so a newly-added domain
+    /// with already-correct DNS doesn't sit pending for a full minute-plus.
+    #[env_config(
+        name = "ZO_STATUS_PAGE_DOMAIN_VERIFY_INTERVAL",
+        default = 30,
+        help = "Seconds between custom-domain DNS ownership verification ticks."
+    )]
+    pub status_page_domain_verify_interval: u64,
+    /// Per-IP request budget per minute for the public status-page read routes
+    /// (snapshot / page / badge / feed). Generous by default — thousands of a
+    /// customer's employees can share one corporate NAT egress IP during an
+    /// outage, so a tight cap would 429 legitimate panicked visitors. 0
+    /// disables the limiter.
+    #[env_config(
+        name = "ZO_STATUS_PAGE_PUBLIC_RPM",
+        default = 240,
+        help = "Per-IP requests/minute for the public status-page read routes. 0 disables."
+    )]
+    pub status_page_public_rpm: u32,
     /// Lambda function name for the browser probe (handles all engines:
     /// chromium, firefox, edge).
     #[env_config(
@@ -1228,8 +1294,6 @@ pub struct Auth {
         help = "Secret used to sign stateless alert-chart render URLs. When empty (the default), a key is derived from the root user's stored password hash, which every node shares via the meta DB. Set explicitly to control rotation; rotating invalidates in-flight chart URLs (bounded by ZO_ALERT_CHART_URL_TTL)."
     )]
     pub alert_chart_signing_key: String,
-    #[env_config(name = "O2_ACTION_SERVER_TOKEN")]
-    pub action_server_token: String,
     #[env_config(name = "ZO_SERVICE_ACCOUNT_ENABLED", default = true)]
     pub service_account_enabled: bool,
     /// Session cleanup interval in seconds (default: 3600 = 1 hour)
@@ -1484,6 +1548,12 @@ pub struct Search {
     )]
     pub feature_metrics_fused_agg_enabled: bool,
     #[env_config(
+        name = "ZO_FEATURE_METRICS_STREAMING_AGG_ENABLED",
+        default = false,
+        help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series, instead of materializing all samples; falls back to the fused evaluator when the file layout or query shape does not allow it"
+    )]
+    pub feature_metrics_streaming_agg_enabled: bool,
+    #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
         help = "Enable dynamic pushdown filter"
@@ -1689,7 +1759,11 @@ pub struct Common {
         help = "Comma-separated fields to build bloom filter on for all streams, replaces the deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS"
     )]
     pub feature_bloom_filter_extra_fields: String,
-    #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
+    #[env_config(
+        name = "ZO_FEATURE_QUICK_MODE_FIELDS",
+        default = "",
+        help = "Comma-separated extra fields quick mode always returns when the stream has them, on top of the built-in defaults"
+    )]
     pub feature_quick_mode_fields: String,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,
@@ -1733,8 +1807,6 @@ pub struct Common {
         help = "Default theme color for dark mode. If not set, uses application default."
     )]
     pub default_theme_dark_mode_color: String,
-    #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
-    pub metrics_dedup_enabled: bool,
     #[env_config(name = "ZO_BLOOM_FILTER_ENABLED", default = true)]
     pub bloom_filter_enabled: bool,
     #[env_config(
@@ -2261,16 +2333,14 @@ pub struct Limit {
     pub traces_query_retention: String,
     #[env_config(name = "ZO_METRICS_QUERY_RETENTION", default = "daily")]
     pub metrics_query_retention: String,
-    #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
-    pub metrics_leader_push_interval: u64,
-    #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
-    pub metrics_leader_election_interval: i64,
     #[env_config(name = "ZO_METRICS_MAX_POINTS_PER_SERIES", default = 30000)]
     pub metrics_max_points_per_series: usize,
     #[env_config(name = "ZO_METRICS_MAX_SERIES_RESPONSE", default = 40000)]
     pub metrics_max_series_response: usize,
-    #[env_config(name = "ZO_METRICS_CACHE_MAX_ENTRIES", default = 10000)]
-    pub metrics_cache_max_entries: usize,
+    // Memory budget in MB for the PromQL result cache index. 0 (default)
+    // means auto: 1% of total memory, clamped to [32, 256] MB.
+    #[env_config(name = "ZO_METRICS_RESULT_CACHE_MAX_SIZE", default = 0)]
+    pub metrics_result_cache_max_size: usize,
     // Memory budget in MB for the PromQL series label cache. 0 (default)
     // means auto: 5% of total memory, clamped to [100, 1024] MB.
     #[env_config(name = "ZO_METRICS_LABEL_CACHE_MAX_SIZE", default = 0)]
@@ -3010,6 +3080,12 @@ pub struct Sns {
 
 #[derive(Serialize, Debug, EnvConfig, Default)]
 pub struct Prometheus {
+    #[env_config(name = "ZO_METRICS_DEDUP_ENABLED", default = true)]
+    pub dedup_enabled: bool,
+    #[env_config(name = "ZO_METRICS_LEADER_PUSH_INTERVAL", default = 15)]
+    pub leader_push_interval: u64,
+    #[env_config(name = "ZO_METRICS_LEADER_ELECTION_INTERVAL", default = 30)]
+    pub leader_election_interval: i64,
     #[env_config(name = "ZO_PROMETHEUS_HA_CLUSTER", default = "cluster")]
     pub ha_cluster_label: String,
     #[env_config(name = "ZO_PROMETHEUS_HA_REPLICA", default = "__replica__")]
@@ -3564,9 +3640,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     if cfg.limit.metrics_max_points_per_series == 0 {
         cfg.limit.metrics_max_points_per_series = 30_000;
     }
-    if cfg.limit.metrics_cache_max_entries == 0 {
-        cfg.limit.metrics_cache_max_entries = 10_000;
-    }
 
     // check search job retention
     if cfg.limit.search_job_retention == 0 {
@@ -3614,11 +3687,6 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
         && !local_node_role.contains(&cluster::Role::Querier)
     {
         cfg.common.tracing_enabled = false;
-    }
-
-    if local_node_role.contains(&cluster::Role::ActionServer) {
-        // action server does not have external dep, so can ignore their config check
-        return Ok(());
     }
 
     // format local_mode_storage
@@ -3990,6 +4058,20 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 * (SIZE_IN_MB as usize);
     } else {
         cfg.limit.datafusion_file_stat_cache_max_size *= SIZE_IN_MB as usize;
+    }
+
+    if cfg.limit.metrics_result_cache_max_size == 0 {
+        // 1% of total mem, clamped to [32, 256] MB; the promql result cache
+        // index holds roughly 200 B per entry at this size.
+        cfg.limit.metrics_result_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.01) as usize).clamp(32, 256)
+                * (SIZE_IN_MB as usize);
+    } else {
+        if cfg.limit.metrics_result_cache_max_size < 32 {
+            log::warn!("ZO_METRICS_RESULT_CACHE_MAX_SIZE raised to the 32 MB minimum");
+        }
+        cfg.limit.metrics_result_cache_max_size =
+            cfg.limit.metrics_result_cache_max_size.max(32) * (SIZE_IN_MB as usize);
     }
     Ok(())
 }

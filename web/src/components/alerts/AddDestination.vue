@@ -85,8 +85,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             "
             class="w-full"
           >
+            <SlackDestinationSetup
+              v-if="isNewSlackDestination"
+              :org-identifier="store.state.selectedOrganization.identifier"
+              :is-cloud="isCloudDeployment"
+              :is-enterprise="isEnterpriseDeployment"
+              @flow-change="handleSlackFlowChange"
+              @readiness-change="handleSlackReadinessChange"
+            />
+
             <!-- Name Field for Create Mode -->
-            <div v-if="!destination" class="w-1/2 pb-3">
+            <div v-if="!destination && !isNewSlackDestination" class="w-1/2 pb-3">
               <OFormInput
                 data-test="add-destination-name-input"
                 name="name"
@@ -97,7 +106,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <PrebuiltDestinationForm
-              v-if="dtVal && dtVal !== 'custom'"
+              v-if="dtVal && dtVal !== 'custom' && !isNewSlackDestination"
               :destination-type="dtVal"
               :hide-actions="true"
               data-test="prebuilt-form"
@@ -108,7 +117,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Template selector for prebuilt destinations -->
-            <div v-if="dtVal && dtVal !== 'custom'" class="w-1/2 py-1">
+            <div
+              v-if="dtVal && dtVal !== 'custom' && showPrebuiltAdvancedSettings"
+              class="w-1/2 py-1"
+            >
               <OFormSelect
                 data-test="add-destination-prebuilt-template-select"
                 name="template"
@@ -129,7 +141,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
 
             <!-- Additional Settings for Prebuilt Destinations -->
-            <div class="mt-3 w-full">
+            <div
+              v-if="showPrebuiltAdvancedSettings"
+              class="mt-3 w-full"
+              data-test="prebuilt-additional-settings"
+            >
               <div class="py-1 font-bold">
                 {{ t("alert_destinations.additional_settings") }}
               </div>
@@ -197,6 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="lastTestResult"
               :result="lastTestResult"
               :is-loading="isTestInProgress"
+              :show-success-response-body="dtVal === 'slack'"
               data-test="prebuilt-test-result"
               @retry="handleTestDestination"
             />
@@ -380,33 +397,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
             </OFormSelect>
           </template>
-
-          <template v-if="typeVal === 'action' && (!isAlerts || dtVal === 'custom')">
-            <div class="action-select w-1/2 py-1">
-              <OFormSelect
-                data-test="add-destination-action-select"
-                name="action_id"
-                :label="t('alert_destinations.action')"
-                required
-                :options="actionOptions"
-                searchable
-                labelKey="label"
-                valueKey="value"
-                :loading="isLoadingActions"
-                tabindex="0"
-              />
-            </div>
-          </template>
         </OForm>
       </div>
-      <div class="border-border-default flex w-full justify-between border-t px-4 py-4">
+      <div
+        class="border-border-default flex w-full flex-col gap-3 border-t px-4 py-4 sm:flex-row sm:items-center sm:justify-between"
+      >
         <!-- Left side: Test and Preview buttons (only for prebuilt destinations) -->
-        <div
-          v-if="
-            isAlerts && (isPrebuiltDestination || (isUpdatingDestination && dtVal !== 'custom'))
-          "
-          class="flex items-center gap-2"
-        >
+        <div v-if="showPrebuiltFinalActions" class="flex flex-wrap items-center gap-2">
           <OButton
             data-test="destination-preview-button"
             variant="outline"
@@ -430,7 +427,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div v-else></div>
 
         <!-- Right side: Cancel and Save buttons -->
-        <div class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center justify-end gap-2">
           <OButton
             data-test="add-destination-cancel-btn"
             v-close-popup="true"
@@ -440,6 +437,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >{{ t("alerts.cancel") }}</OButton
           >
           <OButton
+            v-if="!isNewSlackDestination || showPrebuiltAdvancedSettings"
             data-test="add-destination-submit-btn"
             variant="primary"
             size="sm-action"
@@ -493,18 +491,23 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
 import usersService from "@/services/users";
 import AddUser from "@/components/iam/users/AddUser.vue";
-import useActions from "@/composables/useActions";
 import { useReo } from "@/services/reodotdev_analytics";
-import { usePrebuiltDestinations } from "@/composables/usePrebuiltDestinations";
+import {
+  usePrebuiltDestinations,
+  type SlackSetupMetadata,
+} from "@/composables/usePrebuiltDestinations";
 import { isPrebuiltType, detectPrebuiltTypeFromUrl } from "@/utils/prebuilt-templates";
+import { isValidSlackWebhookUrl } from "@/utils/prebuilt-templates/slack";
+import { DEFAULT_SLACK_APP_NAME } from "@/utils/slackManifest";
 import PrebuiltDestinationForm from "./PrebuiltDestinationForm.vue";
 import { prebuiltDestinationDefaults } from "./PrebuiltDestinationForm.schema";
 import PrebuiltDestinationSelector from "./PrebuiltDestinationSelector.vue";
 import DestinationTestResult from "./DestinationTestResult.vue";
 import DestinationPreview from "./DestinationPreview.vue";
+import SlackDestinationSetup from "./SlackDestinationSetup.vue";
 import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
-import { useOForm } from "@/lib/forms/Form/useOForm";
+import { useOForm, type FormFieldPath } from "@/lib/forms/Form/useOForm";
 import {
   makeAddDestinationSchema,
   addDestinationDefaults,
@@ -544,6 +547,13 @@ const currentUserRole = ref("admin");
 
 const orgUserOptions = computed(() => orgUsers.value);
 const isCloudDeployment = computed(() => config.isCloud === "true");
+const isEnterpriseDeployment = computed(() => config.isEnterprise === "true");
+
+// OSS has neither the OAuth backend nor the enterprise manifest flow, so webhook is the only option.
+const defaultSlackSetupMethod = (): "oauth" | "manifest" | "webhook" => {
+  if (isCloudDeployment.value) return "oauth";
+  return isEnterpriseDeployment.value ? "manifest" : "webhook";
+};
 
 const fetchOrgUsers = async () => {
   isLoadingOrgUsers.value = true;
@@ -608,9 +618,10 @@ const { track } = useReo();
 
 // Single form for custom, pipeline and prebuilt destinations (credentials are
 // `credentials.*` fields); saveDestination dispatches by type.
+const addDestinationSchema = makeAddDestinationSchema(t, props.isAlerts);
 const form = useOForm({
   defaultValues: addDestinationDefaults(),
-  schema: makeAddDestinationSchema(t, props.isAlerts),
+  schema: addDestinationSchema,
   onSubmit: (value: AddDestinationForm) => saveDestination(value),
 });
 
@@ -627,13 +638,23 @@ const typeVal = form.useStore((s: any) => s.values.type as string);
 const apiHeaders = form.useStore(
   (s: any) => (s.values.apiHeaders ?? []) as { key: string; value: string }[],
 );
+const slackSetupMethod = form.useStore(
+  (state: { values: AddDestinationForm }) => state.values.slack_setup_method,
+);
+const slackTeamId = form.useStore(
+  (state: { values: AddDestinationForm }) => state.values.slack_team_id,
+);
+const slackTeamName = form.useStore(
+  (state: { values: AddDestinationForm }) => state.values.slack_team_name,
+);
+const slackChannelId = form.useStore(
+  (state: { values: AddDestinationForm }) => state.values.slack_channel_id,
+);
+const slackManifestReady = ref(false);
+const originalSlackWebhookUrl = ref("");
 
 const isUpdatingDestination = ref(false);
-const isLoadingActions = ref(false);
 const router = useRouter();
-const actionOptions = ref<{ value: string; label: I18nText; type: string }[]>([]);
-
-const { getAllActions } = useActions();
 
 // Prebuilt destinations composable
 const {
@@ -644,6 +665,7 @@ const {
   generatePreview,
   isTestInProgress,
   lastTestResult,
+  clearTestResult,
   detectPrebuiltType,
 } = usePrebuiltDestinations();
 
@@ -655,6 +677,93 @@ const prebuiltCredentials = form.useStore(
 const destinationSearchQuery = ref("");
 const showPreviewModal = ref(false);
 const previewContent = ref("");
+
+watch(
+  prebuiltCredentials,
+  () => {
+    if (lastTestResult.value) clearTestResult();
+  },
+  { deep: true },
+);
+
+const isNewSlackDestination = computed(
+  () => props.isAlerts && !props.destination && dtVal.value === "slack",
+);
+const isSlackOAuthFlow = computed(
+  () => isNewSlackDestination.value && slackSetupMethod.value === "oauth",
+);
+const isSlackManifestFlow = computed(
+  () => isNewSlackDestination.value && slackSetupMethod.value === "manifest",
+);
+const isSlackOAuthConnected = computed(() => {
+  const webhookUrl = prebuiltCredentials.value.webhookUrl;
+  const channel = prebuiltCredentials.value.channel;
+  return (
+    typeof webhookUrl === "string" &&
+    isValidSlackWebhookUrl(webhookUrl) &&
+    typeof channel === "string" &&
+    channel.trim().length > 0 &&
+    slackTeamId.value.trim().length > 0 &&
+    slackTeamName.value.trim().length > 0 &&
+    slackChannelId.value.trim().length > 0
+  );
+});
+const showPrebuiltAdvancedSettings = computed(() => {
+  if (isSlackOAuthFlow.value) return isSlackOAuthConnected.value;
+  if (isSlackManifestFlow.value) return slackManifestReady.value;
+  return true;
+});
+const showPrebuiltFinalActions = computed(
+  () =>
+    props.isAlerts &&
+    (isPrebuiltDestination.value || (isUpdatingDestination.value && dtVal.value !== "custom")) &&
+    showPrebuiltAdvancedSettings.value,
+);
+const handleSlackFlowChange = (): void => {
+  clearTestResult();
+};
+const handleSlackReadinessChange = (ready: boolean): void => {
+  slackManifestReady.value = ready;
+};
+
+const issuePathToName = (path: readonly PropertyKey[]): string =>
+  path.reduce<string>(
+    (name, segment) =>
+      typeof segment === "number"
+        ? `${name}[${segment}]`
+        : name
+          ? `${name}.${String(segment)}`
+          : String(segment),
+    "",
+  );
+
+const formValues = form.useStore((state: { values: AddDestinationForm }) => state.values);
+watch(
+  formValues,
+  () => {
+    const result = addDestinationSchema.safeParse(form.state.values);
+    const invalidFields = new Set(
+      result.success ? [] : result.error.issues.map((issue) => issuePathToName(issue.path)),
+    );
+
+    for (const field of Object.keys(
+      form.state.fieldMeta ?? {},
+    ) as FormFieldPath<AddDestinationForm>[]) {
+      const meta = form.getFieldMeta(field);
+      if (meta && (meta.errors?.length ?? 0) > 0 && !invalidFields.has(field)) {
+        form.setFieldMeta(field, { ...meta, errorMap: {} });
+      }
+    }
+
+    if (result.success) {
+      const errorMap = (form.state.errorMap ?? {}) as Record<string, unknown>;
+      if (errorMap.onDynamic != null) {
+        form.setErrorMap({ onDynamic: undefined });
+      }
+    }
+  },
+  { deep: true },
+);
 
 // When no destination-type card is chosen yet, `destination_type` is empty so the
 // schema rejects on name/url — but those fields aren't mounted until a card is
@@ -684,8 +793,6 @@ const tabs = computed(() => {
       return [{ label: t("alerts.webhook"), value: "http", icon: "webhook" }];
     } else if (currentType === "email") {
       return [{ label: t("alerts.email"), value: "email", icon: "mail" }];
-    } else if (currentType === "action") {
-      return [{ label: t("alerts.action"), value: "action", icon: "bolt" }];
     }
   }
 
@@ -694,13 +801,6 @@ const tabs = computed(() => {
     { label: t("alerts.webhook"), value: "http", icon: "webhook" },
     { label: t("alerts.email"), value: "email", icon: "mail" },
   ];
-
-  if (
-    (config.isEnterprise == "true" || config.isCloud == "true") &&
-    store.state.zoConfig.actions_enabled
-  ) {
-    tabs.push({ label: t("alerts.action"), value: "action", icon: "bolt" });
-  }
 
   return tabs;
 });
@@ -733,7 +833,7 @@ const getDestinationTypeIcon = (typeId: string) => {
 onActivated(() => setupDestinationData());
 onBeforeMount(async () => {
   setupDestinationData();
-  await Promise.all([getActionOptions(), fetchOrgUsers(), fetchCreateUserRoles()]);
+  await Promise.all([fetchOrgUsers(), fetchCreateUserRoles()]);
 });
 
 // Watch for destination prop changes (important for edit mode dialog)
@@ -749,6 +849,7 @@ watch(
 );
 
 const setupDestinationData = () => {
+  originalSlackWebhookUrl.value = "";
   if (props.destination) {
     isUpdatingDestination.value = true;
     // Resolve the destination_type discriminator FIRST; setDestType only records
@@ -848,6 +949,21 @@ const setupDestinationData = () => {
     // loop leaves every prefilled field marked dirty/touched with stale errors, and
     // this runs again on every onActivated. Start from the defaults so every key is
     // present, then overlay the record.
+    const hasSavedSlackOAuthMetadata =
+      destType === "slack" &&
+      parsedMetadata?.setup_method === "oauth" &&
+      typeof parsedMetadata.slack_team_id === "string" &&
+      parsedMetadata.slack_team_id.trim().length > 0 &&
+      typeof parsedMetadata.slack_team_name === "string" &&
+      parsedMetadata.slack_team_name.trim().length > 0 &&
+      typeof parsedMetadata.slack_channel_id === "string" &&
+      parsedMetadata.slack_channel_id.trim().length > 0;
+    const hasSavedSlackManifestMetadata =
+      destType === "slack" &&
+      parsedMetadata?.setup_method === "manifest" &&
+      typeof parsedMetadata.slack_app_name === "string" &&
+      parsedMetadata.slack_app_name.trim().length > 0;
+
     const record: AddDestinationForm = {
       ...addDestinationDefaults(),
       destination_type: destType,
@@ -858,7 +974,17 @@ const setupDestinationData = () => {
       template: props.destination.template ?? "",
       emails: props.destination?.emails ?? [],
       type: props.destination.type || "http",
-      action_id: props.destination.action_id || "",
+      slack_setup_method: hasSavedSlackOAuthMetadata
+        ? "oauth"
+        : hasSavedSlackManifestMetadata
+          ? "manifest"
+          : "webhook",
+      slack_app_name: hasSavedSlackManifestMetadata
+        ? parsedMetadata.slack_app_name.trim()
+        : DEFAULT_SLACK_APP_NAME,
+      slack_team_id: hasSavedSlackOAuthMetadata ? parsedMetadata.slack_team_id : "",
+      slack_team_name: hasSavedSlackOAuthMetadata ? parsedMetadata.slack_team_name : "",
+      slack_channel_id: hasSavedSlackOAuthMetadata ? parsedMetadata.slack_channel_id : "",
       // Prebuilt credentials, typed to the active type's fields. Custom → {}.
       credentials:
         destType && destType !== "custom"
@@ -884,6 +1010,10 @@ const setupDestinationData = () => {
     // Only override the default when the saved destination carries one.
     if (props.destination.output_format) {
       record.output_format = props.destination.output_format;
+    }
+
+    if (destType === "slack") {
+      originalSlackWebhookUrl.value = (props.destination.url ?? "").trim();
     }
 
     // Template name is stored/displayed as-is (e.g. "prebuilt_slack") — the
@@ -913,6 +1043,8 @@ const extractPrebuiltCredentials = (typeId: string): Record<string, any> => {
           // PagerDuty stores the integration key as the bare `routing_key`
           // metadata variable (substituted into the request body).
           credentials.integrationKey = value;
+        } else if (typeId === "pagerduty" && key === "severity") {
+          credentials.severity = value;
         }
       });
     } catch (e) {
@@ -1023,40 +1155,13 @@ const prebuiltTemplateOptions = computed(() => {
   return options;
 });
 
-const updateActionOptions = () => {
-  actionOptions.value = [];
-  store.state.organizationData.actions.forEach((action: any) => {
-    if (action.execution_details_type === "service")
-      actionOptions.value.push({
-        value: action.id,
-        label: action.name,
-        type: action.execution_details_type,
-      });
-  });
-};
-
-const getActionOptions = async () => {
-  try {
-    isLoadingActions.value = true;
-    // Update action options with existing actions
-    updateActionOptions();
-
-    // Get all actions from the server and update the action options
-    await getAllActions();
-    isLoadingActions.value = false;
-    updateActionOptions();
-  } catch (err) {
-    console.error(err);
-  } finally {
-    isLoadingActions.value = false;
-  }
-};
-
 // Select destination type (prebuilt or custom) — bridges the card grid choice
 // into the form and swaps the discriminated branch WITHOUT carrying stale
 // inactive-branch values into the save.
 const selectDestinationType = (type: string) => {
   form.setFieldValue("destination_type", type);
+  clearTestResult();
+  slackManifestReady.value = false;
 
   if (type === "custom") {
     // Switch to custom mode — clear any prebuilt credentials.
@@ -1070,6 +1175,13 @@ const selectDestinationType = (type: string) => {
     form.setFieldValue("credentials", prebuiltDestinationDefaults(type, {}));
     form.setFieldValue("type", type === "email" ? "email" : "http");
     form.setFieldValue("template", templateNameFor(type));
+    if (type === "slack") {
+      form.setFieldValue("slack_setup_method", defaultSlackSetupMethod());
+      form.setFieldValue("slack_app_name", DEFAULT_SLACK_APP_NAME);
+      form.setFieldValue("slack_team_id", "");
+      form.setFieldValue("slack_team_name", "");
+      form.setFieldValue("slack_channel_id", "");
+    }
   }
 };
 
@@ -1079,8 +1191,8 @@ const handleTestDestination = async () => {
 
   try {
     await testDestination(dtVal.value, prebuiltCredentials.value);
-  } catch (error) {
-    console.error("Test failed:", error);
+  } catch {
+    // testDestination owns user-facing sanitized error state.
   }
 };
 
@@ -1098,8 +1210,7 @@ const showPreview = async () => {
 
     // Only show modal after content is ready
     showPreviewModal.value = true;
-  } catch (error) {
-    console.error("Failed to generate preview:", error);
+  } catch {
     toast({
       variant: "error",
       message: t("alert_destinations.previewError"),
@@ -1110,6 +1221,33 @@ const showPreview = async () => {
 // Save a prebuilt destination — invoked by saveDestination once the form's schema
 // passes. name/template/apiHeaders/skip_tls_verify and `credentials` all come from
 // the validated `value`.
+const slackSetupMetadataFor = (value: AddDestinationForm): SlackSetupMetadata | undefined => {
+  if (value.destination_type !== "slack") return undefined;
+  const webhookUrl = value.credentials.webhookUrl;
+  if (
+    isUpdatingDestination.value &&
+    typeof webhookUrl === "string" &&
+    webhookUrl.trim() !== originalSlackWebhookUrl.value
+  ) {
+    return { setup_method: "webhook" };
+  }
+  if (value.slack_setup_method === "oauth") {
+    return {
+      setup_method: "oauth",
+      slack_team_id: value.slack_team_id.trim(),
+      slack_team_name: value.slack_team_name.trim(),
+      slack_channel_id: value.slack_channel_id.trim(),
+    };
+  }
+  if (value.slack_setup_method === "manifest") {
+    return {
+      setup_method: "manifest",
+      slack_app_name: value.slack_app_name.trim(),
+    };
+  }
+  return { setup_method: "webhook" };
+};
+
 async function handlePrebuiltSave(value: AddDestinationForm) {
   try {
     // Scope credentials to the ACTIVE type's fields (dropping any keys left over
@@ -1124,7 +1262,12 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
       if (header.key && header.value) customHeaders[header.key] = header.value;
     });
 
-    const templateOverride = (value.template || "").trim() || undefined;
+    const selectedTemplate = (value.template || "").trim();
+    const templateOverride = isUpdatingDestination.value
+      ? selectedTemplate || undefined
+      : selectedTemplate && selectedTemplate !== templateNameFor(value.destination_type)
+        ? selectedTemplate
+        : undefined;
 
     if (isUpdatingDestination.value) {
       // Update existing prebuilt destination
@@ -1136,6 +1279,7 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
         customHeaders, // custom headers
         value.skip_tls_verify || false, // skipTlsVerify
         templateOverride,
+        slackSetupMetadataFor(value),
       );
     } else {
       // Create new prebuilt destination
@@ -1146,13 +1290,15 @@ async function handlePrebuiltSave(value: AddDestinationForm) {
         customHeaders, // custom headers
         value.skip_tls_verify || false, // skipTlsVerify
         templateOverride,
+        slackSetupMetadataFor(value),
       );
     }
 
     emit("get:destinations");
     emit("cancel:hideform");
-  } catch (error) {
-    console.error("Failed to save prebuilt destination:", error);
+  } catch {
+    // The composable presents a sanitized error toast and rethrows so submission
+    // state settles without exposing credential-bearing request details.
   }
 }
 
@@ -1188,11 +1334,6 @@ function saveCustomDestination(value: AddDestinationForm) {
   if (value.type === "email") {
     payload["type"] = "email";
     payload["emails"] = value.emails ?? [];
-  }
-
-  if (value.type === "action") {
-    payload["type"] = "action";
-    payload["action_id"] = value.action_id;
   }
 
   if (isUpdatingDestination.value) {

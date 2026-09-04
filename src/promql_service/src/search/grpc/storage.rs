@@ -30,9 +30,10 @@ use infra::{
     schema::{get_partition_time_level, unwrap_stream_settings},
 };
 use itertools::Itertools;
+use metrics_index::MetricsFileLayout;
 use promql_parser::label::Matchers;
 use search::{
-    datafusion::exec::register_metrics_table,
+    datafusion::{exec::register_metrics_table, sort_order::FileSortOrder},
     file_cache::{cache_files, calc_target_partitions},
 };
 use search_service::match_source;
@@ -194,6 +195,7 @@ pub(crate) async fn create_context(
     // physical rows are attached to each FileKey before the metrics table is
     // built. Files of any other layout (legacy or not yet finalized hours) are
     // scanned in full; the PromQL matchers are always applied by the query.
+    let mut keep_filters = true;
     match metrics_index::search(
         trace_id,
         &mut files,
@@ -203,9 +205,12 @@ pub(crate) async fn create_context(
     )
     .await
     {
-        Ok(took) => {
-            scan_stats.idx_took = took.unwrap_or_default() as i64;
+        Ok(Some((took_ms, exact))) => {
+            scan_stats.idx_took = took_ms as i64;
+            // exact selections already hold only the matching series' rows
+            keep_filters = !exact;
         }
+        Ok(None) => {}
         Err(error) => {
             log::warn!(
                 "[trace_id {trace_id}] promql->search->storage: metrics-index query failed, falling back to a full scan: {error}"
@@ -228,11 +233,22 @@ pub(crate) async fn create_context(
         target_partitions,
     };
 
-    let ctx = register_metrics_table(&session, schema.clone(), stream_name, files).await?;
+    // one legacy file voids the (__hash__, _timestamp) ordering guarantee
+    let sort_order = if cfg.search.feature_metrics_streaming_agg_enabled
+        && files
+            .iter()
+            .all(|file| MetricsFileLayout::of(&file.key).is_some())
+    {
+        FileSortOrder::HashTimestampAsc
+    } else {
+        FileSortOrder::None
+    };
 
-    // the matchers are always applied by the query: sidecar selections are
-    // exact at series-run granularity only, and other files are scanned in full
-    Ok(Some((ctx, schema, scan_stats, true)))
+    let ctx =
+        register_metrics_table(&session, schema.clone(), stream_name, files, sort_order).await?;
+
+    // keep_filters=false only when the pruner proved its selections exact
+    Ok(Some((ctx, schema, scan_stats, keep_filters)))
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip(trace_id))]

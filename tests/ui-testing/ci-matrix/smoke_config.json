@@ -1,0 +1,196 @@
+{
+  "_comment": "PR smoke selection config for build-ci-matrix.js --select-for-changes. global_paths force the FULL matrix on the PR (shared frontend code, deps, and the smoke machinery itself); ignore_paths are files that cannot affect the app; a changed file matching neither list nor any shard's globs (its folder_paths entry, keyed by actual_folder, plus optional per-shard paths extras; a shard also implicitly owns its own playwright-tests folder) pulls in core_shards \u2014 one representative shard per major surface \u2014 because merge_group always runs the full matrix before anything lands. always_run shards are appended to every smoke selection as a cheap canary. Selection never emits zero shards.",
+  "always_ignore_paths": [
+    "web/src/**/*.spec.ts",
+    "web/src/**/*.spec.js",
+    "web/src/**/*.test.ts",
+    "web/src/**/__snapshots__/**",
+    "web/src/test/**"
+  ],
+  "global_paths": [
+    "web/src/components/*",
+    "web/src/components/common/**",
+    "web/src/components/shared/**",
+    "web/src/composables/**",
+    "web/src/stores/**",
+    "web/src/router/**",
+    "web/src/layouts/**",
+    "web/src/styles/**",
+    "web/src/utils/**",
+    "web/src/lib/**",
+    "web/src/constants/**",
+    "web/src/locales/languages/en-US.json",
+    "web/src/locales/*",
+    "web/src/services/http.*",
+    "web/src/services/common.*",
+    "web/src/services/config.*",
+    "web/src/services/index.*",
+    "web/src/services/search.*",
+    "web/src/services/streaming_search.*",
+    "web/src/App.vue",
+    "web/src/main.ts",
+    "web/package.json",
+    "web/package-lock.json",
+    "web/index.html",
+    "web/vite.config.*",
+    "web/postcss.config.*",
+    "web/tsconfig*",
+    ".github/workflows/playwright.yml",
+    ".github/scripts/build-ci-matrix.js",
+    "tests/ui-testing/ci-matrix/**",
+    "tests/ui-testing/pages/page-manager.js",
+    "tests/ui-testing/pages/commonActions.js",
+    "tests/ui-testing/pages/apiCleanup.js",
+    "tests/ui-testing/playwright-tests/utils/**",
+    "tests/ui-testing/playwright-tests/*",
+    "tests/ui-testing/fixtures/**",
+    "tests/ui-testing/playwright.config.js",
+    "tests/ui-testing/package.json",
+    "tests/ui-testing/package-lock.json",
+    "tests/ui-testing/env.sh",
+    "web/src/plugins/index.ts",
+    "tests/test-data/**"
+  ],
+  "ignore_paths": [
+    "**/*.md",
+    "docs/**",
+    "**/*.png",
+    "**/*.jpg",
+    "**/*.jpeg",
+    "**/*.gif",
+    "**/*.svg",
+    "**/*.webp",
+    ".github/**",
+    ".gitignore",
+    "web/src/locales/languages/*.json",
+    "tests/api-testing/**",
+    "tests/mobile-testing/**",
+    "scripts/translations/**"
+  ],
+  "core_shards": [
+    "Alerts",
+    "Dashboards-Core",
+    "Logs-Core",
+    "Metrics",
+    "Traces",
+    "Pipelines",
+    "GeneralTests",
+    "Streams"
+  ],
+  "always_run": [
+    "Logs-SelectStar"
+  ],
+  "folder_paths": {
+    "Alerts": [
+      "web/src/components/alerts/**",
+      "web/src/components/alertLibrary/**",
+      "web/src/components/anomaly_detection/**",
+      "web/src/views/AppAlerts*",
+      "web/src/views/AddAlertView*",
+      "web/src/views/AlertLibrary/**",
+      "web/src/views/alerts/**",
+      "web/src/services/alerts.*",
+      "web/src/services/alert_*",
+      "web/src/services/alertInsights.*",
+      "web/src/services/anomaly_detection.*",
+      "tests/ui-testing/pages/alertsPages/**",
+      "tests/ui-testing/pages/anomalyPages/**",
+      "web/src/plugins/correlation/**"
+    ],
+    "Dashboards": [
+      "web/src/components/dashboards/**",
+      "web/src/components/cross-linking/**",
+      "web/src/views/Dashboards/**",
+      "web/src/views/PinnedDashboardTab*",
+      "web/src/services/dashboards.*",
+      "web/src/services/dashboard_annotations.*",
+      "tests/ui-testing/pages/dashboardPages/**"
+    ],
+    "Functions": [
+      "web/src/components/functions/**",
+      "web/src/views/Functions*",
+      "web/src/services/jstransform.*",
+      "web/src/services/query_functions.*",
+      "tests/ui-testing/pages/functionsPages/**"
+    ],
+    "GeneralTests": [
+      "web/src/components/login/**",
+      "web/src/components/iam/**",
+      "web/src/components/settings/**",
+      "web/src/components/ingestion/**",
+      "web/src/components/about/**",
+      "web/src/views/About*",
+      "web/src/views/Login*",
+      "web/src/views/Ingestion*",
+      "web/src/views/IdentityAccessManagement*",
+      "web/src/views/Invitations*",
+      "web/src/views/User*",
+      "web/src/services/auth.*",
+      "web/src/services/users.*",
+      "web/src/services/organizations.*",
+      "web/src/services/settings.*",
+      "web/src/services/iam.*",
+      "web/src/services/service_accounts.*",
+      "tests/ui-testing/pages/generalPages/**",
+      "tests/ui-testing/pages/iamPages/**"
+    ],
+    "Logs": [
+      "web/src/plugins/logs/**",
+      "web/src/components/logs/**",
+      "web/src/services/httpsearch.*",
+      "web/src/services/saved_views.*",
+      "web/src/services/patterns.*",
+      "tests/ui-testing/pages/logsPages/**",
+      "tests/ui-testing/pages/generalPages/**",
+      "web/src/plugins/correlation/**"
+    ],
+    "Metrics": [
+      "web/src/plugins/metrics/**",
+      "web/src/components/promql/**",
+      "web/src/views/PromQL/**",
+      "web/src/services/metrics.*",
+      "tests/ui-testing/pages/metricsPages/**"
+    ],
+    "Pipelines": [
+      "web/src/components/pipelines/**",
+      "web/src/components/pipeline/**",
+      "web/src/plugins/pipelines/**",
+      "web/src/services/pipelines.*",
+      "tests/ui-testing/pages/pipelinesPages/**",
+      "tests/ui-testing/pages/generalPages/**"
+    ],
+    "Reports": [
+      "web/src/components/reports/**",
+      "web/src/services/reports.*",
+      "tests/ui-testing/pages/reportsPages/**",
+      "tests/ui-testing/pages/dashboardPages/**"
+    ],
+    "RUM": [
+      "web/src/components/rum/**",
+      "web/src/views/RUM/**",
+      "web/src/services/sessions.*",
+      "web/src/services/sourcemaps.*",
+      "tests/ui-testing/pages/rumPages/**"
+    ],
+    "Streams": [
+      "web/src/components/logstream/**",
+      "web/src/views/LogStream*",
+      "web/src/views/StreamExplorer*",
+      "web/src/services/stream.*",
+      "web/src/services/service_streams.*",
+      "tests/ui-testing/pages/streamsPages/**"
+    ],
+    "Traces": [
+      "web/src/plugins/traces/**",
+      "web/src/services/service_graph.*",
+      "tests/ui-testing/pages/tracesPages/**",
+      "web/src/plugins/correlation/**"
+    ],
+    "SLO": [
+      "web/src/components/slos/**",
+      "web/src/views/slos/**",
+      "web/src/services/slos.*",
+      "tests/ui-testing/pages/sloPages/**"
+    ]
+  }
+}

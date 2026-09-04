@@ -44,8 +44,8 @@ test.describe("Dashboard Metric Chart CamelCase Alias", () => {
    * assuming which of the two states we are in.
    */
   async function ensureSingleYField(page, alias) {
-    const desired = page.locator(`[data-test="dashboard-y-item-${alias}-remove"]`);
-    const anyY = page.locator('[data-test^="dashboard-y-item-"][data-test$="-remove"]');
+    const desired = pm.chartTypeSelector.getYAxisRemoveButton(alias);
+    const anyY = pm.chartTypeSelector.getAnyYAxisRemoveButton();
 
     // Let the SQL-driven seeding settle before deciding what to reconcile.
     await anyY.first().waitFor({ state: "visible", timeout: 10000 }).catch(() => {});

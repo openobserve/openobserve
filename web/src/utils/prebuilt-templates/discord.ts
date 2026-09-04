@@ -124,6 +124,7 @@ export const discordConfig: PrebuiltConfig = {
       type: "text",
       required: false,
       hintKey: "alerts.prebuiltDestinations.discordUsernameHint",
+      persistInMetadata: true,
     },
   ],
 };

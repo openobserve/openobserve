@@ -80,6 +80,8 @@ pub mod external_events;
 pub mod history;
 pub mod incident_integrations;
 pub mod incidents;
+#[cfg(feature = "cloud")]
+pub mod slack_oauth;
 pub mod templates;
 
 /// CreateAlert
@@ -96,7 +98,7 @@ pub mod templates;
     ),
     params(
         ("org_id" = String, Path, description = "Organization name"),
-        ("folder" = Option<String>, Query, description = "Folder ID (Required if alert folder is not the default folder)"),
+        ("folder" = Option<String>, Query, description = "Folder ID for the alert. The default folder is used when absent."),
       ),
     request_body(content = inline(CreateAlertRequestBody), description = "Alert data", content_type = "application/json"),
     responses(
@@ -314,6 +316,7 @@ fn composite_input(
         tags: alert.tags,
         owner: alert.owner.or_else(|| Some(user_id.clone())),
         last_edited_by: Some(user_id),
+        pending_period_sec: alert.pending_period_sec,
     }
 }
 
@@ -472,6 +475,7 @@ async fn composite_detail_response(
         },
         "children": children,
         "evaluation": evaluation_json,
+        "pending_period_sec": definition.pending_period_sec,
     }))
 }
 
@@ -585,6 +589,9 @@ fn composite_error_response(
                 "composite_internal_error",
                 error,
             )
+        }
+        CompositeServiceError::NegativePendingPeriod => {
+            composite_machine_error(StatusCode::BAD_REQUEST, "negative_pending_period", error)
         }
     }
 }
@@ -3444,6 +3451,23 @@ pub async fn generate_sql(
         ),
     );
 
+    let user_sql = match resolve_generate_sql(&query_condition) {
+        Ok(v) => v,
+        Err(e) => return e.into(),
+    };
+    if let Some(sql) = user_sql {
+        // Unparseable user SQL cannot prove a GROUP BY, so report false instead of failing.
+        let has_group_by = config::utils::sql::is_group_by_query(&sql).unwrap_or(false);
+        return MetaHttpResponse::json(GenerateSqlResponseBody {
+            sql,
+            metadata: Some(GenerateSqlMetadata {
+                has_aggregation: query_condition.aggregation.is_some(),
+                has_conditions: conditions.len().await > 0,
+                has_group_by,
+            }),
+        });
+    }
+
     // Call the existing build_sql function from service layer
     match build_sql(
         &org_id,
@@ -3488,10 +3512,38 @@ pub async fn generate_sql(
     }
 }
 
+// `None` means fall through to build_sql; families that run no SQL are refused rather
+// than silently answered with a generated `SELECT *`.
+fn resolve_generate_sql(
+    query_condition: &config::meta::alerts::QueryCondition,
+) -> Result<Option<String>, AlertError> {
+    use config::meta::alerts::QueryType;
+
+    match query_condition.query_type {
+        QueryType::Custom => Ok(None),
+        QueryType::SQL => {
+            let Some(sql) = query_condition.sql.as_ref().filter(|s| !s.is_empty()) else {
+                return Err(AlertError::SqlMissingQuery);
+            };
+            if search::sql::RE_ONLY_SELECT.is_match(sql) {
+                return Err(AlertError::SqlContainsSelectStar);
+            }
+            Ok(Some(sql.clone()))
+        }
+        QueryType::PromQL => Err(AlertError::SqlUnsupportedQueryType {
+            query_type: "PromQL",
+        }),
+        QueryType::Slo => Err(AlertError::SqlUnsupportedQueryType { query_type: "SLO" }),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use axum::{http::StatusCode, response::Response};
+    use config::meta::alerts::{QueryCondition, QueryType};
     use openobserve_core::alerts::alert::AlertError;
+
+    use super::resolve_generate_sql;
 
     fn status(err: AlertError) -> StatusCode {
         Response::from(err).status()
@@ -3739,5 +3791,72 @@ mod tests {
             )),
             StatusCode::INTERNAL_SERVER_ERROR
         );
+    }
+
+    fn query_condition(query_type: QueryType, sql: Option<&str>) -> QueryCondition {
+        QueryCondition {
+            query_type,
+            sql: sql.map(str::to_string),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn generate_sql_returns_the_users_sql_for_sql_query_type() {
+        let qc = query_condition(QueryType::SQL, Some("SELECT count(*) FROM \"logs\""));
+        let resolved = resolve_generate_sql(&qc).unwrap();
+        assert_eq!(
+            resolved,
+            Some("SELECT count(*) FROM \"logs\"".to_string()),
+            "SQL-type conditions must not be discarded in favour of SELECT *"
+        );
+    }
+
+    #[test]
+    fn generate_sql_rejects_sql_query_type_with_no_query() {
+        assert!(matches!(
+            resolve_generate_sql(&query_condition(QueryType::SQL, None)),
+            Err(AlertError::SqlMissingQuery)
+        ));
+        assert!(matches!(
+            resolve_generate_sql(&query_condition(QueryType::SQL, Some(""))),
+            Err(AlertError::SqlMissingQuery)
+        ));
+    }
+
+    #[test]
+    fn generate_sql_rejects_sql_query_type_containing_select_star() {
+        assert!(matches!(
+            resolve_generate_sql(&query_condition(
+                QueryType::SQL,
+                Some("SELECT * FROM \"logs\"")
+            )),
+            Err(AlertError::SqlContainsSelectStar)
+        ));
+    }
+
+    #[test]
+    fn generate_sql_defers_to_the_builder_for_custom_query_type() {
+        // None means "no user-supplied SQL", i.e. the caller falls through to build_sql.
+        assert_eq!(
+            resolve_generate_sql(&query_condition(QueryType::Custom, None)).unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn generate_sql_rejects_promql_and_slo_rather_than_emitting_select_star() {
+        // A query is supplied so the rejection is provably about the TYPE, not a missing
+        // query — otherwise SqlMissingQuery would satisfy a bare is_err().
+        for ty in [QueryType::PromQL, QueryType::Slo] {
+            let err = resolve_generate_sql(&query_condition(ty, Some("SELECT 1")))
+                .expect_err("must not silently fall through to SELECT *");
+            assert_ne!(
+                err.to_string(),
+                AlertError::SqlMissingQuery.to_string(),
+                "rejected for the wrong reason"
+            );
+            assert_eq!(status(err), StatusCode::BAD_REQUEST);
+        }
     }
 }

@@ -52,7 +52,7 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({ toast: vi.fn() }));
 vi.mock("@/components/flow/FlowNodeCard.vue", () => ({
   default: {
     name: "FlowNodeCard",
-    props: ["icon", "ioType", "hasInput", "hasOutput"],
+    props: ["icon", "ioType", "hasInput", "hasOutput", "outputHandles"],
     template: `
       <div class="flow-node-card-stub">
         <slot name="body" />
@@ -97,6 +97,14 @@ const mountNode = (id: string, data: any) =>
   });
 
 const card = (wrapper: any) => wrapper.findComponent({ name: "FlowNodeCard" });
+
+// A badge click opens the node's NDV — the same panel a node click opens, now
+// carrying this run's Input/Output. There is no separate results dock any more,
+// so "inspect a step" and "edit a step" are one surface.
+const expectNdvOpenedOn = (id: string) => {
+  expect(workflowObj.dialog.show).toBe(true);
+  expect(workflowObj.currentSelectedNodeID).toBe(id);
+};
 
 describe("WorkflowNode", () => {
   let wrapper: any = null;
@@ -215,6 +223,82 @@ describe("WorkflowNode", () => {
       expect(
         wrapper.find('[data-test="workflow-node-destination-incomplete-badge"]').exists(),
       ).toBe(false);
+    });
+  });
+
+  // A Branch with an unwired output arm is LEGAL (you may deliberately drop the
+  // false path), so it gets a PERSISTENT informational badge — the same badge
+  // mechanism as the "Set Up Later" placeholder marker — and NOT the
+  // `meta.incomplete` flag, which is what blocks Publish.
+  describe("branch: unwired-handle badge", () => {
+    // Mirrors initialNodeData: a Branch is born with case-0 + else declared.
+    const BRANCH = {
+      id: "b1",
+      data: {
+        node_type: "branch",
+        cases: [{ handle: "case-0", conditions: null }],
+        else_handle: "else",
+      },
+    };
+
+    it("shows the unwired-handle badge when an arm has no outgoing edge", () => {
+      setGraph([TRIGGER, BRANCH], [{ source: "t1", target: "b1" }]);
+      wrapper = mountNode("b1", BRANCH.data);
+      expect(wrapper.find('[data-test="workflow-node-branch-unwired-badge"]').exists()).toBe(true);
+    });
+
+    it("hides the badge once every arm is wired", () => {
+      setGraph(
+        [TRIGGER, BRANCH, FUNCTION, DESTINATION],
+        [
+          { source: "t1", target: "b1" },
+          { source: "b1", target: "f1", sourceHandle: "case-0" },
+          { source: "b1", target: "d1", sourceHandle: "else" },
+        ],
+      );
+      wrapper = mountNode("b1", BRANCH.data);
+      expect(wrapper.find('[data-test="workflow-node-branch-unwired-badge"]').exists()).toBe(false);
+    });
+
+    it("still shows the badge when only ONE of the two arms is wired", () => {
+      setGraph(
+        [TRIGGER, BRANCH, FUNCTION],
+        [
+          { source: "t1", target: "b1" },
+          { source: "b1", target: "f1", sourceHandle: "case-0" },
+        ],
+      );
+      wrapper = mountNode("b1", BRANCH.data);
+      expect(wrapper.find('[data-test="workflow-node-branch-unwired-badge"]').exists()).toBe(true);
+    });
+
+    it("does NOT flag the node as incomplete — an unwired arm never blocks Publish", () => {
+      setGraph([TRIGGER, BRANCH], [{ source: "t1", target: "b1" }]);
+      wrapper = mountNode("b1", BRANCH.data);
+      // The Publish-blocking marker is the "Set Up Later" placeholder badge; a
+      // branch with a dangling arm must not raise it.
+      expect(wrapper.find('[data-test="workflow-node-branch-incomplete-badge"]').exists()).toBe(
+        false,
+      );
+      const branch = workflowObj.currentSelectedWorkflow.nodes.find((n: any) => n.id === "b1");
+      expect(branch.meta?.incomplete).toBeUndefined();
+    });
+
+    it("raises the unwired badge without the Publish-blocking incomplete badge", () => {
+      setGraph([TRIGGER, BRANCH], [{ source: "t1", target: "b1" }]);
+      wrapper = mountNode("b1", BRANCH.data);
+      // Both selectors are on the SAME node, so this cannot pass by naming a
+      // selector no implementation would ever emit.
+      expect(wrapper.find('[data-test="workflow-node-branch-unwired-badge"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-branch-incomplete-badge"]').exists()).toBe(
+        false,
+      );
+    });
+
+    it("gives the card both branch handles so the arms are clickable", () => {
+      setGraph([TRIGGER, BRANCH], [{ source: "t1", target: "b1" }]);
+      wrapper = mountNode("b1", BRANCH.data);
+      expect(card(wrapper).props("outputHandles")).toEqual([{ id: "case-0" }, { id: "else" }]);
     });
   });
 
@@ -476,42 +560,23 @@ describe("WorkflowNode", () => {
       expect(workflowObj.dialog.show).toBe(false);
       expect(workflowObj.currentSelectedNodeID).toBe("");
     });
+
+    it("opens the NDV on a body click even in read-only Runs mode (not just the badge)", async () => {
+      workflowObj.readOnly = true;
+      wrapper = mountNode("c1", CONDITION.data);
+      await wrapper.trigger("click");
+      expectNdvOpenedOn("c1");
+      workflowObj.readOnly = false;
+    });
   });
 
   // The hover-`+` under the card is gone: clicking the node's SOURCE HANDLE
   // opens the step picker. Terminal (output) nodes render no source handle, so
   // there is nothing to click on them.
-  describe("source handle -> step picker", () => {
-    const outputClick = (w: any, x = 120, y = 240) =>
-      w.findComponent({ name: "FlowNodeCard" }).vm.$emit("outputClick", {
-        clientX: x,
-        clientY: y,
-      } as MouseEvent);
-
-    it("opens the step picker anchored at the click for a logic node", async () => {
-      wrapper = mountNode("c1", CONDITION.data);
-      outputClick(wrapper, 120, 240);
-      await nextTick();
-      expect(workflowObj.stepPicker).toEqual({
-        show: true,
-        source: "c1",
-        handle: "out",
-        mode: "next",
-        // edgeId is only set in insert-on-edge mode (T7); empty here.
-        edgeId: "",
-        position: null,
-        anchor: { x: 120, y: 240 },
-      });
-    });
-
-    it("opens the step picker for the trigger too", async () => {
-      wrapper = mountNode("t1", TRIGGER.data);
-      outputClick(wrapper);
-      await nextTick();
-      expect(workflowObj.stepPicker.show).toBe(true);
-      expect(workflowObj.stepPicker.source).toBe("t1");
-    });
-
+  // The source dot is a connection point only now (adding a next step / fan-out
+  // branch moved to the canvas-level append `+`); it renders where a next step is
+  // legal and is absent on terminal nodes.
+  describe("source handle (connection point)", () => {
     it("renders a source handle on a logic node", () => {
       wrapper = mountNode("c1", CONDITION.data);
       expect(wrapper.findComponent({ name: "FlowNodeCard" }).props("hasOutput")).toBe(true);
@@ -520,15 +585,6 @@ describe("WorkflowNode", () => {
     it("renders NO source handle on a terminal (output) destination node", () => {
       wrapper = mountNode("d1", DESTINATION.data);
       expect(wrapper.findComponent({ name: "FlowNodeCard" }).props("hasOutput")).toBe(false);
-    });
-
-    it("does nothing on the read-only Runs canvas", async () => {
-      workflowObj.readOnly = true;
-      wrapper = mountNode("c1", CONDITION.data);
-      outputClick(wrapper);
-      await nextTick();
-      expect(workflowObj.stepPicker.show).toBe(false);
-      workflowObj.readOnly = false;
     });
   });
 
@@ -584,6 +640,142 @@ describe("WorkflowNode", () => {
         true,
       );
       expect(wrapper.find('[data-test="workflow-node-condition-test-ok"]').exists()).toBe(false);
+    });
+
+    // An unconfigured step cannot have done its job, so records arriving at it must
+    // never read as a pass: proven against the live backend, a Destination with an
+    // empty `destination_id` records an `inputs` entry, emits NO output, dispatches
+    // nowhere and raises no error — indistinguishable from a real delivery here.
+    it("grey badge (not a green tick) for an incomplete node that received records", () => {
+      setGraph([{ ...DESTINATION, meta: { incomplete: "true" } }], []);
+      setResult({
+        errors: {},
+        inputs: { d1: [{ meta: {}, data: [{ x: 1 }] }] },
+        ranNodeIds: ["d1"],
+        blockedNodeIds: [],
+      });
+      wrapper = mountNode("d1", DESTINATION.data);
+      expect(wrapper.find('[data-test="workflow-node-destination-test-ok"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-node-destination-test-skipped"]').exists()).toBe(
+        true,
+      );
+    });
+
+    // "No records reached this step" would be a lie for a node records DID reach —
+    // the unconfigured case needs its own reason.
+    it("explains the incomplete node's grey badge as unconfigured, not as no-records", () => {
+      setGraph([{ ...DESTINATION, meta: { incomplete: "true" } }], []);
+      setResult({
+        errors: {},
+        inputs: { d1: [{ meta: {}, data: [{ x: 1 }] }] },
+        ranNodeIds: ["d1"],
+        blockedNodeIds: [],
+      });
+      wrapper = mountNode("d1", DESTINATION.data);
+      expect(wrapper.text()).toContain("not set up");
+      expect(wrapper.text()).not.toContain("No records reached this step");
+    });
+
+    // A real failure still outranks it — an incomplete node that errored is a ✗, not grey.
+    it("keeps the red error badge for an incomplete node that errored", () => {
+      setGraph([{ ...DESTINATION, meta: { incomplete: "true" } }], []);
+      setResult({
+        errors: { d1: { error_count: 1, errors: [["boom"]] } },
+        inputs: { d1: [{ meta: {}, data: [{ x: 1 }] }] },
+        ranNodeIds: ["d1"],
+        blockedNodeIds: [],
+      });
+      wrapper = mountNode("d1", DESTINATION.data);
+      expect(wrapper.find('[data-test="workflow-node-destination-test-error"]').exists()).toBe(
+        true,
+      );
+    });
+
+    // History runs carry no `inputs` map and fall through to the blockedNodeIds
+    // branch — the incomplete downgrade has to apply on that path too.
+    it("grey badge for an incomplete node on a history run (no inputs map)", () => {
+      setGraph([{ ...DESTINATION, meta: { incomplete: "true" } }], []);
+      setResult({ errors: {}, ranNodeIds: ["d1"], blockedNodeIds: [] });
+      wrapper = mountNode("d1", DESTINATION.data);
+      expect(wrapper.find('[data-test="workflow-node-destination-test-ok"]').exists()).toBe(false);
+      expect(wrapper.find('[data-test="workflow-node-destination-test-skipped"]').exists()).toBe(
+        true,
+      );
+    });
+
+    // The reverse failure mode: a fully configured step that did its job keeps its ✓
+    // on a history run exactly as before.
+    it("keeps the green tick for a configured node on a history run", () => {
+      setGraph([DESTINATION], []);
+      setResult({ errors: {}, ranNodeIds: ["d1"], blockedNodeIds: [] });
+      wrapper = mountNode("d1", DESTINATION.data);
+      expect(wrapper.find('[data-test="workflow-node-destination-test-ok"]').exists()).toBe(true);
+    });
+
+    // The whole point of the dirty state: the success symbol is REMOVED, not decorated,
+    // so a stale run cannot be misread as a pass at a glance.
+    it("REPLACES the green tick with the amber badge when the node is dirty", () => {
+      setResult({
+        errors: {},
+        inputs: { c1: [{ meta: {}, data: [{ x: 1 }] }] },
+        ranNodeIds: ["c1"],
+        blockedNodeIds: [],
+        dirtyNodeIds: ["c1"],
+      });
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-dirty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-ok"]').exists()).toBe(false);
+    });
+
+    it("hides a stale error badge behind the dirty badge too", () => {
+      setResult({
+        errors: { c1: { error_count: 1, errors: [["boom"]] } },
+        ranNodeIds: ["c1"],
+        blockedNodeIds: [],
+        dirtyNodeIds: ["c1"],
+      });
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-dirty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-error"]').exists()).toBe(false);
+    });
+
+    it("tells the user it was THIS step's config that changed", () => {
+      setResult({
+        errors: {},
+        inputs: { c1: [{ meta: {}, data: [{ x: 1 }] }] },
+        ranNodeIds: ["c1"],
+        blockedNodeIds: [],
+        dirtyNodeIds: ["c1"],
+        dirtyEditedId: "c1",
+      });
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.text()).toContain("Config changed since this step last ran");
+    });
+
+    it("tells the user an EARLIER step changed when it was dirtied by cascade", () => {
+      setResult({
+        errors: {},
+        inputs: { c1: [{ meta: {}, data: [{ x: 1 }] }] },
+        ranNodeIds: ["c1"],
+        blockedNodeIds: [],
+        dirtyNodeIds: ["c1"],
+        dirtyEditedId: "upstream",
+      });
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.text()).toContain("An earlier step changed since this ran");
+    });
+
+    it("leaves a clean node's tick alone when a DIFFERENT node is dirty", () => {
+      setResult({
+        errors: {},
+        inputs: { c1: [{ meta: {}, data: [{ x: 1 }] }] },
+        ranNodeIds: ["c1"],
+        blockedNodeIds: [],
+        dirtyNodeIds: ["someone-else"],
+      });
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-ok"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-dirty"]').exists()).toBe(false);
     });
 
     it("renders the red error badge with its messages in the tooltip", () => {
@@ -663,7 +855,7 @@ describe("WorkflowNode", () => {
       expect(wrapper.find(".wf-test-count").exists()).toBe(false);
     });
 
-    it("opens the per-node result drawer when the error badge is clicked", async () => {
+    it("opens the NDV when the error badge is clicked", async () => {
       setResult({
         errors: { c1: { error_count: 1, errors: [["boom"]] } },
         ranNodeIds: ["c1"],
@@ -671,13 +863,10 @@ describe("WorkflowNode", () => {
       });
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.find('[data-test="workflow-node-condition-test-error"]').trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({
-        show: true,
-        nodeId: "c1",
-      });
+      expectNdvOpenedOn("c1");
     });
 
-    it("opens the drawer when the ok badge is clicked (every ran node is inspectable)", async () => {
+    it("opens the NDV when the ok badge is clicked (every ran node is inspectable)", async () => {
       setResult({
         errors: {},
         inputs: { c1: [{ meta: {}, data: [{ x: 1 }] }] },
@@ -686,14 +875,14 @@ describe("WorkflowNode", () => {
       });
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.find('[data-test="workflow-node-condition-test-ok"]').trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({ show: true, nodeId: "c1" });
+      expectNdvOpenedOn("c1");
     });
 
-    it("opens the drawer when the grey (skipped) badge is clicked", async () => {
+    it("opens the NDV when the grey (skipped) badge is clicked", async () => {
       setResult({ errors: {}, inputs: {}, ranNodeIds: ["c1"], blockedNodeIds: [] });
       wrapper = mountNode("c1", CONDITION.data);
       await wrapper.find('[data-test="workflow-node-condition-test-skipped"]').trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({ show: true, nodeId: "c1" });
+      expectNdvOpenedOn("c1");
     });
 
     it("reacts to a test result arriving after mount", async () => {
@@ -744,10 +933,7 @@ describe("WorkflowNode", () => {
       const badge = wrapper.find('[data-test="workflow-node-undefined-test-error"]');
       expect(badge.exists()).toBe(true);
       await badge.trigger("click");
-      expect(workflowObj.testRun.resultDrawer).toEqual({
-        show: true,
-        nodeId: "c1",
-      });
+      expectNdvOpenedOn("c1");
     });
 
     it("renders the delete button and the actions bar with an undefined type", async () => {
@@ -761,6 +947,113 @@ describe("WorkflowNode", () => {
     it("renders no body label and does not crash (no meta)", () => {
       wrapper = mountNode("c1", undefined);
       expect(wrapper.text()).toBe("");
+    });
+  });
+  // A green tick on a PUBLISHED workflow reads as "the live workflow works". A test
+  // run never establishes that — it is a rehearsal, run against a sample payload with
+  // destinations suppressed. Suppressing the badge outright would be worse (it would
+  // hide genuine failures), so a test-earned pass is DEMOTED rather than deleted.
+  describe("test-earned badges on a published workflow", () => {
+    const setResult = (result: any) => {
+      workflowObj.testRun.result = result;
+    };
+    const TEST_PASS = {
+      errors: {},
+      inputs: { c1: [{ meta: {}, data: [{ x: 1 }] }] },
+      ranNodeIds: ["c1"],
+      blockedNodeIds: [],
+      source: "test",
+    };
+
+    it("does NOT show the green verified tick for a test-earned pass once published", () => {
+      workflowObj.currentSelectedWorkflow.isDraft = false;
+      setResult(TEST_PASS);
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-ok"]').exists()).toBe(false);
+    });
+
+    it("marks it as test-earned instead of dropping it silently", () => {
+      workflowObj.currentSelectedWorkflow.isDraft = false;
+      setResult(TEST_PASS);
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-rehearsal"]').exists()).toBe(
+        true,
+      );
+    });
+
+    it("says in the tooltip that the evidence came from a test run", () => {
+      workflowObj.currentSelectedWorkflow.isDraft = false;
+      setResult(TEST_PASS);
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.text().toLowerCase()).toContain("test run");
+    });
+
+    // A draft is where rehearsing IS the point — demoting there would strip the
+    // feedback the Test button exists to give.
+    it("keeps the plain green tick on a DRAFT", () => {
+      workflowObj.currentSelectedWorkflow.isDraft = true;
+      setResult(TEST_PASS);
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-ok"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-rehearsal"]').exists()).toBe(
+        false,
+      );
+    });
+
+    // A REAL recorded execution on a published workflow is exactly the evidence the
+    // tick is meant to convey — it must not be demoted along with the rehearsals.
+    it("keeps the green tick for a real recorded run on a published workflow", () => {
+      workflowObj.currentSelectedWorkflow.isDraft = false;
+      setResult({ ...TEST_PASS, mode: "history", source: "run" });
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-ok"]').exists()).toBe(true);
+    });
+
+    // A failure found in rehearsal is still a real defect in the graph, so the red
+    // badge is honest evidence and must survive the demotion.
+    it("keeps the red error badge for a test-earned failure", () => {
+      workflowObj.currentSelectedWorkflow.isDraft = false;
+      setResult({
+        errors: { c1: { error_count: 1, errors: [["boom"]] } },
+        inputs: { c1: [{ meta: {}, data: [{ x: 1 }] }] },
+        ranNodeIds: ["c1"],
+        blockedNodeIds: [],
+        source: "test",
+      });
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-error"]').exists()).toBe(true);
+    });
+
+    // Dirty means "this no longer describes the step at all" — a stronger statement
+    // than "the evidence was a rehearsal", so it stays on top.
+    it("keeps the amber dirty badge ahead of the test-earned marker", () => {
+      workflowObj.currentSelectedWorkflow.isDraft = false;
+      setResult({ ...TEST_PASS, dirtyNodeIds: ["c1"] });
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-dirty"]').exists()).toBe(true);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-rehearsal"]').exists()).toBe(
+        false,
+      );
+    });
+
+    // Grey already says "not verified" — demoting it further would only add noise.
+    it("leaves a grey not-verified badge alone", () => {
+      workflowObj.currentSelectedWorkflow.isDraft = false;
+      setResult({ ...TEST_PASS, inputs: {} });
+      wrapper = mountNode("c1", CONDITION.data);
+      expect(wrapper.find('[data-test="workflow-node-condition-test-skipped"]').exists()).toBe(
+        true,
+      );
+    });
+
+    // The marker is a badge like any other: it opens the step so the author can see
+    // what the rehearsal actually did.
+    it("opens the step drawer when the test-earned marker is clicked", async () => {
+      workflowObj.currentSelectedWorkflow.isDraft = false;
+      setResult(TEST_PASS);
+      wrapper = mountNode("c1", CONDITION.data);
+      await wrapper.find('[data-test="workflow-node-condition-test-rehearsal"]').trigger("click");
+      expectNdvOpenedOn("c1");
     });
   });
 });

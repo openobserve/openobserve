@@ -197,10 +197,9 @@ describe("ExperimentBrowser", () => {
     }
   });
 
-  // The clone is a new run that this list does not show until it is opened, so
-  // the action confirms and navigates rather than leaving the page unchanged.
-  it("clones a row from the actions column and opens the copy", async () => {
-    cloneExperiment.mockResolvedValue({ id: "copy" });
+  // A clone costs a full run, and it is normally made in order to change
+  // something first — so the action opens the seeded form, it does not launch.
+  it("opens the create form seeded from the row instead of running a copy", async () => {
     const wrapper = mount(ExperimentBrowser, {
       props: {
         orgId: "acme",
@@ -213,13 +212,15 @@ describe("ExperimentBrowser", () => {
     await wrapper.get('[data-test="ai-experiment-clone-one"]').trigger("click");
     await flushPromises();
 
-    expect(cloneExperiment).toHaveBeenCalledWith("acme", "one");
-    expect(toast).toHaveBeenCalledWith(expect.objectContaining({ variant: "success" }));
+    expect(cloneExperiment).not.toHaveBeenCalled();
     expect(push).toHaveBeenCalledWith(
-      expect.objectContaining({ name: "aiExperimentDetail", params: { id: "copy" } }),
+      expect.objectContaining({
+        name: "aiExperimentCreate",
+        query: expect.objectContaining({ clone_of: "one" }),
+      }),
     );
     // The click must not ALSO open the row it sits in, which would race the
-    // navigation to the clone.
+    // navigation to the form.
     expect(wrapper.emitted("select")).toBeUndefined();
   });
 
@@ -305,6 +306,58 @@ describe("ExperimentBrowser", () => {
     expect(wrapper.find('[data-test="ai-experiment-row-alpha"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="ai-experiment-row-beta"]').exists()).toBe(false);
     expect(wrapper.find("button input, button button").exists()).toBe(false);
+  });
+
+  it("clears the baseline when the pin is clicked again", async () => {
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("new", "dataset-a", 2), experiment("old", "dataset-a", 1)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+      },
+      global: { stubs },
+    });
+
+    const pin = () => wrapper.get('[data-test="ai-experiment-baseline-old"]');
+    await pin().trigger("click");
+    expect(JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}")).toEqual({
+      "dataset-a": "old",
+    });
+
+    // The pin renders filled once set, so it reads as a toggle — before this it
+    // could only ever re-pin the row to itself, stranding the baseline forever.
+    await pin().trigger("click");
+    expect(JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}")).toEqual({});
+
+    // The dataset key is DELETED, not blanked: an empty string left behind still
+    // reads as a configured baseline everywhere the id is looked up.
+    expect(
+      Object.prototype.hasOwnProperty.call(
+        JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}"),
+        "dataset-a",
+      ),
+    ).toBe(false);
+  });
+
+  it("leaves another dataset's baseline alone when one is cleared", async () => {
+    localStorage.setItem(
+      "o2_experiment_baselines_acme",
+      JSON.stringify({ "dataset-a": "old", "dataset-b": "other" }),
+    );
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("old", "dataset-a", 1)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+      },
+      global: { stubs },
+    });
+
+    await wrapper.get('[data-test="ai-experiment-baseline-old"]').trigger("click");
+
+    expect(JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}")).toEqual({
+      "dataset-b": "other",
+    });
   });
 
   it("persists the selected baseline and orders it first", async () => {

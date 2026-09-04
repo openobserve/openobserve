@@ -49,6 +49,7 @@ import {
 } from "@/utils/zincutils";
 import { convertDateToTimestamp } from "@/utils/date";
 import { generateSqlQuery } from "@/utils/alerts/alertQueryBuilder";
+import { isUnaryOperator } from "@/utils/alerts/conditionsFormatter";
 import {
   validateInputs as validateInputsUtil,
   validateSqlQuery as validateSqlQueryUtil,
@@ -57,6 +58,7 @@ import {
   type JsonValidationContext,
 } from "@/utils/alerts/alertValidation";
 import { type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import {
   getAlertPayload as getAlertPayloadUtil,
   prepareAndSaveAlert as prepareAndSaveAlertUtil,
@@ -154,6 +156,11 @@ export const defaultAlertValue: any = () => {
       frequency_type: "minutes",
       timezone: "UTC",
     },
+    // Minutes while the form is open — the CANONICAL stored value (mirrors
+    // trigger_condition.frequency); `_ui.pendingPeriod` is the DISPLAY value,
+    // which may be in hours. getAlertPayload converts to seconds on save.
+    // 0 = fire immediately.
+    pending_period_sec: 0,
     destinations: [],
     // Enterprise-only: workflows linked to this alert (run when it fires).
     workflows: [],
@@ -196,7 +203,7 @@ export const defaultAnomalyConfig = () => ({
   detection_window_unit: "h" as "m" | "h",
   training_window_days: 14,
   retrain_interval_days: 7,
-  threshold: 100,
+  threshold: 97,
   alert_enabled: true,
   alert_destination_ids: [] as string[],
   folder_id: "default",
@@ -284,12 +291,29 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     };
   };
 
+  /** Split the alert's STORED pending period (always MINUTES, mirroring
+   *  `frequencyDisplay`) into the display unit + the number the user actually
+   *  sees. AlertSettings.vue derives its own initial unit the same way — see
+   *  its `initialPendingPeriodMode`, kept in sync by rule, not shared code
+   *  (matching how `frequencyMode` and this helper stay independent). */
+  const pendingPeriodDisplay = (obj: any): { mode: "minutes" | "hours"; value: number } => {
+    const mins = Number(obj?.pending_period_sec ?? 0);
+    const isHours = mins >= 60 && mins % 60 === 0;
+    return {
+      mode: isHours ? "hours" : "minutes",
+      value: isHours ? mins / 60 : mins,
+    };
+  };
+
   const buildDefaultForm = (): any => {
     const base = defaultAlertValue();
     return {
       ...base,
       logGroupBy: [] as string[],
-      _ui: { checkEvery: frequencyDisplay(base).checkEvery },
+      _ui: {
+        checkEvery: frequencyDisplay(base).checkEvery,
+        pendingPeriod: pendingPeriodDisplay(base).value,
+      },
       _meta: defaultAddAlertMeta({
         frequencyMode: frequencyDisplay(base).mode,
         minAutoRefreshInterval: minAutoRefreshInterval(),
@@ -310,7 +334,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     return {
       ...obj,
       logGroupBy: groupBy,
-      _ui: obj?._ui ?? { checkEvery: freq.checkEvery },
+      _ui: obj?._ui ?? {
+        checkEvery: freq.checkEvery,
+        pendingPeriod: pendingPeriodDisplay(obj).value,
+      },
       _meta:
         obj?._meta ??
         defaultAddAlertMeta({
@@ -523,6 +550,16 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   // Editor squiggle ranges for server SQL-validation errors (shared with editors
   // via provide/inject from AddAlert.vue).
   const sqlErrorRanges = ref<SqlErrorRange[]>([]);
+  // SQL tab's Multi Alert value-column dropdown options — the query's own
+  // resolved output columns. Populated by PreviewAlert's `schema-updated`
+  // emit (AddAlert.vue's handleSqlSchemaUpdated), which reuses the
+  // /result_schema call PreviewAlert already makes every time the preview
+  // query itself fires (sql_simple_multi_alert_fe_prd.md §11.2/§11.3).
+  const sqlAggColumnOptions = ref<string[]>([]);
+  // Whether the user's own SQL carries a HAVING clause — same emit as above.
+  // Drives the QueryConfig warning that it runs before the Multi Alert's own
+  // "Alert if [column]" condition.
+  const sqlQueryHasHaving = ref(false);
   const validateSqlQueryPromise = ref<Promise<unknown>>();
   const addAlertFormRef = ref(null);
   const viewSqlEditorDialog = ref(false);
@@ -766,6 +803,10 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
 
   const debouncedSyncStreamFromSql = debounce(async (sql: string) => {
     if (!sql || !parser || isSyncingStreamFromSql.value) return;
+    // parse() is exponential in paren nesting depth — skip a pathologically
+    // nested query rather than freeze the tab. Losing this convenience sync
+    // is fine; the user can still pick the stream from the dropdown.
+    if (maxParenDepth(sql) > SQL_PARSE_MAX_DEPTH) return;
     try {
       const parsed = parser.parse(sql);
       const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;
@@ -858,7 +899,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return false;
     }
     if (conditions.filterType === "condition") {
-      return !!(conditions.column && conditions.value !== undefined && conditions.value !== "");
+      return !!(
+        conditions.column &&
+        (isUnaryOperator(conditions.operator) ||
+          (conditions.value !== undefined && conditions.value !== ""))
+      );
     }
     if (conditions.filterType === "group" && Array.isArray(conditions.conditions)) {
       return conditions.conditions.every((cond: any) => allConditionsValid(cond));
@@ -1027,6 +1072,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
         trigger_condition: {
           silence: Number(source.trigger_condition?.silence ?? 0),
         },
+        // Stored and evaluated for composite alerts server-side (see
+        // handle_composite_alert_trigger). Note the detail GET response
+        // doesn't return it yet on edit — see the fallback comment on the
+        // edit-prefill conversion above.
+        pending_period_sec: Math.round((Number(source.pending_period_sec) || 0) * 60),
         owner: source.owner || undefined,
         creates_incident: source.creates_incident ?? false,
         workflows: source.workflows ?? [],
@@ -2274,6 +2324,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       // silently wipe existing links. Must run AFTER the swap above, which
       // replaces every key on `data`.
       if (!Array.isArray(data.workflows)) data.workflows = [];
+      // BE stores seconds; the form field displays minutes (mirrors the
+      // frequency field's display unit). Falls back to 0 for any alert type
+      // where the field is absent from the GET response (older cached
+      // response shape, etc.) rather than showing NaN.
+      data.pending_period_sec = Math.round((Number(data.pending_period_sec) || 0) / 60);
       isAggregationEnabled.value = !!data.query_condition?.aggregation;
 
       if (data.query_condition?.promql_condition) {
@@ -2608,6 +2663,18 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
               },
             });
           }
+          if ((newVal as any).pendingPeriodFieldRef) {
+            focusManager.registerField("pending_period", {
+              ref: (newVal as any).pendingPeriodFieldRef,
+              onBeforeFocus: () => {
+                if (isAnomalyMode.value) {
+                  activeTab.value = "anomaly-alerting";
+                } else {
+                  activeTab.value = "condition";
+                }
+              },
+            });
+          }
         });
       }
     },
@@ -2912,6 +2979,8 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
     isUsingBackendSql,
     sqlQueryErrorMsg,
     sqlErrorRanges,
+    sqlAggColumnOptions,
+    sqlQueryHasHaving,
     validateSqlQueryPromise,
     addAlertFormRef,
     viewSqlEditorDialog,

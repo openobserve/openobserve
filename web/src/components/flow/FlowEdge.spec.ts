@@ -23,6 +23,13 @@ vi.mock("@vue-flow/core", () => ({
     template: '<path class="mock-base-edge" />',
     props: ["id", "style", "path", "markerEnd", "type"],
   },
+  // The label layer teleports to the viewport in the real lib; here it just renders
+  // its slot inline so the mid-edge `+` is queryable.
+  EdgeLabelRenderer: {
+    name: "EdgeLabelRenderer",
+    template: '<div class="mock-edge-label"><slot /></div>',
+  },
+  Position: { Top: "top", Right: "right", Bottom: "bottom", Left: "left" },
   getBezierPath: vi.fn((props: any) => [
     `M ${props.sourceX} ${props.sourceY} C ... ${props.targetX} ${props.targetY}`,
     props.sourceX,
@@ -105,6 +112,23 @@ describe("FlowEdge.vue", () => {
       expect(wrapper.exists()).toBe(true);
     });
 
+    // Selection is invisible without this: the resting stroke is an INLINE style,
+    // which beats the library's `.selected` stylesheet rule — so the selected
+    // state must be painted from the style object itself.
+    it("selected: overrides the resting stroke with the selection colour", () => {
+      wrapper = createWrapper({ style: { stroke: "grey", strokeWidth: 2 }, selected: true });
+      const style = wrapper.findComponent({ name: "BaseEdge" }).props("style");
+      expect(style.stroke).toBe("var(--color-indigo-500)");
+      expect(style.strokeWidth).toBe(3);
+    });
+
+    it("selected defaults to false and keeps the resting stroke (pipelines unchanged)", () => {
+      wrapper = createWrapper({ style: { stroke: "grey", strokeWidth: 2 } });
+      const style = wrapper.findComponent({ name: "BaseEdge" }).props("style");
+      expect(style.stroke).toBe("grey");
+      expect(style.strokeWidth).toBe(2);
+    });
+
     it("defaults isInView to false", () => {
       wrapper = createWrapper();
       expect((wrapper.vm as any).isInView ?? false).toBe(false);
@@ -121,6 +145,67 @@ describe("FlowEdge.vue", () => {
   describe("inheritAttrs", () => {
     it("sets inheritAttrs to false via the plain <script> block", () => {
       expect((FlowEdge as any).inheritAttrs).toBe(false);
+    });
+  });
+
+  describe("mid-edge insert + (insertable)", () => {
+    const addBtn = (w: any) => w.find('[data-test="workflow-edge-add"]');
+
+    it("does not render the insert + by default (pipelines opt out)", () => {
+      wrapper = createWrapper();
+      expect(addBtn(wrapper).exists()).toBe(false);
+    });
+
+    it("renders the insert + when insertable is set (Workflows opt in)", () => {
+      wrapper = createWrapper({ insertable: true });
+      expect(addBtn(wrapper).exists()).toBe(true);
+    });
+
+    it("emits insert with the click event when the + is clicked", async () => {
+      wrapper = createWrapper({ insertable: true });
+      await addBtn(wrapper).trigger("click");
+      expect(wrapper.emitted("insert")).toBeTruthy();
+      expect(wrapper.emitted("insert")).toHaveLength(1);
+    });
+
+    it("emits insert-enter / insert-leave as the cursor crosses the + chip", async () => {
+      wrapper = createWrapper({ insertable: true });
+      const chip = wrapper.find(".pointer-events-auto"); // the chip wrapper around the +
+      await chip.trigger("mouseenter");
+      await chip.trigger("mouseleave");
+      expect(wrapper.emitted("insert-enter")).toHaveLength(1);
+      expect(wrapper.emitted("insert-leave")).toHaveLength(1);
+    });
+  });
+
+  describe("branch path label (label prop)", () => {
+    const chip = (w: any) => w.find('[data-test="workflow-edge-label"]');
+
+    it("renders no label by default (pipelines opt out)", () => {
+      wrapper = createWrapper();
+      expect(chip(wrapper).exists()).toBe(false);
+    });
+
+    it("renders no label for an empty label (a non-branch edge)", () => {
+      wrapper = createWrapper({ label: "" });
+      expect(chip(wrapper).exists()).toBe(false);
+    });
+
+    it("renders the label text when one is supplied", () => {
+      wrapper = createWrapper({ label: "Severe (>=1000)" });
+      expect(chip(wrapper).exists()).toBe(true);
+      expect(chip(wrapper).text()).toBe("Severe (>=1000)");
+    });
+
+    it("exposes the full text as a title so a truncated label stays readable", () => {
+      const long = "Severe breach over one thousand requests per second sustained";
+      wrapper = createWrapper({ label: long });
+      expect(chip(wrapper).attributes("title")).toBe(long);
+    });
+
+    it("positions the label from the bezier midpoint via the shared CSS var", () => {
+      wrapper = createWrapper({ label: "Moderate", sourceX: 10, sourceY: 20 });
+      expect(chip(wrapper).attributes("style")).toContain("--wf-edge-mid");
     });
   });
 

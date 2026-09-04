@@ -27,7 +27,8 @@ use openobserve_core::llm_evaluations::{
     experiment_results::{
         ExperimentAggregateSummary, ExperimentClientScoreSummary, ExperimentProgress,
         ExperimentResultScore, ExperimentResultScoreStatus, ExperimentResultSlot,
-        ExperimentResultTaskStatus, ExperimentScoreSummary, ExperimentSkipSummary, ScoringStatus,
+        ExperimentResultTaskStatus, ExperimentScoreSummary, ExperimentSkipSummary,
+        ExperimentSlotStatus, ScoringStatus,
     },
     experiments::{
         CloneExperimentOverrides, CreateExperiment, CreateExperimentResult, Experiment,
@@ -40,12 +41,66 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::{IntoParams, ToSchema};
 
+#[derive(Debug, Clone, Copy, Default, Deserialize, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExperimentResultRowSortBody {
+    #[default]
+    Dataset,
+    DispersionDesc,
+}
+
+#[derive(Debug, Deserialize, IntoParams)]
+#[into_params(parameter_in = Query)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentResultRowPageQuery {
+    pub page: Option<usize>,
+    pub page_size: Option<usize>,
+    pub sort: Option<ExperimentResultRowSortBody>,
+    pub high_dispersion_only: Option<bool>,
+}
+
+/// One pinned Dataset case with every trial reduced to list-surface aggregates.
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentResultRowBody {
+    /// Zero-based position in deterministic pinned-snapshot row order.
+    pub row_index: usize,
+    pub row_id: String,
+    pub logical_id: String,
+    pub input: Value,
+    pub expected_output: Option<Value>,
+    pub trial_count: usize,
+    pub status: ExperimentSlotStatusBody,
+    /// Present only for a single-trial row; multi-trial outputs belong in drill-down.
+    pub output: Option<Value>,
+    pub score_summaries: Vec<ExperimentScoreSummaryBody>,
+    pub p50_latency_ms: Option<u64>,
+    pub dispersion: Option<ExperimentRowDispersionBody>,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentResultRowPaginationBody {
+    pub page: usize,
+    pub page_size: usize,
+    pub total_rows: usize,
+    pub has_more: bool,
+}
+
+#[derive(Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentResultRowPageResponseBody {
+    pub rows: Vec<ExperimentResultRowBody>,
+    pub pagination: ExperimentResultRowPaginationBody,
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize, ToSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum DatasetItemSourceBody {
     Trace,
     Annotation,
     Manual,
+    Playground,
 }
 
 impl From<DatasetItemSourceBody> for DatasetItemSource {
@@ -54,6 +109,7 @@ impl From<DatasetItemSourceBody> for DatasetItemSource {
             DatasetItemSourceBody::Trace => Self::Trace,
             DatasetItemSourceBody::Annotation => Self::Annotation,
             DatasetItemSourceBody::Manual => Self::Manual,
+            DatasetItemSourceBody::Playground => Self::Playground,
         }
     }
 }
@@ -93,6 +149,7 @@ impl From<DatasetSnapshotFilter> for DatasetSnapshotFilterBody {
                     DatasetItemSource::Trace => DatasetItemSourceBody::Trace,
                     DatasetItemSource::Annotation => DatasetItemSourceBody::Annotation,
                     DatasetItemSource::Manual => DatasetItemSourceBody::Manual,
+                    DatasetItemSource::Playground => DatasetItemSourceBody::Playground,
                 })
                 .collect(),
             tags: value.tags,
@@ -1080,6 +1137,8 @@ pub struct ExperimentResultSlotBody {
     pub trial_index: u32,
     pub input: Value,
     pub expected_output: Option<Value>,
+    /// The one field a list surface needs; task and score statuses remain for drill-down.
+    pub status: ExperimentSlotStatusBody,
     pub task_status: ExperimentResultTaskStatusBody,
     pub execution: Option<Value>,
     pub scores: Vec<ExperimentResultScoreBody>,
@@ -1105,6 +1164,18 @@ pub enum ExperimentResultTaskStatusBody {
     Ok,
     Skipped,
     Error,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExperimentSlotStatusBody {
+    Pending,
+    Running,
+    Scoring,
+    Completed,
+    Skipped,
+    TaskFailed,
+    ScoreFailed,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -1179,6 +1250,21 @@ pub struct ExperimentAggregateSummaryBody {
     pub incomplete: bool,
     pub incomplete_task_slots: u64,
     pub incomplete_score_dimensions: u64,
+    pub error_task_slots: u64,
+}
+
+impl From<ExperimentSlotStatus> for ExperimentSlotStatusBody {
+    fn from(value: ExperimentSlotStatus) -> Self {
+        match value {
+            ExperimentSlotStatus::Pending => Self::Pending,
+            ExperimentSlotStatus::Running => Self::Running,
+            ExperimentSlotStatus::Scoring => Self::Scoring,
+            ExperimentSlotStatus::Completed => Self::Completed,
+            ExperimentSlotStatus::Skipped => Self::Skipped,
+            ExperimentSlotStatus::TaskFailed => Self::TaskFailed,
+            ExperimentSlotStatus::ScoreFailed => Self::ScoreFailed,
+        }
+    }
 }
 
 impl From<ExperimentResultTaskStatus> for ExperimentResultTaskStatusBody {
@@ -1226,6 +1312,7 @@ impl From<ExperimentResultSlot> for ExperimentResultSlotBody {
             trial_index: value.trial_index,
             input: value.input,
             expected_output: value.expected_output,
+            status: value.status.into(),
             task_status: value.task_status.into(),
             execution: value
                 .execution
@@ -1302,6 +1389,7 @@ impl From<ExperimentAggregateSummary> for ExperimentAggregateSummaryBody {
             incomplete: value.incomplete,
             incomplete_task_slots: value.incomplete_task_slots,
             incomplete_score_dimensions: value.incomplete_score_dimensions,
+            error_task_slots: value.error_task_slots,
         }
     }
 }

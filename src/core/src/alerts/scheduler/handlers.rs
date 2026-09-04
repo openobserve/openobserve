@@ -20,7 +20,7 @@ use config::{
     cluster::LOCAL_NODE,
     get_config, ider,
     meta::{
-        alerts::TriggerCondition,
+        alerts::{TriggerCondition, level::DeliveryDecision},
         dashboards::reports::ReportFrequencyType,
         pipeline::components::NodeData,
         self_reporting::{
@@ -104,8 +104,13 @@ async fn persist_alert_run_state(
             }
         };
         let at = now_micros();
-        let plan =
-            config::meta::alerts::grouping::plan_group_updates(alert_id, classification, &prev, at);
+        let plan = config::meta::alerts::grouping::plan_group_updates(
+            alert_id,
+            classification,
+            &prev,
+            at,
+            alert.pending_period_sec,
+        );
         if let Err(e) = db::alerts::alert_states::persist_group_plan(&plan, alert_id).await {
             log::error!("[SCHEDULER] could not persist group states for {alert_id}: {e}");
             return false;
@@ -281,6 +286,8 @@ async fn load_tracked_group_states(
 struct GroupDispatchOutcome {
     delivered: usize,
     failed: usize,
+    // how many have transitioned to pending state
+    pending: usize,
     errors: Vec<String>,
     /// Group keys whose send succeeded. A dedup reservation is confirmed by
     /// its OWN group's delivery, never a sibling's (§5.5 MN-6).
@@ -344,6 +351,7 @@ async fn dispatch_per_group(
         return Some(GroupDispatchOutcome {
             delivered: 0,
             failed: 0,
+            pending: 0,
             errors: vec!["group state did not commit".to_string()],
             delivered_groups: Default::default(),
             state_failed: true,
@@ -357,6 +365,7 @@ async fn dispatch_per_group(
             return Some(GroupDispatchOutcome {
                 delivered: 0,
                 failed: 0,
+                pending: 0,
                 errors: vec![format!("group state read failed: {e}")],
                 delivered_groups: Default::default(),
                 state_failed: true,
@@ -510,13 +519,15 @@ async fn dispatch_per_group(
 
     log::info!(
         "[SCHEDULER trace_id {trace_id}] alert {alert_id}: per-group dispatch delivered={delivered} \
-         failed={failed} suppressed={} candidates={}",
+         pending={} failed={failed} suppressed={} candidates={}",
         plan.suppressed,
+        plan.pending,
         plan.items.len()
     );
     Some(GroupDispatchOutcome {
         delivered,
         failed,
+        pending: plan.pending,
         errors,
         delivered_groups,
         state_failed: false,
@@ -796,11 +807,42 @@ async fn handle_composite_alert_trigger(
     )?;
     let previous =
         infra::table::alert_states::get(&definition.definition.id, ROLLUP_GROUP_KEY).await?;
-    let outcome = if evaluated.result {
+
+    let base_outcome = if evaluated.result {
         RunOutcome::Firing
     } else {
         RunOutcome::Normal
     };
+
+    let outcome = if definition.definition.pending_period_sec > 0 {
+        match &previous {
+            // non existent state -> firing = pending
+            None if evaluated.result => RunOutcome::Pending,
+            // non-existent state -> normal = normal
+            None => RunOutcome::Normal,
+            Some(state) => match (state.last_outcome.as_ref(), state.since.as_ref()) {
+                (None, _) | (Some(RunOutcome::Normal), _) if evaluated.result => {
+                    RunOutcome::Pending
+                }
+                (Some(RunOutcome::Pending), Some(last)) if evaluated.result => {
+                    if now - last
+                        < definition
+                            .definition
+                            .pending_period_sec
+                            .saturating_mul(1_000_000)
+                    {
+                        RunOutcome::Pending
+                    } else {
+                        base_outcome
+                    }
+                }
+                _ => base_outcome,
+            },
+        }
+    } else {
+        base_outcome
+    };
+
     let update = apply_outcome(
         &definition.definition.id,
         ROLLUP_GROUP_KEY,
@@ -848,15 +890,19 @@ async fn handle_composite_alert_trigger(
 
     let mut delivery_retry_at = None;
     if evaluated.result {
-        let delivery = config::meta::alerts::level::delivery_decision(
-            evaluated.level,
-            scheduled_data
-                .last_notified_level
-                .and_then(config::meta::alerts::level::AlertLevel::from_i32),
-            scheduled_data.delivery_silenced_until,
-            now,
-            Some(true),
-        );
+        let delivery = if matches!(outcome, RunOutcome::Pending) {
+            DeliveryDecision::SuppressedByPending
+        } else {
+            config::meta::alerts::level::delivery_decision(
+                evaluated.level,
+                scheduled_data
+                    .last_notified_level
+                    .and_then(config::meta::alerts::level::AlertLevel::from_i32),
+                scheduled_data.delivery_silenced_until,
+                now,
+                Some(true),
+            )
+        };
         if delivery.should_deliver()
             && (!definition
                 .definition
@@ -1072,6 +1118,7 @@ fn composite_notification_alert(
         .and_then(|value| serde_json::from_value(value).ok())
         .unwrap_or_default();
     alert.trigger_condition.silence = definition.silence_seconds;
+    alert.pending_period_sec = definition.pending_period_sec;
     alert
 }
 
@@ -1131,6 +1178,9 @@ async fn handle_anomaly_detection_triggers(
     {
         trigger.next_run_at = now_micros() + 60 * 1_000_000;
         trigger.status = db::scheduler::TriggerStatus::Completed;
+        // The row is parked and never pulled again, so without this the last
+        // real outcome stands forever on a detector the kill switch stopped.
+        record_anomaly_outcome(&mut trigger, &RunOutcome::Skipped, now_micros());
         db::scheduler::update_trigger(trigger, true, "").await?;
         return Ok(());
     }
@@ -1162,6 +1212,11 @@ async fn handle_anomaly_detection_triggers(
     if !config.is_trained || !config.enabled {
         trigger.next_run_at = now_micros() + 60 * 1_000_000;
         trigger.status = db::scheduler::TriggerStatus::Waiting;
+        // Untrained only: a DISABLED config is not running, and its last real
+        // outcome is what should stand when it is re-enabled.
+        if !config.is_trained {
+            record_anomaly_outcome(&mut trigger, &RunOutcome::Skipped, now_micros());
+        }
         db::scheduler::update_trigger(trigger.clone(), true, "").await?;
 
         usage_reporting::publish_triggers_usage(TriggerData {
@@ -1258,6 +1313,8 @@ async fn handle_anomaly_detection_triggers(
         td.last_satisfied_at = Some(run_end_us);
         trigger.data = td.to_json_string();
     }
+    // An errored run and an empty one leave the config row identical.
+    record_anomaly_outcome(&mut trigger, &trigger_status, run_end_us);
 
     // If detection succeeded and the config is trained but status is not Active
     // (e.g. stuck at Waiting after a manual retrain request that hasn't been
@@ -1287,6 +1344,20 @@ async fn handle_anomaly_detection_triggers(
     db::scheduler::update_trigger(trigger, true, "").await?;
 
     Ok(())
+}
+
+/// Stamp the run outcome onto the trigger, the only per-row record of it —
+/// anomaly detection writes no `alert_states` rollup the list could read.
+fn record_anomaly_outcome(trigger: &mut db::scheduler::Trigger, outcome: &RunOutcome, at: i64) {
+    use config::meta::triggers::ScheduledTriggerData;
+    // Skip rather than default on a parse failure: rewriting the blob would
+    // erase `last_satisfied_at`, and for an untrained config that repeats hourly.
+    let Ok(mut td) = ScheduledTriggerData::from_json_string(&trigger.data) else {
+        return;
+    };
+    td.last_outcome = Some(outcome.to_string());
+    td.last_outcome_at = Some(at);
+    trigger.data = td.to_json_string();
 }
 
 /// Parse a detection interval string like "5m", "1h" into microseconds.
@@ -1406,6 +1477,7 @@ pub(crate) fn merge_ledger(prior: &[String], succeeded: &[String]) -> Vec<String
     out
 }
 
+#[allow(clippy::cognitive_complexity, clippy::too_many_lines)]
 async fn handle_alert_triggers(
     trace_id: &str,
     trigger: db::scheduler::Trigger,
@@ -1662,6 +1734,8 @@ async fn handle_alert_triggers(
             period_end_time: None,
             tolerance: 0,
             last_satisfied_at: None,
+            last_outcome: None,
+            last_outcome_at: None,
             delivery_silenced_until: None,
             last_notified_level: None,
             backfill_job: None,
@@ -1771,6 +1845,16 @@ async fn handle_alert_triggers(
                 .unwrap()
                 .num_microseconds()
                 .unwrap();
+
+    let last_states = if !alert.query_condition.multi_alert_enabled()
+        && alert.pending_period_sec > 0
+    {
+        load_tracked_group_states(&alert.get_unique_key()).await.inspect_err(|e|{
+            log::error!("[SCHEDULER trace_id {scheduler_trace_id}] alert {} error in getting alert state: {e}",trigger.module_key);
+        })?
+    } else {
+        Default::default()
+    };
 
     let mut should_store_last_end_time =
         alert.trigger_condition.frequency == (alert.trigger_condition.period * 60);
@@ -2115,6 +2199,98 @@ async fn handle_alert_triggers(
             let _ = is_multi_alert;
             false
         };
+
+        // for non multi alert, we need to check if it should move to pending state or firing state
+        // this only applies if the pending period > 0, for 0 pending period, always immediately
+        // transition to firing etc.
+        if !is_multi_alert && alert.pending_period_sec > 0 {
+            if let Some(last_state) = last_states.get("") {
+                match (last_state.last_outcome.as_ref(), last_state.since) {
+                    (None, _) | (Some(RunOutcome::Normal), _) => {
+                        // last state not recorded, so maybe first firing, or normal
+                        // so set to pending
+                        trigger_data_stream.status = RunOutcome::Pending;
+                        trigger_data.period_end_time = if should_store_last_end_time {
+                            Some(trigger_results.end_time)
+                        } else {
+                            None
+                        };
+                        new_trigger.data = json::to_string(&trigger_data).unwrap();
+                        db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                        // Condition matched; only the notification was
+                        // deduplicated away. State must reflect the firing.
+                        if let Some(alert_id) = alert.id.as_ref() {
+                            let _ = persist_alert_run_state(
+                                &alert,
+                                &alert_id.to_string(),
+                                &trigger_data_stream.status,
+                                eval_level,
+                                trigger_results.group_classification.as_ref(),
+                            )
+                            .await;
+                        }
+                        publish_triggers_usage(trigger_data_stream);
+                        return Ok(());
+                    }
+                    #[allow(clippy::collapsible_match)]
+                    (Some(RunOutcome::Pending), Some(last)) => {
+                        // last state was pending, so check if the the pending state exists for more
+                        // than pending seconds or not.
+                        if now - last < alert.pending_period_sec.saturating_mul(1_000_000) {
+                            trigger_data_stream.status = RunOutcome::Pending;
+                            trigger_data.period_end_time = if should_store_last_end_time {
+                                Some(trigger_results.end_time)
+                            } else {
+                                None
+                            };
+                            new_trigger.data = json::to_string(&trigger_data).unwrap();
+                            db::scheduler::update_trigger(new_trigger, true, &query_trace_id)
+                                .await?;
+                            // Condition matched; only the notification was
+                            // deduplicated away. State must reflect the firing.
+                            if let Some(alert_id) = alert.id.as_ref() {
+                                let _ = persist_alert_run_state(
+                                    &alert,
+                                    &alert_id.to_string(),
+                                    &trigger_data_stream.status,
+                                    eval_level,
+                                    trigger_results.group_classification.as_ref(),
+                                )
+                                .await;
+                            }
+                            publish_triggers_usage(trigger_data_stream);
+                            return Ok(());
+                        }
+                    }
+                    // for all other states, continue processing
+                    _ => {}
+                }
+            } else {
+                // last state not recorded, so maybe first firing, set it to pending
+                trigger_data_stream.status = RunOutcome::Pending;
+                trigger_data.period_end_time = if should_store_last_end_time {
+                    Some(trigger_results.end_time)
+                } else {
+                    None
+                };
+                new_trigger.data = json::to_string(&trigger_data).unwrap();
+                db::scheduler::update_trigger(new_trigger, true, &query_trace_id).await?;
+                // Condition matched; only the notification was
+                // deduplicated away. State must reflect the firing.
+                if let Some(alert_id) = alert.id.as_ref() {
+                    let _ = persist_alert_run_state(
+                        &alert,
+                        &alert_id.to_string(),
+                        &trigger_data_stream.status,
+                        eval_level,
+                        trigger_results.group_classification.as_ref(),
+                    )
+                    .await;
+                }
+                publish_triggers_usage(trigger_data_stream);
+                return Ok(());
+            }
+        }
 
         if grouping_enabled {
             #[cfg(feature = "enterprise")]
@@ -2508,6 +2684,22 @@ async fn handle_alert_triggers(
                 // Partial-destination failures reach the record too, even when
                 // the group counts as delivered.
                 trigger_data_stream.error = Some(dispatch.errors.join("; "));
+            }
+
+            if dispatch.delivered == 0 && dispatch.failed == 0 && dispatch.pending != 0 {
+                // this is when no group was fired, but some were pending,
+                // in which case mark the whole alert in pending state
+                trigger_data_stream.status = RunOutcome::Pending;
+                if let Some(alert_id) = alert.id.as_ref() {
+                    let _ = persist_alert_run_state(
+                        &alert,
+                        &alert_id.to_string(),
+                        &RunOutcome::Pending,
+                        eval_level,
+                        None,
+                    )
+                    .await;
+                }
             }
             // MN-6: a reservation is confirmed by its own group's delivery.
             // An unkeyed one falls back to "any delivery confirms".
@@ -6291,6 +6483,7 @@ mod tests {
                 name: "my_func".to_string(),
                 after_flatten: false,
                 num_args: 0,
+                raw_fn: None,
             }),
             0.0,
             0.0,
@@ -6432,5 +6625,72 @@ mod tests {
         let result = get_destination_stream_from_pipeline(&pipeline).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].stream_name.as_str(), "output-stream");
+    }
+
+    /// The alert list's only source for an anomaly's outcome, so the recorded
+    /// value must survive alongside the anomaly timestamp written beside it.
+    mod record_anomaly_outcome_tests {
+        use config::meta::triggers::ScheduledTriggerData;
+
+        use super::*;
+
+        fn trigger_with(data: &str) -> db::scheduler::Trigger {
+            db::scheduler::Trigger {
+                data: data.to_string(),
+                ..Default::default()
+            }
+        }
+
+        #[test]
+        fn records_the_outcome_onto_the_trigger_data() {
+            let mut trigger = trigger_with("{}");
+            record_anomaly_outcome(&mut trigger, &RunOutcome::Firing, 1_700);
+
+            let td = ScheduledTriggerData::from_json_string(&trigger.data).unwrap();
+            assert_eq!(td.last_outcome.as_deref(), Some("firing"));
+            assert_eq!(td.last_outcome_at, Some(1_700));
+        }
+
+        /// The detection path writes `last_satisfied_at` immediately before
+        /// this runs; losing it blanks the list's "last anomaly" column.
+        #[test]
+        fn preserves_the_rest_of_the_blob() {
+            let td = ScheduledTriggerData {
+                last_satisfied_at: Some(900),
+                tolerance: 42,
+                ..Default::default()
+            };
+            let mut trigger = trigger_with(&td.to_json_string());
+
+            record_anomaly_outcome(&mut trigger, &RunOutcome::Normal, 1_000);
+
+            let out = ScheduledTriggerData::from_json_string(&trigger.data).unwrap();
+            assert_eq!(out.last_satisfied_at, Some(900));
+            assert_eq!(out.tolerance, 42);
+            assert_eq!(out.last_outcome.as_deref(), Some("normal"));
+        }
+
+        /// Defaulting here would rewrite the blob and erase `last_satisfied_at`
+        /// — every 60s for an untrained config. Losing one update is cheaper.
+        #[test]
+        fn leaves_an_unparseable_blob_untouched() {
+            let mut trigger = trigger_with("{not json");
+            record_anomaly_outcome(&mut trigger, &RunOutcome::Error, 1_000);
+
+            assert_eq!(trigger.data, "{not json");
+        }
+
+        /// An errored run and an empty one are indistinguishable on the config
+        /// row, which is the whole reason the outcome is recorded.
+        #[test]
+        fn records_error_distinctly_from_normal() {
+            let mut trigger = trigger_with("{}");
+            record_anomaly_outcome(&mut trigger, &RunOutcome::Error, 1);
+            assert!(trigger.data.contains("\"error\""));
+
+            record_anomaly_outcome(&mut trigger, &RunOutcome::Normal, 2);
+            assert!(trigger.data.contains("\"normal\""));
+            assert!(!trigger.data.contains("\"error\""));
+        }
     }
 }

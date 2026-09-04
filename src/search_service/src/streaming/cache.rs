@@ -101,7 +101,7 @@ pub async fn write_results_to_cache(
             &c_resp.ts_column,
             start_time,
             end_time,
-            merged_response,
+            &merged_response,
             c_resp.file_path.clone(),
             c_resp.is_aggregate,
             c_resp.is_descending,

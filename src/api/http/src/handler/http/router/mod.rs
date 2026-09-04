@@ -32,7 +32,8 @@ use openobserve_api_management::request::cloud;
 use openobserve_api_management::request::profiling;
 use openobserve_api_management::request::{
     alerts, announcements, authz, dashboards, db_monitoring, folders, kv, model_pricing,
-    organization, service_accounts, short_url, slos, sourcemaps, status, stream, synthetics, users,
+    organization, service_accounts, short_url, slos, sourcemaps, status, status_pages, stream,
+    synthetics, users,
 };
 use openobserve_api_pipelines::request::{enrichment_table, functions, pipeline, pipelines};
 use openobserve_api_search::{promql, search, traces};
@@ -54,9 +55,9 @@ use {
         config::get_config as get_o2_config,
     },
     openobserve_api_management::request::{
-        actions, ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
-        domain_management, eval_jobs, experiments, gen_ai, keys, license, providers, remote_tasks,
-        score_configs, scorers, service_streams, workflows,
+        ai, annotation_queues, annotations, anomaly_detection, datasets, discovery,
+        domain_management, eval_jobs, experiments, gen_ai, keys, license, playground, providers,
+        remote_tasks, score_configs, scorers, service_streams, workflows,
     },
     openobserve_api_pipelines::request::re_pattern,
     openobserve_api_search::search::patterns,
@@ -699,6 +700,33 @@ pub fn basic_routes() -> Router {
             alerts::external_events::MAX_BODY_BYTES,
         ));
 
+    // Public status pages — unauthenticated by design, like chart_render
+    // above: existence and visibility are checked inside the handler, and the
+    // handlers are pure meta-store point-reads (no search, storage, or
+    // cross-node calls on this plane).
+    if get_config().synthetics.enabled {
+        router = router
+            .route(
+                "/api/status_pages_public/{slug}",
+                get(status_pages::public::snapshot),
+            )
+            // Password unlock — unauthenticated by design (in-handler crypto +
+            // rate-limit), same plane as the read routes.
+            .route(
+                "/api/status_pages_public/{slug}/auth",
+                post(status_pages::public::auth),
+            )
+            .route(
+                "/api/status_pages_public/{slug}/badge.svg",
+                get(status_pages::public::badge),
+            )
+            .route(
+                "/api/status_pages_public/{slug}/feed.xml",
+                get(status_pages::public::feed),
+            )
+            .route("/status/{slug}", get(status_pages::public::page));
+    }
+
     router
 }
 
@@ -1205,6 +1233,10 @@ pub fn service_routes() -> Router {
                         .delete(experiments::clear_experiment_baseline),
                 )
                 .route(
+                    "/{org_id}/experiments/{experiment_id}/rows",
+                    get(experiments::list_experiment_result_rows),
+                )
+                .route(
                     "/{org_id}/experiments/{experiment_id}/rows/{row_id}",
                     get(experiments::get_experiment_row),
                 )
@@ -1277,6 +1309,12 @@ pub fn service_routes() -> Router {
                 .route("/{org_id}/scorers/{entity_id}/versions", get(scorers::list_scorer_versions))
                 .route("/{org_id}/scorers/{entity_id}", get(scorers::get_scorer).put(scorers::update_scorer).delete(scorers::delete_scorer))
 
+                // Playground (Phase 3.1)
+                .route("/{org_id}/playground/run", post(playground::run_playground_cell))
+                .route("/{org_id}/playground/score", post(playground::score_playground_cell))
+                .route("/{org_id}/playground/snapshots", post(playground::share_playground_snapshot))
+                .route("/{org_id}/playground/snapshots/{snapshot_id}", get(playground::get_playground_snapshot))
+
                 // Online Eval Jobs (Online Eval Phase 2)
                 // NOTE: /activate, /pause, /resume, /archive must precede /{job_id}
                 .route("/{org_id}/eval_jobs", get(eval_jobs::list_eval_jobs).post(eval_jobs::create_eval_job))
@@ -1312,16 +1350,6 @@ pub fn service_routes() -> Router {
             .route("/{org_id}/cipher_keys", get(keys::list).post(keys::save))
             .route("/{org_id}/cipher_keys/bulk", delete(keys::delete_bulk))
             .route("/{org_id}/cipher_keys/{key_name}", get(keys::get).put(keys::update).delete(keys::delete))
-
-            // Actions
-            .route("/{org_id}/actions", get(actions::action::list_actions))
-            .route("/{org_id}/actions/upload", post(actions::action::upload_zipped_action))
-            .route("/{org_id}/actions/bulk", delete(actions::action::delete_action_bulk))
-            .route("/{org_id}/actions/{action_id}", get(actions::action::get_action_from_id).put(actions::action::update_action_details).delete(actions::action::delete_action))
-            .route("/{org_id}/actions/download/{action_id}", get(actions::action::serve_action_zip))
-            .route("/{org_id}/actions/pause/{action_id}", get(actions::operations::pause_action))
-            .route("/{org_id}/actions/resume/{action_id}", get(actions::operations::resume_action))
-            .route("/{org_id}/actions/test/{action_id}", post(actions::operations::test_action))
 
             // Rate limits
             .route("/{org_id}/ratelimit/api_modules", get(ratelimit::api_modules))
@@ -1438,6 +1466,65 @@ pub fn service_routes() -> Router {
             )
             .route("/{org_id}/synthetics/jobs/upload", post(synthetics::job_upload));
 
+        // Status pages — authenticated admin CRUD (the public read plane lives
+        // in basic_routes, not here). Ships with synthetics, no separate
+        // toggle. RBAC is enforced by the OpenFGA route-permission middleware
+        // (resource "status_page"); the per-mapped-check folder-authz is
+        // in-handler (R-1).
+        router = router
+            .route(
+                "/{org_id}/status_pages",
+                get(status_pages::admin::list_pages).post(status_pages::admin::create_page),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}",
+                get(status_pages::admin::get_page)
+                    .put(status_pages::admin::update_page)
+                    .delete(status_pages::admin::delete_page),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/components",
+                put(status_pages::admin::set_components),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/rotate_slug",
+                post(status_pages::admin::rotate_slug),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/preview",
+                get(status_pages::admin::preview),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/notices",
+                get(status_pages::admin::list_page_notices)
+                    .post(status_pages::admin::create_notice),
+            )
+            .route(
+                "/{org_id}/status_pages/notices/{nid}",
+                put(status_pages::admin::update_notice).delete(status_pages::admin::delete_notice),
+            )
+            .route(
+                "/{org_id}/status_pages/notices/{nid}/updates",
+                get(status_pages::admin::list_notice_updates)
+                    .post(status_pages::admin::add_notice_update),
+            )
+            .route(
+                "/{org_id}/status_pages/notices/{nid}/mark_false_positive",
+                post(status_pages::admin::mark_false_positive),
+            )
+            .route(
+                "/{org_id}/status_pages/{id}/domains",
+                get(status_pages::admin::list_domains).post(status_pages::admin::create_domain),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/{did}",
+                delete(status_pages::admin::delete_domain),
+            )
+            .route(
+                "/{org_id}/status_pages/domains/{did}/verify",
+                post(status_pages::admin::verify_domain),
+            );
+
         // The private-VPC-agent path, and the only part of synthetics that
         // is enterprise. Not registered at all in an OSS build, so these
         // 404 rather than 403 — the endpoints do not exist there.
@@ -1471,6 +1558,15 @@ pub fn service_routes() -> Router {
     #[cfg(feature = "cloud")]
     {
         router = router
+            // Authorized by ROUTE_PERMISSIONS in o2-enterprise; without those rows enterprise auth 403s these for non-root users.
+            .route(
+                "/{org_id}/alerts/destinations/slack/oauth/start",
+                post(alerts::slack_oauth::start),
+            )
+            .route(
+                "/{org_id}/alerts/destinations/slack/oauth/exchange",
+                post(alerts::slack_oauth::exchange),
+            )
             .route(
                 "/{org_id}/invites",
                 get(organization::org::get_org_invites)
@@ -1509,9 +1605,12 @@ pub fn service_routes() -> Router {
                 get(cloud::billings::create_billing_portal_session),
             )
             .route("/{org_id}/ai/usage", get(cloud::billings::get_ai_usage))
+            // Pool-generic limit route. Replaced `/ai/usage_limit`, which was
+            // removed with it: one route, one ROUTE_PERMISSIONS entry, and no
+            // endpoint left that resolve_permission cannot authorize.
             .route(
-                "/{org_id}/ai/usage_limit",
-                put(organization::org::set_ai_usage_limit),
+                "/{org_id}/quota/{pool}/usage_limit",
+                put(organization::org::set_quota_usage_limit),
             )
             .route(
                 "/{org_id}/billings/data_usage/{usage_date}",
@@ -1707,7 +1806,7 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
         .layer(DefaultBodyLimit::max(cfg.limit.req_payload_limit));
 
     // Apply base_uri if configured
-    if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
+    let mut outer = if cfg.common.base_uri.is_empty() || cfg.common.base_uri == "/" {
         app
     } else {
         // In axum 0.8, nest("/abc", app) maps the inner "/" route to exactly "/abc",
@@ -1722,7 +1821,18 @@ pub fn create_app_router(ui_routes: fn(&str) -> Router) -> Router {
             );
         }
         outer
+    };
+
+    // Must be the LAST `.layer()` call in this function: `Router::layer` only
+    // wraps routes that exist at call time, so this has to come after the
+    // "/" redirect, "/web" mount, and base_uri trailing-slash redirect above
+    // or a custom domain's Host falls through to those unchecked.
+    if config::get_config().synthetics.enabled {
+        outer = outer.layer(middleware::from_fn(
+            status_pages::public::host_route_middleware,
+        ));
     }
+    outer
 }
 
 #[cfg(test)]
@@ -2203,5 +2313,49 @@ mod tests {
                 "unexpected challenge: {v}"
             );
         }
+    }
+
+    // Pins the half of the a36fcfc537 layer ordering that custom domains must not break.
+    #[tokio::test]
+    async fn root_still_redirects_to_web_on_an_unclaimed_host() {
+        let app = create_app_router(|_| Router::new());
+
+        let req = Request::builder()
+            .uri("/")
+            .header(header::HOST, "localhost")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::PERMANENT_REDIRECT);
+        assert_eq!(
+            response
+                .headers()
+                .get(header::LOCATION)
+                .and_then(|v| v.to_str().ok()),
+            Some("/web/")
+        );
+    }
+
+    // The a36fcfc537 ordering is what lets a claimed Host serve `/` instead of 308ing to /web/.
+    #[tokio::test]
+    async fn the_outermost_layer_intercepts_root_ahead_of_the_web_redirect() {
+        let app = create_app_router(|_| Router::new()).layer(middleware::from_fn(
+            |req: axum::extract::Request, next: middleware::Next| async move {
+                if req.uri().path() == "/" {
+                    return (StatusCode::OK, "intercepted").into_response();
+                }
+                next.run(req).await
+            },
+        ));
+
+        let req = Request::builder()
+            .uri("/")
+            .header(header::HOST, "claimed.example.com")
+            .body(Body::empty())
+            .unwrap();
+
+        let response = app.oneshot(req).await.unwrap();
+        assert_eq!(response.status(), StatusCode::OK);
     }
 }

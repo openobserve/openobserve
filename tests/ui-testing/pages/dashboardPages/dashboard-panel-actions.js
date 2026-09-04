@@ -33,6 +33,8 @@ export default class DashboardactionPage {
     // cells (data-test="o2-table-th-<colId>") used for sort / pivot-total checks.
     this.tableHeaderCells = page.locator('[data-test="dashboard-panel-table"] thead tr th');
     this.tableThCells = page.locator('[data-test^="o2-table-th-"]');
+    // Per-cell copy button revealed on hover over a rendered table cell.
+    this.tableCellCopyBtn = page.locator("[data-test^='dashboard-table-cell-copy-']");
 
     // Rendered chart bar + the per-panel edit dropdown/menu, used to reopen a
     // saved panel in edit mode from the dashboard view.
@@ -79,6 +81,11 @@ export default class DashboardactionPage {
     return this.tableDataRow;
   }
 
+  // Returns the first per-cell copy button (revealed on hovering a table cell)
+  getFirstTableCellCopyButton() {
+    return this.tableCellCopyBtn.first();
+  }
+
   // Returns the nth data cell (data-test="o2-table-cell-<columnId>") of the first data row.
   // Excludes the nested o2-table-cell-copy-* / o2-table-cell-hover-actions-* elements,
   // which share the o2-table-cell- prefix but are not data cells.
@@ -89,11 +96,6 @@ export default class DashboardactionPage {
         '[data-test^="o2-table-cell-"]:not([data-test^="o2-table-cell-copy-"]):not([data-test^="o2-table-cell-hover-actions-"])'
       )
       .nth(index);
-  }
-
-  //Click discard panel button
-  async discardPanel() {
-    await this.discardPanelBtn.click();
   }
 
   //Verify no-data element is visible

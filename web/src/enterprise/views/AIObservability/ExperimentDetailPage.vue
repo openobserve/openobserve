@@ -27,7 +27,7 @@
         {{ t("aiObservability.experiments.cancel") }}
       </OButton>
       <OButton
-        v-else-if="failedSlotCount > 0"
+        v-else-if="detail?.experiment.status === 'failed' || failedSlotCount > 0"
         size="sm"
         variant="outline"
         :disabled="acting"
@@ -112,7 +112,17 @@
           :key="card.key"
           :label="card.label"
           :icon="card.icon"
+          :as="isMetricCardActionable(card) ? 'button' : 'div'"
+          :type="isMetricCardActionable(card) ? 'button' : undefined"
+          :aria-pressed="isMetricCardActionable(card) ? highDispersionOnly : undefined"
+          :class="{
+            'focus-visible:ring-button-outline-hover-border cursor-pointer text-left focus-visible:ring-3':
+              isMetricCardActionable(card),
+            'ring-button-outline-hover-border ring-2':
+              isMetricCardActionable(card) && highDispersionOnly,
+          }"
           :data-test="card.dataTest"
+          @click="handleMetricCardClick(card)"
         >
           <template #value>
             <span class="text-text-secondary text-2xl leading-none font-bold">
@@ -130,10 +140,10 @@
 
       <div class="min-h-0 flex-1 overflow-hidden">
         <OTable
-          :data="visibleSlots"
+          :data="visibleRows"
           :columns="columns"
-          row-key="slotKey"
-          :loading="loading"
+          row-key="rowKey"
+          :loading="loading || rowsLoading"
           :show-global-filter="false"
           :default-columns="false"
           :enable-column-resize="true"
@@ -150,7 +160,13 @@
               <OInput
                 v-model="rowSearch"
                 class="min-w-0 flex-1"
-                :placeholder="t('aiObservability.experiments.detail.searchPlaceholder')"
+                :placeholder="
+                  t(
+                    isMultiTrial
+                      ? 'aiObservability.experiments.detail.searchInputPlaceholder'
+                      : 'aiObservability.experiments.detail.searchPlaceholder',
+                  )
+                "
                 clearable
                 data-test="ai-experiment-detail-search"
               />
@@ -164,6 +180,19 @@
                 clearable
                 data-test="ai-experiment-detail-status-filter"
               />
+              <OButton
+                v-if="isMultiTrial"
+                class="shrink-0"
+                size="sm-toolbar"
+                variant="outline"
+                icon-left="swap-vert"
+                :active="sortByDispersion"
+                :aria-pressed="sortByDispersion"
+                data-test="ai-experiment-detail-sort-dispersion"
+                @click="toggleDispersionSort"
+              >
+                {{ t("aiObservability.experiments.detail.sortByDispersion") }}
+              </OButton>
             </div>
           </template>
 
@@ -183,9 +212,9 @@
           <template #cell-slotStatus="{ row }: { row: any }">
             <OTag
               size="sm"
-              :variant="statusVariant(row.taskStatus, 'eval').variant"
-              :label="statusVariant(row.taskStatus, 'eval').label"
-              :data-test="`ai-experiment-slot-status-${row.slotKey}`"
+              :variant="statusVariant(row.status, 'eval').variant"
+              :label="statusVariant(row.status, 'eval').label"
+              :data-test="`ai-experiment-row-status-${row.rowKey}`"
             />
           </template>
 
@@ -199,8 +228,41 @@
             </span>
           </template>
 
+          <template #cell-trialCount="{ row }: { row: any }">
+            <span class="text-text-secondary">{{ raw(row.trialLabel) }}</span>
+          </template>
+
+          <template #cell-dispersion="{ row }: { row: any }">
+            <OTag
+              v-if="row.highDispersion"
+              size="sm"
+              variant="warning"
+              :label="
+                raw(
+                  `${t('aiObservability.experiments.detail.highDispersionBadge')} · ${row.dispersionLabel}`,
+                )
+              "
+            />
+            <span v-else class="text-text-secondary">{{ raw(row.dispersionLabel) }}</span>
+          </template>
+
           <template #cell-latency="{ row }: { row: any }">
             <span class="text-text-secondary">{{ raw(row.latency) }}</span>
+          </template>
+
+          <!-- Only boolean scores with a configured healthy value ever set
+               row.violations[id] — everything else (numeric, categorical, or
+               a boolean with no healthy value set yet) renders exactly as
+               before: plain text, no false "everything is fine" green. -->
+          <template v-for="id in scorerIds" :key="id" #[`cell-score:${id}`]="{ row }: { row: any }">
+            <OTag
+              v-if="row.violations[id]"
+              size="sm"
+              variant="error"
+              :label="raw(row[`score:${id}`])"
+              :data-test="`ai-experiment-score-violation-${row.rowKey}-${id}`"
+            />
+            <span v-else class="text-text-secondary">{{ raw(row[`score:${id}`]) }}</span>
           </template>
 
           <template #empty>
@@ -254,19 +316,30 @@ import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import onlineEvalsService, { type ScoreConfig } from "@/services/online-evals.service";
+import { healthyBooleanValue } from "@/enterprise/components/onlineEvals/utils/qualitySummary";
 import llmExperimentsService, {
   type ExperimentDetail,
   type ExperimentExecution,
+  type ExperimentResultRow,
+  type ExperimentResultRowSort,
   type ExperimentResultSlot,
   type ExperimentRowDetail,
 } from "@/services/llm-experiments.service";
 import ExperimentRowDetailDrawer from "@/enterprise/components/AIObservability/ExperimentRowDetailDrawer.vue";
 import {
   aiExperimentCompareRoute,
+  aiExperimentCreateRoute,
   aiExperimentDetailRoute,
   aiExperimentsRoute,
 } from "./experimentRoutes";
-import { experimentScoreValue, openExperimentTrace } from "./experimentResults";
+import { canCloneInForm } from "@/enterprise/components/AIObservability/ExperimentForm.schema";
+import {
+  durationLabel,
+  durationUnit,
+  formatDuration,
+} from "@/enterprise/components/AIObservability/experimentRowContent";
+import { experimentScoreSummaryValue, openExperimentTrace } from "./experimentResults";
 
 defineOptions({ name: "AIExperimentDetailPage" });
 
@@ -279,15 +352,15 @@ const orgId = computed<string>(() => store.state.selectedOrganization?.identifie
 const experimentId = computed<string>(() => String(route.params.id ?? ""));
 const detail = ref<ExperimentDetail | null>(null);
 const loading = ref(false);
+const rowsLoading = ref(false);
 const acting = ref(false);
 const comparePickerOpen = ref(false);
-// Meant to fetch the whole run in one request, so the search box and the status
-// filter below cover every slot. Pinned to the server's current
-// MAX_RESULT_PAGE_SIZE until that cap is lifted — while it stands, both controls
-// only see the first page of a longer run.
-const ALL_RESULTS_PAGE_SIZE = 50;
+const RESULTS_PAGE_SIZE = 100;
+const resultRows = ref<ExperimentResultRow[]>([]);
 const rowSearch = ref("");
 const statusFilter = ref("");
+const sortByDispersion = ref(false);
+const highDispersionOnly = ref(false);
 const rowDrawerOpen = ref(false);
 const retryingRow = ref(false);
 const selectedRowDetail = ref<ExperimentRowDetail | null>(null);
@@ -296,11 +369,43 @@ const backTarget = computed(() => ({
   label: t("aiObservability.nav.experiments"),
   to: aiExperimentsRoute(orgId.value),
 }));
-const slots = computed<ExperimentResultSlot[]>(() => detail.value?.results.slots ?? []);
+const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) > 1);
 
 /** Scorer columns come from the pinned scorers, so a run with two scorers gets
  *  two score columns exactly like the dataset grouping on the list page. */
 const scorerIds = computed(() => (detail.value?.preview.pinnedScorers ?? []).map((s) => s.id));
+
+// Fetched once per org, not re-fetched on every refresh() — Score Configs
+// change far less often than an Experiment's results.
+const scoreConfigs = ref<ScoreConfig[]>([]);
+async function loadScoreConfigs() {
+  if (!orgId.value) return;
+  try {
+    scoreConfigs.value = await onlineEvalsService.scoreConfigs.list(orgId.value);
+  } catch {
+    // Non-fatal: without configs, boolean cells just render unhighlighted —
+    // same as before this feature existed.
+    scoreConfigs.value = [];
+  }
+}
+
+/** scorerId -> the healthy boolean for its produced Score Config, when that
+ *  config is boolean-typed and has one configured. `undefined` means "don't
+ *  know" (non-boolean, no config found, or no healthy value set) — the cell
+ *  renders plain in that case rather than guessing. */
+const scorerHealthyBoolean = computed<Record<string, boolean | undefined>>(() => {
+  const map: Record<string, boolean | undefined> = {};
+  for (const summary of detail.value?.results.scoreSummaries ?? []) {
+    if (!summary.scoreConfigId) continue;
+    const config = scoreConfigs.value.find(
+      (c) => c.entityId === summary.scoreConfigId || c.id === summary.scoreConfigId,
+    );
+    if (!config) continue;
+    const healthy = healthyBooleanValue(config);
+    if (healthy !== null) map[summary.scorerId] = healthy;
+  }
+  return map;
+});
 
 /** Score summaries carry the pinned Score Config name even before the first
  *  Score exists. Completed Score records remain a compatibility fallback. */
@@ -318,31 +423,59 @@ const scorerNames = computed<Record<string, string>>(() => {
     }
   }
   for (const score of detail.value?.results.scores ?? []) record(score);
-  for (const slot of slots.value) {
-    for (const entry of slot.scores) record(entry.score as Record<string, unknown> | undefined);
-  }
   return names;
 });
 
-const slotRows = computed(() =>
-  slots.value.map((slot) => {
+const tableRows = computed(() =>
+  resultRows.value.map((row) => {
     const scores: Record<string, string> = {};
+    // Which score columns are a violated boolean policy on THIS row — set
+    // only when the config's healthy value is known and this row disagrees
+    // with it, so a normal (non-boolean, or unconfigured) score never lights
+    // up red by accident.
+    const violations: Record<string, boolean> = {};
     for (const id of scorerIds.value) {
-      const entry = slot.scores.find((s) => s.scorerId === id);
-      scores[`score:${id}`] = entry?.status === "success" ? experimentScoreValue(entry.score) : "—";
+      const summary = row.scoreSummaries.find((candidate) => candidate.scorerId === id);
+      scores[`score:${id}`] = experimentScoreSummaryValue(summary?.value ?? null);
+      const healthy = scorerHealthyBoolean.value[id];
+      const aggregate = summary?.value as Record<string, unknown> | null | undefined;
+      if (healthy !== undefined && aggregate?.kind === "boolean") {
+        const trueCount = Number(aggregate.trueCount ?? aggregate.true_count ?? 0);
+        const falseCount = Number(aggregate.falseCount ?? aggregate.false_count ?? 0);
+        const unhealthyCount = healthy ? falseCount : trueCount;
+        if (unhealthyCount > 0) violations[id] = true;
+      }
     }
+    const maxDispersion = row.dispersion?.maxNormalized ?? null;
     return {
-      ...slot,
+      ...row,
       ...scores,
-      slotKey: `${slot.rowId}:${slot.trialIndex}`,
-      input: slot.input ?? "—",
-      output: slot.execution?.output ?? "—",
-      latency: slot.execution?.latencyMs == null ? "—" : `${slot.execution.latencyMs}ms`,
+      violations,
+      rowKey: row.rowId,
+      input: row.input ?? "—",
+      output: row.output ?? "—",
+      trialLabel: gt(
+        "aiObservability.experiments.detail.trialCount",
+        { count: row.trialCount },
+        row.trialCount,
+      ),
+      latency: durationLabel(row.p50LatencyMs),
+      dispersion: maxDispersion ?? -1,
+      dispersionLabel: maxDispersion === null ? "—" : `${Math.round(maxDispersion * 100)}%`,
+      highDispersion: row.dispersion?.high ?? false,
     };
   }),
 );
 
-const STATUS_FILTERS = ["pending", "in_progress", "ok", "skipped", "error"] as const;
+const STATUS_FILTERS = [
+  "pending",
+  "running",
+  "scoring",
+  "completed",
+  "skipped",
+  "task_failed",
+  "score_failed",
+] as const;
 
 const statusOptions = computed(() =>
   STATUS_FILTERS.map((status) => ({
@@ -351,12 +484,10 @@ const statusOptions = computed(() =>
   })),
 );
 
-// Every slot is loaded, so filtering here covers the whole run rather than the
-// page in view.
-const visibleSlots = computed(() => {
+const visibleRows = computed(() => {
   const term = rowSearch.value.trim().toLowerCase();
-  return slotRows.value.filter((row) => {
-    if (statusFilter.value && row.taskStatus !== statusFilter.value) return false;
+  return tableRows.value.filter((row) => {
+    if (statusFilter.value && row.status !== statusFilter.value) return false;
     if (!term) return true;
     return `${row.input} ${row.output}`.toLowerCase().includes(term);
   });
@@ -430,11 +561,15 @@ const metricCards = computed<MetricCard[]>(() => {
   // without bound (the API puts no cap on pinned scorers). Per-scorer values
   // live in the table columns.
   const cards: MetricCard[] = [];
+  // Seconds once past a second: a raw "10449" costs the reader the magnitude and
+  // overflows the tile. Unit rides beside the number, so it is never guessed at.
+  const p50 = aggregate?.p50LatencyMs ?? null;
+  const p50Unit = p50 === null ? undefined : durationUnit(p50);
   cards.push({
     key: "p50",
     label: t("aiObservability.experiments.detail.p50Latency"),
-    value: aggregate?.p50LatencyMs == null ? "—" : String(aggregate.p50LatencyMs),
-    unit: aggregate?.p50LatencyMs == null ? undefined : "ms",
+    value: p50 === null || p50Unit === undefined ? "—" : formatDuration(p50, p50Unit),
+    unit: p50Unit,
     icon: "speed" as IconName,
     dataTest: "ai-experiment-detail-p50",
   });
@@ -478,11 +613,27 @@ const metricCards = computed<MetricCard[]>(() => {
   return cards;
 });
 
+function isMetricCardActionable(card: MetricCard) {
+  return card.key === "dispersion" && isMultiTrial.value;
+}
+
+function toggleDispersionSort() {
+  sortByDispersion.value = !sortByDispersion.value;
+}
+
+function toggleHighDispersionFilter() {
+  highDispersionOnly.value = !highDispersionOnly.value;
+}
+
+function handleMetricCardClick(card: MetricCard) {
+  if (isMetricCardActionable(card)) toggleHighDispersionFilter();
+}
+
 const columns = computed<OTableColumnDef[]>(() => [
   {
     id: "slotStatus",
     header: t("aiObservability.experiments.detail.slotStatus"),
-    accessorKey: "taskStatus",
+    accessorKey: "status",
     sortable: true,
     size: COL.status,
     meta: { align: "left" as const },
@@ -496,14 +647,27 @@ const columns = computed<OTableColumnDef[]>(() => [
     minSize: 160,
     meta: { align: "left" as const, flex: true, isName: true },
   },
-  {
-    id: "output",
-    header: t("aiObservability.experiments.detail.columns.output"),
-    accessorKey: "output",
-    sortable: false,
-    size: 320,
-    meta: { align: "left" as const },
-  },
+  ...(isMultiTrial.value
+    ? [
+        {
+          id: "trialCount",
+          header: t("aiObservability.experiments.detail.columns.trials"),
+          accessorKey: "trialCount",
+          sortable: true,
+          size: 120,
+          meta: { align: "left" as const },
+        },
+      ]
+    : [
+        {
+          id: "output",
+          header: t("aiObservability.experiments.detail.columns.output"),
+          accessorKey: "output",
+          sortable: false,
+          size: 320,
+          meta: { align: "left" as const },
+        },
+      ]),
   ...scorerIds.value.map((id) => ({
     id: `score:${id}`,
     header: raw(scorerNames.value[id] ?? id),
@@ -513,9 +677,23 @@ const columns = computed<OTableColumnDef[]>(() => [
     size: 140,
     meta: { align: "left" as const },
   })),
+  ...(isMultiTrial.value
+    ? [
+        {
+          id: "dispersion",
+          header: t("aiObservability.experiments.detail.columns.dispersion"),
+          accessorKey: "dispersion",
+          sortable: true,
+          size: 130,
+          meta: { align: "left" as const },
+        },
+      ]
+    : []),
   {
     id: "latency",
-    header: t("aiObservability.experiments.detail.columns.latency"),
+    header: isMultiTrial.value
+      ? t("aiObservability.experiments.detail.columns.p50Latency")
+      : t("aiObservability.experiments.detail.columns.latency"),
     accessorKey: "latency",
     sortable: true,
     size: 120,
@@ -523,22 +701,72 @@ const columns = computed<OTableColumnDef[]>(() => [
   },
 ]);
 
+function resultRowOptions(page: number) {
+  const sort: ExperimentResultRowSort = sortByDispersion.value ? "dispersion_desc" : "dataset";
+  return {
+    page,
+    pageSize: RESULTS_PAGE_SIZE,
+    sort,
+    highDispersionOnly: highDispersionOnly.value,
+  };
+}
+
+async function fetchAllResultRows() {
+  const rows: ExperimentResultRow[] = [];
+  let page = 1;
+  let hasMore = true;
+  while (hasMore) {
+    const next = await llmExperimentsService.listRows(
+      orgId.value,
+      experimentId.value,
+      resultRowOptions(page),
+    );
+    rows.push(...next.rows);
+    hasMore = next.pagination.hasMore;
+    page += 1;
+  }
+  return rows;
+}
+
+function showLoadError(error: any) {
+  toast({
+    variant: "error",
+    message:
+      raw(error?.response?.data?.message) || t("aiObservability.experiments.detail.loadError"),
+  });
+}
+
+async function refreshRows() {
+  if (!orgId.value || !experimentId.value) return;
+  rowsLoading.value = true;
+  try {
+    resultRows.value = await fetchAllResultRows();
+  } catch (error: any) {
+    showLoadError(error);
+  } finally {
+    rowsLoading.value = false;
+  }
+}
+
 async function refresh() {
   if (!orgId.value || !experimentId.value) return;
   loading.value = true;
+  rowsLoading.value = true;
   try {
-    detail.value = await llmExperimentsService.get(orgId.value, experimentId.value, {
-      resultPage: 1,
-      resultPageSize: ALL_RESULTS_PAGE_SIZE,
-    });
+    const [nextDetail, rows] = await Promise.all([
+      llmExperimentsService.get(orgId.value, experimentId.value, {
+        resultPage: 1,
+        resultPageSize: 1,
+      }),
+      fetchAllResultRows(),
+    ]);
+    detail.value = nextDetail;
+    resultRows.value = rows;
   } catch (error: any) {
-    toast({
-      variant: "error",
-      message:
-        raw(error?.response?.data?.message) || t("aiObservability.experiments.detail.loadError"),
-    });
+    showLoadError(error);
   } finally {
     loading.value = false;
+    rowsLoading.value = false;
   }
 }
 
@@ -617,7 +845,15 @@ function openComparison(baselineId: string) {
   void router.push(aiExperimentCompareRoute(orgId.value, baselineId, experimentId));
 }
 
+// Opens the create form seeded from this run rather than starting a copy
+// outright: a clone costs a full execution, and it is normally made in order to
+// change something first.
 async function cloneExperiment() {
+  const task = detail.value?.experiment.task;
+  if (task && canCloneInForm(task)) {
+    void router.push(aiExperimentCreateRoute(orgId.value, { cloneOf: experimentId.value }));
+    return;
+  }
   acting.value = true;
   try {
     const clone = await llmExperimentsService.clone(orgId.value, experimentId.value);
@@ -653,4 +889,6 @@ async function runAction(
 }
 
 watch([orgId, experimentId], refresh, { immediate: true });
+watch([sortByDispersion, highDispersionOnly], refreshRows);
+watch(orgId, loadScoreConfigs, { immediate: true });
 </script>

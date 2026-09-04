@@ -63,9 +63,43 @@ export interface SessionDetailsApiResponse {
   total: number;
   from: number;
   size: number;
-  hits: any[];
+  hits: SessionDetailsApiHit[];
   trace_id?: string;
   function_error?: string;
+}
+
+/** Per-trace turn summary returned by the session-detail endpoint. */
+export interface SessionDetailsApiHit {
+  trace_id: string;
+  /** All distinct, non-empty user IDs found on spans in this trace. */
+  user_ids: string[];
+  start_time: number;
+  end_time: number;
+  duration: number;
+  spans: [number, number];
+  service_name: Array<{
+    service_name: string;
+    count: number;
+    duration: number;
+    service_type?: string;
+  }>;
+  first_event: {
+    service_name: string;
+    operation_name: string;
+  };
+  gen_ai_usage_input_tokens: number;
+  gen_ai_usage_output_tokens: number;
+  gen_ai_usage_total_tokens: number;
+  gen_ai_usage_cost: number;
+  gen_ai_usage_cache_read_input_tokens: number;
+  gen_ai_usage_cache_creation_input_tokens: number;
+  gen_ai_usage_cost_cache_read_input: number;
+  gen_ai_usage_cost_cache_creation_input: number;
+  gen_ai_usage_cost_estimated_without_cache: number;
+  gen_ai_usage_cost_cache_read_savings: number;
+  gen_ai_usage_cost_net_cache_impact: number;
+  gen_ai_input_messages?: unknown;
+  models: string[];
 }
 
 const sessions = {

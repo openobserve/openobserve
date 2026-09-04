@@ -74,6 +74,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @update:model-value="onNameChange"
           />
           <BetaBadge />
+          <OTag
+            v-if="workflowObj.currentSelectedWorkflow.isDraft"
+            variant="warning-soft"
+            size="sm"
+            :label="t('workflow.draft')"
+            data-test="workflow-editor-draft-tag"
+          />
         </span>
       </template>
       <!-- Name is editable on CREATE only; on edit it's shown read-only as the
@@ -82,17 +89,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            it's managed from the list, same as pipelines. -->
 
       <template #actions>
-        <!-- History (Runs) — only meaningful for a published, saved workflow.
-             Drafts have no run history by design, so it's hidden for them. -->
-        <OButton
-          v-if="workflowObj.isEditWorkflow && !workflowObj.currentSelectedWorkflow.isDraft"
-          variant="outline"
-          size="sm-action"
-          data-test="workflow-editor-history"
-          @click="openRuns"
+        <!-- Past-run chip — shown when a run is loaded onto the canvas (arrived via
+             "Fix This Step" or picked from History). Compact provenance in place of
+             the old full-width banner: the tooltip carries "edit freely — never
+             changed", and ✕ clears the run data. -->
+        <span
+          v-if="runOverlay"
+          data-test="workflow-editor-run-chip"
+          class="border-border-default text-text-secondary rounded-default inline-flex max-w-[16rem] shrink-0 items-center gap-1 border px-1.5 py-0.5 text-xs"
+          :title="t('workflow.runOverlay.banner', { run: runOverlay.runId })"
         >
-          {{ t("workflow.history.open") }}
-        </OButton>
+          <OIcon name="history" size="xs" class="shrink-0" />
+          <span class="truncate">{{ t("workflow.ndv.runLabel") }} · {{ runOverlay.runId }}</span>
+          <button
+            type="button"
+            data-test="workflow-editor-run-chip-clear"
+            class="text-text-secondary hover:text-text-body -mr-0.5 flex shrink-0 items-center"
+            :aria-label="t('workflow.runOverlay.clear')"
+            @click="clearRunOverlay"
+          >
+            <OIcon name="close" size="xs" />
+          </button>
+        </span>
+
+        <!-- History — published, saved workflows only (drafts have no runs). Opens
+             the runs list as a minified dropdown (same as the NDV: a titled header
+             with the refresh + "last refreshed" time built in), with "Open Full Runs
+             View" for the full inspection surface. Picking a run loads it. -->
+        <WorkflowRunSwitcher
+          v-if="showHistory"
+          :current-run-id="runOverlay?.runId || ''"
+          :org-id="orgId()"
+          :workflow-id="workflowObj.currentSelectedWorkflow.id || ''"
+          @select="switchEditorRun"
+        >
+          <template #trigger>
+            <OButton variant="outline" size="sm-action" data-test="workflow-editor-history">
+              {{ t("workflow.history.open") }}
+            </OButton>
+          </template>
+          <template #footer>
+            <button
+              type="button"
+              data-test="workflow-editor-open-runs-view"
+              class="text-accent flex w-full items-center justify-center text-xs font-medium hover:underline"
+              @click="openRuns"
+            >
+              {{ t("workflow.history.openFullView") }}
+            </button>
+          </template>
+        </WorkflowRunSwitcher>
         <OButton
           variant="outline"
           size="sm-action"
@@ -118,7 +164,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           size="sm-action"
           data-test="workflow-editor-save"
           :loading="saving"
-          :disabled="saving"
+          :disabled="saving || unchanged"
+          :title="unchanged ? t('workflow.noChangesToPublish') : undefined"
           @click="onSave"
         >
           {{ t("common.save") }}
@@ -168,15 +215,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            on the lighter `surface-subtle` slab, which is what made the two
            editors read as different shades. -->
       <div class="bg-surface-subtle relative min-w-0 flex-1 overflow-hidden dark:bg-transparent">
-        <!-- The results dock (T4) is a LAYOUT WRAPPER around the canvas: with no
-             Test result it renders the canvas full-size; once a run produces a
-             result it splits the space (canvas on top, results panel docked below,
-             draggable divider) so the graph stays visible — instead of the old
-             overlay drawer. The canvas is the dock's slot so the dock can place it
-             in the splitter's top pane. -->
-        <WorkflowResultsDock>
-          <WorkflowCanvas />
-        </WorkflowResultsDock>
+        <!-- Test results are inspected in the node's NDV (click a node's ✓/✗ badge),
+             so the canvas fills the space — no docked results panel. -->
+        <WorkflowCanvas />
       </div>
     </div>
 
@@ -242,20 +283,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <script setup lang="ts">
 import { computed, onMounted, onBeforeUnmount, ref } from "vue";
-import { useI18nTyped } from "@/types/i18n";
+import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import { useRouter, onBeforeRouteLeave, type RouteLocationRaw } from "vue-router";
 import { useStore } from "vuex";
 
 import OButton from "@/lib/core/Button/OButton.vue";
+import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OInlineEdit from "@/lib/forms/InlineEdit/OInlineEdit.vue";
 import OPageHeader from "@/lib/core/PageHeader/OPageHeader.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
 
 import WorkflowCanvas from "@/plugins/workflows/WorkflowCanvas.vue";
 import WorkflowNodeDrawer from "./WorkflowNodeDrawer.vue";
+import WorkflowRunSwitcher from "./WorkflowRunSwitcher.vue";
 import WorkflowTestDialog from "./WorkflowTestDialog.vue";
-import WorkflowResultsDock from "./WorkflowResultsDock.vue";
 import WorkflowLinkAlertsDialog from "./WorkflowLinkAlertsDialog.vue";
 import StepPickerDialog from "@/components/flow/StepPickerDialog.vue";
 import NodePalette from "@/components/flow/NodePalette.vue";
@@ -273,6 +316,13 @@ import useWorkflowCanvas, {
   markWorkflowDirty,
   reachableFrom,
   isNodeIncomplete,
+  structurallyBrokenNodes,
+  loadWorkflowRun,
+  humanizeNodeIds,
+  markNodesFromError,
+  captureStoredSnapshot,
+  isUnchangedFromStored,
+  clearTestData,
 } from "@/plugins/workflows/useWorkflowCanvas";
 import workflowService from "@/services/workflows";
 
@@ -295,10 +345,29 @@ const {
   addNodeAfter,
   addNodeOnEdge,
   addTriggerNode,
+  addActionFromStart,
   closeStepPicker,
   onDragStart,
   addNodeToEnd,
+  editNode,
 } = useWorkflowCanvas(t);
+
+// ── Run overlay (arriving from Runs history) ────────────────────────────────
+// A past run is loaded into the SAME `testRun.result` the canvas paints from, so
+// the editor shows the identical badges and per-node Input/Output — except the
+// workflow stays editable. `mode: "history"` is stamped only by loadWorkflowRun;
+// a real Test writes the same key WITHOUT it, so running a test drops the banner
+// on its own and the two data sources can never be confused.
+const runOverlay = computed(() =>
+  workflowObj.testRun.result?.mode === "history" ? workflowObj.testRun.result : null,
+);
+const clearRunOverlay = () => {
+  workflowObj.testRun.result = null;
+};
+// History is only meaningful for a published, saved workflow — drafts have no runs.
+const showHistory = computed(
+  () => workflowObj.isEditWorkflow && !workflowObj.currentSelectedWorkflow.isDraft,
+);
 
 // Docked palette items, grouped into sections (Transform / Destination) to
 // mirror the pipeline sidebar. The trigger is pre-placed and not addable, so
@@ -382,6 +451,9 @@ const onStepPick = (item: any) => {
   // The trigger has nothing before it, so it is placed rather than appended.
   if (mode === "trigger")
     addTriggerNode(item.nodeType || "workflow_trigger", item.trigger_kind, position);
+  // Empty-canvas scaffold's Action slot — the workflow's first step (appends after
+  // the trigger when one exists, else placed unconnected at the slot).
+  else if (mode === "action") addActionFromStart(item.key, position);
   // Insert-between (T7): splice the picked type onto the selected edge.
   else if (mode === "insert") addNodeOnEdge(edgeId, item.key);
   else addNodeAfter(source, handle, item.key);
@@ -481,6 +553,7 @@ const validate = ({
   requireName = true,
   requireGraph = true,
   allowOrphans = false,
+  blockGraphNoOp = false,
 }: {
   requireName?: boolean;
   requireGraph?: boolean;
@@ -488,69 +561,107 @@ const validate = ({
   // unwired/orphan steps — they're simply excluded from the run set. Save/Publish
   // keep the strict check (allowOrphans stays false).
   allowOrphans?: boolean;
+  // Save/Publish only: a Draft save is a checkpoint an author may repeat, and a
+  // Test never writes, so neither has anything to be a no-op against.
+  blockGraphNoOp?: boolean;
 } = {}): boolean => {
   const wf = workflowObj.currentSelectedWorkflow;
+  // Every blocker is reported on ONE click: fixing one and re-clicking only to meet
+  // the next is what made publishing feel like a guessing game.
+  const blockers: I18nText[] = [];
   if (requireName) {
     const name = (wf.name || "").trim();
-    if (!name) {
-      workflowObj.nameError = true;
-      toast({ message: t("workflow.nameRequired"), variant: "warning" });
-      return false;
-    }
-    workflowObj.nameError = false;
+    workflowObj.nameError = !name;
+    if (!name) blockers.push(t("workflow.nameRequired"));
   }
 
   // A draft may be an incomplete graph (no trigger yet, missing steps, orphan
   // nodes) — skip the connectivity checks so it can be saved as-is. The backend
   // re-runs full validation on Publish/promote.
-  if (!requireGraph) return true;
+  if (requireGraph) blockers.push(...graphBlockers(allowOrphans));
 
+  // Last, and only when nothing else blocks: a graph that already matches the
+  // stored version is not a change, and a 200 + "saved" would claim otherwise.
+  if (blockGraphNoOp && !blockers.length && isUnchangedFromStored()) {
+    blockers.push(t("workflow.noChangesToPublish"));
+  }
+
+  for (const message of blockers) toast({ message, variant: "warning" });
+  return blockers.length === 0;
+};
+
+// Graph blockers, all of them. A missing trigger short-circuits: with no entry
+// point every downstream check reports on a graph that cannot run at all.
+const graphBlockers = (allowOrphans: boolean): I18nText[] => {
+  const wf = workflowObj.currentSelectedWorkflow;
   const nodes = wf.nodes || [];
   const trigger = nodes.find((n: any) => n.data?.node_type === "workflow_trigger");
-  if (!trigger) {
-    toast({ message: t("workflow.triggerRequired"), variant: "warning" });
-    return false;
+  if (!trigger) return [t("workflow.triggerRequired")];
+
+  const found: I18nText[] = [];
+  const rung: string[] = [];
+
+  // Unrunnable WIRING (a Branch routing through handles it does not declare) is
+  // checked for Draft/Test/Publish alike: unlike `meta.incomplete` this does not
+  // mean "unfinished", it means the backend would reject the run mid-flight with a
+  // message naming raw uuids. Flag the nodes on the canvas the same way Publish does.
+  const brokenIds = structurallyBrokenNodes();
+  if (brokenIds.length) {
+    rung.push(...brokenIds);
+    found.push(t("workflow.branchPathsRequired", { count: brokenIds.length }, brokenIds.length));
   }
 
   // Test (allowOrphans): require only a trigger with at least one connected step;
   // unwired steps stay on the canvas and are skipped on the run.
   if (allowOrphans) {
     const reachable = reachableFrom(wf.edges || [], [trigger.id]);
-    if (reachable.size < 2) {
-      toast({ message: t("workflow.addStepRequired"), variant: "warning" });
-      return false;
-    }
-    return true;
+    if (reachable.size < 2) found.push(t("workflow.addStepRequired"));
+    workflowObj.incompleteHighlight = rung;
+    return found;
   }
 
-  if (nodes.length < 2) {
-    toast({ message: t("workflow.addStepRequired"), variant: "warning" });
-    return false;
-  }
+  if (nodes.length < 2) found.push(t("workflow.addStepRequired"));
 
   // Every non-trigger node must have an incoming edge.
   const targets = new Set((wf.edges || []).map((e: any) => e.target));
   const orphan = nodes.find((n: any) => n.id !== trigger.id && !targets.has(n.id));
-  if (orphan) {
-    toast({ message: t("workflow.connectAllNodes"), variant: "warning" });
-    return false;
-  }
+  if (orphan) found.push(t("workflow.connectAllNodes"));
 
-  // Publish-only (strict path — Test/allowOrphans and Draft/!requireGraph both
-  // return before here): a still-unfinished placeholder node (e.g. a Destination
-  // saved with no destination) can't be published. Draft + Test allow it.
-  const incomplete = nodes.find((n: any) => isNodeIncomplete(n));
-  if (incomplete) {
-    toast({ message: t("workflow.finishStepsBeforePublish"), variant: "warning" });
-    return false;
+  // Publish-only (Draft/!requireGraph never reaches here): a still-unfinished
+  // placeholder node (e.g. a Destination saved with no destination) can't be
+  // published. Draft + Test allow it.
+  const incompleteNodes = nodes.filter((n: any) => isNodeIncomplete(n));
+  if (incompleteNodes.length) {
+    // Show the user EXACTLY which steps block publishing: flash a warning ring on each
+    // (the canvas frames them — see WorkflowCanvas) instead of a vague "fill all steps".
+    rung.push(...incompleteNodes.map((n: any) => n.id));
+    found.push(
+      t(
+        "workflow.finishStepsBeforePublish",
+        { count: incompleteNodes.length },
+        incompleteNodes.length,
+      ),
+    );
   }
-  return true;
+  workflowObj.incompleteHighlight = rung;
+  return found;
 };
 
 // Create/update body: the backend `Workflow` object (built by the shared
 // serializer — same graph the Test run sends) plus a top-level `trigger_type`
 // (AlertFired | IncidentEvent) derived from the graph's trigger kind, defaulting
 // to AlertFired when no trigger is present.
+// A save/publish rejection names the offending node(s); surface the message with
+// real names AND flag those nodes on the canvas, so the author is not left
+// matching a uuid by eye.
+// Returns I18nText, not a bare string: the backend message is already human — it is
+// server copy, not a translation key — so it reaches toast() the same way raw() does.
+const reportGraphError = (e: any): I18nText => {
+  const msg = e?.response?.data?.message;
+  markNodesFromError(msg);
+  return raw(humanizeNodeIds(msg));
+};
+
 const buildPayload = () => {
   return {
     workflow: serializeWorkflow(),
@@ -564,7 +675,7 @@ const buildPayload = () => {
 // workflow is immediately editable/testable. Emits `saved` so the parent list
 // re-fetches (reaches WorkflowsList via its <router-view> slot binding).
 const persist = async (): Promise<boolean> => {
-  if (saving.value || !validate()) return false;
+  if (saving.value || !validate({ blockGraphNoOp: true })) return false;
   saving.value = true;
   const org = orgId();
   const data = buildPayload();
@@ -592,11 +703,12 @@ const persist = async (): Promise<boolean> => {
       toast({ message: t("workflow.createSuccess"), variant: "success" });
     }
     workflowObj.dirtyFlag = false;
+    captureStoredSnapshot();
     emit("saved");
     return true;
   } catch (e: any) {
     toast({
-      message: e?.response?.data?.message || t("workflow.saveError"),
+      message: reportGraphError(e) || t("workflow.saveError"),
       variant: "error",
     });
     return false;
@@ -639,6 +751,11 @@ const onLinkAlertsDone = () => {
   goBack();
 };
 
+// Nothing to save: the graph already matches what the server holds. Tracks the
+// live graph (not `dirtyFlag`), so undoing an edit back to the stored shape
+// re-disables Save instead of leaving a save that would write nothing.
+const unchanged = computed(() => isUnchangedFromStored());
+
 // A workflow already promoted to the workflows table: shows a single validated
 // Save. New workflows and drafts show Save-as-Draft + Publish instead.
 const isExistingPublished = computed(
@@ -676,12 +793,13 @@ const persistDraft = async (): Promise<boolean> => {
     }
     wf.isDraft = true;
     workflowObj.dirtyFlag = false;
+    captureStoredSnapshot();
     toast({ message: t("workflow.draftSaveSuccess"), variant: "success" });
     emit("saved");
     return true;
   } catch (e: any) {
     toast({
-      message: e?.response?.data?.message || t("workflow.saveError"),
+      message: reportGraphError(e) || t("workflow.saveError"),
       variant: "error",
     });
     return false;
@@ -705,6 +823,9 @@ const promoteDraft = async (): Promise<void> => {
   saving.value = true;
   const org = orgId();
   try {
+    // Badges are evidence about a draft rehearsal, not about production. Promoting
+    // with them attached makes a published workflow claim a run it never had.
+    clearTestData(wf.id);
     await workflowService.updateWorkflow({
       org_identifier: org,
       id: wf.id,
@@ -718,6 +839,7 @@ const promoteDraft = async (): Promise<void> => {
     });
     wf.isDraft = false;
     workflowObj.dirtyFlag = false;
+    captureStoredSnapshot();
     toast({ message: t("workflow.publishSuccess"), variant: "success" });
     emit("saved");
     // Freshly published — offer the same link-to-alerts prompt as a new create.
@@ -728,7 +850,7 @@ const promoteDraft = async (): Promise<void> => {
     goBack();
   } catch (e: any) {
     toast({
-      message: e?.response?.data?.message || t("workflow.publishError"),
+      message: reportGraphError(e) || t("workflow.publishError"),
       variant: "error",
     });
   } finally {
@@ -778,10 +900,59 @@ onMounted(async () => {
     // Edit-from-list already hydrated the shared state synchronously; only
     // re-fetch on a cold load (deep link / refresh) where it's missing.
     if (workflowObj.currentSelectedWorkflow?.id !== id) await loadWorkflow(id);
+    // Arrived from a run ("Fix This Step"). Must run AFTER the workflow is
+    // hydrated: loadWorkflowRun diffs the run against the current node list to
+    // find ghost steps, and resetWorkflowData nulls testRun.result.
+    await applyRunOverlay(
+      id,
+      query.run_id as string | undefined,
+      query.node_id as string | undefined,
+    );
   } else {
     startNewWorkflow();
   }
 });
+
+// Copy a past run onto the canvas, then open the step the user came to fix.
+// Read-only projection: nothing here writes back to the stored run.
+const applyRunOverlay = async (workflowId: string, runId?: string, nodeId?: string) => {
+  if (!runId) return;
+  const r = await loadWorkflowRun({ orgId: orgId(), workflowId, runId });
+  if (!r.ok) {
+    toast({
+      message: raw(r.error) || t("workflow.history.loadRunError"),
+      variant: "error",
+    });
+    return;
+  }
+  // Steps this run executed that the workflow no longer has: their badges have
+  // nowhere to render, so the run would look cleaner here than it actually was.
+  const ghosts = runOverlay.value?.ghostNodeIds?.length || 0;
+  if (ghosts) {
+    toast({
+      message: t("workflow.runOverlay.ghostNodes", { count: ghosts }, ghosts),
+      variant: "warning",
+    });
+  }
+  if (!nodeId) return;
+  const exists = (workflowObj.currentSelectedWorkflow.nodes || []).some(
+    (n: any) => n.id === nodeId,
+  );
+  if (exists) editNode(nodeId);
+  else toast({ message: t("workflow.runOverlay.missingNode"), variant: "warning" });
+};
+
+// Pick a run from the History dropdown → load it onto the canvas and reflect it in
+// the URL, so a refresh reloads the same run. No node is opened (unlike arriving via
+// "Fix This Step"); the user is switching which run's data the editor overlays.
+const switchEditorRun = async (runId: string) => {
+  const id = workflowObj.currentSelectedWorkflow?.id;
+  if (!id || !runId || runId === (runOverlay.value?.runId || "")) return;
+  await applyRunOverlay(id, runId);
+  router.replace({
+    query: { ...router.currentRoute.value.query, run_id: runId },
+  });
+};
 
 onBeforeUnmount(() => {
   window.removeEventListener("beforeunload", beforeUnloadHandler);

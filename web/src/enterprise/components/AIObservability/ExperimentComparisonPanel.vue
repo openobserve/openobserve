@@ -2,65 +2,18 @@
 
 <template>
   <div class="flex h-full min-h-0 flex-col" data-test="ai-experiment-comparison">
-    <!-- A fixed tile set: cost and latency are one each, and the score-dimension
-         tiles summarise every configured dimension in constant space. -->
-    <KpiCardRow v-if="tiles.length" class="px-page-edge shrink-0 py-2.5">
-      <KpiCard
-        v-for="tile in tiles"
-        :key="tile.key"
-        :label="tile.label"
-        :icon="tile.icon"
-        :data-test="tile.dataTest"
-      >
-        <template #value>
-          <span class="text-text-secondary text-2xl leading-none font-bold">
-            {{ tile.primary }}
-          </span>
-          <template v-if="tile.secondary">
-            <OIcon name="arrow-right-alt" size="sm" class="text-text-tertiary" />
-            <span class="text-text-secondary text-2xl leading-none font-bold">
-              {{ tile.secondary }}
-            </span>
-          </template>
-          <span
-            v-if="tile.unit"
-            class="text-compact text-text-secondary font-semibold"
-            :data-test="`${tile.dataTest}-unit`"
-          >
-            {{ tile.unit }}
-          </span>
-          <OTag
-            v-if="tile.delta"
-            size="sm"
-            icon=""
-            :variant="tile.delta.variant"
-            :label="tile.delta.label"
-            :data-test="`${tile.dataTest}-delta`"
-          />
-        </template>
-        <template #footer>
-          <span v-if="tile.caption" class="text-3xs text-text-tertiary font-medium">
-            {{ tile.caption }}
-          </span>
-          <span
-            v-if="tile.warning"
-            class="text-3xs text-warning font-medium"
-            :data-test="`${tile.dataTest}-warning`"
-          >
-            {{ tile.warning }}
-          </span>
-        </template>
-      </KpiCard>
-    </KpiCardRow>
-
     <div class="min-h-0 flex-1 overflow-hidden">
       <OTable
         :data="visibleRows"
         :columns="comparisonColumns"
         row-key="logicalId"
-        pagination="none"
+        pagination="client"
+        :page-size="20"
         :default-columns="false"
         :show-global-filter="false"
+        :enable-column-resize="true"
+        :persist-columns="true"
+        table-id="ai-experiment-comparison-rows"
         data-test="ai-experiment-comparison-rows"
         @row-click="(row: ExperimentComparisonRow) => $emit('inspect', row, visibleRows)"
       >
@@ -103,6 +56,16 @@
           <OTag size="sm" icon="" :variant="bucketVariant(row.bucket)" :label="bucketLabel(row)" />
         </template>
 
+        <template #cell-input="{ row }">
+          <span
+            class="text-text-body block truncate text-xs"
+            :title="raw(displayRowInput(row.input))"
+            data-test="ai-experiment-comparison-row-input"
+          >
+            {{ displayRowInput(row.input) }}
+          </span>
+        </template>
+
         <template
           v-for="dimension in comparison.dimensions"
           :key="dimensionColumnId(dimension)"
@@ -115,7 +78,7 @@
               size="sm"
               icon=""
               :variant="deltaVariant(rowDimension(row, dimension)!)"
-              :label="signed(rowDimension(row, dimension)!.delta)"
+              :label="deltaLabel(rowDimension(row, dimension)!)"
             />
           </div>
         </template>
@@ -125,11 +88,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, h, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
-import KpiCard from "@/components/common/KpiCard.vue";
-import KpiCardRow from "@/components/common/KpiCardRow.vue";
-import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
@@ -139,7 +99,12 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import OTable from "@/lib/core/Table/OTable.vue";
 import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
-import { dimensionIdentity, dimensionLabel } from "./experimentRowContent";
+import ExperimentDimensionHeader from "./ExperimentDimensionHeader.vue";
+import {
+  dimensionIdentity,
+  dimensionMovementCounts,
+  dimensionSideValue,
+} from "./experimentRowContent";
 import type {
   ExperimentComparison,
   ExperimentComparisonBucket,
@@ -239,135 +204,6 @@ function selectThreshold(next: SelectModelValue) {
   }
 }
 
-interface Tile {
-  key: string;
-  label: I18nText;
-  /** Chip glyph, top-right — the same icons the Experiment detail cards use. */
-  icon: IconName;
-  /** Small suffix after the value, e.g. "ms". */
-  unit?: I18nText;
-  /** The large value. For a pair tile this is the baseline side. */
-  primary: I18nText;
-  /** Present only on pair tiles — renders after the arrow. */
-  secondary?: I18nText;
-  delta?: { label: I18nText; variant: BadgeVariant };
-  /** Single caption under the value — what the number measures or covers. */
-  caption?: I18nText;
-  warning?: I18nText;
-  dataTest: string;
-}
-
-const scoreDimensions = computed(() =>
-  props.comparison.dimensions.filter((dimension) => dimension.kind === "score"),
-);
-
-const regressedDimensionCount = computed(
-  () => scoreDimensions.value.filter((dimension) => dimension.assignment === "regressed").length,
-);
-
-// `orientedDelta` is a fraction of the configured range for some dimensions and raw
-// units for others, so ranking across both would compare unlike numbers. Rank
-// inside the normalized set whenever there is one.
-const weakestDimension = computed(() => {
-  const ranked = scoreDimensions.value.filter((dimension) => dimension.orientedDelta !== null);
-  if (!ranked.length) return null;
-  const normalized = ranked.filter((dimension) => dimension.normalized);
-  const pool = normalized.length ? normalized : ranked;
-  return pool.reduce((worst, dimension) =>
-    (dimension.orientedDelta ?? 0) < (worst.orientedDelta ?? 0) ? dimension : worst,
-  );
-});
-
-/** Cost and latency, rendered whether or not the run recorded them — a missing
- *  cost is itself worth seeing, and a tile that vanishes says nothing. */
-const INTRINSIC_ICONS: Record<"cost" | "latency", IconName> = {
-  cost: "payments",
-  latency: "speed",
-};
-
-function money(value: number) {
-  return `$${format(value)}`;
-}
-
-function intrinsicTile(kind: "cost" | "latency", label: I18nText, dataTest: string): Tile {
-  const icon = INTRINSIC_ICONS[kind];
-  const dimension = props.comparison.dimensions.find((entry) => entry.kind === kind);
-  if (!dimension) {
-    return { key: kind, label, icon, primary: raw("—"), dataTest };
-  }
-  const show = (value: number | null) =>
-    value === null ? raw("—") : raw(kind === "cost" ? money(value) : format(value));
-  const showDelta = (value: number) =>
-    raw(kind === "cost" ? `${value > 0 ? "+" : "-"}${money(Math.abs(value))}` : signed(value));
-  return {
-    key: kind,
-    label,
-    icon,
-    unit: kind === "latency" ? raw("ms") : undefined,
-    primary: show(dimension.baseline),
-    secondary: show(dimension.candidate),
-    delta:
-      dimension.delta === null
-        ? undefined
-        : { label: showDelta(dimension.delta), variant: deltaVariant(dimension) },
-    caption: t("aiObservability.experiments.comparePage.panel.measurePerRow"),
-    warning:
-      dimension.baselineOnlyRowCount || dimension.candidateOnlyRowCount
-        ? t("aiObservability.experiments.comparePage.panel.oneSidedCoverage", {
-            baseline: dimension.baselineOnlyRowCount,
-            candidate: dimension.candidateOnlyRowCount,
-          })
-        : undefined,
-    dataTest,
-  };
-}
-
-const tiles = computed<Tile[]>(() => {
-  const list: Tile[] = [];
-
-  // Quality leads: score dimensions are what the run is judged on. Cost sits last.
-  if (scoreDimensions.value.length) {
-    const total = scoreDimensions.value.length;
-    list.push({
-      key: "score-dimensions-regressed",
-      label: t("aiObservability.experiments.comparePage.panel.tileScoreDimensionsRegressed"),
-      icon: "error-outline",
-      primary: raw(String(regressedDimensionCount.value)),
-      caption: t("aiObservability.experiments.comparePage.panel.ofScoreDimensions", { total }),
-      dataTest: "ai-experiment-tile-score-dimensions-regressed",
-    });
-
-    const weakest = weakestDimension.value;
-    list.push({
-      key: "weakest-score-dimension",
-      label: t("aiObservability.experiments.comparePage.panel.tileWeakestScoreDimension"),
-      icon: "trending-down",
-      primary: weakest ? dimensionLabel(weakest) : raw("—"),
-      delta: weakest
-        ? { label: signed(weakest.orientedDelta), variant: deltaVariant(weakest) }
-        : undefined,
-      caption: weakest
-        ? undefined
-        : t("aiObservability.experiments.comparePage.panel.noScoreDimensionMoved"),
-      dataTest: "ai-experiment-tile-weakest-score-dimension",
-    });
-  }
-
-  list.push(
-    intrinsicTile(
-      "latency",
-      t("aiObservability.experiments.comparePage.panel.tileLatency"),
-      "ai-experiment-tile-latency",
-    ),
-    intrinsicTile(
-      "cost",
-      t("aiObservability.experiments.comparePage.panel.tileCost"),
-      "ai-experiment-tile-cost",
-    ),
-  );
-  return list;
-});
-
 /** Rows in either run — what "All" counts. */
 const totalRows = computed(
   () =>
@@ -415,10 +251,15 @@ function selectBucket(key: string) {
 
 const comparisonColumns = computed<OTableColumnDef<ExperimentComparisonRow>[]>(() => [
   {
-    id: "logicalId",
-    header: t("aiObservability.experiments.comparePage.panel.datasetRow"),
-    accessorKey: "logicalId",
+    id: "input",
+    header: t("aiObservability.experiments.comparePage.panel.input"),
+    accessorFn: (row) => displayRowInput(row.input),
     sortable: true,
+    // Starting width the previous max-w-[32rem] cap implied — the resize
+    // handle (enable-column-resize on the table, below) now owns going wider
+    // or narrower than this.
+    size: 512,
+    minSize: 160,
   },
   {
     id: "bucket",
@@ -426,12 +267,29 @@ const comparisonColumns = computed<OTableColumnDef<ExperimentComparisonRow>[]>((
     accessorKey: "bucket",
     sortable: true,
   },
+  // A component header, not a label: the movement counts describe THIS column.
+  // `header` already accepts a component, so none of this asks the shared table
+  // to change.
   ...props.comparison.dimensions.map((dimension) => ({
     id: dimensionColumnId(dimension),
-    header: dimensionLabel(dimension),
+    header: () =>
+      h(ExperimentDimensionHeader, {
+        dimension,
+        counts: dimensionMovementCounts(props.comparison.rows, dimension),
+      }),
     accessorKey: dimensionColumnId(dimension),
   })),
 ]);
+
+function displayRowInput(input: unknown): string {
+  if (input == null) return "—";
+  if (typeof input === "string") return input;
+  try {
+    return JSON.stringify(input) ?? String(input);
+  } catch {
+    return String(input);
+  }
+}
 
 function dimensionColumnId(dimension: ExperimentComparisonDimension) {
   return `dimension:${dimensionIdentity(dimension)}`;
@@ -460,7 +318,15 @@ function rowDimensionValue(row: ExperimentComparisonRow, dimension: ExperimentCo
   const found = rowDimension(row, dimension);
   if (!found) return raw("—");
   if (found.delta === null) return t("aiObservability.experiments.comparePage.panel.oneSided");
-  return raw(`${format(found.baseline ?? 0)} → ${format(found.candidate ?? 0)}`);
+  return raw(
+    `${dimensionSideValue(found, "baseline")} → ${dimensionSideValue(found, "candidate")}`,
+  );
+}
+
+/** A delta smaller than the trial noise on both sides is a `~`, not a claim. */
+function deltaLabel(dimension: ExperimentComparisonDimension) {
+  const value = signed(dimension.delta);
+  return dimension.withinNoise ? raw(`~${value}`) : value;
 }
 
 // Colour follows orientedDelta, never the raw delta: a latency rising by +31 is

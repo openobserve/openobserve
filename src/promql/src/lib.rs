@@ -38,8 +38,9 @@ pub mod engine;
 pub mod exec;
 mod functions;
 mod fused;
-mod load_series;
+pub mod load_series;
 pub mod promql;
+mod series_source;
 pub mod utils;
 
 pub const DEFAULT_LOOKBACK: Duration = Duration::from_secs(300); // 5m

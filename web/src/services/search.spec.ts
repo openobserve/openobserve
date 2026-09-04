@@ -414,7 +414,6 @@ describe("Search Service", () => {
         is_multistream: false,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
@@ -442,7 +441,6 @@ describe("Search Service", () => {
         is_multistream: true,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
@@ -467,38 +465,12 @@ describe("Search Service", () => {
         is_multistream: false,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
 
       expect(mockHttp.post).toHaveBeenCalledWith(
         "/api/test-org/logs/_around?key=key123&size=10&sql=SELECT * FROM logs&type=logs&query_fn=custom_function",
-        params.body,
-      );
-    });
-
-    it("should add action_id parameter when provided", async () => {
-      const params = {
-        org_identifier: "test-org",
-        index: "logs",
-        key: "key123",
-        size: "10",
-        query_context: "SELECT * FROM logs",
-        query_fn: "",
-        stream_type: "logs",
-        regions: "",
-        clusters: "",
-        is_multistream: false,
-        traceparent: "trace-123",
-        body: { filter: "test" },
-        action_id: "action123",
-      };
-
-      await search.search_around(params);
-
-      expect(mockHttp.post).toHaveBeenCalledWith(
-        "/api/test-org/logs/_around?key=key123&size=10&sql=SELECT * FROM logs&type=logs&action_id=action123",
         params.body,
       );
     });
@@ -517,7 +489,6 @@ describe("Search Service", () => {
         is_multistream: false,
         traceparent: "trace-123",
         body: { filter: "test" },
-        action_id: "",
       };
 
       await search.search_around(params);
@@ -628,6 +599,67 @@ describe("Search Service", () => {
 
       expect(mockHttp.get).toHaveBeenCalledWith(
         `/api/test-org/traces/traces/latest?filter=${encodeURIComponent("service_name='webapp'")}&start_time=1609459200&end_time=1609545600&from=0&size=100`,
+      );
+    });
+  });
+
+  describe("get_trace_time_ranges", () => {
+    const T1 = "01a034c1aabc72f78880daf6c9755cff";
+    const T2 = "0badc0ffee0ddf00dd15ea5eba5eba11";
+
+    it("joins ids with commas on the org-wide endpoint", async () => {
+      await search.get_trace_time_ranges({ org_identifier: "test-org", trace_ids: [T1, T2] });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        `/api/test-org/traces/time_range?trace_id=${T1}%2C${T2}`,
+      );
+    });
+
+    it("sends the bounds, hint and stream filter when given", async () => {
+      await search.get_trace_time_ranges({
+        org_identifier: "test-org",
+        trace_ids: [T1],
+        start_time: 1000,
+        end_time: 2000,
+        hint_ts: 1500,
+        streams: ["default", "payments_traces"],
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        `/api/test-org/traces/time_range?trace_id=${T1}&start_time=1000&end_time=2000&hint_ts=1500&streams=default%2Cpayments_traces`,
+      );
+    });
+
+    it("omits a lone bound — the server rejects start_time without end_time", async () => {
+      await search.get_trace_time_ranges({
+        org_identifier: "test-org",
+        trace_ids: [T1],
+        start_time: 1000,
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(`/api/test-org/traces/time_range?trace_id=${T1}`);
+    });
+
+    it("omits an empty stream filter", async () => {
+      await search.get_trace_time_ranges({
+        org_identifier: "test-org",
+        trace_ids: [T1],
+        streams: [],
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(`/api/test-org/traces/time_range?trace_id=${T1}`);
+    });
+
+    it("sends a zero bound pair — 0/0 is the server's 'no bounds' encoding, not absence", async () => {
+      await search.get_trace_time_ranges({
+        org_identifier: "test-org",
+        trace_ids: [T1],
+        start_time: 0,
+        end_time: 0,
+      });
+
+      expect(mockHttp.get).toHaveBeenCalledWith(
+        `/api/test-org/traces/time_range?trace_id=${T1}&start_time=0&end_time=0`,
       );
     });
   });
@@ -745,6 +777,45 @@ describe("Search Service", () => {
         org_identifier: "test-org",
         user_email: null,
         start_time: 1609459200,
+      });
+    });
+
+    it("should get search history scoped to a traces stream", async () => {
+      await search.get_history("test-org", 1609459200, 1609545600, "traces", "my-trace-stream");
+
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
+        stream_type: "traces",
+        org_identifier: "test-org",
+        user_email: null,
+        start_time: 1609459200,
+        end_time: 1609545600,
+        stream_name: "my-trace-stream",
+      });
+    });
+
+    it("should get search history scoped to a metrics stream", async () => {
+      await search.get_history("test-org", 1609459200, 1609545600, "metrics", "my-metric-stream");
+
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
+        stream_type: "metrics",
+        org_identifier: "test-org",
+        user_email: null,
+        start_time: 1609459200,
+        end_time: 1609545600,
+        stream_name: "my-metric-stream",
+      });
+    });
+
+    it("should default to logs and omit stream_name when only stream_type is missing", async () => {
+      await search.get_history("test-org", 1609459200, 1609545600, null, "unscoped-stream");
+
+      expect(mockHttp.post).toHaveBeenCalledWith("/api/test-org/_search_history", {
+        stream_type: "logs",
+        org_identifier: "test-org",
+        user_email: null,
+        start_time: 1609459200,
+        end_time: 1609545600,
+        stream_name: "unscoped-stream",
       });
     });
   });

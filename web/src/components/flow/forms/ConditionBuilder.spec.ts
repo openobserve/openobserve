@@ -80,14 +80,16 @@ describe("ConditionBuilder", () => {
     expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("Contains");
   });
 
-  it("leaves operators untouched when normalizeOperators is false", () => {
+  it("canonicalizes operator spelling on load even without normalizeOperators", () => {
+    // ensureIds maps backend spellings to the select's option values on every
+    // load path now, so the select never renders empty for a saved operator.
     const saved = {
       filterType: "group",
       logicalOperator: "AND",
       conditions: [{ filterType: "condition", column: "msg", operator: "contains", value: "x" }],
     };
     const wrapper = createWrapper({ initialConditions: saved });
-    expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("contains");
+    expect((wrapper.vm as any).conditionGroup.conditions[0].operator).toBe("Contains");
   });
 
   it("submit resolves { version, conditions } for a valid rule", async () => {
@@ -99,6 +101,45 @@ describe("ConditionBuilder", () => {
     const payload = await (wrapper.vm as any).submit();
     expect(payload.version).toBe(2);
     expect(payload.conditions.conditions[0].column).toBe("level");
+  });
+
+  // Optional mode (Workflows dummy node): submit never blocks — it returns the rule
+  // with a `complete` flag so the host can save an incomplete rule as a placeholder.
+  it("optional: returns complete:true and the payload for a valid rule", async () => {
+    const saved = {
+      filterType: "group",
+      conditions: [{ filterType: "condition", column: "level", operator: "=", value: "error" }],
+    };
+    const wrapper = createWrapper({ initialConditions: saved, optional: true });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload.version).toBe(2);
+    expect(payload.complete).toBe(true);
+    expect(payload.conditions.conditions[0].column).toBe("level");
+  });
+
+  it("optional: returns complete:false (not null) for an incomplete rule", async () => {
+    const wrapper = createWrapper({
+      initialConditions: {
+        filterType: "group",
+        conditions: [{ filterType: "condition", column: "", operator: "" }],
+      },
+      optional: true,
+    });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).not.toBeNull();
+    expect(payload.version).toBe(2);
+    expect(payload.complete).toBe(false);
+  });
+
+  it("does not add a complete flag in the default (non-optional) payload", async () => {
+    const saved = {
+      filterType: "group",
+      conditions: [{ filterType: "condition", column: "level", operator: "=", value: "error" }],
+    };
+    const wrapper = createWrapper({ initialConditions: saved });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).toEqual({ version: 2, conditions: expect.any(Object) });
+    expect("complete" in payload).toBe(false);
   });
 
   it("normalizes dotted columns on submit when normalizeColumnNames is on", async () => {
@@ -167,6 +208,17 @@ describe("ConditionBuilder", () => {
     // value ever reaches the form — the whole builder silently stops working.
     const wrapper = createWrapper();
     expect(wrapper.findComponent({ name: "FilterGroup" }).props("namePrefix")).toBe("conditions");
+  });
+
+  // The condition inputs sit in a node drawer, and this width governs the column
+  // select as well as the operator/value inputs. At 8.125rem a dotted trigger
+  // field ("meta.alert_start_time") truncates to an unreadable stub, which is the
+  // whole complaint — the select is wide enough to pick from, not to read.
+  it("gives the condition inputs room for long dotted field names", () => {
+    const wrapper = createWrapper();
+    const width = wrapper.findComponent({ name: "FilterGroup" }).props("conditionInputWidth");
+    const rem = Number(/\[([\d.]+)rem\]/.exec(String(width))?.[1] ?? 0);
+    expect(rem).toBeGreaterThanOrEqual(11);
   });
 
   it("passes allowCustomColumns through to FilterGroup", () => {
@@ -285,5 +337,92 @@ describe("ConditionBuilder", () => {
     });
     const payload = await (wrapper.vm as any).submit();
     expect(payload.conditions.conditions[0].ignore_case).toBe(true);
+  });
+});
+
+// Authoring-time unknown-column warning: only workflow callers pass
+// normalize-column-names (the payload envelope is known there), so the warning
+// must be inert for pipeline usage where stream columns are open-ended.
+describe("ConditionBuilder unknown-column warning", () => {
+  const FIELDS = [
+    { label: "meta.alert_name", value: "meta_alert_name", type: "Utf8" },
+    { label: "meta.severity", value: "meta_severity", type: "Utf8" },
+  ];
+  const treeWith = (column: string) => ({
+    filterType: "group",
+    logicalOperator: "AND",
+    conditions: [{ filterType: "condition", column, operator: "=", value: "critical" }],
+  });
+  const warnings = (wrapper: any) =>
+    wrapper.findAll('[data-test="condition-builder-unknown-column-warning"]');
+
+  it("warns for a typed column the trigger payload cannot resolve, with a suggestion", () => {
+    const wrapper = createWrapper({
+      fields: FIELDS,
+      initialConditions: treeWith("severity"),
+      normalizeColumnNames: true,
+    });
+    const warns = warnings(wrapper);
+    expect(warns).toHaveLength(1);
+    expect(warns[0].text()).toContain("severity");
+    expect(warns[0].text()).toContain("meta.severity");
+  });
+
+  it("shows the warning without a suggestion when nothing near-matches", () => {
+    const wrapper = createWrapper({
+      fields: FIELDS,
+      initialConditions: treeWith("hostname"),
+      normalizeColumnNames: true,
+    });
+    const warns = warnings(wrapper);
+    expect(warns).toHaveLength(1);
+    expect(warns[0].text()).not.toContain("?");
+  });
+
+  it("does not warn for a dropdown-picked (known) column", () => {
+    const wrapper = createWrapper({
+      fields: FIELDS,
+      initialConditions: treeWith("meta_severity"),
+      normalizeColumnNames: true,
+    });
+    expect(warnings(wrapper)).toHaveLength(0);
+  });
+
+  it("does not warn for a custom path under a known payload root", () => {
+    const wrapper = createWrapper({
+      fields: FIELDS,
+      initialConditions: treeWith("meta_custom_runtime_field"),
+      normalizeColumnNames: true,
+    });
+    expect(warnings(wrapper)).toHaveLength(0);
+  });
+
+  it("stays inert without normalizeColumnNames (pipeline builders)", () => {
+    const wrapper = createWrapper({
+      fields: FIELDS,
+      initialConditions: treeWith("severity"),
+    });
+    expect(warnings(wrapper)).toHaveLength(0);
+  });
+
+  it("stays inert when the payload shape is unknown (no fields)", () => {
+    const wrapper = createWrapper({
+      fields: [],
+      initialConditions: treeWith("severity"),
+      normalizeColumnNames: true,
+    });
+    expect(warnings(wrapper)).toHaveLength(0);
+  });
+
+  it("never blocks submit — the payload is returned despite the warning", async () => {
+    const wrapper = createWrapper({
+      fields: FIELDS,
+      initialConditions: treeWith("severity"),
+      normalizeColumnNames: true,
+      optional: true,
+    });
+    const payload = await (wrapper.vm as any).submit();
+    expect(payload).not.toBeNull();
+    expect(payload.conditions.conditions[0].column).toBe("severity");
   });
 });

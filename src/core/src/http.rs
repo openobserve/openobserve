@@ -86,8 +86,12 @@ impl From<AlertError> for Response {
             | AlertError::SqlMissingQuery
             | AlertError::SqlContainsSelectStar
             | AlertError::PromqlMissingQuery
+            | AlertError::SqlUnsupportedQueryType { .. }
             | AlertError::PeriodExceedsMaxQueryRange { .. }
-            | AlertError::AlertIdMissing => MetaHttpResponse::bad_request(value),
+            | AlertError::AlertIdMissing
+            | AlertError::PendingPeriodOnRealtimeAlert
+            | AlertError::NegativePendingPeriod
+            | AlertError::MultiAlertGroupingError(_) => MetaHttpResponse::bad_request(value),
             // S-16 PR 4. A conflict, not a bad request: the alert being sent is
             // fine on its own terms — it is the SLOs that already exist and
             // measure from it that the request collides with. Both messages

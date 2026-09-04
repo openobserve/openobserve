@@ -4,6 +4,8 @@ on:
   pull_request:
     branches:
       - "**"
+    # Fires once per PR when "Merge when ready" is clicked, then only for pushes while auto-merge stays on.
+    types: [auto_merge_enabled, synchronize, labeled, ready_for_review, converted_to_draft]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -14,20 +16,42 @@ env:
 
 jobs:
   initiate_enterprise_build:
-    if: ${{ github.event.pull_request.head.repo.fork == false }} # Only run for PRs which are not from forks
+    # A pre-merge gate: runs once auto-merge is enabled on a labelled PR, not on every push.
+    if: ${{ github.event.pull_request.head.repo.fork == false && (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) && github.event.pull_request.auto_merge != null }}
     runs-on: ubuntu-latest
     permissions:
       pull-requests: write
+      contents: read
+      statuses: write
     steps:
+      # Debounce: a push inside this window cancels the run (concurrency) before anything paid starts.
+      - if: github.event_name == 'pull_request'
+        run: sleep 60
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/classify-changes
+        id: classify
+      # ent-build-status-check is required; when no backend or frontend code changed there is nothing to build,
+      # so report it as passed here instead of dispatching.
+      - name: Report not applicable
+        if: ${{ steps.classify.outputs.run_enterprise != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "repos/${{ github.repository }}/statuses/${{ github.event.pull_request.head.sha }}" \
+            -f state=success -f context=ent-build-status-check -f description="no backend or frontend change; enterprise build not needed"
       - name: Generate token
+        if: ${{ steps.classify.outputs.run_enterprise == 'true' }}
         id: generate_token
-        uses: actions/create-github-app-token@v3
+        uses: actions/create-github-app-token@v3.2.0
         with:
           private-key: ${{ secrets.PRIVATE_KEY }}
           app-id: ${{ secrets.APP_ID }}
           # Set the owner, so the token can be used in all repositories
           owner: ${{ github.repository_owner }}
       - name: Set build short sha
+        if: ${{ steps.classify.outputs.run_enterprise == 'true' }}
         shell: bash
         run: |
           unset SHORT_COMMIT_ID
@@ -35,9 +59,11 @@ jobs:
           echo "COMMIT_ID=${GITHUB_HEAD_SHA}" >> $GITHUB_ENV
 
       - name: Confirm git commit SHA output
+        if: ${{ steps.classify.outputs.run_enterprise == 'true' }}
         run: echo ${{ env.SHORT_COMMIT_ID }}
 
       - name: Repository Dispatch
+        if: ${{ steps.classify.outputs.run_enterprise == 'true' }}
         uses: peter-evans/repository-dispatch@v4
         env:
           TOKEN: ${{ steps.generate_token.outputs.token }}

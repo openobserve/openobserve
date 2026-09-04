@@ -27,7 +27,6 @@ import { arraysMatch } from "@/utils/zincutils";
 import { logsUtils } from "@/composables/useLogs/logsUtils";
 import type { ExtendedParsedSQLResult } from "@/composables/useLogs/logsUtils";
 
-import useActions from "@/composables/useActions";
 import useFunctions from "@/composables/useFunctions";
 import useNotifications from "@/composables/useNotifications";
 import useSearchWebSocket from "@/composables/useSearchWebSocket";
@@ -51,7 +50,6 @@ export const useSearchBar = (t: TranslateFn) => {
   const { getDataThroughStream, buildSearch } = useSearchStream(t);
 
   const { getAllFunctions } = useFunctions();
-  const { getAllActions } = useActions();
   const { showErrorNotification } = useNotifications();
 
   const { cancelSearchQueryBasedOnRequestId } = useSearchWebSocket();
@@ -83,28 +81,6 @@ export const useSearchBar = (t: TranslateFn) => {
       return;
     } catch (e) {
       showErrorNotification(t("toastMessages.useLogs.errorWhileFetchingFunctions"));
-    }
-  };
-
-  const getActions = async () => {
-    try {
-      searchObj.data.actions = [];
-
-      if (store.state.organizationData.actions.length == 0) {
-        await getAllActions();
-      }
-
-      store.state.organizationData.actions.forEach((data: any) => {
-        if (data.execution_details_type === "service") {
-          searchObj.data.actions.push({
-            name: data.name,
-            id: data.id,
-          });
-        }
-      });
-      return;
-    } catch (e) {
-      showErrorNotification(t("toastMessages.useLogs.errorWhileFetchingActions"));
     }
   };
 
@@ -550,7 +526,6 @@ export const useSearchBar = (t: TranslateFn) => {
       //     searchObj.meta.refreshHistogram = true;
       //   }
 
-      //   // update query with function or action
       //   addTransformToQuery(queryReq);
 
       //   // in case of relative time, set start_time and end_time to query
@@ -590,8 +565,6 @@ export const useSearchBar = (t: TranslateFn) => {
 
       //   delete searchObj.data.histogramQuery.query.quick_mode;
       //   delete searchObj.data.histogramQuery.query.from;
-      //   if (searchObj.data.histogramQuery.query.action_id)
-      //     delete searchObj.data.histogramQuery.query.action_id;
 
       //   delete searchObj.data.histogramQuery.aggs;
       //   searchObj.data.customDownloadQueryObj = JSON.parse(
@@ -967,7 +940,6 @@ export const useSearchBar = (t: TranslateFn) => {
   //       queryReq.query.size = 0;
   //       delete queryReq.query.from;
   //       delete queryReq.query.quick_mode;
-  //       if (queryReq.query.action_id) delete queryReq.query.action_id;
   //       if (queryReq.query.hasOwnProperty("streaming_output"))
   //         delete queryReq.query.streaming_output;
   //       if (queryReq.query.hasOwnProperty("streaming_id"))
@@ -1361,7 +1333,6 @@ export const useSearchBar = (t: TranslateFn) => {
 
   return {
     getFunctions,
-    getActions,
     getSavedViews,
     getRegionInfo,
     setSelectedStreams,

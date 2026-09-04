@@ -306,6 +306,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :vrlFunction="decodedVrlFunction"
                     :streamName="formData.stream_name"
                     :sqlQueryErrorMsg="sqlQueryErrorMsg"
+                    :sqlAggColumnOptions="sqlAggColumnOptions"
+                    :sqlQueryHasHaving="sqlQueryHasHaving"
                     :isAggregationEnabled="isAggregationEnabled"
                     :beingUpdated="beingUpdated"
                     :isSeeding="isLoadingPrefill"
@@ -405,7 +407,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <div v-show="activeTab === 'anomaly-config'" data-tab-pane="anomaly-config">
-                <AnomalyDetectionConfig ref="anomalyStep2Ref" :config="anomalyConfig" />
+                <AnomalyDetectionConfig
+                  ref="anomalyStep2Ref"
+                  :config="anomalyConfig"
+                  :preview-sql="anomalyPreviewSql"
+                />
               </div>
 
               <div v-show="activeTab === 'anomaly-alerting'" data-tab-pane="anomaly-alerting">
@@ -457,9 +463,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="border-border-default flex shrink-0 items-center gap-2 border-b px-3 py-2.5 select-none"
             >
-              <span class="text-sm font-medium">{{
-                isAnomalyMode ? t("alerts.sqlPreview") : t("alerts.preview")
-              }}</span>
+              <span class="text-sm font-medium">{{ t("alerts.preview") }}</span>
               <template v-if="!isAnomalyMode && activeEvaluationStatus">
                 <div class="bg-border-default h-4 w-px" />
                 <OIcon
@@ -486,17 +490,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
             <div class="min-h-0 flex-1 overflow-hidden">
               <template v-if="isAnomalyMode">
-                <!-- editor-height is QueryEditor's own API for this; a class cannot
-                   win against the inline height its rootStyle always sets. -->
-                <QueryEditor
-                  editor-id="anomaly-sql-preview"
-                  language="sql"
-                  :read-only="true"
-                  :show-auto-complete="false"
-                  :hide-nl-toggle="true"
-                  :query="anomalyPreviewSql"
-                  editor-height="100%"
-                />
+                <AnomalyDataPreview :config="anomalyConfig" />
               </template>
               <template v-else>
                 <div
@@ -519,6 +513,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :isUsingBackendSql="isUsingBackendSql"
                   :isEditorOpen="isEditorOpen"
                   :previewDateTime="previewDateTimeValue"
+                  @schema-updated="handleSqlSchemaUpdated"
                 />
               </template>
             </div>
@@ -577,6 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { raw } from "@/types/i18n";
 import { defineComponent, computed, watch, provide, ref } from "vue";
+import { useStore } from "vuex";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -594,9 +590,9 @@ import InlineSelectFolderDropdown from "../common/sidebar/InlineSelectFolderDrop
 import PreviewAlert from "./PreviewAlert.vue";
 import AlertSummary from "./AlertSummary.vue";
 import AnomalyDetectionConfig from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.vue";
+import AnomalyDataPreview from "@/components/anomaly_detection/AnomalyDataPreview.vue";
 import AnomalyAlerting from "@/components/anomaly_detection/steps/AnomalyAlerting.vue";
 import AnomalySummary from "@/components/anomaly_detection/AnomalySummary.vue";
-import QueryEditor from "@/components/QueryEditor.vue";
 import { useAlertForm, defaultAlertValue } from "@/composables/useAlertForm";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -650,9 +646,9 @@ export default defineComponent({
     PreviewAlert,
     AlertSummary,
     AnomalyDetectionConfig,
+    AnomalyDataPreview,
     AnomalyAlerting,
     AnomalySummary,
-    QueryEditor,
     InlineSelectFolderDropdown,
     OButton,
     OToggleGroup,
@@ -667,11 +663,23 @@ export default defineComponent({
     CompositeAlertForm,
   },
   setup(props, { emit }) {
+    const store = useStore();
     const alertForm = useAlertForm(props, emit);
 
     // Share server SQL-validation squiggle ranges with the descendant query
     // editors (QueryEditorDialog / QueryConfig) via inject.
     provide("alertSqlErrorRanges", alertForm.sqlErrorRanges);
+
+    // SQL tab's Multi Alert value-column dropdown (sql_simple_multi_alert_fe_prd.md
+    // §11): PreviewAlert already calls /result_schema every time the preview
+    // query itself fires (its own reactive query watcher / editor-closed
+    // refresh) — reuse that response instead of a second, differently-timed
+    // fetch. QueryConfig's own watcher on this prop does the actual
+    // clear-if-missing comparison; this handler only forwards the list.
+    const handleSqlSchemaUpdated = (payload: { projections: string[]; hasHaving: boolean }) => {
+      alertForm.sqlAggColumnOptions.value = payload.projections;
+      alertForm.sqlQueryHasHaving.value = payload.hasHaving;
+    };
 
     const isAnomalyDetectionEnabled = computed(
       () => alertForm.store.state.zoConfig.anomaly_detection_enabled === true,
@@ -838,6 +846,7 @@ export default defineComponent({
         path: "/alerts",
         query: {
           folder: alertForm.activeFolderId.value ?? "default",
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };
@@ -892,6 +901,7 @@ export default defineComponent({
       updateCompositeDraft,
       compositeSaveDisabled,
       onCompositeValidation,
+      handleSqlSchemaUpdated,
     };
   },
 });
