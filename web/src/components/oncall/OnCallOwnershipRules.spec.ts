@@ -38,6 +38,7 @@ const stubs = {
   OTimeCell: { name: "OTimeCell", props: ["value"], template: "<span />" },
   OText: { name: "OText", template: "<span><slot /></span>" },
   OButton: { name: "OButton", template: "<button><slot /></button>" },
+  OTooltip: { name: "OTooltip", props: ["content", "side"], template: "<span />" },
 };
 
 function rule(over: Partial<OwnershipRuleStats> = {}): OwnershipRuleStats {
@@ -140,6 +141,16 @@ describe("OnCallOwnershipRules", () => {
     ]);
     expect(health(wrapper).text()).toContain("Never used");
     expect(health(wrapper).props("variant")).toBe("default-soft");
+  });
+
+  /// The server already computes why a rule is in the state it's in
+  /// (`health_summary`) — a reader staring at "Never used" with no traffic
+  /// context has no way to tell "no traffic yet" from "this rule is broken".
+  it("surfaces the server's own explanation on the health chip", () => {
+    const wrapper = render([rule({ health_summary: "no signal has ever carried this path" })]);
+    expect(health(wrapper).findComponent({ name: "OTooltip" }).props("content")).toBe(
+      "no signal has ever carried this path",
+    );
   });
 
   it("tones an active rule apart from a shadowed one", () => {

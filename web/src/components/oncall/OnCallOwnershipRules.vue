@@ -95,6 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :data-test="`oncall-rule-health-${row.rule_id}`"
         >
           {{ healthLabel(row) }}
+          <OTooltip v-if="row.health_summary" side="bottom" :content="raw(row.health_summary)" />
         </OTag>
       </template>
 
