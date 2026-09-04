@@ -17,17 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div v-if="!promqlMode && dashboardPanelData.data.type == 'sankey'">
     <!-- source container -->
-    <div class="flex flex-row pl-3">
+    <div class="flex flex-row ps-3">
       <div class="layout-name flex min-w-20 items-center whitespace-nowrap">
         <span
-          class="rounded-default bg-badge-indigo-ol-text mr-1.5 h-2 w-2 shrink-0"
+          class="rounded-default bg-badge-indigo-ol-text me-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ t("panel.source") }}
-        <OIcon name="info-outline" size="sm" class="ml-1" />
+        <OIcon name="info-outline" size="sm" class="ms-1" />
         <OTooltip :content="Hint" />
       </div>
-      <span class="layout-separator mr-0.5 ml-0.5 flex items-center">:</span>
+      <span class="layout-separator ms-0.5 me-0.5 flex items-center">:</span>
       <div
         class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
@@ -44,7 +44,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-source-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+          class="axis-field border-border-default border-s-badge-indigo-ol-border bg-surface-panel my-0.5 me-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
           :divided="true"
           v-if="
@@ -89,7 +89,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-source-item-${sourceLabel}-menu`"
             >
               <div
-                class="pt-0.75 pr-4 pb-4 pl-4"
+                class="ps-4 pe-4 pt-0.75 pb-4"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -101,7 +101,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <div>
-                  <div class="mr-1 mb-2">
+                  <div class="me-1 mb-2">
                     <DynamicFunctionPopUp
                       v-model="
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -143,17 +143,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- target container -->
-    <div class="flex flex-row pl-3">
+    <div class="flex flex-row ps-3">
       <div class="layout-name flex min-w-20 items-center whitespace-nowrap">
         <span
-          class="rounded-default bg-badge-orange-ol-text mr-1.5 h-2 w-2 shrink-0"
+          class="rounded-default bg-badge-orange-ol-text me-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ t("panel.target") }}
-        <OIcon name="info-outline" size="sm" class="ml-1" />
+        <OIcon name="info-outline" size="sm" class="ms-1" />
         <OTooltip :content="Hint" />
       </div>
-      <span class="layout-separator mr-0.5 ml-0.5 flex items-center">:</span>
+      <span class="layout-separator ms-0.5 me-0.5 flex items-center">:</span>
       <div
         class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
@@ -170,7 +170,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-target-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+          class="axis-field border-border-default border-s-badge-orange-ol-border bg-surface-panel my-0.5 me-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
           :divided="true"
           v-if="
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-target-item-${targetLabel}-menu`"
             >
               <div
-                class="pt-0.75 pr-4 pb-4 pl-4"
+                class="ps-4 pe-4 pt-0.75 pb-4"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -227,7 +227,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <div>
-                  <div class="mr-1 mb-2">
+                  <div class="me-1 mb-2">
                     <DynamicFunctionPopUp
                       v-model="
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -268,17 +268,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator />
     <!-- value container -->
-    <div class="flex flex-row pl-3">
+    <div class="flex flex-row ps-3">
       <div class="layout-name flex min-w-20 items-center whitespace-nowrap">
         <span
-          class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+          class="rounded-default bg-badge-success-ol-text me-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ t("panel.value") }}
-        <OIcon name="info-outline" size="sm" class="ml-1" />
+        <OIcon name="info-outline" size="sm" class="ms-1" />
         <OTooltip :content="Hint" />
       </div>
-      <span class="layout-separator mr-0.5 ml-0.5 flex items-center">:</span>
+      <span class="layout-separator ms-0.5 me-0.5 flex items-center">:</span>
       <div
         class="axis-container droppable scroll flex min-h-8 w-full flex-1 flex-wrap items-center border border-dashed border-transparent"
         :class="{
@@ -295,7 +295,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-value-layout"
       >
         <OButtonGroup
-          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 mr-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
+          class="axis-field border-border-default border-s-badge-success-ol-border bg-surface-panel my-0.5 me-2 overflow-hidden border border-s-2 [&>*:not(:first-child)]:!border-s"
           radius="sm"
           :divided="true"
           v-if="
@@ -340,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :data-test="`dashboard-value-item-${valueLabel}-menu`"
             >
               <div
-                class="pt-0.75 pr-4 pb-4 pl-4"
+                class="ps-4 pe-4 pt-0.75 pb-4"
                 :style="{
                   width:
                     dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]
@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 }"
               >
                 <div>
-                  <div class="mr-1 mb-2">
+                  <div class="me-1 mb-2">
                     <DynamicFunctionPopUp
                       v-model="
                         dashboardPanelData.data.queries[dashboardPanelData.layout.currentQueryIndex]

@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="workflow-edge-delete-hint"
       class="bg-surface-base text-text-body border-border-default rounded-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-lg dark:shadow-lg"
     >
-      <OIcon name="info" class="mr-1" size="sm" />
+      <OIcon name="info" class="me-1" size="sm" />
       {{ t("workflow.canvas.edgeDeleteHint") }}
     </div>
 
@@ -193,9 +193,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Dashed connector + `+` between the two slots — same chip as every other
          "add a step here" affordance; here it opens the Action picker. -->
     <div class="flex flex-col items-center">
-      <span class="border-border-strong h-5 border-l-2"></span>
+      <span class="border-border-strong h-5 border-s-2"></span>
       <FlowAddButton data-test="workflow-flow-start-add" @click="openActionPicker($event)" />
-      <span class="border-border-strong h-5 border-l-2"></span>
+      <span class="border-border-strong h-5 border-s-2"></span>
     </div>
 
     <WorkflowStartCard
@@ -226,9 +226,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     }"
   >
     <div class="flex flex-col items-center">
-      <span class="border-border-strong h-5 border-l-2"></span>
+      <span class="border-border-strong h-5 border-s-2"></span>
       <FlowAddButton data-test="workflow-flow-action-add" @click="openActionPicker($event)" />
-      <span class="border-border-strong h-5 border-l-2"></span>
+      <span class="border-border-strong h-5 border-s-2"></span>
     </div>
     <WorkflowStartCard
       :tag="t('workflow.node.kindAction')"
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Connector is ALWAYS drawn for a shown point — a leaf's straight stub, or a
          branch's short side-nudged curve. Option C: the point only renders while its
          node is hovered, so at rest there's nothing here. -->
-    <span v-if="!pt.svgW" class="border-border-strong h-5 border-l-2"></span>
+    <span v-if="!pt.svgW" class="border-border-strong h-5 border-s-2"></span>
     <svg
       v-else
       :width="pt.svgW"

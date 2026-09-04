@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="flex h-full w-full flex-col">
           <!-- Main Content Grid: field browser | editors | output -->
           <div
-            class="grid min-h-0 w-full flex-1 grid-cols-[20fr_45fr_35fr] gap-x-2 overflow-hidden px-2 py-2 pr-2"
+            class="grid min-h-0 w-full flex-1 grid-cols-[20fr_45fr_35fr] gap-x-2 overflow-hidden px-2 py-2 pe-2"
           >
             <!-- Left Section (25%) — Field Browser -->
             <div
@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="text-compact relative h-5.5 shrink-0 cursor-default font-medium"
                     :class="[
                       sqlStatusBarClasses,
-                      'border-border-default rounded-bl-default rounded-br-default border-r border-b border-l',
+                      'border-border-default rounded-bl-default rounded-br-default border-s border-e border-b',
                     ]"
                   >
                     <div class="absolute inset-0 flex items-center gap-1.25 overflow-hidden px-2.5">
@@ -498,7 +498,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <!-- AI Chat Panel -->
       <div
-        class="bg-surface-base ml-2 w-[24.5vw] max-w-full min-w-18.75"
+        class="bg-surface-base ms-2 w-[24.5vw] max-w-full min-w-18.75"
         v-if="store.state.isAiChatEnabled"
       >
         <O2AIChat

@@ -210,7 +210,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <template v-if="!filterQuery" #extra>
                   <div class="flex flex-wrap items-center justify-center gap-2">
-                    <span class="text-text-secondary mr-1 text-sm font-semibold">
+                    <span class="text-text-secondary me-1 text-sm font-semibold">
                       {{ t("logStream.emptyOr") }}
                     </span>
                     <EmptyStateIngestionChip
@@ -291,7 +291,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   icon-left="delete"
                   variant="outline-destructive"
                   size="sm-action"
-                  class="ml-4"
+                  class="ms-4"
                   :disabled="isDeleting"
                   @click="confirmBatchDeleteAction"
                 >

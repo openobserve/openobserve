@@ -1567,7 +1567,7 @@ const fieldWidthClass = computed(() => {
                                       ? 'cursor-help'
                                       : undefined,
                                     filteredOptions[vRow.index].badgeStyle
-                                      ? 'ml-auto inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center border-current px-1 text-xs leading-none font-semibold'
+                                      ? 'ms-auto inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center border-current px-1 text-xs leading-none font-semibold'
                                       : 'text-3xs px-1 py-px leading-tight font-medium',
                                   ]"
                                   :title="filteredOptions[vRow.index].badgeTitle"

@@ -290,7 +290,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div class="flex items-start justify-center">
                 <div
                   data-test="scheduled-pipeline-expanded-sql"
-                  class="border-border-default border-l-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5 whitespace-normal"
+                  class="border-border-default border-s-accent bg-surface-subtle text-text-body h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5 whitespace-normal"
                 >
                   <pre style="text-wrap: wrap">{{ row?.sql_query }} </pre>
                 </div>
@@ -316,7 +316,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <template #bottom="bottomProps">
             <div class="flex w-full items-center justify-between py-1">
-              <div class="mr-4 flex items-center text-xs font-normal">
+              <div class="me-4 flex items-center text-xs font-normal">
                 {{ bottomProps.totalRows }} {{ t("pipeline.header") }}
               </div>
               <div v-if="selectedPipelineIds.length > 0" class="flex items-center gap-2">
@@ -476,7 +476,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="(msg, idx) in nodeErrorMessages(nodeError)"
                 :key="idx"
-                class="error-message rounded-default bg-banner-error-soft-bg border-l-status-negative text-banner-error-soft-text border-l-3 p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
+                class="error-message rounded-default bg-banner-error-soft-bg border-s-status-negative text-banner-error-soft-text border-s-3 p-3 font-mono text-xs leading-[1.5] wrap-break-word whitespace-pre-wrap"
               >
                 {{ msg }}
               </div>

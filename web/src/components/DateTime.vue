@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             ><OIcon
               name="arrow-drop-down"
               size="sm"
-              class="date-time-arrow ml-auto text-lg! transition-transform duration-250"
+              class="date-time-arrow ms-auto text-lg! transition-transform duration-250"
           /></template>
         </OButton>
       </template>
@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OTabPanel v-if="!disableRelative" name="relative">
               <div class="date-time-table relative flex flex-col">
                 <div
-                  class="relative-row border-border-default flex items-center border-b py-2 pl-3 [&>*]:mr-1.5"
+                  class="relative-row border-border-default flex items-center border-b py-2 ps-3 [&>*]:me-1.5"
                   v-for="(period, index) in relativePeriods"
                   :key="'date_' + index"
                 >
@@ -147,7 +147,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
 
                 <div
-                  class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:mr-1.5"
+                  class="relative-row border-border-default flex items-center border-b px-3 py-2 [&>*]:me-1.5"
                 >
                   <div class="min-w-18.75 text-sm font-semibold">{{ t("common.custom") }}</div>
                   <OTooltip
@@ -207,7 +207,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     @update:end-date="selectedDate.to = $event"
                   />
                 </div>
-                <div class="text-3xs pr-6 pl-6">{{ t("common.datetimeMessage") }}</div>
+                <div class="text-3xs ps-6 pe-6">{{ t("common.datetimeMessage") }}</div>
                 <OSeparator v-if="!disableRelative" class="my-2" />
 
                 <table
@@ -217,18 +217,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <tbody>
                     <tr>
                       <td
-                        class="label o-input-label text-compact text-input-label-text w-1/2 pr-1.5 leading-tight font-medium"
+                        class="label o-input-label text-compact text-input-label-text w-1/2 pe-1.5 leading-tight font-medium"
                       >
                         {{ t("common.startTime") }}
                       </td>
                       <td
-                        class="label o-input-label text-compact text-input-label-text w-1/2 pl-1.5 leading-tight font-medium"
+                        class="label o-input-label text-compact text-input-label-text w-1/2 ps-1.5 leading-tight font-medium"
                       >
                         {{ t("common.endTime") }}
                       </td>
                     </tr>
                     <tr>
-                      <td class="w-1/2 pr-1.5">
+                      <td class="w-1/2 pe-1.5">
                         <OTime
                           class="w-full"
                           v-model="selectedTime.startTime"
@@ -237,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           @blur="resetTime(selectedTime.startTime, selectedTime.endTime)"
                         />
                       </td>
-                      <td class="w-1/2 pl-1.5">
+                      <td class="w-1/2 ps-1.5">
                         <OTime
                           class="w-full"
                           v-model="selectedTime.endTime"
@@ -253,7 +253,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OTabPanel>
           </OTabPanels>
         </div>
-        <div v-if="!hideRelativeTimezone" class="pr-3">
+        <div v-if="!hideRelativeTimezone" class="pe-3">
           <OSelect
             data-test="datetime-timezone-select"
             v-model="timezone"

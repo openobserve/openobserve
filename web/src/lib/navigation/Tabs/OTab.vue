@@ -75,14 +75,14 @@ const baseClasses = computed<string>(() =>
     // Horizontal inset. A vertical (side-rail) tab is a selectable PILL, so the
     // rail container insets it (px-1.5) to give the pill breathing room from the
     // rail edges. With that 6px container inset + the tab's own 2px active border
-    // + this pl-1, the label lands on the page-edge grid line (12px) while the
+    // + this ps-1, the label lands on the page-edge grid line (12px) while the
     // pill never touches the rail edge. Rails add the px-1.5; tabs don't hand-roll
     // their own padding override.
     // Reorderable tabs widen the left inset to a 0.75rem gutter that hosts the
     // hover-revealed drag grip. The gutter is tied to `reorderable` (not
     // per-press state), so a tab is pixel-identical at rest, on hover, and
     // while its label is being edited — the grip only ever changes opacity.
-    isReorderable.value ? "pl-3 pr-2" : isVertical.value ? "pl-1 pr-2" : "px-2",
+    isReorderable.value ? "ps-3 pe-2" : isVertical.value ? "ps-1 pe-2" : "px-2",
     "font-normal text-sm whitespace-nowrap",
     isVertical.value ? "rounded-default" : "rounded-t-default",
     "outline-none transition-[color,background-color,border-color,text-decoration-color,fill,stroke,box-shadow] duration-150",
@@ -97,7 +97,7 @@ const stateClasses = computed<string>(() => {
     return [
       "text-tabs-disabled-text cursor-not-allowed opacity-60",
       // Keep the transparent left border so disabled items don't shift width.
-      isVertical.value ? "border-l-2 border-transparent" : "",
+      isVertical.value ? "border-s-2 border-transparent" : "",
     ].join(" ");
   }
   if (isActive.value) {
@@ -110,7 +110,7 @@ const stateClasses = computed<string>(() => {
     return [
       "text-tabs-active-text cursor-pointer",
       isVertical.value
-        ? "bg-tabs-active-bg border-l-2 border-tabs-indicator"
+        ? "bg-tabs-active-bg border-s-2 border-tabs-indicator"
         : "border-b-2 border-transparent",
     ].join(" ");
   }
@@ -121,7 +121,7 @@ const stateClasses = computed<string>(() => {
       : "enabled:hover:text-tabs-hover-text",
     // Transparent border (left for vertical, bottom for horizontal) keeps inactive
     // items the same size as the active one — no layout shift on activation.
-    isVertical.value ? "border-l-2 border-transparent" : "border-b-2 border-transparent",
+    isVertical.value ? "border-s-2 border-transparent" : "border-b-2 border-transparent",
   ].join(" ");
 });
 

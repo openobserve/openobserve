@@ -139,7 +139,7 @@ the Free Software Foundation, either version 3 of the License, or
           <!-- Last-refreshed indicator + labeled primary Refresh button, matching
                the other AI pages' AiPageShell header. -->
           <AiLastRefreshed
-            class="mr-1"
+            class="me-1"
             :last-run-at="qualityLastRunAt"
             :loading="qualityRefreshing"
             data-test="quality-last-refreshed"
