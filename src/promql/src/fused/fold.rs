@@ -20,7 +20,7 @@
 use std::{sync::Arc, time::Duration};
 
 use config::meta::promql::value::{
-    CounterSeries, EvalContext, ExtrapolationKind, Labels, RangeValue, Sample, Value,
+    CounterSeries, EvalContext, ExtrapolationKind, Labels, RangeValue, Sample, TimeWindow, Value,
 };
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::{HashMap, hash_map::Entry};
@@ -40,13 +40,59 @@ pub(super) struct GroupEntry {
     acc: FusedAccumulator,
 }
 
-pub(super) struct FoldParams {
-    op: FusedAggOp,
+/// How one series becomes per-step values: the range function, its window, and the slots.
+pub(super) struct SeriesEval {
     func: Arc<dyn RangeFunc>,
     counter_kind: Option<ExtrapolationKind>,
     range: Duration,
     eval_ctx: EvalContext,
     timestamps: Vec<i64>,
+}
+
+pub(super) struct FoldParams {
+    op: FusedAggOp,
+    eval: SeriesEval,
+}
+
+impl SeriesEval {
+    pub(super) fn new(func: Arc<dyn RangeFunc>, range: Duration, eval_ctx: &EvalContext) -> Self {
+        Self {
+            counter_kind: func.counter_extrapolation(),
+            func,
+            range,
+            eval_ctx: eval_ctx.clone(),
+            timestamps: eval_ctx.timestamps(),
+        }
+    }
+
+    /// Evaluates the function over one series, handing each value to `emit` with its slot.
+    fn eval_series(&self, samples: &[Sample], mut emit: impl FnMut(usize, f64)) {
+        let range_micros = micros(self.range);
+        let mut start_index = 0;
+        let mut end_index = 0;
+        let counter =
+            CounterSeries::try_new(samples, self.counter_kind, &self.eval_ctx, range_micros);
+
+        for (slot, &eval_ts) in self.timestamps.iter().enumerate() {
+            let window_samples = advance_sample_window(
+                samples,
+                eval_ts - range_micros,
+                eval_ts,
+                &mut start_index,
+                &mut end_index,
+            );
+            if window_samples.is_empty() {
+                continue;
+            }
+            let value = match &counter {
+                Some(counter) => counter.extrapolate(start_index, end_index, eval_ts, self.range),
+                None => self.func.exec(window_samples, eval_ts, &self.range),
+            };
+            if let Some(value) = value {
+                emit(slot, value);
+            }
+        }
+    }
 }
 
 impl FoldParams {
@@ -58,11 +104,7 @@ impl FoldParams {
     ) -> Arc<Self> {
         Arc::new(Self {
             op,
-            counter_kind: func.counter_extrapolation(),
-            func,
-            range,
-            eval_ctx: eval_ctx.clone(),
-            timestamps: eval_ctx.timestamps(),
+            eval: SeriesEval::new(func, range, eval_ctx),
         })
     }
 }
@@ -84,13 +126,65 @@ where
             async move { fold_partition(source.await?, params).await }
         })
         .collect();
-    let folds = run_folds(folds).await?;
+    let folds = run_partitions(folds).await?;
     let series_count = folds.iter().map(|(_, series)| series).sum();
     let value = merge_folds(
         folds.into_iter().map(|(groups, _)| groups).collect(),
-        &params.timestamps,
+        &params.eval.timestamps,
     );
     Ok((value, series_count))
+}
+
+/// Evaluates every series of every partition and returns them whole, in partition order: the
+/// range function's output is the result, so nothing folds. Dropping the future aborts the
+/// partitions.
+pub(super) async fn emit_sources<F, S>(
+    sources: Vec<F>,
+    eval: Arc<SeriesEval>,
+) -> Result<(Vec<RangeValue>, usize)>
+where
+    F: Future<Output = Result<S>> + Send + 'static,
+    S: SeriesSource + 'static,
+{
+    let parts = sources
+        .into_iter()
+        .map(|source| {
+            let eval = eval.clone();
+            async move { emit_partition(source.await?, eval).await }
+        })
+        .collect();
+    let parts = run_partitions(parts).await?;
+    let series_count = parts.iter().map(|(_, series)| series).sum();
+    let series = parts.into_iter().flat_map(|(series, _)| series).collect();
+    Ok((series, series_count))
+}
+
+/// Emits one partition's series; like the generic evaluator, a series with no value is dropped.
+async fn emit_partition<S: SeriesSource>(
+    mut source: S,
+    eval: Arc<SeriesEval>,
+) -> Result<(Vec<RangeValue>, usize)> {
+    let mut series = Vec::new();
+    let mut series_count = 0;
+    while source.advance().await?.is_some() {
+        let labels = source.labels();
+        let samples = source.consume().await?;
+        let mut values = Vec::new();
+        eval.eval_series(samples, |slot, value| {
+            values.push(Sample::new(eval.timestamps[slot], value));
+        });
+        if !values.is_empty() {
+            series.push(RangeValue {
+                labels,
+                samples: values,
+                exemplars: None,
+                time_window: Some(TimeWindow::new(eval.range)),
+            });
+        }
+        series_count += 1;
+        tokio::task::consume_budget().await;
+    }
+    Ok((series, series_count))
 }
 
 /// Folds one partition's series into its group accumulators, dropping each as it goes.
@@ -105,19 +199,13 @@ async fn fold_partition<S: SeriesSource>(
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(GroupEntry {
                 labels: source.labels(),
-                acc: FusedAccumulator::new(params.op, params.timestamps.len()),
+                acc: FusedAccumulator::new(params.op, params.eval.timestamps.len()),
             }),
         };
         let samples = source.consume().await?;
-        fold_series(
-            &mut entry.acc,
-            samples,
-            params.range,
-            params.func.as_ref(),
-            params.counter_kind,
-            &params.eval_ctx,
-            &params.timestamps,
-        );
+        params
+            .eval
+            .eval_series(samples, |slot, value| entry.acc.push(slot, value));
         series_count += 1;
         // the fold is pure CPU: give the runtime a chance to time out or abort it
         tokio::task::consume_budget().await;
@@ -125,60 +213,25 @@ async fn fold_partition<S: SeriesSource>(
     Ok((groups, series_count))
 }
 
-/// Evaluates `func` over one series and pushes each value into `acc` at its evaluation slot.
-fn fold_series(
-    acc: &mut FusedAccumulator,
-    samples: &[Sample],
-    range: Duration,
-    func: &dyn RangeFunc,
-    counter_kind: Option<ExtrapolationKind>,
-    eval_ctx: &EvalContext,
-    timestamps: &[i64],
-) {
-    let range_micros = micros(range);
-    let mut start_index = 0;
-    let mut end_index = 0;
-    let counter = CounterSeries::try_new(samples, counter_kind, eval_ctx, range_micros);
-
-    for (slot, &eval_ts) in timestamps.iter().enumerate() {
-        let window_samples = advance_sample_window(
-            samples,
-            eval_ts - range_micros,
-            eval_ts,
-            &mut start_index,
-            &mut end_index,
-        );
-        if window_samples.is_empty() {
-            continue;
-        }
-        let value = match &counter {
-            Some(counter) => counter.extrapolate(start_index, end_index, eval_ts, range),
-            None => func.exec(window_samples, eval_ts, &range),
-        };
-        if let Some(value) = value {
-            acc.push(slot, value);
-        }
-    }
-}
-
-/// The first failed partition fails the fold; dropping the set aborts the rest.
-async fn run_folds<Fut>(folds: Vec<Fut>) -> Result<Vec<(GroupAccs, usize)>>
+/// The first failed partition fails the whole; dropping the set aborts the rest.
+async fn run_partitions<T, Fut>(parts: Vec<Fut>) -> Result<Vec<T>>
 where
-    Fut: Future<Output = Result<(GroupAccs, usize)>> + Send + 'static,
+    T: Send + 'static,
+    Fut: Future<Output = Result<T>> + Send + 'static,
 {
-    let mut results: Vec<Option<(GroupAccs, usize)>> = folds.iter().map(|_| None).collect();
+    let mut results: Vec<Option<T>> = parts.iter().map(|_| None).collect();
     let mut tasks = JoinSet::new();
-    for (index, fold) in folds.into_iter().enumerate() {
-        tasks.spawn(async move { (index, fold.await) });
+    for (index, part) in parts.into_iter().enumerate() {
+        tasks.spawn(async move { (index, part.await) });
     }
-    // folds finish in any order; the merge needs them in partition order
+    // partitions finish in any order; the merge needs them in partition order
     while let Some(joined) = tasks.join_next().await {
-        let (index, fold) = joined.map_err(|e| DataFusionError::Execution(e.to_string()))?;
-        results[index] = Some(fold?);
+        let (index, part) = joined.map_err(|e| DataFusionError::Execution(e.to_string()))?;
+        results[index] = Some(part?);
     }
     Ok(results
         .into_iter()
-        .map(|fold| fold.expect("every partition joined"))
+        .map(|part| part.expect("every partition joined"))
         .collect())
 }
 
@@ -297,7 +350,7 @@ mod tests {
         ];
 
         let start = std::time::Instant::now();
-        let result = run_folds(folds).await;
+        let result = run_partitions(folds).await;
         assert!(result.is_err(), "the failed partition must fail the fold");
         assert!(
             start.elapsed() < Duration::from_secs(5),

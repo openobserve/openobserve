@@ -23,18 +23,21 @@ use std::{sync::Arc, time::Duration};
 use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{
-        EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, NAME_LABEL, VALUE_LABEL,
+        BUCKET_LABEL, EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, NAME_LABEL,
+        VALUE_LABEL,
         value::{EvalContext, Value},
     },
 };
 use datafusion::{
     arrow::datatypes::{DataType, Schema},
     error::Result,
+    execution::SendableRecordBatchStream,
     prelude::SessionContext,
 };
+use hashbrown::HashSet;
 use promql_parser::{label::Matchers, parser::LabelModifier};
 
-use super::fold::{FoldParams, fold_sources};
+use super::fold::{FoldParams, SeriesEval, emit_sources, fold_sources};
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     fused::FusedAggOp,
@@ -56,6 +59,13 @@ pub(crate) struct FusedShape {
     pub op: FusedAggOp,
     pub func: Arc<dyn RangeFunc>,
     pub range: Duration,
+}
+
+/// Which labels an emitted series carries: the engine's label selector narrows the projection,
+/// and a query that drops every label at the root skips them entirely.
+pub(crate) struct SeriesLabels<'a> {
+    pub selector: &'a HashSet<String>,
+    pub skip: bool,
 }
 
 /// Folds from per-shard ordered streams; `None` when the layout or shape cannot stream. The
@@ -80,27 +90,15 @@ pub(crate) async fn fused_agg(
     let Some(group_cols) = group_label_columns(modifier, schema, shape.func.name()) else {
         return Ok(None);
     };
-    let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
-    let Ok(df) = ctx.table(sorted_table.as_str()).await else {
-        return Ok(None);
-    };
-
-    let df = apply_time_window(
-        df,
-        eval_ctx.start - selector.offset,
-        eval_ctx.end - selector.offset,
-        eval_ctx.step,
-        micros(shape.range),
-    )?;
-    let df = apply_matchers(df, selector.matchers)?;
-
     let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
     columns.extend(group_cols.iter().map(String::as_str));
 
-    let shards = ctx.state().config().target_partitions();
-    let Some(shard_inputs) = build_shard_inputs(&df, &columns, shards, &trace_id).await? else {
+    let Some(shard_inputs) =
+        shard_inputs(ctx, &selector, micros(shape.range), &columns, eval_ctx).await?
+    else {
         return Ok(None);
     };
+    let shards = shard_inputs.len();
 
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) started with {shards} shards",
@@ -126,6 +124,117 @@ pub(crate) async fn fused_agg(
         },
     );
     Ok(Some(value))
+}
+
+/// Evaluates `func` over every series of the hash-sorted table and returns them whole; `None`
+/// when the layout cannot stream. The caller bounds it like the fold.
+pub(crate) async fn range_series(
+    ctx: &SessionContext,
+    schema: &Schema,
+    selector: StreamingSelector<'_>,
+    func: Arc<dyn RangeFunc>,
+    range: Duration,
+    labels: SeriesLabels<'_>,
+    eval_ctx: &EvalContext,
+) -> Result<Option<Value>> {
+    let start_time = std::time::Instant::now();
+    let trace_id = eval_ctx.trace_id.clone();
+
+    if schema
+        .field_with_name(HASH_LABEL)
+        .is_ok_and(|field| field.data_type() != &DataType::UInt64)
+    {
+        return Ok(None);
+    }
+    let label_cols = series_label_columns(schema, &labels, func.name());
+    let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
+    columns.extend(label_cols.iter().map(String::as_str));
+
+    let Some(shard_inputs) =
+        shard_inputs(ctx, &selector, micros(range), &columns, eval_ctx).await?
+    else {
+        return Ok(None);
+    };
+    let shards = shard_inputs.len();
+
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] streaming {}() started with {shards} shards",
+        func.name(),
+    );
+    let eval = Arc::new(SeriesEval::new(func.clone(), range, eval_ctx));
+    let label_cols = Arc::new(label_cols);
+    let sources = shard_inputs
+        .into_iter()
+        .map(|streams| StreamSource::start(streams, label_cols.clone(), selector.offset))
+        .collect();
+    let (series, series_count) = emit_sources(sources, eval).await?;
+
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] streaming {}() execution took: {:?}, emitted {} of {series_count} series",
+        func.name(),
+        start_time.elapsed(),
+        series.len(),
+    );
+    // the generic path evaluates an empty selector to None and a matrix with no values to []
+    Ok(Some(if series_count == 0 {
+        Value::None
+    } else {
+        Value::Matrix(series)
+    }))
+}
+
+/// The per-shard ordered streams of the selector's hash-sorted table projected to `columns`;
+/// `None` when the table is missing or a shard plan cannot stream in order.
+async fn shard_inputs(
+    ctx: &SessionContext,
+    selector: &StreamingSelector<'_>,
+    lookback: i64,
+    columns: &[&str],
+    eval_ctx: &EvalContext,
+) -> Result<Option<Vec<Vec<SendableRecordBatchStream>>>> {
+    let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
+    let Ok(df) = ctx.table(sorted_table.as_str()).await else {
+        return Ok(None);
+    };
+    let df = apply_time_window(
+        df,
+        eval_ctx.start - selector.offset,
+        eval_ctx.end - selector.offset,
+        eval_ctx.step,
+        lookback,
+    )?;
+    let df = apply_matchers(df, selector.matchers)?;
+    let shards = ctx.state().config().target_partitions();
+    build_shard_inputs(&df, columns, shards, &eval_ctx.trace_id).await
+}
+
+/// The label columns an emitted series carries, in the sorted order the materializing loader
+/// uses: string columns other than the hash and exemplars, narrowed by the label selector
+/// (which always keeps `le`), without the metric name unless the function keeps it.
+fn series_label_columns(
+    schema: &Schema,
+    labels: &SeriesLabels<'_>,
+    func_name: &str,
+) -> Vec<String> {
+    if labels.skip {
+        return vec![];
+    }
+    let mut cols: Vec<String> = schema
+        .fields()
+        .iter()
+        .filter(|field| matches!(field.data_type(), DataType::Utf8 | DataType::Utf8View))
+        .map(|field| field.name().clone())
+        .filter(|name| {
+            name != HASH_LABEL
+                && name != EXEMPLARS_LABEL
+                && (labels.selector.is_empty()
+                    || labels.selector.contains(name)
+                    || name == BUCKET_LABEL)
+                && (name != NAME_LABEL || KEEP_METRIC_NAME_FUNC.contains(func_name))
+        })
+        .collect();
+    cols.sort();
+    cols
 }
 
 /// The `by()` columns in a stable order; `None` for `without()`, which needs the full label set.
@@ -162,7 +271,10 @@ fn group_label_columns(
 mod tests {
     use config::meta::promql::value::{Label, RangeValue, Sample, TimeWindow};
     use datafusion::{
-        arrow::array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+        arrow::{
+            array::{Float64Array, Int64Array, RecordBatch, StringArray, UInt64Array},
+            datatypes::Field,
+        },
         datasource::MemTable,
         logical_expr::SortExpr,
         prelude::{SessionConfig, col},
@@ -415,6 +527,98 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[tokio::test]
+    async fn test_range_series_matches_eval_range_for_all_funcs() {
+        let ctx = session_ctx();
+        register_sorted_table(&ctx);
+        let range = Duration::from_secs(60);
+        let eval_ctx = eval_ctx();
+        let all_labels = HashSet::new();
+        let func_cases = [
+            "avg_over_time",
+            "changes",
+            "count_over_time",
+            "delta",
+            "deriv",
+            "idelta",
+            "increase",
+            "irate",
+            "last_over_time",
+            "max_over_time",
+            "min_over_time",
+            "rate",
+            "resets",
+            "stddev_over_time",
+            "stdvar_over_time",
+            "sum_over_time",
+        ];
+        for func_name in func_cases {
+            let func: Arc<dyn RangeFunc> =
+                Arc::from(functions::fusable_range_func(func_name).unwrap());
+            let expected = functions::eval_range(
+                Value::Matrix(reference_matrix(range)),
+                func.clone(),
+                &eval_ctx,
+            )
+            .unwrap();
+            let actual = range_series(
+                &ctx,
+                &arrow_schema(),
+                StreamingSelector {
+                    table_name: "m",
+                    matchers: &Matchers::empty(),
+                    offset: 0,
+                },
+                func,
+                range,
+                SeriesLabels {
+                    selector: &all_labels,
+                    skip: false,
+                },
+                &eval_ctx,
+            )
+            .await
+            .unwrap()
+            .expect("the sorted table streams");
+            assert_matrix_close(
+                canonical_matrix(expected),
+                canonical_matrix(actual),
+                &format!("streaming {func_name}()"),
+            );
+        }
+    }
+
+    #[test]
+    fn test_series_label_columns_follow_the_loader() {
+        let schema = Schema::new(vec![
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new(HASH_LABEL, DataType::UInt64, false),
+            Field::new(VALUE_LABEL, DataType::Float64, false),
+            Field::new("path", DataType::Utf8View, true),
+            Field::new(NAME_LABEL, DataType::Utf8, true),
+            Field::new(BUCKET_LABEL, DataType::Utf8, true),
+            Field::new("instance", DataType::Utf8, true),
+            Field::new(EXEMPLARS_LABEL, DataType::Utf8, true),
+        ]);
+        let all = HashSet::new();
+        let labels = |selector, skip| SeriesLabels { selector, skip };
+        assert_eq!(
+            series_label_columns(&schema, &labels(&all, false), "rate"),
+            ["instance", "le", "path"]
+        );
+        // last_over_time keeps the metric name, like an offset would
+        assert_eq!(
+            series_label_columns(&schema, &labels(&all, false), "last_over_time"),
+            [NAME_LABEL, "instance", "le", "path"]
+        );
+        let selected: HashSet<String> = ["path".to_string()].into_iter().collect();
+        assert_eq!(
+            series_label_columns(&schema, &labels(&selected, false), "rate"),
+            ["le", "path"]
+        );
+        assert!(series_label_columns(&schema, &labels(&all, true), "rate").is_empty());
     }
 
     #[tokio::test]

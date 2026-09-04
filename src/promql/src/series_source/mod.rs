@@ -28,7 +28,7 @@ use datafusion::error::Result;
 /// `labels`/`consume` read the current one.
 pub(crate) trait SeriesSource: Send {
     fn advance(&mut self) -> impl Future<Output = Result<Option<u64>>> + Send;
-    /// Group labels of the current series; valid only before `consume`.
+    /// The projected labels of the current series; valid only before `consume`.
     fn labels(&self) -> Labels;
     /// Time-ordered samples of the current series.
     fn consume(&mut self) -> impl Future<Output = Result<&[Sample]>> + Send;
