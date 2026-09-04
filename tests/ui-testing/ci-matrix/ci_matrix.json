@@ -16,7 +16,8 @@
       "anomaly-detection-form-validation.spec.js",
       "alerts-priority-tags.spec.js",
       "alerts-multialert-ui.spec.js",
-      "alert-library.spec.js"
+      "alert-library.spec.js",
+      "alerts-add-alert-org-identifier.spec.js"
     ],
     "disabled": [
       {

@@ -3604,6 +3604,20 @@ export class AlertsPage {
         await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
     }
 
+    // The submit button only renders once AddAlertView stops redirecting to the list, so wait on it before touching the header.
+    async expectAddAlertFormVisible() {
+        await expect(this.page.locator(this.locators.alertSubmitButton)).toBeVisible({ timeout: 15000 });
+    }
+
+    // goBackToAlertsList pushes a fresh query string, so assert on parsed searchParams rather than an exact URL match.
+    async expectBackRedirectPreservesOrg(org, folder) {
+        await this.clickBackButton();
+        await expect(this.page).toHaveURL(/\/web\/alerts\/?\?/, { timeout: 15000 });
+        const params = new URL(this.page.url()).searchParams;
+        expect(params.get('org_identifier')).toBe(org);
+        expect(params.get('folder')).toBe(folder);
+    }
+
     /**
      * Click a step indicator in the v3 alert wizard to navigate between steps.
      * Step indices: 0 = Step 1 (Stream Setup), 1 = Step 2 (Query Config), etc.

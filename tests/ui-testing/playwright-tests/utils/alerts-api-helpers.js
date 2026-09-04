@@ -177,6 +177,12 @@ async function seedAlertFixtures(page) {
   ]).catch(() => {});
 }
 
+/** Create an alerts folder and return its server-assigned folderId. */
+async function createAlertFolder(page, name) {
+  const r = await api(page, 'post', `${urls().v2}/folders/alerts`, { name, description: '' });
+  return (await r.json()).folderId;
+}
+
 /** Ingest rows into a stream (creates it on first write). */
 async function ingest(page, stream, rows) {
   return api(page, 'post', `${urls().v1}/${stream}/_json`, rows);
@@ -243,6 +249,6 @@ module.exports = {
   simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert, cronAlert,
   compositeAlert, validateComposite, getCompositeReferences,
   createAlert, listAlerts, findAlertId, getAlert, deleteAlerts, seedAlertFixtures,
-  ingest, getAlertGroups, getAlertTransitions,
+  createAlertFolder, ingest, getAlertGroups, getAlertTransitions,
   waitForAlertOutcome, waitForAlertLevel, isFiringOutcome,
 };
