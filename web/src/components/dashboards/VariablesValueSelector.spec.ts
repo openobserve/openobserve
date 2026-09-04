@@ -89,7 +89,12 @@ vi.mock("@/utils/zincutils", () => ({
   isWebSocketEnabled: vi.fn(() => false),
 }));
 
-vi.mock("@/utils/dashboard/variables/variablesDependencyUtils", () => ({
+// Partial: the real variables manager builds the SCOPED graph from this module,
+// so replacing the whole module leaves it without the chain it is being tested on.
+vi.mock("@/utils/dashboard/variables/variablesDependencyUtils", async (importOriginal) => ({
+  ...(await importOriginal<
+    typeof import("@/utils/dashboard/variables/variablesDependencyUtils")
+  >()),
   buildVariablesDependencyGraph: vi.fn((variables: any[]) => {
     const graph: any = {};
     variables.forEach((variable) => {
@@ -1597,6 +1602,111 @@ describe("VariablesValueSelector", () => {
       const emittedEvents = wrapper.emitted("openAddVariable");
       expect(emittedEvents).toBeDefined();
       expect(emittedEvents!.length).toBeGreaterThan(0);
+    });
+  });
+
+  // An all-sentinel parent keeps its `_o2_all_` value across its OWN fetch, so
+  // its value never changes when the options arrive. Gating the manager
+  // notification on a changed VALUE therefore never fires for such a parent, and
+  // onVariablePartiallyLoaded is the only thing that marks a dependent child
+  // pending — so the child never loads and its picker stays permanently empty.
+  // Completion, not change, is what a child waits on.
+  describe("a chained child is notified when its all-sentinel parent finishes loading", () => {
+    const chainedConfig = {
+      list: [
+        {
+          name: "namespace",
+          type: "query_values",
+          label: "Namespace",
+          multiSelect: true,
+          selectAllValueForMultiSelect: "all",
+          loadOptionsWithAllDefault: true,
+          query_data: {
+            field: "k8s_namespace_name",
+            stream: "k8s_pod_memory_usage",
+            stream_type: "metrics",
+            max_record_size: 100,
+            filter: [],
+          },
+        },
+        {
+          name: "pod",
+          type: "query_values",
+          label: "Pod",
+          multiSelect: true,
+          selectAllValueForMultiSelect: "all",
+          loadOptionsWithAllDefault: true,
+          query_data: {
+            field: "k8s_pod_name",
+            stream: "k8s_pod_memory_usage",
+            stream_type: "metrics",
+            max_record_size: 100,
+            filter: [{ name: "k8s_namespace_name", operator: "IN", value: "$namespace" }],
+          },
+        },
+      ],
+    };
+
+    it("notifies the manager on completion even though the parent value never changed", async () => {
+      const { useVariablesManager } = await import("@/composables/dashboard/useVariablesManager");
+      const manager = useVariablesManager(((key: string) => key) as never);
+      await manager.initialize(chainedConfig.list as any, {});
+
+      const parent = manager.variablesData.global.find((v: any) => v.name === "namespace") as any;
+      const child = manager.variablesData.global.find((v: any) => v.name === "pod") as any;
+      // The premise of the whole test: the child is NOT already pending, so the
+      // only way it ever loads is the notification under test.
+      expect(child.isVariableLoadingPending).toBe(false);
+      const valueBefore = JSON.stringify(parent.value);
+
+      wrapper = createWrapper({
+        variablesConfig: chainedConfig,
+        variablesManager: manager,
+        scope: "global",
+      });
+      await nextTick();
+
+      const vm = wrapper.vm as any;
+      const parentVariable = vm.variablesData.values.find((v: any) => v.name === "namespace");
+
+      // The parent's own fetch completes and returns options, but an all-sentinel
+      // parent holds `_o2_all_` throughout — so its VALUE is unchanged. `end` on
+      // the data channel is the completion signal the component acts on.
+      mockStreamingComposable.fetchQueryDataWithHttpStream.mockImplementation(
+        (payload: any, handlers: any) => {
+          handlers.data(payload, {
+            type: "search_response_hits",
+            content: {
+              results: {
+                hits: [
+                  {
+                    field: "k8s_namespace_name",
+                    values: [{ zo_sql_key: "argocd" }, { zo_sql_key: "monitor" }],
+                  },
+                ],
+              },
+            },
+          });
+          handlers.data(payload, { type: "end", content: {} });
+        },
+      );
+
+      await vm.loadVariableOptions(parentVariable);
+      // The child's own fetch is dispatched asynchronously once it is told.
+      await nextTick();
+      await new Promise((r) => setTimeout(r, 0));
+      await nextTick();
+
+      expect(JSON.stringify(parent.value), "parent value must be unchanged").toBe(valueBefore);
+
+      // The observable consequence, and the one the user sees: the child issues
+      // its own values query. Before the fix it was never notified, never became
+      // pending, never fetched, and its picker stayed empty forever.
+      const podCall = mockStreamingComposable.fetchQueryDataWithHttpStream.mock.calls.find(
+        (call: any) => JSON.stringify(call[0]).includes("k8s_pod_name"),
+      );
+      expect(podCall, "child never issued its values query").toBeTruthy();
+      expect(JSON.stringify(podCall[0])).not.toContain("$namespace");
     });
   });
 
