@@ -263,6 +263,35 @@ describe.each(packs)("generic invariants — %s pack", (packId, manifest) => {
     }
   });
 
+  it("a section scoping by a chained picker also scopes by every picker above it", () => {
+    // The completeness rule the coverage rule above cannot reach: every rule keyed
+    // off `scopedBy` is silent about the picker a section never listed, so omitting
+    // one renders no control and silently answers a narrow question with fleet-wide
+    // data — strictly worse than a visibly broken picker.
+    //
+    // Scoping narrowly is a legitimate editorial choice (an Overview stays fleet-
+    // wide on purpose), so breadth alone is not the defect. Offering a CHILD while
+    // withholding its PARENT is: the page invites the user to narrow to one pod
+    // while quietly pooling every cluster's identically-named pods. That is exactly
+    // how Workloads shipped fleet-wide under a chosen cluster.
+    const parentsOf = (name: string): string[] => {
+      const def: any = manifest.scopePickers.find((p: any) => p.name === name);
+      return (def?.chainedOn ?? []).map((c: any) => c.picker);
+    };
+    for (const section of manifest.sections) {
+      const scopedBy: string[] = section.scopedBy ?? [];
+      for (const name of scopedBy) {
+        for (const parent of parentsOf(name)) {
+          expect(
+            scopedBy.includes(parent),
+            `${section.id}.scopedBy offers "${name}" but not its parent "${parent}" — ` +
+              `its panels pool every ${parent} while the picker implies one`,
+          ).toBe(true);
+        }
+      }
+    }
+  });
+
   it("cardinality: every by(...) reaching the output is topk(N ≤ 20) or allowlist-only", () => {
     // Curated pages render on any fleet size — an unbounded per-node fan-out is a
     // page that dies on the org that needs it most.

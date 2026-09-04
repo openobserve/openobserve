@@ -319,13 +319,28 @@ describe("declarative scoping (pass-1 finding 3)", () => {
     }
   });
 
-  it("Workloads declares namespace/pod, and every kube-state workload panel scopes on namespace", () => {
+  it("Workloads declares cluster/namespace/pod, and every kube-state workload panel scopes on namespace", () => {
     expect(kubernetesPage.sections.find((s: any) => s.id === "workloads")!.scopedBy).toEqual([
+      "cluster",
       "namespace",
       "pod",
     ]);
     for (const id of ["k8s_wl_nonrunning_by_ns", "k8s_wl_cpu_requests"]) {
       expect(queriesOf(id)[0], id).toContain("${scope:namespace}");
+    }
+  });
+
+  it("EVERY Workloads panel carries the cluster scope on EVERY query", () => {
+    // Pod names repeat across clusters, so an unscoped Workloads panel silently
+    // pools identically-named pods from every cluster into one series while the
+    // cluster picker beside it reads as a single cluster. No panel opts out:
+    // unlike `pod`, narrowing to one cluster never under-reports a namespace
+    // rollup — it is the rollup the user asked for.
+    const workloads = kubernetesPage.sections.find((s: any) => s.id === "workloads")!;
+    expect(workloads.panels.length).toBe(8);
+    for (const p of workloads.panels as any[]) {
+      expect(p.fleetWide ?? [], `${p.id} must not opt out of cluster`).not.toContain("cluster");
+      for (const q of queriesOf(p.id)) expect(q, p.id).toContain("${scope:cluster}");
     }
   });
 
