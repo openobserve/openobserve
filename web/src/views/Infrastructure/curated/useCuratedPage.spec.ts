@@ -307,8 +307,16 @@ describe("useCuratedPage", () => {
       // k8s streams ARE arriving, but none satisfies a pack group, so the face must
       // claim absence while l0State keeps saying the workload was seen — the exact
       // pair the partialTelemetry line needs. `toBeDefined()` alone passed on ref(null).
+      // TWO k8s_-prefixed streams: the L0 signature is ">= 2 metrics streams
+      // prefixed k8s_" (useWorkloadDetection.ts, unchanged per §3.4), so one
+      // stream reads `undetected` on BOTH halves and the pair stops
+      // discriminating. Neither name is required by any pack variant, so the
+      // page still resolves zero groups.
       primeStreams({
-        metrics: [streamEntry("k8s_ingress_requests_total", NODE_SCHEMA)],
+        metrics: [
+          streamEntry("k8s_ingress_requests_total", NODE_SCHEMA),
+          streamEntry("k8s_ingress_request_duration", NODE_SCHEMA),
+        ],
         logs: [],
       });
       const h = withCuratedPage();
@@ -330,9 +338,12 @@ describe("useCuratedPage", () => {
     });
 
     it("a successful FORCED retry clears loadError and reaches `ready`", async () => {
-      getStreamsMock
-        .mockRejectedValueOnce(new Error("network"))
-        .mockRejectedValueOnce(new Error("network"));
+      // ONE queued rejection, because the failing refresh makes exactly one
+      // getStreams call: the k8s pack's groups are all `metrics`, so tier 1 is a
+      // single blocking read, and its catch returns BEFORE the best-effort L0
+      // `logs` read. A second queued rejection would be consumed by the retry
+      // itself and this could never go green against a correct implementation.
+      getStreamsMock.mockRejectedValueOnce(new Error("network"));
       const h = withCuratedPage();
       wrapper = h.wrapper;
       await h.page.refresh(refreshArgs);

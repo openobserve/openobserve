@@ -1182,23 +1182,28 @@ describe("VariableQueryValueSelector", () => {
   // person operating it. Additive prop, default false, so stored dashboards are
   // unaffected (same posture as the PanelContainer badge).
   describe("disabled prop forwarding", () => {
+    // The stub's own static `data-test` never reaches the DOM: the component
+    // binds `:data-test="variable-selector-<name>-inner"` on OSelect and a bound
+    // fallthrough attribute OVERWRITES the stub root's static one. So these read
+    // the component's real selector; `data-disabled` is the stub echoing the
+    // forwarded prop either way.
+    const oSelect = () => wrapper.find('[data-test="variable-selector-region-inner"]');
+
     it("forwards disabled:true to OSelect", () => {
       wrapper = createWrapper({ disabled: true });
-      const select = wrapper.find('[data-test="dashboard-variable-query-value-selector"]');
-      expect(select.attributes("data-disabled")).toBe("true");
+      expect(oSelect().exists()).toBe(true);
+      expect(oSelect().attributes("data-disabled")).toBe("true");
     });
 
     it("defaults to NOT disabled when the prop is omitted — the stored-dashboard guard", () => {
       wrapper = createWrapper();
-      const select = wrapper.find('[data-test="dashboard-variable-query-value-selector"]');
-      expect(select.attributes("data-disabled")).toBe("false");
+      expect(oSelect().exists()).toBe(true);
+      expect(oSelect().attributes("data-disabled")).toBe("false");
     });
 
     it("forwards disabled:false explicitly", () => {
       wrapper = createWrapper({ disabled: false });
-      expect(
-        wrapper.find('[data-test="dashboard-variable-query-value-selector"]').attributes("data-disabled"),
-      ).toBe("false");
+      expect(oSelect().attributes("data-disabled")).toBe("false");
     });
 
     it("renders the not-applicable tooltip when disabled with a reason key", () => {
