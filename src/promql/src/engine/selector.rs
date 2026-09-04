@@ -29,7 +29,7 @@ use datafusion::{
 };
 use futures::future::{pending, try_join_all};
 use hashbrown::HashMap;
-use infra::errors::{Error, ErrorCodes};
+use infra::errors::ErrorCodes;
 use promql_parser::{
     label::{MatchOp, Matchers},
     parser::{LabelModifier, MatrixSelector, Offset, VectorSelector},
@@ -374,7 +374,7 @@ impl Engine {
         let timeout = self.ctx.query_ctx.timeout;
         let query_task = try_join_all(tasks);
         tokio::pin!(query_task);
-        let task_results = tokio::select! {
+        let task_results: Result<Vec<_>> = tokio::select! {
             ret = &mut query_task => {
                 match ret {
                     Ok(ret) => {
@@ -385,13 +385,14 @@ impl Engine {
                                 Ok(Ok(data)) => unwrapped_results.push(data),
                                 Ok(Err(_)) => {
                                     log::error!("[trace_id {trace_id}] [PromQL] grpc search load data task timeout");
-                                    return Err(DataFusionError::Plan(
-                                        Error::ErrorCode(ErrorCodes::SearchTimeout("[PromQL] grpc search load data task timeout".to_string())).to_string()
-                                    ));
+                                    return Err(ErrorCodes::SearchTimeout(
+                                        "[PromQL] grpc search load data task timeout".to_string(),
+                                    )
+                                    .into());
                                 }
                                 Err(err) => {
                                     log::error!("[trace_id {trace_id}] [PromQL] grpc search execute error: {err}");
-                                    return Err(DataFusionError::Plan(format!("task error: {err}")));
+                                    return Err(ErrorCodes::ServerInternalError(err.to_string()).into());
                                 }
                             }
                         }
@@ -399,7 +400,7 @@ impl Engine {
                     },
                     Err(err) => {
                         log::error!("[trace_id {trace_id}] [PromQL] grpc search execute error: {err}");
-                        Err(Error::Message(err.to_string()))
+                        Err(ErrorCodes::ServerInternalError(err.to_string()).into())
                     }
                 }
             },
@@ -408,7 +409,7 @@ impl Engine {
                     handle.abort();
                 }
                 log::error!("[trace_id {trace_id}] [PromQL] grpc search timeout");
-                Err(Error::ErrorCode(ErrorCodes::SearchTimeout("[PromQL] grpc search timeout".to_string())))
+                Err(ErrorCodes::SearchTimeout("[PromQL] grpc search timeout".to_string()).into())
             },
             _ = async {
                 match abort_receiver.as_mut() {
@@ -422,12 +423,11 @@ impl Engine {
                     handle.abort();
                 }
                 log::info!("[trace_id {trace_id}] [PromQL] grpc search canceled");
-                Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery("[PromQL] grpc search canceled".to_string())))
+                Err(ErrorCodes::SearchCancelQuery("[PromQL] grpc search canceled".to_string()).into())
             }
         };
 
-        let task_results =
-            task_results.map_err(|e| DataFusionError::Plan(format!("task error: {e}")))?;
+        let task_results = task_results?;
 
         // check for super cluster
         #[cfg(feature = "enterprise")]
@@ -601,21 +601,17 @@ impl Engine {
                 }
             } => {
                 log::info!("[trace_id {trace_id}] [PromQL] streaming fused agg canceled");
-                Err(DataFusionError::Plan(
-                    Error::ErrorCode(ErrorCodes::SearchCancelQuery(
-                        "[PromQL] streaming fused agg canceled".to_string(),
-                    ))
-                    .to_string(),
-                ))
+                Err(ErrorCodes::SearchCancelQuery(
+                    "[PromQL] streaming fused agg canceled".to_string(),
+                )
+                .into())
             }
             _ = tokio::time::sleep(Duration::from_secs(timeout)) => {
                 log::error!("[trace_id {trace_id}] [PromQL] streaming fused agg timeout");
-                Err(DataFusionError::Plan(
-                    Error::ErrorCode(ErrorCodes::SearchTimeout(
-                        "[PromQL] streaming fused agg timeout".to_string(),
-                    ))
-                    .to_string(),
-                ))
+                Err(ErrorCodes::SearchTimeout(
+                    "[PromQL] streaming fused agg timeout".to_string(),
+                )
+                .into())
             }
             ret = &mut run => ret,
         }
@@ -1273,20 +1269,20 @@ mod tests {
 
         #[tokio::test]
         async fn test_streaming_run_stops_on_cancel() {
-            let err = eval_sum_rate(provider(true, true), 30)
-                .await
-                .unwrap_err()
-                .to_string();
-            assert!(err.contains("canceled"), "unexpected error: {err}");
+            let err = eval_sum_rate(provider(true, true), 30).await.unwrap_err();
+            assert!(matches!(
+                infra::errors::Error::from(err),
+                infra::errors::Error::ErrorCode(ErrorCodes::SearchCancelQuery(_))
+            ));
         }
 
         #[tokio::test]
         async fn test_streaming_run_stops_on_timeout() {
-            let err = eval_sum_rate(provider(true, false), 0)
-                .await
-                .unwrap_err()
-                .to_string();
-            assert!(err.contains("timeout"), "unexpected error: {err}");
+            let err = eval_sum_rate(provider(true, false), 0).await.unwrap_err();
+            assert!(matches!(
+                infra::errors::Error::from(err),
+                infra::errors::Error::ErrorCode(ErrorCodes::SearchTimeout(_))
+            ));
         }
 
         #[tokio::test]
