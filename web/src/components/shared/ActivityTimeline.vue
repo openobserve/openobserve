@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
 
     <div v-else class="relative flex min-h-0 flex-1 flex-col">
-      <div class="absolute top-1 right-1 z-10 flex flex-col gap-1">
+      <div v-if="showScrollButtons" class="absolute top-1 right-1 z-10 flex flex-col gap-1">
         <OButton
           variant="ghost-muted"
           size="icon-circle-sm"
@@ -240,6 +240,9 @@ interface Props {
   submitting?: boolean;
   commentText: string;
   systemLabel?: string;
+  /** Off in a compact host (e.g. a table row expansion) where the feed is
+   *  short enough that jump-to-top/bottom controls are just clutter. */
+  showScrollButtons?: boolean;
 
   isCommentEvent: (event: any) => boolean;
   getUserId: (event: any) => string;
@@ -279,6 +282,7 @@ const props = withDefaults(defineProps<Props>(), {
   loading: false,
   submitting: false,
   systemLabel: "System",
+  showScrollButtons: true,
   isAiLabelled: undefined,
   aiSreBadgeText: () => raw(""),
   getTooltip: undefined,

@@ -105,7 +105,7 @@ export type ResponseEventKind =
    * The machine-readable half of the ledger. Deliberately kept off the human
    * timeline — a responder wants one legible "paged ana, bo" line, not a row
    * per address — but it is what `GET /responses/{id}/deliveries` returns, so
-   * the kind has to exist here even though `OnCallTimeline` filters it out.
+   * the kind has to exist here even though the human timeline filters it out.
    */
   | "delivery"
   /**

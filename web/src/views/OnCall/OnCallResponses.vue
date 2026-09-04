@@ -111,6 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :enable-column-resize="true"
       data-test="oncall-responses-table"
       :row-tone="rowTone"
+      :row-rail-tone="rowRailTone"
       :row-section="visibleRowSection"
       :section-order="SECTION_ORDER"
       selection="multiple"
@@ -549,20 +550,30 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #expansion="{ row }">
         <div class="px-page-edge py-3" :data-test="`oncall-expansion-${row.rowKey}`">
           <OInnerLoading v-if="expandedLoading" showing />
-          <!-- What happened beside what it usually means: the timeline answers
-               "what has this page done", the panel answers "should I be worried
-               about it", and neither is much use without the other. -->
-          <div v-else class="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-            <OnCallTimeline
-              v-if="expandedEvents.length"
+          <template v-else>
+            <div class="mb-2 flex justify-end">
+              <OButton
+                variant="ghost-primary"
+                size="sm"
+                data-test="oncall-expansion-activity-toggle-all"
+                @click="expandedShowAllActivity = !expandedShowAllActivity"
+              >
+                {{
+                  expandedShowAllActivity
+                    ? t("oncall.activityHideSystem")
+                    : t("oncall.activityShowSystemCount", { count: expandedSystemActivityCount })
+                }}
+              </OButton>
+            </div>
+            <OnCallActivityTimeline
               :events="expandedEvents"
-              :opened-at="row.latest.opened_at"
+              :show-scroll-buttons="false"
+              v-model:comment-text="expandedNoteBody"
+              v-model:show-all="expandedShowAllActivity"
+              :submitting="addingExpandedNote"
+              @submit="addExpandedNote(row.latest.id)"
             />
-            <p v-else class="text-text-muted text-sm" data-test="oncall-expansion-empty">
-              {{ t("oncall.ladderNothingSent") }}
-            </p>
-            <OnCallPageContext :firings="expandedHistory" :causes="expandedCauses" />
-          </div>
+          </template>
         </div>
       </template>
 
@@ -728,11 +739,10 @@ import { useRoute, useRouter } from "vue-router";
 import { useStore } from "vuex";
 
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
+import OnCallActivityTimeline from "@/components/oncall/OnCallActivityTimeline.vue";
 import OnCallEscalationCell from "@/components/oncall/OnCallEscalationCell.vue";
-import OnCallPageContext from "@/components/oncall/OnCallPageContext.vue";
 import OnCallSetupChecklist from "@/components/oncall/OnCallSetupChecklist.vue";
 import OnCallShiftBanner from "@/components/oncall/OnCallShiftBanner.vue";
-import OnCallTimeline from "@/components/oncall/OnCallTimeline.vue";
 import { useOnCallPermissions } from "@/composables/useOnCallPermissions";
 import OText from "@/lib/core/Typography/OText.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -757,13 +767,12 @@ import OTag from "@/lib/core/Badge/OTag.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import { COL } from "@/lib/core/Table/OTable.types";
-import type { OTableColumnDef, RowTone } from "@/lib/core/Table/OTable.types";
+import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
 import incidentsService from "@/services/incidents";
 import oncallService, { RESPONSE_PAGE_LIMIT } from "@/services/oncall";
 import type {
-  CauseGroup,
   Channel,
   CoverageGaps,
   EscalationProgress,
@@ -782,6 +791,7 @@ import { raw, useI18nTyped } from "@/types/i18n";
 import { formatMicrosDuration } from "@/utils/formatters";
 import { focusSearchInput, isInputFocused } from "@/utils/keyboardShortcuts";
 import {
+  DEFAULT_ACTIVITY_KINDS,
   groupBySubject,
   isDeliverableChannel,
   isEscalating,
@@ -845,9 +855,13 @@ const progressById = ref<Record<string, EscalationProgress>>({});
 const escalationCapped = ref(false);
 const expandedIds = ref<string[]>([]);
 const expandedEvents = ref<OnCallResponseEvent[]>([]);
-const expandedHistory = ref<OnCallResponse[]>([]);
-const expandedCauses = ref<CauseGroup[]>([]);
 const expandedLoading = ref(false);
+const expandedNoteBody = ref("");
+const addingExpandedNote = ref(false);
+const expandedShowAllActivity = ref(true);
+const expandedSystemActivityCount = computed(
+  () => expandedEvents.value.filter((e) => !DEFAULT_ACTIVITY_KINDS.includes(e.kind)).length,
+);
 const teamsAvailable = ref(true);
 const truncated = ref(false);
 const loading = ref(false);
@@ -1507,6 +1521,10 @@ function rowTone(row: PageRow): RowTone | null {
   return isSnoozed(row.latest) ? "muted" : null;
 }
 
+function rowRailTone(row: PageRow): RowRailTone | null {
+  return isRinging(row) ? "error" : null;
+}
+
 function errorMessage(err: unknown): string {
   const body = (err as { response?: { data?: { message?: string } } } | null)?.response?.data;
   return body?.message ?? (err instanceof Error ? err.message : "");
@@ -1712,25 +1730,36 @@ async function fetchEscalationProgress() {
   progressById.value = next;
 }
 
-/// The expanded row's timeline plus what previous firings turned out to be.
+/// The expanded row's timeline.
 async function fetchExpandedEvents(responseId: string) {
   expandedLoading.value = true;
   expandedEvents.value = [];
-  expandedHistory.value = [];
-  expandedCauses.value = [];
   try {
-    // Settled: the context panel is worth having, but a missing prior-cause
-    // must not cost the timeline that sits beside it.
-    const [events, history, causes] = await Promise.allSettled([
-      oncallService.getResponse({ org_identifier: orgId.value, response_id: responseId }),
-      oncallService.responseHistory({ org_identifier: orgId.value, response_id: responseId }),
-      oncallService.priorCauses({ org_identifier: orgId.value, response_id: responseId }),
-    ]);
-    if (events.status === "fulfilled") expandedEvents.value = events.value.data?.events ?? [];
-    if (history.status === "fulfilled") expandedHistory.value = history.value.data ?? [];
-    if (causes.status === "fulfilled") expandedCauses.value = causes.value.data ?? [];
+    const res = await oncallService.getResponse({
+      org_identifier: orgId.value,
+      response_id: responseId,
+    });
+    expandedEvents.value = res.data?.events ?? [];
+  } catch {
+    // A failed fetch leaves this row's timeline empty rather than erroring the whole list.
   } finally {
     expandedLoading.value = false;
+  }
+}
+
+async function addExpandedNote(responseId: string) {
+  const body = expandedNoteBody.value.trim();
+  if (!body) return;
+  addingExpandedNote.value = true;
+  try {
+    await oncallService.addNote({ org_identifier: orgId.value, response_id: responseId, body });
+    expandedNoteBody.value = "";
+    toast({ variant: "success", message: t("oncall.noteAdded") });
+    await fetchExpandedEvents(responseId);
+  } catch (err) {
+    toast({ variant: "error", message: raw(errorMessage(err)) || t("oncall.addNoteFailed") });
+  } finally {
+    addingExpandedNote.value = false;
   }
 }
 
@@ -1747,6 +1776,8 @@ async function refreshAll() {
 // Expansion is single-mode, so there is at most one id to resolve. The table
 // keys rows by `rowKey`, which is the group key when grouping is on.
 watch(expandedIds, (ids) => {
+  expandedNoteBody.value = "";
+  expandedShowAllActivity.value = true;
   const row = rows.value.find((candidate) => candidate.rowKey === ids[0]);
   if (row) void fetchExpandedEvents(row.latest.id);
   else expandedEvents.value = [];

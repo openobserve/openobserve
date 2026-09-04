@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <ActivityTimeline
     :events="visibleEvents"
     :submitting="submitting"
+    :show-scroll-buttons="showScrollButtons"
     v-model:comment-text="commentTextModel"
     :is-comment-event="isCommentEvent"
     :get-user-id="getUserId"
@@ -70,9 +71,10 @@ interface Props {
   events: OnCallResponseEvent[];
   commentText: string;
   submitting?: boolean;
+  showScrollButtons?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), { submitting: false });
+const props = withDefaults(defineProps<Props>(), { submitting: false, showScrollButtons: true });
 
 const emit = defineEmits<{
   "update:commentText": [value: string];
