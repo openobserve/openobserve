@@ -628,7 +628,6 @@ export function buildDashboard(
   opts: {
     timezone: string;
     nowUs: number;
-    activeSectionId?: string;
     /** Threaded onto every drilldown URL so the explorer opens the SAME window. */
     drilldownRange?: { period?: string; from?: number; to?: number };
     /** Options already fetched, by picker name — a rebuild re-initializes the
@@ -650,6 +649,9 @@ export function buildDashboard(
       return {
         tabId: section.id,
         name: section.id,
+        // A caveat about THIS section's panels as a set — carried per tab so the
+        // built object never depends on which tab is selected.
+        ...(section.noteKey ? { curatedNoteKey: section.noteKey } : {}),
         panels: panels.map((panel, index) =>
           buildPanel(
             panel,
@@ -668,15 +670,8 @@ export function buildDashboard(
     })
     .filter((tab): tab is NonNullable<typeof tab> => tab !== null);
 
-  // The note belongs to the ACTIVE section only: a caveat about the Overview
-  // trio is not true of the Nodes tab, and one line for all sections would be
-  // read as a page-wide disclaimer.
-  const noteSectionId = opts.activeSectionId ?? tabs[0]?.tabId;
-  const noteKey = manifest.sections.find((section) => section.id === noteSectionId)?.noteKey;
-
   return {
     version: 8,
-    ...(noteKey ? { curatedSectionNoteKey: noteKey } : {}),
     dashboardId: "",
     title: "",
     description: "",
@@ -684,13 +679,7 @@ export function buildDashboard(
     owner: "",
     variables: {
       list: resolution.pickers.map((picker) =>
-        buildVariable(
-          picker,
-          resolution,
-          manifest,
-          opts.activeSectionId ?? tabs[0]?.tabId,
-          opts.pickerOptions?.[picker.def.name],
-        ),
+        buildVariable(picker, resolution, manifest, opts.pickerOptions?.[picker.def.name]),
       ),
       showDynamicFilters: false,
     },
@@ -1049,7 +1038,6 @@ function buildVariable(
   picker: ResolvedPicker,
   resolution: CuratedResolution,
   manifest: CuratedPageManifest,
-  activeSectionId: string | undefined,
   loadedOptions: PickerOption[] | undefined,
 ): Record<string, unknown> {
   const def = picker.def;
@@ -1058,19 +1046,18 @@ function buildVariable(
     ? resolution.pickers.find((entry) => entry.def.name === parent)
     : undefined;
 
-  // useVariablesManager CLONES every variable on initialize (:141-148) and again
-  // at :414, and initialize is driven by dashboardData IDENTITY — so a disabled
-  // flag mutated onto these objects after the build is invisible to the rendered
-  // picker. It has to be stamped HERE, inside the built object, to ride the clone.
-  const activeSection = manifest.sections.find((section) => section.id === activeSectionId);
-  const scopedBy = activeSection?.scopedBy ?? [];
-  const curatedDisabled = activeSection ? !scopedBy.includes(def.name) : false;
+  // The sections this picker applies to, declared on the variable the way the
+  // dashboards model declares `tabs` — read as a reactive filter at render time
+  // so switching tabs never rebuilds this object. Scope stays "global": an
+  // all-sentinel variable at tab scope is skipped by setTabVisibility and would
+  // never fetch its options at all.
+  const curatedTabs = manifest.sections
+    .filter((section) => (section.scopedBy ?? []).includes(def.name))
+    .map((section) => section.id);
 
   return {
-    curatedDisabled,
-    ...(curatedDisabled ? { curatedDisabledTooltipKey: "infra.curated.pickerNotApplicable" } : {}),
+    curatedTabs,
     curatedPickerLabel: picker.label,
-    curatedSectionLabel: activeSection?.titleKey ?? "",
     name: def.name,
     label: def.labelKey ? "" : picker.label,
     ...(def.labelKey ? { labelKey: def.labelKey } : {}),

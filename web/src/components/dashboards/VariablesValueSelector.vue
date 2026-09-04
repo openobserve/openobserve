@@ -30,12 +30,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
-          :disabled="!!item.curatedDisabled"
-          :disabledTooltipKey="item.curatedDisabledTooltipKey"
-          :disabledTooltipParams="{
-            picker: item.curatedPickerLabel ?? item.label ?? item.name,
-            section: item.curatedSectionLabel ?? '',
-          }"
           @update:model-value="onVariablesValueUpdated(Number(index))"
           :loadOptions="loadVariableOptions"
           @search="onVariableSearch(Number(index), $event)"

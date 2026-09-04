@@ -50,7 +50,6 @@ const HOUR_US = 60 * 60 * 1_000_000;
 let state: any;
 
 const refreshSpy = vi.fn(async () => {});
-const rebuildSpy = vi.fn(() => {});
 const rememberSpy = vi.fn((_variables: unknown) => {});
 
 /**
@@ -76,9 +75,16 @@ const dashboardFixture = (sections = ["overview", "nodes"]) => ({
   })),
 });
 
+/** The note rides the TAB it qualifies, so the build never depends on the selected tab. */
+const withNoteOnFirstTab = (dashboard: any) => ({
+  ...dashboard,
+  tabs: dashboard.tabs.map((tab: any, index: number) =>
+    index === 0 ? { ...tab, curatedNoteKey: "infra.k8s.section.overviewNote" } : tab,
+  ),
+});
+
 const makeState = (over: Record<string, any> = {}) => {
   refreshSpy.mockClear();
-  rebuildSpy.mockClear();
   rememberSpy.mockClear();
   return {
     face: ref("ready"),
@@ -96,7 +102,6 @@ const makeState = (over: Record<string, any> = {}) => {
     // production could not take; the door is derived from the manifest instead.
     presentGroupIds: ref([]),
     refresh: refreshSpy,
-    rebuild: rebuildSpy,
     rememberPickerOptions: rememberSpy,
     ...over,
   };
@@ -670,7 +675,7 @@ describe("CuratedPageView", () => {
     it("the hedge renders the `infra.curated.hiddenFootnote` KEY, not ad-hoc copy", async () => {
       // Structure alone (one node, on no row) is satisfied by any hardcoded string.
       // §8.4 authors this as one key so the sentence is translated and edited in one
-      // place; the key idiom follows the pickerNotApplicable pin below.
+      // place, rather than as copy inlined at the call site.
       wrapper = await mountView(
         {},
         { hiddenGroups: ref([hiddenGroup()]), stripAutoExpand: ref(true) },
@@ -900,10 +905,7 @@ describe("CuratedPageView", () => {
       wrapper = await mountView(
         {},
         {
-          dashboard: ref({
-            ...dashboardFixture(),
-            curatedSectionNoteKey: "infra.k8s.section.overviewNote",
-          }),
+          dashboard: ref(withNoteOnFirstTab(dashboardFixture())),
         },
       );
       const note = wrapper.find('[data-test="curated-section-note"]');
@@ -1036,30 +1038,32 @@ describe("CuratedPageView", () => {
       return selector;
     };
 
-    // curatedDisabled is stamped INSIDE the built variables (resolve.ts
-    // buildVariable), NOT mutated onto them afterwards: useVariablesManager
-    // clones every variable on initialize (:141-148, :414) and re-initializes
-    // only on a new dashboardData IDENTITY, so a post-build mutation was
-    // invisible to the rendered picker on every tab after the first. The BUILD
-    // half is pinned in resolve.spec.ts; this is the view's half of the seam.
-    it("a tab switch asks the composable to REBUILD — the flags cannot ride a mutation", async () => {
+    // THE restructure invariant, and the direct cause of "filters reset on tab
+    // switch": a tab switch must mutate the injected selectedTabId ref and
+    // NOTHING else. Rebuilding emitted a new dashboard object, which re-ran
+    // useVariablesManager.initialize, which re-seeded every picker from
+    // buildVariable's `value: ""` and discarded the user's selection. Dashboards
+    // never do this (ViewDashboard :540-542, RenderDashboardCharts :528-531).
+    it("a tab switch changes ONLY the injected tab ref — the dashboard object is untouched", async () => {
       const variables = pickerVariables();
       wrapper = await mountView({}, withPickers(variables));
-      rebuildSpy.mockClear();
 
-      const injected = (wrapper.findComponent({ name: "RenderDashboardCharts" }).vm as any).$
-        .provides["selectedTabId"] as Ref<string | null>;
+      const render = wrapper.findComponent({ name: "RenderDashboardCharts" });
+      const before = render.props("dashboardData");
+      const injected = (render.vm as any).$.provides["selectedTabId"] as Ref<string | null>;
       expect(isRef(injected)).toBe(true);
+
       injected.value = "workloads";
       await flushPromises();
 
-      expect(rebuildSpy).toHaveBeenCalled();
+      // Same object IDENTITY — that is what stops the manager re-initializing.
+      expect(render.props("dashboardData")).toBe(before);
     });
 
-    // The rebuild above re-initializes the variables manager, which never
+    // A re-resolve re-initializes the variables manager, which never
     // re-fetches an all-sentinel picker — so the view has to hand the loaded
     // options back to the composable before the next build drops them.
-    it("forwards loaded variable options to the composable so a rebuild keeps them", async () => {
+    it("forwards loaded variable options to the composable so a re-resolve keeps them", async () => {
       wrapper = await mountView({}, withPickers(pickerVariables()));
       rememberSpy.mockClear();
 
@@ -1073,19 +1077,6 @@ describe("CuratedPageView", () => {
       await flushPromises();
 
       expect(rememberSpy).toHaveBeenCalledWith(payload);
-    });
-
-    it("the REAL selector forwards curatedDisabled + tooltip key to VariableQueryValueSelector", async () => {
-      const variables = pickerVariables();
-      (variables[1] as any).curatedDisabled = true;
-      (variables[1] as any).curatedDisabledTooltipKey = "infra.curated.pickerNotApplicable";
-      const selector = await mountRealSelector(variables);
-      const inner = selector
-        .findAllComponents({ name: "VariableQueryValueSelector" })
-        .find((c: any) => c.props("variableItem")?.name === "namespace") as any;
-      expect(inner.props("disabled")).toBe(true);
-      expect(inner.props("disabledTooltipKey")).toBe("infra.curated.pickerNotApplicable");
-      selector.unmount();
     });
 
     it("values length === cap renders valuesCapped in the REAL selector; below the cap it is absent", async () => {
@@ -1389,9 +1380,9 @@ describe("CuratedPageView", () => {
       expect(committedValue(manager, "namespace")).toEqual(["argocd"]);
     });
 
-    it("a picker change does NOT re-resolve or rebuild — only the selection moved", async () => {
+    it("a picker change does NOT re-resolve — only the selection moved", async () => {
       // The counterweight: committing must not be smuggled in via a full
-      // refresh()/rebuild(), which would remount every panel and drop the
+      // refresh(), which would remount every panel and drop the
       // pickers' own loaded options.
       const dashboardData = workloadsDashboard();
       wrapper = await mountView({}, { dashboard: ref(dashboardData) });
@@ -1402,14 +1393,12 @@ describe("CuratedPageView", () => {
         .vm.$emit("variablesManagerReady", manager);
       await flushPromises();
       refreshSpy.mockClear();
-      rebuildSpy.mockClear();
       const identityBefore = captured.dashboardData;
 
       manager.updateVariableValue("namespace", "global", undefined, undefined, ["ziox"]);
       await flushPromises();
 
       expect(refreshSpy).not.toHaveBeenCalled();
-      expect(rebuildSpy).not.toHaveBeenCalled();
       expect(captured.dashboardData).toBe(identityBefore);
     });
   });

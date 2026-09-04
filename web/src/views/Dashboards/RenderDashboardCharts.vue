@@ -516,10 +516,17 @@ export default defineComponent({
     provide("variablesManager", variablesManager);
 
     // Computed properties for filtered variables by scope
+    // `curatedTabs` narrows a GLOBAL variable to the tabs that declare it —
+    // curated pages need per-tab picker applicability but cannot use tab scope,
+    // because setTabVisibility skips all-sentinel variables and they would never
+    // fetch their options. Stored dashboards never carry the key, so they keep
+    // showing every global variable on every tab.
     const globalVariables = computed(() => {
       return (
         props.dashboardData?.variables?.list?.filter(
-          (v: any) => !v.scope || v.scope === "global",
+          (v: any) =>
+            (!v.scope || v.scope === "global") &&
+            (!v.curatedTabs || v.curatedTabs.includes(selectedTabId.value)),
         ) || []
       );
     });
