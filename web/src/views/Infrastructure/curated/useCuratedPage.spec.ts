@@ -18,7 +18,7 @@
 // dashboard ref. Fan-out/generation conventions follow useHostsList.spec.ts.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { defineComponent, nextTick } from "vue";
+import { defineComponent, watch } from "vue";
 import { mount, flushPromises } from "@vue/test-utils";
 import { createStore } from "vuex";
 import type { FieldAlias } from "@/services/service_streams";
@@ -355,6 +355,72 @@ describe("useCuratedPage", () => {
       await flushPromises();
       expect(h.page.loadError.value).toBe(false);
       expect(h.page.face.value).toBe("ready");
+    });
+
+    it("a lists failure AFTER a good load DROPS the page — never a confident stale one", async () => {
+      // face was checked before loadError and presentGroupIds was never reset, so
+      // the previous org's charts stayed on screen with no Retry anywhere.
+      const h = withCuratedPage();
+      wrapper = h.wrapper;
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+      expect(h.page.face.value).toBe("ready");
+      expect(h.page.dashboard.value).not.toBeNull();
+
+      getStreamsMock.mockRejectedValue(new Error("lists down"));
+      await h.page.refresh({ ...refreshArgs, force: true });
+      await flushPromises();
+
+      expect(h.page.loadError.value).toBe(true);
+      // `unknown` + loadError is what the view renders the Retry on; `ready`
+      // renders charts and no Retry at all.
+      expect(h.page.face.value).toBe("unknown");
+      expect(h.page.dashboard.value).toBeNull();
+      expect(h.page.staleGroups.value).toEqual([]);
+    });
+
+    it("an ORG SWITCH drops the previous org's dashboard for the whole tier-1 window", async () => {
+      // Tier 1 is 1.5-3.3s on a large org; leaving the old dashboard mounted keeps
+      // firing the previous org's panel queries against the NEW org id.
+      const h = withCuratedPage();
+      wrapper = h.wrapper;
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+      const previous = h.page.dashboard.value;
+      expect(previous).not.toBeNull();
+
+      let release!: (value: any) => void;
+      getStreamsMock.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }),
+      );
+      const pending = h.page.refresh({ ...refreshArgs, orgId: "other-org", force: true });
+      await flushPromises();
+
+      expect(h.page.face.value).toBe("unknown");
+      expect(h.page.dashboard.value).toBeNull();
+
+      release({ list: [] });
+      await pending;
+      await flushPromises();
+    });
+
+    it("a HEALTHY page never passes through `undetected` — no setup-face flash", async () => {
+      // settledGroupIds/listsLoaded were set before the first applyResolution, so
+      // presentGroupIds was still empty in that window and the face read absence.
+      const h = withCuratedPage();
+      wrapper = h.wrapper;
+      const seen: string[] = [];
+      const stop = watch(h.page.face, (value) => seen.push(value), { immediate: true });
+
+      await h.page.refresh(refreshArgs);
+      await flushPromises();
+      stop();
+
+      expect(h.page.face.value).toBe("ready");
+      expect(seen).not.toContain("undetected");
     });
   });
 
@@ -865,6 +931,34 @@ describe("useCuratedPage", () => {
 
       expect(getStreamsMock).toHaveBeenCalledWith("metrics", false, false, true);
       for (const call of getStreamsMock.mock.calls) expect(call[3]).toBe(true);
+    });
+
+    it("schema reads are scoped PER ORG — org B re-reads a name org A already read", async () => {
+      // Defence in depth behind the org-change clear: the map key carries the org
+      // so a name org A read can never be handed to org B under any interleaving.
+      primeProbeStreams();
+      let hold!: (value: any) => void;
+      getStreamMock.mockImplementation((name: string) =>
+        name === "alpha_stream"
+          ? (new Promise((resolve) => {
+              hold = resolve;
+            }) as any)
+          : Promise.resolve(logsEntry(name, ["alpha_field", "beta_field"])),
+      );
+
+      const h = withCuratedPage(syntheticProbePage);
+      wrapper = h.wrapper;
+      const first = h.page.refresh(refreshArgs);
+      await flushPromises();
+      const second = h.page.refresh({ ...refreshArgs, orgId: "other-org" });
+      await flushPromises();
+      hold(logsEntry("alpha_stream", ["alpha_field"]));
+      await first;
+      await second;
+      await flushPromises();
+
+      const alphaReads = getStreamMock.mock.calls.filter((call) => call[0] === "alpha_stream");
+      expect(alphaReads.length).toBeGreaterThanOrEqual(2);
     });
 
     it("generation discipline covers the SCHEMA and PROBE fan-out, not just getStreams", async () => {

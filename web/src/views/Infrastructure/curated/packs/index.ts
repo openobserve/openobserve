@@ -13,8 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The pack registry (design §4). Registering a pack is what opts it into every
-// generic invariant — lint.spec.ts is parameterized over this map.
+// The pack registry (design §4): registering a pack opts it into every generic invariant lint.spec.ts runs.
 
 import type { WorkloadId } from "@/composables/useWorkloadDetection";
 import type { CuratedPageManifest } from "../types";

@@ -20,7 +20,15 @@
 import { describe, it, expect } from "vitest";
 import type { FieldAlias } from "@/services/service_streams";
 import defaultSemanticGroups from "./packs/__fixtures__/semanticGroups.default.json";
-import { resolveManifest, buildDashboard, promEscape, sqlEscape, STALE_GRACE_US } from "./resolve";
+import {
+  resolveManifest,
+  buildDashboard,
+  lintManifest,
+  promEscape,
+  sqlEscape,
+  STALE_GRACE_US,
+} from "./resolve";
+import { b64DecodeUnicodeSafe } from "@/utils/formatters";
 import { GROUP, STALENESS_24H_US } from "./types";
 import { kubernetesPage } from "./packs/kubernetes.page";
 import { hostsPage } from "./packs/hosts.page";
@@ -144,7 +152,7 @@ const resolve = (args: {
   });
 
 const build = (resolution: any, opts: { pins?: Record<string, string> } = {}) =>
-  buildDashboard(kubernetesPage, resolution, opts.pins ?? {}, { timezone: "UTC" });
+  buildDashboard(kubernetesPage, resolution, opts.pins ?? {}, { timezone: "UTC", nowUs: NOW_US });
 
 const allQueries = (dashboard: any): string[] =>
   (dashboard.tabs ?? []).flatMap((tab: any) =>
@@ -433,7 +441,9 @@ describe("token substitution", () => {
     expect(nodeQueries.length).toBeGreaterThan(0);
     for (const q of nodeQueries) expect(q).toContain("k8s_node_name");
     // …and the untokenized scalar is still built, so this is not a silent skip.
-    expect(allQueries(dashboard)).toContain('sum(k8s_node_cpu_usage{k8s_cluster_name=~"$cluster"})');
+    expect(allQueries(dashboard)).toContain(
+      'sum(k8s_node_cpu_usage{k8s_cluster_name=~"$cluster"})',
+    );
     expect(allLegends(dashboard).some((l) => l.includes("{k8s_node_name}"))).toBe(true);
   });
 
@@ -478,7 +488,7 @@ describe("token substitution", () => {
       hostsPage,
       resolution,
       { [GROUP.host]: 'he"llo' },
-      { timezone: "UTC" },
+      { timezone: "UTC", nowUs: NOW_US },
     );
     const queries = allQueries(dashboard);
     expect(queries.length).toBeGreaterThan(0);
@@ -512,7 +522,12 @@ describe("token substitution", () => {
       ),
     };
     const resolution = resolve({ manifest: noClusterProbe, streams });
-    const dashboard = buildDashboard(noClusterProbe, resolution, {}, { timezone: "UTC" });
+    const dashboard = buildDashboard(
+      noClusterProbe,
+      resolution,
+      {},
+      { timezone: "UTC", nowUs: NOW_US },
+    );
 
     expect((dashboard.variables?.list ?? []).some((v: any) => v.name === "cluster")).toBe(false);
     for (const q of allQueries(dashboard)) {
@@ -969,7 +984,12 @@ describe("§5.5 scope pickers", () => {
       ),
     };
     const resolution = resolve({ manifest: noClusterProbe, streams });
-    const dashboard = buildDashboard(noClusterProbe, resolution, {}, { timezone: "UTC" });
+    const dashboard = buildDashboard(
+      noClusterProbe,
+      resolution,
+      {},
+      { timezone: "UTC", nowUs: NOW_US },
+    );
     expect((dashboard.variables?.list ?? []).some((v: any) => v.name === "cluster")).toBe(false);
   });
 
@@ -1025,7 +1045,12 @@ describe("§5.5 scope pickers", () => {
       ),
     };
     const resolution = resolve({ manifest: withLabelKey });
-    const dashboard = buildDashboard(withLabelKey, resolution, {}, { timezone: "UTC" });
+    const dashboard = buildDashboard(
+      withLabelKey,
+      resolution,
+      {},
+      { timezone: "UTC", nowUs: NOW_US },
+    );
     const cluster = (dashboard.variables?.list ?? []).find((v: any) => v.name === "cluster");
     expect(cluster.labelKey).toBe("infra.hosts.panel.cpuBusy");
     expect(cluster.label).not.toBe("K8s Cluster");
@@ -1044,7 +1069,7 @@ describe("§5.5 scope pickers", () => {
       hostsPage,
       resolution,
       { [GROUP.host]: "host-1" },
-      { timezone: "UTC" },
+      { timezone: "UTC", nowUs: NOW_US },
     );
     expect(dashboard.variables?.list ?? []).toHaveLength(0);
   });
@@ -1141,12 +1166,111 @@ describe("§5.5 buildDashboard", () => {
     const streams = fullK8sStreams();
     for (const entry of streams.metrics) entry.stats.doc_time_max = NOW_US - 3 * DAY_US;
     const resolution = resolve({ streams, range: longRange });
-    const utc = buildDashboard(kubernetesPage, resolution, {}, { timezone: "UTC" });
-    const tokyo = buildDashboard(kubernetesPage, resolution, {}, { timezone: "Asia/Tokyo" });
+    const utc = buildDashboard(kubernetesPage, resolution, {}, { timezone: "UTC", nowUs: NOW_US });
+    const tokyo = buildDashboard(
+      kubernetesPage,
+      resolution,
+      {},
+      { timezone: "Asia/Tokyo", nowUs: NOW_US },
+    );
     const dateOf = (d: any) =>
       d.tabs.flatMap((t: any) => t.panels).find((p: any) => p.config.curated_badge).config
         .curated_badge.date;
     expect(dateOf(utc)).not.toBe(dateOf(tokyo));
+  });
+
+  it("the cardinality exemption is CLAUSE-local — one re-aggregated clause arms no others", () => {
+    // The exemption tested the whole query string, so a single count(count by …)
+    // anywhere disarmed the topk bound for every other clause in that query.
+    const leaky: any = {
+      ...kubernetesPage,
+      sections: [
+        {
+          id: "overview",
+          titleKey: "infra.k8s.section.overview",
+          scopedBy: [],
+          panels: [
+            {
+              id: "leaky",
+              groupId: "kubelet-node",
+              titleKey: "infra.k8s.panel.nodes",
+              type: "line",
+              unit: "numbers",
+              layout: { w: 96, h: 16 },
+              variants: [
+                {
+                  requiresStreams: ["k8s_node_cpu_usage"],
+                  queryType: "promql",
+                  queries: [
+                    {
+                      // Clause 1 is legitimately re-aggregated; clause 2 is an
+                      // UNBOUNDED per-pod fan-out that must still be flagged.
+                      query:
+                        "count(count by (k8s_node_name) (k8s_node_cpu_usage))" +
+                        " + sum by (k8s_pod_name) (k8s_pod_cpu_usage)",
+                      legend: "",
+                    },
+                  ],
+                },
+              ],
+              drilldown: [],
+            },
+          ],
+        },
+      ],
+    };
+    const violations = lintManifest(leaky);
+    const cardinality = violations.filter((v) => v.rule === "cardinality");
+    expect(cardinality.length).toBeGreaterThan(0);
+    expect(cardinality.some((v) => v.message.includes("k8s_pod_name"))).toBe(true);
+    // …and the genuinely re-aggregated clause is NOT flagged.
+    expect(cardinality.some((v) => v.message.includes("k8s_node_name"))).toBe(false);
+  });
+
+  it("the drilldown URL carries the SUBSTITUTED query and the SELECTED variant's stream", () => {
+    // The authored drilldown is built at pack-authoring time from variant 1's raw
+    // text, so it shipped `${f:}` tokens and the wrong variant's stream — decoding
+    // it is the only way to catch that; asserting it merely EXISTS passes anyway.
+    const dashboard = build(resolve({}));
+    const panels = dashboard.tabs.flatMap((tab: any) => tab.panels);
+    const withDrilldown = panels.filter((panel: any) =>
+      (panel.config.drilldown ?? []).some((d: any) => d.name === "openInMetricsExplorer"),
+    );
+    expect(withDrilldown.length).toBeGreaterThan(0);
+
+    for (const panel of withDrilldown) {
+      const entry = panel.config.drilldown.find((d: any) => d.name === "openInMetricsExplorer");
+      const params = new URLSearchParams(String(entry.data.url).split("?")[1]);
+      const decoded = b64DecodeUnicodeSafe(params.get("query") ?? "");
+
+      // No unsubstituted tokens survive into the link the user opens.
+      expect(decoded).not.toContain("${f:");
+      expect(decoded).not.toContain("${scope:");
+      expect(decoded).not.toContain("<probe>");
+      // …and it is the query the TILE ran, not the one the pack authored.
+      expect(decoded).toBe(panel.queries[0].query);
+      expect(params.get("query_type")).toBe("promql");
+    }
+  });
+
+  it("a panel resolving to the OTHER variant drills down to THAT variant's stream", () => {
+    // node-CPU carries two variants (_usage | _utilization). The authored link
+    // always named the first; only the resolved one is correct.
+    const streams = streamLists([
+      { name: "k8s_node_cpu_utilization", schema: KUBELET_NODE_SCHEMA },
+      { name: "k8s_node_memory_usage", schema: KUBELET_NODE_SCHEMA },
+      { name: "k8s_node_network_io", schema: KUBELET_NODE_SCHEMA },
+    ]);
+    const dashboard = build(resolve({ streams }));
+    const panel = dashboard.tabs
+      .flatMap((tab: any) => tab.panels)
+      .find((p: any) => String(p.id).includes("cpu") && p.config.drilldown?.length);
+    expect(panel).toBeTruthy();
+    const entry = panel.config.drilldown.find((d: any) => d.name === "openInMetricsExplorer");
+    const params = new URLSearchParams(String(entry.data.url).split("?")[1]);
+    const decoded = b64DecodeUnicodeSafe(params.get("query") ?? "");
+    expect(decoded).toContain("k8s_node_cpu_utilization");
+    expect(decoded).not.toContain("k8s_node_cpu_usage");
   });
 
   it("carries the per-panel drilldown from the def", () => {
@@ -1375,7 +1499,7 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       hostsPage,
       resolution,
       { [GROUP.host]: "host-1" },
-      { timezone: "UTC" },
+      { timezone: "UTC", nowUs: NOW_US },
     );
 
     expect(strip(engine)).toEqual(strip(golden));
@@ -1397,7 +1521,7 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
       hostsPage,
       resolution,
       { [GROUP.host]: "host-1" },
-      { timezone: "UTC" },
+      { timezone: "UTC", nowUs: NOW_US },
     );
     const queries = allQueries(engine);
     expect(queries).toHaveLength(10);

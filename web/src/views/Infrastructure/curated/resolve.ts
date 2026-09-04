@@ -13,15 +13,14 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-// The curated engine's PURE passes (design §5.2-§5.5) plus the governance lint
-// (§9). The dictionary arrives as a FieldAlias[] argument and the timezone as a
-// buildDashboard option, so nothing here reads a store or the network.
+// The curated engine's PURE passes (design §5.2-§5.5) plus the governance lint (§9) — no store, no network.
 
 import type { FieldAlias } from "@/services/service_streams";
 import { timestampToTimezoneDate } from "@/utils/timezone";
 import { b64DecodeUnicodeSafe } from "@/utils/formatters";
 import { getUnitOptions } from "@/composables/dashboard/useColumnFormatting";
 import { raw } from "@/types/i18n";
+import { explorerDrilldown } from "./packs/drilldown";
 import type {
   CuratedPageManifest,
   CuratedPanelDef,
@@ -237,8 +236,7 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     return value;
   };
 
-  // The same two-sided comparison §5.3 uses, minus the grace term: grace stops a
-  // healthy stream being BADGED, it has no business widening a liveness gate.
+  // Grace stops a healthy stream being BADGED; it has no business widening a liveness gate.
   const livenessFloor = Math.min(range.start, now - STALENESS_24H_US);
   const isLive = (entry: StreamListEntry | undefined): boolean => {
     const seen = docTimeMax(entry);
@@ -279,8 +277,7 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     if (schemaStream) schemasNeeded.add(schemaStream);
 
     if (!schemaWasFetched) {
-      // A transport failure is not evidence of a missing field: resolve to the
-      // group's first declared spelling and render, with a warning.
+      // A transport failure is not evidence of a missing field, so resolve to the group's first spelling and render.
       const fallback = dictEntry?.fields?.[0] ?? group.probeFields?.[gid]?.[0];
       if (fallback) {
         pushWarning("schema", raw(`schema unavailable for ${schemaStream ?? gid}`));
@@ -322,9 +319,7 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     return [...ids];
   };
 
-  // ── Pass 1b step 1: probe CANDIDATE resolution, decidable off the lists ───
-  // The COUNT needs I/O and arrives as a verdict; which candidate it should run
-  // against does not — it is present + live + carries every probe column.
+  // Which candidate the COUNT runs against is decidable off the lists alone: present + live + carries every probe column.
 
   const candidateFor = (group: RequirementGroup): { stream?: string; furthest?: string } => {
     let furthest: string | undefined;
@@ -374,9 +369,7 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     const verdict = group.probe ? probeVerdicts?.[group.id] : undefined;
 
     if (group.probe) {
-      // A probe group's panels query the resolved candidate. A COUNT verdict is
-      // required whenever the caller runs the ladder at all: rendering on the
-      // candidate walk alone would claim data the COUNT has not confirmed.
+      // A COUNT verdict is required whenever the ladder runs: the candidate walk alone would claim data nothing confirmed.
       const resolvedProbe = probeStreamOf(group.id);
       const confirmed = probeVerdicts ? verdict?.passed === true : Boolean(resolvedProbe);
       if (!resolvedProbe || !confirmed) {
@@ -399,8 +392,7 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
           break;
         }
         if (missing.length === 0) {
-          // Only the FIRST variant's spellings are reported — the strip names
-          // what the user would install, not every alternative the pack knows.
+          // Only the FIRST variant's spellings are reported — the strip names what the user would install.
           for (const name of unmet) {
             const entry = listFor(streamType).get(name);
             missing.push(
@@ -476,8 +468,7 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
           missingStreams: dedupeStreams(hiddenPanels.flatMap((panel) => panel.missingStreams)),
         });
       }
-      // A concept the stream simply does not carry is a reportable state even
-      // when siblings still render — the strip must name what was lost (§5.4).
+      // A concept the stream does not carry is reportable even when siblings render — the strip must name what was lost (§5.4).
       if (unresolvedHere.length > 0) {
         hiddenGroups.push({
           group,
@@ -535,8 +526,7 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     if (seenValues.length === 0) continue;
 
     const streamMax = Math.max(...seenValues);
-    // A pinned page badges off the row's OWN last-seen: stream stats are
-    // fleet-wide, so a dead host behind a live fleet would never badge.
+    // Stream stats are fleet-wide, so a pinned page badges off the row's OWN last-seen or a dead host never badges.
     const lastSeen = lastSeenUs ?? streamMax;
 
     if (lastSeen > (lastDataUs ?? -1)) lastDataUs = lastSeen;
@@ -612,7 +602,7 @@ export function buildDashboard(
   manifest: CuratedPageManifest,
   resolution: CuratedResolution,
   pins: CuratedPagePins,
-  opts: { timezone: string },
+  opts: { timezone: string; nowUs: number },
 ): Record<string, unknown> {
   const staleByPanelId = new Map<string, StaleGroupInfo>();
   for (const stale of resolution.staleGroups) {
@@ -638,6 +628,7 @@ export function buildDashboard(
             pins,
             staleByPanelId,
             opts.timezone,
+            opts.nowUs,
           ),
         ),
       };
@@ -767,6 +758,12 @@ export function lintManifest(manifest: CuratedPageManifest): Violation[] {
   return violations;
 }
 
+/** True when THIS `by(...)` is the inner one of a `count(count by (…)(…))`. */
+function isReAggregated(query: string, byIndex: number): boolean {
+  const before = query.slice(0, byIndex);
+  return /count\s*\(\s*count\s*$/.test(before.replace(/\s+/g, " "));
+}
+
 function lintCardinality(
   panelId: string,
   query: string,
@@ -778,8 +775,8 @@ function lintCardinality(
       .map((label) => label.trim())
       .filter(Boolean);
     if (labels.every((label) => ENUMERABLE_LABELS.has(label))) continue;
-    // A fully re-aggregated inner by — count(count by (x)(…)) — is one series.
-    if (/count\s*\(\s*count\s+by/.test(query)) continue;
+    // Clause-LOCAL, not query-global: one re-aggregated clause must not disarm the topk bound for the others.
+    if (isReAggregated(query, match.index ?? 0)) continue;
     const topk = query.match(/topk\((\d+),/);
     if (!topk || Number(topk[1]) > 20) add("cardinality", `${panelId}: ${match[0]}`);
   }
@@ -818,8 +815,7 @@ function substituteQuery(
     const field = panel.resolvedFields[def.group] ?? resolved?.field;
     if (!field) return "";
     if (pinned !== undefined) return `${field}="${promEscape(pinned)}"`;
-    // A picker dropped at resolution time collapses cleanly rather than
-    // emitting a matcher against a variable nothing will ever populate.
+    // A picker dropped at resolution time collapses rather than emitting a matcher nothing will populate.
     if (!resolved) return "";
     return `${field}=~"$${name}"`;
   };
@@ -829,10 +825,7 @@ function substituteQuery(
     (_match, gid: string) => panel.resolvedFields[gid] ?? "",
   );
 
-  // A ${scope:} token standing alone right after a metric name owns its whole
-  // matcher block and must bring the braces with it; one already inside a
-  // matcher must not. Depth is tracked by scanning, since a PromQL query nests
-  // braces the token itself does not close.
+  // A ${scope:} token standing alone after a metric name owns its whole matcher block and must bring the braces with it.
   let out = "";
   let depth = 0;
   for (let i = 0; i < withFields.length; i++) {
@@ -875,30 +868,45 @@ function buildPanel(
   pins: CuratedPagePins,
   staleByPanelId: Map<string, StaleGroupInfo>,
   timezone: string,
+  nowUs: number,
 ): Record<string, unknown> {
   const variant = panel.selectedVariant!;
   const stale = staleByPanelId.get(panel.id);
   const layout = flowLayout(siblings, index);
   const probeStream = pinnedScopeStream(panel);
 
+  const queries = variant.queries.map((query) => ({
+    query: tidyMatchers(
+      substituteQuery(query.query, panel, manifest, resolution, pins).replace(
+        /<probe>/g,
+        probeStream,
+      ),
+    ),
+    legend: substituteQuery(query.legend ?? "", panel, manifest, resolution, pins),
+  }));
+
   const config: Record<string, unknown> = {
     show_legends: true,
     legends_position: "bottom",
     unit: panel.unit,
     unit_custom: null,
-    drilldown: panel.def.drilldown ?? [],
+    // Rebuilt from the SUBSTITUTED query and the variant that won — the authored one carries tokens and variant 1's stream.
+    drilldown: (panel.def.drilldown ?? []).map((entry) =>
+      entry.name === "openInMetricsExplorer" && queries[0]
+        ? explorerDrilldown(panel.queryStream ?? "", queries[0].query)
+        : entry,
+    ),
   };
 
   if (stale) {
     config.curated_badge = {
       key: stale.noDataYet ? "infra.curated.staleNoDataBadge" : "infra.curated.staleBadge",
       date: timestampToTimezoneDate(Math.floor(stale.lastSeenUs / 1000), timezone),
-      duration: humanDuration(stale.lastSeenUs),
+      duration: durationParts(stale.lastSeenUs, nowUs),
     };
   }
   if (panel.def.type === "metric") {
-    // The resolver cannot know whether a query returned series; it can only say
-    // whether a "— no data" claim would be honest here (§6.3 finding 2a).
+    // The resolver cannot know whether a query returned series, only whether a "no data" claim would be honest (§6.3).
     config.curated_no_data_eligible = !stale;
   }
   if (panel.def.subtitleKey) config.curated_subtitle_key = panel.def.subtitleKey;
@@ -906,19 +914,13 @@ function buildPanel(
   return {
     id: panel.id,
     type: panel.def.type,
-    // The KEY, not the copy: buildDashboard is pure and i18n-free, so the view
-    // translates this on the way into the renderer (§5.5, §8.2).
+    // The KEY, not the copy: buildDashboard is pure and i18n-free, so the view translates this (§5.5, §8.2).
     title: panel.def.titleKey,
     description: "",
     config,
     queryType: variant.queryType,
-    queries: variant.queries.map((query) => ({
-      query: tidyMatchers(
-        substituteQuery(query.query, panel, manifest, resolution, pins).replace(
-          /<probe>/g,
-          probeStream,
-        ),
-      ),
+    queries: queries.map((built) => ({
+      query: built.query,
       vrlFunctionQuery: "",
       customQuery: true,
       fields: (variant.fields as Record<string, unknown> | undefined) ?? {
@@ -930,9 +932,7 @@ function buildPanel(
         breakdown: [],
         filter: { filterType: "group", logicalOperator: "AND", conditions: [] },
       },
-      config: {
-        promql_legend: substituteQuery(query.legend ?? "", panel, manifest, resolution, pins),
-      },
+      config: { promql_legend: built.legend },
     })),
     layout: { ...layout, i: index },
   };
@@ -980,6 +980,10 @@ function buildVariable(
     ...(def.multiSelect ? { selectAllValueForMultiSelect: "all" } : {}),
     scope: "global",
     omitWhenValuesEmpty: def.omitWhenValuesEmpty === true,
+    // Consumed by VariablesValueSelector; stored dashboards never carry them, so they stay invisible outside curated pages.
+    curatedOmitWhenValuesEmpty: def.omitWhenValuesEmpty === true,
+    curatedCapNotice: true,
+    curatedNarrowBy: parentPicker?.label ?? "",
     query_data: {
       stream_type: def.valuesFrom.streamType,
       stream: def.valuesFrom.stream,
@@ -992,12 +996,17 @@ function buildVariable(
   };
 }
 
-/** Elapsed time in the badge's own words — duration is what tells a user to care. */
-function humanDuration(lastSeenUs: number, now = Date.now() * 1000): string {
-  const elapsed = Math.max(0, now - lastSeenUs);
-  const minutes = Math.floor(elapsed / 60_000_000);
-  if (minutes < 60) return `${Math.max(1, minutes)}m`;
+/**
+ * The elapsed-time KEY and count, never formatted copy: this layer is pure and
+ * i18n-free, and a string baked here would freeze at build time and speak English.
+ */
+export function durationParts(
+  lastSeenUs: number,
+  nowUs: number,
+): { key: "durationMinutes" | "durationHours" | "durationDays"; count: number } {
+  const minutes = Math.floor(Math.max(0, nowUs - lastSeenUs) / 60_000_000);
+  if (minutes < 60) return { key: "durationMinutes", count: Math.max(1, minutes) };
   const hours = Math.floor(minutes / 60);
-  if (hours < 48) return `${hours}h`;
-  return `${Math.floor(hours / 24)}d`;
+  if (hours < 48) return { key: "durationHours", count: hours };
+  return { key: "durationDays", count: Math.floor(hours / 24) };
 }

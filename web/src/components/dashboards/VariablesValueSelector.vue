@@ -20,17 +20,35 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :key="item.name + index"
       :data-test="`dashboard-variable-${item.name}-container`"
     >
-      <div v-if="item.type == 'query_values'" class="max-w-[40rem] min-w-37.5">
+      <div
+        v-if="item.type == 'query_values'"
+        class="max-w-[40rem] min-w-37.5"
+        v-show="!isVariableOmitted(item)"
+      >
         <VariableQueryValueSelector
           class="me-4 mt-1"
           v-show="!item.hideOnDashboard"
           v-model="item.value"
           :variableItem="item"
+          :disabled="!!item.curatedDisabled"
+          :disabledTooltipKey="item.curatedDisabledTooltipKey"
           @update:model-value="onVariablesValueUpdated(Number(index))"
           :loadOptions="loadVariableOptions"
           @search="onVariableSearch(Number(index), $event)"
           :data-test="`variable-selector-${item.name}`"
         />
+        <div
+          v-if="isVariableCapped(item)"
+          class="text-text-muted text-xs"
+          :data-test="`variable-values-capped-${item.name}`"
+        >
+          {{
+            t("infra.curated.valuesCapped", {
+              count: item.query_data?.max_record_size ?? 0,
+              parent: item.curatedNarrowBy || item.label || item.name,
+            })
+          }}
+        </div>
       </div>
       <div v-else-if="item.type == 'constant'" class="max-w-[40rem] min-w-37.5">
         <OInput
@@ -2287,9 +2305,28 @@ export default defineComponent({
       );
     };
 
+    // No truncation signal exists in the response (`no_count: true`), so an
+    // exactly-at-cap list is the only inference available and it errs to disclosure.
+    const isVariableCapped = (item: any) => {
+      const cap = item?.query_data?.max_record_size ?? 0;
+      return Boolean(item?.curatedCapNotice && cap && item?.options?.length === cap);
+    };
+
+    // Schema presence is not resolvability, so a zero-values picker is removed
+    // rather than left enabled and blank — but only once its load has settled.
+    const isVariableOmitted = (item: any) =>
+      Boolean(
+        item?.curatedOmitWhenValuesEmpty &&
+        !item?.isLoading &&
+        Array.isArray(item?.options) &&
+        item.options.length === 0,
+      );
+
     return {
       t,
       props,
+      isVariableCapped,
+      isVariableOmitted,
       variablesData,
       changeInitialVariableValues,
       onVariablesValueUpdated,

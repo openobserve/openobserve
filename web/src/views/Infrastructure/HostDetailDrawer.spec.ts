@@ -497,6 +497,46 @@ describe("HostDetailDrawer", () => {
       expect(wrapper.text()).not.toContain("OLD-HOST-LINE");
     });
 
+    it("EVERY metrics query carries the NEW host after the switch — the drawer instance is reused", async () => {
+      // opts.pins was read once at setup, so the reused instance kept plotting the
+      // host the drawer first opened on while the header said otherwise.
+      wrapper = await mountDrawer();
+      await flushPromises();
+      const before = JSON.stringify(lastDashboardData);
+      expect(before).toContain("web-01");
+
+      await wrapper.setProps({ hostName: "web-02" });
+      await flushPromises();
+
+      const panels = (lastDashboardData?.tabs ?? []).flatMap((tab: any) => tab.panels ?? []);
+      expect(panels.length).toBeGreaterThanOrEqual(8);
+      for (const panel of panels) {
+        for (const query of panel.queries ?? []) {
+          expect(query.query).toContain("web-02");
+          expect(query.query).not.toContain("web-01");
+        }
+      }
+    });
+
+    it("a lastSeenUs arriving AFTER mount engages the badge override", async () => {
+      // The hosts list is usually still in flight at mount, so the row's last-seen
+      // lands late — a snapshot read at setup meant it never engaged at all.
+      wrapper = await mountDrawer({ status: "INACTIVE", lastSeenUs: null });
+      await flushPromises();
+      const badgedBefore = ((lastDashboardData?.tabs ?? []) as any[])
+        .flatMap((tab) => tab.panels ?? [])
+        .filter((panel: any) => panel.config?.curated_badge);
+      expect(badgedBefore.length).toBe(0);
+
+      await wrapper.setProps({ lastSeenUs: NOW_US - 3 * DAY_US });
+      await flushPromises();
+
+      const badgedAfter = ((lastDashboardData?.tabs ?? []) as any[])
+        .flatMap((tab) => tab.panels ?? [])
+        .filter((panel: any) => panel.config?.curated_badge);
+      expect(badgedAfter.length).toBeGreaterThan(0);
+    });
+
     it("clears the loaded flag when the host changes off the logs tab", async () => {
       wrapper = await mountDrawer();
       await openTab("logs");
