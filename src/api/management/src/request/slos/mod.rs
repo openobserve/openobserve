@@ -144,22 +144,22 @@ pub async fn create_slo(
     if slo.id.is_empty() {
         slo.id = config::ider::generate();
     }
-    // Same reason as org above: the gate authorized the `?folder=` folder, so a
-    // body folder_id must be authorized before it can be written.
-    #[cfg(feature = "enterprise")]
-    if !slo.folder_id.is_empty()
-        && !check_folder_write_permissions(
-            &slo.org,
-            &user_email.user_id,
-            "alert_folders",
-            &slo.folder_id,
-        )
-        .await
-    {
-        return MetaHttpResponse::forbidden("Unauthorized Access");
-    }
+    // Resolve the effective destination BEFORE authorizing it: an empty
+    // folder_id writes to the default folder, which the `?folder=` gate did not
+    // necessarily cover, so skipping the check on empty would leave a hole.
     if slo.folder_id.is_empty() {
         slo.folder_id = config::meta::folder::DEFAULT_FOLDER.to_string();
+    }
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &slo.org,
+        &user_email.user_id,
+        "alert_folders",
+        &slo.folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Unauthorized Access");
     }
     if slo.owner.is_none() {
         slo.owner = Some(user_email.user_id.clone());

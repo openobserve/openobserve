@@ -688,6 +688,32 @@ pub async fn update_report_v2(
             .find(|(k, _)| k == "folder")
             .map(|(_, v)| v.into_owned())
     });
+    // The route gate resolves `?folder=`, which HERE names the DESTINATION, so a
+    // move is authorized against the folder it lands in and never against the one
+    // it leaves. Check the source before honouring the move.
+    #[cfg(feature = "enterprise")]
+    if new_folder.is_some() {
+        let curr_folder = match reports::get_by_id(&org_id, &report_id).await {
+            Ok((folder, _)) => folder.folder_id,
+            Err(e) => return e.into(),
+        };
+        if !check_permissions(
+            &report_id,
+            &org_id,
+            &report.last_edited_by,
+            "reports",
+            "PUT",
+            Some(&curr_folder),
+            false,
+            true,
+            false,
+        )
+        .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
+    }
+
     match reports::update_by_id(&org_id, &report_id, new_folder.as_deref(), report).await {
         Ok(_) => MetaHttpResponse::ok("Report updated"),
         Err(e) => e.into(),

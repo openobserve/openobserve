@@ -3341,6 +3341,34 @@ pub async fn move_alerts(
     #[cfg(feature = "enterprise")]
     for id in anomaly_ids {
         use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+        // Source side: `update_config` performs no check of its own, so without
+        // this a caller could pull a config out of a folder they cannot reach.
+        let id_str = id.to_string();
+        let src_folder = openobserve_core::anomaly_detection::get_config(&org_id, &id_str)
+            .await
+            .ok()
+            .flatten()
+            .and_then(|cfg| {
+                cfg.get("folder_id")
+                    .and_then(|f| f.as_str())
+                    .map(str::to_string)
+            });
+        if let Some(src_folder) = src_folder
+            && !check_permissions(
+                &id_str,
+                &org_id,
+                &user_email.user_id,
+                "alerts",
+                "PUT",
+                Some(&src_folder),
+                false,
+                true,
+                false,
+            )
+            .await
+        {
+            return MetaHttpResponse::forbidden("Unauthorized Access");
+        }
         let req = UpdateAnomalyConfigRequest {
             folder_id: Some(req_body.dst_folder_id.clone()),
             ..Default::default()

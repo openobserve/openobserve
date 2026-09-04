@@ -574,7 +574,11 @@ export default defineComponent({
             alert_enabled: jsonObj.alert_enabled ?? true,
           },
         };
-        await anomalyDetectionService.create(org, payload);
+        await anomalyDetectionService.create(
+          org,
+          payload,
+          selectedFolderId.value || "default",
+        );
         alertCreators.value.push({
           message: t("alerts.import.anomalyImportSuccess", { index, name: jsonObj.name }),
           success: true,
