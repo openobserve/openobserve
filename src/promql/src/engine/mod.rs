@@ -28,11 +28,7 @@ use promql_parser::parser::{
     UnaryExpr,
 };
 
-use crate::{
-    binaries,
-    exec::PromqlContext,
-    promql::{label_usage::labels_dropped_at_root, rewrite::remove_filter_all},
-};
+use crate::{binaries, exec::PromqlContext, promql::label_usage::labels_dropped_at_root};
 
 pub struct Engine {
     trace_id: String,
@@ -204,18 +200,7 @@ impl Engine {
             PromExpr::NumberLiteral(NumberLiteral { val }) => Value::Float(*val),
             PromExpr::StringLiteral(StringLiteral { val }) => Value::String(val.clone()),
             PromExpr::VectorSelector(vs) => {
-                let mut vs = vs.clone();
-                remove_filter_all(&mut vs);
-                if !vs.matchers.or_matchers.is_empty() {
-                    return Err(DataFusionError::Plan(
-                        "VectorSelector: or_matchers is not supported".into(),
-                    ));
-                }
-                if vs.at.is_some() {
-                    return Err(DataFusionError::NotImplemented(
-                        "VectorSelector: @ modifier is not supported".into(),
-                    ));
-                }
+                let vs = selector::plain_selector(vs, "VectorSelector")?;
                 let data = self.eval_vector_selector(&vs).await?;
                 if data.is_empty() {
                     Value::None
@@ -224,19 +209,8 @@ impl Engine {
                 }
             }
             PromExpr::MatrixSelector(MatrixSelector { vs, range }) => {
-                let mut vs = vs.clone();
-                remove_filter_all(&mut vs);
-                if !vs.matchers.or_matchers.is_empty() {
-                    return Err(DataFusionError::Plan(
-                        "MatrixSelector: or_matchers is not supported".into(),
-                    ));
-                }
-                if vs.at.is_some() {
-                    return Err(DataFusionError::NotImplemented(
-                        "MatrixSelector: @ modifier is not supported".into(),
-                    ));
-                }
-                let data = self.eval_matrix_selector(&vs, *range).await?;
+                let vs = selector::plain_selector(vs, "MatrixSelector")?;
+                let data = self.eval_matrix_selector(&vs, *range, None).await?;
                 if data.is_empty() {
                     Value::None
                 } else {

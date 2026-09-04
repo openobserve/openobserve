@@ -233,11 +233,8 @@ pub(crate) async fn create_context(
         target_partitions,
     };
 
-    // one legacy file voids the (__hash__, _timestamp) ordering guarantee
     let sort_order = if cfg.search.feature_metrics_streaming_agg_enabled
-        && files
-            .iter()
-            .all(|file| MetricsFileLayout::of(&file.key).is_some())
+        && MetricsFileLayout::all_hash_ordered(&files)
     {
         FileSortOrder::HashTimestampAsc
     } else {

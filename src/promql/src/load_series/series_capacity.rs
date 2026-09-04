@@ -15,12 +15,13 @@
 
 //! Sample-capacity estimation for hash-sorted series materialization.
 
-const STORAGE_HOUR_MICROS: i64 = 60 * 60 * 1_000_000;
+use config::utils::time::hour_micros;
+
 const MAX_SERIES_FRAGMENT_HINT: usize = 24;
 const MAX_INITIAL_SERIES_CAPACITY: usize = 2048;
 
 /// Length of the contiguous run of equal hashes starting at `start`.
-pub fn batch_run_len(hashes: &[u64], start: usize) -> usize {
+pub(crate) fn batch_run_len(hashes: &[u64], start: usize) -> usize {
     let hash = hashes[start];
     let mut end = start + 1;
     while end < hashes.len() && hashes[end] == hash {
@@ -66,7 +67,7 @@ pub(super) fn initial_series_capacity(
 /// Hash-sorted parquet is written per storage hour, so a series arrives as
 /// roughly one contiguous run per hour fragment of the query span.
 pub(super) fn series_fragment_hint(query_duration: i64) -> usize {
-    let hourly_fragments = (query_duration.max(0) as u64).div_ceil(STORAGE_HOUR_MICROS as u64);
+    let hourly_fragments = (query_duration.max(0) as u64).div_ceil(hour_micros(1) as u64);
     hourly_fragments.clamp(1, MAX_SERIES_FRAGMENT_HINT as u64) as usize
 }
 
@@ -100,7 +101,7 @@ mod tests {
 
     #[test]
     fn test_series_fragment_hint_is_bounded() {
-        let hour = STORAGE_HOUR_MICROS;
+        let hour = hour_micros(1);
         assert_eq!(series_fragment_hint(3 * hour + 5 * 60 * 1_000_000), 4);
         assert_eq!(series_fragment_hint(0), 1);
         assert_eq!(series_fragment_hint(100 * hour), MAX_SERIES_FRAGMENT_HINT);

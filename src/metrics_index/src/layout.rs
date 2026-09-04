@@ -20,7 +20,10 @@
 use arrow_schema::{DataType, Schema};
 use config::{
     FileFormat, get_config,
-    meta::{promql::HASH_LABEL, stream::StreamType},
+    meta::{
+        promql::HASH_LABEL,
+        stream::{FileKey, StreamType},
+    },
 };
 
 pub const METRICS_INDEX_ROW_COUNT: &str = "__oo_midx_row_count";
@@ -82,6 +85,16 @@ impl MetricsFileLayout {
             }
         }
         None
+    }
+
+    /// Whether `path` names a `(__hash__, _timestamp)` ordered metrics file.
+    pub fn is_hash_ordered(path: &str) -> bool {
+        Self::of(path).is_some()
+    }
+
+    /// Whether every file is hash-ordered; one legacy file voids the ordering guarantee.
+    pub fn all_hash_ordered(files: &[FileKey]) -> bool {
+        files.iter().all(|file| Self::is_hash_ordered(&file.key))
     }
 
     fn prefix(self) -> &'static str {

@@ -19,8 +19,8 @@ concurrency:
 
 jobs:
   check:
-    # Nothing runs on a PR without the 'e2e' label, or on a draft; ci-gate alone reports the state.
-    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) }}
+    # Nothing runs on a PR without the 'ready-for-ci' label, or on a draft; ci-gate alone reports the state.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
     runs-on: ubicloud-standard-8
     timeout-minutes: 10
     steps:

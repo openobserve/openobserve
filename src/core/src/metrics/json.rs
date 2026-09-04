@@ -26,7 +26,10 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         alerts::alert::Alert,
-        promql::{HASH_LABEL, METADATA_LABEL, Metadata, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+        promql::{
+            HASH_LABEL, METADATA_LABEL, METRICS_HASH_EXCLUDED_LABELS, Metadata, NAME_LABEL,
+            TYPE_LABEL, VALUE_LABEL,
+        },
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamPartition, StreamType},
     },
@@ -44,7 +47,6 @@ use infra::schema::{SchemaCache, get_partition_time_level};
 use ingestion_common::{IngestionResponse, StreamStatus};
 use schema::check_for_schema;
 
-use super::get_exclude_labels;
 use crate::{
     alerts::alert::AlertExt,
     common::meta::{authz::Authz, stream::SchemaRecords},
@@ -449,7 +451,7 @@ pub async fn ingest(
             // remove type from labels
             record.remove(TYPE_LABEL);
             // add hash
-            let hash = super::signature_without_labels(&record, get_exclude_labels());
+            let hash = super::signature_without_labels(&record, METRICS_HASH_EXCLUDED_LABELS);
             record.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
 
             // convert every label to string

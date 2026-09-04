@@ -15,16 +15,9 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{
-    EvalContext, ExtrapolationKind, Sample, Value, extrapolated_rate,
-};
-use datafusion::error::Result;
+use config::meta::promql::value::{ExtrapolationKind, Sample, extrapolated_rate};
 
 use crate::functions::RangeFunc;
-
-pub(crate) fn increase(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, IncreaseFunc::new(), eval_ctx)
-}
 
 pub struct IncreaseFunc;
 
@@ -58,9 +51,14 @@ impl RangeFunc for IncreaseFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Labels, RangeValue, TimeWindow, Value};
+    use datafusion::error::Result;
 
     use super::*;
+
+    fn increase(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        crate::functions::eval_range(data, IncreaseFunc::new(), eval_ctx)
+    }
     // Test helper
     fn increase_test_helper(data: Value) -> Result<Value> {
         let eval_ctx = EvalContext::new(3000, 3000, 0, "test".to_string());

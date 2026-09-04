@@ -56,31 +56,15 @@ mod vector;
 
 pub(crate) use absent::absent;
 pub(crate) use absent_over_time::absent_over_time;
-pub(crate) use avg_over_time::avg_over_time;
-pub(crate) use changes::changes;
 pub(crate) use clamp::clamp;
-pub(crate) use count_over_time::count_over_time;
-pub(crate) use delta::delta;
-pub(crate) use deriv::deriv;
 pub(crate) use histogram::histogram_quantile;
 pub(crate) use holt_winters::holt_winters;
-pub(crate) use idelta::idelta;
-pub(crate) use increase::increase;
-pub(crate) use irate::irate;
 pub(crate) use label_join::label_join;
 pub(crate) use label_replace::label_replace;
-pub(crate) use last_over_time::last_over_time;
 pub(crate) use math_operations::*;
-pub(crate) use max_over_time::max_over_time;
-pub(crate) use min_over_time::min_over_time;
 pub(crate) use predict_linear::predict_linear;
 pub(crate) use quantile_over_time::quantile_over_time;
-pub(crate) use rate::rate;
-pub(crate) use resets::resets;
 pub(crate) use scalar::scalar;
-pub(crate) use stddev_over_time::stddev_over_time;
-pub(crate) use stdvar_over_time::stdvar_over_time;
-pub(crate) use sum_over_time::sum_over_time;
 pub(crate) use time_operations::*;
 pub(crate) use vector::vector;
 
@@ -142,6 +126,45 @@ pub(crate) enum Func {
     Timestamp,
     Vector,
     Year,
+}
+
+impl Func {
+    /// The single-argument range function this name evaluates through [`eval_range`], if any.
+    pub(crate) fn range_func(self) -> Option<Box<dyn RangeFunc>> {
+        Some(match self {
+            Func::AvgOverTime => Box::new(avg_over_time::AvgOverTimeFunc::new()),
+            Func::Changes => Box::new(changes::ChangesFunc::new()),
+            Func::CountOverTime => Box::new(count_over_time::CountOverTimeFunc::new()),
+            Func::Delta => Box::new(delta::DeltaFunc::new()),
+            Func::Deriv => Box::new(deriv::DerivFunc::new()),
+            Func::Idelta => Box::new(idelta::IdeltaFunc::new()),
+            Func::Increase => Box::new(increase::IncreaseFunc::new()),
+            Func::Irate => Box::new(irate::IrateFunc::new()),
+            Func::LastOverTime => Box::new(last_over_time::LastOverTimeFunc::new()),
+            Func::MaxOverTime => Box::new(max_over_time::MaxOverTimeFunc::new()),
+            Func::MinOverTime => Box::new(min_over_time::MinOverTimeFunc::new()),
+            Func::Rate => Box::new(rate::RateFunc::new()),
+            Func::Resets => Box::new(resets::ResetsFunc::new()),
+            Func::StddevOverTime => Box::new(stddev_over_time::StddevOverTimeFunc::new()),
+            Func::StdvarOverTime => Box::new(stdvar_over_time::StdvarOverTimeFunc::new()),
+            Func::SumOverTime => Box::new(sum_over_time::SumOverTimeFunc::new()),
+            _ => return None,
+        })
+    }
+}
+
+impl<T: RangeFunc + ?Sized> RangeFunc for Box<T> {
+    fn name(&self) -> &'static str {
+        (**self).name()
+    }
+
+    fn exec(&self, samples: &[Sample], eval_ts: i64, range: &Duration) -> Option<f64> {
+        (**self).exec(samples, eval_ts, range)
+    }
+
+    fn counter_extrapolation(&self) -> Option<ExtrapolationKind> {
+        (**self).counter_extrapolation()
+    }
 }
 
 pub static KEEP_METRIC_NAME_FUNC: Lazy<HashSet<&str>> =
@@ -218,29 +241,9 @@ pub trait RangeFunc: Send + Sync {
     }
 }
 
-/// Constructs the range function for fused aggregate evaluation, or `None` if
-/// it is not eligible: only single-argument functions whose engine path is
-/// exactly [`eval_range`] qualify.
+/// The fused evaluators' view of the same table: a name that resolves to a range function.
 pub(crate) fn fusable_range_func(name: &str) -> Option<Box<dyn RangeFunc>> {
-    Some(match name {
-        "avg_over_time" => Box::new(avg_over_time::AvgOverTimeFunc::new()),
-        "changes" => Box::new(changes::ChangesFunc::new()),
-        "count_over_time" => Box::new(count_over_time::CountOverTimeFunc::new()),
-        "delta" => Box::new(delta::DeltaFunc::new()),
-        "deriv" => Box::new(deriv::DerivFunc::new()),
-        "idelta" => Box::new(idelta::IdeltaFunc::new()),
-        "increase" => Box::new(increase::IncreaseFunc::new()),
-        "irate" => Box::new(irate::IrateFunc::new()),
-        "last_over_time" => Box::new(last_over_time::LastOverTimeFunc::new()),
-        "max_over_time" => Box::new(max_over_time::MaxOverTimeFunc::new()),
-        "min_over_time" => Box::new(min_over_time::MinOverTimeFunc::new()),
-        "rate" => Box::new(rate::RateFunc::new()),
-        "resets" => Box::new(resets::ResetsFunc::new()),
-        "stddev_over_time" => Box::new(stddev_over_time::StddevOverTimeFunc::new()),
-        "stdvar_over_time" => Box::new(stdvar_over_time::StdvarOverTimeFunc::new()),
-        "sum_over_time" => Box::new(sum_over_time::SumOverTimeFunc::new()),
-        _ => return None,
-    })
+    name.parse::<Func>().ok()?.range_func()
 }
 
 pub(crate) fn eval_range<F>(data: Value, func: F, eval_ctx: &EvalContext) -> Result<Value>
@@ -488,5 +491,18 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn test_fusable_range_func_whitelist() {
+        assert!(fusable_range_func("rate").is_some());
+        assert!(fusable_range_func("increase").is_some());
+        assert!(fusable_range_func("last_over_time").is_some());
+        // Parameterized or special-semantics functions stay on the generic path.
+        assert!(fusable_range_func("quantile_over_time").is_none());
+        assert!(fusable_range_func("predict_linear").is_none());
+        assert!(fusable_range_func("holt_winters").is_none());
+        assert!(fusable_range_func("absent_over_time").is_none());
+        assert!(fusable_range_func("histogram_quantile").is_none());
     }
 }
