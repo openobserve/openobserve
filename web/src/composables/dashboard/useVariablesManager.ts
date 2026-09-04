@@ -50,6 +50,12 @@ export interface VariableConfig {
     selected?: boolean;
   }>;
   selectAllValueForMultiSelect?: "first" | "all" | "custom";
+  /**
+   * Load options even when an "all" default already fixes the value. Dashboards
+   * built at runtime have no saved `options` to fall back on, so without this the
+   * picker renders its select-all label over an empty list.
+   */
+  loadOptionsWithAllDefault?: boolean;
   customMultiSelectValue?: string[];
   isVariableLoadingPending?: boolean;
   isLoading?: boolean;
@@ -480,7 +486,11 @@ export const useVariablesManager = (t: TranslateFn) => {
         const hasCustomOrAllDefault =
           v.selectAllValueForMultiSelect === "custom" || v.selectAllValueForMultiSelect === "all";
 
-        if (!hasCustomOrAllDefault) {
+        // An "all" default fixes the VALUE without an API call but leaves the
+        // OPTION list empty, so the picker renders its select-all label over
+        // nothing until the user's own interaction refetches it. Opt-in, because
+        // every saved dashboard uses the "first" default and never hits this.
+        if (!hasCustomOrAllDefault || v.loadOptionsWithAllDefault === true) {
           v.isVariableLoadingPending = true;
         }
       }

@@ -1046,15 +1046,20 @@ function buildVariable(
     curatedOmitWhenValuesEmpty: def.omitWhenValuesEmpty === true,
     curatedCapNotice: true,
     curatedNarrowBy: parentPicker?.label ?? "",
-    ...(loadedOptions ? { options: loadedOptions } : {}),
+    // Built fresh each render, so there is no saved `options` array to fall back
+    // on the way a stored dashboard has — without this the all-sentinel picker
+    // never fetches and renders <ALL> over an empty list (useVariablesManager :479-491).
+    loadOptionsWithAllDefault: true,
+    value: "",
+    options: loadedOptions ?? [],
     query_data: {
       stream_type: def.valuesFrom.streamType,
       stream: def.valuesFrom.stream,
       field: picker.field,
       max_record_size: 100,
-      ...(parentPicker
-        ? { filter: [{ name: parentPicker.field, operator: "IN", value: `$${parent}` }] }
-        : {}),
+      filter: parentPicker
+        ? [{ name: parentPicker.field, operator: "IN", value: `$${parent}` }]
+        : [],
     },
   };
 }
