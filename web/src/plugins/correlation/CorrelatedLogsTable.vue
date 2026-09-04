@@ -54,12 +54,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </OButton>
 
           <!-- Column Visibility Dropdown -->
-          <div class="pr-4">
+          <div class="pe-4">
             <ODropdown side="bottom" align="end" data-test="column-visibility-dropdown">
               <template #trigger>
                 <OButton variant="outline" size="sm" :disabled="!hasResults">
                   <template v-if="true">
-                    <OIcon name="view-column" size="sm" class="mr-1" />
+                    <OIcon name="view-column" size="sm" class="me-1" />
                     {{ t("search.showHideColumns") }}
                   </template>
                 </OButton>

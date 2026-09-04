@@ -27,7 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="icon-xs-sq"
-          class="ml-1.5 shrink-0"
+          class="ms-1.5 shrink-0"
           data-test="logs-search-field-list-collapse-btn"
           @click="toggleFieldList"
         >
@@ -50,7 +50,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           />
         </OButton>
         <div
-          class="bg-warning text-text-inverse rounded-default min-w-0 flex-1 pl-2 text-left"
+          class="bg-warning text-text-inverse rounded-default min-w-0 flex-1 ps-2 text-left"
           v-if="searchObj.data.countErrorMsg != ''"
         >
           <SanitizedHtmlRenderer
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
         <div
           v-else
-          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 pl-2 text-left"
+          class="text-warning flex min-w-0 flex-1 flex-wrap items-center gap-1.5 ps-2 text-left"
           data-test="logs-search-result-title"
           :data-search-state="
             searchObj.loading || searchObj.loadingCounter ? 'loading' : 'complete'
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
         </div>
 
-        <div class="flex flex-none items-center justify-end gap-1 pr-2">
+        <div class="flex flex-none items-center justify-end gap-1 pe-2">
           <!-- OVERFLOW MENU (narrow): refresh + all action buttons collapse here -->
           <ODropdown v-if="shouldMoveActionsToMenu" side="bottom" align="end">
             <template #trigger>
@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div class="histogram-skeleton__y-label" style="width: 2.25rem" />
                 <div class="histogram-skeleton__y-label" style="width: 1rem" />
               </div>
-              <div class="histogram-skeleton__plot border-card-glass-border border-b border-l">
+              <div class="histogram-skeleton__plot border-card-glass-border border-s border-b">
                 <div class="histogram-skeleton__bars">
                   <div
                     v-for="h in skeletonBarHeights"

@@ -184,7 +184,7 @@ function toggleExpanded() {
         <OCheckbox
           :model-value="selected ? true : false"
           size="xs"
-          class="pl-1"
+          class="ps-1"
           :data-test="`synthetics-journey-step-checkbox-${index}`"
           @update:model-value="emit('toggle-select')"
         />
@@ -192,7 +192,7 @@ function toggleExpanded() {
         <!-- Step number (colored status circle during replay) -->
         <span
           :class="stepNumberClass"
-          class="ml-1"
+          class="ms-1"
           :data-test="replayDotState ? `synthetics-journey-step-dot-${index}` : undefined"
           :aria-label="
             replayDotState

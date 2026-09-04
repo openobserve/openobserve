@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="feature-comparison-table-your-plan-badge"
           class="text-3xs bg-accent text-button-primary-foreground absolute top-[-0.875rem] left-1/2 inline-flex -translate-x-1/2 items-center rounded-full px-3.5 py-1 font-bold tracking-[0.08em] whitespace-nowrap uppercase"
         >
-          <OIcon name="arrow-upward" size="sm" class="mr-1" />
+          <OIcon name="arrow-upward" size="sm" class="me-1" />
           {{ t("about.yourPlan") }}
         </div>
 
@@ -89,13 +89,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-for="pillarId in PILLAR_IDS"
               :key="pillarId"
               data-test="feature-comparison-table-pillar-chip"
-              class="rounded-default text-2xs text-accent border-accent/20 bg-card-glass-tint mr-1.5 mb-1.5 inline-flex items-center border px-2 py-[0.1875rem] font-medium"
+              class="rounded-default text-2xs text-accent border-accent/20 bg-card-glass-tint me-1.5 mb-1.5 inline-flex items-center border px-2 py-[0.1875rem] font-medium"
             >
               {{ t(`about.feature_${pillarId}`) }}
             </span>
           </div>
           <span
-            class="rounded-default text-2xs text-accent border-accent/20 bg-card-glass-tint mr-1.5 mb-1.5 inline-flex items-center border px-2 py-[0.1875rem] font-medium"
+            class="rounded-default text-2xs text-accent border-accent/20 bg-card-glass-tint me-1.5 mb-1.5 inline-flex items-center border px-2 py-[0.1875rem] font-medium"
             >{{ t("about.feature_dashboards") }}</span
           >
         </div>

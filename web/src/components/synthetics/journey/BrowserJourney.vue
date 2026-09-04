@@ -1088,9 +1088,9 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
 
 <template>
   <div ref="journeyRootRef" class="flex min-h-0 w-full flex-col py-4">
-    <!-- Toolbar — pl-4 mirrors the expand column (w-4) so the select-all checkbox
+    <!-- Toolbar — ps-4 mirrors the expand column (w-4) so the select-all checkbox
          aligns with the row checkboxes in the OTable below. -->
-    <div class="mb-3 ml-6.5 flex items-center gap-4 px-3">
+    <div class="ms-6.5 mb-3 flex items-center gap-4 px-3">
       <!-- Select-all — visibility:hidden during replay to preserve layout -->
       <OCheckbox
         :model-value="allSelected || undefined"
@@ -1100,10 +1100,10 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
         @update:model-value="toggleSelectAll()"
       />
       <div class="flex">
-        <h3 class="text-text-heading mr-0 text-base font-semibold">
+        <h3 class="text-text-heading me-0 text-base font-semibold">
           {{ t("synthetics.journey.steps") }}
         </h3>
-        <OBadge variant="default" size="sm" class="ml-1">{{ modelValue.length }}</OBadge>
+        <OBadge variant="default" size="sm" class="ms-1">{{ modelValue.length }}</OBadge>
       </div>
 
       <!-- Advisory notices used to be two permanently-expanded cards below this
@@ -1598,7 +1598,7 @@ function handleStepReplace(row: BrowserStep, next: BrowserStep) {
               class="recording-pulse-ring bg-status-error-text absolute h-[0.7rem] w-[0.7rem] rounded-full opacity-0"
             />
           </span>
-          <span class="text-status-error-text pl-1.5 text-sm font-semibold">{{
+          <span class="text-status-error-text ps-1.5 text-sm font-semibold">{{
             t("synthetics.journey.recording")
           }}</span>
         </span>

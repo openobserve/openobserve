@@ -395,7 +395,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
           {
             // Bottom divider on the cells along the header's bottom edge, since
             // the <thead> border-b doesn't paint in border-separate mode. Uses
-            // the directional border-b color so it doesn't clash with border-l.
+            // the directional border-b color so it doesn't clash with border-s.
             'border-b-table-header-border border-b': level.isLeaf || cell._isTotalHeader,
           },
           {
@@ -700,7 +700,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :data-test="`o2-table-column-filter-btn-${header.column.id}`"
-                class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+                class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
                 @click.stop
               >
                 <OIcon
@@ -769,7 +769,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
             type="button"
             :data-test="`o2-table-column-format-btn-${header.column.id}`"
-            class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+            class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
             :aria-label="t('components.table.formatColumnAria')"
             @click.stop="emit('format-column', header.column.id)"
           >
@@ -1005,7 +1005,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
               <button
                 type="button"
                 :data-test="`o2-table-column-filter-btn-${header.column.id}`"
-                class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+                class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
                 @click.stop
               >
                 <OIcon
@@ -1074,7 +1074,7 @@ function getStandardStickyTotalStyle(header: any): Record<string, any> {
             v-if="enableColumnFormat && (header.column.columnDef.meta as any)?.formattable"
             type="button"
             :data-test="`o2-table-column-format-btn-${header.column.id}`"
-            class="rounded-default ml-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
+            class="rounded-default ms-0.5 inline-flex shrink-0 cursor-pointer items-center justify-center border-0 bg-transparent p-0.5"
             :aria-label="t('components.table.formatColumnAria')"
             @click.stop="emit('format-column', header.column.id)"
           >

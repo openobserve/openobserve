@@ -23,13 +23,13 @@
       <div class="mb-1.25 flex justify-between">
         <div
           @click="onDrilldownClick(index)"
-          class="w-62.5 cursor-pointer truncate pl-2.5"
+          class="w-62.5 cursor-pointer truncate ps-2.5"
           :data-test="`dashboard-addpanel-config-drilldown-name-${index}`"
         >
           {{ Number(index) + 1 }}. {{ data.name }}
         </div>
         <OIcon
-          class="mr-1 cursor-pointer"
+          class="me-1 cursor-pointer"
           size="sm"
           name="close"
           @click="removeDrilldownByIndex(index)"

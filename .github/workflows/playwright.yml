@@ -193,8 +193,6 @@ jobs:
 
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - uses: ./.github/actions/github-auth
       - name: Setup Rust Toolchain
@@ -358,8 +356,6 @@ jobs:
 
       - name: Clone the current repo
         uses: actions/checkout@v5
-        with:
-          fetch-depth: 0
 
       - name: Download binary artifact
         uses: actions/download-artifact@v5
@@ -855,6 +851,9 @@ jobs:
           O2_REPORTING_INGEST_BASE: ${{ secrets.O2_REPORTING_INGEST_BASE }}
           O2_REPORTING_AUTH: ${{ secrets.O2_REPORTING_AUTH }}
           O2_REPORTING_INSECURE: ${{ vars.O2_REPORTING_INSECURE }}
+          # Track lightweight readiness separately from a successful fresh
+          # build; skipped reuse-path builds are reported as null.
+          RUNTIME_READY_JOB_NAME: resolve_binary
           TESTS: ${{ needs.ui_integration_tests.result }}
           MERGE_STATS: ${{ needs.merge_reports.outputs.stats }}
           MERGE_FLAKY: ${{ needs.merge_reports.outputs.flaky }}

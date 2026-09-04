@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </template>
                 <span
                   v-if="row.longestWait"
-                  class="bg-status-error-bg text-status-error-text rounded-default text-3xs ml-0.5 px-1 py-px font-semibold"
+                  class="bg-status-error-bg text-status-error-text rounded-default text-3xs ms-0.5 px-1 py-px font-semibold"
                 >
                   {{ t("dbm.blocked.longestWait") }}
                 </span>

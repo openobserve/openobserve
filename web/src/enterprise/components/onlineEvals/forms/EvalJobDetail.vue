@@ -208,7 +208,7 @@
                  scrollbar off the card edges. -->
             <ul
               v-else
-              class="m-0 flex max-h-100 list-none flex-col gap-2.5 overflow-y-auto p-0 pt-2.5 pr-1"
+              class="m-0 flex max-h-100 list-none flex-col gap-2.5 overflow-y-auto p-0 pe-1 pt-2.5"
             >
               <li v-for="item in resolvedScorers" :key="item.id">
                 <!-- `group` drives the card's hover affordances on the CTA /

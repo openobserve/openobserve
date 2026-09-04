@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="icon-xs-sq"
-          class="mr-1.5 shrink-0"
+          class="me-1.5 shrink-0"
           data-test="traces-search-field-list-collapse-btn"
           @click="toggleFieldList"
         >
@@ -59,7 +59,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="traces-count-badge"
           type="logsResultChip"
           value="neutral"
-          class="mr-[0.6rem]"
+          class="me-[0.6rem]"
           >{{
             `${formatLargeNumber(searchObj.data.queryResults.total != null ? searchObj.data.queryResults.total : hits.length)} ${searchObj.meta.searchMode === "spans" ? t("traces.spansFound") : t("traces.tracesFound")}`
           }}</OTag
@@ -96,7 +96,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Right: Refresh → Insights → rows per page → pagination (same sequence as logs) -->
         <div
-          class="border-card-glass-border rounded-default mr-1 inline-flex h-6 items-center overflow-hidden border px-1"
+          class="border-card-glass-border rounded-default me-1 inline-flex h-6 items-center overflow-hidden border px-1"
         >
           <ORefreshButton
             :last-run-at="searchObj.meta.lastRunAt"
@@ -134,7 +134,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OSelect
             :model-value="searchObj.meta.resultGrid.rowsPerPage"
             :options="rowsPerPageOptions"
-            class="select-pagination mt-0! mr-1 ml-1"
+            class="select-pagination ms-1 me-1 mt-0!"
             size="sm"
             :searchable="false"
             data-test="traces-search-result-records-per-page"

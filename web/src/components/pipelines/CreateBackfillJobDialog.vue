@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <div class="text-banner-warning-text mb-1 text-sm font-semibold">
                         {{ t("pipeline.timeAlignmentRequirements") }}
                       </div>
-                      <ul class="text-banner-warning-text ml-5 list-disc space-y-1 text-xs">
+                      <ul class="text-banner-warning-text ms-5 list-disc space-y-1 text-xs">
                         <li>
                           <strong>{{ t("common.logs") }}</strong>
                           {{ t("pipeline.logsHourBoundaryNote") }}
@@ -193,7 +193,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <OIcon name="schedule" size="sm" />
               <span>{{ t("pipeline.estimatedProcessingTime") }} {{ estimatedInfo.time }}</span>
             </div>
-            <div v-if="estimatedInfo.chunks" class="ml-6 text-xs">
+            <div v-if="estimatedInfo.chunks" class="ms-6 text-xs">
               {{ t("pipeline.estimatedChunks") }} {{ estimatedInfo.chunks }}
             </div>
           </div>
@@ -201,7 +201,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Error Message -->
         <div v-if="errorMessage" class="text-status-error-text">
-          <OIcon name="error" size="sm" class="mr-2" />
+          <OIcon name="error" size="sm" class="me-2" />
           {{ errorMessage }}
         </div>
       </OForm>

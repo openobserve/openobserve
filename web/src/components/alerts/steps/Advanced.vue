@@ -26,7 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Section header -->
         <div class="section-header border-border-default flex items-center border-b px-3 py-2.5">
           <div
-            class="section-header-accent rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0"
+            class="section-header-accent rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0"
           />
           <span class="section-header-title text-compact text-text-heading font-semibold">{{
             t("alerts.additional_settings")
@@ -153,7 +153,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
               >
                 <span>{{ t("alerts.priority") }}</span>
-                <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
                 <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
               </div>
               <OFormSelect
@@ -171,7 +171,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="subsection-label text-text-secondary mb-2 flex items-center text-xs font-semibold"
               >
                 <span>{{ t("alerts.tags") }}</span>
-                <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+                <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
                 <OTooltip :content="t('alerts.tagsTooltip')" side="right" />
               </div>
               <OFormTagInput

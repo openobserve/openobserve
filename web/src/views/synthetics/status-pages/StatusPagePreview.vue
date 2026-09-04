@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="bg-error-500/60 h-2.5 w-2.5 rounded-full" aria-hidden="true" />
         <span class="bg-warning-500/60 h-2.5 w-2.5 rounded-full" aria-hidden="true" />
         <span class="bg-success-500/60 h-2.5 w-2.5 rounded-full" aria-hidden="true" />
-        <span class="text-text-secondary ml-2 min-w-0 flex-1 truncate font-mono text-xs">{{
+        <span class="text-text-secondary ms-2 min-w-0 flex-1 truncate font-mono text-xs">{{
           displayUrl
         }}</span>
       </div>

@@ -75,7 +75,7 @@ describe("experimentFormFromExperiment — clone prefill", () => {
             { role: "system", content: "Be terse." },
             { role: "user", content: "Answer {{ input }}" },
           ],
-          providerId: "pr-1",
+          providerId: "pe-1",
           model: "gpt-4o",
           params: { temperature: 0.3 },
         },
@@ -86,7 +86,7 @@ describe("experimentFormFromExperiment — clone prefill", () => {
     expect(values).toMatchObject({
       name: "prompt v3 (Copy)",
       taskType: "inline_prompt",
-      providerId: "pr-1",
+      providerId: "pe-1",
       model: "gpt-4o",
       systemPrompt: "Be terse.",
       userPrompt: "Answer {{ input }}",

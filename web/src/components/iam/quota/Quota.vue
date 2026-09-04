@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 :options="organizationToDisplay"
                 searchable
                 :placeholder="t('iam.quotaPage.selectOrganization')"
-                class="no-case input-width org-select mr-3 w-75 py-2"
+                class="no-case input-width org-select me-3 w-75 py-2"
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="handleOrgSelect"
@@ -88,14 +88,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 searchable
                 clearable
                 :placeholder="t('iam.quotaPage.selectApiCategory')"
-                class="no-case input-width category-select mr-3 ml-3 w-75 p-0"
+                class="no-case input-width category-select ms-3 me-3 w-75 p-0"
                 labelKey="label"
                 valueKey="value"
                 @update:model-value="handleApiCategorySelect"
               />
             </div>
-            <div v-if="selectedOrganization" class="float-right ml-auto flex items-center">
-              <div class="app-tabs-container mr-3 h-9 w-fit">
+            <div v-if="selectedOrganization" class="float-right ms-auto flex items-center">
+              <div class="app-tabs-container me-3 h-9 w-fit">
                 <AppTabs
                   data-test="time-unit-tabs"
                   class="tabs-selection-container"
@@ -331,7 +331,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
 
       <div
-        class="border-border-default bg-surface-base sticky top-0 bottom-0 z-1 mt-auto ml-auto flex w-full justify-end gap-2 border-t py-2 pr-3"
+        class="border-border-default bg-surface-base sticky top-0 bottom-0 z-1 ms-auto mt-auto flex w-full justify-end gap-2 border-t py-2 pe-3"
         v-if="editTable && activeType == 'table'"
       >
         <OButton variant="outline" size="sm-action" @click="cancelChanges">
@@ -347,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </OButton>
       </div>
       <div
-        class="border-border-default bg-surface-base sticky top-0 bottom-0 z-1 mt-auto ml-auto flex w-full justify-end gap-2 border-t pr-3"
+        class="border-border-default bg-surface-base sticky top-0 bottom-0 z-1 ms-auto mt-auto flex w-full justify-end gap-2 border-t pe-3"
         v-if="editTable && activeType == 'json'"
       >
         <OButton
