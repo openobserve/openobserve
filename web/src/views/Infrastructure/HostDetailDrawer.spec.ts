@@ -60,14 +60,17 @@ vi.mock("@/utils/semanticGroupsCache", () => ({
 const searchMock = vi.mocked(searchService.search);
 
 let lastDashboardData: any = null;
+let lastCurrentTimeObj: any = null;
 const renderChartsStub = defineComponent({
   name: "RenderDashboardCharts",
   props: ["dashboardData", "currentTimeObj", "viewOnly", "searchType", "initialVariableValues"],
   created() {
     lastDashboardData = (this as any).dashboardData;
+    lastCurrentTimeObj = (this as any).currentTimeObj;
   },
   updated() {
     lastDashboardData = (this as any).dashboardData;
+    lastCurrentTimeObj = (this as any).currentTimeObj;
   },
   template: "<div class='render-stub'><slot name='before_panels' /></div>",
 });
@@ -639,6 +642,19 @@ describe("HostDetailDrawer", () => {
         }),
       );
       expect(router.push).not.toHaveBeenCalled();
+    });
+  });
+  // ── Time range handed to the shared renderer ─────────────────────────────
+
+  describe("the window the inline dashboard queries", () => {
+    it("hands RenderDashboardCharts Dates on the MICROSECOND epoch", async () => {
+      // Same defect the curated page carried: `new Date(us / 1000)` builds a
+      // ms-epoch Date, and usePanelDataLoader:418 reads it straight back as µs,
+      // so convertPromQLData's gap-fill snapped the axis floor to 1970.
+      // Every other producer feeds it undivided — plugins/metrics/Index.vue:425.
+      wrapper = await mountDrawer();
+      expect(lastCurrentTimeObj.__global.start_time.getTime()).toBe(RANGE.from);
+      expect(lastCurrentTimeObj.__global.end_time.getTime()).toBe(RANGE.to);
     });
   });
 });

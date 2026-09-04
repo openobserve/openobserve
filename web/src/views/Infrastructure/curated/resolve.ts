@@ -121,6 +121,11 @@ export interface ResolvedPicker {
   label: string;
 }
 
+export interface PickerOption {
+  label: string;
+  value: string;
+}
+
 export interface CuratedResolution {
   panels: ResolvedPanel[];
   presentGroupIds: string[];
@@ -626,6 +631,9 @@ export function buildDashboard(
     activeSectionId?: string;
     /** Threaded onto every drilldown URL so the explorer opens the SAME window. */
     drilldownRange?: { period?: string; from?: number; to?: number };
+    /** Options already fetched, by picker name — a rebuild re-initializes the
+     * manager, which never re-fetches an all-sentinel picker (§6.4). */
+    pickerOptions?: Record<string, PickerOption[]>;
   },
 ): Record<string, unknown> {
   const staleByPanelId = new Map<string, StaleGroupInfo>();
@@ -669,7 +677,13 @@ export function buildDashboard(
     owner: "",
     variables: {
       list: resolution.pickers.map((picker) =>
-        buildVariable(picker, resolution, manifest, opts.activeSectionId ?? tabs[0]?.tabId),
+        buildVariable(
+          picker,
+          resolution,
+          manifest,
+          opts.activeSectionId ?? tabs[0]?.tabId,
+          opts.pickerOptions?.[picker.def.name],
+        ),
       ),
       showDynamicFilters: false,
     },
@@ -922,6 +936,11 @@ function buildPanel(
     ),
   };
 
+  // "single" (the converter's default) emits only Timestamp/Value, which hides the
+  // very labels an inventory table exists to name — same reason the metrics
+  // handoff sets it at utils/metrics/metricsHandoff.ts:180-183.
+  if (panel.def.type === "table") config.promql_table_mode = "all";
+
   if (stale) {
     config.curated_badge = {
       key: stale.noDataYet ? "infra.curated.staleNoDataBadge" : "infra.curated.staleBadge",
@@ -994,6 +1013,7 @@ function buildVariable(
   resolution: CuratedResolution,
   manifest: CuratedPageManifest,
   activeSectionId: string | undefined,
+  loadedOptions: PickerOption[] | undefined,
 ): Record<string, unknown> {
   const def = picker.def;
   const parent = def.chainedOn?.[0]?.picker;
@@ -1026,6 +1046,7 @@ function buildVariable(
     curatedOmitWhenValuesEmpty: def.omitWhenValuesEmpty === true,
     curatedCapNotice: true,
     curatedNarrowBy: parentPicker?.label ?? "",
+    ...(loadedOptions ? { options: loadedOptions } : {}),
     query_data: {
       stream_type: def.valuesFrom.streamType,
       stream: def.valuesFrom.stream,

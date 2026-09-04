@@ -141,10 +141,11 @@ const staleBanners = computed(() =>
     };
   }),
 );
+// MICROSECOND epoch, undivided — usePanelDataLoader reads these back as µs.
 const currentTimeObj = computed(() => ({
   __global: {
-    start_time: new Date(drawerRange.value.from / 1000),
-    end_time: new Date(drawerRange.value.to / 1000),
+    start_time: new Date(drawerRange.value.from),
+    end_time: new Date(drawerRange.value.to),
   },
 }));
 
