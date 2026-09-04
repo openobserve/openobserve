@@ -4771,7 +4771,9 @@ export class LogsPage {
     }
 
     async clickMenuLinkLogsItem() {
-        return await this.clickMenuLinkByType('logs');
+        await this.clickMenuLinkByType('logs');
+        // Sidebar nav is an in-SPA route change; gate on the Logs view toggle re-mounting (present in every tab mode) before callers read persisted state.
+        await expect(this.page.locator(this.visualizeToggle)).toBeVisible({ timeout: 15000 });
     }
 
     async clickMenuLinkTracesItem() {

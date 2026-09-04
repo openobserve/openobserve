@@ -1415,6 +1415,15 @@ export class AlertsPage {
         testLogger.info('Evaluation history Retries column and cells present');
     }
 
+    /** Reload the detail page until the evaluation-history table has >=1 data row — its fetch is single-shot on load, so a lagging row leaves headers but no cells. */
+    async waitForEvaluationHistoryRow({ attempts = 6 } = {}) {
+        const row = this.getAlertHistoryRowsLocator().first();
+        for (let i = 0; i < attempts; i++) {
+            if (await row.isVisible({ timeout: 5000 }).catch(() => false)) return;
+            await this.page.reload({ waitUntil: 'networkidle' }).catch(() => {});
+        }
+    }
+
     /**
      * Assert the newest evaluation's retries cell renders the given integer (0 for a clean
      * self-delivery). Newest-first row ordering means `.first()` is the latest run.
