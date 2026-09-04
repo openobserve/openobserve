@@ -81,7 +81,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 size="lg"
                 :label="t('reports.cachedReport')"
               />
-              <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
+              <OIcon name="info-outline" class="ms-2 cursor-pointer" size="sm">
                 <OTooltip side="right" align="center">
                   <template #content>{{ t("reports.cachedReportHint") }}</template>
                 </OTooltip>
@@ -110,7 +110,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="flex items-start justify-start">
                       <div
                         data-test="add-report-folder-select"
-                        class="o2-input mr-2 pt-0"
+                        class="o2-input me-2 pt-0"
                         style="width: 30%"
                       >
                         <OFormSelect
@@ -126,7 +126,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       </div>
                       <div
                         data-test="add-report-dashboard-select"
-                        class="o2-input mr-2 pt-0"
+                        class="o2-input me-2 pt-0"
                         style="width: 30%"
                       >
                         <OFormSelect
@@ -250,7 +250,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <OIcon
                             :name="showCustomDimensions ? 'expand-less' : 'expand-more'"
                             size="sm"
-                            class="mr-1"
+                            class="me-1"
                           />
                           <span class="text-text-secondary font-bold">{{
                             t("reports.customDimensions")
@@ -348,12 +348,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mt-3 flex items-start justify-start">
                       <div
                         data-test="add-report-schedule-custom-interval-input"
-                        class="o2-input mr-2 pt-0"
+                        class="o2-input me-2 pt-0"
                         style="width: 20rem"
                       >
                         <div class="text-text-secondary mb-1 font-bold">
                           {{ t("reports.cronExpression") + " *" }}
-                          <OIcon name="info" size="sm" class="text-text-muted ml-1 cursor-pointer">
+                          <OIcon name="info" size="sm" class="text-text-muted ms-1 cursor-pointer">
                             <OTooltip side="right" align="center">
                               <template #content>
                                 <span style="font-size: var(--text-sm); white-space: pre-line">
@@ -398,7 +398,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           {{ visual.label }}
                         </OToggleGroupItem>
                       </OFormToggleGroup>
-                      <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
+                      <OIcon name="info-outline" class="ms-2 cursor-pointer" size="sm">
                         <OTooltip side="right" align="center">
                           <template #content
                             >{{ t("reports.scheduleNowHint") }}<br />
@@ -414,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     >
                       <div
                         data-test="add-report-schedule-custom-interval-input"
-                        class="o2-input mr-2 pt-0"
+                        class="o2-input me-2 pt-0"
                         style="width: 10rem"
                       >
                         <OFormInput
@@ -451,7 +451,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       v-if="selectedTimeTab === 'scheduleLater'"
                       class="mt-3 flex items-start justify-start"
                     >
-                      <div data-test="add-report-schedule-start-date-input" class="o2-input mr-2">
+                      <div data-test="add-report-schedule-start-date-input" class="o2-input me-2">
                         <OFormDate
                           name="date"
                           :label="t('reports.startDate')"
@@ -459,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="add-report-schedule-start-date-field"
                         />
                       </div>
-                      <div data-test="add-report-schedule-start-time-input" class="o2-input mr-2">
+                      <div data-test="add-report-schedule-start-time-input" class="o2-input me-2">
                         <OFormTime
                           name="time"
                           :label="t('common.startTime')"
@@ -563,7 +563,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       :label="t('reports.imagePreview')"
                       data-test="add-report-image-preview-toggle"
                     />
-                    <OIcon name="info-outline" class="ml-2 cursor-pointer" size="sm">
+                    <OIcon name="info-outline" class="ms-2 cursor-pointer" size="sm">
                       <OTooltip max-width="20rem">
                         <template #content>{{ t("reports.imagePreviewHint") }}</template>
                       </OTooltip>
@@ -593,7 +593,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="add-report-cancel-btn"
         variant="outline"
         size="sm-action"
-        class="mr-2"
+        class="me-2"
         :disabled="isSaving"
         @click="openCancelDialog"
       >

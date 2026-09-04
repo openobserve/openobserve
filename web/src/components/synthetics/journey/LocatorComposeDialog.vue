@@ -231,7 +231,7 @@ function apply() {
             data-test="synthetics-journey-step-locator-combine-relation-has"
           />
         </ORadioGroup>
-        <p class="text-text-muted m-0 pl-6 text-xs">
+        <p class="text-text-muted m-0 ps-6 text-xs">
           {{ t("synthetics.journey.locatorCombineRelationHasHelp") }}
         </p>
       </section>
@@ -245,7 +245,7 @@ function apply() {
           :label="t('synthetics.journey.locatorCombinePosition', { position: basePosition + 1 })"
           data-test="synthetics-journey-step-locator-combine-position"
         />
-        <p class="text-text-muted m-0 pl-6 text-xs">
+        <p class="text-text-muted m-0 ps-6 text-xs">
           {{ t("synthetics.journey.locatorCombinePositionHelp") }}
         </p>
       </section>

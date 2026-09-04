@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   >
     <!-- Section header -->
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
-      <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+      <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
       <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
         t("alerts.alertSettings.sectionTitle")
       }}</span>
@@ -38,10 +38,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div class="mb-4 flex items-start justify-start pb-3">
             <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
             </div>
-            <div class="mr-2 flex w-fit flex-col gap-1">
+            <div class="me-2 flex w-fit flex-col gap-1">
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
@@ -80,10 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div v-if="isRealTime === 'composite'" class="mb-4 flex items-start justify-start pb-3">
             <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.queryConfig.pendingPeriod") }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
             </div>
-            <div class="mr-2 flex w-fit flex-col gap-1">
+            <div class="me-2 flex w-fit flex-col gap-1">
               <div class="flex items-center gap-2">
                 <div class="w-21.75">
                   <OFormInput
@@ -136,13 +136,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- For Scheduled Alerts -->
         <template v-else>
           <!-- Period -->
-          <div ref="periodFieldRef" class="mr-2 mb-4! flex items-start">
+          <div ref="periodFieldRef" class="me-2 mb-4! flex items-start">
             <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.period") + " *" }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.periodTooltip')" side="right" />
             </div>
-            <div class="mr-2 flex w-fit flex-col gap-1">
+            <div class="me-2 flex w-fit flex-col gap-1">
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
@@ -175,13 +175,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Silence Notification (Cooldown) for Scheduled Alerts -->
-          <div ref="silenceFieldRef" class="mr-2 mb-4! flex items-start">
+          <div ref="silenceFieldRef" class="me-2 mb-4! flex items-start">
             <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.silenceNotification") + " *" }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.alertSettings.cooldownTooltip')" side="right" />
             </div>
-            <div class="mr-2 flex w-fit flex-col gap-1">
+            <div class="me-2 flex w-fit flex-col gap-1">
               <div class="flex items-center">
                 <div class="w-21.75">
                   <OFormInput
@@ -217,13 +217,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                tooltip as the composite version above, plus the
                not-a-multiple-of-Check-every warning (composite has no
                frequency to compare against, so it skips that row). -->
-          <div ref="pendingPeriodFieldRef" class="mr-2 mb-4! flex items-start">
+          <div ref="pendingPeriodFieldRef" class="me-2 mb-4! flex items-start">
             <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
               {{ t("alerts.queryConfig.pendingPeriod") }}
-              <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+              <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
               <OTooltip :content="t('alerts.queryConfig.pendingPeriodTooltip')" side="right" />
             </div>
-            <div class="mr-2 flex w-fit flex-col gap-1">
+            <div class="me-2 flex w-fit flex-col gap-1">
               <div class="flex items-center gap-2">
                 <div class="w-21.75">
                   <OFormInput
@@ -272,7 +272,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                $el, so the ref moves onto the field unchanged. -->
           <AlertDestinationsField
             ref="destinationsFieldRef"
-            class="mr-2 mb-4!"
+            class="me-2 mb-4!"
             :destinations="destinations"
             :workflows="workflows"
             :destination-options="formattedDestinations"
@@ -287,7 +287,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="mb-4! flex items-start">
           <div class="text-text-heading flex h-7 w-47.5 items-center font-semibold">
             {{ t("alerts.alertSettings.createsIncident") }}
-            <OIcon name="info" size="sm" class="ml-1 cursor-pointer" />
+            <OIcon name="info" size="sm" class="ms-1 cursor-pointer" />
             <OTooltip :content="t('alerts.alertSettings.createsIncidentTooltip')" side="right" />
           </div>
           <OFormSwitch name="creates_incident" data-test="alert-creates-incident-toggle" />

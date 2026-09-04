@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           {{ t("components.databaseDeprecationBanner.description") }}
         </span>
       </div>
-      <div class="col-auto ml-2">
+      <div class="col-auto ms-2">
         <OButton variant="ghost" size="icon-sm" icon-left="close" @click="dismissWarning" />
       </div>
     </div>

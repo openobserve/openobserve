@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-wrap items-center">
     <div
-      class="mr-4 mb-2 flex flex-nowrap items-center gap-x-1"
+      class="me-4 mb-2 flex flex-nowrap items-center gap-x-1"
       v-for="(item, index) in adhocVariables"
       :key="index"
     >
@@ -30,18 +30,18 @@
       <OButton
         variant="ghost"
         size="icon"
-        class="ml-1"
+        class="ms-1"
         @click="removeField(index)"
         :data-test="`dashboard-variable-adhoc-close-${index}`"
         icon-left="close"
       >
       </OButton>
-      <!-- <div v-if="index != adhocVariables.length - 1" class="ml-2 and-border" class="bg-surface-subtle-hover">AND</div> -->
+      <!-- <div v-if="index != adhocVariables.length - 1" class="ms-2 and-border" class="bg-surface-subtle-hover">AND</div> -->
     </div>
     <OButton
       variant="ghost"
       size="sm"
-      class="hideOnPrintMode mb-2 ml-1"
+      class="hideOnPrintMode ms-1 mb-2"
       @click="addFields"
       data-test="dashboard-variable-adhoc-add-selector"
     >

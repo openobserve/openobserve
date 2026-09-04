@@ -35,7 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <section class="mb-5" :data-test="`overview-skeleton-${section}`">
     <!-- Every real section carries a title + count chip + View all -->
-    <div class="mb-2 flex items-center justify-between pl-1">
+    <div class="mb-2 flex items-center justify-between ps-1">
       <div class="flex items-center gap-2">
         <OSkeleton class="h-4 w-28" />
         <OSkeleton class="h-4 w-6" />

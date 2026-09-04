@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Tool-specific rendering -->
     <div v-if="isToolObservation && toolContent !== null" class="tool-content flex h-full flex-col">
       <div v-if="toolMetadata" class="mb-2 flex flex-wrap items-center gap-2">
-        <OTag v-if="toolMetadata.name" type="toolMeta" value="tool" class="mr-2">{{
+        <OTag v-if="toolMetadata.name" type="toolMeta" value="tool" class="me-2">{{
           t("traces.lLMContentRenderer.tool", { name: toolMetadata.name })
         }}</OTag>
         <OTag v-if="toolMetadata.callId" type="toolMeta" value="callid">{{

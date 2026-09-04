@@ -40,7 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             : '',
         }"
       >
-        <OSpinner size="xs" class="mx-0 my-2 mr-2" />
+        <OSpinner size="xs" class="mx-0 my-2 me-2" />
         <div>{{ t("iam.permissionsTable.loadingResources") }}</div>
       </div>
       <div

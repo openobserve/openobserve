@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <template #title>
         {{ t("modelPricing.header") }}
-        <OButton variant="ghost" size="icon-sm" class="-ml-1" data-test="model-pricing-info-btn">
+        <OButton variant="ghost" size="icon-sm" class="-ms-1" data-test="model-pricing-info-btn">
           <OIcon name="info-outline" size="sm" />
           <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
         </OButton>
@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <OSearchInput
                 v-model="filterQuery"
-                class="ml-auto w-64"
+                class="ms-auto w-64"
                 :placeholder="t('modelPricing.searchPlaceholder')"
               />
             </div>
@@ -152,7 +152,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="relative z-2 flex min-h-6 flex-nowrap items-center">
               <span
                 v-if="getSource(row) === 'built_in'"
-                class="mr-1 inline-flex shrink-0 cursor-default"
+                class="me-1 inline-flex shrink-0 cursor-default"
               >
                 <img :src="ooLogo" class="h-4 w-4" :alt="t('modelPricing.openObserveLogoAlt')" />
                 <OTooltip
@@ -166,12 +166,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   getSource(row) === 'meta_org' ||
                   (getSource(row) === 'org' && row.org_id !== orgIdentifier)
                 "
-                class="mr-1 inline-flex shrink-0 cursor-default"
+                class="me-1 inline-flex shrink-0 cursor-default"
               >
                 <OIcon name="corporate-fare" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceInherited')" />
               </span>
-              <span v-else class="mr-1 inline-flex shrink-0 cursor-default">
+              <span v-else class="me-1 inline-flex shrink-0 cursor-default">
                 <OIcon name="person" size="sm" class="text-text-secondary" />
                 <OTooltip side="top" align="center" :content="t('modelPricing.sourceCustom')" />
               </span>
@@ -233,12 +233,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           <thead>
                             <tr>
                               <th
-                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b pt-0 pr-4 pb-1 pl-0 text-left font-semibold"
+                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-4 pt-0 pb-1 text-left font-semibold"
                               >
                                 {{ t("modelPricing.usageType") }}
                               </th>
                               <th
-                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b pt-0 pr-0 pb-1 pl-0 text-right font-semibold"
+                                class="text-2xs text-table-header-text bg-table-header-bg border-table-header-border border-b ps-0 pe-0 pt-0 pb-1 text-right font-semibold"
                               >
                                 {{ t("modelPricing.colPricingSimple") }}
                               </th>
@@ -251,8 +251,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                               )"
                               :key="key"
                             >
-                              <td class="py-0.5 pr-4 pl-0 text-xs">{{ formatPriceKey(key) }}</td>
-                              <td class="py-0.5 pr-0 pl-0 text-right text-xs font-medium">
+                              <td class="py-0.5 ps-0 pe-4 text-xs">{{ formatPriceKey(key) }}</td>
+                              <td class="py-0.5 ps-0 pe-0 text-right text-xs font-medium">
                                 {{ formatPerMillion(price) }}
                               </td>
                             </tr>
@@ -305,8 +305,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                                 v-for="[key, price] in sortedPriceEntries(tier.prices || {})"
                                 :key="key"
                               >
-                                <td class="py-0.5 pr-4 pl-0 text-xs">{{ formatPriceKey(key) }}</td>
-                                <td class="py-0.5 pr-0 pl-0 text-right text-xs font-medium">
+                                <td class="py-0.5 ps-0 pe-4 text-xs">{{ formatPriceKey(key) }}</td>
+                                <td class="py-0.5 ps-0 pe-0 text-right text-xs font-medium">
                                   {{ formatPerMillion(price) }}
                                 </td>
                               </tr>
@@ -501,7 +501,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div v-if="tier.utc_windows?.length" class="mt-2">
                     <div class="text-2xs mb-1.5 opacity-55">
                       {{ t("modelPricing.timeWindows") }}
-                      <span class="ml-1 font-mono">{{ formatUtcWindows(tier.utc_windows) }}</span>
+                      <span class="ms-1 font-mono">{{ formatUtcWindows(tier.utc_windows) }}</span>
                     </div>
                     <div
                       v-if="tierWindowsLocal(tier)"

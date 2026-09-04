@@ -141,7 +141,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #after>
             <div
               data-test="dashboard-import-error-container"
-              class="bg-card-glass-bg border-border-default flex h-full min-h-0 flex-col border-l"
+              class="bg-card-glass-bg border-border-default flex h-full min-h-0 flex-col border-s"
             >
               <div class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold">
                 {{ t("dashboard.importDashboardPage.errorValidations") }}

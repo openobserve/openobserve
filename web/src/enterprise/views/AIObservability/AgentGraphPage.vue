@@ -83,7 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              localStorage keys), so the two surfaces don't share a type. Same
              control shape as the Traces SearchBar toolbar for consistency. -->
         <template #trailing>
-          <div class="ml-auto flex shrink-0 items-center gap-2">
+          <div class="ms-auto flex shrink-0 items-center gap-2">
             <OToggleGroup
               :model-value="vizType"
               type="single"

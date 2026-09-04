@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click.self="handleCloseAddVariable"
     >
       <div
-        class="add-variable-drawer-panel border-border-default bg-surface-base h-screen w-180 overflow-hidden rounded-none! border-l pt-2 pl-2 shadow-sm"
+        class="add-variable-drawer-panel border-border-default bg-surface-base h-screen w-180 overflow-hidden rounded-none! border-s ps-2 pt-2 shadow-sm"
       >
         <AddSettingVariable
           @save="handleSaveVariable"

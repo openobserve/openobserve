@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex justify-end">
       <div class="my-1">
         <OButton
-          class="mr-2"
+          class="me-2"
           variant="ghost"
           size="sm"
           :disabled="
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             @on:date-change="updateDateTime"
           />
         </div>
-        <div class="float-left mr-2 pl-2">
+        <div class="float-left me-2 ps-2">
           <OButton
             data-test="logs-search-bar-refresh-btn"
             data-cy="search-bar-refresh-button"

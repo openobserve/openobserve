@@ -460,7 +460,7 @@ describe("TraceHeader", () => {
       const tic0 = wrapper.find('[data-test="trace-header-tic-label-0"]');
       expect(tic0.classes()).toContain("w-1/4");
       expect(tic0.classes()).toContain("text-xs");
-      expect(tic0.classes()).toContain("pl-3");
+      expect(tic0.classes()).toContain("ps-3");
     });
 
     it("should have correct tic line classes", () => {

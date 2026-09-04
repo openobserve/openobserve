@@ -205,15 +205,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Last Refreshed — always the rightmost element, the SAME element the
              dashboard panel bar carries (PanelErrorButtons): 🕑 with the
-             relative tooltip. `ml-1.25` matches PanelErrorButtons' spacing. A
+             relative tooltip. `ms-1.25` matches PanelErrorButtons' spacing. A
              card restored from cache says how old its data really is instead of
              passing it off as live. -->
         <span
           v-if="preview?.lastTriggeredAt"
-          class="lastRefreshedAt mr-0.5 ml-1.25 shrink-0 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap"
+          class="lastRefreshedAt ms-1.25 me-0.5 shrink-0 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap"
           :data-test="`metrics-explorer-card-last-refreshed-${card.name}`"
         >
-          <span class="mr-0.5 text-[smaller]">
+          <span class="me-0.5 text-[smaller]">
             🕑
             <OTooltip side="bottom" align="end">
               <template #content
