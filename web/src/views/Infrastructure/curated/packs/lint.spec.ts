@@ -73,7 +73,10 @@ const allTokens = (manifest: any, prefix: "f" | "scope"): string[] => {
   const out: string[] = [];
   const pattern = new RegExp(`\\$\\{${prefix}:([^}]+)\\}`, "g");
   for (const panel of panelsOf(manifest)) {
-    for (const text of [...queriesOf(panel), ...panel.variants.flatMap((v: any) => v.queries.map((q: any) => q.legend ?? ""))]) {
+    for (const text of [
+      ...queriesOf(panel),
+      ...panel.variants.flatMap((v: any) => v.queries.map((q: any) => q.legend ?? "")),
+    ]) {
       for (const match of String(text).matchAll(pattern)) out.push(match[1]);
     }
   }
@@ -244,7 +247,8 @@ describe.each(packs)("generic invariants — %s pack", (packId, manifest) => {
         expect(i18nHas(key), key).toBe(true);
       }
     }
-    for (const section of manifest.sections) expect(i18nHas(section.titleKey), section.titleKey).toBe(true);
+    for (const section of manifest.sections)
+      expect(i18nHas(section.titleKey), section.titleKey).toBe(true);
     for (const panel of panels) {
       expect(i18nHas(panel.titleKey), panel.titleKey).toBe(true);
       if (panel.subtitleKey) expect(i18nHas(panel.subtitleKey), panel.subtitleKey).toBe(true);
@@ -268,11 +272,12 @@ describe.each(packs)("generic invariants — %s pack", (packId, manifest) => {
 
   it("group labels are CAPABILITY-FIRST — no label copy STARTS with a bare collector token", () => {
     for (const group of manifest.groups) {
-      const copy = String((enLocale as any) && i18nHas(group.labelKey) ? group.labelKey : "");
-      // Resolve the actual copy, not the key, so the rule reads the sentence.
+      // Resolve the actual copy, not the key, so the rule reads the sentence —
+      // and require it to resolve, or a missing key would vacuously pass.
       let node: any = enLocale;
       for (const segment of group.labelKey.split(".")) node = node?.[segment];
-      const text = String(node ?? copy).toLowerCase().trim();
+      expect(typeof node, `${group.id}: ${group.labelKey} resolves to no copy`).toBe("string");
+      const text = String(node).toLowerCase().trim();
       for (const token of COLLECTOR_TOKENS) {
         expect(text.startsWith(token), `${group.id}: "${text}"`).toBe(false);
       }
@@ -293,10 +298,12 @@ describe.each(packs)("generic invariants — %s pack", (packId, manifest) => {
       for (const query of queriesOf(panel)) {
         const topk = query.match(/topk\((\d+),/);
         if (!topk) continue;
-        // The title must disclose the same N.
+        // The title must disclose the same N — and must resolve, or a missing
+        // key would pass this rule by asserting against "".
         let node: any = enLocale;
         for (const segment of panel.titleKey.split(".")) node = node?.[segment];
-        expect(String(node ?? ""), panel.titleKey).toContain(topk[1]);
+        expect(typeof node, `${panel.id}: ${panel.titleKey} resolves to no copy`).toBe("string");
+        expect(String(node), panel.titleKey).toContain(topk[1]);
         // …and the query must actually honour it. A range topk is a per-step
         // selector: measured, topk(20) over 3h returned 450 rows.
         expect(query, panel.id).toMatch(/last_over_time\(.*\[\d+[smh]:\]\)/s);
@@ -345,9 +352,10 @@ describe.each(packs)("generic invariants — %s pack", (packId, manifest) => {
       const required = new Set(
         groupPanels.flatMap((p) => p.variants.flatMap((v: any) => v.requiresStreams ?? [])),
       );
-      expect(required.has(picker.valuesFrom.stream), `${picker.name} → ${picker.valuesFrom.stream}`).toBe(
-        true,
-      );
+      expect(
+        required.has(picker.valuesFrom.stream),
+        `${picker.name} → ${picker.valuesFrom.stream}`,
+      ).toBe(true);
     }
   });
 });
