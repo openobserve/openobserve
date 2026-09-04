@@ -5,7 +5,7 @@ OpenObserve stream, so we can build performance/reliability dashboards on top of
 
 | Workflow | Repo | Stream | Emitting job |
 |---|---|---|---|
-| Playwright Regression (`playwright_regression.yml`) | openobserve (OSS) | `ci_regression` | `report_to_openobserve` |
+| Playwright Bug-Fix Regression (`playwright_bugfix_regression.yml`) | openobserve (OSS) | `ci_regression` | `report_to_openobserve` |
 | DocGen engine (`docgen.yml`) | o2-enterprise | `ci_docgen` | `report_metrics` |
 | E2E Council engine (`e2e-council.yml`) | o2-enterprise | `ci_council` | `report_metrics` |
 
