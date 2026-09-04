@@ -747,19 +747,12 @@ pub async fn correlate_alert_to_incident(
                     log::error!("[incidents] could not link on-call record for {incident_id}: {e}");
                 }
 
-                let impacted = crate::alerts::scheduler::handlers::impacted_services(
+                if let Err(e) = crate::alerts::scheduler::handlers::page_blast_radius(
                     &alert.org_id,
+                    &origin,
                     &dimensions,
                 )
-                .await;
-                if !impacted.is_empty()
-                    && let Err(e) = o2_enterprise::enterprise::oncall::escalation::page_impacted(
-                        &alert.org_id,
-                        &origin,
-                        &impacted,
-                        config::utils::time::now_micros(),
-                    )
-                    .await
+                .await
                 {
                     log::error!("[incidents] impacted paging failed for {incident_id}: {e}");
                 }

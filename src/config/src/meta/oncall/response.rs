@@ -828,6 +828,45 @@ pub fn flap_note(recovered_for_micros: i64) -> String {
     )
 }
 
+/// Why blast radius found no downstream team.
+///
+/// Every one of these used to return an empty list and write nothing, so
+/// "nothing depends on this" and "blast radius is broken" produced identical
+/// output. `NoGraph` is not hypothetical: the service-graph job runs hourly by
+/// default, so a fresh data directory has no graph for the first hour and every
+/// page in that window silently has no blast radius.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NoBlastRadius {
+    /// The signal carried no `service` dimension, so there was nothing to ask
+    /// the graph about.
+    NoServiceDimension,
+    /// The graph has no edges at all for the window that was read.
+    NoGraph,
+    /// The graph has edges, and nothing calls the service that broke.
+    NothingCallsIt { service: String },
+}
+
+impl NoBlastRadius {
+    /// The timeline sentence. Pure and here rather than formatted at the call
+    /// site, because it is the entire evidence that blast radius ran at all.
+    pub fn note(&self) -> String {
+        match self {
+            Self::NoServiceDimension => "this signal carries no service, so no downstream teams \
+                                         were computed"
+                .to_string(),
+            Self::NoGraph => "the service graph has no recent data, so no downstream teams were \
+                              computed"
+                .to_string(),
+            Self::NothingCallsIt { service } => {
+                format!(
+                    "nothing in the service graph calls {service}, so no other team is \
+                         downstream of this"
+                )
+            }
+        }
+    }
+}
+
 // ── Ordered recovery (00-simplified-flow §4) ─────────────────────────────────
 
 /// What the upstream signal recovering means for the records it opened.
@@ -2177,5 +2216,35 @@ mod tests {
         assert_eq!(recovered_for_micros, 40_000_000);
         assert!(flap_note(recovered_for_micros).contains("40s"));
         assert!(flap_note(recovered_for_micros).contains("dampened"));
+    }
+
+    /// The three ways blast radius finds nobody all used to write nothing, so
+    /// "nothing depends on this" and "blast radius is broken" produced
+    /// byte-identical output. Each has to say which one it was, and none may
+    /// read as an error — finding nobody is a legitimate answer.
+    #[test]
+    fn test_each_reason_for_no_blast_radius_says_which_one_it_was() {
+        let notes = [
+            NoBlastRadius::NoServiceDimension.note(),
+            NoBlastRadius::NoGraph.note(),
+            NoBlastRadius::NothingCallsIt {
+                service: "zxporter".into(),
+            }
+            .note(),
+        ];
+        assert!(notes[0].contains("no service"));
+        assert!(notes[1].contains("service graph has no recent data"));
+        assert!(notes[2].contains("zxporter"));
+
+        let mut distinct = notes.to_vec();
+        distinct.sort();
+        distinct.dedup();
+        assert_eq!(distinct.len(), 3, "each case reads differently: {notes:?}");
+        for note in &notes {
+            assert!(
+                !note.to_lowercase().contains("error") && !note.to_lowercase().contains("failed"),
+                "finding nobody is an answer, not a fault: {note}"
+            );
+        }
     }
 }
