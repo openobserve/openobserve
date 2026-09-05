@@ -1151,11 +1151,6 @@ describe("PlayerTracesTab", () => {
   // =========================================================================
   // SQL is schema-guarded so a mobile stream never 400s
   //
-  // Mobile RUM streams lack the browser-shaped view columns: `view_loading_type`
-  // is browser-only, and `action_id` may be absent. Referencing a column the
-  // stream does not have fails the whole query with a 400. Every optional column
-  // must therefore be selected only when present, and the `action_id` filter
-  // applied only when that column exists.
   // =========================================================================
 
   describe("schema-guarded SQL", () => {
@@ -1164,9 +1159,7 @@ describe("PlayerTracesTab", () => {
       return call?.[0]?.query?.query?.sql ?? "";
     }
 
-    it("omits view_loading_type and the action_id filter on a mobile schema", async () => {
-      // Arrange: a mobile-shaped schema — trace_id present, but no view_loading_type
-      // and no action_id.
+    it("omits browser-only fields and filters on a mobile schema", async () => {
       wrapper.unmount();
       mockSearch.mockClear();
       mockGetStream.mockResolvedValueOnce({
@@ -1190,11 +1183,12 @@ describe("PlayerTracesTab", () => {
       expect(sql).not.toContain("max(view_loading_type)");
       expect(sql).toContain("NULL as _view_loading_type");
       expect(sql).not.toContain("action_id is not null");
+      expect(sql).not.toContain("resource_url");
       expect(sql).toContain("_o2_trace_id");
       expect(sql).toContain("max(view_url)");
     });
 
-    it("keeps view_loading_type and the action_id filter on a full browser schema", async () => {
+    it("includes unlinked traces and filters Socket.IO groups on a browser schema", async () => {
       // Arrange: browser schema carries every column.
       wrapper.unmount();
       mockSearch.mockClear();
@@ -1208,6 +1202,7 @@ describe("PlayerTracesTab", () => {
           { name: "type" },
           { name: "date" },
           { name: "action_id" },
+          { name: "resource_url" },
         ],
       });
 
@@ -1218,7 +1213,26 @@ describe("PlayerTracesTab", () => {
       // Assert
       const sql = lastRumSql();
       expect(sql).toContain("max(view_loading_type) as _view_loading_type");
-      expect(sql).toContain("action_id is not null");
+      expect(sql).not.toContain("action_id is not null");
+      expect(sql).toContain(
+        "HAVING MAX(CASE WHEN resource_url LIKE '%/socket.io/%' AND resource_url LIKE '%transport=polling%' THEN 1 ELSE 0 END) = 0",
+      );
+    });
+
+    it("keeps null resource URLs while excluding a trace containing Socket.IO polling", async () => {
+      wrapper.unmount();
+      mockSearch.mockClear();
+      mockGetStream.mockResolvedValueOnce({
+        schema: [{ name: "_oo_trace_id" }, { name: "session_id" }, { name: "resource_url" }],
+      });
+
+      wrapper = mountComponent();
+      await flushPromises();
+
+      const sql = lastRumSql();
+      expect(sql).not.toContain("resource_url NOT LIKE");
+      expect(sql).toContain("resource_url LIKE '%/socket.io/%'");
+      expect(sql).toContain("resource_url LIKE '%transport=polling%'");
     });
 
     it("does not query at all when the stream has no trace_id column", async () => {

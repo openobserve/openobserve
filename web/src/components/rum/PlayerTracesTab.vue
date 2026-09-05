@@ -494,11 +494,7 @@ async function fetchTraces() {
       return;
     }
 
-    // The view-context columns are browser-shaped and are NOT guaranteed on a mobile
-    // `_rumdata` schema. Referencing a column the stream lacks fails the whole query with a
-    // 400, so each optional column is selected only when present (NULL-aliased otherwise)
-    // and the `action_id` filter is applied only when that column exists. `session_id` and
-    // the guarded `trace_id` are the only hard requirements.
+    // Optional browser fields must be schema-guarded because mobile streams omit them.
     const presentCols = new Set((rumStream?.schema ?? []).map((field: any) => field?.name));
     const has = (col: string): boolean => presentCols.has(col);
     const aggOrNull = (fn: string, col: string, alias: string): string =>
@@ -513,11 +509,13 @@ async function fetchTraces() {
       aggOrNull("min", "date", "_date"),
     ];
     const whereParts = [`session_id='${props.sessionId}'`, traceIdSet];
-    if (has("action_id")) whereParts.push("action_id is not null");
+    const having = has("resource_url")
+      ? " HAVING MAX(CASE WHEN resource_url LIKE '%/socket.io/%' AND resource_url LIKE '%transport=polling%' THEN 1 ELSE 0 END) = 0"
+      : "";
 
     const rumQuery = {
       query: {
-        sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr} ORDER BY _date ASC`,
+        sql: `SELECT ${selectParts.join(", ")} FROM "_rumdata" WHERE ${whereParts.join(" AND ")} GROUP BY ${traceIdExpr}${having} ORDER BY _date ASC`,
         start_time: searchStartTime,
         end_time: searchEndTime,
         from: 0,
