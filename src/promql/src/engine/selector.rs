@@ -73,15 +73,14 @@ impl Engine {
         // Get all evaluation timestamps from the context
         let eval_timestamps = self.eval_ctx.timestamps();
 
-        // For each metric, select appropriate samples at each evaluation timestamp
-        // TODO: make it parallel
-        let mut result = Vec::with_capacity(metrics_cache.len());
-        for metric in metrics_cache {
+        let lookback_delta = self.ctx.lookback_delta;
+        // every series selects independently, so fan the selection out
+        let result = metrics_cache.into_par_iter().filter_map(|metric| {
             let mut selected_samples = Vec::with_capacity(eval_timestamps.len());
 
             for &eval_ts in &eval_timestamps {
                 // Calculate lookback window for this evaluation timestamp
-                let start = eval_ts - self.ctx.lookback_delta;
+                let start = eval_ts - lookback_delta;
 
                 // Find the sample for this evaluation timestamp
                 // Binary search for the last sample before or at eval_ts (considering offset)
@@ -111,17 +110,15 @@ impl Engine {
             }
 
             // Only include metrics that have at least one sample
-            if !selected_samples.is_empty() {
-                result.push(RangeValue {
-                    labels: metric.labels,
-                    samples: selected_samples,
-                    exemplars: metric.exemplars,
-                    time_window: metric.time_window,
-                });
-            }
-        }
+            (!selected_samples.is_empty()).then_some(RangeValue {
+                labels: metric.labels,
+                samples: selected_samples,
+                exemplars: metric.exemplars,
+                time_window: metric.time_window,
+            })
+        });
 
-        Ok(result)
+        Ok(result.collect())
     }
 
     /// Range vector selector --- select a whole time range at each evaluation
