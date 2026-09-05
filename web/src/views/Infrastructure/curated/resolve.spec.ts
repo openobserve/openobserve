@@ -137,6 +137,9 @@ const fullK8sStreams = () =>
     { name: "kube_node_status_condition", schema: KUBE_NODE_COND_SCHEMA },
     { name: "kube_node_status_allocatable", schema: KUBE_NODE_ALLOC_SCHEMA },
     { name: "kube_pod_container_resource_requests", schema: KUBE_POD_PHASE_SCHEMA },
+    { name: "kube_pod_container_resource_limits", schema: KUBE_POD_PHASE_SCHEMA },
+    { name: "k8s_pod_cpu_request_utilization", schema: KUBELET_POD_SCHEMA },
+    { name: "k8s_pod_memory_request_utilization", schema: KUBELET_POD_SCHEMA },
     { name: "kube_pod_container_status_restarts_total", schema: KUBE_POD_PHASE_SCHEMA },
   ]);
 
@@ -243,11 +246,15 @@ describe("§5.4 concept resolution — rung by rung", () => {
     // `k8s_namespace_name` must resolve to `namespace`, which is the defaults'
     // declared order (§3.3 fact 2). A "sort canonical-first" refactor fails here.
     //
-    // kubelet-pod declares NO fieldOverrides, so rung 1 cannot fire and the pack is
-    // used as authored — stripping an override it does not have would be a no-op
-    // that only made the fixture look like it was doing something.
+    // kubelet-pod declares no override for NAMESPACE, so rung 1 cannot fire for the
+    // concept this fixture exercises and the pack is used as authored — stripping an
+    // override it does not have would be a no-op that only made the fixture look
+    // like it was doing something. (It does pin k8s-cluster at rung 1, which is a
+    // different concept and deliberately unrelated to this ladder test.)
     expect(
-      kubernetesPage.groups.find((g: any) => g.id === "kubelet-pod").fieldOverrides,
+      kubernetesPage.groups.find((g: any) => g.id === "kubelet-pod").fieldOverrides?.[
+        GROUP.namespace
+      ],
     ).toBeUndefined();
     const streams = fullK8sStreams();
     const podMem = streams.metrics.find((s: any) => s.name === "k8s_pod_memory_usage")!;
@@ -1152,7 +1159,12 @@ describe("§5.5 buildDashboard", () => {
   it("emits a v8 document with tabs = sections and tabId = section id", () => {
     const dashboard = build(resolve({}));
     expect(dashboard.version).toBe(8);
-    expect(dashboard.tabs.map((t: any) => t.tabId)).toEqual(["overview", "nodes", "workloads"]);
+    expect(dashboard.tabs.map((t: any) => t.tabId)).toEqual([
+      "overview",
+      "utilization",
+      "nodes",
+      "workloads",
+    ]);
   });
 
   it("drops a section whose panels ALL hid — the tab list never shows an empty tab", () => {
@@ -2115,8 +2127,8 @@ describe("the built dashboard does not depend on the selected tab", () => {
     );
     // Cluster renders on ALL THREE tabs: a Workloads without it answered a
     // per-cluster question with every cluster's pods, silently.
-    expect(byName.cluster).toEqual(["overview", "nodes", "workloads"]);
-    expect(byName.namespace).toEqual(["workloads"]);
+    expect(byName.cluster).toEqual(["overview", "utilization", "nodes", "workloads"]);
+    expect(byName.namespace).toEqual(["utilization", "workloads"]);
     expect(byName.pod).toEqual(["workloads"]);
   });
 

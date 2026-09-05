@@ -59,7 +59,7 @@ const COLLECTOR_TOKENS = ["kubeletstats", "kube-state", "cluster receiver", "kub
 const GOLDEN_NAMES: Record<string, { pickers: string[]; sections: string[] }> = {
   kubernetes: {
     pickers: ["cluster", "namespace", "pod"],
-    sections: ["overview", "nodes", "workloads"],
+    sections: ["overview", "utilization", "nodes", "workloads"],
   },
   hosts: { pickers: ["host"], sections: ["host"] },
 };

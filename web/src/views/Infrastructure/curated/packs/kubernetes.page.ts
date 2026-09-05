@@ -62,6 +62,13 @@ export const kubernetesPage: CuratedPageManifest = {
       setup: { kind: "card", slug: "kubernetes" },
       streamType: "metrics",
       anchorStream: "k8s_pod_memory_usage",
+      // Rung-1 certainty for the labels the utilization tables group BY: a ${f:}
+      // token is a REQUIRED concept, so a cluster-less resolution hides the panel
+      // instead of collapsing to fleet-wide. Measured, every kubeletstats pod
+      // stream carries k8s_cluster (and a dead k8s_cluster_name spelling beside it).
+      fieldOverrides: {
+        [GROUP.cluster]: "k8s_cluster",
+      },
       probeFields: {
         [GROUP.namespace]: ["k8s_namespace_name", "k8s_namespace", "namespace"],
         [GROUP.pod]: ["k8s_pod_name", "k8s_pod", "pod"],
@@ -375,6 +382,301 @@ export const kubernetesPage: CuratedPageManifest = {
             ],
           },
           "kube_pod_status_phase",
+        ),
+      ],
+    },
+
+    {
+      id: "utilization",
+      titleKey: "infra.k8s.section.utilization",
+      // The caveats belong to the panel set, not to any one tile: the ratios cannot
+      // see a pod that declares no request at all, and the tiles deliberately ignore
+      // the namespace picker while the tables honour it.
+      noteKey: "infra.k8s.section.utilizationNote",
+      scopedBy: ["cluster", "namespace"],
+      panels: [
+        panel(
+          {
+            id: "k8s_ut_over_limit",
+            titleKey: "infra.k8s.panel.containersOverLimit",
+            type: "metric",
+            unit: "numbers",
+            groupId: "kubelet-pod",
+            layout: { w: 32, h: 6 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: ["k8s_pod_memory_limit_utilization"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `count(k8s_pod_memory_limit_utilization\${scope:cluster} > 1)`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "k8s_pod_memory_limit_utilization",
+        ),
+        panel(
+          {
+            id: "k8s_ut_near_limit",
+            titleKey: "infra.k8s.panel.containersNearLimit",
+            type: "metric",
+            unit: "numbers",
+            groupId: "kubelet-pod",
+            layout: { w: 32, h: 6 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: ["k8s_pod_memory_limit_utilization"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `count(k8s_pod_memory_limit_utilization\${scope:cluster} > 0.9)`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "k8s_pod_memory_limit_utilization",
+        ),
+        panel(
+          {
+            id: "k8s_ut_cpu_idle_pods",
+            titleKey: "infra.k8s.panel.podsIdleCpuRequest",
+            type: "metric",
+            unit: "numbers",
+            groupId: "kubelet-pod",
+            layout: { w: 32, h: 6 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: ["k8s_pod_cpu_request_utilization"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `count(k8s_pod_cpu_request_utilization\${scope:cluster} < 0.2)`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "k8s_pod_cpu_request_utilization",
+        ),
+        panel(
+          {
+            id: "k8s_ut_mem_idle_pods",
+            titleKey: "infra.k8s.panel.podsIdleMemRequest",
+            type: "metric",
+            unit: "numbers",
+            groupId: "kubelet-pod",
+            layout: { w: 32, h: 6 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: ["k8s_pod_memory_request_utilization"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `count(k8s_pod_memory_request_utilization\${scope:cluster} < 0.2)`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "k8s_pod_memory_request_utilization",
+        ),
+        panel(
+          {
+            id: "k8s_ut_cpu_commit",
+            titleKey: "infra.k8s.panel.cpuReserved",
+            type: "metric",
+            unit: "percent-1",
+            groupId: "kube-state",
+            layout: { w: 32, h: 6 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: [
+                  "kube_pod_container_resource_requests",
+                  "kube_node_status_allocatable",
+                ],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `sum(kube_pod_container_resource_requests{\${scope:cluster},resource="cpu"}) / sum(kube_node_status_allocatable{\${scope:cluster},resource="cpu"})`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_pod_container_resource_requests",
+        ),
+        panel(
+          {
+            id: "k8s_ut_cpu_overcommit",
+            titleKey: "infra.k8s.panel.cpuLimitsOfAllocatable",
+            type: "metric",
+            unit: "percent-1",
+            groupId: "kube-state",
+            layout: { w: 32, h: 6 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: [
+                  "kube_pod_container_resource_limits",
+                  "kube_node_status_allocatable",
+                ],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `sum(kube_pod_container_resource_limits{\${scope:cluster},resource="cpu"}) / sum(kube_node_status_allocatable{\${scope:cluster},resource="cpu"})`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_pod_container_resource_limits",
+        ),
+        panel(
+          {
+            id: "k8s_ut_commit_trend",
+            titleKey: "infra.k8s.panel.cpuReservedTrend",
+            type: "line",
+            unit: "percent-1",
+            groupId: "kube-state",
+            layout: { w: 96, h: 16 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: [
+                  "kube_pod_container_resource_requests",
+                  "kube_node_status_allocatable",
+                ],
+                queryType: "promql",
+                queries: [
+                  {
+                    query: `sum(kube_pod_container_resource_requests{\${scope:cluster},resource="cpu"}) / sum(kube_node_status_allocatable{\${scope:cluster},resource="cpu"})`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_pod_container_resource_requests",
+        ),
+        panel(
+          {
+            id: "k8s_ut_over_limit_top",
+            titleKey: "infra.k8s.panel.containersOverLimitTop",
+            type: "table",
+            unit: "percent-1",
+            groupId: "kubelet-pod",
+            layout: { w: 96, h: 16 },
+            variants: [
+              {
+                requiresStreams: ["k8s_pod_memory_limit_utilization"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `topk(20, sum by (${CLUSTER}, ${NS}, ${POD}) (k8s_pod_memory_limit_utilization{\${scope:cluster},\${scope:namespace}} > 1))`,
+                    legend: `{${CLUSTER}} {${NS}}/{${POD}}`,
+                  },
+                ],
+              },
+            ],
+          },
+          "k8s_pod_memory_limit_utilization",
+        ),
+        panel(
+          {
+            id: "k8s_ut_cpu_waste_top",
+            titleKey: "infra.k8s.panel.cpuWasteTop",
+            type: "table",
+            unit: "percent-1",
+            groupId: "kubelet-pod",
+            layout: { w: 96, h: 16 },
+            variants: [
+              {
+                requiresStreams: ["k8s_pod_cpu_request_utilization"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `topk(20, clamp_min(1 - sum by (${CLUSTER}, ${NS}, ${POD}) (k8s_pod_cpu_request_utilization{\${scope:cluster},\${scope:namespace}}), 0))`,
+                    legend: `{${CLUSTER}} {${NS}}/{${POD}}`,
+                  },
+                ],
+              },
+            ],
+          },
+          "k8s_pod_cpu_request_utilization",
+        ),
+        panel(
+          {
+            id: "k8s_ut_mem_waste_top",
+            titleKey: "infra.k8s.panel.memWasteTop",
+            type: "table",
+            unit: "percent-1",
+            groupId: "kubelet-pod",
+            layout: { w: 96, h: 16 },
+            variants: [
+              {
+                requiresStreams: ["k8s_pod_memory_request_utilization"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `topk(20, clamp_min(1 - sum by (${CLUSTER}, ${NS}, ${POD}) (k8s_pod_memory_request_utilization{\${scope:cluster},\${scope:namespace}}), 0))`,
+                    legend: `{${CLUSTER}} {${NS}}/{${POD}}`,
+                  },
+                ],
+              },
+            ],
+          },
+          "k8s_pod_memory_request_utilization",
+        ),
+        panel(
+          {
+            id: "k8s_ut_node_commit_top",
+            titleKey: "infra.k8s.panel.nodeCommitmentTop",
+            type: "table",
+            unit: "percent-1",
+            groupId: "kube-state",
+            layout: { w: 96, h: 16 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: [
+                  "kube_pod_container_resource_requests",
+                  "kube_node_status_allocatable",
+                ],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `topk(20, sum by (${CLUSTER}, ${NODE}) (kube_pod_container_resource_requests{\${scope:cluster},resource="cpu"}) / sum by (${CLUSTER}, ${NODE}) (kube_node_status_allocatable{\${scope:cluster},resource="cpu"}))`,
+                    legend: `{${CLUSTER}} {${NODE}}`,
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_pod_container_resource_requests",
         ),
       ],
     },

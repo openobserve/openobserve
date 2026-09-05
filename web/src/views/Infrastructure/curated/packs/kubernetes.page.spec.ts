@@ -43,7 +43,7 @@ const queriesOf = (id: string): string[] =>
   panel(id).variants.flatMap((v: any) => v.queries.map((q: any) => q.query as string));
 
 describe("kubernetes pack — shape", () => {
-  it("declares 3 groups, 3 pickers, 3 sections and 22 panels", () => {
+  it("declares 3 groups, 3 pickers, 4 sections and 33 panels", () => {
     expect(kubernetesPage.id).toBe("kubernetes");
     expect(kubernetesPage.groups.map((g: any) => g.id)).toEqual([
       "kubelet-node",
@@ -57,10 +57,11 @@ describe("kubernetes pack — shape", () => {
     ]);
     expect(kubernetesPage.sections.map((s: any) => s.id)).toEqual([
       "overview",
+      "utilization",
       "nodes",
       "workloads",
     ]);
-    expect(allPanels()).toHaveLength(22);
+    expect(allPanels()).toHaveLength(33);
   });
 
   it("pins the 24h staleness threshold like every v1 pack (§5.3)", () => {
@@ -152,6 +153,10 @@ describe("DRY-RUN finding 2 — a `status` label is not a value test", () => {
 describe("DRY-RUN finding 7 — topk bounds rows only on an instant vector", () => {
   const TABLES = [
     "k8s_ov_unhealthy_pods",
+    "k8s_ut_over_limit_top",
+    "k8s_ut_cpu_waste_top",
+    "k8s_ut_mem_waste_top",
+    "k8s_ut_node_commit_top",
     "k8s_nd_conditions",
     "k8s_nd_not_ready",
     "k8s_wl_pod_restarts",
@@ -383,6 +388,10 @@ describe("panel titles carry an N only where the query can honour it", () => {
 describe("inventory tables read the same instant as the tiles above them", () => {
   const TABLES = [
     "k8s_ov_unhealthy_pods",
+    "k8s_ut_over_limit_top",
+    "k8s_ut_cpu_waste_top",
+    "k8s_ut_mem_waste_top",
+    "k8s_ut_node_commit_top",
     "k8s_nd_conditions",
     "k8s_nd_not_ready",
     "k8s_wl_pod_restarts",
