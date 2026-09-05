@@ -1502,7 +1502,7 @@ describe("tileNoData + positive freshness", () => {
   it("a metric tile in a PRESENT+FRESH group is marked as ELIGIBLE for the tileNoData state", () => {
     // The resolver cannot know whether a query returned series — that arrives at
     // render time — so its half of finding 2a is the eligibility flag: only tiles
-    // in a present AND fresh group may show "— no data" rather than a blank. The
+    // in a present AND fresh group may show "No Data" rather than a blank. The
     // rendering half is pinned in CuratedPageView.spec.ts.
     const dashboard = build(resolve({}));
     const failed = dashboard.tabs
