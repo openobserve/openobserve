@@ -173,10 +173,7 @@ pub async fn run_pass(slo: &Slo, now_secs: i64) -> Result<PassOutcome, anyhow::E
 
     write_slices(&slo.org, &result.slices, now_secs).await?;
 
-    // `slo_status` is written here, so use the read-write client: the read-only
-    // pool is opened read_only on SQLite and rejects the update.
-    let db_rw = get_orm_client_rw().await;
-    let outcome = commit_status(db_rw, slo, &result, range.end, now_secs).await?;
+    let outcome = commit_status(slo, &result, range.end, now_secs).await?;
     if let slo_table::WriteOutcome::FencedByGeneration { expected, found } = outcome {
         return Ok(PassOutcome::Fenced { expected, found });
     }
@@ -777,12 +774,13 @@ async fn write_slices(org: &str, slices: &[SliceRow], now_secs: i64) -> Result<(
 
 /// Fold the pass's slices into the running aggregate, CAS-fenced.
 async fn commit_status(
-    db: &sea_orm::DatabaseConnection,
     slo: &Slo,
     result: &PassResult,
     watermark_end: i64,
     now_secs: i64,
 ) -> Result<slo_table::WriteOutcome, anyhow::Error> {
+    // SQLite opens the read-only pool with read_only(true), and this path always writes.
+    let db = get_orm_client_rw().await;
     let mut by_group: std::collections::BTreeMap<String, (f64, f64, i32)> = Default::default();
     for s in &result.slices {
         let e = by_group.entry(s.group_key.clone()).or_insert((0.0, 0.0, 0));
