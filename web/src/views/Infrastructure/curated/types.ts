@@ -108,6 +108,12 @@ export interface ScopePickerDef {
   group: SemanticGroupId;
   valuesFrom: { groupId: string; stream: string; streamType: CuratedStreamType };
   multiSelect: boolean;
+  /**
+   * Default the picker to its FIRST loaded value instead of the all-sentinel. Use
+   * where "everything" is not a useful reading — a fleet-wide crash-loop table
+   * mixes ten clusters into one list nobody can act on.
+   */
+  defaultFirstValue?: boolean;
   chainedOn?: { picker: string }[];
   omitWhenFieldAbsent?: boolean;
   /** Schema presence is not resolvability — omit at values-load time (§6.4). */

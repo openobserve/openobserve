@@ -16341,7 +16341,7 @@
       "staleBadge": "no data for {duration} (last seen {date})",
       "staleNoDataBadge": "no data yet",
       "staleBadgeTooltip": "As of the last stream-list refresh.",
-      "tileNoData": "- no data",
+      "tileNoData": "none found",
       "lastData": "Last data: {duration} ago",
       "durationMinutes": "{count} minute | {count} minutes",
       "durationHours": "{count} hour | {count} hours",

@@ -96,16 +96,28 @@ export const kubernetesPage: CuratedPageManifest = {
     {
       name: "cluster",
       group: GROUP.cluster,
-      // The dead utilization spelling returned 0 values where the live usage stream returned all 10 clusters (dry run finding 6).
-      valuesFrom: { groupId: "kubelet-node", stream: "k8s_node_cpu_usage", streamType: "metrics" },
+      // Sourced from kube_pod_status_phase, not a kubeletstats stream: measured, both
+      // list all 10 clusters, but the SPARSE kube-state families (waiting_reason has 2
+      // clusters, HPA conditions 3) only ever appear where kube-state runs, so the
+      // values must come from the same collector the health tables query. The picker
+      // supplies VALUES only — each panel still spells the label via its own group
+      // (resolve.ts:909 prefers panel.resolvedFields), so this is schema-safe for the
+      // kubeletstats sections too.
+      valuesFrom: { groupId: "kube-state", stream: "kube_pod_status_phase", streamType: "metrics" },
       multiSelect: true,
+      // A fleet-wide default mixes ten clusters into one crash-loop list nobody can
+      // act on; the first cluster is a readable starting point.
+      defaultFirstValue: true,
       omitWhenFieldAbsent: true,
       omitWhenValuesEmpty: true,
     },
     {
       name: "namespace",
       group: GROUP.namespace,
-      valuesFrom: { groupId: "kubelet-pod", stream: "k8s_pod_memory_usage", streamType: "metrics" },
+      // Measured: 61 namespaces here against 58 on the kubeletstats stream, and
+      // crucially the same collector the health tables filter on — sourcing from
+      // kubeletstats offered 46 of 58 namespaces that returned zero health rows.
+      valuesFrom: { groupId: "kube-state", stream: "kube_pod_status_phase", streamType: "metrics" },
       multiSelect: true,
       chainedOn: [{ picker: "cluster" }],
       omitWhenValuesEmpty: true,

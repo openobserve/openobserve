@@ -1094,7 +1094,11 @@ function buildVariable(
     ...(def.labelKey ? { labelKey: def.labelKey } : {}),
     type: "query_values",
     multiSelect: def.multiSelect,
-    ...(def.multiSelect ? { selectAllValueForMultiSelect: "all" } : {}),
+    // "first" makes the manager fall through to the first loaded option
+    // (useVariablesManager:96-112); "all" returns the sentinel instead.
+    ...(def.multiSelect
+      ? { selectAllValueForMultiSelect: def.defaultFirstValue ? "first" : "all" }
+      : {}),
     scope: "global",
     omitWhenValuesEmpty: def.omitWhenValuesEmpty === true,
     // Consumed by VariablesValueSelector; stored dashboards never carry them, so they stay invisible outside curated pages.
