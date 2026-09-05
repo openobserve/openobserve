@@ -565,7 +565,7 @@ export default defineComponent({
             detection_window_seconds: jsonObj.detection_window_seconds,
             training_window_days: jsonObj.training_window_days,
             retrain_interval_days: jsonObj.retrain_interval_days ?? 0,
-            threshold: jsonObj.threshold ?? 95,
+            threshold: jsonObj.threshold ?? 97,
             seasonality: jsonObj.seasonality ?? "none",
             query_mode: jsonObj.query_mode ?? "filters",
             filters: jsonObj.filters ?? [],

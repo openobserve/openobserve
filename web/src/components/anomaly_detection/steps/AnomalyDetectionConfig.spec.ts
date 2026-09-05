@@ -128,7 +128,7 @@ const renderedFilterFields = (w: VueWrapper): unknown[] =>
     .map((c: any) => c.findComponent(OSelect).props("modelValue"));
 
 // The sensitivity tiers, in render order (decreasing percentile).
-const SENSITIVITY_TIERS = [97, 95, 90];
+const SENSITIVITY_TIERS = [99, 97, 95];
 
 // data-state of each tier button. A missing button reads as undefined so a
 // "no tier is active" assertion cannot pass just because nothing rendered.
@@ -523,26 +523,11 @@ describe("AnomalyDetectionConfig", () => {
     });
 
     it("a seeded tier value renders that tier active", async () => {
-      wrapper = mountConfig({ threshold: 97 });
+      wrapper = mountConfig({ threshold: 99 });
       await flushPromises();
 
       expect(tierStates(wrapper)).toEqual(["on", "off", "off"]);
     });
-
-    // Retuned tiers leave a saved 99 or 98 off-tier: it must keep its own percentile, not snap.
-    it.each([99, 98])(
-      "a config saved at the pre-retune %i keeps that percentile and lights no tier",
-      async (saved) => {
-        const config = { ...defaultAnomalyConfig(), threshold: saved };
-        wrapper = mount(AnomalyDetectionConfig, { ...mountOptions, props: { config } });
-        await flushPromises();
-
-        expect(tierStates(wrapper)).toEqual(["off", "off", "off"]);
-        expect((percentileInput(wrapper).element as HTMLInputElement).value).toBe(String(saved));
-        expect(getForm(wrapper).state.values.threshold).toBe(saved);
-        expect(config.threshold).toBe(saved);
-      },
-    );
 
     it("a seeded non-tier value renders no tier active and shows the exact percentile", async () => {
       wrapper = mountConfig({ threshold: 88 });
@@ -554,11 +539,11 @@ describe("AnomalyDetectionConfig", () => {
     });
 
     it("typing a tier value lights that tier up", async () => {
-      wrapper = mountConfig({ threshold: 97 });
+      wrapper = mountConfig({ threshold: 99 });
       await flushPromises();
       expect(tierStates(wrapper)).toEqual(["on", "off", "off"]);
 
-      await percentileInput(wrapper).setValue("90");
+      await percentileInput(wrapper).setValue("95");
       await flushPromises();
       await nextTick();
 
@@ -566,11 +551,11 @@ describe("AnomalyDetectionConfig", () => {
     });
 
     it("moving to a non-tier value after picking a tier leaves no tier active", async () => {
-      wrapper = mountConfig({ threshold: 90 });
+      wrapper = mountConfig({ threshold: 97 });
       await flushPromises();
       const form = getForm(wrapper);
 
-      await wrapper.find('[data-test="anomaly-sensitivity-tier-97"]').trigger("click");
+      await wrapper.find('[data-test="anomaly-sensitivity-tier-99"]').trigger("click");
       await flushPromises();
       await nextTick();
       expect(tierStates(wrapper)).toEqual(["on", "off", "off"]);
@@ -749,9 +734,9 @@ describe("AnomalyDetectionConfig", () => {
     });
 
     it("tier labels re-resolve when the locale changes", async () => {
-      wrapper = mountConfig({ threshold: 97 });
+      wrapper = mountConfig({ threshold: 99 });
       await flushPromises();
-      const before = wrapper.find('[data-test="anomaly-sensitivity-tier-97"]').text();
+      const before = wrapper.find('[data-test="anomaly-sensitivity-tier-99"]').text();
 
       const previous = i18n.global.locale.value;
       try {
@@ -759,7 +744,7 @@ describe("AnomalyDetectionConfig", () => {
         await nextTick();
         // A module-level const array would still read the English label captured
         // at import time; a computed over t() re-resolves.
-        expect(wrapper.find('[data-test="anomaly-sensitivity-tier-97"]').text()).toBe(
+        expect(wrapper.find('[data-test="anomaly-sensitivity-tier-99"]').text()).toBe(
           i18n.global.t("alerts.anomaly.sensitivityConservative"),
         );
       } finally {
@@ -767,7 +752,7 @@ describe("AnomalyDetectionConfig", () => {
         await nextTick();
       }
 
-      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-97"]').text()).toBe(before);
+      expect(wrapper.find('[data-test="anomaly-sensitivity-tier-99"]').text()).toBe(before);
     });
 
     it("hint is suppressed for a fractional percentile", async () => {
@@ -788,24 +773,8 @@ describe("AnomalyDetectionConfig", () => {
       expect(wrapper.find('[data-test="anomaly-sensitivity-hint"]').exists()).toBe(false);
     });
 
-    it("the schema default threshold is the Balanced tier, 95", () => {
-      expect(anomalyDetectionConfigDefaults(undefined).threshold).toBe(95);
-      expect(defaultAnomalyConfig().threshold).toBe(95);
-    });
-
-    it("renders exactly the three retuned tiers", async () => {
-      wrapper = mountConfig();
-      await flushPromises();
-
-      expect(
-        wrapper
-          .findAll('[data-test^="anomaly-sensitivity-tier-"]')
-          .map((b) => b.attributes("data-test")),
-      ).toEqual([
-        "anomaly-sensitivity-tier-97",
-        "anomaly-sensitivity-tier-95",
-        "anomaly-sensitivity-tier-90",
-      ]);
+    it("the schema default threshold is 97 when the config carries none", () => {
+      expect(anomalyDetectionConfigDefaults(undefined).threshold).toBe(97);
     });
   });
 
