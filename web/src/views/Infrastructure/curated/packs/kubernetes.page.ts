@@ -640,7 +640,7 @@ export const kubernetesPage: CuratedPageManifest = {
             id: "k8s_wh_deploy_short_top",
             titleKey: "infra.k8s.panel.deploymentsShortTop",
             type: "table",
-            unit: "numbers",
+            unit: "percent-1",
             groupId: "kube-state",
             layout: { w: 96, h: 16 },
             variants: [
@@ -653,7 +653,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryMode: "instant",
                 queries: [
                   {
-                    query: `topk(20, sum by (${CLUSTER}, ${NS}, deployment) (kube_deployment_spec_replicas{\${scope:cluster},\${scope:namespace}}) - sum by (${CLUSTER}, ${NS}, deployment) (kube_deployment_status_replicas_ready{\${scope:cluster},\${scope:namespace}}) > 0)`,
+                    query: `topk(20, (sum by (${CLUSTER}, ${NS}, deployment) (kube_deployment_status_replicas_ready{\${scope:cluster},\${scope:namespace}}) / sum by (${CLUSTER}, ${NS}, deployment) (kube_deployment_spec_replicas{\${scope:cluster},\${scope:namespace}})) < 1)`,
                     legend: `{${CLUSTER}} {${NS}}/{deployment}`,
                   },
                 ],
@@ -667,7 +667,7 @@ export const kubernetesPage: CuratedPageManifest = {
             id: "k8s_wh_sts_short_top",
             titleKey: "infra.k8s.panel.statefulSetsShortTop",
             type: "table",
-            unit: "numbers",
+            unit: "percent-1",
             groupId: "kube-state",
             layout: { w: 96, h: 16 },
             variants: [
@@ -680,7 +680,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryMode: "instant",
                 queries: [
                   {
-                    query: `topk(20, sum by (${CLUSTER}, ${NS}, statefulset) (kube_statefulset_replicas{\${scope:cluster},\${scope:namespace}}) - sum by (${CLUSTER}, ${NS}, statefulset) (kube_statefulset_status_replicas_ready{\${scope:cluster},\${scope:namespace}}) > 0)`,
+                    query: `topk(20, (sum by (${CLUSTER}, ${NS}, statefulset) (kube_statefulset_status_replicas_ready{\${scope:cluster},\${scope:namespace}}) / sum by (${CLUSTER}, ${NS}, statefulset) (kube_statefulset_replicas{\${scope:cluster},\${scope:namespace}})) < 1)`,
                     legend: `{${CLUSTER}} {${NS}}/{statefulset}`,
                   },
                 ],
