@@ -405,6 +405,9 @@ export const kubernetesPage: CuratedPageManifest = {
       // The caveats belong to the panel SET: waiting containers mix normal startup
       // with real failures, and kube-state exposes only a container's LAST exit.
       noteKey: "infra.k8s.section.healthNote",
+      // kube-state omits a family entirely when nothing is in that state, so an
+      // empty panel here is GOOD news, not missing data (§ empty-means-healthy).
+      emptyMeansHealthy: true,
       scopedBy: ["cluster", "namespace"],
       panels: [
         panel(

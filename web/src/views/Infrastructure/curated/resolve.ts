@@ -27,6 +27,7 @@ import type {
   CuratedPagePins,
   PanelVariant,
   RequirementGroup,
+  CuratedSection,
 } from "./types";
 import { STALENESS_24H_US } from "./types";
 
@@ -697,6 +698,7 @@ export function buildDashboard(
             opts.timezone,
             opts.nowUs,
             opts.drilldownRange,
+            section,
           ),
         ),
       };
@@ -968,6 +970,7 @@ function buildPanel(
   timezone: string,
   nowUs: number,
   drilldownRange?: { period?: string; from?: number; to?: number },
+  section?: CuratedSection,
 ): Record<string, unknown> {
   const variant = panel.selectedVariant!;
   const stale = staleByPanelId.get(panel.id);
@@ -1018,6 +1021,10 @@ function buildPanel(
   if (panel.def.type === "metric" || variant.queryMode === "instant") {
     // The resolver cannot know whether a query returned series, only whether a "no data" claim would be honest (§6.3).
     config.curated_no_data_eligible = !stale;
+    // Rides the SAME gate: a green "all clear" on a stale collector would assert
+    // something the page cannot know, so it is stamped only where the no-data
+    // verdict itself is trustworthy.
+    if (!stale && section?.emptyMeansHealthy) config.curated_empty_means_healthy = true;
   }
   return {
     id: panel.id,

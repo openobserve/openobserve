@@ -16356,7 +16356,8 @@
         "stats": "Stream statistics are unavailable, so freshness isn't shown.",
         "probe": "Couldn't check whether {label} data is arriving - showing its panels anyway.",
         "defaultFieldNames": "Some fields were resolved using default names."
-      }
+      },
+      "tileAllClear": "All clear"
     },
     "k8s": {
       "section": {

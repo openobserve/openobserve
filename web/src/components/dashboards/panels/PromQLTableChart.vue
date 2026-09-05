@@ -27,6 +27,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :enable-filtering="enableFiltering"
         @row-click="$emit('row-click', $event)"
       >
+        <!-- kube-state omits the metric family entirely when nothing is in that
+             state, so an empty triage table means nothing is wrong rather than
+             nothing was collected. -->
+        <template v-if="panelConfig.curated_empty_means_healthy" #empty>
+          <div class="bg-success-50 absolute inset-0 flex items-center justify-center">
+            <OEmptyState
+              size="inline"
+              icon="check"
+              :title="t('infra.curated.tileAllClear')"
+              :backdrop="false"
+              data-test="no-data-all-clear"
+            />
+          </div>
+        </template>
+
         <!-- Override bottom slot to add legend filter alongside native pagination -->
         <!-- When legend footer is not shown, TableRenderer's default pagination will be used -->
         <template #bottom="scope" v-if="showLegendFooter">
@@ -73,6 +88,7 @@ import TableRenderer from "./TableRenderer.vue";
 import TablePaginationControls from "../addPanel/TablePaginationControls.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 
 export default defineComponent({
   name: "PromQLTableChart",
@@ -90,7 +106,7 @@ export default defineComponent({
       default: false,
     },
   },
-  components: { TableRenderer, TablePaginationControls, OSelect, OIcon },
+  components: { TableRenderer, TablePaginationControls, OSelect, OIcon, OEmptyState },
   setup(props) {
     const store = useStore();
     const { t } = useI18nTyped();
