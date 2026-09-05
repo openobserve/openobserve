@@ -53,7 +53,7 @@ jobs:
           echo "Repository: $GITHUB_REPOSITORY"
 
           if [ "$EVENT_NAME" = "workflow_run" ]; then
-            echo "::notice::Auto-rerun triggered for branch: $WR_BRANCH"
+            echo "::notice::🔄 Auto-rerun triggered for branch: $WR_BRANCH"
             echo "Workflow run ID: $WR_ID"
             echo "Workflow run conclusion: $WR_CONCLUSION"
             echo "Workflow run attempt: $WR_ATTEMPT"
@@ -65,7 +65,7 @@ jobs:
 
             # For PR events, extract PR number from head_branch (format: refs/pull/123/merge or branch name)
             if [ "$WR_EVENT" = "pull_request" ]; then
-              echo "::notice::Triggered by PR event"
+              echo "::notice::📋 Triggered by PR event"
               echo "PR Head Repo: $WR_HEAD_REPO"
             fi
           else
@@ -121,7 +121,7 @@ jobs:
           # Verify the run exists and get its details
           echo "::group::Fetching workflow run details"
 
-          RUN_INFO=$(gh run view $RUN_ID --repo $GH_REPO --json conclusion,status,databaseId,attempt,event 2>&1)
+          RUN_INFO=$(gh run view "$RUN_ID" --repo "$GH_REPO" --json conclusion,status,databaseId,attempt,event 2>&1)
 
           if [ $? -ne 0 ]; then
             echo "::error::Failed to fetch run information for run ID $RUN_ID"
@@ -163,7 +163,7 @@ jobs:
           echo "::group::Triggering workflow rerun"
           echo "::notice::Executing: gh run rerun $RUN_ID --failed --repo $GH_REPO"
 
-          RERUN_OUTPUT=$(gh run rerun $RUN_ID --failed --repo $GH_REPO 2>&1)
+          RERUN_OUTPUT=$(gh run rerun "$RUN_ID" --failed --repo "$GH_REPO" 2>&1)
           RERUN_EXIT_CODE=$?
 
           if [ $RERUN_EXIT_CODE -eq 0 ]; then
