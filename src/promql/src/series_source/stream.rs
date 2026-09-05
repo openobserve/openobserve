@@ -24,7 +24,7 @@ use config::{
         plan::generate_plan_string,
         promql::{
             HASH_LABEL, VALUE_LABEL,
-            value::{Label, Labels, Sample},
+            value::{Labels, Sample},
         },
     },
     utils::hash::gxhash,
@@ -46,13 +46,15 @@ use datafusion::{
 use futures::TryStreamExt;
 
 use super::SeriesSource;
-use crate::load_series::{LabelColumn, batch_run_len};
+use crate::load_series::{LabelColumn, LabelInterner, batch_run_len};
 
 /// One shard's series source; every chain holds one run per series, so the minimum head hash is the
 /// next series.
 pub(crate) struct StreamSource {
     cursors: Vec<ChainCursor>,
     group_cols: Arc<Vec<String>>,
+    /// One interner per group column, so the emitted series share label allocations.
+    interners: Vec<LabelInterner>,
     offset: i64,
     /// Hash of the series `advance` yielded, until `consume` takes it.
     current: Option<u64>,
@@ -69,9 +71,14 @@ impl StreamSource {
         for stream in streams {
             cursors.push(ChainCursor::start(stream).await?);
         }
+        let interners = group_cols
+            .iter()
+            .map(|name| LabelInterner::new(name.clone()))
+            .collect();
         Ok(Self {
             cursors,
             group_cols,
+            interners,
             offset,
             current: None,
             samples: Vec::new(),
@@ -123,15 +130,16 @@ impl SeriesSource for StreamSource {
         Ok(Some(hasher.finish()))
     }
 
-    fn labels(&self) -> Labels {
+    fn labels(&mut self) -> Labels {
         let (batch, row) = self.head();
+        let batch = batch.clone();
         let cols = self
-            .label_columns(batch)
+            .label_columns(&batch)
             .expect("advance validated the group columns");
         cols.iter()
-            .zip(self.group_cols.iter())
+            .zip(self.interners.iter_mut())
             .filter(|(values, _)| !values.is_null(row))
-            .map(|(values, name)| Arc::new(Label::new(name.as_str(), values.value(row))))
+            .map(|(values, interner)| interner.intern(values.value(row)))
             .collect()
     }
 

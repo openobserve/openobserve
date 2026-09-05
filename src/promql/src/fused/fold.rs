@@ -169,7 +169,7 @@ async fn emit_partition<S: SeriesSource>(
     while source.advance().await?.is_some() {
         let labels = source.labels();
         let samples = source.consume().await?;
-        let mut values = Vec::new();
+        let mut values = Vec::with_capacity(eval.timestamps.len());
         eval.eval_series(samples, |slot, value| {
             values.push(Sample::new(eval.timestamps[slot], value));
         });
@@ -296,7 +296,7 @@ mod tests {
         async fn advance(&mut self) -> Result<Option<u64>> {
             Err(DataFusionError::Execution("partition failed".into()))
         }
-        fn labels(&self) -> Labels {
+        fn labels(&mut self) -> Labels {
             Labels::default()
         }
         async fn consume(&mut self) -> Result<&[Sample]> {
@@ -314,7 +314,7 @@ mod tests {
         async fn advance(&mut self) -> Result<Option<u64>> {
             Ok(Some(1))
         }
-        fn labels(&self) -> Labels {
+        fn labels(&mut self) -> Labels {
             Labels::default()
         }
         async fn consume(&mut self) -> Result<&[Sample]> {

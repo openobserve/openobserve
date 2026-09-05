@@ -44,7 +44,7 @@ impl SeriesSource for MatrixSource {
         Ok(Some(sig))
     }
 
-    fn labels(&self) -> Labels {
+    fn labels(&mut self) -> Labels {
         let series = self.current.as_ref().expect("advance yielded a series");
         projected_labels(&self.modifier, &series.labels)
     }

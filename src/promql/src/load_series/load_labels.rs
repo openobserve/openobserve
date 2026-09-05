@@ -57,7 +57,7 @@ pub(super) trait LoadedLabelsObserver: Send + Sync {
 /// Label values are looked up by borrowed `&str`, so cache hits only clone the
 /// `Arc`. A low-reuse column disables and releases its cache after an observation
 /// window instead of retaining one map entry per series.
-struct LabelInterner {
+pub(crate) struct LabelInterner {
     name: String,
     values: Option<HashMap<String, Arc<Label>>>,
     window_lookups: usize,
@@ -65,7 +65,7 @@ struct LabelInterner {
 }
 
 impl LabelInterner {
-    fn new(name: String) -> Self {
+    pub(crate) fn new(name: String) -> Self {
         Self {
             name,
             values: Some(HashMap::new()),
@@ -74,7 +74,7 @@ impl LabelInterner {
         }
     }
 
-    fn intern(&mut self, value: &str) -> Arc<Label> {
+    pub(crate) fn intern(&mut self, value: &str) -> Arc<Label> {
         let Some(values) = self.values.as_mut() else {
             return Arc::new(Label {
                 name: self.name.clone(),
