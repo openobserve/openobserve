@@ -1510,6 +1510,43 @@ describe("strip model", () => {
   });
 });
 
+describe("emptyMeansHealthy travels to the panel config", () => {
+  it("a section that declares it stamps every one of its panels", () => {
+    const dashboard = build(resolve({}));
+    const health = dashboard.tabs.find((t: any) => t.tabId === "health");
+    expect(health, "health tab must build").toBeTruthy();
+    for (const panel of health.panels) {
+      expect(panel.config.curated_empty_means_healthy, panel.id).toBe(true);
+    }
+  });
+
+  it("a section that does NOT declare it stamps nothing", () => {
+    const dashboard = build(resolve({}));
+    for (const tab of dashboard.tabs) {
+      if (tab.tabId === "health") continue;
+      for (const panel of tab.panels) {
+        expect(panel.config.curated_empty_means_healthy, panel.id).toBeUndefined();
+      }
+    }
+  });
+
+  it("a STALE group is not marked healthy — a dead collector must never render green", () => {
+    // The green check asserts "all clear", which is only honest when the collector
+    // is alive and simply has nothing to report. Riding on the same eligibility the
+    // no-data state already uses keeps the two verdicts from diverging.
+    const streams = fullK8sStreams();
+    for (const entry of streams.metrics) {
+      entry.stats.doc_time_max = NOW_US - 40 * DAY_US;
+    }
+    const dashboard = build(resolve({ streams }));
+    const health = dashboard.tabs.find((t: any) => t.tabId === "health");
+    for (const panel of health?.panels ?? []) {
+      expect(panel.config.curated_no_data_eligible, panel.id).not.toBe(true);
+      expect(panel.config.curated_empty_means_healthy, panel.id).not.toBe(true);
+    }
+  });
+});
+
 describe("tileNoData + positive freshness", () => {
   it("a metric tile in a PRESENT+FRESH group is marked as ELIGIBLE for the tileNoData state", () => {
     // The resolver cannot know whether a query returned series — that arrives at

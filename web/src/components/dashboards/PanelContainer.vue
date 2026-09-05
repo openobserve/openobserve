@@ -393,11 +393,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- A wrong label VALUE leaves the panel present, fresh and blank, and a
            blank tile is read as a zero — so it refuses to imply a number. -->
       <div
-        v-if="curatedNoData"
-        class="text-text-muted absolute inset-0 flex items-center justify-center text-sm italic"
+        v-if="curatedNoData && !curatedTableOwnsEmpty"
+        class="absolute inset-0 flex items-center justify-center text-sm"
+        :class="
+          curatedAllClear ? 'bg-success-50 text-text-success gap-1' : 'text-text-muted italic'
+        "
         data-test="dashboard-panel-curated-no-data"
       >
-        {{ t("infra.curated.tileNoData") }}
+        <OIcon v-if="curatedAllClear" name="check" size="1rem" />
+        <span>{{
+          curatedAllClear ? t("infra.curated.tileAllClear") : t("infra.curated.tileNoData")
+        }}</span>
       </div>
     </div>
 
@@ -586,6 +592,23 @@ export default defineComponent({
       curatedSeriesEmpty.value = verdict === "No Data";
     };
     /** Only ever claimed after a load actually settled — never while pending. */
+    /**
+     * A triage section reports an empty result as GOOD news. Ownership is per panel
+     * type, because the layer underneath differs: PanelSchemaRenderer's OEmptyState
+     * covers charts and tiles (suppressed there for these panels, so this overlay is
+     * the sole owner), while a promql TABLE is excluded from it and gets its wording
+     * from PromQLTableChart's own #empty slot. Claiming tables here too printed the
+     * words twice, once from each layer.
+     */
+    const curatedAllClear = computed(
+      () =>
+        props.data?.config?.curated_empty_means_healthy === true && props.data?.type !== "table",
+    );
+    /** A curated promql table renders its own empty state; the overlay stands down. */
+    const curatedTableOwnsEmpty = computed(
+      () =>
+        props.data?.type === "table" && props.data?.config?.curated_empty_means_healthy === true,
+    );
     const curatedNoData = computed(
       () =>
         props.data?.config?.curated_no_data_eligible === true && curatedSeriesEmpty.value === true,
@@ -1044,6 +1067,8 @@ export default defineComponent({
       curatedBadge,
       curatedBadgeParams,
       curatedNoData,
+      curatedAllClear,
+      curatedTableOwnsEmpty,
       onCuratedSeriesData,
       alertDisabledReason,
       onEditPanel,

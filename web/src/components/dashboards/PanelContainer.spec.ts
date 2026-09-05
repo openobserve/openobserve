@@ -1801,6 +1801,7 @@ describe("PanelContainer", () => {
   });
 
   // ── Curated tile no-data + subtitle (design §6.3) ──────────────────────────
+
   describe("curated tile no-data and subtitle", () => {
     const eligible = (over = {}) => ({
       ...mockPanelData,
@@ -1826,6 +1827,36 @@ describe("PanelContainer", () => {
       const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
       await settle(renderer, "No Data");
       expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(true);
+    });
+
+    // Ownership is per panel type, because the layer underneath differs:
+    // PanelSchemaRenderer's OEmptyState covers TILES (suppressed there for these
+    // panels via config.curated_empty_means_healthy), while a promql TABLE is
+    // excluded from it and takes its wording from PromQLTableChart's own #empty
+    // slot. Claiming both printed the words twice, once from each layer.
+    it("a healthy-empty TILE reads All clear, not No Data", async () => {
+      wrapper = createWrapper({
+        data: eligible({ curated_empty_means_healthy: true }),
+        viewOnly: true,
+      });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "No Data");
+      const overlay = wrapper.find('[data-test="dashboard-panel-curated-no-data"]');
+      expect(overlay.exists()).toBe(true);
+      expect(overlay.text()).toContain("All clear");
+    });
+
+    it("a healthy-empty TABLE stands the overlay down — its own empty state owns it", async () => {
+      wrapper = createWrapper({
+        data: {
+          ...eligible({ curated_empty_means_healthy: true }),
+          type: "table",
+        },
+        viewOnly: true,
+      });
+      const renderer = wrapper.findComponent({ name: "PanelSchemaRenderer" });
+      await settle(renderer, "No Data");
+      expect(wrapper.find('[data-test="dashboard-panel-curated-no-data"]').exists()).toBe(false);
     });
 
     it("a tile resolving to a REAL 0 renders no no-data state — the two must look different", async () => {

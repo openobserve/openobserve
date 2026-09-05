@@ -749,6 +749,42 @@ describe("Convert PromQL Data Utils", () => {
       expect(result.extras.isTimeSeries).toBe(false);
     });
 
+    it("renders the NUMBER for a vector result, exactly as it does for a matrix", async () => {
+      // An INSTANT promql query returns resultType "vector"; a range query returns
+      // "matrix". The matrix branch builds a custom series carrying `_metricText`
+      // and a renderItem that paints the value — the vector branch returned a bare
+      // {name, value} with no renderer, so a curated instant tile with a perfectly
+      // good scalar (measured: 8) painted an empty box.
+      const panelSchema = {
+        id: "panel1",
+        type: "metric",
+        config: {},
+        queries: [{ config: { promql_legend: "" } }],
+      };
+      const vectorData = [
+        {
+          resultType: "vector",
+          result: [{ metric: {}, value: [1640435200, "8"] }],
+        },
+      ];
+
+      const result = await convertPromQLData(
+        panelSchema,
+        vectorData,
+        mockStore,
+        mockChartPanelRef,
+        mockHoveredSeriesState,
+        mockAnnotations,
+      );
+
+      const painted = (result.options?.series ?? []).find((s: any) => s?._metricText);
+      expect(
+        painted,
+        "a vector metric must build the text series the matrix branch builds",
+      ).toBeDefined();
+      expect(String(painted._metricText)).toContain("8");
+    });
+
     it("should handle legends position right", async () => {
       const panelSchema = {
         id: "panel1",
@@ -3869,7 +3905,12 @@ describe("Convert PromQL Data Utils", () => {
         );
 
         expect(result.extras.isTimeSeries).toBe(false);
-        expect(result.options.backgroundColor).toBe("transparent"); // Default background is transparent
+        // The panel configures background.value.color = "#ff0000", and a vector
+        // (instant) result now honours panel config the same way a matrix (range)
+        // result always has. The previous "transparent" expectation was recording
+        // the bug: the vector branch returned a bare data point and applied no
+        // metric styling at all, which is why an instant tile painted nothing.
+        expect(result.options.backgroundColor).toBe("#ff0000");
         expect(result.options.series).toHaveLength(1);
       });
 

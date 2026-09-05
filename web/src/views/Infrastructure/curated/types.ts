@@ -98,6 +98,13 @@ export interface CuratedSection {
    * renders once above the grid; inlining it per tile ate the titles it qualified.
    */
   noteKey?: I18nKey;
+  /**
+   * An empty panel in this section means "nothing is wrong", not "no data". Set it
+   * only where the metric family is ABSENT when the condition is absent — kube-state
+   * omits `kube_job_status_failed` entirely on a cluster with no failed jobs, so
+   * `count()` returns an empty vector and no query idiom can produce the 0.
+   */
+  emptyMeansHealthy?: boolean;
   panels: CuratedPanelDef[];
 }
 

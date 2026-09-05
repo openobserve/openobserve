@@ -453,6 +453,25 @@ describe("health — the section note discloses the transient-reason caveat", ()
   });
 });
 
+describe("health — an empty panel reads as ALL CLEAR, not as missing data", () => {
+  // kube-state omits a family entirely when nothing is in that state: on a healthy
+  // cluster kube_job_status_failed has no series at all, so PromQL count() returns
+  // an EMPTY VECTOR, never 0. Measured, no query idiom can manufacture the zero —
+  // `or vector(0)` is unsupported here and actually BREAKS the query (a working 4
+  // became empty), and sum()/`> bool 0`/unfiltered count() all stay empty. So the
+  // distinction has to be carried to the renderer as intent.
+  it("the section declares that empty means healthy", () => {
+    expect(section().emptyMeansHealthy, "health is a triage tab: empty is good news").toBe(true);
+  });
+
+  it("no OTHER section claims it — an empty Utilization panel really is missing data", () => {
+    for (const other of kubernetesPage.sections as any[]) {
+      if (other.id === SECTION_ID) continue;
+      expect(other.emptyMeansHealthy, `${other.id} must keep saying No Data`).toBeUndefined();
+    }
+  });
+});
+
 describe("health — i18n", () => {
   it("every title and the section note resolve to en-US copy", () => {
     expect(copy(section().titleKey)).toBeTruthy();
