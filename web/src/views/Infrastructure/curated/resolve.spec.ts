@@ -120,6 +120,20 @@ const KUBE_NODE_COND_SCHEMA = ["node", "condition", "status", "k8s_cluster", "_t
 // the whole fleet (addendum §2.7c).
 const KUBE_NODE_ALLOC_SCHEMA = ["node", "resource", "k8s_cluster", "_timestamp", "value"];
 
+// Live schemas, fetched 2026-09-05: the kube_pod_container_status_* families carry a
+// `container` label the phase family does not, and the controller families are keyed
+// by their own kind rather than by pod.
+const KUBE_CONTAINER_SCHEMA = [
+  "namespace",
+  "pod",
+  "container",
+  "reason",
+  "k8s_cluster",
+  "_timestamp",
+  "value",
+];
+const kubeKindSchema = (kind: string) => ["namespace", kind, "k8s_cluster", "_timestamp", "value"];
+
 /** A full, live k8s org: every pack stream present and fresh. */
 const fullK8sStreams = () =>
   streamLists([
@@ -141,6 +155,22 @@ const fullK8sStreams = () =>
     { name: "k8s_pod_cpu_request_utilization", schema: KUBELET_POD_SCHEMA },
     { name: "k8s_pod_memory_request_utilization", schema: KUBELET_POD_SCHEMA },
     { name: "kube_pod_container_status_restarts_total", schema: KUBE_POD_PHASE_SCHEMA },
+    { name: "kube_pod_container_status_waiting_reason", schema: KUBE_CONTAINER_SCHEMA },
+    { name: "kube_pod_container_status_terminated_reason", schema: KUBE_CONTAINER_SCHEMA },
+    { name: "kube_deployment_spec_replicas", schema: kubeKindSchema("deployment") },
+    { name: "kube_deployment_status_replicas_ready", schema: kubeKindSchema("deployment") },
+    { name: "kube_statefulset_replicas", schema: kubeKindSchema("statefulset") },
+    { name: "kube_statefulset_status_replicas_ready", schema: kubeKindSchema("statefulset") },
+    { name: "kube_daemonset_status_number_unavailable", schema: kubeKindSchema("daemonset") },
+    { name: "kube_job_status_failed", schema: kubeKindSchema("job_name") },
+    {
+      name: "kube_persistentvolumeclaim_status_phase",
+      schema: [...kubeKindSchema("persistentvolumeclaim"), "phase"],
+    },
+    {
+      name: "kube_horizontalpodautoscaler_status_condition",
+      schema: [...kubeKindSchema("horizontalpodautoscaler"), "condition", "status"],
+    },
   ]);
 
 const HOST_SCHEMA = ["host_name", "state", "device", "mountpoint", "direction"];
@@ -1161,6 +1191,7 @@ describe("§5.5 buildDashboard", () => {
     expect(dashboard.version).toBe(8);
     expect(dashboard.tabs.map((t: any) => t.tabId)).toEqual([
       "overview",
+      "health",
       "utilization",
       "nodes",
       "workloads",
@@ -2127,8 +2158,8 @@ describe("the built dashboard does not depend on the selected tab", () => {
     );
     // Cluster renders on ALL THREE tabs: a Workloads without it answered a
     // per-cluster question with every cluster's pods, silently.
-    expect(byName.cluster).toEqual(["overview", "utilization", "nodes", "workloads"]);
-    expect(byName.namespace).toEqual(["utilization", "workloads"]);
+    expect(byName.cluster).toEqual(["overview", "health", "utilization", "nodes", "workloads"]);
+    expect(byName.namespace).toEqual(["health", "utilization", "workloads"]);
     expect(byName.pod).toEqual(["workloads"]);
   });
 
