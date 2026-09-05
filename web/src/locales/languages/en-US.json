@@ -2874,10 +2874,10 @@
       "runToView": "Run a test to view this data.",
       "noBranchItems": "No items on this branch.",
       "forwardedCount": "{out} of {total} record forwarded | {out} of {total} records forwarded",
-      "noMatchForwarded": "No match \u2014 0 of {total} record forwarded | No match \u2014 0 of {total} records forwarded",
-      "branchDropped": "{count} record matched no path \u2014 dropped | {count} records matched no path \u2014 dropped",
-      "noUpstream": "No upstream steps.",
-      "noRunYet": "No run yet.",
+      "noMatchForwarded": "No match — 0 of {total} record forwarded | No match — 0 of {total} records forwarded",
+      "branchDropped": "{count} record matched no path — dropped | {count} records matched no path — dropped",
+      "noUpstream": "No Upstream Steps.",
+      "noRunYet": "No Run Yet.",
       "runLabel": "Run",
       "switchRun": "Switch Run",
       "notInRun": "This step is not included in this run.",
@@ -16363,7 +16363,9 @@
         "overview": "Overview",
         "overviewNote": "Every number on this tab reads the current instant, so the tiles and the table below agree. Pod tiles show three of five phases - Succeeded and Unknown pods aren't counted, so the three don't add up to the fleet total.",
         "nodes": "Nodes",
-        "workloads": "Workloads"
+        "workloads": "Workloads",
+        "utilization": "Utilization",
+        "utilizationNote": "Ratios compare a pod's usage against its own declared request or limit, so a pod that declares no request at all reports no ratio and is invisible to these panels — about a quarter of pods on a typical fleet. Tiles count objects across the whole selected cluster and ignore the namespace filter; the tables below honour it. Every number reads the current instant."
       },
       "group": {
         "nodeMetrics": "Node CPU & memory (kubeletstats receiver)",
@@ -16398,7 +16400,18 @@
         "podNetwork": "Pod network I/O by namespace",
         "podFilesystem": "Highest filesystem use by pod",
         "podMemLimitPct": "Highest memory-limit use by pod",
-        "podRestarts": "Top 20 restarting containers"
+        "podRestarts": "Top 20 restarting containers",
+        "containersOverLimit": "Containers over memory limit (now)",
+        "containersNearLimit": "Containers above 90% of memory limit (now)",
+        "podsIdleCpuRequest": "Pods under 20% of CPU request (now)",
+        "podsIdleMemRequest": "Pods under 20% of memory request (now)",
+        "cpuReserved": "CPU reserved of allocatable (now)",
+        "cpuLimitsOfAllocatable": "CPU limits of allocatable (now)",
+        "cpuReservedTrend": "CPU reserved vs allocatable",
+        "containersOverLimitTop": "Top 20 containers over memory limit (now)",
+        "cpuWasteTop": "Top 20 pods by unused CPU request (now)",
+        "memWasteTop": "Top 20 pods by unused memory request (now)",
+        "nodeCommitmentTop": "Top 20 nodes by CPU commitment (now)"
       }
     }
   },
