@@ -1075,4 +1075,29 @@ mod tests {
             "an org the loop never iterates keeps September's row untouched (U-23)",
         );
     }
+
+    /// Spec §7.9: the reset rides each org's own upsert, so no write may be scoped to a `feature`
+    /// alone.
+    #[test]
+    fn reset_is_per_row() {
+        let marker = ["#[cfg(", "test)]"].concat();
+        let source = code_only_source();
+        let source = &source[..source.find(&marker).unwrap_or(source.len())];
+
+        // Case-insensitive: `execute_unprepared("update trial_quota_usage set …")` walks through.
+        let update = ["update", " "].concat();
+        assert!(
+            !source.to_lowercase().contains(&update),
+            "a raw statement bypasses the per-org filters the query builder makes visible",
+        );
+        for (at, _) in source.match_indices("update_many()") {
+            let chain = &source[at..];
+            let end = chain.find(".exec").expect("an update that never executes");
+            assert!(
+                chain[..end].contains("Column::OrgId"),
+                "this update is not scoped to one org: {}",
+                &chain[..end],
+            );
+        }
+    }
 }
