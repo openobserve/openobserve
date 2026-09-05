@@ -30,8 +30,13 @@ const SEARCH_SQL_MAX_HITS: usize = 100;
 /// Maximum number of results to include in testFunction summary responses
 const TEST_FUNCTION_MAX_RESULTS: usize = 5;
 
-/// Fields to keep from SearchSQL responses (everything else is dropped)
-/// Fields to keep from SearchSQL responses (everything else is dropped)
+/// Fields to keep from SearchSQL responses (everything else is dropped).
+///
+/// `data`/`format`/`advisory` carry the whole result set when the caller asked
+/// for `agent_options.output_format` (csv / md_table / the sparse ndjson
+/// fallback): that path moves the rows out of `hits` and clears it, so
+/// dropping these three returns an empty-looking response with a non-zero
+/// `total`. See `agent_format::apply_output_format`.
 const SEARCH_SQL_KEEP_FIELDS: &[&str] = &[
     "took",
     "hits",
@@ -41,6 +46,9 @@ const SEARCH_SQL_KEEP_FIELDS: &[&str] = &[
     "columns",
     "scan_size",
     "function_error",
+    "data",
+    "format",
+    "advisory",
 ];
 
 /// Filter a tool's response body based on the requested detail level.
@@ -352,6 +360,54 @@ mod tests {
         assert_eq!(parsed["total"], 150);
         assert_eq!(parsed["took"], 42);
         assert_eq!(parsed["_hits_capped"]["original"], 150);
+    }
+
+    #[test]
+    fn test_search_sql_keeps_agent_output_format_payload() {
+        // `agent_options.output_format` moves the rows into `data` and clears
+        // `hits`; the summary filter must not drop that payload.
+        let body = serde_json::to_string(&json!({
+            "hits": [],
+            "total": 2,
+            "took": 5,
+            "columns": ["_timestamp", "service_name"],
+            "from": 0,
+            "size": 2,
+            "scan_size": 4,
+            "format": "csv",
+            "data": "_timestamp,service_name\n1788624716442729,checkout-api\n1788624716438585,search-api",
+            "trace_id": "abc-123"
+        }))
+        .unwrap();
+
+        let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+
+        assert_eq!(parsed["format"], "csv");
+        assert!(parsed["data"].as_str().unwrap().contains("checkout-api"));
+        assert_eq!(parsed["total"], 2);
+        // still filtered
+        assert!(parsed.get("trace_id").is_none());
+    }
+
+    #[test]
+    fn test_search_sql_keeps_ndjson_fallback_advisory() {
+        // The sparse-result fallback returns ndjson plus an `advisory`
+        // explaining why; without it the caller cannot tell the shape changed.
+        let body = serde_json::to_string(&json!({
+            "hits": [],
+            "total": 1,
+            "format": "ndjson",
+            "data": "{\"log\":\"one\"}",
+            "advisory": "result is sparse (24 columns, 80% empty cells); returned as ndjson instead"
+        }))
+        .unwrap();
+
+        let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+
+        assert_eq!(parsed["format"], "ndjson");
+        assert!(parsed["advisory"].as_str().unwrap().contains("sparse"));
     }
 
     #[test]
