@@ -149,6 +149,7 @@ mod tests {
                 aliases: Default::default(),
                 schemas: Default::default(),
                 limit: -1,
+                sql_limit: None,
                 offset: 0,
                 time_range: (0, 0),
                 group_by: Default::default(),

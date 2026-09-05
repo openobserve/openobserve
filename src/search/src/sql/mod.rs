@@ -77,6 +77,8 @@ pub struct Sql {
     pub aliases: Vec<(String, String)>,                    // field_name, alias
     pub schemas: HashMap<TableReference, Arc<SchemaCache>>,
     pub limit: i64,
+    /// Literal LIMIT on the outermost query; not a CTE's, a subquery's, or FETCH FIRST.
+    pub sql_limit: Option<i64>,
     pub offset: i64,
     pub time_range: (i64, i64),
     pub group_by: Vec<String>,
@@ -156,6 +158,10 @@ impl Sql {
         let mut match_all_raw_visitor = MatchAllRawVisitor::new();
         let _ = statement.visit(&mut match_all_raw_visitor);
         //********************Change the sql end*********************************//
+
+        // Read after the rewriters: track_total_hits drops the LIMIT for DISTINCT and set-op
+        // queries, and a stale value would not describe the statement actually run.
+        let sql_limit = top_level_limit(&statement);
 
         // 5. get column name, alias, group by, order by
         let mut column_visitor = ColumnVisitor::new(&total_schemas);
@@ -287,6 +293,7 @@ impl Sql {
             aliases,
             schemas: final_schemas,
             limit,
+            sql_limit,
             offset,
             time_range: (query.start_time, query.end_time),
             group_by,
@@ -325,7 +332,7 @@ impl std::fmt::Display for Sql {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, has_match_all: {}, equal_items: {:?}, aliases: {:?}, limit: {}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, is_complex: {}",
+            "sql: {}, time_range: {:?}, stream: {}/{}/{:?}, has_match_all: {}, equal_items: {:?}, aliases: {:?}, limit: {}, sql_limit: {:?}, offset: {}, group_by: {:?}, order_by: {:?}, histogram_interval: {:?}, sorted_by_time: {}, is_complex: {}",
             self.sql,
             self.time_range,
             self.org_id,
@@ -335,6 +342,7 @@ impl std::fmt::Display for Sql {
             self.equal_items,
             self.aliases,
             self.limit,
+            self.sql_limit,
             self.offset,
             self.group_by,
             self.order_by,
@@ -343,6 +351,26 @@ impl std::fmt::Display for Sql {
             self.is_complex,
         )
     }
+}
+
+/// Outermost LIMIT only: one inside a CTE or set-op branch does not bound the result.
+fn top_level_limit(statement: &sqlparser::ast::Statement) -> Option<i64> {
+    let sqlparser::ast::Statement::Query(query) = statement else {
+        return None;
+    };
+    let sqlparser::ast::LimitClause::LimitOffset {
+        limit: Some(limit), ..
+    } = query.limit_clause.as_ref()?
+    else {
+        return None;
+    };
+    let sqlparser::ast::Expr::Value(sqlparser::ast::ValueWithSpan { value, .. }) = limit else {
+        return None;
+    };
+    let sqlparser::ast::Value::Number(n, _) = value else {
+        return None;
+    };
+    n.to_string().parse::<i64>().ok()
 }
 
 fn o2_id_is_needed(
@@ -465,5 +493,68 @@ mod tests {
         let query = SearchQuery::default();
         let result = parse_sampling_config(&query, None, (0, 0), false);
         assert!(result.is_none());
+    }
+    fn limit_of(sql: &str) -> Option<i64> {
+        let st = Parser::parse_sql(&PostgreSqlDialect {}, sql)
+            .unwrap()
+            .pop()
+            .unwrap();
+        top_level_limit(&st)
+    }
+
+    #[test]
+    fn top_level_limit_reads_the_outermost_limit() {
+        assert_eq!(limit_of("SELECT a FROM t LIMIT 99"), Some(99));
+    }
+
+    #[test]
+    fn top_level_limit_ignores_a_limit_inside_a_cte() {
+        // The CTE's LIMIT bounds the CTE, not the result, so it must not become the row budget.
+        assert_eq!(
+            limit_of("WITH a AS (SELECT x FROM t LIMIT 10) SELECT * FROM a"),
+            None
+        );
+    }
+
+    #[test]
+    fn top_level_limit_ignores_limits_inside_a_set_operation() {
+        assert_eq!(
+            limit_of("(SELECT a FROM t LIMIT 5) UNION ALL (SELECT a FROM t LIMIT 7)"),
+            None
+        );
+    }
+
+    #[test]
+    fn top_level_limit_ignores_a_subquery_limit_but_keeps_the_outer_one() {
+        assert_eq!(
+            limit_of("SELECT a FROM t WHERE b IN (SELECT b FROM t LIMIT 3) LIMIT 99"),
+            Some(99)
+        );
+    }
+
+    #[test]
+    fn top_level_limit_is_none_without_a_limit() {
+        assert_eq!(limit_of("SELECT a FROM t"), None);
+    }
+    #[test]
+    fn top_level_limit_keeps_the_limit_when_an_offset_follows_it() {
+        assert_eq!(limit_of("SELECT a FROM t LIMIT 10 OFFSET 5"), Some(10));
+    }
+
+    #[test]
+    fn top_level_limit_is_read_after_track_total_hits_has_rewritten_the_query() {
+        // That rewrite drops the LIMIT for DISTINCT queries, so a value read before it
+        // would describe a statement that is never executed.
+        let mut statement =
+            Parser::parse_sql(&PostgreSqlDialect {}, "SELECT DISTINCT a FROM t LIMIT 10")
+                .unwrap()
+                .pop()
+                .unwrap();
+        assert_eq!(top_level_limit(&statement), Some(10));
+
+        let mut visitor = TrackTotalHitsVisitor::new();
+        let _ = statement.visit(&mut visitor);
+
+        assert_eq!(top_level_limit(&statement), None);
     }
 }
