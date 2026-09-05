@@ -672,11 +672,11 @@ async fn set_pool_limit(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SetQuotaUsageLimit",
-    summary = "Set an organization's lifetime allowance for one quota pool",
+    summary = "Set an organization's allowance for one quota pool",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Must be _meta"),
-        ("pool" = String, Path, description = "ai_credits | synthetics_steps"),
+        ("pool" = String, Path, description = "ai_credits | synthetics_browser_steps | synthetics_protocol_steps | synthetics_status_protocol"),
     ),
     request_body(content = inline(SetQuotaUsageLimitRequest), content_type = "application/json"),
     responses(
@@ -695,12 +695,7 @@ pub async fn set_quota_usage_limit(
 
     // Rejected rather than defaulted: a fallback would credit the wrong pool.
     let Some(pool) = TrialQuotaPool::from_key(&pool) else {
-        return MetaHttpResponse::bad_request(format!(
-            "unknown quota pool '{pool}' (expected one of: {}, {}, {})",
-            TrialQuotaPool::AiCredits.key(),
-            TrialQuotaPool::SyntheticsBrowserSteps.key(),
-            TrialQuotaPool::SyntheticsProtocolSteps.key(),
-        ));
+        return MetaHttpResponse::bad_request(unknown_quota_pool_message(&pool));
     };
 
     match set_pool_limit(&org_id, &req.org_id, pool, req.limit).await {
@@ -1562,4 +1557,67 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
     }
 
     Ok(response)
+}
+
+/// The 400 body for an unrecognised pool, listed from `ALL_POOLS` so none is left out.
+#[cfg(feature = "cloud")]
+fn unknown_quota_pool_message(pool: &str) -> String {
+    let expected = openobserve_core::trial_quota::TrialQuotaPool::ALL_POOLS
+        .iter()
+        .map(|pool| pool.key())
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("unknown quota pool '{pool}' (expected one of: {expected})")
+}
+
+#[cfg(all(test, feature = "cloud"))]
+mod tests {
+    use openobserve_core::trial_quota::TrialQuotaPool;
+
+    use super::unknown_quota_pool_message;
+
+    /// The route accepts every key in `ALL_POOLS`, so a hand-written list leaves an admin who
+    /// typos the pool they want reading a 400 that never names it.
+    #[test]
+    fn the_unknown_pool_message_names_every_accepted_pool() {
+        let message = unknown_quota_pool_message("synthetics_stpes");
+        assert!(message.contains("synthetics_stpes"), "{message}");
+        for pool in TrialQuotaPool::ALL_POOLS {
+            assert!(
+                message.contains(pool.key()),
+                "`{}` is accepted by the route but missing from its own 400: {message}",
+                pool.key(),
+            );
+            assert_eq!(
+                TrialQuotaPool::from_key(pool.key()),
+                Some(*pool),
+                "the message lists a key the route would itself reject",
+            );
+        }
+    }
+
+    /// The route's OpenAPI parameter is the same hand-written list the 400 body no longer is, so
+    /// a fifth pool would be accepted, named by the error, and absent from the documentation.
+    #[test]
+    fn the_openapi_pool_parameter_names_every_accepted_pool() {
+        // Assembled at runtime so this test's own source is not what the scan finds.
+        let needle = ["(\"pool\" = String", ", Path, description = "].concat();
+        let source = include_str!("org.rs");
+        let at = source
+            .find(&needle)
+            .expect("the pool path parameter must be documented on the route");
+        let documented = source[at..]
+            .lines()
+            .next()
+            .expect("the parameter's own line");
+
+        for pool in TrialQuotaPool::ALL_POOLS {
+            assert!(
+                documented.contains(pool.key()),
+                "`{}` is accepted by the route but missing from its OpenAPI parameter: \
+                 {documented}",
+                pool.key(),
+            );
+        }
+    }
 }

@@ -13,9 +13,10 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use chrono::Datelike;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
-    sea_query::{Expr, Func, OnConflict},
+    sea_query::{CaseStatement, Expr, Func, OnConflict},
 };
 
 use crate::{
@@ -23,51 +24,45 @@ use crate::{
     table::entity::trial_quota_usage,
 };
 
-/// Batch increment quota records by delta. Each tuple is (org_id, feature, delta).
-/// Upserts: if the row exists, adds delta to usage_count; otherwise inserts with
-/// usage_count = delta. Uses sea_orm's on_conflict for atomic upserts.
+/// The `feature` key of the one MONTHLY synthetics allowance; every other key is lifetime.
+pub const SYNTHETICS_STATUS_FEATURE: &str = "synthetics_status_protocol";
+
+pub const SYNTHETICS_BROWSER_FEATURE: &str = "synthetics_browser_steps";
+pub const SYNTHETICS_PROTOCOL_FEATURE: &str = "synthetics_protocol_steps";
+
+/// One settled window's free steps per pool, and the `YYYYMM` its window STARTS in.
+pub struct SyntheticsDeltas {
+    pub browser: i64,
+    pub protocol: i64,
+    pub status: i64,
+    pub month: i32,
+}
+
+/// Additively upsert one `(org_id, feature, delta)` triple per record.
 pub async fn batch_increment(records: Vec<(String, String, i64)>) -> Result<(), sea_orm::DbErr> {
+    // Ahead of `get_orm_client_rw`, which blocks on pool initialisation an idle tick never needs.
     if records.is_empty() {
         return Ok(());
     }
-    let db = get_orm_client_rw().await;
-    // one transaction for the whole batch so the write lock is held for a
-    // single commit instead of one autocommit round-trip per record
-    let txn = db.begin().await?;
+    batch_increment_in(get_orm_client_rw().await, records).await
+}
+
+/// [`batch_increment`] against a caller-supplied connection.
+async fn batch_increment_in<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    records: Vec<(String, String, i64)>,
+) -> Result<(), sea_orm::DbErr> {
+    if records.is_empty() {
+        return Ok(());
+    }
+    // One transaction for the whole batch: N autocommits take the write lock N times.
+    let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
 
     for (org_id, feature, delta) in records {
-        let active_model = trial_quota_usage::ActiveModel {
-            org_id: sea_orm::ActiveValue::Set(org_id),
-            feature: sea_orm::ActiveValue::Set(feature),
-            usage_count: sea_orm::ActiveValue::Set(delta),
-            usage_limit: sea_orm::ActiveValue::NotSet,
-            updated_at: sea_orm::ActiveValue::Set(now),
-            notified_checkpoint: sea_orm::ActiveValue::Set(0),
-        };
-
-        trial_quota_usage::Entity::insert(active_model)
-            .on_conflict(
-                OnConflict::columns([
-                    trial_quota_usage::Column::OrgId,
-                    trial_quota_usage::Column::Feature,
-                ])
-                .value(
-                    trial_quota_usage::Column::UsageCount,
-                    Expr::col((
-                        trial_quota_usage::Entity,
-                        trial_quota_usage::Column::UsageCount,
-                    ))
-                    .add(delta),
-                )
-                .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
-                .to_owned(),
-            )
-            .exec(&txn)
-            .await?;
+        increment_lifetime_row(&txn, &org_id, &feature, delta, now).await?;
     }
-    txn.commit().await?;
-    Ok(())
+    txn.commit().await
 }
 
 /// Load all quota records (all features, all orgs).
@@ -78,17 +73,32 @@ pub async fn load_all() -> Result<Vec<trial_quota_usage::Model>, sea_orm::DbErr>
 }
 
 /// Total usage for an org across the given pool's feature rows. `features`
-/// scopes the sum to ONE pool, or synthetics steps report as AI credits used.
-///
-/// Note: PostgreSQL SUM(bigint) returns NUMERIC, so we cast to BIGINT for Rust i64 compat.
+/// scopes the sum to ONE pool, or synthetics steps report as AI credits used;
+/// `month` scopes it to one `YYYYMM`, or a monthly pool reports a stale month's spend.
 pub async fn get_total_usage_for_org(
     org_id: &str,
     features: &[&str],
+    month: Option<i32>,
 ) -> Result<i64, sea_orm::DbErr> {
-    let db = get_orm_client_ro().await;
-    let result: Option<Option<i64>> = trial_quota_usage::Entity::find()
+    get_total_usage_for_org_in(get_orm_client_ro().await, org_id, features, month).await
+}
+
+/// [`get_total_usage_for_org`] against a caller-supplied connection.
+///
+/// Note: PostgreSQL SUM(bigint) returns NUMERIC, so we cast to BIGINT for Rust i64 compat.
+async fn get_total_usage_for_org_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    features: &[&str],
+    month: Option<i32>,
+) -> Result<i64, sea_orm::DbErr> {
+    let mut query = trial_quota_usage::Entity::find()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
-        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()));
+    if let Some(month) = month {
+        query = query.filter(trial_quota_usage::Column::Period.eq(month));
+    }
+    let result: Option<Option<i64>> = query
         .select_only()
         .column_as(
             Expr::expr(Func::cast_as(
@@ -98,7 +108,7 @@ pub async fn get_total_usage_for_org(
             "total_usage",
         )
         .into_tuple()
-        .one(db)
+        .one(conn)
         .await?;
     Ok(result.flatten().unwrap_or(0))
 }
@@ -146,8 +156,26 @@ pub async fn set_usage_limit_for_org(
     features: &[&str],
     usage_limit: i64,
 ) -> Result<(), sea_orm::DbErr> {
-    let db = get_orm_client_rw().await;
-    let txn = db.begin().await?;
+    set_usage_limit_for_org_in(
+        get_orm_client_rw().await,
+        org_id,
+        seed_feature,
+        features,
+        usage_limit,
+    )
+    .await
+}
+
+/// [`set_usage_limit_for_org`] against a caller-supplied connection.
+async fn set_usage_limit_for_org_in<C: ConnectionTrait + TransactionTrait>(
+    conn: &C,
+    org_id: &str,
+    seed_feature: &str,
+    features: &[&str],
+    usage_limit: i64,
+) -> Result<(), sea_orm::DbErr> {
+    // Spec §7.4: a crash between the seed and the fan-out leaves the pool on two limits.
+    let txn = conn.begin().await?;
     let now = config::utils::time::now_micros();
     let active_model = trial_quota_usage::ActiveModel {
         org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
@@ -156,6 +184,8 @@ pub async fn set_usage_limit_for_org(
         usage_limit: sea_orm::ActiveValue::Set(Some(usage_limit)),
         updated_at: sea_orm::ActiveValue::Set(now),
         notified_checkpoint: sea_orm::ActiveValue::Set(0),
+        // A raised limit carries no month, and the entity schema has no column default.
+        period: sea_orm::ActiveValue::Set(0),
     };
 
     trial_quota_usage::Entity::insert(active_model)
@@ -174,18 +204,21 @@ pub async fn set_usage_limit_for_org(
         .exec(&txn)
         .await?;
 
-    trial_quota_usage::Entity::update_many()
-        .filter(trial_quota_usage::Column::OrgId.eq(org_id))
-        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
-        .col_expr(
-            trial_quota_usage::Column::UsageLimit,
-            Expr::value(usage_limit),
-        )
-        .col_expr(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
-        .exec(&txn)
-        .await?;
-    txn.commit().await?;
-    Ok(())
+    // `is_in(&[])` is not a reliable "match nothing": an unfiltered fan-out would raise the
+    // limit on every row of the org, across pools.
+    if !features.is_empty() {
+        trial_quota_usage::Entity::update_many()
+            .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+            .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
+            .col_expr(
+                trial_quota_usage::Column::UsageLimit,
+                Expr::value(usage_limit),
+            )
+            .col_expr(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+            .exec(&txn)
+            .await?;
+    }
+    txn.commit().await
 }
 
 /// Get quota record for a specific org and feature.
@@ -303,11 +336,126 @@ pub async fn get_for_orgs<C: ConnectionTrait>(
         .await
 }
 
+/// The ONE `YYYYMM` encoding, UTC: `period == month` holds only while every side uses it.
+pub fn month_of(micros: i64) -> i32 {
+    let at = chrono::DateTime::from_timestamp_micros(micros).unwrap_or_default();
+    at.year() * 100 + at.month() as i32
+}
+
+/// Advance one org's synthetics counters — the CALLER wraps these in the offset's transaction.
+pub async fn apply_synthetics_deltas_in<C: ConnectionTrait>(
+    txn: &C,
+    org_id: &str,
+    deltas: &SyntheticsDeltas,
+    now: i64,
+) -> Result<(), sea_orm::DbErr> {
+    for (feature, delta) in [
+        (SYNTHETICS_BROWSER_FEATURE, deltas.browser),
+        (SYNTHETICS_PROTOCOL_FEATURE, deltas.protocol),
+    ] {
+        // Write amplification: an org that never touched the pool must not acquire a row.
+        if delta != 0 {
+            increment_lifetime_row(txn, org_id, feature, delta, now).await?;
+        }
+    }
+    if deltas.status != 0 {
+        upsert_status_row(txn, org_id, deltas.status, deltas.month, now).await?;
+    }
+    Ok(())
+}
+
+/// The additive upsert of a LIFETIME pool: `period` is 0 on insert, untouched on conflict.
+async fn increment_lifetime_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    feature: &str,
+    delta: i64,
+    now: i64,
+) -> Result<(), sea_orm::DbErr> {
+    let active_model = trial_quota_usage::ActiveModel {
+        org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
+        feature: sea_orm::ActiveValue::Set(feature.to_string()),
+        usage_count: sea_orm::ActiveValue::Set(delta),
+        usage_limit: sea_orm::ActiveValue::NotSet,
+        updated_at: sea_orm::ActiveValue::Set(now),
+        notified_checkpoint: sea_orm::ActiveValue::Set(0),
+        period: sea_orm::ActiveValue::Set(0),
+    };
+
+    trial_quota_usage::Entity::insert(active_model)
+        .on_conflict(
+            OnConflict::columns([
+                trial_quota_usage::Column::OrgId,
+                trial_quota_usage::Column::Feature,
+            ])
+            .value(
+                trial_quota_usage::Column::UsageCount,
+                Expr::col((
+                    trial_quota_usage::Entity,
+                    trial_quota_usage::Column::UsageCount,
+                ))
+                .add(delta),
+            )
+            .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+            .to_owned(),
+        )
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
+/// Spec §7.3: the reset rides the increment, so no state adds this window then zeroes it.
+async fn upsert_status_row<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    grant: i64,
+    month: i32,
+    now: i64,
+) -> Result<(), sea_orm::DbErr> {
+    let period = Expr::col((trial_quota_usage::Entity, trial_quota_usage::Column::Period));
+    let stale = period.clone().lt(month);
+    let usage_count = CaseStatement::new().case(stale.clone(), grant).finally(
+        Expr::col((
+            trial_quota_usage::Entity,
+            trial_quota_usage::Column::UsageCount,
+        ))
+        .add(grant),
+    );
+    // Stands in for `GREATEST`, which SQLite lacks; `MAX(a, b)` is an aggregate on Postgres.
+    let advance = CaseStatement::new().case(stale, month).finally(period);
+
+    let active_model = trial_quota_usage::ActiveModel {
+        org_id: sea_orm::ActiveValue::Set(org_id.to_string()),
+        feature: sea_orm::ActiveValue::Set(SYNTHETICS_STATUS_FEATURE.to_string()),
+        usage_count: sea_orm::ActiveValue::Set(grant),
+        // Left unset so the deployment default applies until an admin overrides it.
+        usage_limit: sea_orm::ActiveValue::NotSet,
+        updated_at: sea_orm::ActiveValue::Set(now),
+        notified_checkpoint: sea_orm::ActiveValue::Set(0),
+        period: sea_orm::ActiveValue::Set(month),
+    };
+
+    trial_quota_usage::Entity::insert(active_model)
+        .on_conflict(
+            OnConflict::columns([
+                trial_quota_usage::Column::OrgId,
+                trial_quota_usage::Column::Feature,
+            ])
+            .value(trial_quota_usage::Column::UsageCount, usage_count)
+            .value(trial_quota_usage::Column::Period, advance)
+            .value(trial_quota_usage::Column::UpdatedAt, Expr::value(now))
+            .to_owned(),
+        )
+        .exec(conn)
+        .await?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use sea_orm::{
-        ActiveModelTrait, ActiveValue, ConnectOptions, ConnectionTrait, Database,
-        DatabaseConnection, Schema,
+        ActiveModelTrait, ActiveValue, ConnectOptions, ConnectionTrait, Database, DatabaseBackend,
+        DatabaseConnection, MockDatabase, MockExecResult, Schema, Transaction,
     };
 
     use super::*;
@@ -315,7 +463,8 @@ mod tests {
     const AI: &str = "ai_chat";
     const BROWSER: &str = "synthetics_browser_steps";
     const PROTOCOL: &str = "synthetics_protocol_steps";
-    const SYNTHETICS: &[&str] = &[BROWSER, PROTOCOL];
+    const STATUS: &str = SYNTHETICS_STATUS_FEATURE;
+    const SYNTHETICS: &[&str] = &[BROWSER, PROTOCOL, STATUS];
 
     /// One connection, not a pool: two connections to `sqlite::memory:` are two databases.
     async fn db() -> DatabaseConnection {
@@ -331,26 +480,171 @@ mod tests {
     }
 
     async fn seed(db: &DatabaseConnection, org_id: &str, feature: &str, usage_count: i64) {
+        seed_row(db, org_id, feature, usage_count, None, 0).await;
+    }
+
+    async fn seed_row(
+        db: &DatabaseConnection,
+        org_id: &str,
+        feature: &str,
+        usage_count: i64,
+        usage_limit: Option<i64>,
+        period: i32,
+    ) {
         trial_quota_usage::ActiveModel {
             org_id: ActiveValue::Set(org_id.to_string()),
             feature: ActiveValue::Set(feature.to_string()),
             usage_count: ActiveValue::Set(usage_count),
-            usage_limit: ActiveValue::Set(None),
+            usage_limit: ActiveValue::Set(usage_limit),
             updated_at: ActiveValue::Set(0),
             notified_checkpoint: ActiveValue::Set(0),
+            period: ActiveValue::Set(period),
         }
         .insert(db)
         .await
         .unwrap();
     }
 
-    fn pairs(rows: &[trial_quota_usage::Model]) -> Vec<(String, String, i64)> {
-        let mut out: Vec<(String, String, i64)> = rows
+    fn deltas(browser: i64, protocol: i64, status: i64, month: i32) -> SyntheticsDeltas {
+        SyntheticsDeltas {
+            browser,
+            protocol,
+            status,
+            month,
+        }
+    }
+
+    async fn apply(db: &DatabaseConnection, org_id: &str, d: SyntheticsDeltas, now: i64) {
+        apply_synthetics_deltas_in(db, org_id, &d, now)
+            .await
+            .unwrap();
+    }
+
+    async fn row_of(
+        db: &DatabaseConnection,
+        org_id: &str,
+        feature: &str,
+    ) -> trial_quota_usage::Model {
+        trial_quota_usage::Entity::find()
+            .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+            .filter(trial_quota_usage::Column::Feature.eq(feature))
+            .one(db)
+            .await
+            .unwrap()
+            .expect("the upsert must leave a row behind")
+    }
+
+    /// `(usage_count, period)` — the pair the whole monthly design turns on.
+    async fn counter(db: &DatabaseConnection, org_id: &str, feature: &str) -> (i64, i32) {
+        let row = row_of(db, org_id, feature).await;
+        (row.usage_count, row.period)
+    }
+
+    /// `period` rides along: a read that drops it lets October spend September's count.
+    fn pairs(rows: &[trial_quota_usage::Model]) -> Vec<(String, String, i64, i32)> {
+        let mut out: Vec<(String, String, i64, i32)> = rows
             .iter()
-            .map(|r| (r.org_id.clone(), r.feature.clone(), r.usage_count))
+            .map(|r| (r.org_id.clone(), r.feature.clone(), r.usage_count, r.period))
             .collect();
         out.sort();
         out
+    }
+
+    /// CODE only: a comment naming what a scan forbids would trip that scan on its own text.
+    fn code_only_source() -> String {
+        include_str!("trial_quota_usage.rs")
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// The body of the first `fn name` defined in this file, up to its closing brace.
+    fn fn_body<'a>(source: &'a str, name: &str) -> &'a str {
+        let needle = format!("fn {name}");
+        // `<` as well as `(`: a generic entry point is still the entry point, not a missing one.
+        let at = source
+            .match_indices(&needle)
+            .find(|(at, _)| matches!(source[at + needle.len()..].chars().next(), Some('(' | '<')))
+            .expect("the function must live in this file")
+            .0;
+        let body = &source[at..];
+        let end = body.find("\n}\n").expect("end of the function");
+        &body[..end]
+    }
+
+    /// The `_in` split is what these tests can reach, so the pub entry point must run it too.
+    fn assert_entry_point_delegates(entry_point: &str, inner: &str) {
+        let source = code_only_source();
+        assert!(
+            fn_body(&source, entry_point).contains(&format!("{inner}(")),
+            "the write under test is not the one `{entry_point}` runs",
+        );
+    }
+
+    fn mock_db(backend: DatabaseBackend, writes: usize) -> DatabaseConnection {
+        MockDatabase::new(backend)
+            .append_exec_results(vec![
+                MockExecResult {
+                    last_insert_id: 0,
+                    rows_affected: 1,
+                };
+                writes
+            ])
+            .into_connection()
+    }
+
+    /// `ConnectionTrait` has no `begin`, so a wrapper that only forwards the pool autocommits.
+    fn assert_one_transaction(log: &[Transaction], writes: usize, what: &str) {
+        assert_eq!(log.len(), 1, "{what} must open ONE transaction: {log:?}");
+        let sql: Vec<&str> = log[0].statements().iter().map(|s| s.sql.as_str()).collect();
+        assert_eq!(sql.first().copied(), Some("BEGIN"), "{what}: {sql:?}");
+        assert_eq!(sql.last().copied(), Some("COMMIT"), "{what}: {sql:?}");
+        assert_eq!(
+            sql.len() - 2,
+            writes,
+            "{what} must hold all {writes} writes inside that one transaction: {sql:?}",
+        );
+    }
+
+    async fn has_no_row(db: &DatabaseConnection, org_id: &str, feature: &str) -> bool {
+        trial_quota_usage::Entity::find()
+            .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+            .filter(trial_quota_usage::Column::Feature.eq(feature))
+            .one(db)
+            .await
+            .unwrap()
+            .is_none()
+    }
+
+    async fn status_upsert_log(backend: DatabaseBackend) -> Vec<Transaction> {
+        let db = mock_db(backend, 4);
+        apply_synthetics_deltas_in(&db, "acme", &deltas(0, 0, 90, 202610), 5)
+            .await
+            .unwrap();
+        db.into_transaction_log()
+    }
+
+    /// Every `period` literal below is a YYYYMM the metering side must derive from an instant,
+    /// and `period == month` is true only while both sides encode it identically.
+    #[test]
+    fn month_of_encodes_the_utc_year_and_month() {
+        let at = |rfc3339: &str| {
+            chrono::DateTime::parse_from_rfc3339(rfc3339)
+                .unwrap()
+                .timestamp_micros()
+        };
+
+        // Spec §7.3: the window starting 30 Sep 23:10 is September's, 1 Oct 01:10 is October's.
+        assert_eq!(month_of(at("2026-09-30T23:10:00Z")), 202609);
+        assert_eq!(month_of(at("2026-10-01T01:10:00Z")), 202610);
+        // UTC, not local: under any fixed offset one of these two lands in the wrong month.
+        assert_eq!(month_of(at("2026-09-30T23:59:59.999999Z")), 202609);
+        assert_eq!(month_of(at("2026-10-01T00:00:00Z")), 202610);
+        // `year * 100 + month`, so a single-digit month is zero-padded, never `year * 12`.
+        assert_eq!(month_of(at("2026-01-01T00:00:00Z")), 202601);
+        assert_eq!(month_of(at("2026-12-31T23:59:59Z")), 202612);
+        assert_eq!(month_of(at("2027-01-01T00:00:00Z")), 202701);
     }
 
     /// A leaked org or a leaked feature is a grant spent against the wrong pool.
@@ -360,7 +654,9 @@ mod tests {
         seed(&db, "acme", BROWSER, 100).await;
         seed(&db, "acme", PROTOCOL, 200).await;
         seed(&db, "acme", AI, 5).await;
+        seed_row(&db, "acme", STATUS, 12_480, None, 202609).await;
         seed(&db, "beta", BROWSER, 7).await;
+        seed_row(&db, "beta", STATUS, 40, None, 202610).await;
         seed(&db, "gamma", BROWSER, 9).await;
 
         let orgs = vec!["acme".to_string(), "beta".to_string()];
@@ -368,25 +664,415 @@ mod tests {
         assert_eq!(
             pairs(&rows),
             vec![
-                ("acme".to_string(), BROWSER.to_string(), 100),
-                ("acme".to_string(), PROTOCOL.to_string(), 200),
-                ("beta".to_string(), BROWSER.to_string(), 7),
+                ("acme".to_string(), BROWSER.to_string(), 100, 0),
+                ("acme".to_string(), PROTOCOL.to_string(), 200, 0),
+                ("acme".to_string(), STATUS.to_string(), 12_480, 202609),
+                ("beta".to_string(), BROWSER.to_string(), 7, 0),
+                ("beta".to_string(), STATUS.to_string(), 40, 202610),
             ],
-            "an unrequested org or an AI-credit row must never reach the synthetics gate",
+            "an unrequested org or an AI-credit row must never reach the synthetics gate, and a \
+             period the read drops leaves the gate unable to tell a stale count from a live one",
         );
 
         let rows = get_for_orgs(&db, &orgs, &[BROWSER]).await.unwrap();
         assert_eq!(
             pairs(&rows),
             vec![
-                ("acme".to_string(), BROWSER.to_string(), 100),
-                ("beta".to_string(), BROWSER.to_string(), 7),
+                ("acme".to_string(), BROWSER.to_string(), 100, 0),
+                ("beta".to_string(), BROWSER.to_string(), 7, 0),
             ],
         );
 
         assert!(
             get_for_orgs(&db, &[], SYNTHETICS).await.unwrap().is_empty(),
             "a tick that claimed nothing must not read the whole table",
+        );
+    }
+
+    /// Spec §7.3: the admin API reports `used` from this sum, so an unscoped one bills an org
+    /// for a month it has already left.
+    #[tokio::test]
+    async fn the_total_is_scoped_to_the_month_when_one_is_given() {
+        let db = db().await;
+        seed_row(&db, "bigcorp", STATUS, 81_000, Some(150_000), 202609).await;
+        seed(&db, "bigcorp", AI, 340).await;
+        seed_row(&db, "acme", STATUS, 12_480, None, 202609).await;
+
+        assert_eq!(
+            get_total_usage_for_org_in(&db, "bigcorp", &[STATUS], Some(202610))
+                .await
+                .unwrap(),
+            0,
+            "September's row is unspent in October, or the admin API reports last month's spend",
+        );
+        assert_eq!(
+            get_total_usage_for_org_in(&db, "bigcorp", &[STATUS], Some(202609))
+                .await
+                .unwrap(),
+            81_000,
+        );
+        assert_eq!(
+            get_total_usage_for_org_in(&db, "bigcorp", &[AI], None)
+                .await
+                .unwrap(),
+            340,
+            "a lifetime pool passes no month, and `period = 0` must not filter it out",
+        );
+
+        assert_entry_point_delegates("get_total_usage_for_org", "get_total_usage_for_org_in");
+    }
+
+    /// Spec §7.3, `30 Sep 23:10`.
+    #[tokio::test]
+    async fn status_upsert_adds_within_month() {
+        let db = db().await;
+        seed_row(&db, "acme", STATUS, 12_480, None, 202609).await;
+
+        apply(&db, "acme", deltas(0, 0, 410, 202609), 77).await;
+
+        assert_eq!(counter(&db, "acme", STATUS).await, (12_890, 202609));
+        assert_eq!(row_of(&db, "acme", STATUS).await.updated_at, 77);
+    }
+
+    /// Spec §7.3, `1 Oct 01:10` — the reset and the first October increment are ONE write,
+    /// so the row must hold this window's grant, never a zero another write has to fill.
+    #[tokio::test]
+    async fn status_upsert_resets_on_a_newer_month() {
+        let db = db().await;
+        seed_row(&db, "acme", STATUS, 12_890, None, 202609).await;
+
+        apply(&db, "acme", deltas(0, 0, 90, 202610), 5).await;
+
+        assert_eq!(
+            counter(&db, "acme", STATUS).await,
+            (90, 202610),
+            "0 here means the reset dropped this window's steps; 12,980 means it never fired",
+        );
+        assert_eq!(row_of(&db, "acme", STATUS).await.updated_at, 5);
+    }
+
+    /// A September window settling after October already reset the row carries an OLDER month.
+    #[tokio::test]
+    async fn status_upsert_ignores_an_older_month() {
+        let db = db().await;
+        seed_row(&db, "acme", STATUS, 90, None, 202610).await;
+
+        apply(&db, "acme", deltas(0, 0, 5, 202609), 5).await;
+
+        assert_eq!(
+            counter(&db, "acme", STATUS).await,
+            (95, 202610),
+            "a late replay that rewinds period re-opens October's grant a second time",
+        );
+    }
+
+    /// Spec §7.5 ④ — a status check first attached in October must not read as a stale
+    /// September row.
+    #[tokio::test]
+    async fn status_upsert_inserts_with_the_month() {
+        let db = db().await;
+
+        apply(&db, "acme", deltas(0, 0, 40, 202610), 5).await;
+
+        assert_eq!(counter(&db, "acme", STATUS).await, (40, 202610));
+        assert_eq!(row_of(&db, "acme", STATUS).await.updated_at, 5);
+    }
+
+    /// The override is the whole reason `period` is out of the primary key (spec §7.2).
+    #[tokio::test]
+    async fn status_upsert_never_touches_usage_limit() {
+        let db = db().await;
+        seed_row(&db, "bigcorp", STATUS, 81_000, Some(150_000), 202609).await;
+
+        for (grant, month, expected) in [
+            (1_200, 202609, (82_200, 202609)),
+            (260, 202610, (260, 202610)),
+            (5, 202609, (265, 202610)),
+        ] {
+            apply(&db, "bigcorp", deltas(0, 0, grant, month), 5).await;
+            assert_eq!(counter(&db, "bigcorp", STATUS).await, expected);
+            assert_eq!(
+                row_of(&db, "bigcorp", STATUS).await.usage_limit,
+                Some(150_000),
+                "the override survives every reset, or an admin re-enters it every month",
+            );
+        }
+
+        apply(&db, "acme", deltas(0, 0, 40, 202610), 5).await;
+        assert_eq!(
+            row_of(&db, "acme", STATUS).await.usage_limit,
+            None,
+            "the insert half must leave the limit unset so the env default applies",
+        );
+    }
+
+    /// No state may exist in which an October increment is applied and then zeroed, so the
+    /// reset cannot be a statement of its own.
+    #[tokio::test]
+    async fn the_reset_and_the_increment_are_one_write() {
+        for backend in [DatabaseBackend::Sqlite, DatabaseBackend::Postgres] {
+            let log = status_upsert_log(backend).await;
+            // Counted over the status row's OWN statements: a log length would be satisfied by
+            // the fixture's zero browser and protocol deltas rather than by this property.
+            let touching_status = log
+                .iter()
+                .flat_map(|txn| txn.statements())
+                .filter(|statement| format!("{statement:?}").contains(SYNTHETICS_STATUS_FEATURE))
+                .count();
+            assert_eq!(
+                touching_status, 1,
+                "the reset rides the increment: ONE statement touches the status row, or a \
+                 crash between two leaves the month half-turned ({backend:?}): {log:?}",
+            );
+        }
+    }
+
+    /// SQLite has no `GREATEST` and Postgres no two-argument `MAX`, so the guard must render as
+    /// a `CASE`; the loop is here only to catch a `get_database_backend()` branch.
+    #[tokio::test]
+    async fn the_period_guard_renders_for_every_backend() {
+        for backend in [DatabaseBackend::Sqlite, DatabaseBackend::Postgres] {
+            let log = status_upsert_log(backend).await;
+            assert!(
+                !log.is_empty(),
+                "an empty log renders as `[]`, which every ban below is happy with ({backend:?})",
+            );
+
+            let sql = format!("{log:?}").to_uppercase();
+            assert!(
+                sql.matches("CASE").count() >= 2,
+                "usage_count's reset and period's GREATEST replacement are TWO guards; one CASE \
+                 means period is written unguarded on {backend:?}: {sql}",
+            );
+            for unportable in ["GREATEST", "MAX("] {
+                assert!(
+                    !sql.contains(unportable),
+                    "`{unportable}` on {backend:?}: the period guard must compile to a CASE: \
+                     {sql}",
+                );
+            }
+        }
+    }
+
+    /// The one-time pools are lifetime. A month on their rows would reset them every month.
+    #[tokio::test]
+    async fn batch_increment_leaves_period_at_zero() {
+        let db = db().await;
+        seed_row(&db, "acme", STATUS, 90, None, 202610).await;
+
+        batch_increment_in(
+            &db,
+            vec![
+                ("acme".to_string(), BROWSER.to_string(), 40),
+                ("acme".to_string(), STATUS.to_string(), 5),
+            ],
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(counter(&db, "acme", BROWSER).await, (40, 0));
+        assert_eq!(
+            counter(&db, "acme", STATUS).await,
+            (95, 202610),
+            "the conflict clause must not write period, or this path rewinds the month",
+        );
+
+        assert_entry_point_delegates("batch_increment", "batch_increment_in");
+    }
+
+    /// A flush tick that coalesced to nothing must answer without waiting on the write pool.
+    #[test]
+    fn an_empty_batch_returns_before_the_write_pool_is_touched() {
+        let source = code_only_source();
+        let body = fn_body(&source, "batch_increment");
+        let guard = body
+            .find("records.is_empty()")
+            .expect("the empty batch must be answered here, not by the callee");
+        let pool = body
+            .find("get_orm_client_rw")
+            .expect("the wrapper is what reaches for the write pool");
+        assert!(
+            guard < pool,
+            "an empty batch blocks on pool initialisation once the guard moves into the callee",
+        );
+    }
+
+    /// N autocommits hold the write lock N times and leave a crash mid-batch half applied.
+    #[tokio::test]
+    async fn the_batch_is_one_transaction() {
+        let db = mock_db(DatabaseBackend::Sqlite, 3);
+
+        batch_increment_in(
+            &db,
+            vec![
+                ("acme".to_string(), BROWSER.to_string(), 40),
+                ("acme".to_string(), PROTOCOL.to_string(), 10),
+                ("beta".to_string(), STATUS.to_string(), 5),
+            ],
+        )
+        .await
+        .unwrap();
+
+        assert_one_transaction(&db.into_transaction_log(), 3, "batch_increment_in");
+    }
+
+    /// The seed-insert must `Set(0)`: the ENT `ALTER` carries `DEFAULT 0`, but the schema built
+    /// from the entity does not, so `NotSet` is a NOT NULL violation the moment it is tested.
+    #[tokio::test]
+    async fn setting_a_limit_never_writes_a_month() {
+        let db = db().await;
+        seed_row(&db, "acme", PROTOCOL, 100, None, 0).await;
+
+        set_usage_limit_for_org_in(&db, "acme", BROWSER, &[BROWSER, PROTOCOL], 5_000)
+            .await
+            .unwrap();
+
+        let row = row_of(&db, "acme", BROWSER).await;
+        assert_eq!(row.usage_limit, Some(5_000));
+        assert_eq!(
+            row.period, 0,
+            "the call has no month input, so the seed insert must stamp the lifetime 0",
+        );
+        assert_eq!(
+            row_of(&db, "acme", PROTOCOL).await.usage_limit,
+            Some(5_000),
+            "the seed insert reaches ONE feature; the pool's other rows need the fan-out UPDATE",
+        );
+        assert_eq!(
+            counter(&db, "acme", PROTOCOL).await,
+            (100, 0),
+            "the fan-out raises the limit only — a count or a month written here is a reset",
+        );
+
+        seed_row(&db, "bigcorp", STATUS, 12_480, None, 202610).await;
+        set_usage_limit_for_org_in(&db, "bigcorp", STATUS, &[STATUS], 150_000)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            counter(&db, "bigcorp", STATUS).await,
+            (12_480, 202610),
+            "raising a limit mid-month must not rewind the month and re-open the grant",
+        );
+        assert_eq!(
+            row_of(&db, "bigcorp", STATUS).await.usage_limit,
+            Some(150_000),
+        );
+
+        assert_entry_point_delegates("set_usage_limit_for_org", "set_usage_limit_for_org_in");
+    }
+
+    /// `is_in(&[])` is not a reliable "match nothing", and on an `update_many` degrading to an
+    /// unfiltered write raises every pool's limit at once.
+    #[tokio::test]
+    async fn an_empty_feature_set_reaches_no_other_pool() {
+        let db = db().await;
+        seed_row(&db, "acme", AI, 340, Some(10_000), 0).await;
+        seed_row(&db, "acme", PROTOCOL, 100, None, 0).await;
+
+        set_usage_limit_for_org_in(&db, "acme", BROWSER, &[], 5_000)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            row_of(&db, "acme", AI).await.usage_limit,
+            Some(10_000),
+            "an unfiltered fan-out hands the AI pool the synthetics limit",
+        );
+        assert_eq!(
+            row_of(&db, "acme", PROTOCOL).await.usage_limit,
+            None,
+            "the other synthetics pools are not in the set either",
+        );
+        assert_eq!(
+            row_of(&db, "acme", BROWSER).await.usage_limit,
+            Some(5_000),
+            "the seed insert is unconditional — only the fan-out is guarded",
+        );
+    }
+
+    /// Spec §7.4 — a crash between the seed and the fan-out leaves the pool on two limits.
+    #[tokio::test]
+    async fn setting_a_limit_is_one_transaction() {
+        let db = mock_db(DatabaseBackend::Sqlite, 2);
+
+        set_usage_limit_for_org_in(&db, "acme", BROWSER, &[BROWSER, PROTOCOL], 5_000)
+            .await
+            .unwrap();
+
+        assert_one_transaction(&db.into_transaction_log(), 2, "set_usage_limit_for_org_in");
+    }
+
+    #[tokio::test]
+    async fn the_one_time_rows_never_acquire_a_month() {
+        let db = db().await;
+        seed_row(&db, "acme", PROTOCOL, 100, None, 0).await;
+
+        apply(&db, "acme", deltas(30, 20, 0, 202610), 5).await;
+
+        assert_eq!(counter(&db, "acme", BROWSER).await, (30, 0));
+        assert_eq!(counter(&db, "acme", PROTOCOL).await, (120, 0));
+        assert_eq!(row_of(&db, "acme", BROWSER).await.updated_at, 5);
+        assert_eq!(row_of(&db, "acme", PROTOCOL).await.updated_at, 5);
+        assert!(
+            has_no_row(&db, "acme", STATUS).await,
+            "a zero delta must write no row, or every org acquires one for a pool it has \
+             never touched",
+        );
+    }
+
+    /// Write amplification: an org that never touched the pool must not acquire a row for it.
+    #[tokio::test]
+    async fn a_zero_one_time_delta_writes_no_row() {
+        let db = db().await;
+
+        apply(&db, "acme", deltas(0, 0, 40, 202610), 5).await;
+
+        assert!(has_no_row(&db, "acme", BROWSER).await, "browser");
+        assert!(has_no_row(&db, "acme", PROTOCOL).await, "protocol");
+        assert_eq!(counter(&db, "acme", STATUS).await, (40, 202610));
+    }
+
+    /// Spec §7.5 — each org resets itself on the first window that STARTS in October, and a
+    /// window that starts in September still meets September's counter.
+    #[tokio::test]
+    async fn the_month_boundary_settles_four_orgs_independently() {
+        let db = db().await;
+        seed_row(&db, "acme", STATUS, 12_480, None, 202609).await;
+        seed_row(&db, "bigcorp", STATUS, 81_000, Some(150_000), 202609).await;
+        seed_row(&db, "startup", STATUS, 6_100, None, 202609).await;
+        seed_row(&db, "contract-co", STATUS, 33_000, None, 202609).await;
+
+        for (org, grant) in [("acme", 410), ("bigcorp", 1_200), ("contract-co", 900)] {
+            apply(&db, org, deltas(0, 0, grant, 202609), 5).await;
+        }
+        for (org, grant) in [("acme", 90), ("bigcorp", 260), ("contract-co", 400)] {
+            apply(&db, org, deltas(0, 0, grant, 202609), 6).await;
+        }
+        assert_eq!(counter(&db, "acme", STATUS).await, (12_980, 202609));
+        assert_eq!(counter(&db, "bigcorp", STATUS).await, (82_460, 202609));
+        assert_eq!(counter(&db, "contract-co", STATUS).await, (34_300, 202609));
+
+        apply(&db, "acme", deltas(0, 0, 40, 202610), 7).await;
+        apply(&db, "bigcorp", deltas(0, 0, 260, 202610), 7).await;
+        apply(&db, "acme", deltas(0, 0, 70, 202610), 8).await;
+        apply(&db, "contract-co", deltas(0, 0, 1_300, 202610), 8).await;
+
+        assert_eq!(counter(&db, "acme", STATUS).await, (110, 202610));
+        assert_eq!(counter(&db, "bigcorp", STATUS).await, (260, 202610));
+        assert_eq!(
+            row_of(&db, "bigcorp", STATUS).await.usage_limit,
+            Some(150_000),
+        );
+        assert_eq!(
+            counter(&db, "contract-co", STATUS).await,
+            (1_300, 202610),
+            "a failed post delays only its own org's reset, and the retry still resets",
+        );
+        assert_eq!(
+            counter(&db, "startup", STATUS).await,
+            (6_100, 202609),
+            "an org the loop never iterates keeps September's row untouched (U-23)",
         );
     }
 }
