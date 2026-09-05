@@ -250,43 +250,87 @@ pub async fn get_notified_checkpoint(org_id: &str) -> Result<i16, sea_orm::DbErr
     Ok(result.flatten().unwrap_or(0))
 }
 
-/// Atomically update the notified checkpoint for an org.
-/// Only updates rows where the current checkpoint is lower (prevents duplicates
-/// across pods).
+/// Stamp ONE pool's notification watermark, and only where it rises; `features` bounds the
+/// `UPDATE`, or one pool's notification silences every other pool the org has (spec §11.1).
 pub async fn update_notified_checkpoint(
     org_id: &str,
     checkpoint: i16,
+    features: &[&str],
 ) -> Result<bool, sea_orm::DbErr> {
-    let db = get_orm_client_rw().await;
+    update_notified_checkpoint_in(get_orm_client_rw().await, org_id, checkpoint, features).await
+}
+
+/// [`update_notified_checkpoint`] against a caller-supplied connection.
+async fn update_notified_checkpoint_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    checkpoint: i16,
+    features: &[&str],
+) -> Result<bool, sea_orm::DbErr> {
+    // No keys, nothing to stamp: consistency with the siblings, not correctness.
+    if features.is_empty() {
+        return Ok(false);
+    }
     let result = trial_quota_usage::Entity::update_many()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
         .filter(trial_quota_usage::Column::NotifiedCheckpoint.lt(checkpoint))
         .col_expr(
             trial_quota_usage::Column::NotifiedCheckpoint,
             sea_orm::sea_query::Expr::value(checkpoint),
         )
-        .exec(db)
+        .exec(conn)
         .await?;
     // If rows_affected > 0, this pod won the update (no other pod set it first)
     Ok(result.rows_affected > 0)
 }
 
-pub async fn reset_notified_checkpoint(org_id: &str) -> Result<(), sea_orm::DbErr> {
-    let db = get_orm_client_rw().await;
+/// Re-arm ONE pool's notification watermark; `features` bounds the `UPDATE`, or raising one
+/// grant re-arms every other pool the org has (spec §11.1).
+pub async fn reset_notified_checkpoint(
+    org_id: &str,
+    features: &[&str],
+) -> Result<(), sea_orm::DbErr> {
+    reset_notified_checkpoint_in(get_orm_client_rw().await, org_id, features).await
+}
+
+/// [`reset_notified_checkpoint`] against a caller-supplied connection.
+async fn reset_notified_checkpoint_in<C: ConnectionTrait>(
+    conn: &C,
+    org_id: &str,
+    features: &[&str],
+) -> Result<(), sea_orm::DbErr> {
+    // No keys, nothing to clear: consistency with the siblings, not correctness.
+    if features.is_empty() {
+        return Ok(());
+    }
     trial_quota_usage::Entity::update_many()
         .filter(trial_quota_usage::Column::OrgId.eq(org_id))
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
         .col_expr(
             trial_quota_usage::Column::NotifiedCheckpoint,
             Expr::value(0),
         )
-        .exec(db)
+        .exec(conn)
         .await?;
     Ok(())
 }
 
-/// Load all notified checkpoints (one per org, max across features).
-pub async fn load_all_checkpoints() -> Result<Vec<(String, i16)>, sea_orm::DbErr> {
-    let db = get_orm_client_ro().await;
+/// Each org's notified watermark for ONE pool; `features` bounds the `MAX`, or another pool's
+/// watermark answers for this one and the org is never warned again (spec §11.1).
+pub async fn load_all_checkpoints(features: &[&str]) -> Result<Vec<(String, i16)>, sea_orm::DbErr> {
+    load_all_checkpoints_in(get_orm_client_ro().await, features).await
+}
+
+/// [`load_all_checkpoints`] against a caller-supplied connection.
+async fn load_all_checkpoints_in<C: ConnectionTrait>(
+    conn: &C,
+    features: &[&str],
+) -> Result<Vec<(String, i16)>, sea_orm::DbErr> {
+    // No keys, nothing to read: consistency with the siblings, not correctness.
+    if features.is_empty() {
+        return Ok(Vec::new());
+    }
     let results: Vec<(String, Option<i16>)> = trial_quota_usage::Entity::find()
         .select_only()
         .column(trial_quota_usage::Column::OrgId)
@@ -294,9 +338,10 @@ pub async fn load_all_checkpoints() -> Result<Vec<(String, i16)>, sea_orm::DbErr
             trial_quota_usage::Column::NotifiedCheckpoint.max(),
             "max_checkpoint",
         )
+        .filter(trial_quota_usage::Column::Feature.is_in(features.iter().copied()))
         .group_by(trial_quota_usage::Column::OrgId)
         .into_tuple()
-        .all(db)
+        .all(conn)
         .await?;
     Ok(results
         .into_iter()
@@ -465,6 +510,10 @@ mod tests {
     const PROTOCOL: &str = "synthetics_protocol_steps";
     const STATUS: &str = SYNTHETICS_STATUS_FEATURE;
     const SYNTHETICS: &[&str] = &[BROWSER, PROTOCOL, STATUS];
+    const AI_FEATURES: &[&str] = &[AI, "new_incident", "incident_reanalysis"];
+    /// The pre-split key the protocol pool still counts into, so a reset must name it as well.
+    const LEGACY_STEPS: &str = "synthetics_steps";
+    const PROTOCOL_POOL: &[&str] = &[PROTOCOL, LEGACY_STEPS];
 
     /// One connection, not a pool: two connections to `sqlite::memory:` are two databases.
     async fn db() -> DatabaseConnection {
@@ -483,6 +532,25 @@ mod tests {
         seed_row(db, org_id, feature, usage_count, None, 0).await;
     }
 
+    fn usage_row(
+        org_id: &str,
+        feature: &str,
+        usage_count: i64,
+        usage_limit: Option<i64>,
+        period: i32,
+        notified_checkpoint: i16,
+    ) -> trial_quota_usage::ActiveModel {
+        trial_quota_usage::ActiveModel {
+            org_id: ActiveValue::Set(org_id.to_string()),
+            feature: ActiveValue::Set(feature.to_string()),
+            usage_count: ActiveValue::Set(usage_count),
+            usage_limit: ActiveValue::Set(usage_limit),
+            updated_at: ActiveValue::Set(0),
+            notified_checkpoint: ActiveValue::Set(notified_checkpoint),
+            period: ActiveValue::Set(period),
+        }
+    }
+
     async fn seed_row(
         db: &DatabaseConnection,
         org_id: &str,
@@ -491,18 +559,22 @@ mod tests {
         usage_limit: Option<i64>,
         period: i32,
     ) {
-        trial_quota_usage::ActiveModel {
-            org_id: ActiveValue::Set(org_id.to_string()),
-            feature: ActiveValue::Set(feature.to_string()),
-            usage_count: ActiveValue::Set(usage_count),
-            usage_limit: ActiveValue::Set(usage_limit),
-            updated_at: ActiveValue::Set(0),
-            notified_checkpoint: ActiveValue::Set(0),
-            period: ActiveValue::Set(period),
-        }
-        .insert(db)
-        .await
-        .unwrap();
+        usage_row(org_id, feature, usage_count, usage_limit, period, 0)
+            .insert(db)
+            .await
+            .unwrap();
+    }
+
+    async fn seed_checkpoint(
+        db: &DatabaseConnection,
+        org_id: &str,
+        feature: &str,
+        notified_checkpoint: i16,
+    ) {
+        usage_row(org_id, feature, 0, None, 0, notified_checkpoint)
+            .insert(db)
+            .await
+            .unwrap();
     }
 
     fn deltas(browser: i64, protocol: i64, status: i64, month: i32) -> SyntheticsDeltas {
@@ -538,6 +610,10 @@ mod tests {
     async fn counter(db: &DatabaseConnection, org_id: &str, feature: &str) -> (i64, i32) {
         let row = row_of(db, org_id, feature).await;
         (row.usage_count, row.period)
+    }
+
+    async fn checkpoint_of(db: &DatabaseConnection, org_id: &str, feature: &str) -> i16 {
+        row_of(db, org_id, feature).await.notified_checkpoint
     }
 
     /// `period` rides along: a read that drops it lets October spend September's count.
@@ -1001,6 +1077,202 @@ mod tests {
             .unwrap();
 
         assert_one_transaction(&db.into_transaction_log(), 2, "set_usage_limit_for_org_in");
+    }
+
+    /// Spec §11.1: an org at 96% of its AI credits carries `notified_checkpoint = 95` on EVERY
+    /// row, so an admin raising ONE synthetics grant re-emails 80 → 90 → 95 on the next tick
+    /// unless this reset is bounded by the pool whose limit actually moved.
+    #[tokio::test]
+    async fn resetting_one_pool_leaves_every_other_watermark_standing() {
+        let db = db().await;
+        for feature in [AI, "new_incident", BROWSER, PROTOCOL, LEGACY_STEPS, STATUS] {
+            seed_checkpoint(&db, "acme", feature, 95).await;
+        }
+        seed_checkpoint(&db, "beta", PROTOCOL, 90).await;
+
+        reset_notified_checkpoint_in(&db, "acme", PROTOCOL_POOL)
+            .await
+            .unwrap();
+
+        assert_eq!(
+            checkpoint_of(&db, "acme", AI).await,
+            95,
+            "the AI watermark is gone, so the next 900 s tick re-emails 80, 90 and 95",
+        );
+        assert_eq!(checkpoint_of(&db, "acme", "new_incident").await, 95);
+        for feature in [BROWSER, STATUS] {
+            assert_eq!(
+                checkpoint_of(&db, "acme", feature).await,
+                95,
+                "{feature}: a pool whose limit never moved is re-armed for notifications it has \
+                 already sent",
+            );
+        }
+        for feature in PROTOCOL_POOL {
+            assert_eq!(
+                checkpoint_of(&db, "acme", feature).await,
+                0,
+                "{feature}: every feature key of the pool whose limit moved must be re-armed",
+            );
+        }
+        assert_eq!(
+            checkpoint_of(&db, "beta", PROTOCOL).await,
+            90,
+            "the org filter is still the outer bound",
+        );
+
+        assert_entry_point_delegates("reset_notified_checkpoint", "reset_notified_checkpoint_in");
+    }
+
+    /// The working case: raising the AI limit re-arms the AI pool's own rows.
+    #[tokio::test]
+    async fn resetting_the_ai_pool_still_clears_its_own_rows() {
+        let db = db().await;
+        for feature in AI_FEATURES.iter().copied().chain([BROWSER]) {
+            seed_checkpoint(&db, "acme", feature, 95).await;
+        }
+
+        reset_notified_checkpoint_in(&db, "acme", AI_FEATURES)
+            .await
+            .unwrap();
+
+        for feature in AI_FEATURES {
+            assert_eq!(
+                checkpoint_of(&db, "acme", feature).await,
+                0,
+                "{feature}: the reset covers every feature key of the pool, not just the one \
+                 that is named",
+            );
+        }
+        assert_eq!(checkpoint_of(&db, "acme", BROWSER).await, 95);
+    }
+
+    /// An empty slice clears nothing, whether the guard runs or sea-query renders `1 = 2`.
+    #[tokio::test]
+    async fn resetting_no_features_touches_no_row() {
+        let db = db().await;
+        seed_checkpoint(&db, "acme", AI, 95).await;
+
+        reset_notified_checkpoint_in(&db, "acme", &[])
+            .await
+            .unwrap();
+
+        assert_eq!(checkpoint_of(&db, "acme", AI).await, 95);
+    }
+
+    /// Spec §11.1: the watermark is read back as a MAX over the org's rows, so an AI
+    /// notification stamping the synthetics rows answers for the synthetics pool ever after.
+    #[tokio::test]
+    async fn stamping_one_pool_leaves_every_other_watermark_standing() {
+        let db = db().await;
+        for feature in AI_FEATURES
+            .iter()
+            .copied()
+            .chain(SYNTHETICS.iter().copied())
+        {
+            seed_checkpoint(&db, "acme", feature, 0).await;
+        }
+        seed_checkpoint(&db, "beta", AI, 0).await;
+
+        assert!(
+            update_notified_checkpoint_in(&db, "acme", 95, AI_FEATURES)
+                .await
+                .unwrap(),
+            "the pod that moves the watermark is the one that sends the email",
+        );
+
+        for feature in AI_FEATURES {
+            assert_eq!(checkpoint_of(&db, "acme", feature).await, 95);
+        }
+        for feature in SYNTHETICS {
+            assert_eq!(
+                checkpoint_of(&db, "acme", feature).await,
+                0,
+                "{feature}: a pool nobody notified is left claiming it warned the org at 95",
+            );
+        }
+        assert_eq!(
+            checkpoint_of(&db, "beta", AI).await,
+            0,
+            "the org filter is still the outer bound",
+        );
+
+        assert_entry_point_delegates(
+            "update_notified_checkpoint",
+            "update_notified_checkpoint_in",
+        );
+    }
+
+    /// The AI job's `already_notified` is this MAX, and `pending_checkpoint_from` returns
+    /// `None` for every checkpoint at or below it.
+    #[tokio::test]
+    async fn loading_one_pools_checkpoints_ignores_another_pools_rows() {
+        let db = db().await;
+        seed_checkpoint(&db, "acme", BROWSER, 95).await;
+        seed_checkpoint(&db, "acme", AI, 0).await;
+        seed_checkpoint(&db, "beta", AI, 80).await;
+
+        let loaded = load_all_checkpoints_in(&db, AI_FEATURES).await.unwrap();
+
+        assert_eq!(
+            loaded,
+            vec![("beta".to_string(), 80)],
+            "acme's AI pool is unnotified: only a synthetics watermark, or its own zero, can \
+             put it in this answer",
+        );
+
+        assert_entry_point_delegates("load_all_checkpoints", "load_all_checkpoints_in");
+    }
+
+    /// Spec §11.1 end to end: production rows carry 95 on EVERY feature, so an AI grant raised
+    /// after the fix must still leave the AI job seeing an org it can warn again.
+    #[tokio::test]
+    async fn raising_the_ai_grant_re_arms_the_job_a_synthetics_row_would_pin() {
+        let db = db().await;
+        for feature in AI_FEATURES
+            .iter()
+            .copied()
+            .chain(SYNTHETICS.iter().copied())
+        {
+            seed_checkpoint(&db, "acme", feature, 95).await;
+        }
+
+        reset_notified_checkpoint_in(&db, "acme", AI_FEATURES)
+            .await
+            .unwrap();
+
+        assert!(
+            load_all_checkpoints_in(&db, AI_FEATURES)
+                .await
+                .unwrap()
+                .is_empty(),
+            "a synthetics row still at 95 would hold the org's MAX at 95, and the raised AI \
+             grant would never be warned about again",
+        );
+        for feature in SYNTHETICS {
+            assert_eq!(
+                checkpoint_of(&db, "acme", feature).await,
+                95,
+                "{feature}: the synthetics watermark is not the AI reset's to clear",
+            );
+        }
+    }
+
+    /// An empty slice touches nothing, whether the guard runs or sea-query renders `1 = 2`.
+    #[tokio::test]
+    async fn no_features_stamps_no_row_and_reads_nothing() {
+        let db = db().await;
+        seed_checkpoint(&db, "acme", AI, 80).await;
+
+        assert!(
+            !update_notified_checkpoint_in(&db, "acme", 95, &[])
+                .await
+                .unwrap(),
+            "a write that reached no row must not report itself as the winning claim",
+        );
+
+        assert_eq!(checkpoint_of(&db, "acme", AI).await, 80);
+        assert!(load_all_checkpoints_in(&db, &[]).await.unwrap().is_empty(),);
     }
 
     #[tokio::test]

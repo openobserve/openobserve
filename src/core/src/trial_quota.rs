@@ -497,7 +497,7 @@ pub async fn set_limit_for_pool(
     )
     .await?;
     if usage_limit > previous_limit {
-        reset_checkpoint(org_id).await;
+        reset_checkpoint(org_id, pool.feature_keys()).await;
     }
     set_cached_limit(org_id, pool, usage_limit);
 
@@ -1186,11 +1186,15 @@ pub fn pending_checkpoint_from(pct: u8, already_notified: u8) -> Option<u8> {
     highest_reached
 }
 
-/// Atomically mark a checkpoint as notified for an org in the DB.
+/// Atomically mark ONE pool's checkpoint as notified for an org in the DB.
 /// Returns true if this pod won the update (no other pod set it first).
-pub async fn mark_checkpoint_notified(org_id: &str, checkpoint: u8) -> bool {
-    match infra::table::trial_quota_usage::update_notified_checkpoint(org_id, checkpoint as i16)
-        .await
+pub async fn mark_checkpoint_notified(org_id: &str, checkpoint: u8, features: &[&str]) -> bool {
+    match infra::table::trial_quota_usage::update_notified_checkpoint(
+        org_id,
+        checkpoint as i16,
+        features,
+    )
+    .await
     {
         Ok(updated) => updated,
         Err(e) => {
@@ -1200,10 +1204,12 @@ pub async fn mark_checkpoint_notified(org_id: &str, checkpoint: u8) -> bool {
     }
 }
 
-/// Reset checkpoint tracking for an org (e.g., when credits are refilled).
-pub async fn reset_checkpoint(org_id: &str) {
-    if let Err(e) = infra::table::trial_quota_usage::reset_notified_checkpoint(org_id).await {
-        log::error!("[AI_QUOTA] Failed to reset checkpoint for org={org_id}: {e}");
+/// Reset checkpoint tracking for ONE pool of an org (e.g., when its grant is raised).
+pub async fn reset_checkpoint(org_id: &str, features: &[&str]) {
+    if let Err(e) =
+        infra::table::trial_quota_usage::reset_notified_checkpoint(org_id, features).await
+    {
+        log::error!("[TRIAL_QUOTA] Failed to reset checkpoint for org={org_id}: {e}");
     }
 }
 
@@ -1275,6 +1281,17 @@ pub async fn init_from_db() {
     }
 }
 
+/// One org's synthetics spend and the grant it was spent against, per pool.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SyntheticsQuota {
+    pub browser_used: u64,
+    pub browser_limit: u64,
+    pub protocol_used: u64,
+    pub protocol_limit: u64,
+    pub status_used: u64,
+    pub status_limit: u64,
+}
+
 /// Every `trial_quota_usage.feature` value that spends from a synthetics pool.
 ///
 /// Composed from the pools' own `feature_keys`, never hand-written: it has to
@@ -1293,10 +1310,31 @@ pub fn all_synthetics_features() -> Vec<&'static str> {
 /// An org missing from the answer is UNGATED at the scheduler, so a failed read
 /// returns nothing at all rather than a map of zeroes.
 pub async fn synthetics_remaining_for_orgs(org_ids: Vec<String>) -> HashMap<String, StepRemaining> {
+    let Some((rows, month)) = read_synthetics_rows(&org_ids).await else {
+        return HashMap::new();
+    };
+    fold_synthetics_remaining(&org_ids, &rows, month)
+}
+
+/// Each requested org's synthetics spend and grant, for the `_meta` org listing — SPEC §11 #5.
+///
+/// A failed read answers with nothing: this node's own counters are not the source of truth.
+pub async fn synthetics_quota_for_orgs(org_ids: Vec<String>) -> HashMap<String, SyntheticsQuota> {
+    let Some((rows, month)) = read_synthetics_rows(&org_ids).await else {
+        return HashMap::new();
+    };
+    fold_synthetics_quota(&org_ids, &rows, month)
+}
+
+/// The rows both batched readers fold, and the month to read them in — `None` when the table
+/// cannot be reached, so neither reader can resolve a month the other would not.
+async fn read_synthetics_rows(
+    org_ids: &[String],
+) -> Option<(Vec<infra::table::entity::trial_quota_usage::Model>, i32)> {
     let conn = infra::db::get_orm_client_ro().await;
     let rows = match infra::table::trial_quota_usage::get_for_orgs(
         conn,
-        &org_ids,
+        org_ids,
         &all_synthetics_features(),
     )
     .await
@@ -1304,14 +1342,13 @@ pub async fn synthetics_remaining_for_orgs(org_ids: Vec<String>) -> HashMap<Stri
         Ok(rows) => rows,
         Err(e) => {
             log::error!("[TRIAL_QUOTA] synthetics counter read failed: {e}");
-            return HashMap::new();
+            return None;
         }
     };
-    fold_synthetics_remaining(
-        &org_ids,
-        &rows,
+    Some((
+        rows,
         infra::table::trial_quota_usage::month_of(config::utils::time::now_micros()),
-    )
+    ))
 }
 
 /// `month` is the reader's, `now`'s; the writer stamps the window START's, so the two differ
@@ -1321,6 +1358,29 @@ pub(crate) fn fold_synthetics_remaining(
     rows: &[infra::table::entity::trial_quota_usage::Model],
     month: i32,
 ) -> HashMap<String, StepRemaining> {
+    fold_synthetics_quota(org_ids, rows, month)
+        .into_iter()
+        .map(|(org_id, quota)| {
+            (
+                org_id,
+                // A lowered limit leaves usage above it, so a plain subtraction is a panic.
+                StepRemaining {
+                    browser: quota.browser_limit.saturating_sub(quota.browser_used),
+                    protocol: quota.protocol_limit.saturating_sub(quota.protocol_used),
+                    status: quota.status_limit.saturating_sub(quota.status_used),
+                },
+            )
+        })
+        .collect()
+}
+
+/// The spend and the grant every requested org's rows resolve to, per pool — the one place
+/// either reader decides what an org's effective limit is.
+pub(crate) fn fold_synthetics_quota(
+    org_ids: &[String],
+    rows: &[infra::table::entity::trial_quota_usage::Model],
+    month: i32,
+) -> HashMap<String, SyntheticsQuota> {
     let mut used: HashMap<(&str, TrialQuotaPool), u64> = HashMap::new();
     let mut limits: HashMap<(&str, TrialQuotaPool), u64> = HashMap::new();
     for row in rows {
@@ -1344,21 +1404,29 @@ pub(crate) fn fold_synthetics_remaining(
     org_ids
         .iter()
         .map(|org_id| {
-            // A lowered limit leaves usage above it, so a plain subtraction is a panic.
-            let left = |pool| {
+            let spent = |pool| {
                 // The row's override beats `ORG_LIMITS`, which is empty until the first refresh.
-                limits
+                let limit = limits
                     .get(&(org_id.as_str(), pool))
                     .copied()
-                    .unwrap_or_else(|| get_pool_limit(org_id, pool))
-                    .saturating_sub(used.get(&(org_id.as_str(), pool)).copied().unwrap_or(0))
+                    .unwrap_or_else(|| get_pool_limit(org_id, pool));
+                (
+                    used.get(&(org_id.as_str(), pool)).copied().unwrap_or(0),
+                    limit,
+                )
             };
+            let (browser_used, browser_limit) = spent(TrialQuotaPool::SyntheticsBrowserSteps);
+            let (protocol_used, protocol_limit) = spent(TrialQuotaPool::SyntheticsProtocolSteps);
+            let (status_used, status_limit) = spent(TrialQuotaPool::SyntheticsStatusProtocol);
             (
                 org_id.clone(),
-                StepRemaining {
-                    browser: left(TrialQuotaPool::SyntheticsBrowserSteps),
-                    protocol: left(TrialQuotaPool::SyntheticsProtocolSteps),
-                    status: left(TrialQuotaPool::SyntheticsStatusProtocol),
+                SyntheticsQuota {
+                    browser_used,
+                    browser_limit,
+                    protocol_used,
+                    protocol_limit,
+                    status_used,
+                    status_limit,
                 },
             )
         })
@@ -1392,6 +1460,18 @@ mod tests {
 
     const STEPS: TrialQuotaFeature = TrialQuotaFeature::SyntheticsBrowserSteps;
 
+    /// The one read behind both batched entry points.
+    const SYNTHETICS_READER: &str = "fn read_synthetics_rows(";
+
+    /// Each batched synthetics read and the fold it is a thin wrapper around.
+    const BATCHED_READS: [(&str, &str); 2] = [
+        (
+            "fn synthetics_remaining_for_orgs(",
+            "fold_synthetics_remaining(",
+        ),
+        ("fn synthetics_quota_for_orgs(", "fold_synthetics_quota("),
+    ];
+
     /// CODE only: a comment naming what a scan forbids would trip that scan on its own text.
     fn code_only_source() -> String {
         include_str!("trial_quota.rs")
@@ -1417,6 +1497,83 @@ mod tests {
             }
         }
         panic!("`{needle}` call is never closed");
+    }
+
+    /// The text after `signature`, up to the closing brace of the item it opens.
+    fn fn_body<'a>(source: &'a str, signature: &str) -> &'a str {
+        let body = source
+            .split_once(signature)
+            .unwrap_or_else(|| panic!("`{signature}` must live in this file"))
+            .1;
+        let end = body.find("\n}\n").expect("end of the function");
+        &body[..end]
+    }
+
+    /// rustfmt is free to break an argument list across lines, so every scan of one compares
+    /// against this.
+    fn without_whitespace(text: &str) -> String {
+        text.chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
+    /// Whether `body` reads a pool off this node's own cache rather than the table.
+    fn reads_the_node_cache(body: &str) -> bool {
+        // Assembled at runtime so this file is not itself a call site to the workspace scan.
+        ["get_used", "get_limit", "get_remaining"]
+            .into_iter()
+            .any(|reader| body.contains(&[reader, "_for_pool("].concat()))
+    }
+
+    /// Whether `args` hands `param` on, as itself or as something read off it — a token scan, so
+    /// `all_features()` does not read as the `features` the frame was given.
+    fn passes_through(args: &str, param: &str) -> bool {
+        args.split(|c: char| !c.is_alphanumeric() && c != '_')
+            .any(|token| token == param)
+    }
+
+    /// The name of the `index`-th parameter the function `signature` opens declares.
+    fn parameter(source: &str, signature: &str, index: usize) -> String {
+        call_args(source, signature)
+            .split(',')
+            .nth(index)
+            .unwrap_or_else(|| panic!("`{signature}` must declare {} parameters", index + 1))
+            .split(':')
+            .next()
+            .expect("a parameter name")
+            .trim()
+            .to_string()
+    }
+
+    /// What `name` is bound to in `body`, up to the `;` that ends its `let`.
+    fn binding_value<'a>(body: &'a str, name: &str) -> Option<&'a str> {
+        let mut rest = body;
+        loop {
+            let at = rest.find("let ")? + "let ".len();
+            rest = &rest[at..];
+            let declared = rest.trim_start_matches("mut ");
+            let end = declared
+                .find(|c: char| !c.is_alphanumeric() && c != '_')
+                .unwrap_or(declared.len());
+            if &declared[..end] == name {
+                let value = declared[end..].split_once('=')?.1;
+                return Some(&value[..value.find(';')?]);
+            }
+        }
+    }
+
+    /// Whether `args` hands on ALL of `expr` — as the expression itself, or as a binding assigned
+    /// it — so hoisting is fine and an index that narrows it to one element is not.
+    fn hands_on_all(body: &str, args: &str, expr: &str) -> bool {
+        let expr = without_whitespace(expr);
+        let args = without_whitespace(args);
+        let handed = args.trim_end_matches(',').trim_start_matches('&');
+        if handed.contains('[') {
+            return false;
+        }
+        handed == expr
+            || binding_value(body, handed).is_some_and(|bound| {
+                let bound = without_whitespace(bound);
+                bound.trim_start_matches('&') == expr
+            })
     }
 
     /// Every `.rs` file under the workspace `src/` that mentions one of `needles`, comments
@@ -1455,6 +1612,26 @@ mod tests {
             }
         }
         found
+    }
+
+    /// Every workspace call of `needles` as `(path, argument text)`; a definition proves nothing
+    /// about what a caller passes, so the `fn` that declares one is skipped.
+    fn workspace_call_sites(needles: &[String]) -> Vec<(String, String)> {
+        let mut sites = Vec::new();
+        for (path, code) in &workspace_code_mentioning(needles) {
+            for needle in needles {
+                let mut rest = code.as_str();
+                while let Some(at) = rest.find(needle.as_str()) {
+                    let start = code.len() - rest.len() + at;
+                    rest = &rest[at..];
+                    if !code[..start].trim_end().ends_with("fn") {
+                        sites.push((path.clone(), call_args(rest, needle).to_string()));
+                    }
+                    rest = &rest[needle.len()..];
+                }
+            }
+        }
+        sites
     }
 
     /// `TrialQuotaFeature::pool` and `TrialQuotaPool::feature_keys` MUST agree,
@@ -2085,8 +2262,9 @@ mod tests {
         }
     }
 
-    /// The sync readers answer from a counter a monthly pool has no entry in, so a call site
-    /// passing one reads the whole allowance back for an org that already spent its month.
+    /// The sync readers answer from a counter a monthly pool has no entry in, so any workspace
+    /// call site passing one — this module's own included — reads the whole allowance back for
+    /// an org that already spent its month.
     #[test]
     fn no_call_site_reads_a_monthly_pool_from_the_sync_readers() {
         // Assembled at runtime so this test's own source is not itself a call site.
@@ -2095,40 +2273,19 @@ mod tests {
             ["get_used", "_for_pool("].concat(),
         ];
         let monthly = ["Synthetics", "StatusProtocol"].concat();
-        let mut call_sites = 0usize;
-        let mut outside_this_module = 0usize;
-        for (path, code) in &workspace_code_mentioning(&needles) {
-            let defining_module = path.ends_with("core/src/trial_quota.rs");
-            for needle in &needles {
-                let mut rest = code.as_str();
-                while let Some(at) = rest.find(needle.as_str()) {
-                    let start = code.len() - rest.len() + at;
-                    rest = &rest[at..];
-                    // The needle hits the `pub fn` that defines it too, and a definition proves
-                    // nothing about what any caller passes.
-                    if !code[..start].trim_end().ends_with("fn") {
-                        call_sites += 1;
-                        outside_this_module += usize::from(!defining_module);
-                        assert!(
-                            !call_args(rest, needle).contains(&monthly),
-                            "{path}: the monthly pool has no in-memory counter, so this reads \
-                             the full allowance for an org that spent its month — use \
-                             get_pool_usage or the batched synthetics fold",
-                        );
-                    }
-                    rest = &rest[needle.len()..];
-                }
-            }
+        let sites = workspace_call_sites(&needles);
+        for (path, args) in &sites {
+            assert!(
+                !args.contains(&monthly),
+                "{path}: the monthly pool has no in-memory counter, so this reads the full \
+                 allowance for an org that spent its month — use get_pool_usage or the batched \
+                 synthetics fold",
+            );
         }
         assert!(
-            call_sites > 0,
+            !sites.is_empty(),
             "the scan inspected no call site at all: every match was the definition itself, so \
              the ban above cannot fail",
-        );
-        assert!(
-            outside_this_module > 0,
-            "the scan reached {call_sites} call site(s), all inside this module; it no longer \
-             sees the callers it exists to police",
         );
     }
 
@@ -2137,12 +2294,7 @@ mod tests {
     #[test]
     fn the_pool_usage_read_is_month_aware() {
         let source = code_only_source();
-        let body = source
-            .split_once("pub async fn get_pool_usage(")
-            .expect("the pool usage read must live in this file")
-            .1;
-        let end = body.find("\n}\n").expect("end of the pool usage read");
-        let body = &body[..end];
+        let body = fn_body(&source, "pub async fn get_pool_usage(");
 
         assert!(
             call_args(body, "get_total_usage_for_org(").contains("month"),
@@ -2186,12 +2338,7 @@ mod tests {
     #[test]
     fn every_ha_branch_acks_before_it_skips() {
         let source = code_only_source();
-        let body = source
-            .split_once("pub async fn subscribe_ha_queue(")
-            .expect("the HA subscriber must live in this file")
-            .1;
-        let end = body.find("\n}\n").expect("end of the HA subscriber");
-        let body = &body[..end];
+        let body = fn_body(&source, "pub async fn subscribe_ha_queue(");
 
         let skips = body.matches("continue;").count();
         assert!(skips > 0, "the subscriber no longer skips anything: {body}");
@@ -2228,37 +2375,96 @@ mod tests {
         );
     }
 
-    /// `fold_synthetics_remaining`'s `month` is a literal in every test, so nothing else ties
-    /// the reader's month to the `period` the upsert writes.
+    /// The folds' `month` is a literal in every test, so nothing else ties either reader's month
+    /// to the `period` the upsert writes.
     #[test]
     fn the_read_takes_its_month_from_the_writers_own_encoding() {
         let source = code_only_source();
-        // The first match is the definition, so nothing below this line is ever scanned.
-        let body = source
-            .split_once("fn synthetics_remaining_for_orgs(")
-            .expect("the batched read must live in this file")
-            .1;
-        let end = body.find("\n}\n").expect("end of the batched read");
-        let body = &body[..end];
-
-        assert!(
-            call_args(body, "fold_synthetics_remaining(").contains("month_of("),
-            "0 or any other literal in that argument reads `period == month` as false for every \
-             live row; a `month_of` computed beside the fold but never passed in is the same bug",
-        );
         // Assembled at runtime so the guard cannot match its own text.
         let local_time = ["Local", "::"].concat();
-        let year = ["year", "()"].concat();
-        let month = ["month", "()"].concat();
+        let year_call = ["year", "()"].concat();
+        let month_call = ["month", "()"].concat();
+        // The first match is the definition, so nothing below it is ever scanned.
+        let reader = fn_body(&source, SYNTHETICS_READER);
         assert!(
-            !body.contains(&local_time),
+            reader.contains("month_of("),
+            "the shared read carries the month both folds are handed, so a month resolved \
+             anywhere else is a second encoding",
+        );
+        assert!(
+            !reader.contains(&local_time),
             "the upsert stamps a UTC month, so a local-time month disagrees with it for up to \
              a day either side of every boundary",
         );
         assert!(
-            !(body.contains(&year) && body.contains(&month)),
+            !(reader.contains(&year_call) && reader.contains(&month_call)),
             "a second YYYYMM encoding here is the drift `month_of` exists to prevent",
         );
+        for (read, fold) in BATCHED_READS {
+            let body = fn_body(&source, read);
+            assert!(
+                !body.contains("month_of("),
+                "{read}: a month resolved beside the fold drifts from the one the other entry \
+                 point folds with; both take the shared read's",
+            );
+            assert!(
+                !body.contains(&local_time),
+                "{read}: the upsert stamps a UTC month, so a local-time month disagrees with it \
+                 for up to a day either side of every boundary",
+            );
+            assert!(
+                !(body.contains(&year_call) && body.contains(&month_call)),
+                "{read}: a second YYYYMM encoding here is the drift `month_of` exists to prevent",
+            );
+            assert!(
+                passes_through(call_args(body, fold), "month"),
+                "{read}: 0 or any other literal in that argument reads `period == month` as \
+                 false for every live row",
+            );
+        }
+    }
+
+    /// One read, every synthetics key, and nothing at all when it fails: a fall back to the node's
+    /// own counters answers with a grant no other node agrees on.
+    #[test]
+    fn a_batched_read_answers_from_the_table_or_not_at_all() {
+        let source = code_only_source();
+        let reader = fn_body(&source, SYNTHETICS_READER);
+        let args = call_args(reader, "get_for_orgs(");
+        assert!(
+            args.contains("all_synthetics_features()"),
+            "a read narrowed to one pool's `feature_keys()` reports `used = 0` for every other \
+             pool, and nothing in the answer says those rows were never asked for",
+        );
+        assert!(
+            passes_through(args, &parameter(&source, SYNTHETICS_READER, 0)),
+            "the read must ask about the orgs this frame was given",
+        );
+        assert!(
+            without_whitespace(reader).contains("returnNone;"),
+            "a failed read answers with nothing, so both entry points hand back an empty map \
+             instead of a number the table never granted",
+        );
+        assert!(
+            !reads_the_node_cache(reader),
+            "the shared read answers from this node's own cache, which no other node agrees with",
+        );
+        for (read, _) in BATCHED_READS {
+            let body = fn_body(&source, read);
+            assert!(
+                body.contains(SYNTHETICS_READER.trim_start_matches("fn ")),
+                "{read}: the shared read is the only source either entry point has",
+            );
+            assert!(
+                without_whitespace(body).contains("returnHashMap::new();"),
+                "{read}: a failed read answers with an empty map — the listing then reports \
+                 zeros for the page instead of a number the table never granted",
+            );
+            assert!(
+                !reads_the_node_cache(body),
+                "{read}: this node's own cache is not a grant the table ever made",
+            );
+        }
     }
 
     /// Absent from the map means UNGATED at the gate, so "has not used it yet" must not land there.
@@ -2402,6 +2608,158 @@ mod tests {
         );
     }
 
+    /// Defect #5: the listing reports USED and LIMIT, so the grant it names must be the one the
+    /// same rows' spend was measured against — the row's own override, not a stale cache.
+    #[test]
+    fn fold_synthetics_quota_reports_each_pools_spend_against_its_own_grant() {
+        let org_id = steps_org("quota-pools", 4_000);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 1_000);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsStatusProtocol, 50_000);
+        // The pool's two rows carry different grants, so first-, last- and min-wins each differ.
+        let mut pre_split = db_row(&org_id, "synthetics_steps", 300);
+        pre_split.usage_limit = Some(5_000);
+        let mut protocol = db_row(&org_id, "synthetics_protocol_steps", 200);
+        protocol.usage_limit = Some(9_000);
+        let rows = vec![
+            db_row(&org_id, "synthetics_browser_steps", 900),
+            pre_split,
+            protocol,
+            db_status_row(&org_id, 12_480, 202609),
+        ];
+
+        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows, 202609);
+        let q = quota.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            (q.browser_used, q.browser_limit),
+            (900, 4_000),
+            "a pool's spend is its own rows against its own grant; the two must come from the \
+             same pool",
+        );
+        assert_eq!(
+            (q.protocol_used, q.protocol_limit),
+            (500, 9_000),
+            "both protocol feature keys draw down one grant, and an admin's row-level raise is \
+             the grant they were spent against — the cache still says 1,000; the read has no \
+             ORDER BY, so anything but the largest of a pool's rows reports a grant the gate is \
+             not enforcing",
+        );
+        assert_eq!((q.status_used, q.status_limit), (12_480, 50_000));
+
+        let next_month = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows, 202610);
+        let q = next_month.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            (q.status_used, q.status_limit),
+            (0, 50_000),
+            "September's count reported as October's spend shows an admin a month the org has \
+             already left, and the next limit is sized against it",
+        );
+    }
+
+    /// E14's force-deduct lets `usage_count` pass `usage_limit`, and the admin sizing the next
+    /// grant needs the org's real spend, not the grant it already spent past.
+    #[test]
+    fn fold_synthetics_quota_reports_the_spend_past_an_exhausted_grant() {
+        let org_id = steps_org("quota-saturate", 10);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 10);
+        let rows = vec![
+            db_row(&org_id, "synthetics_browser_steps", 4_000),
+            db_row(&org_id, "synthetics_protocol_steps", 11),
+        ];
+
+        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows, 202610);
+        let q = quota.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            (q.browser_used, q.browser_limit),
+            (4_000, 10),
+            "`used` written as `limit - remaining` saturates to the limit here, so the listing \
+             reports a spend of 10 for an org that spent 4,000",
+        );
+        assert_eq!((q.protocol_used, q.protocol_limit), (11, 10));
+    }
+
+    /// An org with no rows has not used the feature; a listing that leaves it out shows a blank
+    /// where the grant is.
+    #[test]
+    fn fold_synthetics_quota_gives_every_requested_org_an_entry() {
+        let org_id = steps_org("quota-empty", 700);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 900);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsStatusProtocol, 50_000);
+        let other = steps_org("quota-other", 5);
+
+        let quota = fold_synthetics_quota(
+            std::slice::from_ref(&org_id),
+            &[db_row(&other, "synthetics_browser_steps", 4)],
+            202610,
+        );
+
+        assert_eq!(
+            quota.len(),
+            1,
+            "the fold answers about the orgs it was handed; an extra entry is a row for an org \
+             this page never asked about",
+        );
+        let q = quota
+            .get(&org_id)
+            .expect("an org with no rows has not used the feature — it is not absent");
+        assert_eq!((q.browser_used, q.browser_limit), (0, 700));
+        assert_eq!((q.protocol_used, q.protocol_limit), (0, 900));
+        assert_eq!((q.status_used, q.status_limit), (0, 50_000));
+    }
+
+    /// Defect #5: the listing's numbers are the table's, and the node's own counter cannot move
+    /// them.
+    #[test]
+    fn the_quota_a_listing_reports_follows_the_row_not_the_node() {
+        let org_id = steps_org("quota-follows-db", 4_000);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 1_000);
+        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsStatusProtocol, 50_000);
+        apply_to_pool_counter(&org_id, TrialQuotaPool::SyntheticsBrowserSteps, 7);
+        let mut browser = db_row(&org_id, "synthetics_browser_steps", 900);
+        browser.usage_limit = Some(6_000);
+        // The larger of the pool's two grants comes FIRST here and last in the fold's own test.
+        let mut protocol = db_row(&org_id, "synthetics_protocol_steps", 200);
+        protocol.usage_limit = Some(9_000);
+        let mut pre_split = db_row(&org_id, "synthetics_steps", 300);
+        pre_split.usage_limit = Some(5_000);
+        let rows = vec![
+            browser,
+            protocol,
+            pre_split,
+            db_status_row(&org_id, 12_480, 202610),
+        ];
+
+        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows, 202610);
+        let q = quota.get(&org_id).expect("the org was requested");
+        assert_eq!(
+            q.browser_used, 900,
+            "this node's counter says 7 and the next node's says 0; the row is the only number \
+             they agree on",
+        );
+
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows, 202610);
+        let r = remaining.get(&org_id).expect("the org was requested");
+        // Every pool here is under its grant, so the two halves must add back up to it.
+        assert_eq!(
+            (q.browser_used + r.browser, q.browser_limit),
+            (6_000, 6_000),
+            "an org under its grant spends the row's own override, not the 4,000 the cache \
+             still holds; a pair that does not add up means the two folds resolved different \
+             limits from one row",
+        );
+        assert_eq!(
+            (q.protocol_used + r.protocol, q.protocol_limit),
+            (9_000, 9_000),
+            "the raise is recorded on one of the pool's two rows, and the gate and the listing \
+             must find the same one",
+        );
+        assert_eq!(
+            (q.status_used + r.status, q.status_limit),
+            (50_000, 50_000),
+            "the monthly pool falls back to the cached grant, and both folds must fall back to \
+             the same one",
+        );
+    }
+
     /// **A5.** A dropped flush record is counted under its own pool's label.
     /// Reached through a function pointer so the call does not count towards
     /// `every_dropped_pool_record_is_counted` below.
@@ -2458,6 +2816,58 @@ mod tests {
         assert!(
             body[..end].contains(&["record_flush", "_drop("].concat()),
             "the dropped record is no longer counted; A5 has nothing to alert on",
+        );
+    }
+
+    /// Spec §11.1: the limit write beside it is bounded by the pool it was handed, so a reset
+    /// that is not wipes the AI watermark of an org whose synthetics grant was raised.
+    #[test]
+    fn the_checkpoint_reset_is_scoped_to_the_pool_whose_limit_moved() {
+        let source = code_only_source();
+        // Assembled at runtime so this test's own source is not what the scan finds.
+        let reset = ["reset", "_checkpoint("].concat();
+        let limit_write = "pub async fn set_limit_for_pool(";
+        let keys = format!("{}.feature_keys()", parameter(&source, limit_write, 1));
+        let body = fn_body(&source, limit_write);
+        let features = call_args(body, &reset)
+            .split_once(',')
+            .map_or(String::new(), |(_, rest)| rest.to_string());
+        assert!(
+            hands_on_all(body, &features, &keys),
+            "`seed_feature` is ONE key of the pool and the pre-split `synthetics_steps` row is \
+             another, so a reset handed one of `{keys}` leaves the other row's watermark armed \
+             — the limit write beside it is bounded by all of them",
+        );
+
+        let definition = ["pub async fn reset", "_checkpoint("].concat();
+        assert!(
+            passes_through(
+                call_args(fn_body(&source, &definition), "reset_notified_checkpoint("),
+                &parameter(&source, &definition, 1),
+            ),
+            "the pool stops at this frame and the UPDATE below it is org-wide again",
+        );
+    }
+
+    /// Every caller resets ONE pool; an argument that spans them all is the org-wide wipe again,
+    /// wearing a feature filter.
+    #[test]
+    fn no_call_site_resets_a_checkpoint_across_pools() {
+        // Assembled at runtime so this test's own source is not itself a call site.
+        let needle = ["reset", "_checkpoint("].concat();
+        let cross_pool = ["all_synthetics_features", "ALL_POOLS", "flat_map", "&[]"];
+        let sites = workspace_call_sites(std::slice::from_ref(&needle));
+        for (path, args) in &sites {
+            let features = without_whitespace(args.split_once(',').map_or("", |(_, rest)| rest));
+            assert!(
+                !features.is_empty() && !cross_pool.iter().any(|shape| features.contains(shape)),
+                "{path}: `{args}` clears the watermark of every pool the org has, not the one \
+                 whose limit moved",
+            );
+        }
+        assert!(
+            !sites.is_empty(),
+            "the scan inspected no call site at all, so the ban above cannot fail",
         );
     }
 

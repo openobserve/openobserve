@@ -175,14 +175,15 @@ async fn run_ai_quota_check() {
 }
 
 async fn check_all_orgs_ai_quota() {
-    use openobserve_core::trial_quota;
+    use openobserve_core::trial_quota::{self, TrialQuotaPool};
 
+    let ai_features = TrialQuotaPool::AiCredits.feature_keys();
     let orgs = db::schema::list_organizations_from_cache().await;
 
     // Pre-fetch all notified checkpoints in a single GROUP-BY query to avoid
     // one DB round-trip per org (N+1).
     let all_checkpoints: HashMap<String, i16> =
-        match infra::table::trial_quota_usage::load_all_checkpoints().await {
+        match infra::table::trial_quota_usage::load_all_checkpoints(ai_features).await {
             Ok(rows) => rows.into_iter().collect(),
             Err(e) => {
                 log::error!("[AI_QUOTA] Failed to load checkpoints: {e}");
@@ -199,7 +200,7 @@ async fn check_all_orgs_ai_quota() {
         };
 
         // Atomically claim this checkpoint in DB — only one pod wins
-        if !trial_quota::mark_checkpoint_notified(&org_id, checkpoint).await {
+        if !trial_quota::mark_checkpoint_notified(&org_id, checkpoint, ai_features).await {
             // Another pod already sent this checkpoint email
             continue;
         }
