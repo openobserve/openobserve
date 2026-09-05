@@ -140,7 +140,7 @@ pub struct AnomalyAlertFields {
     pub training_window_days: Option<i32>,
     /// 0 = never retrain automatically; otherwise days between retrains
     pub retrain_interval_days: Option<i32>,
-    /// Percentile threshold (50.0–99.9), default 95.0; also accepts `threshold` as an integer.
+    /// Percentile threshold (50.0–99.9), default 97.0; also accepts `threshold` as an integer.
     #[serde(
         default,
         alias = "threshold",

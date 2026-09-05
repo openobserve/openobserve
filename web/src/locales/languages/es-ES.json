@@ -7251,7 +7251,7 @@
       "sensitivityHintEveryNDays": "Marca el {rate}% de intervalos más inusuales: aproximadamente uno cada {count} días con resolución de {resolution}.",
       "sensitivityHintPerDay": "Marca el {rate}% de intervalos más inusuales: unos {count} al día con resolución de {resolution}. | Marca el {rate}% de intervalos más inusuales: unos {count} al día con resolución de {resolution}.",
       "sensitivityRange": "Introduce un número entero entre 50 y 99",
-      "sensitivityTooltip": "Cuán inusual debe ser un bucket para que se marque, como percentil de las puntuaciones de entrenamiento del modelo. 95 marca el 5 % más inusual. Cada bucket marcado envía una alerta, así que un valor más bajo detecta más incidentes reales y envía más alertas.",
+      "sensitivityTooltip": "Cuán inusual debe ser un bucket para que se marque, como percentil de las puntuaciones de entrenamiento del modelo. 97 marca el 3 % más inusual. Cada bucket marcado envía una alerta, así que un valor más bajo marca más buckets y envía más alertas.",
       "seriesAnomaly": "Anomalía",
       "seriesDeviation": "Desviación",
       "seriesScore": "Puntuación",

@@ -424,7 +424,7 @@ pub async fn create_config(
         training_window_days: req.training_window_days.unwrap_or(7),
         retrain_interval_days: req.retrain_interval_days.unwrap_or(7),
         // Whole-number percentiles suffice; the model clamps to 50–99.9 regardless.
-        threshold: req.percentile.unwrap_or(95.0).clamp(50.0, 99.9) as i32,
+        threshold: req.percentile.unwrap_or(97.0).clamp(50.0, 99.9) as i32,
         is_trained: false,
         training_started_at: None,
         training_completed_at: None,

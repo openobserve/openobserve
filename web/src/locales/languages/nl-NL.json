@@ -7251,7 +7251,7 @@
       "sensitivityHintEveryNDays": "Markeert de {rate}% meest ongebruikelijke intervallen — ongeveer één per {count} dagen bij een resolutie van {resolution}.",
       "sensitivityHintPerDay": "Markeert de {rate}% meest ongebruikelijke intervallen — ongeveer {count} per dag bij een resolutie van {resolution}. | Markeert de {rate}% meest ongebruikelijke intervallen — ongeveer {count} per dag bij een resolutie van {resolution}.",
       "sensitivityRange": "Voer een geheel getal tussen 50 en 99 in",
-      "sensitivityTooltip": "Hoe ongebruikelijk een bucket moet zijn voordat deze wordt gemarkeerd, als een percentiel van de trainingsscores van het model. 95 markeert de meest ongebruikelijke 5%. Elke gemarkeerde bucket verstuurt een melding, dus een lagere waarde vangt meer echte incidenten en verstuurt meer meldingen.",
+      "sensitivityTooltip": "Hoe ongebruikelijk een bucket moet zijn voordat deze wordt gemarkeerd, als een percentiel van de trainingsscores van het model. 97 markeert de meest ongebruikelijke 3%. Elke gemarkeerde bucket verstuurt een melding, dus een lagere waarde markeert meer buckets en verstuurt meer meldingen.",
       "seriesAnomaly": "Anomalie",
       "seriesDeviation": "Afwijking",
       "seriesScore": "Score",

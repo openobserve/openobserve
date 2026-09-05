@@ -7251,7 +7251,7 @@
       "sensitivityHintEveryNDays": "En olağan dışı {rate}% aralığı işaretler — {resolution} çözünürlükte yaklaşık {count} günde bir.",
       "sensitivityHintPerDay": "En olağan dışı {rate}% aralığı işaretler — {resolution} çözünürlükte günde yaklaşık {count} adet. | En olağan dışı {rate}% aralığı işaretler — {resolution} çözünürlükte günde yaklaşık {count} adet.",
       "sensitivityRange": "50 ile 99 arasında bir tam sayı girin",
-      "sensitivityTooltip": "Bir aralığın işaretlenmeden önce ne kadar olağandışı olması gerektiği, modelin eğitim puanlarının bir yüzdelik dilimi olarak ifade edilir. 95, en olağandışı %5'i işaretler. İşaretlenen her aralık bir uyarı gönderir; bu nedenle daha düşük bir değer daha fazla gerçek olayı yakalar ve daha fazla uyarı gönderir.",
+      "sensitivityTooltip": "Bir aralığın işaretlenmeden önce ne kadar olağandışı olması gerektiği, modelin eğitim puanlarının bir yüzdelik dilimi olarak ifade edilir. 97, en olağandışı %3'ü işaretler. İşaretlenen her aralık bir uyarı gönderir; bu nedenle daha düşük bir değer daha fazla aralığı işaretler ve daha fazla uyarı gönderir.",
       "seriesAnomaly": "Anomali",
       "seriesDeviation": "Sapma",
       "seriesScore": "Puan",

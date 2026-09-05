@@ -7251,7 +7251,7 @@
       "sensitivityHintEveryNDays": "标记最异常的 {rate}% 时间桶——在 {resolution} 分辨率下约每 {count} 天 1 个。",
       "sensitivityHintPerDay": "标记最异常的 {rate}% 时间桶——在 {resolution} 分辨率下每天约 {count} 个。",
       "sensitivityRange": "请输入 50 到 99 之间的整数",
-      "sensitivityTooltip": "一个数据桶在被标记前需要有多异常，以模型训练分数的百分位数表示。95 会标记最异常的 5%。每个被标记的数据桶都会发送告警，因此取值越低，捕获的真实故障越多，发出的告警也越多。",
+      "sensitivityTooltip": "一个数据桶在被标记前需要有多异常，以模型训练分数的百分位数表示。97 会标记最异常的 3%。每个被标记的数据桶都会发送告警，因此取值越低，被标记的数据桶越多，发出的告警也越多。",
       "seriesAnomaly": "异常",
       "seriesDeviation": "偏差",
       "seriesScore": "分数",

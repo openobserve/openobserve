@@ -44,10 +44,10 @@ const ALL_LOCALES: Array<[string, Json]> = readdirSync(dir)
 const en = read("en-US.json");
 
 // Kept in step with sensitivityTiers in AnomalyDetectionConfig.vue.
-const BALANCED_PERCENTILE = 95;
+const BALANCED_PERCENTILE = 97;
 
-// The default this replaced; no locale may still quote it as the current one.
-const RETIRED_PERCENTILE = 97;
+// The reverted retune's default; no locale may still quote it as the current one.
+const RETIRED_PERCENTILE = 95;
 
 const at = (root: Json, path: string): unknown =>
   path.split(".").reduce<unknown>((node, key) => (node as Json | undefined)?.[key], root);
@@ -191,5 +191,24 @@ describe("anomaly sensitivity locale parity", () => {
     expect(tooltip).toContain("alert");
     expect(tooltip).toMatch(/lower value|lowering/);
     expect(tooltip).toContain("more alerts");
+  });
+
+  // A threshold sweep found recall flat across p90-p97, so lowering flags more, it detects no more.
+  it("en-US does not claim a lower percentile catches more incidents", () => {
+    const tooltip = String(at(en, "alerts.anomaly.sensitivityTooltip")).toLowerCase();
+    for (const claim of [
+      "catches more",
+      "catch more",
+      "more incidents",
+      "more real incidents",
+      "detects more",
+      "detect more",
+      "finds more",
+      "find more",
+      "miss fewer",
+      "misses fewer",
+    ]) {
+      expect(tooltip).not.toContain(claim);
+    }
   });
 });

@@ -7251,7 +7251,7 @@
       "sensitivityHintEveryNDays": "Signale les {rate}% d'intervalles les plus inhabituels, soit environ un tous les {count} jours à une résolution de {resolution}.",
       "sensitivityHintPerDay": "Signale les {rate}% d'intervalles les plus inhabituels, soit environ {count} par jour à une résolution de {resolution}. | Signale les {rate}% d'intervalles les plus inhabituels, soit environ {count} par jour à une résolution de {resolution}.",
       "sensitivityRange": "Saisissez un nombre entier entre 50 et 99",
-      "sensitivityTooltip": "À quel point un compartiment doit être inhabituel avant d'être signalé, en tant que percentile des scores d'entraînement du modèle. 95 signale les 5 % les plus inhabituels. Chaque compartiment signalé déclenche une alerte : une valeur plus basse détecte donc davantage d'incidents réels et envoie davantage d'alertes.",
+      "sensitivityTooltip": "À quel point un compartiment doit être inhabituel avant d'être signalé, en tant que percentile des scores d'entraînement du modèle. 97 signale les 3 % les plus inhabituels. Chaque compartiment signalé déclenche une alerte : une valeur plus basse signale donc davantage de compartiments et envoie davantage d'alertes.",
       "seriesAnomaly": "Anomalie",
       "seriesDeviation": "Écart",
       "seriesScore": "Score",

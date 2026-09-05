@@ -7251,7 +7251,7 @@
       "sensitivityHintEveryNDays": "Đánh dấu {rate}% khoảng bất thường nhất — khoảng {count} ngày một lần ở độ phân giải {resolution}.",
       "sensitivityHintPerDay": "Đánh dấu {rate}% khoảng bất thường nhất — khoảng {count} mỗi ngày ở độ phân giải {resolution}.",
       "sensitivityRange": "Nhập số nguyên từ 50 đến 99",
-      "sensitivityTooltip": "Mức độ bất thường mà một bucket phải đạt để bị gắn cờ, được tính theo phân vị của điểm số huấn luyện của mô hình. 95 gắn cờ 5% bất thường nhất. Mỗi bucket bị gắn cờ đều gửi một cảnh báo, nên giá trị thấp hơn phát hiện được nhiều sự cố thực tế hơn và gửi nhiều cảnh báo hơn.",
+      "sensitivityTooltip": "Mức độ bất thường mà một bucket phải đạt để bị gắn cờ, được tính theo phân vị của điểm số huấn luyện của mô hình. 97 gắn cờ 3% bất thường nhất. Mỗi bucket bị gắn cờ đều gửi một cảnh báo, nên giá trị thấp hơn gắn cờ nhiều bucket hơn và gửi nhiều cảnh báo hơn.",
       "seriesAnomaly": "Bất thường",
       "seriesDeviation": "Độ lệch",
       "seriesScore": "Điểm",
