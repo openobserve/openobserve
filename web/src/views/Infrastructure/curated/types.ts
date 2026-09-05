@@ -74,6 +74,12 @@ export interface CuratedPanelDef {
   titleKey: I18nKey;
   type: "line" | "area-stacked" | "bar" | "metric" | "gauge" | "table";
   unit: string;
+  /**
+   * Suffix for `unit: "custom"`. A percentage hides magnitude — 46% of 92 cores and
+   * 46% of 4 cores are not the same emergency — so a panel reporting an absolute
+   * quantity names its unit rather than leaving the reader to infer the scale.
+   */
+  unitCustom?: string;
   groupId: string;
   variants: PanelVariant[];
   /** 192-col grid cell; x/y flow-computed per section (§5.5). */

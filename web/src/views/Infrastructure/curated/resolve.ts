@@ -991,7 +991,7 @@ function buildPanel(
     show_legends: true,
     legends_position: "bottom",
     unit: panel.unit,
-    unit_custom: null,
+    unit_custom: panel.def.unitCustom ?? null,
     // Rebuilt from the SUBSTITUTED query and the variant that won — the authored one carries tokens and variant 1's stream.
     drilldown: (panel.def.drilldown ?? []).map((entry) =>
       entry.name === "openInMetricsExplorer" && queries[0]

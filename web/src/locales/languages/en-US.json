@@ -16410,7 +16410,7 @@
         "podsIdleMemRequest": "Pods under 20% of memory request (now)",
         "cpuReserved": "CPU reserved of allocatable (now)",
         "cpuLimitsOfAllocatable": "CPU limits of allocatable (now)",
-        "cpuReservedTrend": "CPU reserved vs allocatable",
+        "cpuReservedTrend": "CPU reserved vs allocatable (cores)",
         "containersOverLimitTop": "Top 20 pods over memory limit (now)",
         "cpuWasteTop": "Top 20 pods by unused CPU request (now)",
         "memWasteTop": "Top 20 pods by unused memory request (now)",
@@ -16428,7 +16428,8 @@
         "statefulSetsShortTop": "Top 20 StatefulSets short of replicas (now)",
         "daemonSetsUnavailableTop": "Top 20 DaemonSets with unavailable pods (now)",
         "jobsFailedTop": "Top 20 failed Jobs (now)",
-        "volumeClaimsUnboundTop": "Top 20 unbound volume claims (now)"
+        "volumeClaimsUnboundTop": "Top 20 unbound volume claims (now)",
+        "cpuFree": "CPU cores free to schedule (now)"
       }
     }
   },

@@ -903,38 +903,40 @@ export const kubernetesPage: CuratedPageManifest = {
         ),
         panel(
           {
-            id: "k8s_ut_cpu_overcommit",
-            titleKey: "infra.k8s.panel.cpuLimitsOfAllocatable",
+            id: "k8s_ut_cpu_free",
+            titleKey: "infra.k8s.panel.cpuFree",
             type: "metric",
-            unit: "percent-1",
+            unit: "custom",
+            unitCustom: " cores",
             groupId: "kube-state",
             layout: { w: 32, h: 6 },
             fleetWide: ["namespace"],
             variants: [
               {
                 requiresStreams: [
-                  "kube_pod_container_resource_limits",
                   "kube_node_status_allocatable",
+                  "kube_pod_container_resource_requests",
                 ],
                 queryType: "promql",
                 queryMode: "instant",
                 queries: [
                   {
-                    query: `sum(kube_pod_container_resource_limits{\${scope:cluster},resource="cpu"}) / sum(kube_node_status_allocatable{\${scope:cluster},resource="cpu"})`,
+                    query: `sum(kube_node_status_allocatable{\${scope:cluster},resource="cpu"}) - sum(kube_pod_container_resource_requests{\${scope:cluster},resource="cpu"})`,
                     legend: "",
                   },
                 ],
               },
             ],
           },
-          "kube_pod_container_resource_limits",
+          "kube_node_status_allocatable",
         ),
         panel(
           {
             id: "k8s_ut_commit_trend",
             titleKey: "infra.k8s.panel.cpuReservedTrend",
             type: "line",
-            unit: "percent-1",
+            unit: "custom",
+            unitCustom: " cores",
             groupId: "kube-state",
             layout: { w: 96, h: 16 },
             fleetWide: ["namespace"],
@@ -947,8 +949,12 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryType: "promql",
                 queries: [
                   {
-                    query: `sum(kube_pod_container_resource_requests{\${scope:cluster},resource="cpu"}) / sum(kube_node_status_allocatable{\${scope:cluster},resource="cpu"})`,
-                    legend: "",
+                    query: `sum(kube_pod_container_resource_requests{\${scope:cluster},resource="cpu"})`,
+                    legend: "reserved",
+                  },
+                  {
+                    query: `sum(kube_node_status_allocatable{\${scope:cluster},resource="cpu"})`,
+                    legend: "allocatable",
                   },
                 ],
               },

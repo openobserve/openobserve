@@ -57,7 +57,7 @@ const TILE_IDS = [
   "k8s_ut_cpu_idle_pods",
   "k8s_ut_mem_idle_pods",
   "k8s_ut_cpu_commit",
-  "k8s_ut_cpu_overcommit",
+  "k8s_ut_cpu_free",
 ];
 
 const TABLE_IDS = [
@@ -86,7 +86,11 @@ describe("utilization — shape", () => {
     // has a drift alternative, so one variant is the correct shape.
     for (const p of panels()) {
       expect(p.variants.length, `${p.id} must declare exactly one variant`).toBe(1);
-      expect(p.variants[0].queries.length, `${p.id} must declare exactly one query`).toBe(1);
+      // The trend plots reserved AND allocatable as separate series: a single ratio
+      // line shows 54% but never the two quantities, so a rise cannot be read as
+      // "requests grew" or "capacity shrank".
+      const expected = p.id === "k8s_ut_commit_trend" ? 2 : 1;
+      expect(p.variants[0].queries.length, `${p.id} query count`).toBe(expected);
     }
   });
 
@@ -281,6 +285,9 @@ describe("utilization — units render ratios as percentages", () => {
   // this section that is a ratio is 0..1, so `percent` would render the measured
   // 0.589 fleet commitment as "0.59%" instead of "58.9%". Lint rule 7 only checks
   // the unit is a REAL option; it cannot tell which of the two is correct here.
+  /** Panels whose value is an absolute quantity, not a ratio. */
+  const ABSOLUTE_PANELS = ["k8s_ut_cpu_free", "k8s_ut_commit_trend"];
+
   const COUNT_PANELS = [
     "k8s_ut_over_limit",
     "k8s_ut_near_limit",
@@ -290,8 +297,6 @@ describe("utilization — units render ratios as percentages", () => {
 
   const RATIO_PANELS = [
     "k8s_ut_cpu_commit",
-    "k8s_ut_cpu_overcommit",
-    "k8s_ut_commit_trend",
     "k8s_ut_over_limit_top",
     "k8s_ut_cpu_waste_top",
     "k8s_ut_mem_waste_top",
@@ -301,6 +306,19 @@ describe("utilization — units render ratios as percentages", () => {
   it("every ratio panel uses percent-1, never percent", () => {
     for (const id of RATIO_PANELS) {
       expect(panel(id).unit, `${id} renders a 0..1 ratio`).toBe("percent-1");
+    }
+  });
+
+  it("absolute panels carry their unit, so the number states its own scale", () => {
+    // A percentage hides magnitude: 46% of 92 cores (39.8 free) and 46% of 4 cores
+    // are not the same emergency. Measured on common-dev: 52.22 reserved of 92.04
+    // allocatable. Cluster-level panels can show real units because BOTH operands
+    // are kube-state; pod-level ratio tables cannot, since kubeletstats publishes
+    // only ratios and the absolute limit lives in kube-state, which this engine
+    // cannot join (label_replace is a no-op here).
+    for (const id of ABSOLUTE_PANELS) {
+      expect(panel(id).unit, `${id} must render a real unit`).toBe("custom");
+      expect(panel(id).unitCustom, `${id} must name its unit`).toBeTruthy();
     }
   });
 
@@ -321,7 +339,7 @@ describe("utilization — units render ratios as percentages", () => {
   it("every panel in the section is classified as either a ratio or a count", () => {
     // Both lists are hand-maintained literals. Without this, a 12th panel is
     // silently unpinned and lint rule 7 would accept `percent` on a 0..1 ratio.
-    expect([...RATIO_PANELS, ...COUNT_PANELS].sort()).toEqual(
+    expect([...RATIO_PANELS, ...COUNT_PANELS, ...ABSOLUTE_PANELS].sort()).toEqual(
       panels()
         .map((p: any) => p.id)
         .sort(),
@@ -346,7 +364,7 @@ describe("utilization — group assignment follows the collector, per panel", ()
   ];
   const KUBE_STATE_PANELS = [
     "k8s_ut_cpu_commit",
-    "k8s_ut_cpu_overcommit",
+    "k8s_ut_cpu_free",
     "k8s_ut_commit_trend",
     "k8s_ut_node_commit_top",
   ];
@@ -409,10 +427,17 @@ describe("utilization — fleet-wide tiles are declared, never silent", () => {
     expect(clauses[0]).toContain("${f:k8s-node-name}");
   });
 
-  it("the trend and the commitment tile read the same ratio, differing only in mode", () => {
-    // Byte-identical queries in two panels are the classic drift pair: edit one,
-    // forget the other, and the tab contradicts itself.
-    expect(queriesOf("k8s_ut_commit_trend")).toEqual(queriesOf("k8s_ut_cpu_commit"));
+  it("the trend plots absolute cores, while the tile reports the ratio", () => {
+    // Deliberately NOT the same query any more. A single ratio line shows 54% but
+    // never the two quantities behind it, so a rise cannot be read as "requests
+    // grew" or "capacity shrank"; the trend now carries both series in cores.
+    expect(panel("k8s_ut_commit_trend").unit).toBe("custom");
+    // Leading space: formatUnitValue concatenates value+unit with no separator
+    // (convertDataIntoUnitValue.ts:254), which rendered "47.54cores".
+    expect(panel("k8s_ut_commit_trend").unitCustom).toBe(" cores");
+    expect(panel("k8s_ut_cpu_commit").unit).toBe("percent-1");
+    const legends = panel("k8s_ut_commit_trend").variants[0].queries.map((q: any) => q.legend);
+    expect(legends).toEqual(["reserved", "allocatable"]);
   });
 
   it("the node-commitment table is fleet-wide by namespace and says so", () => {
@@ -493,7 +518,7 @@ describe("utilization — requiresStreams completeness", () => {
       k8s_ut_cpu_idle_pods: "k8s_pod_cpu_request_utilization",
       k8s_ut_mem_idle_pods: "k8s_pod_memory_request_utilization",
       k8s_ut_cpu_commit: "kube_pod_container_resource_requests",
-      k8s_ut_cpu_overcommit: "kube_pod_container_resource_limits",
+      k8s_ut_cpu_free: "kube_node_status_allocatable",
       k8s_ut_commit_trend: "kube_pod_container_resource_requests",
       k8s_ut_over_limit_top: "k8s_pod_memory_limit_utilization",
       k8s_ut_cpu_waste_top: "k8s_pod_cpu_request_utilization",
