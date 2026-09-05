@@ -584,6 +584,14 @@ export function resolveManifest(args: ResolveArgs): CuratedResolution {
     const entry = listFor(source.streamType).get(source.stream);
     if (!entry || !isLive(entry)) continue;
 
+    // `omitWhenFieldAbsent` TESTS the resolved field against this stream's schema,
+    // so the schema must actually be fetched. A rung-1 override resolves without
+    // consulting any schema (and deliberately registers none — the host drawer
+    // depends on that), which left this check reading an EMPTY field set and
+    // dropping a picker whose field is really there. Registering only the streams
+    // that will be tested keeps rung 1's zero-fetch promise everywhere else.
+    if (picker.omitWhenFieldAbsent) schemasNeeded.add(source.stream);
+
     const group = groupById.get(source.groupId);
     if (!group) continue;
     const schemaFields = schemaFieldsOf(source.streamType, source.stream);

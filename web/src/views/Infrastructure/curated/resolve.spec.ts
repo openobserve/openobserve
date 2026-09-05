@@ -1110,6 +1110,18 @@ describe("§5.5 scope pickers", () => {
     expect((dashboard.variables?.list ?? []).some((v: any) => v.name === "cluster")).toBe(false);
   });
 
+  it("an omitWhenFieldAbsent picker REGISTERS its source schema, even on a rung-1 override", () => {
+    // Browser-verified regression: the cluster picker resolves k8s_cluster from the
+    // kube-state rung-1 override, which deliberately consults no schema and (before
+    // this fix) registered none. omitWhenFieldAbsent then tested the field against an
+    // UNFETCHED schema, which arrives as an empty set, so the field read as absent and
+    // the picker vanished from the page — no warning, no hidden-group entry.
+    const resolution = resolve({});
+    const picker: any = kubernetesPage.scopePickers.find((p: any) => p.name === "cluster");
+    expect(picker.omitWhenFieldAbsent, "guards this contract").toBe(true);
+    expect(resolution.schemasNeeded).toContain(picker.valuesFrom.stream);
+  });
+
   it("(b) a picker whose valuesFrom.stream is ABSENT from the list is omitted", () => {
     // Drop BOTH source streams: `pod` sources from the kubeletstats stream, while
     // `cluster` and `namespace` source from kube_pod_status_phase.
