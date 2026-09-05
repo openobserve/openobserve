@@ -896,7 +896,7 @@ describe("CuratedPageView", () => {
       );
     });
 
-    // The "— no data" tile state renders ON the tile (§6.3), so it is pinned in
+    // The "No Data" tile state renders ON the tile (§6.3), so it is pinned in
     // PanelContainer.spec.ts against the real series-data-update seam rather
     // than a page-level footnote list. The phase disclosure is NOT a tile
     // concern — it is a fact about the trio, so it is a section-level line.
