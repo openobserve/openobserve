@@ -617,7 +617,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryMode: "instant",
                 queries: [
                   {
-                    query: `topk(20, clamp_min(1 - sum by (${CLUSTER}, ${NS}, ${POD}) (k8s_pod_cpu_request_utilization{\${scope:cluster},\${scope:namespace}}), 0))`,
+                    query: `topk(20, clamp_min(1 - sum by (${CLUSTER}, ${NS}, ${POD}) (k8s_pod_cpu_request_utilization{\${scope:cluster},\${scope:namespace}} > 0), 0))`,
                     legend: `{${CLUSTER}} {${NS}}/{${POD}}`,
                   },
                 ],
@@ -641,7 +641,7 @@ export const kubernetesPage: CuratedPageManifest = {
                 queryMode: "instant",
                 queries: [
                   {
-                    query: `topk(20, clamp_min(1 - sum by (${CLUSTER}, ${NS}, ${POD}) (k8s_pod_memory_request_utilization{\${scope:cluster},\${scope:namespace}}), 0))`,
+                    query: `topk(20, clamp_min(1 - sum by (${CLUSTER}, ${NS}, ${POD}) (k8s_pod_memory_request_utilization{\${scope:cluster},\${scope:namespace}} > 0), 0))`,
                     legend: `{${CLUSTER}} {${NS}}/{${POD}}`,
                   },
                 ],
