@@ -95,10 +95,16 @@ use std::{
     time::Duration,
 };
 
-use config::{META_ORG_ID, cluster::LOCAL_NODE, meta::synthetics::SyntheticFrequency};
+use config::{
+    cluster::LOCAL_NODE,
+    meta::{
+        self_reporting::usage::{RunOutcome, TriggerData, TriggerDataType},
+        synthetics::SyntheticFrequency,
+    },
+};
 use infra::{
     db::get_orm_client_ro,
-    table::{org_ingestion_tokens, synthetics_checks, synthetics_checks::OrphanCandidate},
+    table::{synthetics_checks, synthetics_checks::OrphanCandidate},
 };
 
 use crate::alerting::ERROR_SOURCE_ORPHAN;
@@ -124,20 +130,10 @@ const MIN_GRACE_US: i64 = 300 * 1_000_000; // 5 min
 const SCAN_LIMIT: u64 = 1_000;
 
 /// Most reports one pass will write. Beyond this the remainder is logged and
-/// left for a later pass — the cooldown map only records what was delivered, so
-/// nothing carries over as silence, and a fleet-wide failure cannot turn one
-/// pass into a thousand sequential HTTP round trips.
+/// left for a later pass — the deferred ones keep no cooldown, so nothing
+/// carries over as silence, and a fleet-wide failure cannot flood the reporting
+/// queue with a thousand rows in one pass.
 const MAX_REPORTS_PER_PASS: usize = 200;
-
-/// Wall-clock ceiling on the reporting phase.
-///
-/// [`MAX_REPORTS_PER_PASS`] alone bounds the pass at 200 x 2 writes x
-/// [`HTTP_TIMEOUT`], which is over an hour if the ingest endpoint is accepting
-/// connections and never answering. Passes cannot overlap, so that is an hour
-/// with no scan — the detector would be down in exactly the way it is supposed
-/// to make visible. Which orgs get served under either limit is arbitrary; the
-/// deferred ones keep no cooldown, so the next pass picks them up.
-const REPORT_BUDGET: Duration = Duration::from_secs(60);
 
 /// Minimum gap between two reports for the same check.
 const RENOTIFY_AFTER_US: i64 = 3_600 * 1_000_000; // 1h
@@ -147,10 +143,6 @@ const RENOTIFY_AFTER_US: i64 = 3_600 * 1_000_000; // 1h
 /// [`MIN_GRACE_US`], so a finer cadence buys no earlier detection and costs a
 /// full table scan every 30 seconds.
 const ORPHAN_TICK: Duration = Duration::from_secs(300);
-
-/// Ceiling on one stream write. `reqwest`'s default is no timeout at all, which
-/// is what made running this inline on the reaper's tick unsafe.
-const HTTP_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Whether orphan detection should run, read fresh on every pass.
 pub fn orphan_detection_enabled() -> bool {
@@ -299,12 +291,11 @@ async fn is_scan_leader() -> bool {
 /// put it.
 ///
 /// The reaper owes the system "every job it terminates has its run completed
-/// exactly once". This scan is up to [`SCAN_LIMIT`] rows x two HTTP writes
-/// each; sharing a task with `requeue_expired` / `dead_letter_expired` /
-/// `prune_stale` means a slow ingest endpoint stalls run accounting, and runs
-/// that never complete never notify. A separate loop cannot do that, and it is
-/// free to run at a cadence that suits the threshold instead of the lease
-/// timers.
+/// exactly once". This scan is a full [`SCAN_LIMIT`]-row table read; sharing a
+/// task with `requeue_expired` / `dead_letter_expired` / `prune_stale` means a
+/// slow scan stalls run accounting, and runs that never complete never notify.
+/// A separate loop cannot do that, and it is free to run at a cadence that
+/// suits the threshold instead of the lease timers.
 pub async fn run() {
     tracing::info!("[synthetics orphan] started");
     if !orphan_detection_enabled() {
@@ -313,14 +304,6 @@ pub async fn run() {
              loop still runs, so a config reload turns it back on without a restart"
         );
     }
-
-    let client = match reqwest::Client::builder().timeout(HTTP_TIMEOUT).build() {
-        Ok(c) => c,
-        Err(e) => {
-            tracing::error!("[synthetics orphan] http client build failed, not starting: {e}");
-            return;
-        }
-    };
 
     // Renotify cooldown, keyed by check id. Lives outside the loop because the
     // whole point is to remember across passes; `plan_reports` prunes it.
@@ -346,21 +329,14 @@ pub async fn run() {
         }
 
         let db = get_orm_client_ro().await;
-        detect(
-            db,
-            &client,
-            config::utils::time::now_micros(),
-            &mut last_reported,
-        )
-        .await;
+        detect(db, config::utils::time::now_micros(), &mut last_reported).await;
     }
 }
 
-/// One pass: scan, decide, publish, report. Metrics go out before the writes so
-/// an unreachable ingest endpoint cannot take the observability with it.
+/// One pass: scan, decide, publish, report. Metrics go out before the reports so
+/// a stalled reporting queue cannot take the observability with it.
 async fn detect(
     db: &sea_orm::DatabaseConnection,
-    client: &reqwest::Client,
     now_us: i64,
     last_reported: &mut HashMap<String, i64>,
 ) {
@@ -391,38 +367,15 @@ async fn detect(
 
     publish_orphan_gauge(&orphans);
 
-    // Unconditional, and BEFORE the writes. This counts "the detector read its
+    // Unconditional, and BEFORE the reports. This counts "the detector read its
     // region and reached a verdict" — including the verdict "nothing is wrong",
-    // without which a healthy region is indistinguishable from a dead one. It
-    // is deliberately not gated on the writes landing: an unresponsive ingest
-    // endpoint can stretch the reporting phase to [`REPORT_BUDGET`], and a
-    // liveness signal that a second subsystem can silence is not one.
+    // without which a healthy region is indistinguishable from a dead one.
     config::metrics::SYNTHETICS_ORPHAN_SCANS_TOTAL.inc();
 
     let by_org = plan_reports(&orphans, &seen, last_reported, now_us);
 
     if !by_org.is_empty() {
-        // One lookup per pass. The `_meta` half of every report authenticates as
-        // `_meta`, not as the reporting org: ingest auth resolves the token
-        // against the URL's org (`find_enabled_token(org_id, token)`), so org1's
-        // token posted to `/api/_meta/...` matches no row and the write 401s.
-        let meta_token = match org_ingestion_tokens::find_default_enabled(META_ORG_ID).await {
-            Ok(Some(t)) => Some(t.token),
-            Ok(None) => {
-                tracing::warn!(
-                    "[synthetics orphan] no enabled ingest token for {META_ORG_ID} — reporting to \
-                     each org only"
-                );
-                None
-            }
-            Err(e) => {
-                tracing::error!(
-                    "[synthetics orphan] {META_ORG_ID} ingest token lookup failed: {e}"
-                );
-                None
-            }
-        };
-        report(client, by_org, meta_token.as_deref(), now_us, last_reported).await;
+        report(by_org, now_us, last_reported).await;
     }
 }
 
@@ -449,49 +402,18 @@ fn publish_orphan_gauge(orphans: &[(OrphanCandidate, i64)]) {
     }
 }
 
-/// Writes the planned reports and records the cooldown for the ones that landed.
+/// Writes the planned reports and records each one's cooldown.
 async fn report(
-    client: &reqwest::Client,
     by_org: HashMap<&str, Vec<&(OrphanCandidate, i64)>>,
-    meta_token: Option<&str>,
     now_us: i64,
     last_reported: &mut HashMap<String, i64>,
 ) {
-    let api_endpoint = config::meta::synthetics::api_endpoint();
-    let started = tokio::time::Instant::now();
     let mut budget = MAX_REPORTS_PER_PASS;
     let mut deferred = 0usize;
-    let exhausted = |budget: usize| budget == 0 || started.elapsed() >= REPORT_BUDGET;
 
     for (org_id, rows) in by_org {
-        if exhausted(budget) {
-            deferred += rows.len();
-            continue;
-        }
-
-        // One org without a usable token must not cost the other orgs their
-        // reports, so this skips rather than returns — the difference from
-        // `handle_dead_letter`, which only ever handles one org's row.
-        let ingest_token = match org_ingestion_tokens::find_default_enabled(org_id).await {
-            Ok(Some(t)) => t.token,
-            Ok(None) => {
-                tracing::warn!(
-                    org_id = %org_id,
-                    "[synthetics orphan] no enabled ingest token — skipping orphan reports"
-                );
-                continue;
-            }
-            Err(e) => {
-                tracing::error!(
-                    org_id = %org_id,
-                    "[synthetics orphan] ingest token lookup failed: {e}"
-                );
-                continue;
-            }
-        };
-
         for (c, overdue_us) in rows {
-            if exhausted(budget) {
+            if budget == 0 {
                 deferred += 1;
                 continue;
             }
@@ -505,130 +427,42 @@ async fn report(
                 "[synthetics orphan] enabled check has not been claimed by any scheduler"
             );
 
-            let delivered = write_orphan_trigger(
-                client,
-                &api_endpoint,
-                &ingest_token,
-                meta_token,
-                c,
-                now_us,
-                overdue_secs,
-            )
-            .await;
-
-            // The cooldown starts on DELIVERY, never on the attempt. A stale
-            // token or a down ingest endpoint would otherwise convert a dropped
-            // write into an hour of enforced silence — the exact failure this
-            // module exists to prevent, caused by the module itself.
-            if delivered {
-                last_reported.insert(c.id.clone(), now_us);
-            }
+            usage_reporting::publish_triggers_usage(orphan_trigger(c, now_us, overdue_secs));
+            // The internal channel is fire-and-forget: enqueue is the only signal to start from.
+            last_reported.insert(c.id.clone(), now_us);
         }
     }
 
     if deferred > 0 {
         tracing::warn!(
             deferred,
-            "[synthetics orphan] this pass spent its report count or time budget; the rest carry \
-             over to a later pass"
+            "[synthetics orphan] this pass spent its report count budget; the rest carry over to \
+             a later pass"
         );
     }
 }
 
-/// Writes one orphan report to the org's triggers stream and to `_meta`.
-///
-/// Returns whether the ORG write was accepted. The `_meta` copy is a
-/// platform-operator convenience; the org's own stream is the record the
-/// customer's alert rules read, so only that one may start a cooldown.
-///
-/// Deliberately the same shape and transport as the dead-letter report
-/// (`write_triggers_stream`), so this needs no new stream, schema or plumbing.
-async fn write_orphan_trigger(
-    client: &reqwest::Client,
-    api_endpoint: &str,
-    ingest_token: &str,
-    meta_token: Option<&str>,
-    c: &OrphanCandidate,
-    now_us: i64,
-    overdue_secs: i64,
-) -> bool {
-    let trigger_record = serde_json::json!([{
-        "_timestamp": now_us,
-        "org": c.org_id,
-        "module": "synthetics",
-        "key": format!("{}/{}", c.name, c.id),
-        "next_run_at": c.next_run_at,
-        "is_realtime": false,
-        "is_silenced": false,
-        "status": "failed",
-        "start_time": now_us,
-        "end_time": now_us,
-        // The stable field an alert rule filters on. The dead-letter path writes
-        // this same stream with the same `status` and no `error_source` at all,
-        // so without this the two are separable only by a substring match on the
-        // free-text `error` — and they need different responses. "Nobody
-        // scheduled this" points at the control plane; "a probe took it and went
-        // quiet" points at the probe fleet.
-        "error_source": ERROR_SOURCE_ORPHAN,
-        "error": format!(
+/// One orphan report, in the same stream and the same shape as the reaper's
+/// dead letter — no new stream, schema or plumbing.
+fn orphan_trigger(c: &OrphanCandidate, now_us: i64, overdue_secs: i64) -> TriggerData {
+    TriggerData {
+        _timestamp: now_us,
+        org: c.org_id.clone(),
+        module: TriggerDataType::Synthetics,
+        key: format!("{}/{}", c.name, c.id),
+        next_run_at: c.next_run_at,
+        status: RunOutcome::Error,
+        start_time: now_us,
+        end_time: now_us,
+        error: Some(format!(
             "no scheduler claimed this enabled check for {overdue_secs}s — more than \
              {ORPHAN_INTERVALS} of its own intervals. A scheduler is running in this region (it \
              produced this report), so it is up and not claiming: check for an unparseable check \
              row failing the whole claim, or for scheduler errors in the log."
-        ),
-    }]);
-
-    let org_url = format!("{api_endpoint}/api/{}/triggers/_json", c.org_id);
-    let delivered = post_trigger(client, &org_url, ingest_token, &trigger_record, c).await;
-
-    if let Some(meta_token) = meta_token {
-        let meta_url = format!("{api_endpoint}/api/{META_ORG_ID}/triggers/_json");
-        post_trigger(client, &meta_url, meta_token, &trigger_record, c).await;
-    }
-
-    delivered
-}
-
-/// Posts one record and says whether ingest actually took it.
-///
-/// A non-2xx is checked explicitly because `send()` resolves to `Ok` for a 401
-/// as readily as for a 200 — treating the transport error as the only failure
-/// meant a mis-scoped token dropped every report and logged nothing.
-async fn post_trigger(
-    client: &reqwest::Client,
-    url: &str,
-    token: &str,
-    body: &serde_json::Value,
-    c: &OrphanCandidate,
-) -> bool {
-    match client
-        .post(url)
-        .basic_auth("ingest", Some(token))
-        .json(body)
-        .send()
-        .await
-    {
-        Ok(resp) if resp.status().is_success() => true,
-        Ok(resp) => {
-            let status = resp.status();
-            let body = resp.text().await.unwrap_or_default();
-            tracing::error!(
-                synthetics_id = %c.id,
-                url = %url,
-                %status,
-                "[synthetics orphan] triggers stream write rejected: {}",
-                body.chars().take(512).collect::<String>()
-            );
-            false
-        }
-        Err(e) => {
-            tracing::error!(
-                synthetics_id = %c.id,
-                url = %url,
-                "[synthetics orphan] triggers stream write failed: {e}"
-            );
-            false
-        }
+        )),
+        // `orphan`, `dispatch`, `quota` and `trial` share this stream and this `status`.
+        error_source: Some(ERROR_SOURCE_ORPHAN.to_string()),
+        ..TriggerData::default()
     }
 }
 
@@ -661,13 +495,17 @@ mod tests {
 
         config::CONFIG.store(saved);
     }
-    use config::meta::synthetics::{SyntheticFrequency, SyntheticFrequencyType};
+    use config::meta::{
+        self_reporting::usage::{RunOutcome, TriggerDataType},
+        synthetics::{SyntheticFrequency, SyntheticFrequencyType},
+    };
     use infra::table::synthetics_checks::OrphanCandidate;
 
     use super::{
-        HashMap, HashSet, MIN_GRACE_US, ORPHAN_INTERVALS, RENOTIFY_AFTER_US, anchor_us,
-        grace_deadline_us, overdue_by_us, plan_reports,
+        ERROR_SOURCE_ORPHAN, HashMap, HashSet, MIN_GRACE_US, ORPHAN_INTERVALS, RENOTIFY_AFTER_US,
+        anchor_us, grace_deadline_us, orphan_trigger, overdue_by_us, plan_reports,
     };
+    use crate::test_source::{block_from, code_only, production};
 
     /// Minute-aligned, so the cron tests get exact slot boundaries out of
     /// `schedule.after()` instead of a partial first interval.
@@ -1090,7 +928,67 @@ mod tests {
         assert_eq!(planned["org2"].len(), 1);
         assert!(
             last.is_empty(),
-            "planning must not record a cooldown — only delivery may"
+            "planning must not record a cooldown — only the report pass may"
+        );
+    }
+
+    /// 22 — the internal channel is fire-and-forget, so the cooldown starts on ENQUEUE.
+    #[test]
+    fn the_cooldown_is_recorded_once_per_report() {
+        let src = code_only(production(include_str!("orphan.rs")));
+        // Assembled at runtime so this test's own text cannot satisfy the scan.
+        let pass = ["async fn re", "port("].concat();
+        let at = src
+            .find(pass.as_str())
+            .expect("the report pass must still be a function of its own");
+        let (open, end) = block_from(&src, at);
+        let body = &src[open..end];
+
+        assert_eq!(
+            body.matches(&["last_reported", ".insert("].concat())
+                .count(),
+            1,
+            "one cooldown write per report: none re-reports a persistent orphan every pass, two \
+             is one silence too many",
+        );
+        assert!(
+            !body.contains("delivered"),
+            "`publish_triggers_usage` returns `()`, so there is no delivery signal left to gate \
+             the cooldown on and a survivor is a gate on something else",
+        );
+    }
+
+    /// §11.3: all three failure paths share one stream and one status, separable only by source.
+    #[test]
+    fn the_orphan_report_keeps_every_field_its_json_carried() {
+        let c = candidate(NOW - ONE_HOUR_US, 0, 0);
+        let trigger = orphan_trigger(&c, NOW, 3_600);
+
+        assert_eq!(trigger.error_source.as_deref(), Some(ERROR_SOURCE_ORPHAN));
+        assert_eq!(
+            trigger.next_run_at, c.next_run_at,
+            "the slot nobody claimed is what makes this row triageable",
+        );
+        assert_eq!(trigger.module, TriggerDataType::Synthetics);
+        assert_eq!(trigger.status, RunOutcome::Error);
+        assert_eq!(trigger.org, "org1");
+        assert_eq!(trigger.key, "Login Flow/chk-1");
+        assert_eq!(trigger._timestamp, NOW);
+        assert_eq!(trigger.start_time, NOW);
+        assert_eq!(trigger.end_time, NOW);
+        assert!(
+            trigger
+                .error
+                .as_deref()
+                .unwrap_or_default()
+                .contains("3600s"),
+            "the overdue span is the whole report",
+        );
+
+        let wire = serde_json::to_value(&trigger).expect("the orphan report must serialize");
+        assert_eq!(
+            wire["status"], "error",
+            "an alert rule matches the SERIALIZED value, and this row writes `failed` today",
         );
     }
 }

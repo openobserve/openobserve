@@ -665,6 +665,8 @@ mod tests {
             level: None,
             group_label: None,
             value_is_lower_bound: None,
+            error_source: None,
+            location: None,
         }
     }
 
@@ -760,7 +762,7 @@ mod tests {
 
         let before = (
             count(UsageEvent::SyntheticsBrowserSteps),
-            count(UsageEvent::SyntheticsFreeBrowserSteps),
+            count(UsageEvent::SyntheticsProtocolSteps),
         );
         record(UsageEvent::SyntheticsBrowserSteps, &"channel closed");
 
@@ -770,10 +772,10 @@ mod tests {
             "A4's counter did not move for the event that was refused",
         );
         assert_eq!(
-            count(UsageEvent::SyntheticsFreeBrowserSteps) - before.1,
+            count(UsageEvent::SyntheticsProtocolSteps) - before.1,
             0,
-            "the failure was attributed to the wrong event — A4 would page for the free pool \
-             while the billable row is the one being lost",
+            "the failure was attributed to the wrong event — A4 would page for protocol steps \
+             while the browser row is the one being lost",
         );
     }
 
