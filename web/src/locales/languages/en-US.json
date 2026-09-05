@@ -16365,7 +16365,7 @@
         "nodes": "Nodes",
         "workloads": "Workloads",
         "utilization": "Utilization",
-        "utilizationNote": "Ratios compare a pod's usage against its own declared request or limit, so a pod that declares no request at all reports no ratio and is invisible to these panels — about a quarter of pods on a typical fleet. Tiles count objects across the whole selected cluster and ignore the namespace filter; the tables below honour it. Every number reads the current instant."
+        "utilizationNote": "Ratios compare a pod's usage against its own declared request or limit, so a pod that declares no request at all reports no ratio and is invisible to these panels. The waste tables also skip pods using no CPU or memory at all — the tiles already count those, and 43 of them tie at 100% waste, which would otherwise fill the table arbitrarily. Tiles count objects across the whole selected cluster and ignore the namespace filter; the tables below honour it. Every number reads the current instant."
       },
       "group": {
         "nodeMetrics": "Node CPU & memory (kubeletstats receiver)",
@@ -16401,14 +16401,14 @@
         "podFilesystem": "Highest filesystem use by pod",
         "podMemLimitPct": "Highest memory-limit use by pod",
         "podRestarts": "Top 20 restarting containers",
-        "containersOverLimit": "Containers over memory limit (now)",
-        "containersNearLimit": "Containers above 90% of memory limit (now)",
+        "containersOverLimit": "Pods over memory limit (now)",
+        "containersNearLimit": "Pods above 90% of memory limit (now)",
         "podsIdleCpuRequest": "Pods under 20% of CPU request (now)",
         "podsIdleMemRequest": "Pods under 20% of memory request (now)",
         "cpuReserved": "CPU reserved of allocatable (now)",
         "cpuLimitsOfAllocatable": "CPU limits of allocatable (now)",
         "cpuReservedTrend": "CPU reserved vs allocatable",
-        "containersOverLimitTop": "Top 20 containers over memory limit (now)",
+        "containersOverLimitTop": "Top 20 pods over memory limit (now)",
         "cpuWasteTop": "Top 20 pods by unused CPU request (now)",
         "memWasteTop": "Top 20 pods by unused memory request (now)",
         "nodeCommitmentTop": "Top 20 nodes by CPU commitment (now)"

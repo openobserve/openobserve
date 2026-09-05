@@ -174,6 +174,37 @@ describe("utilization — waste is topk on the wasted fraction, never bottomk", 
     }
   });
 
+  it("the waste tables group by the pod identity triple, never by a partial key", () => {
+    // The ratio metrics carry k8s_container_name too, so a grouping key that omits
+    // any of (cluster, namespace, pod) would SUM sibling series and inflate the
+    // ratio past 1 — making `1 - ratio` negative for a genuinely idle pod and
+    // letting the clamp hide it. Measured, the triple is 1:1 with the series count
+    // (997/997 cpu, 874/874 mem-request, 817/817 mem-limit), so `sum by` over it is
+    // a passthrough rather than an aggregation.
+    for (const id of ["k8s_ut_cpu_waste_top", "k8s_ut_mem_waste_top", "k8s_ut_over_limit_top"]) {
+      const clause = queriesOf(id)[0].match(/sum by \(([^)]*)\)/);
+      expect(clause, `${id} must aggregate explicitly`).not.toBeNull();
+      const labels = clause![1].split(",").map((l) => l.trim());
+      expect(labels, `${id} groups by a partial identity`).toEqual([
+        "${f:k8s-cluster}",
+        "${f:k8s-namespace}",
+        "${f:k8s-pod-name}",
+      ]);
+    }
+  });
+
+  it("the waste tables exclude pods using nothing at all, or the ranking is arbitrary", () => {
+    // Measured: 43 pods report a CPU-request ratio of exactly 0, so all 43 clamp to
+    // a waste of exactly 1.0 and topk(20) returned 20 rows with ONE distinct value —
+    // an unstable selection that pushes a genuinely interesting pod at 0.97 off the
+    // page. Absolute wasted cores would rank better but needs a kube-state join,
+    // which returns 0 series on this engine, so the degenerate set is excluded
+    // instead; the count tiles already report it.
+    for (const id of ["k8s_ut_cpu_waste_top", "k8s_ut_mem_waste_top"]) {
+      expect(queriesOf(id)[0], `${id} must exclude the zero-usage set`).toMatch(/\}\s*>\s*0\)/);
+    }
+  });
+
   it("the waste fraction is clamped at zero, so over-consuming pods read 0 not negative", () => {
     // Measured: 11 pods exceed their CPU request (max 3.12x), so an unclamped
     // `1 - ratio` reaches -2.12. A "wasted fraction" column showing -212% is
@@ -486,6 +517,7 @@ describe("utilization — the unsized-pod blind spot is disclosed", () => {
     const note = copy(section().noteKey);
     expect(note.toLowerCase()).toContain("request");
     expect(note).toMatch(/no request|without a request|unsized/i);
+    expect(note, "must disclose why the waste tables skip idle pods").toMatch(/skip|exclude/i);
   });
 
   it("the section note explains that tiles ignore the namespace filter", () => {
