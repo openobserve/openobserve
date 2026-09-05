@@ -2,8 +2,9 @@ name: Playwright Bug-Fix Regression Tests
 
 on:
   schedule:
-    # Once a day, after the previous day's merges and before either team starts (08:00 Beijing, 05:30 IST).
-    - cron: '0 0 * * *'
+    # Twice a day, bracketing the IST workday: 11:00 PM IST (17:30 UTC) and 5:00 AM IST (23:30 UTC).
+    - cron: '30 17 * * *'  # 11:00 PM IST
+    - cron: '30 23 * * *'  # 5:00 AM IST
   workflow_dispatch:
 
 concurrency:
