@@ -205,6 +205,19 @@ describe("health — one-hot metrics carry a value test", () => {
     }
   });
 
+  it("every panel filters to a non-zero value, tile and table alike", () => {
+    // Mutation-verified: dropping `> 0` from the DaemonSet tile and the Jobs table
+    // passed all 451 tests. Live, the DaemonSet tile then reads 89 on a fleet where
+    // nothing is unavailable (correct answer: empty), and the Jobs table lists 44
+    // jobs of which 40 failed nothing. Lint rule (e) polices only status=/condition=
+    // selectors, so nothing else guards this.
+    for (const p of panels()) {
+      for (const query of queriesOf(p.id)) {
+        expect(query, `${p.id} would count rows with nothing wrong`).toMatch(/(>\s*0|==\s*1)/);
+      }
+    }
+  });
+
   it("the HPA condition selector asserts == 1 too", () => {
     // status="true" selects the series; the assertion lives in the VALUE.
     const [query] = queriesOf("k8s_wh_hpa_limited");
@@ -233,9 +246,12 @@ describe("health — Jobs never group by reason", () => {
   it("no Job query groups by reason", () => {
     for (const id of ["k8s_wh_jobs_failed", "k8s_wh_jobs_failed_top"]) {
       for (const query of queriesOf(id)) {
-        const clause = query.match(/by \(([^)]*)\)/);
-        if (!clause) continue;
-        expect(clause[1], `${id} must not group Jobs by reason`).not.toContain("reason");
+        // matchAll, not match: a non-global scan reads only the FIRST by(...) clause,
+        // so a second one added later would be invisible. `\bby\s*\(` also accepts
+        // the no-space `by(` spelling PromQL allows.
+        for (const clause of query.matchAll(/\bby\s*\(([^)]*)\)/g)) {
+          expect(clause[1], `${id} must not group Jobs by reason`).not.toContain("reason");
+        }
       }
     }
   });
@@ -264,6 +280,27 @@ describe("health — scope symmetry on multi-operand queries", () => {
         if (!query.includes(" - ")) continue;
         for (const side of operands(query)) {
           expect(side, `${id}: operand without cluster scope`).toContain("${scope:cluster}");
+        }
+      }
+    }
+  });
+
+  it("every arm of an `or` union carries the same scope tokens", () => {
+    // Mutation-verified gap: stripping ${scope:namespace} from ARM 1 only passed all
+    // 451 tests. Lint rule 19 cannot catch it either — it tests token presence per
+    // QUERY STRING, and the mutant still contains the token in arm 2, so the rule
+    // short-circuits. Live, scoped to one namespace, the mutant leaked 3 other
+    // namespaces' failures into the view.
+    for (const id of panels().map((p: any) => p.id)) {
+      for (const query of queriesOf(id)) {
+        if (!query.includes(" or ")) continue;
+        const arms = query.split(" or ");
+        for (const token of ["${scope:cluster}", "${scope:namespace}"]) {
+          const armsWith = arms.filter((a) => a.includes(token)).length;
+          expect(
+            armsWith === 0 || armsWith === arms.length,
+            `${id}: ${token} is on ${armsWith} of ${arms.length} arms`,
+          ).toBe(true);
         }
       }
     }
@@ -349,7 +386,7 @@ describe("health — requiresStreams completeness", () => {
         const declared: string[] = variant.requiresStreams ?? [];
         const used = new Set(
           variant.queries
-            .flatMap((q: any) => [...String(q.query).matchAll(/\bkube_\w+/g)])
+            .flatMap((q: any) => [...String(q.query).matchAll(/\b(?:k8s_pod_\w+|kube_\w+)/g)])
             .map((m: any) => m[0]),
         );
         for (const metric of used) {
