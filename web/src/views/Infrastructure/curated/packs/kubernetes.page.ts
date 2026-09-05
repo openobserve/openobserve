@@ -22,6 +22,7 @@ const CLUSTER = "${f:k8s-cluster}";
 const NODE = "${f:k8s-node-name}";
 const NS = "${f:k8s-namespace}";
 const POD = "${f:k8s-pod-name}";
+const CONTAINER = "${f:k8s-container-name}";
 
 /** One-variant panels share this shape; the drilldown always carries variant 1. */
 const panel = (
@@ -382,6 +383,368 @@ export const kubernetesPage: CuratedPageManifest = {
             ],
           },
           "kube_pod_status_phase",
+        ),
+      ],
+    },
+
+    {
+      id: "health",
+      titleKey: "infra.k8s.section.health",
+      // The caveats belong to the panel SET: waiting containers mix normal startup
+      // with real failures, and kube-state exposes only a container's LAST exit.
+      noteKey: "infra.k8s.section.healthNote",
+      scopedBy: ["cluster", "namespace"],
+      panels: [
+        panel(
+          {
+            id: "k8s_wh_containers_failing",
+            titleKey: "infra.k8s.panel.containersFailing",
+            type: "metric",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 32, h: 6 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: ["kube_pod_container_status_waiting_reason"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `count(count by (${CLUSTER}, ${NS}, ${POD}, ${CONTAINER}) (kube_pod_container_status_waiting_reason{\${scope:cluster},reason=~"CrashLoopBackOff|ImagePullBackOff|ErrImagePull|ErrImageNeverPull|CreateContainerConfigError"} > 0))`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_pod_container_status_waiting_reason",
+        ),
+        panel(
+          {
+            id: "k8s_wh_deploy_short",
+            titleKey: "infra.k8s.panel.deploymentsShort",
+            type: "metric",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 32, h: 6 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: [
+                  "kube_deployment_spec_replicas",
+                  "kube_deployment_status_replicas_ready",
+                ],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `count(count by (${CLUSTER}, ${NS}, deployment) (kube_deployment_spec_replicas{\${scope:cluster}} - kube_deployment_status_replicas_ready{\${scope:cluster}} > 0))`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_deployment_spec_replicas",
+        ),
+        panel(
+          {
+            id: "k8s_wh_sts_short",
+            titleKey: "infra.k8s.panel.statefulSetsShort",
+            type: "metric",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 32, h: 6 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: [
+                  "kube_statefulset_replicas",
+                  "kube_statefulset_status_replicas_ready",
+                ],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `count(count by (${CLUSTER}, ${NS}, statefulset) (kube_statefulset_replicas{\${scope:cluster}} - kube_statefulset_status_replicas_ready{\${scope:cluster}} > 0))`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_statefulset_replicas",
+        ),
+        panel(
+          {
+            id: "k8s_wh_ds_unavailable",
+            titleKey: "infra.k8s.panel.daemonSetsUnavailable",
+            type: "metric",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 32, h: 6 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: ["kube_daemonset_status_number_unavailable"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `count(kube_daemonset_status_number_unavailable{\${scope:cluster}} > 0)`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_daemonset_status_number_unavailable",
+        ),
+        panel(
+          {
+            id: "k8s_wh_jobs_failed",
+            titleKey: "infra.k8s.panel.jobsFailed",
+            type: "metric",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 32, h: 6 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: ["kube_job_status_failed"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  { query: `count(kube_job_status_failed{\${scope:cluster}} > 0)`, legend: "" },
+                ],
+              },
+            ],
+          },
+          "kube_job_status_failed",
+        ),
+        panel(
+          {
+            id: "k8s_wh_pvc_unbound",
+            titleKey: "infra.k8s.panel.volumeClaimsUnbound",
+            type: "metric",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 32, h: 6 },
+            fleetWide: ["namespace"],
+            variants: [
+              {
+                requiresStreams: ["kube_persistentvolumeclaim_status_phase"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `count(kube_persistentvolumeclaim_status_phase{\${scope:cluster},phase!="Bound"} == 1)`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_persistentvolumeclaim_status_phase",
+        ),
+        panel(
+          {
+            id: "k8s_wh_waiting_top",
+            titleKey: "infra.k8s.panel.containersWaitingTop",
+            type: "table",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 96, h: 16 },
+            variants: [
+              {
+                requiresStreams: ["kube_pod_container_status_waiting_reason"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `topk(20, sum by (${CLUSTER}, ${NS}, ${POD}, ${CONTAINER}, reason) (kube_pod_container_status_waiting_reason{\${scope:cluster},\${scope:namespace},reason=~"CrashLoopBackOff|ImagePullBackOff|ErrImagePull|ErrImageNeverPull|CreateContainerConfigError"} > 0) * 2 or sum by (${CLUSTER}, ${NS}, ${POD}, ${CONTAINER}, reason) (kube_pod_container_status_waiting_reason{\${scope:cluster},\${scope:namespace}} > 0))`,
+                    legend: `{${CLUSTER}} {${NS}}/{${POD}}/{${CONTAINER}} {reason}`,
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_pod_container_status_waiting_reason",
+        ),
+        panel(
+          {
+            id: "k8s_wh_terminated_top",
+            titleKey: "infra.k8s.panel.containersTerminatedTop",
+            type: "table",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 96, h: 16 },
+            variants: [
+              {
+                requiresStreams: ["kube_pod_container_status_terminated_reason"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `topk(20, sum by (${CLUSTER}, ${NS}, ${POD}, ${CONTAINER}, reason) (kube_pod_container_status_terminated_reason{\${scope:cluster},\${scope:namespace},reason!="Completed"} > 0))`,
+                    legend: `{${CLUSTER}} {${NS}}/{${POD}}/{${CONTAINER}} {reason}`,
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_pod_container_status_terminated_reason",
+        ),
+        panel(
+          {
+            id: "k8s_wh_hpa_limited",
+            titleKey: "infra.k8s.panel.hpaLimitedTop",
+            type: "table",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 96, h: 16 },
+            variants: [
+              {
+                requiresStreams: ["kube_horizontalpodautoscaler_status_condition"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `topk(20, sum by (${CLUSTER}, ${NS}, horizontalpodautoscaler, condition) (kube_horizontalpodautoscaler_status_condition{\${scope:cluster},\${scope:namespace},condition="ScalingLimited",status="true"} == 1))`,
+                    legend: `{${CLUSTER}} {${NS}}/{horizontalpodautoscaler} {condition}`,
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_horizontalpodautoscaler_status_condition",
+        ),
+        panel(
+          {
+            id: "k8s_wh_deploy_short_top",
+            titleKey: "infra.k8s.panel.deploymentsShortTop",
+            type: "table",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 96, h: 16 },
+            variants: [
+              {
+                requiresStreams: [
+                  "kube_deployment_spec_replicas",
+                  "kube_deployment_status_replicas_ready",
+                ],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `topk(20, sum by (${CLUSTER}, ${NS}, deployment) (kube_deployment_spec_replicas{\${scope:cluster},\${scope:namespace}}) - sum by (${CLUSTER}, ${NS}, deployment) (kube_deployment_status_replicas_ready{\${scope:cluster},\${scope:namespace}}) > 0)`,
+                    legend: `{${CLUSTER}} {${NS}}/{deployment}`,
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_deployment_spec_replicas",
+        ),
+        panel(
+          {
+            id: "k8s_wh_sts_short_top",
+            titleKey: "infra.k8s.panel.statefulSetsShortTop",
+            type: "table",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 96, h: 16 },
+            variants: [
+              {
+                requiresStreams: [
+                  "kube_statefulset_replicas",
+                  "kube_statefulset_status_replicas_ready",
+                ],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `topk(20, sum by (${CLUSTER}, ${NS}, statefulset) (kube_statefulset_replicas{\${scope:cluster},\${scope:namespace}}) - sum by (${CLUSTER}, ${NS}, statefulset) (kube_statefulset_status_replicas_ready{\${scope:cluster},\${scope:namespace}}) > 0)`,
+                    legend: `{${CLUSTER}} {${NS}}/{statefulset}`,
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_statefulset_replicas",
+        ),
+        panel(
+          {
+            id: "k8s_wh_ds_unavailable_top",
+            titleKey: "infra.k8s.panel.daemonSetsUnavailableTop",
+            type: "table",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 96, h: 16 },
+            variants: [
+              {
+                requiresStreams: ["kube_daemonset_status_number_unavailable"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `topk(20, sum by (${CLUSTER}, ${NS}, daemonset) (kube_daemonset_status_number_unavailable{\${scope:cluster},\${scope:namespace}}) > 0)`,
+                    legend: `{${CLUSTER}} {${NS}}/{daemonset}`,
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_daemonset_status_number_unavailable",
+        ),
+        panel(
+          {
+            id: "k8s_wh_jobs_failed_top",
+            titleKey: "infra.k8s.panel.jobsFailedTop",
+            type: "table",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 96, h: 16 },
+            variants: [
+              {
+                requiresStreams: ["kube_job_status_failed"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `topk(20, sum by (${CLUSTER}, ${NS}, job_name) (kube_job_status_failed{\${scope:cluster},\${scope:namespace}} > 0))`,
+                    legend: `{${CLUSTER}} {${NS}}/{job_name}`,
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_job_status_failed",
+        ),
+        panel(
+          {
+            id: "k8s_wh_pvc_unbound_top",
+            titleKey: "infra.k8s.panel.volumeClaimsUnboundTop",
+            type: "table",
+            unit: "numbers",
+            groupId: "kube-state",
+            layout: { w: 96, h: 16 },
+            variants: [
+              {
+                requiresStreams: ["kube_persistentvolumeclaim_status_phase"],
+                queryType: "promql",
+                queryMode: "instant",
+                queries: [
+                  {
+                    query: `topk(20, sum by (${CLUSTER}, ${NS}, persistentvolumeclaim, phase) (kube_persistentvolumeclaim_status_phase{\${scope:cluster},\${scope:namespace},phase!="Bound"} == 1))`,
+                    legend: `{${CLUSTER}} {${NS}}/{persistentvolumeclaim} {phase}`,
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_persistentvolumeclaim_status_phase",
         ),
       ],
     },
