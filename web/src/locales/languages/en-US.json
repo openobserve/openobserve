@@ -16368,7 +16368,7 @@
         "utilization": "Utilization",
         "utilizationNote": "Ratios compare a pod's usage against its own declared request or limit, so a pod that declares no request at all reports no ratio and is invisible to these panels. The waste tables also skip pods using no CPU or memory at all — the tiles already count those, and 43 of them tie at 100% waste, which would otherwise fill the table arbitrarily. Tiles count objects across the whole selected cluster and ignore the namespace filter; the tables below honour it. Every number reads the current instant.",
         "health": "Health",
-        "healthNote": "Waiting containers include normal startup states (ContainerCreating, PodInitializing) alongside real failures like CrashLoopBackOff — read the reason, not just the count; the table ranks failures first so they are never crowded out. Termination reasons show only each container's last exit, so an earlier OOM kill may not appear. Tiles count objects across the whole selected cluster and ignore the namespace filter; the tables below honour it. Every number reads the current instant."
+        "healthNote": "Waiting containers include normal startup states (ContainerCreating, PodInitializing) alongside real failures like CrashLoopBackOff — read the reason, not just the count; the table ranks failures first so they are never crowded out. Termination reasons show only each container's last exit, so an earlier OOM kill may not appear. The Deployment and StatefulSet tables report READINESS - 0% means nothing is running, 67% means two of three - because a bare shortfall cannot tell a total outage from a partial one. Tiles count objects across the whole selected cluster and ignore the namespace filter; the tables below honour it. Every number reads the current instant."
       },
       "group": {
         "nodeMetrics": "Node CPU & memory (kubeletstats receiver)",
@@ -16424,8 +16424,8 @@
         "containersWaitingTop": "Top 20 containers waiting (now)",
         "containersTerminatedTop": "Top 20 containers by last exit reason (now)",
         "hpaLimitedTop": "Top 20 HPAs unable to scale (now)",
-        "deploymentsShortTop": "Top 20 Deployments short of replicas (now)",
-        "statefulSetsShortTop": "Top 20 StatefulSets short of replicas (now)",
+        "deploymentsShortTop": "Top 20 least-ready Deployments (now)",
+        "statefulSetsShortTop": "Top 20 least-ready StatefulSets (now)",
         "daemonSetsUnavailableTop": "Top 20 DaemonSets with unavailable pods (now)",
         "jobsFailedTop": "Top 20 failed Jobs (now)",
         "volumeClaimsUnboundTop": "Top 20 unbound volume claims (now)",

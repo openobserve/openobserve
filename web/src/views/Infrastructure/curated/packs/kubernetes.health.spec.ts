@@ -170,6 +170,46 @@ describe("health — the waiting table ranks failures above transient states", (
   });
 });
 
+describe("health — a shortfall states severity, not a bare difference", () => {
+  // "2.00" is ambiguous: it could be 2 of 3 ready (mild) or desired 2 with 0 ready
+  // (a total outage). Measured on common-dev, o2synthetic-openobserve-ingester is
+  // desired=2 ready=0 current=0 — completely down — and the old panel rendered that
+  // identically to a 5-of-3 partial degradation. Every degraded controller on this
+  // fleet is in fact at 0.0 ready.
+  //
+  // A readiness FRACTION is unambiguous by construction: 0 = nothing running,
+  // 0.67 = two of three. Two value columns are not an option — a second query
+  // renders as extra ROWS, not columns (verified through the real converter), and
+  // PromQL cannot turn a value into a label.
+  it("the controller tables rank on readiness, never on a raw subtraction", () => {
+    for (const id of ["k8s_wh_deploy_short_top", "k8s_wh_sts_short_top"]) {
+      const [query] = queriesOf(id);
+      expect(query, `${id} must report a readiness fraction`).toContain(" / ");
+      expect(query, `${id} must not rank on a bare difference`).not.toContain(" - ");
+      expect(query, `${id} must select the degraded set`).toMatch(/<\s*1/);
+    }
+  });
+
+  it("both sides of the readiness ratio carry the same scope", () => {
+    // Scoping one operand produces a ratio against a fleet-wide denominator — a
+    // plausible-looking number that is silently wrong.
+    for (const id of ["k8s_wh_deploy_short_top", "k8s_wh_sts_short_top"]) {
+      const [query] = queriesOf(id);
+      for (const side of query.split(" / ")) {
+        if (!/[a-z_]+\{/.test(side)) continue;
+        expect(side, `${id}: operand without cluster scope`).toContain("${scope:cluster}");
+        expect(side, `${id}: operand without namespace scope`).toContain("${scope:namespace}");
+      }
+    }
+  });
+
+  it("the readiness tables render as a percentage", () => {
+    for (const id of ["k8s_wh_deploy_short_top", "k8s_wh_sts_short_top"]) {
+      expect(panel(id).unit, `${id} reports a 0..1 fraction`).toBe("percent-1");
+    }
+  });
+});
+
 describe("health — count tiles use the lint-legal aggregation form", () => {
   // Lint rule 14 scans EVERY by(...) and exempts only the fully re-aggregated
   // `count(count by (…))` spelling. `count(sum by (…) (a) - sum by (…) (b) > 0)`
@@ -213,7 +253,11 @@ describe("health — one-hot metrics carry a value test", () => {
     // selectors, so nothing else guards this.
     for (const p of panels()) {
       for (const query of queriesOf(p.id)) {
-        expect(query, `${p.id} would count rows with nothing wrong`).toMatch(/(>\s*0|==\s*1)/);
+        // A readiness RATIO selects the degraded set with `< 1`; a count selects it
+        // with `> 0` or `== 1`. Either way a healthy row must be excluded.
+        expect(query, `${p.id} would count rows with nothing wrong`).toMatch(
+          /(>\s*0|==\s*1|<\s*1)/,
+        );
       }
     }
   });
@@ -329,10 +373,13 @@ describe("health — instant reads, units and titles", () => {
     }
   });
 
-  it("every panel counts objects, so every unit is numbers", () => {
-    // Nothing here is a ratio: these are object counts and one-hot presence rows.
+  it("counts render as numbers; the readiness tables render as percentages", () => {
+    // The two controller tables report a 0..1 readiness fraction — a bare shortfall
+    // could not tell a total outage from a partial one. Everything else counts
+    // objects or is a one-hot presence row.
+    const READINESS = ["k8s_wh_deploy_short_top", "k8s_wh_sts_short_top"];
     for (const p of panels()) {
-      expect(p.unit, `${p.id}`).toBe("numbers");
+      expect(p.unit, `${p.id}`).toBe(READINESS.includes(p.id) ? "percent-1" : "numbers");
       for (const v of p.variants) expect(v.unit, `${p.id} variant override`).toBeUndefined();
     }
   });
