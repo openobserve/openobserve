@@ -1080,14 +1080,23 @@ describe("§5.3 staleness — min(range.start, now − STALE_GRACE_US)", () => {
 describe("§5.5 scope pickers", () => {
   it("(a) omitWhenFieldAbsent: no member of the cluster group on valuesFrom.stream ⇒ picker dropped", () => {
     const streams = fullK8sStreams();
-    streams.metrics.find((s: any) => s.name === "k8s_node_cpu_usage")!.schema = [
-      "k8s_node_name",
+    // The cluster picker sources from kube_pod_status_phase (kube-state); strip every
+    // cluster-group member from THAT stream, and close the rung-1 override that would
+    // otherwise resolve the concept without consulting the schema at all.
+    streams.metrics.find((s: any) => s.name === "kube_pod_status_phase")!.schema = [
+      "namespace",
+      "pod",
     ].map((name) => ({ name, type: "Utf8" }));
     const noClusterProbe = {
       ...kubernetesPage,
       groups: kubernetesPage.groups.map((g: any) =>
-        g.id === "kubelet-node"
-          ? { ...g, probeFields: { [GROUP.node]: g.probeFields?.[GROUP.node] ?? [] } }
+        g.id === "kube-state"
+          ? {
+              ...g,
+              fieldOverrides: Object.fromEntries(
+                Object.entries(g.fieldOverrides ?? {}).filter(([gid]) => gid !== GROUP.cluster),
+              ),
+            }
           : g,
       ),
     };
@@ -1102,10 +1111,15 @@ describe("§5.5 scope pickers", () => {
   });
 
   it("(b) a picker whose valuesFrom.stream is ABSENT from the list is omitted", () => {
+    // Drop BOTH source streams: `pod` sources from the kubeletstats stream, while
+    // `cluster` and `namespace` source from kube_pod_status_phase.
     const streams = fullK8sStreams();
-    streams.metrics = streams.metrics.filter((s: any) => s.name !== "k8s_pod_memory_usage");
+    streams.metrics = streams.metrics.filter(
+      (s: any) => s.name !== "k8s_pod_memory_usage" && s.name !== "kube_pod_status_phase",
+    );
     const dashboard = build(resolve({ streams }));
     const names = (dashboard.variables?.list ?? []).map((v: any) => v.name);
+    expect(names).not.toContain("cluster");
     expect(names).not.toContain("namespace");
     expect(names).not.toContain("pod");
   });
@@ -1115,7 +1129,7 @@ describe("§5.5 scope pickers", () => {
     // the live k8s_node_cpu_usage returned all 10 clusters. A fossil stream must not
     // ship an empty dropdown.
     const streams = fullK8sStreams();
-    streams.metrics.find((s: any) => s.name === "k8s_node_cpu_usage")!.stats.doc_time_max =
+    streams.metrics.find((s: any) => s.name === "kube_pod_status_phase")!.stats.doc_time_max =
       NOW_US - 177 * DAY_US;
     const dashboard = build(resolve({ streams }));
     expect((dashboard.variables?.list ?? []).some((v: any) => v.name === "cluster")).toBe(false);
@@ -1240,11 +1254,26 @@ describe("§5.5 buildDashboard", () => {
     expect(namespace.query_data).toEqual(
       expect.objectContaining({
         stream_type: "metrics",
-        stream: "k8s_pod_memory_usage",
-        field: "k8s_namespace_name",
+        // Sourced from the kube-state stream the health tables query; the field is
+        // that stream's own spelling, not the kubeletstats one.
+        stream: "kube_pod_status_phase",
+        field: "namespace",
         max_record_size: 100,
       }),
     );
+  });
+
+  it("a picker with defaultFirstValue emits the 'first' sentinel instead of 'all'", () => {
+    // The cluster picker opts in: a fleet-wide default mixes ten clusters into one
+    // crash-loop list nobody can act on. useVariablesManager:96-112 falls through to
+    // the first loaded option for any value other than "all"/"custom".
+    const dashboard = build(resolve({}));
+    const byName = Object.fromEntries(
+      (dashboard.variables?.list ?? []).map((v: any) => [v.name, v]),
+    );
+    expect(byName.cluster.selectAllValueForMultiSelect).toBe("first");
+    expect(byName.namespace.selectAllValueForMultiSelect).toBe("all");
+    expect(byName.pod.selectAllValueForMultiSelect).toBe("all");
   });
 
   it("a chained picker carries an IN filter row referencing the PARENT's resolved field", () => {
@@ -1835,7 +1864,12 @@ describe("§8.2 golden parity — hosts pack vs the frozen buildHostDashboard ou
         expect(ours.type).toBe(theirs.type);
         expect(ours.scope).toBe(theirs.scope);
         expect(ours.multiSelect).toBe(theirs.multiSelect);
-        expect(ours.selectAll).toBe(theirs.selectAll);
+        // The sentinel VALUE is a deliberate per-picker choice, not a shape contract:
+        // `cluster` opts into "first" so the page opens on one cluster rather than a
+        // ten-cluster mix. What parity requires is that the value stays one the shared
+        // manager understands (useVariablesManager:96-112 reads "all" and "custom"
+        // specially and falls through to the first option for anything else).
+        expect(["all", "first", "custom"]).toContain(ours.selectAll);
         expect(ours.filterShape).toEqual(theirs.filterShape);
         expect(ours.filterOperators).toEqual(theirs.filterOperators);
         expect(ours.filterRefsAreBareDollar).toBe(true);
@@ -2183,7 +2217,7 @@ describe("the built dashboard does not depend on the selected tab", () => {
 
     // The filter field must be a real column of the stream the child queries.
     const podStreamFields = new Set(KUBELET_POD_SCHEMA);
-    expect(namespaceVar.query_data.stream).toBe("k8s_pod_memory_usage");
+    expect(namespaceVar.query_data.stream).toBe("kube_pod_status_phase");
     expect(
       podStreamFields.has(filter.name),
       `namespace narrows by "${filter.name}", which k8s_pod_memory_usage does not carry`,

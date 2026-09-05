@@ -280,12 +280,35 @@ describe("DRY-RUN finding 10 — five phases exist, so the tiles are not a parti
 describe("DRY-RUN finding 6 — pickers source from a LIVE stream and omit on empty values", () => {
   const picker = (name: string) => kubernetesPage.scopePickers.find((p: any) => p.name === name)!;
 
-  it("the cluster picker names k8s_node_cpu_usage, NOT the dead utilization spelling", () => {
-    // `_values` on the 177-day-dead utilization stream returned 0 values; on the
-    // live usage stream it returned all 10 clusters.
-    expect(picker("cluster").valuesFrom.stream).toBe("k8s_node_cpu_usage");
+  it("the cluster and namespace pickers source from the collector the tables query", () => {
+    // Original intent, preserved: never the 177-day-dead `k8s_node_cpu_utilization`
+    // spelling, which returned 0 values from `_values`.
+    //
+    // Re-sourced from kube_pod_status_phase (kube-state) after a live diagnosis:
+    // sourcing cluster/namespace from kubeletstats offered 10 clusters and 58
+    // namespaces, but the SPARSE kube-state families the health tables query only
+    // exist where kube-state emits them — waiting_reason on 2 clusters, HPA
+    // conditions on 3 — so 8 of 10 clusters and 46 of 58 namespaces blanked every
+    // health table. kube_pod_status_phase is live, carries both k8s_cluster and
+    // namespace, and lists all 10 clusters plus 61 namespaces (3 more than the
+    // kubeletstats stream). Safe for the kubeletstats sections because a picker
+    // supplies VALUES only: each panel spells the label from its own group
+    // (resolve.ts:909 prefers panel.resolvedFields over the picker's field).
+    for (const name of ["cluster", "namespace"]) {
+      expect(picker(name).valuesFrom.stream, name).toBe("kube_pod_status_phase");
+      expect(picker(name).valuesFrom.groupId, name).toBe("kube-state");
+    }
     expect(picker("cluster").valuesFrom.stream).not.toBe("k8s_node_cpu_utilization");
-    expect(picker("cluster").valuesFrom.groupId).toBe("kubelet-node");
+  });
+
+  it("the cluster picker defaults to its first value, not the all-sentinel", () => {
+    // A fleet-wide default mixes ten clusters into one crash-loop list nobody can
+    // act on. `defaultFirstValue` makes buildVariable emit
+    // selectAllValueForMultiSelect: "first", which the manager resolves to the
+    // first loaded option (useVariablesManager:96-112).
+    expect(picker("cluster").defaultFirstValue).toBe(true);
+    expect(picker("namespace").defaultFirstValue).toBeUndefined();
+    expect(picker("pod").defaultFirstValue).toBeUndefined();
   });
 
   it("all three pickers set omitWhenValuesEmpty — schema presence is not resolvability", () => {
