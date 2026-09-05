@@ -145,7 +145,7 @@ pub mod utils;
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
         ("x-o2-mcp" = json!({
-            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode, response is capped at 100 hits, request detail='full' if you need more. Tip: set agent_options.output_format='csv' to receive tabular hits as a compact csv block (~40% fewer tokens than json); 'md_table' for small result sets. Tip: set agent_options.mode='partition' when querying a large time range: the server scans time partitions one by one and stops early once enough rows are collected (less data scanned), and aggregation queries build up reusable cache partition by partition. Do NOT split the time range yourself and query partitions in a loop — one call does it server-side.",
+            "description": "Search data with SQL, you can use `match_all('foo')` to search with full text search, also you can use `str_match(field, 'bar')` to search in a specific field; start_time, end_time can't be zero, need to be a valid micro timestamp. Note: in summary mode the response is capped at both 100 rows and 32 KiB of row payload, whichever bites first; when one does, `_hits_capped`/`_data_capped` reports the original and shown row counts. Narrow the column list or the time range (a wide `select *` can blow the byte budget in under ten rows), or request detail='full' to bypass the cap. Tip: set agent_options.output_format='csv' to receive tabular hits as a compact csv block (~40% fewer tokens than json); 'md_table' for small result sets. Tip: set agent_options.mode='partition' when querying a large time range: the server scans time partitions one by one and stops early once enough rows are collected (less data scanned), and aggregation queries build up reusable cache partition by partition. Do NOT split the time range yourself and query partitions in a loop — one call does it server-side.",
             "category": "search",
             "pinned": true
         }))
@@ -532,7 +532,7 @@ pub async fn search(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp. Note: in summary mode, hits are capped at 100 and only hits/total/took/columns/scan_size/function_error are returned.", "category": "search"}))
+        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp. Note: in summary mode hits are capped at 100 rows and 32 KiB (see `_hits_capped`), and only hits/total/took/columns/scan_size/function_error plus any data/format/advisory block are returned.", "category": "search"}))
     )
 )]
 pub async fn around_v1(
