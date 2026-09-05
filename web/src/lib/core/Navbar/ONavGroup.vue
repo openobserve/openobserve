@@ -293,10 +293,13 @@ async function positionFlyout() {
   const rect = wrapper.getBoundingClientRect();
   // Small breathing gap between the rail and the flyout so they don't touch.
   const GAP = 4;
-  const left = rect.right + GAP;
+  const isRtl = document.documentElement.dir === "rtl";
+  const horizontalPosition: Record<string, string> = isRtl
+    ? { right: `${document.documentElement.clientWidth - rect.left + GAP}px` }
+    : { left: `${rect.right + GAP}px` };
   flyoutStyle.value = {
     position: "fixed",
-    left: `${left}px`,
+    ...horizontalPosition,
     top: `${rect.top}px`,
     zIndex: "6000",
   };

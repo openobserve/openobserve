@@ -19,7 +19,7 @@ import { setBadgeTranslator } from "@/lib/core/Badge/badgeI18n";
 
 // Only the fallback locale (en-us) is bundled into the main chunk. Every other
 // language is code-split and loaded on demand via loadLocaleMessages() so we
-// don't ship all 15 locale files (~5MB raw) to every user on first load.
+// don't ship every locale file to every user on first load.
 import enLocale from "./languages/en-US.json";
 
 // Maps an i18n locale code to its source file name (without extension).
@@ -28,6 +28,7 @@ import enLocale from "./languages/en-US.json";
 // silently falls back to en-us.
 export const localeFileMap: Record<string, string> = {
   "en-us": "en-US",
+  ar: "ar-SA",
   "zh-cn": "zh-CN",
   "tr-turk": "tr-TR",
   de: "de-DE",
@@ -42,6 +43,16 @@ export const localeFileMap: Record<string, string> = {
   ru: "ru-RU",
   pl: "pl-PL",
   vi: "vi-VN",
+};
+
+const RTL_LOCALES = new Set(["ar"]);
+
+export const isRtlLocale = (locale: string): boolean => RTL_LOCALES.has(locale);
+
+export const applyDocumentLocale = (locale: string): void => {
+  if (typeof document === "undefined") return;
+  document.documentElement.lang = localeFileMap[locale] ?? "en-US";
+  document.documentElement.dir = isRtlLocale(locale) ? "rtl" : "ltr";
 };
 
 export const getLocale = () => {

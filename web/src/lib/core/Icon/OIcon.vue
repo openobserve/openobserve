@@ -17,6 +17,38 @@ const imgSrc = computed<string>(() => (props.name?.startsWith("img:") ? props.na
 
 const iconComponent = computed(() => iconRegistry[props.name as keyof typeof iconRegistry]);
 
+const RTL_MIRRORED_ICONS = new Set([
+  "arrow-back",
+  "arrow-back-ios",
+  "arrow-back-ios-new",
+  "arrow-forward",
+  "arrow-forward-ios",
+  "arrow-right",
+  "arrow-right-alt",
+  "chevron-left",
+  "chevron-right",
+  "exit-to-app",
+  "first-page",
+  "fork-right",
+  "git-branch",
+  "keyboard-arrow-right",
+  "keyboard-double-arrow-left",
+  "keyboard-double-arrow-right",
+  "last-page",
+  "left-panel-close",
+  "left-panel-open",
+  "login",
+  "logout",
+  "navigate-before",
+  "navigate-next",
+  "send",
+  "undo",
+]);
+
+const isRtlMirroredIcon = computed<boolean>(() =>
+  Boolean(props.name && RTL_MIRRORED_ICONS.has(props.name)),
+);
+
 // Maps semantic size tokens to Tailwind size utilities (width + height).
 // md = 24px matches the default OIcon rendering size.
 const sizeClasses: Record<NonNullable<IconProps["size"]>, string> = {
@@ -55,6 +87,7 @@ const isDestructiveIcon = computed<boolean>(() =>
         : '',
     ]"
     :data-destructive-icon="isDestructiveIcon ? 'true' : undefined"
+    :data-rtl-mirror="isRtlMirroredIcon ? 'true' : undefined"
     v-bind="label ? { role: 'img', 'aria-label': label } : { 'aria-hidden': 'true' }"
   >
     <!-- img: prefix → external image -->
