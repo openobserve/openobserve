@@ -175,9 +175,15 @@ mod tests {
         assert!(field_names.contains(&"group_label".to_string()));
         assert!(field_names.contains(&"value_is_lower_bound".to_string()));
 
+        // A synthetics slot the step gate skips is dead-lettered as a trigger row, and the alert
+        // rule filters on these two — absent from the reflection sample, the stream schema never
+        // learns the columns and the filter matches nothing.
+        assert!(field_names.contains(&"error_source".to_string()));
+        assert!(field_names.contains(&"location".to_string()));
+
         // Verify count matches struct fields
-        // (32 total: 21 original + 5 dedup/grouping + 6 value-context)
-        assert_eq!(field_names.len(), 32);
+        // (34 total: 21 original + 5 dedup/grouping + 6 value-context + 2 synthetics skip)
+        assert_eq!(field_names.len(), 34);
 
         // Verify no duplicate fields
         let unique_count = field_names

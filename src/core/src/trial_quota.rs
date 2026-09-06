@@ -1903,9 +1903,7 @@ mod tests {
         // §6.1: 10,000 browser steps and 20,000 protocol; the AI pool is 1,000 credits.
         assert_eq!(cfg.cloud.synthetics_free_browser_step_pool, 10_000);
         assert_eq!(cfg.cloud.synthetics_free_protocol_step_pool, 20_000);
-        // §7.3: 43,200 status steps a month — 30 days of one-minute checks.
-        assert_eq!(cfg.cloud.synthetics_free_status_step_pool, 43_200);
-        // The four grants must not collapse onto one knob.
+        // The three grants must not collapse onto one knob.
         assert_ne!(
             cfg.cloud.synthetics_free_browser_step_pool,
             cfg.cloud.synthetics_free_protocol_step_pool,
@@ -1915,7 +1913,7 @@ mod tests {
             cfg.cloud.ai_free_credit_pool,
         );
         assert_ne!(
-            cfg.cloud.synthetics_free_status_step_pool,
+            cfg.cloud.synthetics_free_protocol_step_pool,
             cfg.cloud.ai_free_credit_pool,
         );
     }
@@ -1932,7 +1930,6 @@ mod tests {
             usage_limit: None,
             updated_at: 0,
             notified_checkpoint: 0,
-            period: 0,
         }
     }
 
@@ -2113,46 +2110,6 @@ mod tests {
         }
     }
 
-    /// The sync readers answer from a counter a monthly pool has no entry in, so any workspace
-    /// call site passing one — this module's own included — reads the whole allowance back for
-    /// an org that already spent its month.
-    #[test]
-    fn no_call_site_reads_a_monthly_pool_from_the_sync_readers() {
-        // Assembled at runtime so this test's own source is not itself a call site.
-        let needles = [
-            ["get_remaining", "_for_pool("].concat(),
-            ["get_used", "_for_pool("].concat(),
-        ];
-        let monthly = ["Synthetics", "StatusProtocol"].concat();
-        let sites = workspace_call_sites(&needles);
-        for (path, args) in &sites {
-            assert!(
-                !args.contains(&monthly),
-                "{path}: the monthly pool has no in-memory counter, so this reads the full \
-                 allowance for an org that spent its month — use get_pool_usage or the batched \
-                 synthetics fold",
-            );
-        }
-        assert!(
-            !sites.is_empty(),
-            "the scan inspected no call site at all: every match was the definition itself, so \
-             the ban above cannot fail",
-        );
-    }
-
-    /// The admin API's response body is `get_pool_usage`, so a month-blind read there reports
-    /// a month the org has already left and an admin sizes the next limit against it.
-    #[test]
-    fn the_pool_usage_read_is_month_aware() {
-        let source = code_only_source();
-        let body = fn_body(&source, "pub async fn get_pool_usage(");
-
-        assert!(
-            call_args(body, "get_total_usage_for_org(").contains("month"),
-            "an unscoped SUM(usage_count) charges a monthly pool for every month it ever spent",
-        );
-    }
-
     /// `ack_ha_msg`'s own doc: an un-acked HA delta is redelivered forever, so a branch that
     /// skips a message without acking it spins the subscriber on that message.
     #[test]
@@ -2178,7 +2135,6 @@ mod tests {
             .feature_keys()
             .iter()
             .chain(TrialQuotaPool::SyntheticsProtocolSteps.feature_keys())
-            .chain(TrialQuotaPool::SyntheticsStatusProtocol.feature_keys())
             .copied()
             .collect();
         features.sort_unstable();
@@ -2193,55 +2149,6 @@ mod tests {
             "without the pre-split key an org whose protocol usage predates the split reads \
              used = 0 and is handed the whole grant a second time",
         );
-    }
-
-    /// The folds' `month` is a literal in every test, so nothing else ties either reader's month
-    /// to the `period` the upsert writes.
-    #[test]
-    fn the_read_takes_its_month_from_the_writers_own_encoding() {
-        let source = code_only_source();
-        // Assembled at runtime so the guard cannot match its own text.
-        let local_time = ["Local", "::"].concat();
-        let year_call = ["year", "()"].concat();
-        let month_call = ["month", "()"].concat();
-        // The first match is the definition, so nothing below it is ever scanned.
-        let reader = fn_body(&source, SYNTHETICS_READER);
-        assert!(
-            reader.contains("month_of("),
-            "the shared read carries the month both folds are handed, so a month resolved \
-             anywhere else is a second encoding",
-        );
-        assert!(
-            !reader.contains(&local_time),
-            "the upsert stamps a UTC month, so a local-time month disagrees with it for up to \
-             a day either side of every boundary",
-        );
-        assert!(
-            !(reader.contains(&year_call) && reader.contains(&month_call)),
-            "a second YYYYMM encoding here is the drift `month_of` exists to prevent",
-        );
-        for (read, fold) in BATCHED_READS {
-            let body = fn_body(&source, read);
-            assert!(
-                !body.contains("month_of("),
-                "{read}: a month resolved beside the fold drifts from the one the other entry \
-                 point folds with; both take the shared read's",
-            );
-            assert!(
-                !body.contains(&local_time),
-                "{read}: the upsert stamps a UTC month, so a local-time month disagrees with it \
-                 for up to a day either side of every boundary",
-            );
-            assert!(
-                !(body.contains(&year_call) && body.contains(&month_call)),
-                "{read}: a second YYYYMM encoding here is the drift `month_of` exists to prevent",
-            );
-            assert!(
-                passes_through(call_args(body, fold), "month"),
-                "{read}: 0 or any other literal in that argument reads `period == month` as \
-                 false for every live row",
-            );
-        }
     }
 
     /// One read, every synthetics key, and nothing at all when it fails: a fall back to the node's
@@ -2292,68 +2199,13 @@ mod tests {
     fn fold_synthetics_remaining_gives_every_requested_org_an_entry() {
         let org_id = steps_org("fold-empty", 700);
         set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 900);
-        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsStatusProtocol, 50_000);
 
-        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &[], 202610);
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &[]);
         let r = remaining
             .get(&org_id)
             .expect("an org with no rows has not used the feature — it is not absent");
         assert_eq!(r.browser, 700);
         assert_eq!(r.protocol, 900);
-        assert_eq!(
-            r.status, 50_000,
-            "no row is a month not yet started, so the whole monthly allowance is available",
-        );
-    }
-
-    /// A row is September's until it says otherwise, so October must read it as unspent
-    /// without waiting for the write that resets it.
-    #[test]
-    fn fold_synthetics_remaining_counts_a_status_row_only_in_its_own_month() {
-        let org_id = steps_org("fold-month", 10);
-        // Distinct from the 43,200 default, or a fall-through to it reads as the override.
-        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsStatusProtocol, 50_000);
-        let rows = vec![db_status_row(&org_id, 12_480, 202609)];
-
-        let in_month = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows, 202609);
-        assert_eq!(in_month.get(&org_id).expect("requested").status, 37_520);
-
-        let next_month = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows, 202610);
-        assert_eq!(
-            next_month.get(&org_id).expect("requested").status,
-            50_000,
-            "a stale September count charged against October's grant gates the org for a month",
-        );
-
-        // `period = 0` is the one-time shape; a status row must never be read as lifetime.
-        let lifetime = vec![db_status_row(&org_id, 12_480, 0)];
-        assert_eq!(
-            fold_synthetics_remaining(std::slice::from_ref(&org_id), &lifetime, 202610)
-                .get(&org_id)
-                .expect("requested")
-                .status,
-            50_000,
-        );
-    }
-
-    /// `ORG_LIMITS` is empty for ~10 s after a restart, so a status row's own override wins.
-    #[test]
-    fn fold_synthetics_remaining_prefers_the_status_rows_own_limit() {
-        let org_id = steps_org("fold-status-override", 10);
-        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsStatusProtocol, 50_000);
-        let mut row = db_status_row(&org_id, 81_000, 202609);
-        row.usage_limit = Some(150_000);
-        let rows = std::slice::from_ref(&row);
-
-        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), rows, 202609);
-        assert_eq!(remaining.get(&org_id).expect("requested").status, 69_000);
-
-        let next_month = fold_synthetics_remaining(std::slice::from_ref(&org_id), rows, 202610);
-        assert_eq!(
-            next_month.get(&org_id).expect("requested").status,
-            150_000,
-            "spec §7.4: a stale row is unspent, but its override still stands in October",
-        );
     }
 
     /// E14's force-deduct lets `usage_count` pass `usage_limit`, so the subtraction must saturate.
@@ -2366,7 +2218,7 @@ mod tests {
             db_row(&org_id, "synthetics_protocol_steps", 11),
         ];
 
-        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows, 202610);
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows);
         let r = remaining.get(&org_id).expect("the org was requested");
         assert_eq!(
             r.browser, 0,
@@ -2386,7 +2238,7 @@ mod tests {
             db_row(&org_id, "synthetics_browser_steps", 100),
         ];
 
-        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows, 202610);
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows);
         let r = remaining.get(&org_id).expect("the org was requested");
         assert_eq!(
             r.protocol, 500,
@@ -2414,7 +2266,6 @@ mod tests {
         let remaining = fold_synthetics_remaining(
             std::slice::from_ref(&org_id),
             &[browser, protocol, pre_split],
-            202610,
         );
         let r = remaining.get(&org_id).expect("the org was requested");
         assert_eq!(
@@ -2434,7 +2285,6 @@ mod tests {
     fn fold_synthetics_quota_reports_each_pools_spend_against_its_own_grant() {
         let org_id = steps_org("quota-pools", 4_000);
         set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 1_000);
-        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsStatusProtocol, 50_000);
         // The pool's two rows carry different grants, so first-, last- and min-wins each differ.
         let mut pre_split = db_row(&org_id, "synthetics_steps", 300);
         pre_split.usage_limit = Some(5_000);
@@ -2444,10 +2294,9 @@ mod tests {
             db_row(&org_id, "synthetics_browser_steps", 900),
             pre_split,
             protocol,
-            db_status_row(&org_id, 12_480, 202609),
         ];
 
-        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows, 202609);
+        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows);
         let q = quota.get(&org_id).expect("the org was requested");
         assert_eq!(
             (q.browser_used, q.browser_limit),
@@ -2463,16 +2312,6 @@ mod tests {
              ORDER BY, so anything but the largest of a pool's rows reports a grant the gate is \
              not enforcing",
         );
-        assert_eq!((q.status_used, q.status_limit), (12_480, 50_000));
-
-        let next_month = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows, 202610);
-        let q = next_month.get(&org_id).expect("the org was requested");
-        assert_eq!(
-            (q.status_used, q.status_limit),
-            (0, 50_000),
-            "September's count reported as October's spend shows an admin a month the org has \
-             already left, and the next limit is sized against it",
-        );
     }
 
     /// E14's force-deduct lets `usage_count` pass `usage_limit`, and the admin sizing the next
@@ -2486,7 +2325,7 @@ mod tests {
             db_row(&org_id, "synthetics_protocol_steps", 11),
         ];
 
-        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows, 202610);
+        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows);
         let q = quota.get(&org_id).expect("the org was requested");
         assert_eq!(
             (q.browser_used, q.browser_limit),
@@ -2503,13 +2342,11 @@ mod tests {
     fn fold_synthetics_quota_gives_every_requested_org_an_entry() {
         let org_id = steps_org("quota-empty", 700);
         set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 900);
-        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsStatusProtocol, 50_000);
         let other = steps_org("quota-other", 5);
 
         let quota = fold_synthetics_quota(
             std::slice::from_ref(&org_id),
             &[db_row(&other, "synthetics_browser_steps", 4)],
-            202610,
         );
 
         assert_eq!(
@@ -2523,7 +2360,6 @@ mod tests {
             .expect("an org with no rows has not used the feature — it is not absent");
         assert_eq!((q.browser_used, q.browser_limit), (0, 700));
         assert_eq!((q.protocol_used, q.protocol_limit), (0, 900));
-        assert_eq!((q.status_used, q.status_limit), (0, 50_000));
     }
 
     /// Defect #5: the listing's numbers are the table's, and the node's own counter cannot move
@@ -2532,7 +2368,6 @@ mod tests {
     fn the_quota_a_listing_reports_follows_the_row_not_the_node() {
         let org_id = steps_org("quota-follows-db", 4_000);
         set_cached_limit(&org_id, TrialQuotaPool::SyntheticsProtocolSteps, 1_000);
-        set_cached_limit(&org_id, TrialQuotaPool::SyntheticsStatusProtocol, 50_000);
         apply_to_pool_counter(&org_id, TrialQuotaPool::SyntheticsBrowserSteps, 7);
         let mut browser = db_row(&org_id, "synthetics_browser_steps", 900);
         browser.usage_limit = Some(6_000);
@@ -2541,14 +2376,9 @@ mod tests {
         protocol.usage_limit = Some(9_000);
         let mut pre_split = db_row(&org_id, "synthetics_steps", 300);
         pre_split.usage_limit = Some(5_000);
-        let rows = vec![
-            browser,
-            protocol,
-            pre_split,
-            db_status_row(&org_id, 12_480, 202610),
-        ];
+        let rows = vec![browser, protocol, pre_split];
 
-        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows, 202610);
+        let quota = fold_synthetics_quota(std::slice::from_ref(&org_id), &rows);
         let q = quota.get(&org_id).expect("the org was requested");
         assert_eq!(
             q.browser_used, 900,
@@ -2556,7 +2386,7 @@ mod tests {
              they agree on",
         );
 
-        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows, 202610);
+        let remaining = fold_synthetics_remaining(std::slice::from_ref(&org_id), &rows);
         let r = remaining.get(&org_id).expect("the org was requested");
         // Every pool here is under its grant, so the two halves must add back up to it.
         assert_eq!(
@@ -2571,12 +2401,6 @@ mod tests {
             (9_000, 9_000),
             "the raise is recorded on one of the pool's two rows, and the gate and the listing \
              must find the same one",
-        );
-        assert_eq!(
-            (q.status_used + r.status, q.status_limit),
-            (50_000, 50_000),
-            "the monthly pool falls back to the cached grant, and both folds must fall back to \
-             the same one",
         );
     }
 

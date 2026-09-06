@@ -13,10 +13,9 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use chrono::Datelike;
 use sea_orm::{
     ColumnTrait, ConnectionTrait, EntityTrait, QueryFilter, QuerySelect, TransactionTrait,
-    sea_query::{CaseStatement, Expr, Func, OnConflict},
+    sea_query::{Expr, Func, OnConflict},
 };
 
 use crate::{
@@ -457,7 +456,7 @@ mod tests {
     }
 
     async fn seed(db: &DatabaseConnection, org_id: &str, feature: &str, usage_count: i64) {
-        seed_row(db, org_id, feature, usage_count, None, 0).await;
+        seed_row(db, org_id, feature, usage_count, None).await;
     }
 
     fn usage_row(
@@ -524,10 +523,6 @@ mod tests {
             .await
             .unwrap()
             .expect("the upsert must leave a row behind")
-    }
-
-    async fn counter(db: &DatabaseConnection, org_id: &str, feature: &str) -> i64 {
-        row_of(db, org_id, feature).await.usage_count
     }
 
     async fn checkpoint_of(db: &DatabaseConnection, org_id: &str, feature: &str) -> i16 {
@@ -688,8 +683,8 @@ mod tests {
     #[tokio::test]
     async fn an_empty_feature_set_reaches_no_other_pool() {
         let db = db().await;
-        seed_row(&db, "acme", AI, 340, Some(10_000), 0).await;
-        seed_row(&db, "acme", PROTOCOL, 100, None, 0).await;
+        seed_row(&db, "acme", AI, 340, Some(10_000)).await;
+        seed_row(&db, "acme", PROTOCOL, 100, None).await;
 
         set_usage_limit_for_org_in(&db, "acme", BROWSER, &[], 5_000)
             .await
