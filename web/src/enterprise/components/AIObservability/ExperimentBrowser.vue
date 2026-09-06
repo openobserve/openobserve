@@ -159,7 +159,7 @@
             class="flex min-w-0 items-center gap-2"
             :data-test="`ai-experiment-row-${experiment.id}`"
           >
-            <span class="text-text-heading truncate font-medium">{{ experiment.name }}</span>
+            <span class="text-text-heading min-w-0 truncate font-medium">{{ experiment.name }}</span>
             <OTag v-if="isBaseline(experiment)" size="sm" variant="blue-soft">
               {{ t("aiObservability.experiments.baseline") }}
             </OTag>
@@ -339,7 +339,7 @@ function buildColumns(experiments: LlmExperiment[]): OTableColumnDef[] {
       sortable: true,
       size: COL.name,
       minSize: 160,
-      meta: { align: "left" as const, flex: true, isName: true },
+      meta: { align: "left" as const, isName: true },
     },
     {
       id: "status",
@@ -365,6 +365,21 @@ function buildColumns(experiments: LlmExperiment[]): OTableColumnDef[] {
       sortable: true,
       size: 140,
       meta: { align: "left" as const },
+    },
+    // Invisible filler — absorbs the leftover width so every real column
+    // (Name included) keeps its exact declared size regardless of how many
+    // scorer columns THIS dataset group happens to add. Without a flex column
+    // here, OTable falls back to plain `table-fixed; width:100%`, which
+    // proportionally stretches every declared width to fill the container —
+    // exactly what made Name a different width in each group's table.
+    {
+      id: "fill",
+      header: raw(""),
+      sortable: false,
+      hideable: false,
+      size: 0,
+      minSize: 0,
+      meta: { flex: true },
     },
     {
       id: "actions",
