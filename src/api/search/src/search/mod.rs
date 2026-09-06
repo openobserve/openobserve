@@ -532,7 +532,7 @@ pub async fn search(
     ),
     extensions(
         ("x-o2-ratelimit" = json!({"module": "Search", "operation": "get"})),
-        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp.", "category": "search"}))
+        ("x-o2-mcp" = json!({"description": "Search logs around a timestamp. Note: in summary mode the response is capped at 100 rows and 32 KiB of row payload, whichever bites first; when one does, `_hits_capped` reports the original and shown row counts. Only hits/total/took/columns/scan_size/function_error are returned; request detail='full' to bypass the cap.", "category": "search"}))
     )
 )]
 pub async fn around_v1(

@@ -114,7 +114,7 @@ pub fn filter_response(tool_name: &str, response_body: &str, detail: &DetailLeve
 /// Apply a custom transformer for tools with complex response shapes.
 fn apply_custom_transformer(tool_name: &str, response_body: &str) -> Option<String> {
     match tool_name {
-        "SearchSQL" | "SearchSQLAroundKey" => Some(filter_search_sql(response_body)),
+        "SearchSQL" | "SearchAround" => Some(filter_search_sql(response_body)),
         "testFunction" => Some(filter_test_function(response_body)),
         _ => None,
     }
@@ -607,6 +607,52 @@ mod tests {
 
         assert_eq!(parsed["data"], "a,b\n1,2\n3,4");
         assert!(parsed.get("_data_capped").is_none());
+    }
+
+    #[test]
+    fn test_search_around_is_filtered_like_search_sql() {
+        let hits: Vec<Value> = (0..150)
+            .map(|i| json!({ "_timestamp": i, "log": "x" }))
+            .collect();
+        let body = serde_json::to_string(&json!({
+            "took": 5,
+            "hits": hits,
+            "total": 150,
+            "from": 0,
+            "size": 150,
+            "scan_size": 28943,
+            "trace_id": "abc-123",
+            "took_detail": { "total": 5 },
+        }))
+        .unwrap();
+
+        let result = filter_response("SearchAround", &body, &DetailLevel::Summary);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+
+        assert_eq!(
+            parsed["hits"].as_array().unwrap().len(),
+            SEARCH_SQL_MAX_HITS
+        );
+        assert_eq!(parsed["_hits_capped"]["original"], 150);
+        assert_eq!(parsed["_hits_capped"]["reason"], "row cap");
+        assert_eq!(parsed["total"], 150);
+        assert!(parsed.get("trace_id").is_none());
+        assert!(parsed.get("took_detail").is_none());
+    }
+
+    #[test]
+    fn test_search_around_full_detail_is_untouched() {
+        let body = serde_json::to_string(&json!({
+            "hits": [{ "log": "x" }],
+            "total": 1,
+            "trace_id": "abc-123",
+        }))
+        .unwrap();
+
+        let result = filter_response("SearchAround", &body, &DetailLevel::Full);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+
+        assert_eq!(parsed["trace_id"], "abc-123");
     }
 
     #[test]
