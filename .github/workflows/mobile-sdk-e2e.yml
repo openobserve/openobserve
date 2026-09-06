@@ -107,8 +107,8 @@ jobs:
   # Self-contained model → no secrets to check.
   # -------------------------------------------------------------------------------------------
   preflight:
-    # Paid CI runs only on PRs carrying the 'e2e' label; the merge queue runs unit tests on the merged code.
-    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false) }}
+    # Paid CI runs only on PRs carrying the 'ready-for-ci' label; the merge queue runs unit tests on the merged code.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
     name: Preflight & readiness
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -349,9 +349,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/github-auth
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: mobile-e2e-linux-oo-v2
       - name: Install Protoc
         run: bash ./.github/protoc.sh
       - uses: actions/setup-node@v4
@@ -400,9 +397,6 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/github-auth
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: mobile-e2e-macos-oo-v2
       - name: Install Protoc (macOS)
         run: brew install protobuf || true
       - uses: actions/setup-node@v4
@@ -827,7 +821,7 @@ jobs:
   merge_reports:
     name: Merge Reports
     needs: [android, ios]
-    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false))
+    if: always() && (github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

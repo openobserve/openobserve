@@ -15,6 +15,7 @@
 
 pub mod logs;
 pub mod metrics;
+pub mod profiles;
 pub mod traces;
 
 // The proxy re-encodes the body, so a forwarded content-length is stale and h2 rejects it

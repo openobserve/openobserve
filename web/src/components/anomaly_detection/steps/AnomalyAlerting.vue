@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-6! flex items-start pb-0!">
         <div class="flex h-9 w-47.5 items-center font-semibold">
           {{ t("alerts.priority") }}
-          <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.priorityTooltip')" side="right" />
           </OIcon>
         </div>
@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-6! flex items-start pb-0!">
         <div class="flex h-9 w-47.5 items-center font-semibold">
           {{ t("alerts.tags") }}
-          <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.tagsTooltip')" side="right" />
           </OIcon>
         </div>
@@ -63,7 +63,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div class="mb-6! flex items-start pb-0!">
         <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
           {{ t("alerts.anomaly.notifications") }}
-          <OIcon name="info" size="sm" class="text-icon-color ml-1 cursor-pointer">
+          <OIcon name="info" size="sm" class="text-icon-color ms-1 cursor-pointer">
             <OTooltip :content="t('alerts.anomaly.notificationsTooltip')" side="right" />
           </OIcon>
         </div>
@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div v-if="config.alert_enabled" class="mb-6! flex items-start pb-0!">
         <div class="flex items-center font-semibold" style="width: 11.875rem; height: 2.25rem">
           {{ t("alerts.destination") }}
-          <span class="text-status-error-text ml-1">*</span>
+          <span class="text-status-error-text ms-1">*</span>
         </div>
         <div class="flex flex-col">
           <div class="flex items-center">
@@ -116,7 +116,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     index === visibleChipCount &&
                     config.alert_destination_ids.length > visibleChipCount
                   "
-                  class="text-compact text-text-secondary ml-1 whitespace-nowrap"
+                  class="text-compact text-text-secondary ms-1 whitespace-nowrap"
                 >
                   +{{ config.alert_destination_ids.length - visibleChipCount }}
                 </span>
@@ -128,12 +128,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               variant="ghost"
               size="sm"
-              class="ml-1"
+              class="ms-1"
               :title="t('alerts.alertSettings.refreshDestinations')"
               @click="$emit('refresh:destinations')"
               icon-left="refresh"
             />
-            <OButton variant="outline" size="sm" class="ml-2" @click="openAddDestination">
+            <OButton variant="outline" size="sm" class="ms-2" @click="openAddDestination">
               {{ t("alerts.anomaly.addNewDestination") }}
             </OButton>
           </div>

@@ -251,7 +251,7 @@ jobs:
               || echo "::warning::Could not label stranger PR #$NUMBER"
           fi
 
-      # ── Dependabot: label e2e to unlock gated CI, approve any held runs ──
+      # ── Dependabot: label ready-for-ci to unlock gated CI, approve any held runs ──
       - name: Enable CI for dependabot PR
         if: github.event_name == 'pull_request_target' && github.event.pull_request.user.login == 'dependabot[bot]'
         env:
@@ -260,8 +260,8 @@ jobs:
           NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          gh pr edit "$NUMBER" --add-label "e2e" \
-            && echo "Labeled dependabot PR #$NUMBER with e2e" \
+          gh pr edit "$NUMBER" --add-label "ready-for-ci" \
+            && echo "Labeled dependabot PR #$NUMBER with ready-for-ci" \
             || echo "::warning::Could not label dependabot PR #$NUMBER"
           for id in $(gh api "repos/$GH_REPO/actions/runs?head_sha=$HEAD_SHA&status=action_required" --jq '.workflow_runs[].id'); do
             gh api -X POST "repos/$GH_REPO/actions/runs/$id/approve" \

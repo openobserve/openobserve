@@ -1544,13 +1544,13 @@ pub struct Search {
     #[env_config(
         name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
         default = true,
-        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output; disable to fall back to the generic evaluator"
+        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output"
     )]
     pub feature_metrics_fused_agg_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_METRICS_STREAMING_AGG_ENABLED",
-        default = false,
-        help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series, instead of materializing all samples; falls back to the fused evaluator when the file layout or query shape does not allow it"
+        default = true,
+        help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series"
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
     #[env_config(
@@ -2201,6 +2201,9 @@ pub struct Limit {
     pub disk_free: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
+    #[env_config(name = "ZO_JS_FUNCTION_MAX_EXECUTION_TIME_SECS", default = 5)]
+    // 0 falls back to default
+    pub js_function_max_execution_time_secs: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk

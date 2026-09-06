@@ -261,8 +261,8 @@
             :class="[
               message.role,
               message.role === 'user'
-                ? 'text-text-body dark:text-text-secondary ml-10 w-[calc(100%-2.5rem)] [background:var(--color-chat-bubble-ai)]'
-                : 'bg-surface-base text-text-body dark:text-text-secondary ml-0 w-full',
+                ? 'text-text-body dark:text-text-secondary ms-10 w-[calc(100%-2.5rem)] [background:var(--color-chat-bubble-ai)]'
+                : 'bg-surface-base text-text-body dark:text-text-secondary ms-0 w-full',
               { 'error-message': message.content.startsWith('Error:') },
             ]"
           >
@@ -352,7 +352,7 @@
                         v-if="block.navigationAction && !block.pendingConfirmation"
                         name="open-in-new"
                         size="xs"
-                        class="navigation-icon ml-auto cursor-pointer opacity-70 transition-opacity duration-200 hover:opacity-100"
+                        class="navigation-icon ms-auto cursor-pointer opacity-70 transition-opacity duration-200 hover:opacity-100"
                         @click.stop="handleNavigationAction(block.navigationAction)"
                       >
                         <OTooltip :content="block.navigationAction.label" />
@@ -887,7 +887,7 @@
                           <OTooltip :content="t('aiAssistant.copyContent')" />
                         </OButton>
                         <code
-                          class="log-entry-code text-2xs bg-surface-base text-text-body dark:text-text-secondary block max-h-75 cursor-text overflow-y-auto p-3 pr-10 font-mono leading-relaxed whitespace-pre-wrap select-text [word-wrap:break-word] dark:[background:var(--color-syntax-bg)]"
+                          class="log-entry-code text-2xs bg-surface-base text-text-body dark:text-text-secondary block max-h-75 cursor-text overflow-y-auto p-3 pe-10 font-mono leading-relaxed whitespace-pre-wrap select-text [word-wrap:break-word] dark:[background:var(--color-syntax-bg)]"
                           v-html="formatLogEntryContent(block.content)"
                         ></code>
                       </div>
@@ -896,7 +896,7 @@
                   <!-- Stream-level error block -->
                   <div
                     v-else-if="block.type === 'error'"
-                    class="stream-error-block rounded-default border-border-default text-compact text-text-secondary mb-2 flex flex-col border-l-3 px-3 py-2.5 [background:color-mix(in_srgb,var(--color-status-negative)_6%,transparent)] dark:[background:color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
+                    class="stream-error-block rounded-default border-border-default text-compact text-text-secondary mb-2 flex flex-col border-s-3 px-3 py-2.5 [background:color-mix(in_srgb,var(--color-status-negative)_6%,transparent)] dark:[background:color-mix(in_srgb,var(--color-status-negative)_10%,transparent)]"
                   >
                     <div class="stream-error-header flex items-center gap-2">
                       <OIcon name="warning" size="sm" />
@@ -906,13 +906,13 @@
                     </div>
                     <div
                       v-if="block.suggestion"
-                      class="stream-error-suggestion mt-1.5 pl-6 text-xs italic opacity-85"
+                      class="stream-error-suggestion mt-1.5 ps-6 text-xs italic opacity-85"
                     >
                       {{ block.suggestion }}
                     </div>
                     <div
                       v-if="block.recoverable"
-                      class="stream-error-recoverable text-2xs mt-1 pl-6 opacity-70"
+                      class="stream-error-recoverable text-2xs mt-1 ps-6 opacity-70"
                     >
                       {{ t("aiAssistant.errorMayBeTemporary") }}
                     </div>
@@ -958,7 +958,7 @@
                             @click="copyToClipboard(textBlock.content, t)"
                           >
                             <OIcon size="sm" name="content-copy" />
-                            <span class="ml-1">{{ t("common.copy") }}</span>
+                            <span class="ms-1">{{ t("common.copy") }}</span>
                           </OButton>
                         </div>
                         <span class="generated-code-block">
@@ -977,7 +977,7 @@
                             @click="retryGeneration(message)"
                           >
                             <OIcon size="sm" name="refresh" />
-                            <span class="ml-1">{{ t("common.retry") }}</span>
+                            <span class="ms-1">{{ t("common.retry") }}</span>
                           </OButton>
                         </div>
                       </div>
@@ -1031,7 +1031,7 @@
                           @click="copyToClipboard(block.content, t)"
                         >
                           <OIcon size="sm" name="content-copy" />
-                          <span class="ml-1">{{ t("common.copy") }}</span>
+                          <span class="ms-1">{{ t("common.copy") }}</span>
                         </OButton>
                       </div>
                       <span class="generated-code-block">
@@ -1324,7 +1324,7 @@
                   ]"
                 />
                 <span
-                  class="auto-nav-label ml-1 text-xs font-medium"
+                  class="auto-nav-label ms-1 text-xs font-medium"
                   :class="isAutoNavigationEnabled ? 'text-theme-accent' : 'text-text-secondary'"
                   >{{ t("aiAssistant.autoNavigation.label") }}</span
                 >

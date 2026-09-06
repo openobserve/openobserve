@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Step 1 -->
     <div
-      class="rounded-default border-l-solid bg-surface-subtle border-l-border-strong mb-4 border-l-4 p-4"
+      class="rounded-default border-s-solid bg-surface-subtle border-s-border-strong mb-4 border-s-4 p-4"
     >
       <div class="flex items-start gap-3">
         <div
@@ -64,7 +64,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Step 2 -->
     <div
-      class="rounded-default border-l-solid bg-surface-subtle border-l-border-strong mb-4 border-l-4 p-4"
+      class="rounded-default border-s-solid bg-surface-subtle border-s-border-strong mb-4 border-s-4 p-4"
     >
       <div class="flex items-start gap-3">
         <div
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
           <!-- Portal instructions -->
           <div v-if="step2Mode === 'portal'">
-            <ol class="text-text-secondary space-y-1 pl-4 text-sm">
+            <ol class="text-text-secondary space-y-1 ps-4 text-sm">
               <li>
                 {{ t("ingestion.azureSetup.goTo") }}
                 <strong>{{ t("ingestion.azureSetup.portalSubscriptionPath") }}</strong>

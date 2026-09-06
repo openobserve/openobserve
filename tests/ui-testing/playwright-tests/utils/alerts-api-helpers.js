@@ -81,6 +81,18 @@ function realtimeAlert(name) {
   return a;
 }
 
+/** A scheduled cron alert whose cadence cell renders the raw cron string verbatim. */
+function cronAlert(name) {
+  const a = simpleAlert(name);
+  a.trigger_condition = {
+    ...a.trigger_condition,
+    frequency_type: 'cron',
+    frequency: 1,
+    cron: '0 */10 * * * *',
+  };
+  return a;
+}
+
 /** V1 composite payload. Operands are stable alert IDs, never display names. */
 function compositeAlert(name, childIds, overrides = {}) {
   return {
@@ -165,6 +177,12 @@ async function seedAlertFixtures(page) {
   ]).catch(() => {});
 }
 
+/** Create an alerts folder and return its server-assigned folderId. */
+async function createAlertFolder(page, name) {
+  const r = await api(page, 'post', `${urls().v2}/folders/alerts`, { name, description: '' });
+  return (await r.json()).folderId;
+}
+
 /** Ingest rows into a stream (creates it on first write). */
 async function ingest(page, stream, rows) {
   return api(page, 'post', `${urls().v1}/${stream}/_json`, rows);
@@ -228,9 +246,9 @@ function isFiringOutcome(outcome) {
 module.exports = {
   BASE, STREAM, SINK, TMPL, DEST,
   uniq, urls, api,
-  simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert,
+  simpleAlert, multiAlert, groupedSimpleAlert, realtimeAlert, cronAlert,
   compositeAlert, validateComposite, getCompositeReferences,
   createAlert, listAlerts, findAlertId, getAlert, deleteAlerts, seedAlertFixtures,
-  ingest, getAlertGroups, getAlertTransitions,
+  createAlertFolder, ingest, getAlertGroups, getAlertTransitions,
   waitForAlertOutcome, waitForAlertLevel, isFiringOutcome,
 };

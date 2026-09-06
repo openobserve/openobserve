@@ -265,7 +265,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           </OToggleGroup>
                         </div>
 
-                        <div v-if="hasUserDefinedSchema" class="ml-2 flex items-center">
+                        <div v-if="hasUserDefinedSchema" class="ms-2 flex items-center">
                           <OIcon
                             name="info"
                             size="sm"
@@ -283,7 +283,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           data-test="schema-field-search-input"
                           v-model="filterField"
                           data-cy="schema-index-field-search-input"
-                          class="no-border o2-search-input ml-auto"
+                          class="no-border o2-search-input ms-auto"
                           :placeholder="t('search.searchField')"
                         />
                         <OButton
@@ -367,7 +367,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </span>
                             <span
                               v-if="isEnvQuickModeField(row.name)"
-                              class="ml-1 flex items-center"
+                              class="ms-1 flex items-center"
                             >
                               <img
                                 :src="quickModeIcon"
@@ -571,7 +571,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       style="width: fit-content"
                     >
                       <span class="font-semibold">
-                        <OIcon name="info" class="mr-1" size="sm" />
+                        <OIcon name="info" class="me-1" size="sm" />
 
                         {{
                           t("logStream.extendedRetentionInfo", {
@@ -660,7 +660,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         :disabled="!selectedFields.length || hasUDSFieldInSelection"
                         @click="updateDefinedSchemaFields"
                       >
-                        <span class="mr-1 flex items-center justify-start gap-1">
+                        <span class="me-1 flex items-center justify-start gap-1">
                           <OIcon name="verified-user" size="sm" />
                           <OIcon name="format-list-bulleted" size="sm" />
                         </span>

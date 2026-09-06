@@ -73,7 +73,7 @@ const retryDelayMs = computed({
     data-test="synthetics-check-retries"
   >
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
-      <div class="rounded-default bg-accent mr-2 h-4 w-0.75 shrink-0" />
+      <div class="rounded-default bg-accent me-2 h-4 w-0.75 shrink-0" />
       <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.scheduleAlert.retries") }}
       </h3>

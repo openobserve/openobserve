@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Tool-specific rendering -->
     <div v-if="isToolObservation && toolContent !== null" class="tool-content flex h-full flex-col">
       <div v-if="toolMetadata" class="mb-2 flex flex-wrap items-center gap-2">
-        <OTag v-if="toolMetadata.name" type="toolMeta" value="tool" class="mr-2">{{
+        <OTag v-if="toolMetadata.name" type="toolMeta" value="tool" class="me-2">{{
           t("traces.lLMContentRenderer.tool", { name: toolMetadata.name })
         }}</OTag>
         <OTag v-if="toolMetadata.callId" type="toolMeta" value="callid">{{
@@ -246,6 +246,7 @@ import { computed, defineAsyncComponent, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import DOMPurify from "dompurify";
 import { marked } from "marked";
+import { extractGenAiPartText } from "./genAiParts";
 
 const { t } = useI18nTyped();
 
@@ -482,15 +483,31 @@ const formatContent = (content: any): string => {
   if (Array.isArray(content)) {
     const parts: string[] = [];
     for (const part of content) {
+      const genAiText = extractGenAiPartText(part);
       if (part.type === "text" && part.text) {
         parts.push(part.text);
+      } else if (genAiText != null) {
+        // OTel GenAI v5 parts (reasoning, tool_call, tool_call_response, ...) —
+        // kept in sync with the Thread tab via genAiParts.ts.
+        parts.push(genAiText);
       } else if (part.type === "image_url" && part.image_url?.url) {
         parts.push(raw(`[Image: ${part.image_url.url}]`));
       } else if (part.type === "image" && part.source) {
         // Handle Anthropic-style image content
         parts.push(raw(`[Image: ${part.source.type || "base64"}]`));
+      } else if (part.type === "blob") {
+        // OTel GenAI v5 BlobPart — never show the raw base64 payload.
+        parts.push(raw(`[${part.modality ?? "Blob"}: ${part.mime_type ?? "binary"}]`));
+      } else if (part.type === "file") {
+        parts.push(raw(`[File: ${part.file_id ?? part.mime_type ?? "unknown"}]`));
+      } else if (part.type === "uri") {
+        parts.push(raw(`[${part.modality ?? "Uri"}: ${part.uri ?? ""}]`));
+      } else if (typeof part?.type === "string") {
+        // Unrecognised part type — same "[type]" marker as the Thread tab
+        // (threadView.utils.ts), not a raw JSON dump.
+        parts.push(raw(`[${part.type}]`));
       } else {
-        // Fallback for unknown part types
+        // No `type` at all to build a marker from — last-resort raw dump.
         parts.push(JSON.stringify(part));
       }
     }
@@ -514,13 +531,18 @@ const parsedContentJson = computed(() => {
   return JSON.stringify(parsedContent.value, null, 2);
 });
 
+// A message body is either the legacy `content` field or, for OTel GenAI
+// semconv v5 messages, the `parts` array — `formatContent` already knows how
+// to render both shapes.
+const messageBody = (msg: any) => formatContent(msg.content ?? msg.parts);
+
 // Extract messages
 const parsedMessages = computed(() => {
   // Handle array of messages (input format)
   if (isMessagesArray.value) {
     return (parsedContent.value as any[]).map((msg: any) => ({
       role: msg.role || "unknown",
-      content: formatContent(msg.content),
+      content: messageBody(msg),
     }));
   }
 
@@ -530,7 +552,7 @@ const parsedMessages = computed(() => {
     return [
       {
         role: msg.role || "assistant",
-        content: formatContent(msg.content),
+        content: messageBody(msg),
       },
     ];
   }

@@ -53,7 +53,7 @@ use self::{
     labels::load_series_labels,
     series_capacity::{initial_series_capacity, series_fragment_hint},
 };
-pub use self::{load_labels::LabelColumn, series_capacity::batch_run_len};
+pub(crate) use self::{load_labels::LabelColumn, series_capacity::batch_run_len};
 use super::utils::{apply_label_selector, apply_matchers};
 
 pub(super) type PartitionedMetrics = Vec<HashMap<u64, RangeValue>>;

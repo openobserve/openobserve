@@ -644,6 +644,73 @@ describe("TraceDetailsSidebar", async () => {
     });
   });
 
+  // OTel GenAI semconv v5 (issue #14127): gen_ai_system_instructions is a
+  // Part[] array. This must recognise the same part types as the Preview
+  // message renderer (LLMContentRenderer.vue) and the Thread tab
+  // (threadView.utils.ts), not just `type: "text"`.
+  describe("System instructions parsing (parsedSystemInstructions)", () => {
+    it("renders a reasoning part, not just text parts", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "reasoning", content: "Always be concise." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
+    });
+
+    it("still renders a plain text part (regression check)", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "text", content: "Always be concise." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
+    });
+
+    it("joins multiple parts with a newline", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "text", content: "Be concise." },
+            { type: "text", content: "Never make up facts." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Be concise.\nNever make up facts.");
+    });
+
+    it("renders a `thinking`-typed part (a real-world alias for reasoning)", () => {
+      const w = mountSidebar({
+        span: {
+          ...mockSpan,
+          gen_ai_system_instructions: JSON.stringify([
+            { type: "thinking", content: "Always be concise." },
+          ]),
+        },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe("Always be concise.");
+    });
+
+    it("returns null when there are no system instructions", () => {
+      const w = mountSidebar({
+        span: { ...mockSpan, gen_ai_system_instructions: undefined },
+      });
+
+      expect(w.vm.parsedSystemInstructions).toBe(null);
+    });
+  });
+
   describe("Service information in Attributes tab", () => {
     it("should display service information", () => {
       const attributesTable = wrapper.find('[data-test="trace-details-sidebar-attributes-table"]');

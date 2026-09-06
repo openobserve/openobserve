@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <div class="border-card-glass-border rounded-default mt-3 border border-solid">
-    <div class="text-text-heading mb-2 ml-1 text-base font-bold">
+    <div class="text-text-heading ms-1 mb-2 text-base font-bold">
       {{ t("traces.correlation.distributedTrace") }}
     </div>
 
@@ -49,7 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               icon-left="content-copy"
               variant="ghost"
               size="icon-sm"
-              class="ml-1"
+              class="ms-1"
               @click="copyTraceId"
             >
               <OTooltip :content="t('traces.correlation.copyTraceId')" />
@@ -71,22 +71,22 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Span Hierarchy -->
         <div v-if="hasBackendTrace" class="mb-3">
           <div class="text-text-label mb-1">{{ t("traces.correlation.spanHierarchy") }}</div>
-          <div class="ml-3">
+          <div class="ms-3">
             <div class="flex items-center py-1 text-sm">
-              <OIcon name="circle" size="xs" class="mr-1" />
+              <OIcon name="circle" size="xs" class="me-1" />
               <span class="text-text-secondary">{{ t("traces.correlation.applicationSpan") }}</span>
             </div>
-            <div class="ml-3 flex items-center py-1 text-sm">
-              <OIcon name="arrow-right" size="sm" class="mr-1" />
-              <OIcon name="circle" size="xs" class="mr-1" />
+            <div class="ms-3 flex items-center py-1 text-sm">
+              <OIcon name="arrow-right" size="sm" class="me-1" />
+              <OIcon name="circle" size="xs" class="me-1" />
               <span class="text-text-secondary"
                 >{{ t("traces.correlation.browserSdkSpanPrefix") }}{{ formatSpanId(spanId)
                 }}{{ t("traces.correlation.closingParen") }}</span
               >
             </div>
-            <div class="ml-4 flex items-center py-1 text-sm" v-if="backendSpanCount > 0">
-              <OIcon name="arrow-right" size="sm" class="mr-1" />
-              <OIcon name="circle" size="xs" class="mr-1" />
+            <div class="ms-4 flex items-center py-1 text-sm" v-if="backendSpanCount > 0">
+              <OIcon name="arrow-right" size="sm" class="me-1" />
+              <OIcon name="circle" size="xs" class="me-1" />
               <span class="text-text-secondary"
                 >{{ t("traces.correlation.backendSpansPrefix") }}{{ backendSpanCount
                 }}{{ t("traces.correlation.closingParen") }}</span
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :disabled="!hasBackendTrace"
             @click="viewTraceDetails"
           >
-            <OIcon name="git-branch" size="sm" class="mr-1" />
+            <OIcon name="git-branch" size="sm" class="me-1" />
             {{ t("traces.correlation.viewTraceDetails") }}
             <OTooltip
               v-if="!hasBackendTrace"
@@ -173,7 +173,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Missing trace notice -->
         <div v-if="!hasBackendTrace && traceId" class="bg-surface-accent rounded-default mt-3 p-2">
           <div class="flex items-center">
-            <OIcon name="info" size="sm" class="mr-2" />
+            <OIcon name="info" size="sm" class="me-2" />
             <div class="text-text-secondary text-xs">
               {{ t("traces.correlation.backendTraceNotAvailable") }}
             </div>

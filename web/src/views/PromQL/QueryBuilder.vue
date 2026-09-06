@@ -47,11 +47,11 @@
               @click="copyQuery"
               :disabled="!generatedQuery"
             >
-              <OIcon name="content-copy" size="xs" class="mr-1" />
+              <OIcon name="content-copy" size="xs" class="me-1" />
               {{ t("metrics.queryBuilder.copyQuery") }}
             </OButton>
             <OButton variant="outline" size="sm-action" @click="clearQuery">
-              <OIcon name="close" size="xs" class="mr-1" />
+              <OIcon name="close" size="xs" class="me-1" />
               {{ t("metrics.queryBuilder.clearAll") }}
             </OButton>
             <OButton
@@ -60,7 +60,7 @@
               @click="testQuery"
               :disabled="!generatedQuery"
             >
-              <OIcon name="play-arrow" size="xs" class="mr-1" />
+              <OIcon name="play-arrow" size="xs" class="me-1" />
               {{ t("metrics.queryBuilder.testQuery") }}
             </OButton>
           </div>
