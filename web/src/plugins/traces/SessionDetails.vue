@@ -55,9 +55,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <OButton
           v-if="canManualEvaluate"
-          variant="primary"
+          variant="outline"
           size="sm"
-          icon-left="play-circle"
           data-test="session-detail-evaluate-btn"
           @click="manualEvaluationOpen = true"
         >
