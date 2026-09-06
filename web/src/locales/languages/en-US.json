@@ -11284,8 +11284,8 @@
         },
         "searchPlaceholder": "Search Items...",
         "csvImport": {
-          "button": "Upload CSV",
-          "title": "Upload Dataset Items",
+          "button": "Import Items",
+          "title": "Import Dataset Items",
           "description": "Import dataset items from a CSV file.",
           "fileLabel": "CSV file",
           "placeholder": "Choose a CSV file",
