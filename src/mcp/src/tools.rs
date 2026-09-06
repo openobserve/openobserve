@@ -360,10 +360,15 @@ pub fn init_mcp_tools(api: &OpenApi) -> Result<()> {
     let spec = rmcp_openapi::Spec::from_value(api_json)?;
 
     let zo_config = config::get_config();
-    // Include ZO_BASE_URI so tool calls hit the routes actually mounted under it
+    // Include ZO_BASE_URI so tool calls hit the routes actually mounted under it, and take the
+    // scheme from the listener's own TLS setting: with ZO_HTTP_TLS_ENABLED=true a hardcoded
+    // http:// speaks cleartext to a TLS port, so every tool call fails while initialize and
+    // tools/list — served by the MCP layer itself — keep succeeding.
     let base_url = url::Url::parse(&format!(
-        "http://localhost:{}{}",
-        zo_config.http.port, zo_config.common.base_uri
+        "{}://localhost:{}{}",
+        config::cluster::get_http_schema(),
+        zo_config.http.port,
+        zo_config.common.base_uri
     ))
     .map_err(|e| anyhow::anyhow!("Invalid base URL: {e}"))?;
 
