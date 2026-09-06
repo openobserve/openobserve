@@ -989,12 +989,9 @@ fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::Usage
         // guards a future negative one, not a case that fires now.
         let size = if row.size > 0.0 { row.size as u64 } else { 0 };
         match row.event {
-            // All five step events share a counter, labelled by event: §4.3's
-            // `executed / defined` ratio is then one PromQL division.
+            // §4.3's executed/defined ratio is one PromQL division only if these share a counter.
             UsageEvent::SyntheticsBrowserSteps
             | UsageEvent::SyntheticsProtocolSteps
-            | UsageEvent::SyntheticsFreeBrowserSteps
-            | UsageEvent::SyntheticsFreeProtocolSteps
             | UsageEvent::_SyntheticsStepsDefined => {
                 config::metrics::SYNTHETICS_STEPS_TOTAL
                     .with_label_values(&[row.org_id.as_str(), row.event.to_string().as_str()])
@@ -1006,114 +1003,10 @@ fn record_step_usage_metrics(usage: &[config::meta::self_reporting::usage::Usage
                     .with_label_values(&[row.org_id.as_str()])
                     .inc_by(size);
             }
-            // Other dimensions' rows travel through the shared usage type. The
-            // catch-all does mean a SIXTH synthetics event would be silently
-            // uncounted until added above.
+            // A NEW synthetics event is silently uncounted until it is added above.
             _ => {}
         }
     }
-}
-
-/// The org's one-time free step grant as it stands right now — SPEC §6.1, item
-/// 2.3. Handed to `job_api::ack`, which decides §4.2's free/billable split.
-///
-/// Ordering matters: the `customer_billings` read (the only way to spot an
-/// ExternalContract org, which §7.3 says to never pool-gate) is issued ONLY while
-/// the org still has grant left, so past that a request costs one counter read.
-#[cfg(feature = "cloud")]
-async fn resolve_step_pool(org_id: &str) -> openobserve_synthetics::job_api::StepPoolViews {
-    // Both grants: this runs before `ack` reads the row that says which one the
-    // job spends from. Two in-memory counter reads, not two DB round trips.
-    let browser = openobserve_core::trial_quota::synthetics_steps_remaining(org_id, true);
-    let protocol = openobserve_core::trial_quota::synthetics_steps_remaining(org_id, false);
-    // Each grant decides for itself — summing would report an org whose browser
-    // pool is spent as still funded, and bill its browser steps as free.
-    //
-    // `> 0` first: a spent grant is billable whatever the plan says, so the
-    // `customer_billings` read is skipped once BOTH are gone.
-    let is_contract = (browser > 0 || protocol > 0)
-        && o2_enterprise::enterprise::cloud::ai_credits::resolve_ai_credit_exhaustion_policy(
-            org_id,
-        )
-        .await
-        .requires_additional_credits();
-    openobserve_synthetics::job_api::StepPoolViews {
-        browser: step_pool_view(browser, is_contract),
-        protocol: step_pool_view(protocol, is_contract),
-    }
-}
-
-/// SPEC §6.1 / §7.3 — the free/billable decision for one ack, as arithmetic.
-#[cfg(feature = "cloud")]
-fn step_pool_view(
-    remaining: u64,
-    is_contract: bool,
-) -> openobserve_synthetics::job_api::StepPoolView {
-    use openobserve_synthetics::job_api::StepPoolView;
-
-    if remaining == 0 {
-        // §7.3, E16/T31 — grant gone, so metered overage. A Free org never got
-        // here; its slot was skipped at the enqueue.
-        return StepPoolView::Spent;
-    }
-    if is_contract {
-        // §7.3, E18/T36 — *"never pool-gate"*. §7.4 needs the ack billable so
-        // the NoOp provider advances a step-denominated true-up.
-        return StepPoolView::NotApplicable;
-    }
-    StepPoolView::Funded
-}
-
-/// §8.1: a build without `cloud` has no pool, so every ack is `NotApplicable`.
-#[cfg(not(feature = "cloud"))]
-async fn resolve_step_pool(_org_id: &str) -> openobserve_synthetics::job_api::StepPoolViews {
-    openobserve_synthetics::job_api::StepPoolViews::uniform(
-        openobserve_synthetics::job_api::StepPoolView::NotApplicable,
-    )
-}
-
-/// Applies the free-pool movement one ack owes — SPEC §6.3, item 2.3.
-///
-/// Idempotent on `(synthetics_id, location, scheduled_ts, job_id)`, which
-/// `job_api` built into `idempotency_key`. A refund saturates and a top-up is
-/// NEVER refused (E14) — enforcement belongs at the next enqueue.
-#[cfg(feature = "cloud")]
-fn apply_pool_adjustment(resp: &openobserve_synthetics::job_api::AckResponse) {
-    let Some(adjustment) = resp.pool_adjustment.as_ref() else {
-        return;
-    };
-    openobserve_core::trial_quota::synthetics_steps_adjust(
-        &adjustment.org_id,
-        adjustment.is_browser,
-        core_movement(adjustment.movement),
-        &adjustment.idempotency_key,
-    );
-}
-
-/// Translate `openobserve-synthetics`'s movement into the pool's own. No
-/// compiler checks that this maps the two directions the right way round;
-/// inverted, every refund becomes a second charge against a one-time grant the
-/// org can never get back.
-#[cfg(feature = "cloud")]
-fn core_movement(
-    movement: openobserve_synthetics::job_api::PoolMovement,
-) -> openobserve_core::trial_quota::PoolAdjustment {
-    use openobserve_synthetics::job_api::StepPoolDirection;
-
-    match movement.direction {
-        StepPoolDirection::Refund => {
-            openobserve_core::trial_quota::PoolAdjustment::Refund(movement.steps)
-        }
-        StepPoolDirection::TopUp => {
-            openobserve_core::trial_quota::PoolAdjustment::TopUp(movement.steps)
-        }
-    }
-}
-
-/// §8.1: no pool on this build, so nothing to apply.
-#[cfg(not(feature = "cloud"))]
-fn apply_pool_adjustment(resp: &openobserve_synthetics::job_api::AckResponse) {
-    let _ = resp;
 }
 
 /// Runs one job ack through the enterprise service plus the per-ack side effects
@@ -1127,13 +1020,7 @@ async fn process_ack(
     let error = req.error.clone();
     let checked_at = config::utils::time::now_micros();
 
-    let resp =
-        openobserve_synthetics::job_api::ack(req, token_org, resolve_step_pool(token_org).await)
-            .await?;
-
-    // SPEC §4.1 step 3h / §6.3, item 2.3 — the free-pool reconcile. Returned as
-    // data for the reason `report_step_usage` gives for the usage rows.
-    apply_pool_adjustment(&resp);
+    let resp = openobserve_synthetics::job_api::ack(req, token_org).await?;
 
     // Emit trigger usage record for synthetics telemetry.
     usage_reporting::publish_triggers_usage(config::meta::self_reporting::usage::TriggerData {
@@ -1797,7 +1684,6 @@ mod tests {
             failing_locations: Vec::new(),
             passing_locations: Vec::new(),
             usage_events,
-            pool_adjustment: None,
         }
     }
 
@@ -1807,6 +1693,14 @@ mod tests {
             size,
             ..UsageData::init_for_reflection()
         }
+    }
+
+    /// A comment names what it forbids, so a scan of one passes on prose alone.
+    fn code_only(src: &str) -> String {
+        src.lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
     }
 
     /// SPEC §4.1 step 3g. A batch is one probe's lease cycle: every ack in it
@@ -1842,7 +1736,7 @@ mod tests {
     /// so this test's own source does not count towards its totals.
     #[test]
     fn every_ack_path_reports_the_usage_it_produced() {
-        let source = include_str!("mod.rs");
+        let source = code_only(include_str!("mod.rs"));
         // One definition plus one call per path: run the ack, send its usage rows.
         for (needle, what) in [
             (["process", "_ack("].concat(), "runs an ack"),
@@ -1879,7 +1773,7 @@ mod tests {
         };
         (
             steps("SyntheticsBrowserSteps"),
-            steps("SyntheticsFreeBrowserSteps"),
+            steps("SyntheticsProtocolSteps"),
             steps("_SyntheticsStepsDefined"),
             config::metrics::SYNTHETICS_BROWSER_MS_TOTAL
                 .with_label_values(&[org])
@@ -1920,30 +1814,55 @@ mod tests {
         ]);
 
         let after = recorded(org);
-        assert_eq!(after.0 - before.0, 4, "billed steps");
-        assert_eq!(after.1 - before.1, 0, "nothing came out of the free pool");
+        assert_eq!(after.0 - before.0, 4, "browser steps");
+        assert_eq!(after.1 - before.1, 0, "this ack carried no protocol steps");
         assert_eq!(after.2 - before.2, 14, "defined steps");
         assert_eq!(after.3 - before.3, 9_100, "browser milliseconds");
     }
 
-    /// **§9B.1 row 4.** §4.2 emits exactly one step event per ack, and the free
-    /// and billable ones answer opposite questions — the invoice line versus
-    /// §6.1's grant burning down. Folded together, a free org would show as
-    /// generating revenue.
+    /// **§9B.1 row 4.** Browser and protocol steps meter at different rates; folding hides the mix.
     #[test]
-    fn free_pool_consumption_is_counted_apart_from_billable_steps() {
-        let org = "o9b1-free";
+    fn both_step_events_reach_the_step_counter() {
+        let org = "o9b1-both";
         let before = recorded(org);
 
         record(&[
-            usage_row(org, UsageEvent::SyntheticsFreeBrowserSteps, 28.0),
-            usage_row(org, UsageEvent::_SyntheticsStepsDefined, 28.0),
+            usage_row(org, UsageEvent::SyntheticsBrowserSteps, 4.0),
+            usage_row(org, UsageEvent::SyntheticsProtocolSteps, 9.0),
         ]);
 
         let after = recorded(org);
-        assert_eq!(after.0 - before.0, 0, "a free ack is not billable steps");
-        assert_eq!(after.1 - before.1, 28);
-        assert_eq!(after.2 - before.2, 28);
+        assert_eq!(after.0 - before.0, 4, "browser steps");
+        assert_eq!(after.1 - before.1, 9, "protocol steps");
+    }
+
+    /// A step event the counter's match does not name falls to its catch-all and counts as nothing.
+    #[test]
+    fn every_step_event_is_named_in_the_counter_match() {
+        let source = code_only(include_str!("mod.rs"));
+        // Assembled at runtime so this test's own text is not a second call site.
+        let body = source
+            .split_once(&["fn record_step_usage", "_metrics("].concat())
+            .expect("the §9B.1 emit counter")
+            .1;
+        let end = body.find("\n}\n").expect("end of the emit counter");
+        let body = &body[..end];
+
+        for event in [
+            "SyntheticsBrowserSteps",
+            "SyntheticsProtocolSteps",
+            "_SyntheticsStepsDefined",
+            "_SyntheticsBrowserMs",
+        ] {
+            assert!(
+                body.contains(event),
+                "`{event}` is not named in the counter, so its rows go silently uncounted",
+            );
+        }
+        assert!(
+            !body.contains(&["Synthetics", "Free"].concat()),
+            "no free step event exists for an arm to match",
+        );
     }
 
     /// Milliseconds and steps are different units, so `browser_ms` must never
@@ -2027,7 +1946,7 @@ mod tests {
     /// return is unreachable from a test, and that mutation survived once.
     #[test]
     fn the_emit_hand_off_counts_what_it_sends() {
-        let source = include_str!("mod.rs");
+        let source = code_only(include_str!("mod.rs"));
         assert_eq!(
             source
                 .matches(&["record_step_usage", "_metrics("].concat())
@@ -2055,85 +1974,39 @@ mod tests {
         }
     }
 
-    /// SPEC §6.1 / §7.3 — every grant state maps to exactly one answer, and the
-    /// wrong answer is invisible: `Funded` with the grant gone is free service;
-    /// `Spent`/`NotApplicable` with grant left invoices work §6.1 gave away.
-    #[cfg(feature = "cloud")]
+    /// The ack computes no pool movement, so no `cfg` shape here may resolve, pass, or apply one.
     #[test]
-    fn the_step_pool_view_is_spec_6_1_and_7_3() {
-        use openobserve_synthetics::job_api::StepPoolView;
+    fn the_ack_call_site_carries_no_pool_plumbing() {
+        let source = code_only(include_str!("mod.rs"));
+        // Assembled at runtime so this test's own text cannot satisfy the scan.
+        for banned in [
+            ["resolve_step", "_pool"].concat(),
+            ["step_pool", "_view"].concat(),
+            ["apply_pool", "_adjustment"].concat(),
+            ["core", "_movement"].concat(),
+        ] {
+            assert!(
+                !source.contains(&banned),
+                "`{banned}` belongs to the pool plumbing the neutral ack removes",
+            );
+        }
 
-        use super::step_pool_view;
-
-        // The grant still has room.
-        assert_eq!(step_pool_view(1, false), StepPoolView::Funded);
-        assert_eq!(step_pool_view(10_000, false), StepPoolView::Funded);
-
-        // Spent ⇒ metered overage (E16/T31).
-        assert_eq!(step_pool_view(0, false), StepPoolView::Spent);
-
-        // A contract org with grant left is never pool-gated (E18/T36). It cannot
-        // be asked about a SPENT grant: `resolve_step_pool` short-circuits at
-        // `remaining == 0`, so `is_contract` is never computed there.
-        assert_eq!(step_pool_view(10_000, true), StepPoolView::NotApplicable);
-    }
-
-    /// No compiler checks that the two crates' directions map the right way
-    /// round; inverted, every refund becomes a second charge.
-    #[cfg(feature = "cloud")]
-    #[test]
-    fn a_refund_stays_a_refund_across_the_crate_boundary() {
-        use openobserve_synthetics::job_api::{PoolMovement, StepPoolDirection};
-
-        use super::core_movement;
-
-        assert_eq!(
-            core_movement(PoolMovement {
-                direction: StepPoolDirection::Refund,
-                steps: 10,
-            }),
-            openobserve_core::trial_quota::PoolAdjustment::Refund(10),
-        );
-        assert_eq!(
-            core_movement(PoolMovement {
-                direction: StepPoolDirection::TopUp,
-                steps: 4,
-            }),
-            openobserve_core::trial_quota::PoolAdjustment::TopUp(4),
-        );
-    }
-
-    /// The same guarantee for the OTHER half of an ack — SPEC §4.1 step 3h, §6.3.
-    ///
-    /// Under a ONE-TIME grant (§6.1) a dropped refund is a step the org never gets
-    /// back and a dropped top-up one it never pays for, silently: the ack still
-    /// returns 200 and the usage row is still written.
-    #[test]
-    fn every_ack_path_applies_the_pool_reconcile_it_computed() {
-        let source = include_str!("mod.rs");
-        // Two `cfg`-split definitions plus one call, for each half.
-        assert_eq!(
-            source.matches(&["resolve_step", "_pool("].concat()).count(),
-            3,
-            "one `cloud` definition, one non-`cloud` definition and exactly one call site are \
-             expected for the step that resolves the org's grant"
-        );
-        assert_eq!(
-            source
-                .matches(&["apply_pool", "_adjustment("].concat())
-                .count(),
-            3,
-            "one `cloud` definition, one non-`cloud` definition and exactly one call site are \
-             expected for the step that applies the movement the ack returned"
-        );
-
-        // The hand-off to the pool itself; emptying it never reconciles anything.
-        assert_eq!(
-            source
-                .matches(&["trial_quota::synthetics_steps", "_adjust("].concat())
-                .count(),
-            1,
-            "the hand-off to the free step pool is gone; no reconcile is ever applied"
+        let body = source
+            .split_once(&["async fn process", "_ack("].concat())
+            .expect("the shared ack path")
+            .1;
+        let end = body.find("\n}\n").expect("end of process_ack");
+        let body = &body[..end];
+        // A bare `ack(` and a path-qualified one are both conforming; a self-call is neither.
+        let hands_off_the_ack = body.match_indices(&["ack", "("].concat()).any(|(at, _)| {
+            body[..at]
+                .chars()
+                .next_back()
+                .is_none_or(|c| !c.is_alphanumeric() && c != '_')
+        });
+        assert!(
+            hands_off_the_ack,
+            "`process_ack` must still hand the request to the ack",
         );
     }
 }

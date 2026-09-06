@@ -127,6 +127,13 @@ pub const ERROR_SOURCE_QUEUE: &str = "queue";
 /// the other three point at the probe fleet, this one points at the scheduler.
 pub const ERROR_SOURCE_ORPHAN: &str = "orphan";
 
+/// `error_source` for a job no probe ever ran — the reaper's dead letter.
+///
+/// Both halves of that dead letter (`synthetics_results` and `triggers`) carry
+/// it: the three failure paths share one stream and one `status`, so a rule can
+/// only tell them apart by this value.
+pub const ERROR_SOURCE_DISPATCH: &str = "dispatch";
+
 /// What a completed run should send, if anything.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AlertOutcome {
