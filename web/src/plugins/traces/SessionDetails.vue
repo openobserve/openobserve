@@ -53,6 +53,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #actions>
+        <TraceAnnotateMenu
+          v-if="canAnnotate"
+          ref-type="session"
+          :ref-id="sessionId"
+          :ref-trace-start-time="sessionEvaluationRange.startTime"
+          :source-stream="streamName"
+          compact
+          data-test="session-detail-annotate-btn"
+        />
         <OButton
           v-if="canManualEvaluate"
           variant="outline"
@@ -936,6 +945,9 @@ import { renderMarkdown } from "./markdown";
 const ManualEvaluationDialog = defineAsyncComponent(
   () => import("@/enterprise/components/onlineEvals/ManualEvaluationDialog.vue"),
 );
+const TraceAnnotateMenu = defineAsyncComponent(
+  () => import("@/enterprise/components/AIObservability/TraceAnnotateMenu.vue"),
+);
 
 const { t } = useI18nTyped();
 const route = useRoute();
@@ -1003,6 +1015,21 @@ const canManualEvaluate = computed(() => {
   );
 });
 const manualEvaluationOpen = ref(false);
+
+// Same enterprise gate as manual evaluation minus the online-eval flag —
+// queuing a session for human review does not require the eval engine.
+const canAnnotate = computed(() => {
+  const range = sessionEvaluationRange.value;
+  return (
+    hasLlmSessionData.value &&
+    (config.isEnterprise === "true" || config.isCloud === "true") &&
+    Boolean(orgIdentifier.value) &&
+    Boolean(streamName.value) &&
+    Boolean(sessionId.value) &&
+    Number.isFinite(range.startTime) &&
+    range.startTime > 0
+  );
+});
 
 // Per-turn rollups used by the KPI sub-lines. All values are measured from the
 // real trace rows returned by the session-detail API.
