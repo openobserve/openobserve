@@ -46,7 +46,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OButton
           variant="outline"
           size="sm"
-          icon-left="cloud-upload"
           :disabled="!dataset"
           data-test="ai-dataset-detail-upload-csv"
           @click="openCsvImport"
