@@ -10959,6 +10959,7 @@
       "viewAll": "View experiments",
       "baseline": "Baseline",
       "setBaseline": "Set baseline",
+      "baselineError": "Failed to update the baseline",
       "selectForComparison": "Select for comparison",
       "progress": "{done} of {total} slots",
       "noScores": "No aggregate scores",

@@ -138,6 +138,8 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   completedAt: number | null;
   lifecycleVersion: number;
   retryCount: number;
+  /** At most one Experiment per Dataset carries this. */
+  isBaseline: boolean;
   createdBy: string;
   createdAt: number;
 }
@@ -537,6 +539,7 @@ function normalizeExperiment(input: any): LlmExperiment {
     completedAt: value(input, "completedAt", "completed_at", null),
     lifecycleVersion: Number(value(input, "lifecycleVersion", "lifecycle_version", 0)),
     retryCount: Number(value(input, "retryCount", "retry_count", 0)),
+    isBaseline: value(input, "isBaseline", "is_baseline", false) === true,
     createdBy: value(input, "createdBy", "created_by", ""),
     createdAt: Number(value(input, "createdAt", "created_at", 0)),
   };
@@ -937,6 +940,23 @@ const llmExperimentsService = {
     overrides: ExperimentClonePayload = {},
   ): Promise<LlmExperiment> {
     const response = await http().post(`${base(orgId)}/${experimentId}/clone`, overrides);
+    return normalizeExperiment(response.data);
+  },
+
+  /** Makes this Experiment the Baseline for its Dataset (at most one at a time). */
+  async setBaseline(
+    orgId: string,
+    experimentId: string,
+  ): Promise<{ experiment: LlmExperiment; previousBaselineId: string | null }> {
+    const response = await http().put(`${base(orgId)}/${experimentId}/baseline`);
+    return {
+      experiment: normalizeExperiment(response.data?.experiment),
+      previousBaselineId: value(response.data, "previousBaselineId", "previous_baseline_id", null),
+    };
+  },
+
+  async clearBaseline(orgId: string, experimentId: string): Promise<LlmExperiment> {
+    const response = await http().delete(`${base(orgId)}/${experimentId}/baseline`);
     return normalizeExperiment(response.data);
   },
 };

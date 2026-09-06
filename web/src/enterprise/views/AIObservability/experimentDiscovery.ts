@@ -125,7 +125,6 @@ export function experimentEvidence(detail?: ExperimentDetail): ExperimentEvidenc
 export function groupExperiments(
   experiments: LlmExperiment[],
   datasetNames: Map<string, string>,
-  baselineByDataset: Record<string, string>,
   datasetFilter: string,
   nameSearch: string,
 ): ExperimentDatasetGroup[] {
@@ -141,9 +140,8 @@ export function groupExperiments(
     datasetId,
     datasetName: datasetNames.get(datasetId) ?? datasetId,
     experiments: rows.sort((left, right) => {
-      const baselineId = baselineByDataset[datasetId];
-      if (left.id === baselineId) return -1;
-      if (right.id === baselineId) return 1;
+      if (left.isBaseline) return -1;
+      if (right.isBaseline) return 1;
       return right.createdAt - left.createdAt || left.id.localeCompare(right.id);
     }),
   }));
@@ -165,23 +163,4 @@ export function comparisonEligibility(experiments: LlmExperiment[]): {
     return { eligible: false, reason: "different_dataset" };
   }
   return { eligible: true, reason: null };
-}
-
-export function readExperimentBaselines(orgId: string): Record<string, string> {
-  if (!orgId) return {};
-  try {
-    const parsed = JSON.parse(localStorage.getItem(`o2_experiment_baselines_${orgId}`) ?? "{}");
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-export function writeExperimentBaselines(orgId: string, baselines: Record<string, string>) {
-  if (!orgId) return;
-  try {
-    localStorage.setItem(`o2_experiment_baselines_${orgId}`, JSON.stringify(baselines));
-  } catch {
-    // The selection remains available for the current page if storage is unavailable.
-  }
 }

@@ -215,6 +215,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :loading="loading"
               compact
               @open-filtered="openExperiments"
+              @refresh="refreshExperiments"
+              @baseline-changed="onBaselineChanged"
             />
           </OContent>
         </OTabPanel>
@@ -520,6 +522,14 @@ async function refresh() {
   } finally {
     loading.value = false;
   }
+}
+
+function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string | null) {
+  experiments.value = experiments.value.map((row) => {
+    if (row.id === experiment.id) return experiment;
+    if (previousBaselineId && row.id === previousBaselineId) return { ...row, isBaseline: false };
+    return row;
+  });
 }
 
 async function refreshExperiments() {

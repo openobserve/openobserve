@@ -38,6 +38,7 @@
           @new="openCreate"
           @refresh="refresh"
           @select="openExperiment"
+          @baseline-changed="onBaselineChanged"
           sync-url
         />
       </section>
@@ -74,6 +75,15 @@ const experiments = ref<LlmExperiment[]>([]);
 const experimentDetails = ref<Record<string, ExperimentDetail>>({});
 const datasets = ref<LlmDataset[]>([]);
 const loading = ref(false);
+
+function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string | null) {
+  experiments.value = experiments.value.map((row) => {
+    if (row.id === experiment.id) return experiment;
+    if (previousBaselineId && row.id === previousBaselineId) return { ...row, isBaseline: false };
+    return row;
+  });
+}
+
 async function refresh() {
   if (!orgId.value) return;
   loading.value = true;

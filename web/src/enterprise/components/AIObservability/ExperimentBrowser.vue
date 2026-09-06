@@ -223,6 +223,7 @@
                   ? t('aiObservability.experiments.clearBaseline')
                   : t('aiObservability.experiments.setBaseline')
               "
+              :disabled="baselineChangingId === row.id"
               :data-test="`ai-experiment-baseline-${row.id}`"
               @click.stop="toggleBaseline(row)"
             />
@@ -269,9 +270,7 @@ import {
   comparisonEligibility,
   experimentEvidence,
   groupExperiments,
-  readExperimentBaselines,
   type ComparisonIneligibilityReason,
-  writeExperimentBaselines,
 } from "@/enterprise/views/AIObservability/experimentDiscovery";
 import {
   aiExperimentCompareRoute,
@@ -295,11 +294,14 @@ const props = withDefaults(
   { details: () => ({}), fixedDatasetId: "", compact: false, syncUrl: false, loading: false },
 );
 
-defineEmits<{
+const emit = defineEmits<{
   select: [experimentId: string];
   new: [datasetId: string];
   "open-filtered": [datasetId: string];
   refresh: [];
+  /** The full row refetch a `refresh` triggers is overkill for a single flag
+   *  flip, so the parent patches its own list in place from this instead. */
+  "baseline-changed": [experiment: LlmExperiment, previousBaselineId: string | null];
 }>();
 
 const { t } = useI18nTyped();
@@ -310,7 +312,7 @@ const initialDataset =
 const datasetFilter = ref(initialDataset);
 const cloningId = ref("");
 const nameSearch = ref(props.syncUrl ? String(route.query.experiment ?? "") : "");
-const baselineByDataset = ref(readExperimentBaselines(props.orgId));
+const baselineChangingId = ref("");
 const selectedIds = ref<string[]>([]);
 const collapsedGroups = ref<string[]>([]);
 
@@ -421,7 +423,6 @@ const groups = computed(() =>
   groupExperiments(
     props.experiments,
     datasetNames.value,
-    baselineByDataset.value,
     props.fixedDatasetId || datasetFilter.value,
     nameSearch.value,
   ),
@@ -435,13 +436,6 @@ const comparisonReason = computed(() => {
   const reason = comparison.value.reason;
   return reason ? translateComparisonReason(reason) : raw("");
 });
-
-watch(
-  () => props.orgId,
-  (orgId) => {
-    baselineByDataset.value = readExperimentBaselines(orgId);
-  },
-);
 
 watch(
   () => [route.query.dataset, route.query.experiment, route.query.baseline, route.query.candidate],
@@ -536,7 +530,7 @@ function costLabel(experiment: LlmExperiment) {
 }
 
 function isBaseline(experiment: LlmExperiment) {
-  return baselineByDataset.value[experiment.datasetId] === experiment.id;
+  return experiment.isBaseline;
 }
 
 // Cloning opens the create form seeded from the source rather than starting a
@@ -562,22 +556,32 @@ async function cloneExperiment(experiment: LlmExperiment) {
   }
 }
 
-function toggleBaseline(experiment: LlmExperiment) {
-  const next = { ...baselineByDataset.value };
-  if (next[experiment.datasetId] === experiment.id) {
-    // One baseline per dataset, so clearing is a delete rather than a write of
-    // some empty value — a "" left behind would still match a stale id lookup.
-    delete next[experiment.datasetId];
-    baselineByDataset.value = next;
-    writeExperimentBaselines(props.orgId, next);
-    return;
+async function toggleBaseline(experiment: LlmExperiment) {
+  baselineChangingId.value = experiment.id;
+  try {
+    if (experiment.isBaseline) {
+      const updated = await llmExperimentsService.clearBaseline(props.orgId, experiment.id);
+      emit("baseline-changed", updated, null);
+    } else {
+      const { experiment: updated, previousBaselineId } = await llmExperimentsService.setBaseline(
+        props.orgId,
+        experiment.id,
+      );
+      emit("baseline-changed", updated, previousBaselineId);
+      // Pinning starts a comparison from the new baseline. Clearing does not
+      // touch the selection: dropping the pin is not a statement about what
+      // to compare.
+      selectedIds.value = [experiment.id];
+    }
+  } catch (error: any) {
+    toast({
+      variant: "error",
+      message:
+        raw(error?.response?.data?.message) || t("aiObservability.experiments.baselineError"),
+    });
+  } finally {
+    baselineChangingId.value = "";
   }
-  next[experiment.datasetId] = experiment.id;
-  baselineByDataset.value = next;
-  writeExperimentBaselines(props.orgId, next);
-  // Pinning starts a comparison from the new baseline. Clearing does not touch
-  // the selection: dropping the pin is not a statement about what to compare.
-  selectedIds.value = [experiment.id];
 }
 
 function comparisonDisabled(experiment: LlmExperiment) {
@@ -623,13 +627,12 @@ function toggleComparison(experiment: LlmExperiment) {
     rejectComparison("select_only_two");
     return;
   } else {
-    const baselineId = baselineByDataset.value[experiment.datasetId];
-    const baselineCanSeed =
-      baselineId &&
-      baselineId !== experiment.id &&
-      props.experiments.some(({ id }) => id === baselineId);
+    const baseline = props.experiments.find(
+      (row) => row.datasetId === experiment.datasetId && row.isBaseline,
+    );
+    const baselineCanSeed = baseline && baseline.id !== experiment.id;
     selectedIds.value = baselineCanSeed
-      ? [baselineId, experiment.id]
+      ? [baseline.id, experiment.id]
       : [...selectedIds.value, experiment.id];
   }
 }
@@ -637,7 +640,9 @@ function toggleComparison(experiment: LlmExperiment) {
 function openComparison() {
   if (!comparison.value.eligible) return;
   const datasetId = selectedExperiments.value[0].datasetId;
-  const configuredBaseline = baselineByDataset.value[datasetId];
+  const configuredBaseline = props.experiments.find(
+    (row) => row.datasetId === datasetId && row.isBaseline,
+  )?.id;
   const baseline =
     selectedExperiments.value.find(({ id }) => id === configuredBaseline) ??
     selectedExperiments.value[0];
