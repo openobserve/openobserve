@@ -49,6 +49,7 @@ vi.mock("@/composables/useSyntheticResults", () => {
         lastRunStatus: "passed",
         lastRunAt: Date.now() - 120_000,
       }),
+      bucketsByEnv: ref(new Map()),
       buckets: ref([
         {
           tsMs: 1_700_000_000_000,
@@ -350,6 +351,8 @@ function mountRuns(
     monitorName: string;
     monitorStatus?: string;
     checkType?: string;
+    environments?: string[];
+    environmentScope?: string;
   } = {
     monitorId: "mon-1",
     monitorName: "Test Monitor",
@@ -400,6 +403,71 @@ describe("MonitorRuns", () => {
     });
   });
 
+  // "Don't show env machinery on single-env or unscoped checks" — every env
+  // surface keys off the check having at least two environments.
+  describe("environment awareness", () => {
+    it("should render the env breakdown card only from two environments up", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        environments: ["cloud", "ap1"],
+      });
+      expect(wrapper.find('[data-test="monitor-runs-env-breakdown"]').exists()).toBe(true);
+      wrapper.unmount();
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        environments: ["ap1"],
+      });
+      expect(wrapper.find('[data-test="monitor-runs-env-breakdown"]').exists()).toBe(false);
+    });
+
+    it("should add the environment column only for a multi-env check", () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        environments: ["cloud", "ap1"],
+      });
+      const withEnv = (wrapper.vm as any).runColumns.map((c: { id: string }) => c.id);
+      expect(withEnv).toContain("environment");
+      // Right where the review's mock puts it: directly after status.
+      expect(withEnv[1]).toBe("environment");
+      wrapper.unmount();
+      wrapper = mountRuns();
+      const without = (wrapper.vm as any).runColumns.map((c: { id: string }) => c.id);
+      expect(without).not.toContain("environment");
+    });
+
+    it("should thread the scope into every query the page issues", async () => {
+      wrapper = mountRuns({
+        monitorId: "mon-1",
+        monitorName: "Test Monitor",
+        environments: ["cloud", "ap1"],
+        environmentScope: "ap1",
+      });
+      await flushPromises();
+      const vm = wrapper.vm as any;
+      await vm.refresh(1_700_000_000_000_000, 1_700_003_600_000_000);
+      await flushPromises();
+      expect(mockFetchAll).toHaveBeenCalledWith(
+        "mon-1",
+        1_700_000_000_000_000,
+        1_700_003_600_000_000,
+        "ap1",
+        // Scoped: the split is meaningless with one env selected.
+        false,
+      );
+      await wrapper.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "steps");
+      await flushPromises();
+      expect(mockFetchSteps).toHaveBeenCalledWith(
+        "mon-1",
+        1_700_000_000_000_000,
+        1_700_003_600_000_000,
+        "ap1",
+      );
+    });
+  });
+
   describe("exposed refresh method", () => {
     it("should call fetchAll when refresh is invoked", async () => {
       wrapper = mountRuns();
@@ -413,6 +481,9 @@ describe("MonitorRuns", () => {
         "mon-1",
         1_700_000_000_000_000,
         1_700_003_600_000_000,
+        // No environment scope, and no split — a single-env page has one series.
+        undefined,
+        false,
       );
     });
 
@@ -464,6 +535,7 @@ describe("MonitorRuns", () => {
         "mon-1",
         1_700_000_000_000_000,
         1_700_003_600_000_000,
+        undefined,
       );
     });
 
@@ -500,6 +572,7 @@ describe("MonitorRuns", () => {
         "mon-1",
         1_700_010_000_000_000,
         1_700_013_600_000_000,
+        undefined,
       );
     });
 
@@ -525,6 +598,7 @@ describe("MonitorRuns", () => {
         "mon-1",
         1_700_010_000_000_000,
         1_700_013_600_000_000,
+        undefined,
       );
     });
   });

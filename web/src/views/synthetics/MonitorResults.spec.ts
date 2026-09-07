@@ -79,14 +79,23 @@ vi.mock("@/lib/feedback/Toast/useToast", () => ({
   toast: vi.fn(() => vi.fn()),
 }));
 
+// MonitorRuns is stubbed at mount, but its MODULE still loads with the page,
+// and the real composable's import chain reaches @/stores, which cannot
+// initialise under vitest. Same mock MonitorRuns.spec uses, for the same reason.
+vi.mock("@/composables/useSyntheticResults", () => ({
+  default: () => ({}),
+}));
+
 // Mock syntheticsService.get — called via bootstrap() when MonitorRuns emits
 // need-check-data (only when there are zero runs and no lastTriggeredAt).
 const mockSyntheticsServiceGet = vi.fn().mockResolvedValue({
   data: { name: "Test Monitor", status: "healthy", last_triggered_at: 0 },
 });
+const mockListEnvironments = vi.fn().mockResolvedValue({ data: [] });
 vi.mock("@/services/synthetics", () => ({
   default: {
     get: (...args: any[]) => mockSyntheticsServiceGet(...args),
+    listEnvironments: (...args: any[]) => mockListEnvironments(...args),
     run: vi.fn().mockResolvedValue({}),
   },
 }));
@@ -131,6 +140,10 @@ function makeWrapper() {
           template: '<span class="obadge-stub"><slot /></span>',
           props: ["variant", "size", "icon", "dot"],
         },
+        OSelect: {
+          template: '<select class="oselect-stub" :data-test="$attrs[\'data-test\']" />',
+          props: ["modelValue", "options", "size"],
+        },
         ODrawer: {
           template: `
             <div class="odrawer-stub">
@@ -150,7 +163,15 @@ function makeWrapper() {
               <button data-test="trigger-jump-to-window" @click="$emit('jump-to-window', 1000, 2000)" />
             </div>
           `,
-          props: ["monitorId", "monitorName", "monitorStatus", "lastTriggeredAt", "checkType"],
+          props: [
+            "monitorId",
+            "monitorName",
+            "monitorStatus",
+            "lastTriggeredAt",
+            "checkType",
+            "environments",
+            "environmentScope",
+          ],
         },
         RunDetail: {
           template: '<div data-test="run-detail" />',
@@ -210,6 +231,67 @@ describe("MonitorResults", () => {
       const header = wrapper.find('[data-test="app-page-header"]');
       expect(header.text()).toContain("Test Monitor");
       expect(wrapper.find('[data-test="beta-badge"]').exists()).toBe(true);
+    });
+
+    it("should title the page from the fetched check, not the deep link", async () => {
+      // Rename-safe: the ?name= param is only the pre-fetch fallback.
+      mockSyntheticsServiceGet.mockResolvedValueOnce({
+        data: { name: "Renamed Check", status: "healthy", last_triggered_at: 0 },
+      });
+      wrapper = makeWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="app-page-header"]').text()).toContain("Renamed Check");
+    });
+
+    it("should offer the environment scope only from two environments up", async () => {
+      wrapper = makeWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetic-monitor-results-env-scope"]').exists()).toBe(
+        false,
+      );
+      wrapper.unmount();
+
+      mockSyntheticsServiceGet.mockResolvedValueOnce({
+        data: {
+          name: "Test Monitor",
+          status: "healthy",
+          last_triggered_at: 0,
+          environments: ["e1", "e2"],
+        },
+      });
+      mockListEnvironments.mockResolvedValueOnce({
+        data: [
+          { id: "e1", name: "cloud" },
+          { id: "e2", name: "ap1" },
+        ],
+      });
+      wrapper = makeWrapper();
+      await flushPromises();
+      expect(wrapper.find('[data-test="synthetic-monitor-results-env-scope"]').exists()).toBe(true);
+    });
+
+    it("should restore the scope from ?env= and pass it to MonitorRuns", async () => {
+      routeQuery = { name: "Test Monitor", status: "healthy", env: "ap1" };
+      mockSyntheticsServiceGet.mockResolvedValueOnce({
+        data: {
+          name: "Test Monitor",
+          status: "healthy",
+          last_triggered_at: 0,
+          environments: ["e1", "e2"],
+        },
+      });
+      mockListEnvironments.mockResolvedValueOnce({
+        data: [
+          { id: "e1", name: "cloud" },
+          { id: "e2", name: "ap1" },
+        ],
+      });
+      wrapper = makeWrapper();
+      await flushPromises();
+      const runs = wrapper.findComponent('[data-test="monitor-runs"]') as any;
+      expect(runs.props("environmentScope")).toBe("ap1");
+      // A deleted env id resolves to nothing and drops out of the options.
+      expect(runs.props("environments")).toEqual(["cloud", "ap1"]);
     });
 
     it("should render MonitorRuns child component", async () => {
@@ -370,6 +452,9 @@ describe("MonitorResults", () => {
 
     it("should handle missing name gracefully with default title", async () => {
       routeQuery = {};
+      // No deep-linked name AND no fetched check — only then is the generic
+      // title the right render; a successful fetch always names the page.
+      mockSyntheticsServiceGet.mockRejectedValueOnce(new Error("network"));
       wrapper = makeWrapper();
       await flushPromises();
 

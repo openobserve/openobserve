@@ -26,7 +26,7 @@ import type { SyntheticsVariable } from "@/types/synthetics";
 export type ValueDisplay = { kind: "secret"; isSet: boolean } | { kind: "plain"; isSet: boolean };
 
 export function valueDisplay(variable: SyntheticsVariable): ValueDisplay {
-  return { kind: variable.kind, isSet: variable.has_value };
+  return { kind: variable.kind, isSet: variable.has_value ?? false };
 }
 
 /**

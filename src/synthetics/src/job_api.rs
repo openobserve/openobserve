@@ -1454,8 +1454,14 @@ pub async fn resolve(req: ResolveRequest, token_org: &str) -> anyhow::Result<Res
         .map(|r| r.trigger_type)
         .unwrap_or_else(|| "schedule".to_string());
 
-    let metadata: serde_json::Value =
+    let mut metadata: serde_json::Value =
         serde_json::from_str(&check.metadata).unwrap_or(serde_json::json!({}));
+    // Stamped per JOB, not in the enqueue-time metadata blob: that blob is built
+    // once per run while fan-out gives every job its own environment.
+    if let Some(env_id) = check.env.as_deref() {
+        metadata["environment"] =
+            serde_json::json!(environment_display_name(&check.org_id, env_id).await);
+    }
 
     // SSRF policy from the location registry: private locations run relaxed
     // (probing the customer's own network is the point), everything else strict.
@@ -1911,6 +1917,16 @@ pub async fn ack(
         pool_adjustment,
         failing_environments,
     })
+}
+
+/// The environment name a result row is stamped with — the id when the lookup
+/// fails, the same degradation `environment_names` chose.
+pub(crate) async fn environment_display_name(org_id: &str, env_id: &str) -> String {
+    let conn = get_orm_client_rw().await;
+    match infra::table::synthetics_environments::get_by_id(conn, org_id, env_id).await {
+        Ok(Some(env)) => env.name,
+        _ => env_id.to_string(),
+    }
 }
 
 /// Failing environment IDs for a run, mapped to the names a reader recognises.

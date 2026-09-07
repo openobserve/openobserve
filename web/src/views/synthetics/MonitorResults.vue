@@ -37,6 +37,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </template>
     <template #actions>
+      <!-- Page-level scope, peer of the time range: it changes what every
+           widget below means, which is why it does not live in the table's
+           filter bar. Hidden below two environments by design. -->
+      <OSelect
+        v-if="envNames.length >= 2"
+        :model-value="envScope"
+        :options="envScopeOptions"
+        size="sm"
+        :aria-label="t('synthetics.results.environmentScope')"
+        data-test="synthetic-monitor-results-env-scope"
+        @update:model-value="onEnvScopeChange(String($event))"
+      />
       <DateTime
         ref="dateTimeRef"
         auto-apply
@@ -91,6 +103,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :last-triggered-at="lastTriggeredAt"
         :check-type="checkType"
         :retries="retries"
+        :environments="envNames"
+        :environment-scope="envScope === ENV_SCOPE_ALL ? '' : envScope"
         @edit="editMonitor"
         @open-run="openRunDetail"
         @open-run-error="openRunError"
@@ -121,6 +135,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         class="ms-3"
       >
         {{ drawerRunStatus.label }}
+      </OBadge>
+      <OBadge
+        v-if="drawerEnvironment"
+        variant="default"
+        size="sm"
+        icon="layers"
+        data-test="synthetics-run-drawer-env-badge"
+      >
+        {{ drawerEnvironment }}
       </OBadge>
       <!-- See RunDetail's URL badge: `truncate` must sit on the inner text, not
            on OBadge's inline-flex root, or the URL is cut with no ellipsis. -->
@@ -161,6 +184,7 @@ import OBadge from "@/lib/core/Badge/OBadge.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import type { BadgeVariant } from "@/lib/core/Badge/OBadge.types";
 import ODrawer from "@/lib/overlay/Drawer/ODrawer.vue";
+import OSelect from "@/lib/forms/Select/OSelect.vue";
 import BetaBadge from "@/components/common/BetaBadge.vue";
 import MonitorRuns from "@/views/synthetics/MonitorRuns.vue";
 import RunDetail from "@/views/synthetics/RunDetail.vue";
@@ -200,7 +224,33 @@ const resolvedCheckType = computed(() => (checkTypeReady.value ? checkType.value
 const DEFAULT_RELATIVE = "15m";
 
 const monitorId = computed(() => String(route.params.id ?? ""));
-const monitorName = computed(() => String(route.query.name ?? "") || t("synthetics.results.title"));
+// The check GET is authoritative; `?name=` only bridges the pre-fetch render,
+// so a renamed check never shows a stale deep-linked name.
+const checkName = ref("");
+const monitorName = computed(
+  () => checkName.value || String(route.query.name ?? "") || t("synthetics.results.title"),
+);
+
+// Sentinel, not "": an environment could legitimately be named "all".
+const ENV_SCOPE_ALL = "__all__";
+/** The check's environment NAMES, in the check's configured order. */
+const envNames = ref<string[]>([]);
+const envScope = ref(ENV_SCOPE_ALL);
+const envScopeOptions = computed(() => [
+  { label: t("synthetics.results.allEnvironments"), value: ENV_SCOPE_ALL },
+  ...envNames.value.map((name) => ({ label: raw(name), value: name })),
+]);
+
+function onEnvScopeChange(value: string) {
+  envScope.value = value;
+  const next = { ...route.query };
+  if (value === ENV_SCOPE_ALL) delete next.env;
+  else next.env = value;
+  router.replace({ query: next }).catch(() => {});
+  nextTick(() => {
+    runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
+  });
+}
 // `?folder=` carries the folder ID (the server gates RBAC on it); the header
 // wants the name, so resolve it against the folder list Vuex already holds.
 const folderId = computed(() => String(route.query.folder ?? ""));
@@ -254,6 +304,7 @@ const drawerRunStatus = ref<{
 } | null>(null);
 const drawerUrl = ref("");
 const drawerTimestamp = ref("");
+const drawerEnvironment = ref("");
 
 function onRunStatusUpdate(status: {
   variant: BadgeVariant;
@@ -261,10 +312,12 @@ function onRunStatusUpdate(status: {
   label: I18nText;
   url: string;
   timestamp: string;
+  environment?: string;
 }) {
   drawerRunStatus.value = status;
   drawerUrl.value = status.url;
   drawerTimestamp.value = status.timestamp;
+  drawerEnvironment.value = status.environment ?? "";
 }
 
 function onDrawerClose(open: boolean) {
@@ -273,6 +326,7 @@ function onDrawerClose(open: boolean) {
     drawerUrl.value = "";
     drawerTimestamp.value = "";
     drawerErrorRecord.value = null;
+    drawerEnvironment.value = "";
     // Clear drawer query params
     const next = { ...route.query };
     delete next.run;
@@ -446,6 +500,8 @@ onMounted(() => {
   if (!readFromUrl()) {
     applyRelative(DEFAULT_RELATIVE);
   }
+  const envQ = route.query.env;
+  if (typeof envQ === "string" && envQ) envScope.value = envQ;
   writeToUrl();
   // On a deep link / refresh the folder list is not in the store yet, so the
   // header subtitle would fall back to the raw folder ID. Cheap and cached.
@@ -477,8 +533,10 @@ async function fetchCheck() {
     if (res?.data) {
       lastTriggeredAt.value = Number(res.data.last_triggered_at) || 0;
       checkType.value = res.data.type ?? "browser";
+      checkName.value = String(res.data.name ?? "");
       // The flaky tiles are only answerable when the check is allowed to retry.
       retries.value = Number(res.data.retries ?? res.data.settings?.retries ?? 0) || 0;
+      await resolveEnvironmentNames((res.data.environments ?? []) as string[]);
     }
   } catch (err: any) {
     if (err?.response?.status === 404) {
@@ -488,6 +546,30 @@ async function fetchCheck() {
     }
   } finally {
     checkTypeReady.value = true;
+  }
+}
+
+/** Check env ids → the names rows are stamped with; deleted ids drop out. */
+async function resolveEnvironmentNames(envIds: string[]) {
+  if (!envIds.length) {
+    envNames.value = [];
+    return;
+  }
+  try {
+    const res = await syntheticsService.listEnvironments(orgIdentifier.value);
+    const byId = new Map(
+      ((res?.data ?? []) as { id: string; name: string }[]).map((e) => [e.id, e.name]),
+    );
+    envNames.value = envIds.map((id) => byId.get(id)).filter((n): n is string => !!n);
+    // The first fetch raced this lookup and ran env-blind; now that the check
+    // is known to be multi-env, re-query so All mode gets its per-env series.
+    if (envNames.value.length >= 2 && envScope.value === ENV_SCOPE_ALL) {
+      await nextTick();
+      runsRef.value?.refresh?.(timeRange.value.startTime, timeRange.value.endTime);
+    }
+  } catch {
+    // No scope control is a degraded render, not an error state.
+    envNames.value = [];
   }
 }
 </script>

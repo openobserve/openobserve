@@ -184,9 +184,9 @@ function hintsLine(row: InheritedUnionRow): I18nText {
   return raw(`${row.name} — ${hints.join(" · ")}`);
 }
 
-function gapText(row: InheritedUnionRow): string {
+function gapText(row: InheritedUnionRow): I18nText | undefined {
   const missing = props.gaps.get(row.name);
-  if (!missing?.length) return "";
+  if (!missing?.length) return undefined;
   return missing.length > 2
     ? t("synthetics.inherited.notInMany", { count: missing.length })
     : t("synthetics.inherited.notIn", { envs: missing.join(", ") });

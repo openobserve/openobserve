@@ -43,7 +43,7 @@ already says which scope you are in, so there is no Environment column.
         <!-- Fixed width, not a max: sized to content this block would change
              width with the environment name, and the flex-1 search beside it
              would resize on every scope change. -->
-        <OTooltip side="bottom" :content="`${scopeLabel} — ${scopeSummary}`">
+        <OTooltip side="bottom" :content="raw(`${scopeLabel} — ${scopeSummary}`)">
           <div class="flex w-80 shrink-0 items-center gap-2" data-test="synthetics-scope-summary">
             <!-- The name absorbs the overflow and the count is pinned: sharing
                  one truncating flow would drop the count first, and it is the
@@ -83,7 +83,7 @@ already says which scope you are in, so there is no Environment column.
       </template>
 
       <template #cell-kind="{ row }">
-        <OBadge :variant="row.kind === 'secret' ? 'warning' : 'secondary'">
+        <OBadge :variant="row.kind === 'secret' ? 'warning' : 'default'">
           {{
             row.kind === "secret"
               ? t("synthetics.variables.kindSecret")
@@ -418,6 +418,7 @@ export default defineComponent({
 
     return {
       t,
+      raw,
       columns,
       filterQuery,
       visibleRows,
