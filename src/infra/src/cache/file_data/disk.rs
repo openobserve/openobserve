@@ -119,6 +119,7 @@ pub struct FileData {
     max_size: usize,
     cur_size: usize,
     root_dir: String,
+    canonical_root: OnceLock<PathBuf>,
     multi_dir: Vec<String>,
     file_type: FileType,
     data: CacheStrategy,
@@ -227,6 +228,7 @@ impl FileData {
                 cfg.common.data_cache_dir,
                 storage::format_key("", true),
             ),
+            canonical_root: OnceLock::new(),
             multi_dir: cfg
                 .disk_cache
                 .multi_dir
@@ -247,8 +249,28 @@ impl FileData {
         format!("{}{}{}", self.root_dir, self.choose_multi_dir(file), file)
     }
 
+    /// Resolve a cache key to an on-disk path, returning `None` when it would
+    /// escape `root_dir`. The cache namespace is flat, so a `..`/absolute key or
+    /// any path that canonicalizes outside the cache root is a traversal attempt.
+    fn safe_read_path(&self, file: &str) -> Option<String> {
+        if key_escapes(file) {
+            return None;
+        }
+        let path = self.get_file_path(file);
+        let canonical_root = match self.canonical_root.get() {
+            Some(root) => root,
+            None => {
+                let root = std::fs::canonicalize(&self.root_dir).ok()?;
+                let _ = self.canonical_root.set(root);
+                self.canonical_root.get()?
+            }
+        };
+        let resolved = std::fs::canonicalize(&path).ok()?;
+        resolved.starts_with(canonical_root).then_some(path)
+    }
+
     async fn get(&self, file: &str, range: Option<Range<u64>>) -> Option<Bytes> {
-        let file_path = self.get_file_path(file);
+        let file_path = self.safe_read_path(file)?;
         tokio::task::spawn_blocking(move || match get_file_contents(&file_path, range) {
             Ok(data) => Some(Bytes::from(data)),
             Err(_) => None,
@@ -259,7 +281,7 @@ impl FileData {
     }
 
     async fn get_size(&self, file: &str) -> Option<usize> {
-        let file_path = self.get_file_path(file);
+        let file_path = self.safe_read_path(file)?;
         match get_file_size(&file_path) {
             Ok(v) => Some(v as usize),
             Err(_) => None,
@@ -619,6 +641,13 @@ pub async fn init() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+fn key_escapes(file: &str) -> bool {
+    use std::path::Component;
+    Path::new(file)
+        .components()
+        .any(|c| !matches!(c, Component::Normal(_) | Component::CurDir))
+}
+
 #[inline]
 fn get_file_reader(file: &str) -> Option<&FileData> {
     if !get_config().disk_cache.enabled {
@@ -644,7 +673,13 @@ pub async fn get_opts(file: &str, options: GetOptions) -> object_store::Result<G
             source: Box::new(std::io::Error::other("file not found")),
         });
     };
-    let path = PathBuf::from(files.get_file_path(file));
+    let Some(safe_path) = files.safe_read_path(file) else {
+        return Err(object_store::Error::NotFound {
+            path: file.to_string(),
+            source: Box::new(std::io::Error::other("file not found")),
+        });
+    };
+    let path = PathBuf::from(safe_path);
     let (metadata, fp) = std::fs::File::open(&path)
         .and_then(|f| Ok((f.metadata()?, f)))
         .map_err(|e| object_store::Error::NotFound {
@@ -706,7 +741,13 @@ pub async fn get_ranges(file: &str, ranges: &[Range<u64>]) -> object_store::Resu
             source: Box::new(std::io::Error::other("file not found")),
         });
     };
-    let path = PathBuf::from(files.get_file_path(file));
+    let Some(safe_path) = files.safe_read_path(file) else {
+        return Err(object_store::Error::NotFound {
+            path: file.to_string(),
+            source: Box::new(std::io::Error::other("file not found")),
+        });
+    };
+    let path = PathBuf::from(safe_path);
     let ranges_owned: Vec<Range<u64>> = ranges.to_vec();
     let file_label = file.to_string();
 
@@ -1435,6 +1476,51 @@ async fn write_tmp_file(file: &str, data: Bytes) -> Result<(String, String), any
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn key_escapes_rejects_traversal_and_absolute() {
+        assert!(key_escapes("../etc/passwd"));
+        assert!(key_escapes("files/../../etc/passwd"));
+        assert!(key_escapes("/etc/passwd"));
+        assert!(!key_escapes(
+            "files/default/logs/disk/2022/10/03/10/1_1_1.parquet"
+        ));
+        assert!(!key_escapes(
+            "metrics_results/default/2022/10/03/10/x_1_2_3.pb"
+        ));
+    }
+
+    #[tokio::test]
+    async fn safe_read_path_blocks_traversal_allows_legit() {
+        let mut file_data = FileData::with_capacity_and_cache_strategy(
+            FileType::Data,
+            get_config().disk_cache.max_size,
+            "lru",
+        );
+        let file_key = "files/default/logs/disk/2022/10/03/10/traversal_guard_1.parquet";
+        let content = Bytes::from("legit-bytes");
+        let (file_key, tmp_file) = write_tmp_file(file_key, content.clone()).await.unwrap();
+        file_data
+            .set(&file_key, &tmp_file, content.len())
+            .await
+            .unwrap();
+
+        // legit cached key still reads
+        assert_eq!(file_data.get(&file_key, None).await, Some(content.clone()));
+
+        // a secret planted above the cache root must not be reachable via traversal
+        let secret = format!(
+            "{}../escape_target_{}.txt",
+            file_data.root_dir,
+            std::process::id()
+        );
+        std::fs::write(&secret, b"TOP SECRET").unwrap();
+        let evil = format!("../escape_target_{}.txt", std::process::id());
+        assert!(file_data.get(&evil, None).await.is_none());
+        assert!(file_data.get_size(&evil).await.is_none());
+        assert!(file_data.get("/etc/hosts", None).await.is_none());
+        let _ = std::fs::remove_file(&secret);
+    }
 
     #[tokio::test]
     async fn test_disk_lru_cache_set_file() {
