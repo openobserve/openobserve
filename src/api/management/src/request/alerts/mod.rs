@@ -1664,25 +1664,39 @@ pub async fn clone_alert(
                     .ok()
                     .flatten()
             {
-                #[cfg(feature = "enterprise")]
-                if composite_subject_unauthorized(
-                    &_composite.definition,
-                    &user_email.user_id,
-                    "GET",
-                )
-                .await
-                {
-                    return MetaHttpResponse::forbidden("Unauthorized Access");
-                }
-                // clone_composite falls back to the source folder internally, so
-                // authorize the folder the clone actually lands in.
+                // Resolved here so the folder authorized below is the one written.
+                let dst_folder = req_body
+                    .folder_id
+                    .clone()
+                    .filter(|f| !f.is_empty())
+                    .unwrap_or_else(|| _composite.definition.folder_id.clone());
                 #[cfg(feature = "enterprise")]
                 {
-                    let dst_folder = req_body
-                        .folder_id
-                        .clone()
-                        .filter(|f| !f.is_empty())
-                        .unwrap_or_else(|| _composite.definition.folder_id.clone());
+                    // The composite itself, not only the alerts it references.
+                    if !check_permissions(
+                        &alert_id_str,
+                        &org_id,
+                        &user_email.user_id,
+                        "alerts",
+                        "GET",
+                        Some(&_composite.definition.folder_id),
+                        false,
+                        true,
+                        false,
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
+                    if composite_subject_unauthorized(
+                        &_composite.definition,
+                        &user_email.user_id,
+                        "GET",
+                    )
+                    .await
+                    {
+                        return MetaHttpResponse::forbidden("Unauthorized Access");
+                    }
                     if !check_folder_write_permissions(
                         &org_id,
                         &user_email.user_id,
@@ -1698,7 +1712,7 @@ pub async fn clone_alert(
                     &org_id,
                     &alert_id_str,
                     req_body.name,
-                    req_body.folder_id,
+                    Some(dst_folder),
                     "api".to_string(),
                 )
                 .await
@@ -1717,8 +1731,7 @@ pub async fn clone_alert(
             }
             #[cfg(feature = "enterprise")]
             {
-                // Source read, then the folder the clone actually lands in —
-                // clone_config inherits the source folder when none is given.
+                // Source read, then the folder the clone lands in, both resolved here.
                 let src_cfg =
                     match openobserve_core::anomaly_detection::get_config(&org_id, &alert_id_str)
                         .await
@@ -1773,7 +1786,7 @@ pub async fn clone_alert(
                     &org_id,
                     &alert_id_str,
                     req_body.name,
-                    req_body.folder_id,
+                    Some(dst_folder),
                 )
                 .await
                 {
