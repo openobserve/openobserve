@@ -18,7 +18,7 @@ use std::sync::Arc;
 use config::{
     get_config,
     meta::{
-        search::{Session as SearchSession, StorageType},
+        search::{ScanStats, Session as SearchSession, StorageType},
         stream::{FileKey, PartitionTimeLevel, StreamParams, StreamPartition, StreamType},
     },
     metrics::{self, QUERY_PARQUET_CACHE_RATIO_NODE},
@@ -190,6 +190,8 @@ pub(crate) async fn create_context(
 
     let schema = Arc::new(schema.to_owned().with_metadata(Default::default()));
 
+    cache_metrics_index_files(trace_id, org_id, &files).await;
+
     // Prune indexed metrics files through their `.midx` metrics indexes: matching
     // physical rows are attached to each FileKey before the metrics table is
     // built. Files of any other layout (legacy or not yet finalized hours) are
@@ -245,6 +247,44 @@ pub(crate) async fn create_context(
 
     // keep_filters=false only when the pruner proved its selections exact
     Ok(Some((ctx, schema, scan_stats, keep_filters)))
+}
+
+/// Prefetch the `.midx` sidecars like the Tantivy path prefetches `.ttv` files:
+/// misses download in the background, this query reads them from storage.
+async fn cache_metrics_index_files(trace_id: &str, org_id: &str, files: &[FileKey]) {
+    let sidecars = files
+        .iter()
+        .filter_map(|f| MetricsFileLayout::metrics_index_path(&f.key).map(|path| (f, path)))
+        .collect_vec();
+    if sidecars.is_empty() {
+        return;
+    }
+    let start = std::time::Instant::now();
+    // sidecar sizes are not tracked in file_list; 0 lets the downloader skip the size check
+    let mut sidecar_stats = ScanStats::default();
+    let (cache_type, cache_hits, cache_misses) = cache_files(
+        trace_id,
+        &sidecars
+            .iter()
+            .map(|(f, path)| (f.id, &f.account, path, 0, f.meta.max_ts))
+            .collect_vec(),
+        &mut sidecar_stats,
+        "midx",
+    )
+    .await;
+    metrics::QUERY_DISK_CACHE_HIT_COUNT
+        .with_label_values(&[org_id, &StreamType::Metrics.to_string(), "midx"])
+        .inc_by(cache_hits);
+    metrics::QUERY_DISK_CACHE_MISS_COUNT
+        .with_label_values(&[org_id, &StreamType::Metrics.to_string(), "midx"])
+        .inc_by(cache_misses);
+    log::info!(
+        "[trace_id {trace_id}] promql->search->storage: metrics index files {}, memory cached {}, disk cached {}, downloading others into {cache_type:?} in background, took: {} ms",
+        sidecars.len(),
+        sidecar_stats.querier_memory_cached_files,
+        sidecar_stats.querier_disk_cached_files,
+        start.elapsed().as_millis()
+    );
 }
 
 #[tracing::instrument(name = "promql:search:grpc:storage:get_file_list", skip(trace_id))]

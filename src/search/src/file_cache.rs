@@ -49,7 +49,7 @@ pub async fn cache_files(
             cache_misses += 1;
         }
 
-        let stream_type = if file_type == "index" {
+        let stream_type = if file_type == "index" || file_type == "midx" {
             config::meta::stream::StreamType::Index
         } else if file.contains("/logs/") {
             config::meta::stream::StreamType::Logs

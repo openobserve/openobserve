@@ -1926,6 +1926,59 @@ pub static TANTIVY_RESULT_CACHE_HITS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     .expect("Metric created")
 });
 
+// metrics for metrics index selection cache
+pub static METRICS_INDEX_SELECTION_CACHE_MEMORY_USAGE: Lazy<IntGaugeVec> = Lazy::new(|| {
+    IntGaugeVec::new(
+        Opts::new(
+            "metrics_index_selection_cache_memory_usage",
+            "Total memory usage (bytes) of metrics index selection cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static METRICS_INDEX_SELECTION_CACHE_GC_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "metrics_index_selection_cache_gc_total",
+            "Total number of GC of metrics index selection cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "metrics_index_selection_cache_requests_total",
+            "Total number of search of metrics index selection cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
+pub static METRICS_INDEX_SELECTION_CACHE_HITS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
+    IntCounterVec::new(
+        Opts::new(
+            "metrics_index_selection_cache_hits_total",
+            "Total number of hit of metrics index selection cache",
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+        &[],
+    )
+    .expect("Metric created")
+});
+
 pub static QUERY_AGGREGATION_CACHE_BYTES: Lazy<IntGaugeVec> = Lazy::new(|| {
     IntGaugeVec::new(
         Opts::new(
@@ -2947,6 +3000,22 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(TANTIVY_RESULT_CACHE_HITS_TOTAL.clone()))
         .expect("Metric registered");
 
+    // metrics for metrics index selection cache
+    registry
+        .register(Box::new(METRICS_INDEX_SELECTION_CACHE_MEMORY_USAGE.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(METRICS_INDEX_SELECTION_CACHE_GC_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(
+            METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL.clone(),
+        ))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(METRICS_INDEX_SELECTION_CACHE_HITS_TOTAL.clone()))
+        .expect("Metric registered");
+
     // metrics for generic bytes cache
     registry
         .register(Box::new(BYTES_CACHE_MEMORY_SIZE.clone()))
@@ -3548,6 +3617,10 @@ mod tests {
         let _ = TANTIVY_RESULT_CACHE_GC_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_REQUESTS_TOTAL.clone();
         let _ = TANTIVY_RESULT_CACHE_HITS_TOTAL.clone();
+        let _ = METRICS_INDEX_SELECTION_CACHE_MEMORY_USAGE.clone();
+        let _ = METRICS_INDEX_SELECTION_CACHE_GC_TOTAL.clone();
+        let _ = METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL.clone();
+        let _ = METRICS_INDEX_SELECTION_CACHE_HITS_TOTAL.clone();
         let _ = BYTES_CACHE_MEMORY_SIZE.clone();
         let _ = BYTES_CACHE_ENTRY_COUNT.clone();
         let _ = BYTES_CACHE_GC_TIME.clone();
