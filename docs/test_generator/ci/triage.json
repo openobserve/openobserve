@@ -1,0 +1,25 @@
+{
+  "feature_slug": "logs-build-query-saved-view",
+  "feature_title": "Logs Build Query — Apply Saved View",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsBuildQuerySavedView.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsBuildQuerySavedView.spec.js",
+  "playwright_group": "Logs-Features",
+  "source_files": [
+    "web/src/plugins/logs/BuildQueryPage.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The only changed path is web/src/plugins/logs/BuildQueryPage.vue, which is a standard open-source frontend path. It is not under any enterprise-owned directory (enterprise/, o2_enterprise/, src/enterprise/) and carries no enterprise keywords (cipher/SSO/SAML/RBAC/SDR/sensitive-data/logo-management), so the change is OSS.",
+    "skip": "Not skipped. There is no explicit opt-out (feature_hint and trigger_comment are both empty, no tests-added label) and the change is user-facing frontend behavior in web/src/**, so the no-user-facing-change skip does not apply.",
+    "e2e": "E2E is warranted: the diff adds a watcher on searchObj.meta.savedBuildConfig so that applying a saved view while already on the Build Query tab re-initializes the page (previously onMounted never re-read it). That is a user-exercisable UI flow change that needs verification.",
+    "area": "Logs. The changed file lives in web/src/plugins/logs/ (the Logs Build Query page) and sibling specs for that page live under tests/ui-testing/playwright-tests/Logs/.",
+    "group": "Logs-Features is the closest existing matrix shard: its actual_folder is Logs and it already contains logsQueryBuilder.spec.js and monaco-query-prefill.spec.js, which cover the Build Query page this change touches. (Note: ci_matrix.json does not exist in this repo; I read the equivalent tests/ui-testing/ci-matrix/ci_matrix_cloud.json.)",
+    "existing_tests": "No E2E specs in the diff — the only changed file is a .vue component, not a tests/ui-testing/playwright-tests/**/*.spec.js file."
+  }
+}

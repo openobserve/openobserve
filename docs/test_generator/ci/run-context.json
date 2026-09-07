@@ -1,0 +1,17 @@
+{
+  "feature_slug": "logs-build-query-saved-view",
+  "feature_title": "Logs Build Query — Apply Saved View",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "logsBuildQuerySavedView.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/logsBuildQuerySavedView.spec.js",
+  "playwright_group": "Logs-Features",
+  "source_files": [
+    "web/src/plugins/logs/BuildQueryPage.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

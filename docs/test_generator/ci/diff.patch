@@ -1,0 +1,39 @@
+===== COMPLETE LIST OF CHANGED FILES (1 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/plugins/logs/BuildQueryPage.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/plugins/logs/BuildQueryPage.vue b/web/src/plugins/logs/BuildQueryPage.vue
+index 54da7ff0708..4b54d40e94f 100644
+--- a/web/src/plugins/logs/BuildQueryPage.vue
++++ b/web/src/plugins/logs/BuildQueryPage.vue
+@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ </template>
+ 
+ <script setup lang="ts">
+-import { ref, onMounted, defineAsyncComponent, provide } from "vue";
++import { ref, onMounted, watch, defineAsyncComponent, provide } from "vue";
+ import { useRouter } from "vue-router";
+ import { useI18nTyped } from "@/types/i18n";
+ import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
+@@ -479,6 +479,19 @@ const addPanelToDashboard = () => {
+ // Watchers
+ // ============================================================================
+ 
++// Applying a saved view while already on the build tab does not remount this
++// component, so onMounted never re-reads savedBuildConfig. Re-initialize here so
++// the applied view is reflected. initializeFromQuery consumes and nulls it, so a
++// fresh non-null value always signals a newly applied saved view.
++watch(
++  () => searchObj.meta.savedBuildConfig,
++  (config) => {
++    if (config) {
++      initializeFromQuery();
++    }
++  },
++);
++
+ // NOTE: URL sync for build mode fields is handled by explicit actions (runQuery, apply)
+ // rather than a deep watcher. A deep watcher here would call router.push on every
+ // field/filter mutation, causing excessive history pushes. The explicit-action

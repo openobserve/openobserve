@@ -1,0 +1,13 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/logsBuildQuerySavedView.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/logsQueryBuilder-editor.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logsVisualizePersistence.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/monaco-query-prefill.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logsqueries.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/Logs/logs-regression.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers applying a saved view against the Build Query tab. logsQueryBuilder-* covers builder mode without saved views; logsVisualizePersistence covers tab persistence without saved views; monaco-query-prefill and logsqueries cover saved views only from the Logs tab (Monaco prefill), never the BuildQueryPage savedBuildConfig restore path. The PR headline (watch on searchObj.meta.savedBuildConfig re-initializing an already-open build tab) has zero coverage, so a brand-new Logs-area spec is required. Registered under the existing Logs-Features group in ci_matrix.json."
+}

@@ -1,0 +1,1 @@
+web/src/plugins/logs/BuildQueryPage.vue

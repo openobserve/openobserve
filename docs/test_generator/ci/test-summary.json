@@ -1,0 +1,7 @@
+[
+  { "title": "Applying a build-mode saved view while already on the Build Query tab re-initializes the builder", "action": "new", "verifies": "the savedBuildConfig watch re-runs initializeFromQuery so an already-open build tab reflects the applied saved view's chart" },
+  { "title": "Applying a build-mode saved view from the Logs tab opens the Build tab restored", "action": "new", "verifies": "the onMounted path flips to the build tab and restores the saved builder chart" },
+  { "title": "Applying a saved view with no buildData re-derives instead of restoring a saved chart", "action": "new", "verifies": "a saved view with no buildData falls back to re-deriving the default builder instead of restoring a phantom chart" },
+  { "title": "Re-applying the same build-mode saved view on the build tab restores again", "action": "new", "verifies": "a fresh savedBuildConfig re-fires the watch so re-applying the same view restores it each time" },
+  { "title": "Toggling away and back after applying a build-mode view re-derives the builder instead of restoring the saved chart", "action": "new", "verifies": "on re-toggle the builder re-derives from the current query rather than re-applying the saved chart type" }
+]
