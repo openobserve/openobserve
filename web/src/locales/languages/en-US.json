@@ -11103,7 +11103,7 @@
           "run": "Run"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Progress",
+        "progress": "Task Progress",
         "scoring": "Scoring",
         "scoringDistribution": "{success} successful · {failed} failed · {pending} pending · {skipped} skipped",
         "compare": "Compare",
