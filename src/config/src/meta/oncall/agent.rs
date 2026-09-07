@@ -1096,47 +1096,27 @@ fn last_verdict_block(rca_content: &str) -> Option<String> {
 
 /// The channels a follow-up verdict update may use.
 ///
-/// §5.2 names three and only three — "it rides channel/push/email" — so this is
-/// an **allowlist**, not a denylist of the urgent ones. The difference is not
-/// cosmetic: a denylist admits every channel added later by default, and the
-/// next channel added to this product would start carrying updates without
-/// anybody deciding that it should.
-///
-/// `Voice` and `Sms` are excluded because they are reserved for "a human is
-/// needed" rather than "news arrived". `Push` is *not* excluded even though it
-/// interrupts — it revises the message it already delivered
-/// ([`updates_in_place`]) and is where a responder already reading the page
-/// expects the answer to appear, which is a different question from whether it
-/// can wake somebody. That is why `!Channel::is_interrupting()` is the wrong
-/// predicate here.
+/// §5.2 names chat, push and email, so this is an **allowlist**: a denylist of
+/// the urgent ones would admit every channel this product adds later without
+/// anybody deciding that it should. Of the three, only email still exists —
+/// chat and push were removed with the rest of the channels nothing could send.
 pub fn update_channels(channels: &[Channel]) -> Vec<Channel> {
     channels
         .iter()
         .copied()
-        // An allowlist of the three §5.2 names, in the order the policy wrote
-        // them. A denylist of the urgent ones would admit every channel this
-        // product adds later, without anybody deciding that it should.
-        .filter(|c| matches!(c, Channel::Chat | Channel::Push | Channel::Email))
+        .filter(|c| matches!(c, Channel::Email))
         .collect()
 }
 
 /// The channel set a downgraded firing is notified on.
 ///
 /// §3: a `Downgrade` asks for *this firing* to ride quieter channels while the
-/// record keeps the severity the rule assigned. Quieter means "does not wake a
-/// sleeping person", so the interrupting channels are dropped — and if that
-/// would leave nothing, the original set is kept, because a downgrade may make
-/// a page quieter and may never make it disappear.
+/// record keeps the severity the rule assigned. No channel this build can send
+/// wakes a sleeping person, so there is nothing quieter to drop to — and a
+/// downgrade may make a page quieter, never make it disappear. Kept as the seam
+/// the caller already has for when an interrupting channel lands.
 pub fn quieter_channels(channels: &[Channel]) -> Vec<Channel> {
-    let quiet: Vec<Channel> = channels
-        .iter()
-        .copied()
-        .filter(|c| !c.is_interrupting())
-        .collect();
-    if quiet.is_empty() {
-        return channels.to_vec();
-    }
-    quiet
+    channels.to_vec()
 }
 
 /// The line every message on a promoted page carries.
@@ -1241,16 +1221,12 @@ pub fn verdict_lines(analysis: &AnalysisState, decision: &SeverityDecision) -> V
 /// Whether a channel can revise a message it has already delivered.
 ///
 /// §5.1: on chat, push and in-app the findings fill in **the same message**
-/// rather than arriving as a second notification. Email and SMS cannot be
-/// revised, so on those a verdict rides the one follow-up update instead —
+/// rather than arriving as a second notification. Neither channel this build
+/// can send is revisable, so a verdict always rides the one follow-up update —
 /// which is why the update has to be ledger-deduped and the edit does not.
 pub fn updates_in_place(channel: Channel) -> bool {
     match channel {
-        Channel::Chat | Channel::Push | Channel::InApp => true,
-        // Once an email or an SMS has gone, the finding cannot be taken back,
-        // which is why the follow-up update — not the edit — is the thing that
-        // has to be ledger-deduped.
-        Channel::Email | Channel::Sms | Channel::Voice | Channel::Webhook => false,
+        Channel::Email | Channel::Webhook => false,
     }
 }
 
@@ -3951,87 +3927,33 @@ mod tests {
     /// and quietly admits every channel this product adds later: the next
     /// transport to land would start carrying verdict updates because nobody
     /// wrote it down anywhere.
-    ///
-    /// The obvious shortcut, `!Channel::is_interrupting()`, is wrong twice
-    /// over: it drops push, which §5.2 names, and it admits in-app and webhook,
-    /// which §5.2 does not.
     #[test]
-    fn test_a_verdict_update_rides_only_the_three_channels_the_design_names() {
+    fn test_a_verdict_update_rides_only_the_channels_the_design_names() {
         assert_eq!(
-            update_channels(&[
-                Channel::Email,
-                Channel::Sms,
-                Channel::Voice,
-                Channel::Push,
-                Channel::Chat,
-                Channel::InApp,
-                Channel::Webhook,
-            ]),
-            vec![Channel::Email, Channel::Push, Channel::Chat],
-            "chat, push and email, in the order the policy wrote them"
+            update_channels(&[Channel::Email, Channel::Webhook]),
+            vec![Channel::Email],
+            "webhook is not one of the §5.2 names"
         );
         assert!(update_channels(&[]).is_empty());
         assert!(
-            update_channels(&[Channel::Sms, Channel::Voice]).is_empty(),
-            "a team reachable only by phone gets no update rather than a second page"
+            update_channels(&[Channel::Webhook]).is_empty(),
+            "a team reachable only by its room gets no update rather than a second post"
         );
-        assert_eq!(
-            update_channels(&[Channel::Push]),
-            vec![Channel::Push],
-            "push interrupts and is still named in §5.2 — the two questions are different"
-        );
-        // Every channel the vocabulary has, decided one way or the other, so a
-        // new variant cannot be admitted by omission.
-        for c in [Channel::Email, Channel::Chat, Channel::Push] {
-            assert_eq!(update_channels(&[c]), vec![c], "{c} is named in §5.2");
-        }
-        for c in [
-            Channel::Voice,
-            Channel::Sms,
-            Channel::InApp,
-            Channel::Webhook,
-        ] {
-            assert!(
-                update_channels(&[c]).is_empty(),
-                "{c} is not one of the three §5.2 names"
-            );
-        }
     }
 
     /// §3, the `Downgrade` branch: "NOTIFYING with quieter channels for THIS
-    /// firing". The counter `oncall_l0_downgraded_total` claims a firing was
-    /// notified more quietly, so something has to actually make it quieter —
-    /// a flag that is computed, counted and never read is a metric that
-    /// reports an event which did not happen.
-    ///
-    /// Quieter is "does not wake a sleeping person", which is exactly
-    /// `is_interrupting`. This is the one place that predicate is right: §5.2's
-    /// allowlist is about what an *update* may ride, and this is about how one
-    /// page is delivered.
+    /// firing" — and "quieter" must never become "silent", because §2.1a's
+    /// whole asymmetry is that nothing a verdict says may cost somebody a page.
+    /// No channel this build can send wakes a sleeping person, so every set
+    /// comes back unchanged.
     #[test]
-    fn test_a_downgrade_drops_the_channels_that_wake_somebody() {
-        assert_eq!(
-            quieter_channels(&[Channel::Email, Channel::Sms, Channel::Voice, Channel::Chat]),
-            vec![Channel::Email, Channel::Chat],
-            "the interrupting channels go, in policy order"
-        );
-        assert_eq!(
-            quieter_channels(&[Channel::Push, Channel::InApp]),
-            vec![Channel::InApp]
-        );
-        // **Fail open.** A rung that pages only by phone has no quieter form,
-        // and "quieter" must never become "silent" — §2.1a's whole asymmetry is
-        // that nothing a verdict says may cost somebody a page.
-        for phone_only in [
-            vec![Channel::Voice],
-            vec![Channel::Sms],
-            vec![Channel::Voice, Channel::Sms],
+    fn test_a_downgrade_never_silences_a_rung() {
+        for set in [
+            vec![Channel::Email],
+            vec![Channel::Webhook],
+            vec![Channel::Email, Channel::Webhook],
         ] {
-            assert_eq!(
-                quieter_channels(&phone_only),
-                phone_only,
-                "a downgrade silenced a rung that had no quieter channel"
-            );
+            assert_eq!(quieter_channels(&set), set);
         }
         assert!(quieter_channels(&[]).is_empty(), "nothing in, nothing out");
     }
@@ -4169,20 +4091,12 @@ mod tests {
     }
 
     /// §5.1: on channels that can revise a message, the findings fill in the
-    /// same message rather than arriving as a second notification. On the ones
-    /// that cannot, the verdict rides the single follow-up update — which is
-    /// why that update, and not the edit, is the thing that has to be deduped.
+    /// same message rather than arriving as a second notification. Neither
+    /// channel this build can send is revisable — which is why the follow-up
+    /// update, and not the edit, is the thing that has to be deduped.
     #[test]
-    fn test_only_the_channels_that_can_revise_a_message_update_in_place() {
-        for c in [Channel::Chat, Channel::Push, Channel::InApp] {
-            assert!(updates_in_place(c), "{c} can revise what it already sent");
-        }
-        for c in [
-            Channel::Email,
-            Channel::Sms,
-            Channel::Voice,
-            Channel::Webhook,
-        ] {
+    fn test_no_channel_this_build_sends_can_revise_what_it_already_sent() {
+        for c in [Channel::Email, Channel::Webhook] {
             assert!(
                 !updates_in_place(c),
                 "{c} cannot take a finding back once it has gone"

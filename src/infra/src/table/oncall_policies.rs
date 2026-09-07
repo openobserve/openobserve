@@ -95,12 +95,6 @@ fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
             config::meta::oncall::L0Policy::defaults()
         }),
     };
-    // 04 §3's two knobs. `final_action` fails to `Stop` rather than to a
-    // handoff nobody nominated, and `repeat_count` is clamped by
-    // `EscalationPolicy::passes` on the way out — a column can hold anything a
-    // hand-edit or a replicated row put in it.
-    let final_action = config::meta::oncall::FinalAction::from_str_or_stop(&m.final_action);
-    let repeat_count = m.repeat_count;
     match serde_json::from_str::<Vec<PriorityRung>>(&m.rungs) {
         Ok(rungs) => EscalationPolicy {
             id: m.id,
@@ -109,22 +103,13 @@ fn to_policy(m: oncall_policies::Model) -> EscalationPolicy {
             rungs,
             destinations,
             l0,
-            repeat_count,
-            final_action,
         },
         Err(e) => {
             log::error!(
                 "[ONCALL] policy {} has unparseable rungs, falling back to defaults: {e}",
                 m.id
             );
-            // The rungs are what could not be read; how many times they run and
-            // what happens afterwards were stored in their own columns and are
-            // still perfectly legible.
-            EscalationPolicy {
-                repeat_count,
-                final_action,
-                ..EscalationPolicy::whole_team_fallback(m.id, m.org_id, m.team_id)
-            }
+            EscalationPolicy::whole_team_fallback(m.id, m.org_id, m.team_id)
         }
     }
 }
@@ -205,8 +190,6 @@ async fn insert(policy: &EscalationPolicy) -> Result<EscalationPolicy, errors::E
         rungs: Set(serde_json::to_string(&policy.rungs)?),
         destinations: Set(serde_json::to_string(&policy.destinations)?),
         l0_json: Set(serde_json::to_string(&policy.l0)?),
-        repeat_count: Set(policy.repeat_count),
-        final_action: Set(policy.final_action.as_str().to_string()),
         created_at: Set(now),
         updated_at: Set(now),
     };
@@ -235,10 +218,6 @@ pub async fn update_rungs(
     // caller editing rungs must not silently wipe a team's L0 configuration,
     // and this column is the only copy of it.
     l0: Option<&config::meta::oncall::L0Policy>,
-    // §3's repeat/final-action pair. `None` means **unchanged** for the same
-    // reason `l0` does: a caller editing rungs is saying nothing about what
-    // happens when the ladder runs out.
-    repeats: Option<(i32, config::meta::oncall::FinalAction)>,
 ) -> Result<Option<EscalationPolicy>, errors::Error> {
     let client = get_orm_client_rw().await;
     let Some(existing) = oncall_policies::Entity::find()
@@ -256,10 +235,6 @@ pub async fn update_rungs(
     }
     if let Some(l0) = l0 {
         model.l0_json = Set(serde_json::to_string(l0)?);
-    }
-    if let Some((repeat_count, final_action)) = repeats {
-        model.repeat_count = Set(repeat_count);
-        model.final_action = Set(final_action.as_str().to_string());
     }
     model.updated_at = Set(now_micros());
     let updated = to_policy(model.update(client).await?);
@@ -308,8 +283,6 @@ mod tests {
             l0_json: "{}".into(),
             // The column defaults, which are 04 §3's own: one pass, then say
             // on the record that nobody answered.
-            repeat_count: config::meta::oncall::DEFAULT_REPEAT_COUNT,
-            final_action: config::meta::oncall::FinalAction::Stop.as_str().into(),
             created_at: 10,
             updated_at: 20,
         }
@@ -317,52 +290,6 @@ mod tests {
 
     /// The upgrade contract, at the layer that reads the row: a policy whose
     /// repeat columns hold their defaults must come back as the ladder the
-    /// engine has always run.
-    #[test]
-    fn test_the_default_columns_read_back_as_todays_ladder() {
-        let defaults = EscalationPolicy::default_for_team(
-            "pol_1",
-            "default",
-            "team_1",
-            "rot_primary",
-            Some("rot_secondary".into()),
-        );
-        let encoded = serde_json::to_string(&defaults.rungs).unwrap();
-        let p = to_policy(model(&encoded));
-        assert_eq!(p.repeat_count, config::meta::oncall::DEFAULT_REPEAT_COUNT);
-        assert_eq!(p.final_action, config::meta::oncall::FinalAction::Stop);
-    }
-
-    /// Unparseable rungs fall back to the shipped ladder, but how many times
-    /// it runs and what happens afterwards were stored in their own columns
-    /// and are still perfectly legible — losing them would quietly undo a
-    /// team's configuration on top of the corruption.
-    #[test]
-    fn test_corrupt_rungs_do_not_take_the_repeat_configuration_with_them() {
-        let mut m = model("{not json");
-        m.repeat_count = 3;
-        m.final_action = config::meta::oncall::FinalAction::NotifyDefaultTeam
-            .as_str()
-            .into();
-        let p = to_policy(m);
-        assert_eq!(p.repeat_count, 3);
-        assert_eq!(
-            p.final_action,
-            config::meta::oncall::FinalAction::NotifyDefaultTeam
-        );
-    }
-
-    /// An unreadable `final_action` must not invent a handoff to a team
-    /// nobody nominated.
-    #[test]
-    fn test_an_unreadable_final_action_stops_rather_than_handing_off() {
-        let mut m = model("[]");
-        m.final_action = "notify_the_ceo".into();
-        assert_eq!(
-            to_policy(m).final_action,
-            config::meta::oncall::FinalAction::Stop
-        );
-    }
 
     #[test]
     fn test_rungs_round_trip_through_the_json_column() {

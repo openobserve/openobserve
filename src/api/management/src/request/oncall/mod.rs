@@ -183,21 +183,6 @@ pub struct FromPresetRequest {
 #[derive(Debug, Deserialize, utoipa::ToSchema)]
 pub struct SetPolicyRequest {
     pub rungs: Vec<PriorityRung>,
-    /// How many times the ladder runs before `final_action`. 1..=5.
-    ///
-    /// **Absent leaves it unchanged**, which is why it can be added without
-    /// breaking a client that never sent it. It was missing entirely: the
-    /// engine stored, validated and honoured both this and `final_action`,
-    /// while the write path silently dropped them — so a policy could never
-    /// leave the defaults, `PolicyError::RepeatOutOfRange` could never fire
-    /// from the API, and the editor showing them read-only was correct rather
-    /// than lazy.
-    #[serde(default)]
-    pub repeat_count: Option<i32>,
-    /// What happens once the last pass ends with nobody having answered.
-    /// Absent leaves it unchanged.
-    #[serde(default)]
-    pub final_action: Option<config::meta::oncall::FinalAction>,
     /// Alert Destination names to page through. Absent leaves them unchanged.
     #[serde(default)]
     pub destinations: Option<Vec<String>>,
@@ -421,12 +406,6 @@ pub struct HistoryQuery {
 pub struct PreviewRoutingRequest {
     #[serde(default)]
     pub oncall_team: Option<String>,
-    /// What the source object's `context_attributes.team` would say. Accepted
-    /// here so "test routing" can answer for an alert that carries one — the
-    /// attribute is a routing input, and a preview that ignored it would tell
-    /// people the wrong team.
-    #[serde(default)]
-    pub context_team: Option<String>,
     #[serde(default)]
     pub dimensions: std::collections::HashMap<String, String>,
 }
@@ -624,7 +603,12 @@ pub struct OwnershipStatsQuery {
 fn to_response(e: anyhow::Error) -> Response {
     use o2_enterprise::enterprise::oncall::service::OncallError;
     let status = match e.downcast_ref::<OncallError>() {
-        Some(OncallError::TeamNotFound(_)) => StatusCode::NOT_FOUND,
+        Some(OncallError::TeamNotFound(_)) | Some(OncallError::ResponseNotFound(_)) => {
+            StatusCode::NOT_FOUND
+        }
+        // Not 404: the record exists and the caller may well know it does. The
+        // honest answer is that working it is not theirs to do.
+        Some(OncallError::NotOnThisTeam { .. }) => StatusCode::FORBIDDEN,
         // A conflict, not a 400: the request is well-formed and the state of
         // the org is what refuses it, and the caller fixes it by changing that
         // state rather than by changing the request.
@@ -1442,8 +1426,6 @@ pub async fn set_policy(
             body.rungs,
             body.destinations,
             body.l0,
-            body.repeat_count,
-            body.final_action,
         )
         .await
         {
@@ -1785,9 +1767,9 @@ pub async fn ack_page(Path(org_id): Path<String>, Query(q): Query<AckQuery>) -> 
 /// Spelled here rather than as a `from_str` on the meta type: parsing a query
 /// parameter is this surface's problem, and the enum is shared with the engine.
 #[cfg(feature = "enterprise")]
-const SUBJECT_TYPES: [config::meta::oncall::SubjectType; 4] = {
-    use config::meta::oncall::SubjectType::{Alert, Anomaly, Incident, Synthetic};
-    [Alert, Incident, Synthetic, Anomaly]
+const SUBJECT_TYPES: [config::meta::oncall::SubjectType; 2] = {
+    use config::meta::oncall::SubjectType::{Alert, Incident};
+    [Alert, Incident]
 };
 
 #[cfg(feature = "enterprise")]
@@ -3037,7 +3019,6 @@ pub async fn preview_routing(
         let routed = match o2_enterprise::enterprise::oncall::routing::decide(
             &org_id,
             body.oncall_team.as_deref(),
-            body.context_team.as_deref(),
             &body.dimensions,
         )
         .await
@@ -3080,8 +3061,6 @@ pub async fn preview_routing(
             "landed_on_default": routed.landed_on_default(),
             "notes": routed.notes,
             "ladder": context.as_ref().map(|c| &c.ladder),
-            "repeat_count": context.as_ref().map(|c| c.repeat_count),
-            "final_action": context.as_ref().map(|c| c.final_action),
             "current_responder": context.as_ref().and_then(|c| c.current_responder.as_ref()),
             "covered_now": context.as_ref().map(|c| c.covered_now),
             "also_matched": context.as_ref().map(|c| &c.also_matched),
@@ -4545,12 +4524,12 @@ async fn carry_page_history_into_incident(
 
     // One line naming the things a reader of the incident would otherwise have
     // to open the page to learn. Written first so it heads the timeline.
-    let team = infra::table::oncall_teams::get(org_id, &record.team_id)
+    let team = infra::table::oncall_teams::get(org_id, record.team())
         .await
         .ok()
         .flatten()
         .map(|t| t.name)
-        .unwrap_or_else(|| record.team_id.clone());
+        .unwrap_or_else(|| record.team().to_string());
     let mut summary = format!(
         "Promoted from on-call page {response_id} — paged {team} at P{}",
         record.priority
@@ -4639,6 +4618,18 @@ pub async fn promote_to_incident(
                 .into_response();
             }
         };
+        // Promotion opens an incident before it notes the record, so the team
+        // check cannot be inherited from `add_note` further down — a stranger
+        // would create the incident and only then be refused.
+        if let Err(e) = o2_enterprise::enterprise::oncall::service::refuse_if_not_on_the_paged_team(
+            &org_id,
+            record.team(),
+            &user_email.user_id,
+        )
+        .await
+        {
+            return to_response(e);
+        }
         if let Some(existing) = record.incident_id.as_deref() {
             return MetaHttpResponse::error(
                 StatusCode::CONFLICT.as_u16(),
@@ -5023,21 +5014,18 @@ mod tests {
         }
     }
 
-    /// The preview has to see every level-1 source, or "test routing" reports a
+    /// The preview has to see the level-1 source, or "test routing" reports a
     /// team the real page would not go to — which is worse than no preview.
     #[test]
-    fn test_preview_accepts_both_level_one_sources() {
-        let full: PreviewRoutingRequest = serde_json::from_str(
-            r#"{"oncall_team":"t1","context_team":"Payments","dimensions":{"k8s-cluster":"prod"}}"#,
-        )
-        .unwrap();
+    fn test_preview_accepts_the_level_one_source() {
+        let full: PreviewRoutingRequest =
+            serde_json::from_str(r#"{"oncall_team":"t1","dimensions":{"k8s-cluster":"prod"}}"#)
+                .unwrap();
         assert_eq!(full.oncall_team.as_deref(), Some("t1"));
-        assert_eq!(full.context_team.as_deref(), Some("Payments"));
         assert_eq!(full.dimensions.get("k8s-cluster").unwrap(), "prod");
 
         let bare: PreviewRoutingRequest = serde_json::from_str("{}").unwrap();
         assert_eq!(bare.oncall_team, None);
-        assert_eq!(bare.context_team, None);
         assert!(bare.dimensions.is_empty());
     }
 
@@ -5130,12 +5118,8 @@ mod tests {
             parse_subject_type(" incident "),
             Some(SubjectType::Incident)
         );
-        assert_eq!(
-            parse_subject_type("synthetic"),
-            Some(SubjectType::Synthetic)
-        );
-        assert_eq!(parse_subject_type("anomaly"), Some(SubjectType::Anomaly));
         assert_eq!(parse_subject_type("Alert"), None, "wire values are exact");
+        assert_eq!(parse_subject_type("synthetic"), None);
         assert_eq!(parse_subject_type("dashboard"), None);
     }
 
@@ -5476,7 +5460,7 @@ mod tests {
             id: "resp_1".into(),
             org_id: "default".into(),
             subject: SubjectRef::new(SubjectType::Alert, "al_ckt", 1),
-            team_id: "team_1".into(),
+            team_id: Some("team_1".into()),
             title: Some("payment_gateway_error_rate".into()),
             cause: None,
             cause_note: None,
@@ -5541,27 +5525,6 @@ mod tests {
         let q: ResolvedScheduleQuery =
             serde_json::from_str(r#"{"from":1,"to":2,"rotation_id":"rot_2"}"#).unwrap();
         assert_eq!(q.rotation_id.as_deref(), Some("rot_2"));
-    }
-
-    /// Both were stored, validated and honoured by the engine while the write
-    /// path had no field for them — so a policy could never leave the defaults.
-    /// Absent still means "leave unchanged", so a client that never sent them
-    /// keeps working.
-    #[test]
-    fn test_a_policy_body_can_now_set_repeat_count_and_final_action() {
-        let bare: SetPolicyRequest = serde_json::from_str(r#"{"rungs":[]}"#).unwrap();
-        assert_eq!(bare.repeat_count, None);
-        assert_eq!(bare.final_action, None);
-
-        let full: SetPolicyRequest = serde_json::from_str(
-            r#"{"rungs":[],"repeat_count":3,"final_action":"notify_default_team"}"#,
-        )
-        .unwrap();
-        assert_eq!(full.repeat_count, Some(3));
-        assert_eq!(
-            full.final_action,
-            Some(config::meta::oncall::FinalAction::NotifyDefaultTeam)
-        );
     }
 
     /// "I am away" is the common case, and it must not require the caller to

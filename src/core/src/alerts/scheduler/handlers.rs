@@ -605,7 +605,6 @@ pub async fn handle_triggers(
     }
 }
 
-
 /// Run one escalation step for a response record.
 ///
 /// The job is dropped rather than re-armed once the ladder is finished, the
@@ -1602,25 +1601,42 @@ pub(crate) fn merge_ledger(prior: &[String], succeeded: &[String]) -> Vec<String
 
 /// Services that call the one that broke, from the service graph.
 ///
-/// Returns empty on any failure — a missing blast radius costs the impacted
-/// teams a page, while a failure here propagating would cost the OWNER their
-/// page, which is strictly worse. Keyed on service name, so it behaves the
-/// same on Kubernetes, ECS or plain VMs.
+/// Never fails: every way of finding nobody comes back as a
+/// [`NoBlastRadius`] the caller states on the timeline. A missing blast radius
+/// costs the impacted teams a page, while a failure here propagating would cost
+/// the OWNER their page, which is strictly worse. Keyed on service name, so it
+/// behaves the same on Kubernetes, ECS or plain VMs.
 #[cfg(feature = "enterprise")]
 pub(crate) async fn impacted_services(
     org_id: &str,
     dimensions: &std::collections::HashMap<String, String>,
-) -> Vec<String> {
+) -> Result<Vec<String>, config::meta::oncall::NoBlastRadius> {
+    use config::meta::oncall::NoBlastRadius;
+
     let Some(failing) = dimensions.get("service") else {
-        return vec![];
+        return Err(NoBlastRadius::NoServiceDimension);
     };
+    // Deliberately wider than the graph view's window. The aggregation job
+    // writes on `processing_interval_secs` (an hour by default) and the default
+    // read window is the same hour, so a read landing between two writes sees
+    // nothing — and a page must not lose its blast radius to the job's phase.
+    let end = now_micros();
+    let window_micros = (o2_enterprise::enterprise::common::config::get_config()
+        .service_graph
+        .processing_interval_secs as i64)
+        .saturating_mul(2 * 1_000_000)
+        .max(crate::traces::service_graph::DEFAULT_QUERY_WINDOW_MINUTES * 60 * 1_000_000);
     let raw = match crate::traces::service_graph::query_edges_from_stream_internal(
-        org_id, None, None, None, None,
+        org_id,
+        None,
+        Some(end - window_micros),
+        Some(end),
+        None,
     )
     .await
     {
         Ok(e) if !e.is_empty() => e,
-        _ => return vec![],
+        _ => return Err(NoBlastRadius::NoGraph),
     };
     let (_, edges) = o2_enterprise::enterprise::service_graph::build_topology(
         raw,
@@ -1634,7 +1650,34 @@ pub(crate) async fn impacted_services(
         .collect();
     callers.sort();
     callers.dedup();
-    callers
+    if callers.is_empty() {
+        return Err(NoBlastRadius::NothingCallsIt {
+            service: failing.clone(),
+        });
+    }
+    Ok(callers)
+}
+
+/// Page the downstream teams for one origin record, or say why there are none.
+///
+/// Shared by the alert and the incident path so the two cannot drift: they had
+/// the same six lines each, and the note below is exactly the kind of thing
+/// that gets added to one of them.
+#[cfg(feature = "enterprise")]
+pub(crate) async fn page_blast_radius(
+    org_id: &str,
+    origin: &config::meta::oncall::Response,
+    dimensions: &std::collections::HashMap<String, String>,
+) -> Result<(), anyhow::Error> {
+    use o2_enterprise::enterprise::oncall::escalation;
+
+    let now = now_micros();
+    match impacted_services(org_id, dimensions).await {
+        Ok(impacted) => escalation::page_impacted(org_id, origin, &impacted, now)
+            .await
+            .map(|_| ()),
+        Err(why) => escalation::note_no_blast_radius(org_id, &origin.id, &why, now).await,
+    }
 }
 
 /// Open an on-call page for one firing of an alert-shaped signal.
@@ -1681,7 +1724,7 @@ async fn page_for_alert_firing(
     // One representative row per group key, the same reduction
     // `dispatch_per_group` performs, so the two halves of a firing
     // cannot disagree about what its groups are.
-    let group_dimensions: Vec<std::collections::HashMap<String, String>> =
+    let mut group_dimensions: Vec<std::collections::HashMap<String, String>> =
         if alert.query_condition.multi_alert_enabled() {
             let group_by = alert
                 .query_condition
@@ -1702,6 +1745,34 @@ async fn page_for_alert_firing(
         } else {
             vec![dimensions.clone()]
         };
+    // I-D3, last resort: what the service registry already knows. A
+    // `SELECT count(*)` whose threshold lives in an inequality names
+    // nothing static, so neither the row nor the conditions can route it
+    // — and correlation can. The incident path has had this, which meant
+    // the same alert routed differently depending on a checkbox about
+    // incidents.
+    //
+    // Costs a lookup only for a firing that would otherwise be
+    // unroutable: anything carrying its own identity never gets here.
+    // Set on every group because every group is the same empty identity,
+    // so they route as one team either way.
+    if group_dimensions.iter().all(|d| d.is_empty())
+        && let Some(service) =
+            crate::alerts::incidents::correlated_service_for_routing(&alert.org_id, first_row).await
+    {
+        for dims in &mut group_dimensions {
+            dims.insert(
+                config::meta::oncall::SERVICE_DIMENSION.to_string(),
+                service.clone(),
+            );
+        }
+        log::debug!(
+            "[SCHEDULER trace_id {trace_id}] {}/{}: no identity fields in the result row; routing \
+             on the correlated service `{service}`",
+            alert.org_id,
+            alert.name,
+        );
+    }
     // Single-sourced with the incident path: the same alert must
     // not page at a different severity depending on whether it
     // creates an incident.
@@ -1714,7 +1785,6 @@ async fn page_for_alert_firing(
         &alert.name,
         priority,
         alert.oncall_team.as_deref(),
-        alert.context_team(),
         &group_dimensions,
     )
     .await
@@ -1731,15 +1801,8 @@ async fn page_for_alert_firing(
         // one level further out.
         Ok(opened) => {
             for paged in &opened {
-                let impacted = impacted_services(&alert.org_id, &paged.dimensions).await;
-                if !impacted.is_empty()
-                    && let Err(e) = o2_enterprise::enterprise::oncall::escalation::page_impacted(
-                        &alert.org_id,
-                        &paged.response,
-                        &impacted,
-                        now_micros(),
-                    )
-                    .await
+                if let Err(e) =
+                    page_blast_radius(&alert.org_id, &paged.response, &paged.dimensions).await
                 {
                     log::error!(
                         "[SCHEDULER trace_id {trace_id}] impacted paging failed for {}/{}: {e}",
@@ -5955,7 +6018,7 @@ mod tests {
             id: "resp_1".into(),
             org_id: "default".into(),
             subject: SubjectRef::new(SubjectType::Alert, "al_1", 1),
-            team_id: "team_1".into(),
+            team_id: Some("team_1".into()),
             title: None,
             cause: None,
             cause_note: None,
@@ -6026,7 +6089,6 @@ mod tests {
             "the previous firing closed and stayed closed, so this one is a new one"
         );
     }
-
 
     /// The alert path and the incident path have to agree, or ticking
     /// `creates_incident` silently changes how loudly an alert pages.

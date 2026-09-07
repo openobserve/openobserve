@@ -58,16 +58,8 @@ pub const DEFAULT_PAGING_PRIORITY: AlertPriority = AlertPriority::P2;
 #[serde(rename_all = "snake_case")]
 pub enum Channel {
     Email,
-    Sms,
-    Voice,
-    /// Slack, Teams, Google Chat — the team's chat destination.
-    Chat,
     /// An existing alert Destination — Slack, Teams, or any HTTP endpoint.
     Webhook,
-    /// Mobile push.
-    Push,
-    /// Shown in the product, never delivered anywhere.
-    InApp,
 }
 
 impl Channel {
@@ -75,11 +67,6 @@ impl Channel {
     pub fn to_i32(&self) -> i32 {
         match self {
             Self::Email => 1,
-            Self::Sms => 2,
-            Self::Voice => 3,
-            Self::Chat => 4,
-            Self::Push => 5,
-            Self::InApp => 6,
             Self::Webhook => 7,
         }
     }
@@ -87,11 +74,6 @@ impl Channel {
     pub fn from_i32(v: i32) -> Option<Self> {
         match v {
             1 => Some(Self::Email),
-            2 => Some(Self::Sms),
-            3 => Some(Self::Voice),
-            4 => Some(Self::Chat),
-            5 => Some(Self::Push),
-            6 => Some(Self::InApp),
             7 => Some(Self::Webhook),
             _ => None,
         }
@@ -100,73 +82,25 @@ impl Channel {
     pub fn as_str(&self) -> &'static str {
         match self {
             Self::Email => "email",
-            Self::Sms => "sms",
-            Self::Voice => "voice",
-            Self::Chat => "chat",
-            Self::Push => "push",
-            Self::InApp => "in_app",
             Self::Webhook => "webhook",
         }
     }
 
-    /// Channels that interrupt a sleeping person. Used to decide what a
-    /// follow-up update may NOT re-fire: urgent channels are reserved for
-    /// "a human is needed", not "news arrived".
-    pub fn is_interrupting(&self) -> bool {
-        matches!(self, Self::Voice | Self::Sms | Self::Push)
-    }
-
-    /// Whether a `Notifier` can actually deliver this channel today.
-    ///
-    /// The enum carries every channel the design calls for so the stored shape
-    /// does not change when providers land, but only Email has an
-    /// implementation. Offering the rest in the UI, or shipping them as
-    /// defaults, would store a promise that silently delivers nothing — the
-    /// worst possible failure for a paging system.
-    pub fn is_deliverable(&self) -> bool {
-        matches!(self, Self::Email | Self::Webhook)
-    }
-
-    /// Every channel a page can actually reach a person on today.
+    /// Every channel a page can reach a person on.
     pub fn deliverable() -> Vec<Self> {
-        [
-            Self::Email,
-            Self::Webhook,
-            Self::Sms,
-            Self::Voice,
-            Self::Chat,
-            Self::Push,
-            Self::InApp,
-        ]
-        .into_iter()
-        .filter(Self::is_deliverable)
-        .collect()
+        vec![Self::Email, Self::Webhook]
     }
 }
 
 /// 03 §6's fallback chain, in the order it is evaluated.
 ///
-/// Most interrupting first, because the chain stops at the first success and
-/// the point of a page is to reach somebody now: trying email before a phone
-/// call would "succeed" into an inbox nobody is reading at 3am.
-///
-/// The undeliverable half of the list is carried so the order does not have to
-/// be redesigned when a provider lands; [`fallback_chain`] filters it out.
-pub const FALLBACK_ORDER: [Channel; 7] = [
-    Channel::Push,
-    Channel::Sms,
-    Channel::Voice,
-    Channel::Email,
-    Channel::Webhook,
-    Channel::Chat,
-    Channel::InApp,
-];
+/// The chain stops at the first success, so the order decides which channel a
+/// page is tried on first. SMS, voice, push, chat and in-app were removed
+/// because nothing in this build could send them; when a provider lands, the
+/// new channel goes in this list at the position its urgency earns.
+pub const FALLBACK_ORDER: [Channel; 2] = [Channel::Email, Channel::Webhook];
 
 /// The channels one responder is tried on, in order, for a rung.
-///
-/// Deduplicated and restricted to what a `Notifier` can actually send, so a
-/// policy that names SMS today does not put an unreachable rung at the head of
-/// the chain and make every page look like it was attempted.
 ///
 /// §6, verbatim: "On a single-node deployment with just SMTP configured, the
 /// chain collapses to email and everything still works" — that is the baseline,
@@ -174,7 +108,7 @@ pub const FALLBACK_ORDER: [Channel; 7] = [
 pub fn fallback_chain(channels: &[Channel]) -> Vec<Channel> {
     FALLBACK_ORDER
         .into_iter()
-        .filter(|c| c.is_deliverable() && channels.contains(c))
+        .filter(|c| channels.contains(c))
         .collect()
 }
 
@@ -188,12 +122,12 @@ pub fn fallback_chain(channels: &[Channel]) -> Vec<Channel> {
 /// chat` was not expressible at all, and it is the common case.
 ///
 /// So the two kinds are separated by what they address, not by how loud they
-/// are. Chat and Webhook both resolve to a destination the whole team watches;
-/// everything else resolves to one person's inbox, handset or screen.
+/// are. A webhook resolves to a destination the whole team watches; email
+/// resolves to one person's inbox.
 pub fn is_broadcast(channel: Channel) -> bool {
     match channel {
-        Channel::Chat | Channel::Webhook => true,
-        Channel::Email | Channel::Sms | Channel::Voice | Channel::Push | Channel::InApp => false,
+        Channel::Webhook => true,
+        Channel::Email => false,
     }
 }
 
@@ -221,10 +155,6 @@ impl ChannelPlan {
 }
 
 /// Split a rung's channels into the person-reaching chain and the broadcasts.
-///
-/// Both halves are filtered to what a `Notifier` can actually send, for the
-/// same reason [`fallback_chain`] is: a channel nothing can deliver makes a
-/// rung look attempted when nothing left the process.
 pub fn channel_plan(channels: &[Channel]) -> ChannelPlan {
     ChannelPlan {
         chain: fallback_chain(channels)
@@ -233,7 +163,7 @@ pub fn channel_plan(channels: &[Channel]) -> ChannelPlan {
             .collect(),
         broadcast: FALLBACK_ORDER
             .into_iter()
-            .filter(|c| c.is_deliverable() && is_broadcast(*c) && channels.contains(c))
+            .filter(|c| is_broadcast(*c) && channels.contains(c))
             .collect(),
     }
 }
@@ -262,6 +192,59 @@ pub fn team_channel<'a>(team: Option<&'a [String]>, policy: &'a [String]) -> &'a
         Some(list) => list,
         None => policy,
     }
+}
+
+// ── Fanning one firing out to several teams (07 I-D2) ────────────────────────
+
+/// How many teams one firing may wake before it is treated as a grouping
+/// mistake rather than as that many outages.
+///
+/// A `GROUP BY` that suddenly spans fifteen teams is somebody's alert
+/// definition, not fifteen outages, and paging all fifteen is the fastest way
+/// to teach a whole org to ignore the pager. Five is above any real multi-team
+/// failure anybody has described and well below "everyone".
+pub const MAX_FANOUT_TEAMS: usize = 5;
+
+/// How many of a team's other groups the timeline names before it stops
+/// counting. A `GROUP BY` has no bound, and a timeline entry does.
+const NAMED_GROUPS: usize = 5;
+
+/// The line one team's record carries when the firing woke more than one team.
+///
+/// A responder has to be able to tell "my team's own page" from "part of
+/// something wider" without opening three screens, and their own other groups
+/// are the difference between "payments is down" and "payments and search are
+/// down and I am only being told about one of them".
+pub fn fanout_note(mine: &str, also_mine: &[String], other_teams: usize) -> String {
+    let mut note = format!("paged for {mine}");
+    if !also_mine.is_empty() {
+        let named = also_mine
+            .iter()
+            .take(NAMED_GROUPS)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join(", ");
+        note.push_str(&format!(", and {named}"));
+        if also_mine.len() > NAMED_GROUPS {
+            note.push_str(&format!(" and {} more", also_mine.len() - NAMED_GROUPS));
+        }
+        note.push_str(" — all owned by this team, so this is one page");
+    }
+    if other_teams > 0 {
+        note.push_str(&format!(
+            "; {other_teams} other team(s) were paged for the same firing"
+        ));
+    }
+    note
+}
+
+/// The line the one record carries when a firing spanned more teams than
+/// [`MAX_FANOUT_TEAMS`].
+pub fn fanout_capped_note(teams: usize) -> String {
+    format!(
+        "this firing spans {teams} teams, which is a grouping mistake rather than {teams} \
+         outages; one page was sent instead of {teams}, and the alert's grouping needs a look"
+    )
 }
 
 // ── The liaison seat (D-21) ──────────────────────────────────────────────────
@@ -381,89 +364,6 @@ impl ChannelBreaker {
     }
 }
 
-// ── Repeats and what happens at the end (04 §3) ──────────────────────────────
-
-/// How many times a ladder runs when nobody says otherwise. One — which is
-/// what the engine has always done, so an unset column changes nothing.
-pub const DEFAULT_REPEAT_COUNT: i32 = 1;
-
-/// §7's cap on runaway repeats. Five passes of a P1 ladder is an hour of
-/// paging; past that the answer is not another pass.
-pub const MAX_REPEAT_COUNT: i32 = 5;
-
-fn default_repeat_count() -> i32 {
-    DEFAULT_REPEAT_COUNT
-}
-
-/// What a policy does once its ladder has run for the last time (04 §3).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "snake_case")]
-pub enum FinalAction {
-    /// Record that nobody answered, and drop the job. Today's behaviour, and
-    /// the default, so a policy written before this field existed behaves
-    /// exactly as it did.
-    #[default]
-    Stop,
-    /// Hand the page to the org's nominated catch-all team, which starts their
-    /// ladder from its first rung. Only reachable when the org has nominated
-    /// one; without it there is nowhere to hand it to and this is `Stop`.
-    NotifyDefaultTeam,
-}
-
-impl FinalAction {
-    /// Stable wire value. Persisted, so changing one changes what a stored
-    /// policy means.
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::Stop => "stop",
-            Self::NotifyDefaultTeam => "notify_default_team",
-        }
-    }
-
-    /// Reads a stored value, **failing to `Stop`**: an unreadable column must
-    /// not invent a handoff to a team nobody nominated.
-    pub fn from_str_or_stop(s: &str) -> Self {
-        match s.trim() {
-            "notify_default_team" => Self::NotifyDefaultTeam,
-            _ => Self::Stop,
-        }
-    }
-}
-
-/// What the engine does when a ladder pass ends with nobody having answered.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum LadderEnd {
-    /// Run the ladder again from its first rung; `pass` is which pass that is.
-    Repeat { pass: i32 },
-    /// The org's catch-all team takes it from here.
-    HandToDefaultTeam,
-    /// Say on the record that nobody answered, and stop.
-    Stop,
-}
-
-/// §3's end-of-ladder decision, pure over `(policy, passes so far)`.
-///
-/// `passes_done` counts the pass that has just finished, so the default —
-/// `repeat_count` of 1 — reaches `final_action` immediately and the engine
-/// behaves precisely as it did before repeats existed.
-///
-/// `repeat_count` is clamped rather than refused here: a stored row can arrive
-/// from replication or a hand-edit with nobody at a keyboard, and §7 caps
-/// repeats because a runaway one is a paging storm. The write path refuses
-/// out-of-range values while somebody is still looking at the form.
-pub fn ladder_end(repeat_count: i32, passes_done: i32, final_action: FinalAction) -> LadderEnd {
-    let passes = repeat_count.clamp(DEFAULT_REPEAT_COUNT, MAX_REPEAT_COUNT);
-    if passes_done < passes {
-        return LadderEnd::Repeat {
-            pass: passes_done + 1,
-        };
-    }
-    match final_action {
-        FinalAction::Stop => LadderEnd::Stop,
-        FinalAction::NotifyDefaultTeam => LadderEnd::HandToDefaultTeam,
-    }
-}
-
 /// One rung: when it fires, and everyone it pages.
 ///
 /// The delay identifies the rung. Targets that fire together belong to the
@@ -518,16 +418,6 @@ pub struct EscalationPolicy {
     /// screen — which is most of them.
     #[serde(default = "super::agent::L0Policy::defaults")]
     pub l0: super::agent::L0Policy,
-    /// How many times the ladder runs before `final_action` (04 §3).
-    ///
-    /// One by default, which is the ladder the engine has always run: a policy
-    /// stored before this field existed reads back as one pass and behaves
-    /// identically.
-    #[serde(default = "default_repeat_count")]
-    pub repeat_count: i32,
-    /// What happens once the last pass ends with nobody having answered.
-    #[serde(default)]
-    pub final_action: FinalAction,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -543,16 +433,6 @@ pub enum PolicyError {
     DuplicatePriority(AlertPriority),
     /// A priority that pages has to page somewhere.
     NoChannels(AlertPriority),
-    /// The policy names a channel no `Notifier` can send on.
-    ///
-    /// Storing one is the worst failure a pager has: the policy reads as
-    /// configured, the rung fires, every recipient lands in `failed`, and
-    /// nobody is woken. Refusing it at write time is the only point at which
-    /// somebody is still looking at the screen.
-    UndeliverableChannels(AlertPriority, Vec<Channel>),
-    /// §7 caps repeats because a runaway one is a paging storm, and zero
-    /// passes is a policy that pages nobody while looking configured.
-    RepeatOutOfRange(i32),
 }
 
 /// What the engine should do right now.
@@ -617,10 +497,9 @@ impl EscalationPolicy {
     /// P4 and P5 page nobody at all: they are recorded and shown in the
     /// product, and the agent still investigates them.
     ///
-    /// Every paging priority defaults to Email because Email is the only
-    /// channel a `Notifier` can deliver ([`Channel::is_deliverable`]). When
-    /// SMS and voice land, THIS is the function that changes — the defaults
-    /// should never promise a channel that does not send.
+    /// Every paging priority defaults to Email. When SMS and voice land, THIS
+    /// is the function that changes — the defaults should never promise a
+    /// channel that does not send.
     pub fn default_for_team(
         id: impl Into<String>,
         org_id: impl Into<String>,
@@ -650,8 +529,6 @@ impl EscalationPolicy {
             l0: super::agent::L0Policy::defaults(),
             // One pass, then say on the record that nobody answered. §3 allows
             // more; a team that has not asked for more gets what it always got.
-            repeat_count: DEFAULT_REPEAT_COUNT,
-            final_action: FinalAction::Stop,
             rungs: vec![
                 PriorityRung {
                     priority: P1,
@@ -744,8 +621,6 @@ impl EscalationPolicy {
             team_id: team_id.into(),
             destinations: vec![],
             l0: super::agent::L0Policy::defaults(),
-            repeat_count: DEFAULT_REPEAT_COUNT,
-            final_action: FinalAction::Stop,
             rungs: vec![
                 // Three whole-team steps, not four. There is only one target
                 // a team with no rotations has, so every step of this ladder
@@ -794,15 +669,7 @@ impl EscalationPolicy {
     /// Read through here rather than off the field, because the field can hold
     /// anything a replicated row or a hand-edit put in it and the engine must
     /// not be the place that discovers a ladder repeating four thousand times.
-    pub fn passes(&self) -> i32 {
-        self.repeat_count
-            .clamp(DEFAULT_REPEAT_COUNT, MAX_REPEAT_COUNT)
-    }
-
     pub fn validate(&self) -> Result<(), PolicyError> {
-        if !(DEFAULT_REPEAT_COUNT..=MAX_REPEAT_COUNT).contains(&self.repeat_count) {
-            return Err(PolicyError::RepeatOutOfRange(self.repeat_count));
-        }
         let mut seen_priority = std::collections::HashSet::new();
         for rung in &self.rungs {
             if !seen_priority.insert(rung.priority.to_i32()) {
@@ -810,23 +677,6 @@ impl EscalationPolicy {
             }
             if !rung.steps.is_empty() && rung.channels.is_empty() {
                 return Err(PolicyError::NoChannels(rung.priority));
-            }
-            // Only for a priority that actually pages: a rung that pages
-            // nobody may carry whatever a team has ticked in anticipation of
-            // SMS landing, because nothing will ever try to send it.
-            if !rung.steps.is_empty() {
-                let undeliverable: Vec<Channel> = rung
-                    .channels
-                    .iter()
-                    .filter(|c| !c.is_deliverable())
-                    .copied()
-                    .collect();
-                if !undeliverable.is_empty() {
-                    return Err(PolicyError::UndeliverableChannels(
-                        rung.priority,
-                        undeliverable,
-                    ));
-                }
             }
             let mut seen_delay = std::collections::HashSet::new();
             for step in &rung.steps {
@@ -1000,26 +850,6 @@ impl std::fmt::Display for PolicyError {
             Self::NoChannels(p) => {
                 write!(f, "priority `{p}` pages somebody but has no channels")
             }
-            Self::UndeliverableChannels(p, channels) => {
-                let named = channels
-                    .iter()
-                    .map(Channel::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                let deliverable = Channel::deliverable()
-                    .iter()
-                    .map(Channel::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", ");
-                write!(
-                    f,
-                    "priority `{p}` pages over {named}, which nothing can deliver yet, so those pages would reach nobody; the channels available today are {deliverable}"
-                )
-            }
-            Self::RepeatOutOfRange(n) => write!(
-                f,
-                "a ladder runs between {DEFAULT_REPEAT_COUNT} and {MAX_REPEAT_COUNT} times, got {n}"
-            ),
         }
     }
 }
@@ -1048,14 +878,7 @@ mod tests {
 
     #[test]
     fn test_channel_storage_ids_are_pinned() {
-        let all = [
-            (Channel::Email, 1),
-            (Channel::Sms, 2),
-            (Channel::Voice, 3),
-            (Channel::Chat, 4),
-            (Channel::Push, 5),
-            (Channel::InApp, 6),
-        ];
+        let all = [(Channel::Email, 1), (Channel::Webhook, 7)];
         for (c, want) in all {
             assert_eq!(c.to_i32(), want, "{c} moved");
             assert_eq!(Channel::from_i32(want), Some(c));
@@ -1063,16 +886,6 @@ mod tests {
         assert_eq!(Channel::from_i32(0), None);
         assert_eq!(Channel::from_i32(8), None);
         assert_eq!(Channel::Webhook.to_i32(), 7);
-    }
-
-    #[test]
-    fn test_interrupting_channels_are_the_ones_that_wake_people() {
-        for c in [Channel::Voice, Channel::Sms, Channel::Push] {
-            assert!(c.is_interrupting(), "{c} wakes a sleeping person");
-        }
-        for c in [Channel::Email, Channel::Chat, Channel::InApp] {
-            assert!(!c.is_interrupting(), "{c} does not wake anyone");
-        }
     }
 
     #[test]
@@ -1485,53 +1298,6 @@ mod tests {
         );
     }
 
-    /// A policy that names SMS today stores a promise nothing keeps: the rung
-    /// fires, every recipient lands in `failed`, and the page reaches nobody
-    /// while the screen still says the team is covered. It is refused while
-    /// somebody is still looking at the form, and the message says which
-    /// channels are the problem and what can be used instead.
-    #[test]
-    fn test_a_policy_cannot_promise_a_channel_nothing_can_send() {
-        let mut p = policy();
-        p.rungs[0].channels = vec![Channel::Email, Channel::Sms, Channel::Voice];
-
-        let err = p.validate().unwrap_err();
-        assert_eq!(
-            err,
-            PolicyError::UndeliverableChannels(
-                AlertPriority::P1,
-                vec![Channel::Sms, Channel::Voice]
-            )
-        );
-        let message = err.to_string();
-        assert!(
-            message.contains("sms") && message.contains("voice"),
-            "{message}"
-        );
-        assert!(
-            message.contains("email"),
-            "the message has to say what CAN be used: {message}"
-        );
-
-        // Every channel that can be delivered is accepted.
-        p.rungs[0].channels = Channel::deliverable();
-        p.validate().unwrap();
-    }
-
-    /// A priority that pages nobody may carry whatever a team ticked in
-    /// anticipation of SMS landing: nothing will ever try to send it.
-    #[test]
-    fn test_a_non_paging_priority_may_name_a_channel_that_cannot_send_yet() {
-        let mut p = policy();
-        let idx = p
-            .rungs
-            .iter()
-            .position(|r| r.priority == AlertPriority::P4)
-            .unwrap();
-        p.rungs[idx].channels = vec![Channel::Sms];
-        p.validate().unwrap();
-    }
-
     /// A priority that pages nobody is allowed to have no channels beyond the
     /// in-app surface — that is P4, not a misconfiguration.
     #[test]
@@ -1546,40 +1312,15 @@ mod tests {
         p.validate().unwrap();
     }
 
-    /// A default that names a channel nothing can send stores a promise the
-    /// engine silently drops — the worst failure mode a pager has.
+    /// The vocabulary holds only channels something can send. A variant added
+    /// here without a transport behind it stores a promise the engine silently
+    /// drops — the worst failure mode a pager has.
     #[test]
-    fn test_defaults_only_use_channels_that_can_be_delivered() {
-        let p = policy();
-        for rung in &p.rungs {
-            for channel in &rung.channels {
-                assert!(
-                    channel.is_deliverable(),
-                    "{} defaults to {channel}, which no Notifier can send",
-                    rung.priority
-                );
-            }
-        }
-    }
-
-    /// Only Email has an implementation today. This test is the reminder to
-    /// revisit the defaults when a provider lands, not a statement that the
-    /// other channels are wrong to exist.
-    #[test]
-    fn test_email_is_the_only_deliverable_channel_today() {
+    fn test_every_channel_in_the_vocabulary_can_be_delivered() {
         assert_eq!(
             Channel::deliverable(),
             vec![Channel::Email, Channel::Webhook]
         );
-        for c in [
-            Channel::Sms,
-            Channel::Voice,
-            Channel::Chat,
-            Channel::Push,
-            Channel::InApp,
-        ] {
-            assert!(!c.is_deliverable(), "{c} has no Notifier yet");
-        }
     }
 
     /// A priority that pages nobody needs no delivery channel; its record is
@@ -1613,14 +1354,6 @@ mod tests {
             vec![Channel::Email, Channel::Webhook],
             "the policy's storage order must not decide who is tried first"
         );
-        // Everything a team may have ticked in anticipation of a provider is
-        // dropped: an unreachable channel at the head of the chain would make
-        // every page look attempted and reach nobody.
-        assert_eq!(
-            fallback_chain(&[Channel::Sms, Channel::Voice, Channel::Push, Channel::Email]),
-            vec![Channel::Email]
-        );
-        assert!(fallback_chain(&[Channel::InApp]).is_empty());
         assert!(fallback_chain(&[]).is_empty());
     }
 
@@ -1632,22 +1365,11 @@ mod tests {
         assert_eq!(fallback_chain(&[Channel::Email]), vec![Channel::Email]);
     }
 
-    /// The undeliverable half of the published order is carried so the order
-    /// does not have to be redesigned when a provider lands.
+    /// The order is the whole decision, so it is pinned rather than left to
+    /// whatever order the variants happen to be declared in.
     #[test]
     fn test_the_published_order_is_the_one_the_design_names() {
-        assert_eq!(
-            FALLBACK_ORDER,
-            [
-                Channel::Push,
-                Channel::Sms,
-                Channel::Voice,
-                Channel::Email,
-                Channel::Webhook,
-                Channel::Chat,
-                Channel::InApp,
-            ]
-        );
+        assert_eq!(FALLBACK_ORDER, [Channel::Email, Channel::Webhook]);
     }
 
     // ── Retries and the breaker (03 §9) ─────────────────────────────────────
@@ -1726,105 +1448,6 @@ mod tests {
                 "an hourly failure is not a hard-down provider"
             );
         }
-    }
-
-    // ── Repeats and the end of the ladder (04 §3) ───────────────────────────
-
-    /// The whole point of the defaults: a policy nobody has touched behaves
-    /// exactly as it did before repeats existed — one pass, then the record
-    /// says nobody answered.
-    #[test]
-    fn test_an_unset_policy_runs_the_ladder_once_and_stops() {
-        let p = policy();
-        assert_eq!(p.repeat_count, DEFAULT_REPEAT_COUNT);
-        assert_eq!(p.final_action, FinalAction::Stop);
-        assert_eq!(
-            ladder_end(p.repeat_count, 1, p.final_action),
-            LadderEnd::Stop
-        );
-    }
-
-    #[test]
-    fn test_a_repeating_ladder_runs_its_passes_then_reaches_the_final_action() {
-        for pass in 1..3 {
-            assert_eq!(
-                ladder_end(3, pass, FinalAction::NotifyDefaultTeam),
-                LadderEnd::Repeat { pass: pass + 1 }
-            );
-        }
-        assert_eq!(
-            ladder_end(3, 3, FinalAction::NotifyDefaultTeam),
-            LadderEnd::HandToDefaultTeam
-        );
-        assert_eq!(ladder_end(3, 3, FinalAction::Stop), LadderEnd::Stop);
-    }
-
-    /// §7's runaway-repeat control. A stored value can arrive from replication
-    /// or a hand-edit, and the engine must not be where a ladder repeating
-    /// four thousand times is discovered.
-    #[test]
-    fn test_a_stored_repeat_count_is_clamped_rather_than_obeyed() {
-        assert_eq!(
-            ladder_end(4_000, MAX_REPEAT_COUNT, FinalAction::Stop),
-            LadderEnd::Stop
-        );
-        // Zero or negative would be a ladder that pages nobody while looking
-        // configured; it reads as one pass.
-        for bad in [0, -1] {
-            assert_eq!(ladder_end(bad, 1, FinalAction::Stop), LadderEnd::Stop);
-        }
-        let mut p = policy();
-        p.repeat_count = 99;
-        assert_eq!(p.passes(), MAX_REPEAT_COUNT);
-    }
-
-    /// Clamped on read, refused on write: an operator who typed 99 has a
-    /// belief about how long their team is paged for.
-    #[test]
-    fn test_an_out_of_range_repeat_count_is_refused_at_the_form() {
-        for bad in [0, -1, MAX_REPEAT_COUNT + 1, 99] {
-            let mut p = policy();
-            p.repeat_count = bad;
-            let err = p.validate().unwrap_err();
-            assert_eq!(err, PolicyError::RepeatOutOfRange(bad));
-            assert!(err.to_string().contains(&MAX_REPEAT_COUNT.to_string()));
-        }
-        for ok in DEFAULT_REPEAT_COUNT..=MAX_REPEAT_COUNT {
-            let mut p = policy();
-            p.repeat_count = ok;
-            p.validate().unwrap();
-        }
-    }
-
-    /// The stored spelling is durable, and an unreadable one must not invent a
-    /// handoff to a team nobody nominated.
-    #[test]
-    fn test_the_final_action_wire_values_are_pinned_and_fail_to_stop() {
-        assert_eq!(FinalAction::Stop.as_str(), "stop");
-        assert_eq!(
-            FinalAction::NotifyDefaultTeam.as_str(),
-            "notify_default_team"
-        );
-        for s in ["stop", "", "  ", "notify_team", "garbage"] {
-            assert_eq!(FinalAction::from_str_or_stop(s), FinalAction::Stop, "{s}");
-        }
-        assert_eq!(
-            FinalAction::from_str_or_stop(" notify_default_team "),
-            FinalAction::NotifyDefaultTeam
-        );
-        assert_eq!(FinalAction::default(), FinalAction::Stop);
-    }
-
-    /// A policy stored before these fields existed has to read back as the
-    /// ladder it was, not as a ladder that repeats or hands off.
-    #[test]
-    fn test_a_policy_written_before_repeats_existed_reads_back_unchanged() {
-        let mut json = serde_json::to_value(policy()).unwrap();
-        let obj = json.as_object_mut().unwrap();
-        obj.remove("repeat_count");
-        obj.remove("final_action");
-        let back: EscalationPolicy = serde_json::from_value(json).unwrap();
-        assert_eq!(back, policy());
     }
 
     /// The engine's loop, with the dispatching replaced by a fixed outcome:
@@ -2035,20 +1658,11 @@ mod tests {
     /// first success.
     #[test]
     fn test_a_person_reaching_chain_keeps_its_order_and_its_membership() {
-        // Every channel ticked, including the ones no transport can send.
-        let plan = channel_plan(&[
-            Channel::InApp,
-            Channel::Email,
-            Channel::Sms,
-            Channel::Chat,
-            Channel::Webhook,
-            Channel::Voice,
-            Channel::Push,
-        ]);
+        let plan = channel_plan(&[Channel::Webhook, Channel::Email]);
         assert_eq!(
             plan.chain,
             vec![Channel::Email],
-            "only the deliverable person-reaching channels, in FALLBACK_ORDER"
+            "only the person-reaching channels, in FALLBACK_ORDER"
         );
         assert!(
             plan.chain.iter().all(|c| !is_broadcast(*c)),
@@ -2061,25 +1675,61 @@ mod tests {
     /// backwards is how six people on one rung became six identical posts.
     #[test]
     fn test_only_the_room_channels_are_broadcasts() {
-        assert!(is_broadcast(Channel::Chat));
         assert!(is_broadcast(Channel::Webhook));
-        for personal in [
-            Channel::Email,
-            Channel::Sms,
-            Channel::Voice,
-            Channel::Push,
-            Channel::InApp,
-        ] {
-            assert!(!is_broadcast(personal), "{personal} reaches one person");
-        }
+        assert!(!is_broadcast(Channel::Email), "email reaches one person");
     }
 
     /// A rung that pages nobody must not look like it had a plan.
     #[test]
-    fn test_a_rung_with_nothing_deliverable_plans_nothing() {
-        let plan = channel_plan(&[Channel::Sms, Channel::Voice, Channel::Chat]);
-        assert!(plan.is_empty(), "{plan:?}");
+    fn test_a_rung_with_no_channels_plans_nothing() {
         assert!(channel_plan(&[]).is_empty());
+    }
+
+    // ── Fanning one firing out to several teams (07 I-D2) ───────────────────
+
+    /// A responder has to be able to tell their team's own page from part of
+    /// something wider, and to know that their team's other broken groups are
+    /// on this record rather than on one nobody opened.
+    #[test]
+    fn test_the_fanout_note_says_whose_page_this_is_and_how_wide_it_is() {
+        let alone = fanout_note("k8s-namespace=payments", &[], 0);
+        assert_eq!(alone, "paged for k8s-namespace=payments");
+
+        let wider = fanout_note("k8s-namespace=payments", &[], 2);
+        assert!(wider.contains("2 other team(s)"));
+
+        let mine = fanout_note(
+            "k8s-namespace=payments",
+            &["k8s-namespace=billing".to_string()],
+            1,
+        );
+        assert!(mine.contains("k8s-namespace=billing"));
+        assert!(mine.contains("one page"), "{mine}");
+        assert!(mine.contains("1 other team(s)"));
+    }
+
+    /// A `GROUP BY` has no bound and a timeline entry does, so a team owning
+    /// fifty broken groups gets a line somebody can read rather than fifty
+    /// paths.
+    #[test]
+    fn test_the_fanout_note_stops_counting_groups() {
+        let many: Vec<String> = (0..50).map(|i| format!("k8s-namespace=ns{i}")).collect();
+        let note = fanout_note("k8s-namespace=payments", &many, 0);
+        assert!(note.contains("and 45 more"), "{note}");
+        assert!(note.contains("k8s-namespace=ns4"));
+        assert!(!note.contains("k8s-namespace=ns6"), "{note}");
+    }
+
+    /// Fifteen teams is somebody's alert definition, not fifteen outages. The
+    /// note has to say that, because the fix is to the grouping and nobody will
+    /// find it from a page that simply arrived.
+    #[test]
+    fn test_the_capped_note_blames_the_grouping_not_the_estate() {
+        let note = fanout_capped_note(15);
+        assert!(note.contains("15 teams"));
+        assert!(note.contains("grouping"));
+        // A cap outside this range is either useless or is itself the noise.
+        const { assert!(MAX_FANOUT_TEAMS > 1 && MAX_FANOUT_TEAMS < 10) };
     }
 
     // ── Where the team's channel lives (Change 1) ───────────────────────────

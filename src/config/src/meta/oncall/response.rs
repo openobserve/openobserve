@@ -563,7 +563,14 @@ pub struct Response {
     pub id: String,
     pub org_id: String,
     pub subject: SubjectRef,
-    pub team_id: String,
+    /// The team that owns this firing, or `None` when routing found nobody.
+    ///
+    /// A teamless record pages nobody — there is no policy, no rotation and no
+    /// ladder, not an empty one — and it exists so the firing appears beside
+    /// the ones that did page rather than only on the unrouted queue. Handing
+    /// it to a team is what gives it an owner and starts its ladder (R-D6).
+    #[serde(default)]
+    pub team_id: Option<String>,
     /// What the page is about. Kept on the record so it survives the alert
     /// being renamed or deleted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -627,6 +634,22 @@ pub struct Response {
 }
 
 impl Response {
+    /// The owning team on a path that only ever runs for a routed record.
+    ///
+    /// A teamless record never reaches the ladder — `start_with` returns before
+    /// dispatching and no escalation job is armed (R6.2) — so the paging path's
+    /// reads are unreachable for one. This exists so those reads stay one line
+    /// rather than eighteen guards for a case that cannot arrive, and it
+    /// degrades safely if one ever does: the empty id misses every lookup, so
+    /// the answer is no policy, no rotation and no channel.
+    ///
+    /// **Not for anything that WRITES keyed on the team.** `get_or_create` on
+    /// an empty id would mint a row for a team that does not exist; those
+    /// callers ask `team_id` directly and bail.
+    pub fn team(&self) -> &str {
+        self.team_id.as_deref().unwrap_or_default()
+    }
+
     /// How long the page went unacknowledged, in microseconds.
     pub fn time_to_ack(&self) -> Option<i64> {
         self.acked_at.map(|a| a - self.opened_at)
@@ -660,7 +683,9 @@ impl Response {
     /// problem.
     pub fn handed_over(&self, to_team_id: Option<&str>, now: i64) -> Self {
         Self {
-            team_id: to_team_id.unwrap_or(&self.team_id).to_string(),
+            team_id: to_team_id
+                .map(str::to_string)
+                .or_else(|| self.team_id.clone()),
             state: ResponseState::Triggered,
             acked_by: None,
             acked_at: None,
@@ -826,6 +851,45 @@ pub fn flap_note(recovered_for_micros: i64) -> String {
         "the condition fired again {seconds}s after recovering — dampened as the same unstable \
          firing, so nobody was paged a second time"
     )
+}
+
+/// Why blast radius found no downstream team.
+///
+/// Every one of these used to return an empty list and write nothing, so
+/// "nothing depends on this" and "blast radius is broken" produced identical
+/// output. `NoGraph` is not hypothetical: the service-graph job runs hourly by
+/// default, so a fresh data directory has no graph for the first hour and every
+/// page in that window silently has no blast radius.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NoBlastRadius {
+    /// The signal carried no `service` dimension, so there was nothing to ask
+    /// the graph about.
+    NoServiceDimension,
+    /// The graph has no edges at all for the window that was read.
+    NoGraph,
+    /// The graph has edges, and nothing calls the service that broke.
+    NothingCallsIt { service: String },
+}
+
+impl NoBlastRadius {
+    /// The timeline sentence. Pure and here rather than formatted at the call
+    /// site, because it is the entire evidence that blast radius ran at all.
+    pub fn note(&self) -> String {
+        match self {
+            Self::NoServiceDimension => "this signal carries no service, so no downstream teams \
+                                         were computed"
+                .to_string(),
+            Self::NoGraph => "the service graph has no recent data, so no downstream teams were \
+                              computed"
+                .to_string(),
+            Self::NothingCallsIt { service } => {
+                format!(
+                    "nothing in the service graph calls {service}, so no other team is \
+                         downstream of this"
+                )
+            }
+        }
+    }
 }
 
 // ── Ordered recovery (00-simplified-flow §4) ─────────────────────────────────
@@ -1441,7 +1505,7 @@ mod tests {
             id: "resp_1".into(),
             org_id: "default".into(),
             subject: SubjectRef::new(SubjectType::Alert, "al_ckt", 1),
-            team_id: "team_1".into(),
+            team_id: Some("team_1".into()),
             title: None,
             cause: None,
             cause_note: None,
@@ -1519,7 +1583,7 @@ mod tests {
         r.ladder_anchor = Some(1_050);
 
         let moved = r.handed_over(Some("team_2"), 9_000);
-        assert_eq!(moved.team_id, "team_2");
+        assert_eq!(moved.team_id.as_deref(), Some("team_2"));
         assert_eq!(
             moved.state,
             ResponseState::Triggered,
@@ -1882,7 +1946,7 @@ mod tests {
         let mut acked = record(ResponseState::Acknowledged);
         acked.acked_by = Some("ana@o2.ai".into());
         acked.ladder_run = Some(4);
-        acked.team_id = "another_team".into();
+        acked.team_id = Some("another_team".into());
         let acked = channel_post(&acked, "Platform", ChannelPostStage::Acknowledged, URL);
 
         assert_eq!(paged.key, acked.key, "one message, edited, for one record");
@@ -2012,24 +2076,11 @@ mod tests {
         );
     }
 
-    /// The gate is `updates_in_place`, which had no caller until now. Wiring it
-    /// to anything else would let a channel that cannot revise a message post a
-    /// second one.
+    /// The gate is `updates_in_place`. Wiring it to anything else would let a
+    /// channel that cannot revise a message post a second one.
     #[test]
     fn test_the_edit_gate_is_the_channels_own_answer() {
-        for editable in [Channel::Chat, Channel::Push, Channel::InApp] {
-            assert_eq!(
-                channel_post_action(true, super::super::agent::updates_in_place(editable)),
-                ChannelPostAction::Edit,
-                "{editable}"
-            );
-        }
-        for fixed in [
-            Channel::Email,
-            Channel::Sms,
-            Channel::Voice,
-            Channel::Webhook,
-        ] {
+        for fixed in [Channel::Email, Channel::Webhook] {
             assert_eq!(
                 channel_post_action(true, super::super::agent::updates_in_place(fixed)),
                 ChannelPostAction::Skip,
@@ -2190,5 +2241,35 @@ mod tests {
         assert_eq!(recovered_for_micros, 40_000_000);
         assert!(flap_note(recovered_for_micros).contains("40s"));
         assert!(flap_note(recovered_for_micros).contains("dampened"));
+    }
+
+    /// The three ways blast radius finds nobody all used to write nothing, so
+    /// "nothing depends on this" and "blast radius is broken" produced
+    /// byte-identical output. Each has to say which one it was, and none may
+    /// read as an error — finding nobody is a legitimate answer.
+    #[test]
+    fn test_each_reason_for_no_blast_radius_says_which_one_it_was() {
+        let notes = [
+            NoBlastRadius::NoServiceDimension.note(),
+            NoBlastRadius::NoGraph.note(),
+            NoBlastRadius::NothingCallsIt {
+                service: "zxporter".into(),
+            }
+            .note(),
+        ];
+        assert!(notes[0].contains("no service"));
+        assert!(notes[1].contains("service graph has no recent data"));
+        assert!(notes[2].contains("zxporter"));
+
+        let mut distinct = notes.to_vec();
+        distinct.sort();
+        distinct.dedup();
+        assert_eq!(distinct.len(), 3, "each case reads differently: {notes:?}");
+        for note in &notes {
+            assert!(
+                !note.to_lowercase().contains("error") && !note.to_lowercase().contains("failed"),
+                "finding nobody is an answer, not a fault: {note}"
+            );
+        }
     }
 }

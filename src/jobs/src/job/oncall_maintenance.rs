@@ -366,6 +366,9 @@ async fn warn_about(
                 priority: config::meta::alerts::priority::AlertPriority::P3,
                 reason: "you are on this team, or an admin of this org".to_string(),
                 detail_url: String::new(),
+                // A warning that a page would not arrive is not a page, so
+                // there is no alert behind it and no runbook to follow.
+                runbook_url: None,
                 investigation: vec![],
             },
             recipient: recipient.clone(),
