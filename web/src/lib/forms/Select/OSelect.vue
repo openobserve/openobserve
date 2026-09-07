@@ -1107,7 +1107,7 @@ const fieldWidthClass = computed(() => {
                     'bg-select-bg',
                     hasError
                       ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
-                      : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
+                      : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-focus-ring-accent data-[state=open]:border-select-border-focus data-[state=open]:ring-focus-ring-accent focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
                     /* Keep the red error border on focus; focus border color applies only when there's no error. */
                     'focus:outline-none',
                     'transition-[color,background-color,border-color,box-shadow] duration-150',
@@ -1567,7 +1567,7 @@ const fieldWidthClass = computed(() => {
                                       ? 'cursor-help'
                                       : undefined,
                                     filteredOptions[vRow.index].badgeStyle
-                                      ? 'ml-auto inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center border-current px-1 text-xs leading-none font-semibold'
+                                      ? 'ms-auto inline-flex h-[1.125rem] min-w-[1.125rem] items-center justify-center border-current px-1 text-xs leading-none font-semibold'
                                       : 'text-3xs px-1 py-px leading-tight font-medium',
                                   ]"
                                   :title="filteredOptions[vRow.index].badgeTitle"
@@ -1712,7 +1712,7 @@ const fieldWidthClass = computed(() => {
                   'bg-select-bg',
                   hasError
                     ? 'border-select-border-error focus:ring-select-border-error/30 data-[state=open]:ring-select-border-error/30 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]'
-                    : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-accent/25 data-[state=open]:border-select-border-focus data-[state=open]:ring-accent/25 focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
+                    : 'border-select-border hover:border-select-border-hover focus:border-select-border-focus focus:ring-focus-ring-accent data-[state=open]:border-select-border-focus data-[state=open]:ring-focus-ring-accent focus:ring-[0.125rem] data-[state=open]:ring-[0.125rem]',
                   /* Keep the red error border on focus; focus border color applies only when there's no error. */
                   'focus:outline-none',
                   'transition-[color,background-color,border-color,box-shadow] duration-150',

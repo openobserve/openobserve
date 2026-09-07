@@ -31,6 +31,7 @@ import { TimestampRange, ParsedSQLResult, TimePeriodUnit } from "@/ts/interfaces
 import { TIME_MULTIPLIERS } from "@/utils/logs/constants";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import type { TranslateFn } from "@/types/i18n";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 
 interface SQLColumn {
   expr?: {
@@ -132,6 +133,10 @@ export const logsUtils = () => {
         .split("\n")
         .filter((line: string) => !line.trim().startsWith("--"))
         .join("\n");
+
+      if (maxParenDepth(filteredQuery) > SQL_PARSE_MAX_DEPTH) {
+        return DEFAULT_PARSED_RESULT;
+      }
 
       const parsedQuery: ExtendedParsedSQLResult | null = parser?.astify(
         filteredQuery,

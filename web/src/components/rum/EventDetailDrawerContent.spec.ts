@@ -88,11 +88,12 @@ function createMockError(overrides: Record<string, any> = {}) {
 // Mock related resources
 const mockRelatedResources = [createMockResource(), createMockError()];
 
-// Stream discovery: defaults to the constant so the padded-navigation tests
-// keep their `stream: "default"` shape; tests override for custom streams.
-const mockResolveTracesStream = vi.fn().mockResolvedValue("default");
+// Stream discovery: defaults to the constant with no indexed range, so the
+// padded-navigation tests keep their `stream: "default"` shape and the ±10s
+// caller window; tests override for custom streams and ranges.
+const mockResolveTraceLocation = vi.fn().mockResolvedValue({ stream: "default" });
 vi.mock("@/composables/rum/useCorrelatedTracesStream", () => ({
-  default: () => ({ resolveTracesStream: mockResolveTracesStream }),
+  default: () => ({ resolveTraceLocation: mockResolveTraceLocation, cancel: vi.fn() }),
 }));
 
 // ============================================================================
@@ -846,9 +847,9 @@ describe("EventDetailDrawerContent", () => {
       const fakeWin: any = { location: { href: "" } };
       const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => fakeWin);
       let openedBeforeResolve = false;
-      mockResolveTracesStream.mockImplementationOnce(async () => {
+      mockResolveTraceLocation.mockImplementationOnce(async () => {
         openedBeforeResolve = windowOpenSpy.mock.calls.length > 0;
-        return "payments_traces";
+        return { stream: "payments_traces" };
       });
 
       const traceButtons = wrapper.findAll('[data-test="view-trace-btn"]');
@@ -860,6 +861,65 @@ describe("EventDetailDrawerContent", () => {
       expect(openedBeforeResolve).toBe(true);
       expect(fakeWin.location.href).toContain("stream=payments_traces");
       expect(fakeWin.location.href).toContain("trace_id=");
+
+      windowOpenSpy.mockRestore();
+    });
+
+    it("opens the trace over its indexed range, padded, instead of the ±10s guess", async () => {
+      await waitForRelatedResources(wrapper);
+
+      const fakeWin: any = { location: { href: "" } };
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => fakeWin);
+      mockResolveTraceLocation.mockResolvedValueOnce({
+        stream: "payments_traces",
+        range: { start_time: 1_700_000_000_000_000, end_time: 1_700_000_090_000_000 },
+      });
+
+      const traceButtons = wrapper.findAll('[data-test="view-trace-btn"]');
+      await traceButtons[0].trigger("click");
+      await flushPromises();
+
+      expect(fakeWin.location.href).toContain(`from=${1_700_000_000_000_000 - 60_000_000}`);
+      expect(fakeWin.location.href).toContain(`to=${1_700_000_090_000_000 + 60_000_000}`);
+
+      windowOpenSpy.mockRestore();
+    });
+
+    it("keeps the caller window when the trace has no indexed range", async () => {
+      await waitForRelatedResources(wrapper);
+
+      const fakeWin: any = { location: { href: "" } };
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => fakeWin);
+      const routerResolveSpy = vi.spyOn(router, "resolve");
+      mockResolveTraceLocation.mockResolvedValueOnce({ stream: "default" });
+
+      const traceButtons = wrapper.findAll('[data-test="view-trace-btn"]');
+      await traceButtons[0].trigger("click");
+      await flushPromises();
+
+      const query = routerResolveSpy.mock.calls.at(-1)?.[0] as any;
+      // The ±10s window around the resource date, in microseconds.
+      expect(query.query.to - query.query.from).toBe(20_000_000);
+
+      routerResolveSpy.mockRestore();
+      windowOpenSpy.mockRestore();
+    });
+
+    it("falls back to a direct open when the popup handle is blocked", async () => {
+      // window.open returning null is the blocked-popup case: the route must
+      // still be opened, which a local named `window` would silently break.
+      await waitForRelatedResources(wrapper);
+      const windowOpenSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+      mockResolveTraceLocation.mockResolvedValueOnce({ stream: "payments_traces" });
+
+      const traceButtons = wrapper.findAll('[data-test="view-trace-btn"]');
+      await traceButtons[0].trigger("click");
+      await flushPromises();
+
+      expect(windowOpenSpy).toHaveBeenCalledTimes(2);
+      const [href, target] = windowOpenSpy.mock.calls[1];
+      expect(String(href)).toContain("stream=payments_traces");
+      expect(target).toBe("_blank");
 
       windowOpenSpy.mockRestore();
     });

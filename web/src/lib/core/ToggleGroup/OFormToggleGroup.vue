@@ -12,12 +12,13 @@ import { inject } from "vue";
 import OToggleGroup from "./OToggleGroup.vue";
 import { FORM_CONTEXT_KEY } from "@/lib/forms/Form/OForm.types";
 import { firstFieldError } from "@/lib/forms/Form/fieldError";
-import type { FormToggleGroupProps } from "./OFormToggleGroup.types";
+import type { FormToggleGroupProps, FormToggleGroupSlots } from "./OFormToggleGroup.types";
 import type { AcceptableValue } from "reka-ui";
 
 defineOptions({ inheritAttrs: false });
 
 const props = defineProps<FormToggleGroupProps>();
+defineSlots<FormToggleGroupSlots>();
 
 const form = inject(FORM_CONTEXT_KEY, null);
 
@@ -51,9 +52,16 @@ if (import.meta.env.DEV && !form) {
           </template>
           <slot />
         </OToggleGroup>
-        <div v-if="field.state.meta.errors.length > 0" class="text-input-error-text text-xs">
+        <!-- Two OForm* wrappers on one field must not print the same message twice. -->
+        <div
+          v-if="!$slots.error && field.state.meta.errors.length > 0"
+          class="text-input-error-text text-xs"
+        >
           {{ firstFieldError(field.state.meta.errors) }}
         </div>
+        <template v-if="$slots.error">
+          <slot name="error" />
+        </template>
       </div>
     </template>
   </component>

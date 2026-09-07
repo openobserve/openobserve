@@ -361,22 +361,23 @@ describe("SyntheticMonitoring", () => {
   // Header tabs (tabs-below pattern: OTabs in the OPageLayout #header-tabs slot)
   // ═══════════════════════════════════════════════════════════════════════
   describe("header tabs", () => {
-    it("renders both tab options (Checks and Private Locations) in the header", () => {
+    it("renders all tab options (Checks, Private Locations, and Status Pages) in the header", () => {
       wrapper = mountPage();
       const tabsWrapper = wrapper.find('[data-test="synthetic-monitoring-header-tabs"]');
       expect(tabsWrapper.exists()).toBe(true);
 
       const tabElements = wrapper.findAll('[data-test="synthetic-monitoring-header-tab"]');
-      expect(tabElements).toHaveLength(2);
+      expect(tabElements).toHaveLength(3);
     });
 
     it("hides the Private Locations tab when private locations are unavailable", () => {
       // Private locations are served by agents deployed inside the customer's
       // network, which is the one enterprise part of synthetics. An OSS build
-      // must not offer a tab whose contents it cannot serve.
+      // must not offer a tab whose contents it cannot serve. Status Pages ships
+      // with synthetics unconditionally, so it still renders alongside Checks.
       wrapper = mountPageWithoutPrivateLocations();
       const tabElements = wrapper.findAll('[data-test="synthetic-monitoring-header-tab"]');
-      expect(tabElements).toHaveLength(1);
+      expect(tabElements).toHaveLength(2);
     });
 
     it("falls back to Checks when ?section=private but private locations are unavailable", () => {

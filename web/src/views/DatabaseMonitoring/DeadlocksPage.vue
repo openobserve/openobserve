@@ -192,7 +192,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <span
                 v-for="chip in row.chips"
                 :key="chip.id"
-                class="rounded-default text-3xs ml-0.5 px-1 py-px font-semibold"
+                class="rounded-default text-3xs ms-0.5 px-1 py-px font-semibold"
                 :class="chip.tone"
               >
                 {{ chip.label }}

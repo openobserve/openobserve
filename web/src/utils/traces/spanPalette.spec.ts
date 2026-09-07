@@ -52,7 +52,7 @@ const MIN_MARKER_SEPARATION = 0.1;
 
 /** The marker colours the palette must stay clear of, per theme. */
 const MARKER_COLOURS = {
-  light: { error: "#cc3645", warning: "#e56d17", info: "#6c707e" },
+  light: { error: "#cc3645", warning: "#be5a13", info: "#6c707e" },
   dark: { error: "#eb938d", warning: "#f2c55c", info: "#9da0a8" },
 } as const;
 

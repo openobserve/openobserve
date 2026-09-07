@@ -86,7 +86,7 @@ test.describe('Database Monitoring — execution plans', () => {
     // The plans SECTION must exist. Its absence means the page did not even
     // offer the reader a place to look, which is a different and worse failure
     // than an empty one.
-    const section = page.locator('[data-test="dbm-detail-plans"]');
+    const section = dbm.detailPlansSection;
     await expect(
       section,
       'the detail page rendered no plans section for a query that HAS a plan',
@@ -95,7 +95,7 @@ test.describe('Database Monitoring — execution plans', () => {
     // THE INVARIANT. A plan is stored for this statement, so the section must
     // show one — not the "no plans captured" state that a reader would take as
     // "this engine cannot do plans".
-    const planCards = page.locator('[data-test^="dbm-detail-plan-"]');
+    const planCards = dbm.detailPlanCards;
     await expect
       .poll(async () => planCards.count(), { timeout: 30000 })
       .toBeGreaterThan(0);
@@ -115,7 +115,7 @@ test.describe('Database Monitoring — execution plans', () => {
     test.skip(!found?.fingerprint, 'this org holds no execution plans in this window');
 
     await dbm.openQueryDetailTab(found.fingerprint, 'plans', { system: found.engine });
-    const section = page.locator('[data-test="dbm-detail-plans"]');
+    const section = dbm.detailPlansSection;
     await expect(section).toBeVisible({ timeout: 30000 });
     await page.waitForTimeout(2000);
 

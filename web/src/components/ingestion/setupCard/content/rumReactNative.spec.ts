@@ -79,11 +79,12 @@ describe("rumReactNativeCard builder", () => {
   });
 
   describe("replayUrl", () => {
-    it("builds on top of rumBaseUrl and ends with /replay", () => {
+    it("is the same bare base URL as rumBaseUrl — the bridge appends /replay itself", () => {
       const url = replayUrl(BASE_SUBS);
 
-      expect(url).toBe("https://ingest.example.com/rum/v1/my-org/replay");
-      expect(url.endsWith("/replay")).toBe(true);
+      expect(url).toBe("https://ingest.example.com/rum/v1/my-org");
+      expect(url.endsWith("/replay")).toBe(false);
+      expect(url).toBe(rumBaseUrl(BASE_SUBS));
     });
 
     it("reflects a different org and endpoint", () => {
@@ -93,7 +94,7 @@ describe("rumReactNativeCard builder", () => {
         org: "other-org",
       });
 
-      expect(url).toBe("https://other.example.com/rum/v1/other-org/replay");
+      expect(url).toBe("https://other.example.com/rum/v1/other-org");
     });
   });
 
@@ -404,22 +405,22 @@ describe("rumReactNativeCard builder", () => {
   // ── session-replay step ──────────────────────────────────────────────────────
 
   describe("session-replay step", () => {
-    it("code contains the full replay URL ending in /replay", () => {
+    it("code uses the bare rumBaseUrl as the SessionReplay customEndpoint (bridge appends /replay itself)", () => {
       const card = buildCard();
       const replay = card.steps.find((s) => s.id === "session-replay")!;
 
-      expect(replay.code!.raw).toContain(replayUrl(BASE_SUBS));
-      expect(replay.code!.raw).toContain("customEndpoint: '" + replayUrl(BASE_SUBS) + "'");
+      expect(replayUrl(BASE_SUBS)).toBe(rumBaseUrl(BASE_SUBS));
+      expect(replay.code!.raw).toContain(`customEndpoint: '${rumBaseUrl(BASE_SUBS)}'`);
     });
 
-    it("does not use the bare rumBaseUrl as the SessionReplay customEndpoint", () => {
+    it("does not double-append /replay to the SessionReplay customEndpoint", () => {
       const card = buildCard();
       const replay = card.steps.find((s) => s.id === "session-replay")!;
 
-      expect(replay.code!.raw).not.toContain(`customEndpoint: '${rumBaseUrl(BASE_SUBS)}'`);
+      expect(replay.code!.raw).not.toContain(`customEndpoint: '${rumBaseUrl(BASE_SUBS)}/replay'`);
     });
 
-    it("reflects a different org/endpoint in the replay URL", () => {
+    it("reflects a different org/endpoint in the replay customEndpoint", () => {
       const subs: RumReactNativeCardSubs = {
         ...BASE_SUBS,
         endpoint: "https://other.example.com",
@@ -428,7 +429,9 @@ describe("rumReactNativeCard builder", () => {
       const card = rumReactNativeCard(subs, gt);
       const replay = card.steps.find((s) => s.id === "session-replay")!;
 
-      expect(replay.code!.raw).toContain("https://other.example.com/rum/v1/other-org/replay");
+      expect(replay.code!.raw).toContain(
+        "customEndpoint: 'https://other.example.com/rum/v1/other-org'",
+      );
     });
 
     it("code.lang is 'tsx' with filename 'App.tsx'", () => {

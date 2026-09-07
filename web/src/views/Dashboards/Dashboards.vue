@@ -165,7 +165,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       <OToggleGroup
                         :model-value="searchAcrossFolders ? 'all' : 'this'"
                         type="single"
-                        class="mr-1 self-center"
+                        class="me-1 self-center"
                         @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                       >
                         <OToggleGroupItem
@@ -264,7 +264,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <template #cell-folder="{ row }">
               <button
                 type="button"
-                class="bg-surface-subtle text-text-body hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-accent/25 inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs leading-5 transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
+                class="bg-surface-subtle text-text-body hover:bg-surface-subtle-hover hover:text-text-body focus-visible:ring-focus-ring-accent inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs leading-5 transition-colors outline-none focus-visible:ring-4 focus-visible:ring-inset"
                 @click.stop="updateActiveFolderId(row.folder_id)"
               >
                 <OIcon name="folder-outline" size="xs" />
@@ -358,7 +358,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   {{ resultTotal || 0 }} {{ t("dashboard.header") }}
                 </div>
                 <div v-if="selectedIds.length > 0" class="bulk-action-bar flex items-center gap-2">
-                  <span class="text-text-body mr-1 text-sm">{{
+                  <span class="text-text-body me-1 text-sm">{{
                     t("dashboard.dashboards.selected", { count: selectedIds.length })
                   }}</span>
                   <OButton

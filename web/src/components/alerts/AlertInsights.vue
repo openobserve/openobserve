@@ -119,7 +119,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <OIcon
           name="close"
           size="sm"
-          class="ml-2 cursor-pointer text-sm opacity-70 transition-opacity duration-200 hover:opacity-100"
+          class="ms-2 cursor-pointer text-sm opacity-70 transition-opacity duration-200 hover:opacity-100"
           @click="removeRangeFilter(panelId)"
         />
       </div>
@@ -129,7 +129,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="hasActiveFilters"
         variant="ghost"
         size="sm"
-        class="ml-2"
+        class="ms-2"
         @click="clearAllFilters"
         data-test="clear-all-filters-btn"
         icon-left="close"
@@ -202,7 +202,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div @contextmenu="handleNativeContextMenu">
           <div v-show="isLoading" class="flex h-100 items-center justify-center">
             <OSpinner size="md" />
-            <div class="ml-3">{{ t("alerts.insights.loading.insights") }}</div>
+            <div class="ms-3">{{ t("alerts.insights.loading.insights") }}</div>
           </div>
 
           <div :class="isLoading ? 'invisible' : 'visible'">

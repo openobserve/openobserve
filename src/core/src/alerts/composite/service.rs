@@ -71,6 +71,7 @@ pub struct CompositeCreate {
     pub tags: Vec<String>,
     pub owner: Option<String>,
     pub last_edited_by: Option<String>,
+    pub pending_period_sec: i64,
 }
 
 /// Errors the composite service surfaces to the API layer; each variant maps to
@@ -107,6 +108,8 @@ pub enum CompositeServiceError {
     Database(#[from] sea_orm::DbErr),
     #[error(transparent)]
     Scheduler(#[from] anyhow::Error),
+    #[error("Pending period must be >= 0")]
+    NegativePendingPeriod,
 }
 
 pub async fn create_composite(
@@ -317,6 +320,7 @@ pub async fn clone_composite(
             .unwrap_or_default(),
         owner: current.owner,
         last_edited_by: Some(editor),
+        pending_period_sec: current.pending_period_sec,
     })
     .await
 }
@@ -327,6 +331,9 @@ async fn persist(
 ) -> Result<composite_entity::Model, CompositeServiceError> {
     let parsed = parse_expr(&request.expression)
         .map_err(|error| CompositeServiceError::InvalidExpression(error.to_string()))?;
+    if request.pending_period_sec < 0 {
+        return Err(CompositeServiceError::NegativePendingPeriod);
+    }
     let references = collect_references(&parsed).map_err(map_expression_error)?;
     validate_children(&references).map_err(map_expression_error)?;
     let expression = canonical_expression(&parsed);
@@ -404,6 +411,7 @@ async fn persist_under_lock(
         last_edited_by: Set(request.last_edited_by),
         updated_at: Set(Some(config::utils::time::now_micros())),
         evaluation_generation: Set(0),
+        pending_period_sec: Set(request.pending_period_sec),
     };
     let children = resolved
         .into_iter()

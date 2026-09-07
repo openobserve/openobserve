@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="mb-2.5 flex items-center justify-between">
               <div class="flex w-full items-center">
                 <div
-                  class="rounded-default text-3xs mr-1.5 px-1.5 py-0.5 font-semibold uppercase"
+                  class="rounded-default text-3xs me-1.5 px-1.5 py-0.5 font-semibold uppercase"
                   :class="getEventTypeClass(event.type)"
                 >
                   {{ event.type }}
@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template v-if="event.frustration_types && event.frustration_types.length > 0">
                   <FrustrationEventBadge
                     :frustration-types="event.frustration_types"
-                    class="mr-1 inline"
+                    class="me-1 inline"
                   />
                 </template>
                 <div
@@ -55,11 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="event-metadata flex flex-wrap items-center gap-x-3 gap-y-1"
             >
               <div class="flex items-center truncate text-xs">
-                <OIcon name="language" size="sm" class="pr-1" />
+                <OIcon name="language" size="sm" class="pe-1" />
                 {{ sessionDetails.ip }}
               </div>
               <div class="flex items-center text-xs">
-                <OIcon name="code" size="sm" class="pr-1" />
+                <OIcon name="code" size="sm" class="pe-1" />
                 {{ rawEvent.service || t("common.unknownUser") }}
               </div>
               <div class="flex items-center text-xs">
@@ -67,19 +67,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ rawEvent.version || t("common.unknownUser") }}
               </div>
               <div class="flex items-center text-xs">
-                <OIcon name="mail" size="sm" class="pr-1" />
+                <OIcon name="mail" size="sm" class="pe-1" />
                 {{ sessionDetails.user_email || t("common.unknownUser") }}
               </div>
               <div class="flex items-center truncate text-xs">
-                <OIcon name="settings" size="sm" class="pr-1" />
+                <OIcon name="settings" size="sm" class="pe-1" />
                 {{ sessionDetails.browser }}, {{ sessionDetails.os }}
               </div>
               <div class="flex items-center truncate text-xs">
-                <OIcon name="location-on" size="sm" class="pr-1" />
+                <OIcon name="location-on" size="sm" class="pe-1" />
                 {{ sessionDetails.city }}, {{ sessionDetails.country }}
               </div>
               <div class="flex items-center truncate text-xs">
-                <OIcon name="schedule" size="sm" class="pr-1" />
+                <OIcon name="schedule" size="sm" class="pe-1" />
                 {{ sessionDetails.date }}
               </div>
             </div>
@@ -254,7 +254,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <!-- Event Type Badge -->
                   <div class="mb-0.5 flex items-center">
                     <div
-                      class="rounded-default text-3xs mr-1.5 px-1 py-0.5 font-semibold uppercase"
+                      class="rounded-default text-3xs me-1.5 px-1 py-0.5 font-semibold uppercase"
                       :class="getEventTypeClass(item.type)"
                     >
                       {{ item.type }}
@@ -262,7 +262,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                     <!-- Resource -->
                     <template v-if="item.type === 'resource'">
-                      <span class="text-3xs text-button-primary mr-1 font-bold">
+                      <span class="text-3xs text-button-primary me-1 font-bold">
                         {{ item.resource_method || "GET" }}
                       </span>
                       <span class="overflow-hidden text-xs text-ellipsis whitespace-nowrap">
@@ -301,18 +301,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
                   <!-- Event Details Row -->
                   <div class="text-text-secondary text-3xs flex items-center">
-                    <OIcon name="schedule" size="xs" class="mr-1" />
-                    <span class="mr-2">{{ formatTimestamp(item.date) }}</span>
+                    <OIcon name="schedule" size="xs" class="me-1" />
+                    <span class="me-2">{{ formatTimestamp(item.date) }}</span>
 
                     <!-- Resource-specific details -->
                     <template v-if="item.type === 'resource'">
-                      <OIcon name="access-time" size="xs" class="mr-0.5" />
-                      <span class="mr-2">{{
+                      <OIcon name="access-time" size="xs" class="me-0.5" />
+                      <span class="me-2">{{
                         formatDuration(item.resource_duration / 1000000)
                       }}</span>
                       <OIcon
                         :name="getStatusIcon(item.resource_status_code)"
-                        :class="['mr-0.5', getStatusColorClass(item.resource_status_code)]"
+                        :class="['me-0.5', getStatusColorClass(item.resource_status_code)]"
                         size="xs"
                       />
                       <span>{{ item.resource_status_code }}</span>
@@ -325,7 +325,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       size="xs"
                       :title="t('common.viewTraceDetails')"
                       data-test="view-trace-btn"
-                      class="ml-2 h-5! px-1.5"
+                      class="ms-2 h-5! px-1.5"
                       :loading="isResolvingTraceNav"
                       @click.stop="navigateToSpecificTrace(rumField(item, 'trace_id'))"
                     >
@@ -355,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <div class="mb-1 flex items-center">
                 <span
-                  class="rounded-default text-3xs bg-badge-blue-soft-bg text-badge-blue-soft-text mr-2 px-1.5 py-0.5 font-bold"
+                  class="rounded-default text-3xs bg-badge-blue-soft-bg text-badge-blue-soft-text me-2 px-1.5 py-0.5 font-bold"
                 >
                   {{ resource.resource_method || "GET" }}
                 </span>
@@ -365,19 +365,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
               <div class="text-3xs text-text-secondary flex items-center gap-x-3">
                 <div class="flex items-center">
-                  <OIcon name="access-time" size="xs" class="mr-1" />
+                  <OIcon name="access-time" size="xs" class="me-1" />
                   {{ formatDuration(resource.resource_duration / 1000000) }}
                 </div>
                 <div class="flex items-center">
                   <OIcon
                     :name="getStatusIcon(resource.resource_status_code)"
-                    :class="['mr-1', getStatusColorClass(resource.resource_status_code)]"
+                    :class="['me-1', getStatusColorClass(resource.resource_status_code)]"
                     size="xs"
                   />
                   {{ resource.resource_status_code }}
                 </div>
                 <div class="flex items-center">
-                  <OIcon name="schedule" size="xs" class="mr-1" />
+                  <OIcon name="schedule" size="xs" class="me-1" />
                   {{ formatTimestamp(resource.date) }}
                 </div>
               </div>
@@ -426,7 +426,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div>
             {
-            <div v-for="(key, index) in Object.keys(rawEvent)" :key="key" class="ml-4">
+            <div v-for="(key, index) in Object.keys(rawEvent)" :key="key" class="ms-4">
               <span>
                 <LogsHighLighting
                   :data="{ [key]: rawEvent[key] }"
@@ -446,11 +446,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script setup lang="ts">
 import { rumField, normalizeTraceId } from "@/utils/rum/fields";
 import useCorrelatedTracesStream from "@/composables/rum/useCorrelatedTracesStream";
+import { traceQueryWindow } from "@/utils/rum/traceWindow";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 import OTabPanels from "@/lib/navigation/Tabs/OTabPanels.vue";
 import OTabPanel from "@/lib/navigation/Tabs/OTabPanel.vue";
-import { ref, watch, computed } from "vue";
+import { ref, watch, computed, onUnmounted } from "vue";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
 import { copyToClipboard } from "@/utils/clipboard";
@@ -502,7 +503,9 @@ const emit = defineEmits(["update:open", "resource-selected"]);
 const store = useStore();
 const router = useRouter();
 const { t } = useI18nTyped();
-const { resolveTracesStream } = useCorrelatedTracesStream(t);
+const { resolveTraceLocation, cancel: cancelCorrelatedTracesStream } = useCorrelatedTracesStream(t);
+
+onUnmounted(() => cancelCorrelatedTracesStream());
 const relatedResources = ref<any[]>([]);
 const isLoadingRelatedResources = ref(false);
 const selectedResourceWithTrace = ref<any>(null);
@@ -640,14 +643,17 @@ const navigateToSpecificTrace = async (traceId: string) => {
   const win = window.open("", "_blank");
   isResolvingTraceNav.value = true;
   try {
-    const stream = await resolveTracesStream(canonicalTraceId, startTime, endTime);
+    const location = await resolveTraceLocation(canonicalTraceId, startTime, endTime);
+    // The ±10s guess above only frames the lookup; the indexed range is what
+    // the trace actually spans, so a slow call is no longer cut off.
+    const traceWindow = traceQueryWindow(location.range, startTime, endTime);
     const route = router.resolve({
       name: "traceDetails",
       query: {
-        stream,
+        stream: location.stream,
         trace_id: canonicalTraceId,
-        from: startTime,
-        to: endTime,
+        from: traceWindow.startTime,
+        to: traceWindow.endTime,
         org_identifier: store.state.selectedOrganization.identifier,
       },
     });

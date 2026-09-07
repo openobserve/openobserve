@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-use common::meta::grpc::MetadataMap;
+use common::meta::grpc::{MetadataMap, set_parent_or_trace_id};
 use config::{
     meta::{search, stream::StreamType},
     utils::json,
@@ -27,7 +27,6 @@ use proto::cluster_rpc::{
     search_server::Search,
 };
 use tonic::{Request, Response, Status};
-use tracing_opentelemetry::OpenTelemetrySpanExt;
 #[cfg(feature = "enterprise")]
 use {
     config::metrics,
@@ -52,10 +51,10 @@ impl Search for Searcher {
         let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
             prop.extract(&MetadataMap(req.metadata()))
         });
-        let _ = tracing::Span::current().set_parent(parent_cx.clone());
 
         let start = std::time::Instant::now();
         let req = req.into_inner();
+        set_parent_or_trace_id(&tracing::Span::current(), parent_cx, &req.trace_id);
         let request = json::from_slice::<search::Request>(&req.request)
             .map_err(|e| Status::internal(format!("failed to parse search request: {e}")))?;
         let stream_type = StreamType::from(req.stream_type.as_str());
@@ -95,9 +94,9 @@ impl Search for Searcher {
         let parent_cx = opentelemetry::global::get_text_map_propagator(|prop| {
             prop.extract(&MetadataMap(req.metadata()))
         });
-        let _ = tracing::Span::current().set_parent(parent_cx.clone());
 
         let req = req.into_inner();
+        set_parent_or_trace_id(&tracing::Span::current(), parent_cx, &req.trace_id);
         let request =
             json::from_slice::<search::MultiStreamRequest>(&req.request).map_err(|e| {
                 Status::internal(format!("failed to parse multi-stream search request: {e}"))

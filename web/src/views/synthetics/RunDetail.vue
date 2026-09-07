@@ -84,7 +84,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <span class="block min-w-0 truncate">{{ currentRun.url }}</span>
             <OTooltip side="bottom" :content="raw(currentRun.url)" :max-width="'32rem'" />
           </OBadge>
-          <div class="ml-1 flex">
+          <div class="ms-1 flex">
             <OButton
               variant="ghost"
               size="icon-xs"

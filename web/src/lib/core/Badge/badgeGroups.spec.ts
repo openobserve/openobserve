@@ -284,3 +284,14 @@ describe("badgeGroups", () => {
     expect(resolveBadge("logsResultChip", "error").shape).toBe("rounded");
   });
 });
+
+// "waiting" is the status every anomaly config carries until its first model
+// trains. Without a registry entry it fell through to genericEntry, whose label
+// is humanize() — English in every locale, and unstyled.
+describe("alertStatus: waiting", () => {
+  it("resolves from the registry, not the humanize fallback", () => {
+    const r = resolveBadge("alertStatus", "waiting");
+    expect(r.labelKey).toBe("components.badge.alertStatus.waiting");
+    expect(r.variant).toBe("default-soft");
+  });
+});

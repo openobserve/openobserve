@@ -704,14 +704,15 @@ test.describe("Dashboard Table Chart Pagination Feature - SQL Tables", () => {
 
     // Open config panel and enable pagination
     await pm.dashboardPanelConfigs.openConfigPanel();
-    const paginationToggle = pm.dashboardPanelConfigs.paginationToggle;
-    await paginationToggle.click();
+    await pm.dashboardPanelConfigs.enablePagination();
 
-    // Verify the input has min="1" attribute
-    const rowsPerPageInput = pm.dashboardPanelConfigs.rowsPerPageWrapper;
-    await rowsPerPageInput.waitFor({ state: "visible" });
-    const minAttr = await rowsPerPageInput.getAttribute('min');
-    expect(minAttr).toBe('1');
+    // Poll: the control renders on the same tick the toggle flips, so a one-shot
+    // read can land before Vue has patched the attribute onto it.
+    await expect
+      .poll(async () => await pm.dashboardPanelConfigs.getRowsPerPageMin(), {
+        timeout: 10000,
+      })
+      .toBe("1");
 
     testLogger.info('Verified rows per page input has min=1 attribute');
 

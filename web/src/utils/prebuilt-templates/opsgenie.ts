@@ -78,12 +78,14 @@ export const opsgenieConfig: PrebuiltConfig = {
       type: "toggle",
       required: false,
       hintKey: "alerts.prebuiltDestinations.opsgenieEuRegionHelp",
+      persistInMetadata: true,
     },
     {
       key: "priority",
       labelKey: "alerts.prebuiltDestinations.opsgeniePriority",
       type: "select",
       required: false,
+      persistInMetadata: true,
       // Getters, not resolved strings: this config object is module scope, so a
       // plain call would freeze the copy at the boot locale.
       options: [

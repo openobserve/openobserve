@@ -58,7 +58,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OIcon
             name="sentiment-very-dissatisfied"
             size="sm"
-            class="text-severity-warning-color pr-1"
+            class="text-severity-warning-color pe-1"
             data-test="frustration-summary-icon"
           />
           <span

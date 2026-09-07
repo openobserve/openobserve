@@ -76,7 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Output Section with Alert-specific Error Display -->
     <template #output-content>
-      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-l">
+      <div class="border-border-default flex h-full w-full min-w-100 flex-col border-s">
         <div
           v-if="alertErrorsToDisplay.length > 0"
           class="text-text-heading shrink-0 py-3 text-center text-sm font-semibold"
@@ -565,7 +565,7 @@ export default defineComponent({
             detection_window_seconds: jsonObj.detection_window_seconds,
             training_window_days: jsonObj.training_window_days,
             retrain_interval_days: jsonObj.retrain_interval_days ?? 0,
-            threshold: jsonObj.threshold,
+            threshold: jsonObj.threshold ?? 97,
             seasonality: jsonObj.seasonality ?? "none",
             query_mode: jsonObj.query_mode ?? "filters",
             filters: jsonObj.filters ?? [],

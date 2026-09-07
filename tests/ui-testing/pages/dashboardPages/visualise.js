@@ -77,6 +77,8 @@ export default class LogsVisualise {
     if (isTableSelected !== "true") {
       await tableChartItem.click();
     }
+    // The chart-type switch is reactive and lags the click; gate on it actually applying so downstream steps don't run against the wrong chart type.
+    await expect(tableChartItem).toHaveAttribute("data-selected", "true", { timeout: 10000 });
   }
 
   //Apply: Logs
@@ -309,7 +311,7 @@ export default class LogsVisualise {
     await this.queryEditor.fill(vrl);
   }
 
-  async runQueryAndWaitForCompletion() {
+  async runQueryAndWaitForCompletion({ expectTable = false } = {}) {
     const runBtn = this.page.locator(
       '[data-test="logs-search-bar-visualize-refresh-btn"]'
     );
@@ -321,6 +323,11 @@ export default class LogsVisualise {
     // Wait for query to start (cancel btn appears) then complete (cancel btn disappears)
     await cancelBtn.waitFor({ state: "visible", timeout: 5000 }).catch(() => {});
     await cancelBtn.waitFor({ state: "hidden", timeout: 30000 }).catch(() => {});
+    // The cancel button is enterprise-gated (SearchBar.vue config.isEnterprise), so on OSS the waits above are no-ops that don't gate completion — wait for the result to actually render (the table specifically when the caller expects one, so a transient chart-renderer can't satisfy the gate early).
+    const resultSelector = expectTable
+      ? '[data-test="dashboard-panel-table"]'
+      : '[data-test="chart-renderer"], [data-test="dashboard-panel-table"]';
+    await this.page.locator(resultSelector).first().waitFor({ state: "visible", timeout: 30000 }).catch(() => {});
   }
 
   // Helper function to check for dashboard errors
@@ -675,15 +682,22 @@ export default class LogsVisualise {
 
   // Open query inspector from a panel dropdown
   async openPanelQueryInspector(panelName) {
-    // Wait for the dashboard view to fully load after panel save
-    await this.page.waitForLoadState("networkidle", { timeout: 15000 }).catch(() => {});
+    // The Query Inspector item is v-if-gated on the panel's metaData, populated only after its query executes, so wait for the panel to render before opening the menu.
+    await this.verifyChartRenders(this.page);
 
     const dropdown = this.getPanelDropdown(panelName);
     await dropdown.waitFor({ state: "visible", timeout: 20000 });
-    await dropdown.click();
 
     const inspectorBtn = this.page.locator('[data-test="dashboard-query-inspector-panel"]');
-    await inspectorBtn.waitFor({ state: "visible", timeout: 10000 });
+    // Opening the menu before the item mounts leaves it absent for that open, so re-open until it appears.
+    // Escape first each retry: the dropdown is a toggle, so a blind re-click on an already-open menu closes it — fighting itself while metaData populates.
+    await expect(async () => {
+      if (await inspectorBtn.isVisible().catch(() => false)) return;
+      await this.page.keyboard.press("Escape").catch(() => {});
+      await dropdown.click();
+      await expect(inspectorBtn).toBeVisible({ timeout: 3000 });
+    }).toPass({ timeout: 30000, intervals: [500, 1000, 2000] });
+
     await inspectorBtn.click();
     await this.waitForQueryInspector(this.page);
   }

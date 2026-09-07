@@ -392,6 +392,7 @@ export function useSessions() {
     let totalCacheReadSavings = 0;
     let totalNetCacheImpact = 0;
     let totalErrors = 0;
+    let userId: string | null = null;
     let serviceName: string | null = null;
     for (let i = 0; i < accumulated.length; i++) {
       const r = accumulated[i];
@@ -412,13 +413,19 @@ export function useSessions() {
       totalCacheReadSavings += t.cacheReadSavings;
       totalNetCacheImpact += t.netCacheImpact;
       totalErrors += t.errorCount;
+      if (!userId && Array.isArray(r.user_ids)) {
+        const firstUserId = r.user_ids.find(
+          (value: unknown) => typeof value === "string" && value.trim().length > 0,
+        );
+        if (firstUserId) userId = firstUserId;
+      }
       if (!serviceName && t.serviceName) serviceName = t.serviceName;
     }
     if (firstSeenNanos === Infinity) firstSeenNanos = 0;
 
     const detail: SessionDetail = {
       sessionId,
-      userId: null,
+      userId,
       serviceName,
       firstSeenMicros: firstSeenNanos,
       durationNanos: lastSeenNanos > firstSeenNanos ? lastSeenNanos - firstSeenNanos : 0,

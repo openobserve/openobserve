@@ -188,25 +188,25 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
     await pm.sloFormPage.gotoNew(ORG);
 
     await pm.sloFormPage.selectSliType('count');
-    await expect(page.locator(pm.sloFormPage.locators.goodExpr)).toBeVisible();
-    await expect(page.locator(pm.sloFormPage.locators.aggregate)).toHaveCount(0);
+    await expect(pm.sloFormPage.getGoodExprField()).toBeVisible();
+    await expect(pm.sloFormPage.getAggregateField()).toHaveCount(0);
 
     await pm.sloFormPage.selectSliType('time_slice');
-    await expect(page.locator(pm.sloFormPage.locators.aggregate)).toBeVisible();
-    await expect(page.locator(pm.sloFormPage.locators.comparator)).toBeVisible();
-    await expect(page.locator(pm.sloFormPage.locators.threshold)).toBeVisible();
-    await expect(page.locator(pm.sloFormPage.locators.goodExpr)).toHaveCount(0);
+    await expect(pm.sloFormPage.getAggregateField()).toBeVisible();
+    await expect(pm.sloFormPage.getComparatorField()).toBeVisible();
+    await expect(pm.sloFormPage.getThresholdField()).toBeVisible();
+    await expect(pm.sloFormPage.getGoodExprField()).toHaveCount(0);
 
     await pm.sloFormPage.selectSliType('alert');
-    await expect(page.locator(pm.sloFormPage.locators.alertSource)).toBeVisible();
-    await expect(page.locator(pm.sloFormPage.locators.aggregate)).toHaveCount(0);
+    await expect(pm.sloFormPage.getAlertSource()).toBeVisible();
+    await expect(pm.sloFormPage.getAggregateField()).toHaveCount(0);
   });
 
   test('the SLI type description changes with the selected type', {
     tag: ['@P2'],
   }, async ({ page }) => {
     await pm.sloFormPage.gotoNew(ORG);
-    const description = page.locator(pm.sloFormPage.locators.sliTypeDescription);
+    const description = pm.sloFormPage.getSliTypeDescription();
 
     await pm.sloFormPage.selectSliType('count');
     const countText = await description.textContent();
@@ -230,7 +230,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
     tag: ['@P2'],
   }, async ({ page }) => {
     await pm.sloFormPage.gotoNew(ORG);
-    const note = page.locator(pm.sloFormPage.locators.sliceNote);
+    const note = pm.sloFormPage.getSliceNote();
 
     await pm.sloFormPage.selectSliType('count');
     const countNote = (await note.textContent() ?? '').trim();
@@ -250,9 +250,9 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
 
     // Either a populated picker or an explicit empty state — never a bare,
     // unexplained control the user cannot act on.
-    const picker = page.locator(pm.sloFormPage.locators.alertSource);
-    const empty = page.locator(pm.sloFormPage.locators.alertSourceEmpty);
-    const hint = page.locator(pm.sloFormPage.locators.alertSourceHint);
+    const picker = pm.sloFormPage.getAlertSource();
+    const empty = pm.sloFormPage.getAlertSourceEmpty();
+    const hint = pm.sloFormPage.getAlertSourceHint();
 
     const shown = (await picker.count()) + (await empty.count()) + (await hint.count());
     expect(shown, 'the alert SLI must present a picker, an empty state, or a hint')
@@ -410,7 +410,7 @@ test.describe('SLO form validation', { tag: ['@slo', '@sloForm', '@all'] }, () =
     await pm.sloFormPage.setThreshold(500);
 
     await expect(
-      page.locator(pm.sloFormPage.locators.tsPreviewError),
+      pm.sloFormPage.getTimeSlicePreviewError(),
       'a broken expression must report an error, not an empty chart',
     ).toBeVisible({ timeout: 60000 });
   });

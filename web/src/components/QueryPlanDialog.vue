@@ -179,7 +179,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
-import { defineComponent, ref, computed, watch } from "vue";
+import { defineComponent, ref, computed, watch, onUnmounted } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import streamingSearch from "@/services/streaming_search";
@@ -594,6 +594,10 @@ export default defineComponent({
         }
       },
     );
+
+    onUnmounted(() => {
+      document.removeEventListener("keydown", handleEscKey);
+    });
 
     return {
       raw,

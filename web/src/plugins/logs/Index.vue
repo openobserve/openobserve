@@ -39,7 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         <template v-slot:before>
           <!-- px-1 (4px), not 10px: the search bar's own content already carries
-               a 6px internal inset (toolbar p-1.5 + editor ml-1.5), so 4+6=10px
+               a 6px internal inset (toolbar p-1.5 + editor ms-1.5), so 4+6=10px
                lines the toolbar/editor up with the 10px field-list & results
                panels below. -->
           <div class="h-full w-full">
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      OFieldList) so they line up — they're controls, not scrolling
                      surfaces. -->
                 <div
-                  class="relative-position border-border-default bg-surface-panel h-full border-r pt-2.5"
+                  class="relative-position border-border-default bg-surface-panel h-full border-e pt-2.5"
                 >
                   <IndexList
                     v-if="searchObj.meta.showFields"
@@ -553,7 +553,7 @@ export default defineComponent({
       useSearchStream(t);
 
     // Initialize patterns composable (completely separate from logs)
-    const { extractPatterns, patternsState } = usePatterns(t);
+    const { extractPatterns, patternsState, cancelPatterns } = usePatterns(t);
 
     const searchResultRef = ref(null);
     const searchBarRef = ref(null);
@@ -625,6 +625,7 @@ export default defineComponent({
       if (store.state.refreshIntervalID) clearInterval(store.state.refreshIntervalID);
 
       cancelQuery();
+      cancelPatterns();
 
       removeAiContextHandler();
       cleanupContextProvider();
@@ -1200,9 +1201,9 @@ export default defineComponent({
             const streams = searchObj.data.stream.selectedStream;
 
             streams.forEach((stream: string, index: number) => {
-              // Add UNION for all but the first SELECT statement
+              // BY NAME merges differing columns; ALL keeps events duplicated across streams.
               if (index > 0) {
-                searchObj.data.query += " UNION ";
+                searchObj.data.query += " UNION ALL BY NAME ";
               }
               searchObj.data.query += `SELECT [FIELD_LIST]${selectFields} FROM "${stream}" ${whereClause}`;
             });
@@ -1309,9 +1310,19 @@ export default defineComponent({
     };
     const showSearchHistoryfn = () => {
       // Search History is now its own route (was an `action=history` overlay).
+      // Forward the active stream type/name so the history shown there matches
+      // whichever telemetry type the user was viewing (logs/traces/metrics).
+      // With more than one stream selected there's no single name to forward
+      // without silently dropping the others, so leave history unscoped by
+      // stream in that case.
+      const selectedStreams = searchObj.data.stream.selectedStream;
       router.push({
         name: "searchHistory",
-        query: { org_identifier: store.state.selectedOrganization.identifier },
+        query: {
+          org_identifier: store.state.selectedOrganization.identifier,
+          stream_type: searchObj.data.stream.streamType,
+          stream: selectedStreams.length === 1 ? selectedStreams[0] : "",
+        },
       });
     };
 
@@ -3217,25 +3228,16 @@ export default defineComponent({
         this.searchObj.data.queryResults.aggs = [];
 
         if (this.searchObj.meta.sqlMode && this.isLimitQuery(parsedSQL)) {
-          this.resetHistogramWithError(
-            this.t("logs.index.histogramUnavailableCtesDistinctJoinLimit"),
-            -1,
-          );
+          this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);
           this.searchObj.meta.histogramDirtyFlag = false;
         } else if (
           this.searchObj.meta.sqlMode &&
           (this.isDistinctQuery(parsedSQL) || this.isWithQuery(parsedSQL))
         ) {
-          this.resetHistogramWithError(
-            this.t("logs.index.histogramUnavailableCtesDistinctJoinLimit"),
-            -1,
-          );
+          this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);
           this.searchObj.meta.histogramDirtyFlag = false;
-        } else if (
-          this.searchObj.data.stream.selectedStream.length > 1 &&
-          this.searchObj.meta.sqlMode == true
-        ) {
-          this.resetHistogramWithError(this.t("logs.index.histogramNotAvailableMultiStream"));
+        } else if (this.searchObj.data.stream.selectedStream.length > 1) {
+          this.resetHistogramWithError(this.t("search.histogramUnavailableForQueries"), -1);
         } else if (this.searchObj.data.queryResults.is_histogram_eligible == false) {
           this.resetHistogramWithError(
             this.t("logs.index.histogramUnavailableCtesDistinctLimit"),

@@ -41,6 +41,9 @@ export interface Alert {
     threshold: number;
     silence: number;
   };
+  /** Seconds. A condition must hold continuously this long before the alert
+   *  transitions from `pending` to `firing`. 0 = fire immediately (default). */
+  pending_period_sec: number;
   is_real_time: boolean;
   enabled: boolean;
   context_attributes: { [key: string]: string };
@@ -100,6 +103,12 @@ export interface Headers {
   [key: string]: string;
 }
 export interface DestinationMetadata {
+  prebuilt_type?: string;
+  setup_method?: "oauth" | "manifest" | "webhook";
+  slack_team_id?: string;
+  slack_team_name?: string;
+  slack_channel_id?: string;
+  slack_app_name?: string;
   // Splunk specific fields
   source?: string;
   sourcetype?: string;
@@ -111,6 +120,7 @@ export interface DestinationMetadata {
   ddtags?: string;
   service?: string;
   // hostname is shared between Splunk and Datadog
+  [key: string]: string | undefined;
 }
 
 export interface Destination {

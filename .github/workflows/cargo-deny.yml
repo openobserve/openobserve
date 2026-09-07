@@ -1,11 +1,17 @@
 name: "Licenses checker"
 on:
-  push:
+  # Licences only change with the dependency set: labelled, non-draft PRs that touch the Cargo manifests,
+  # plus a weekly run for advisories against unchanged dependencies. No post-merge rerun.
+  pull_request:
+    types: [opened, reopened, synchronize, labeled, unlabeled, ready_for_review, converted_to_draft]
     paths:
       - "**/Cargo.lock"
       - "**/Cargo.toml"
       - "deny.toml"
-      - ".github/workflows/cargo-deny.yml" # run when this file changes, so we know nothing is broken
+      - ".github/workflows/cargo-deny.yml"
+  schedule:
+    - cron: "0 3 * * 1"
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -13,10 +19,13 @@ concurrency:
 
 jobs:
   check:
+    # Nothing runs on a PR without the 'ready-for-ci' label, or on a draft; ci-gate alone reports the state.
+    if: ${{ github.event_name != 'pull_request' || (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false) }}
     runs-on: ubicloud-standard-8
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+      - uses: ./.github/actions/github-auth
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           # The command to run with cargo-deny

@@ -21,6 +21,21 @@ describe("OCheckbox", () => {
     expect(wrapper.text()).toContain("Accept terms");
   });
 
+  it("names the control with ariaLabel when there is no visible label", () => {
+    // A checkbox on a card cannot carry visible text, and the wrapping <label>
+    // does not name a `button[role=checkbox]` — only an explicit aria-label on
+    // that button does.
+    wrapper = mount(OCheckbox, { props: { ariaLabel: "Select Pod OOM Killed" } });
+    expect(wrapper.find('[role="checkbox"]').attributes("aria-label")).toBe(
+      "Select Pod OOM Killed",
+    );
+  });
+
+  it("leaves the control unnamed by aria when a visible label is used instead", () => {
+    wrapper = mount(OCheckbox, { props: { label: "Accept terms" } });
+    expect(wrapper.find('[role="checkbox"]').attributes("aria-label")).toBeUndefined();
+  });
+
   it("renders a label slot when provided", () => {
     wrapper = mount(OCheckbox, {
       slots: { label: "<span>Custom label</span>" },

@@ -132,6 +132,10 @@ pub enum RunOutcome {
     /// this, a webhook outage silently undercounts firings.
     #[serde(rename = "notify_failed")]
     NotifyFailed,
+    /// alert is in pending state, will wait for configured time before
+    /// transitioning to firing
+    #[serde(rename = "pending")]
+    Pending,
 }
 
 impl RunOutcome {
@@ -152,6 +156,7 @@ impl RunOutcome {
             Self::Error => 3,
             Self::Skipped => 4,
             Self::NotifyFailed => 5,
+            Self::Pending => 6,
         }
     }
 
@@ -163,6 +168,7 @@ impl RunOutcome {
             3 => Some(Self::Error),
             4 => Some(Self::Skipped),
             5 => Some(Self::NotifyFailed),
+            6 => Some(Self::Pending),
             _ => None,
         }
     }
@@ -175,6 +181,7 @@ impl RunOutcome {
             Self::Error => "error",
             Self::Skipped => "skipped",
             Self::NotifyFailed => "notify_failed",
+            Self::Pending => "pending",
         }
     }
 }
@@ -216,6 +223,7 @@ pub fn normalize_outcome(
         "error" => Some(RunOutcome::Error),
         "skipped" => Some(RunOutcome::Skipped),
         "notify_failed" => Some(RunOutcome::NotifyFailed),
+        "pending" => Some(RunOutcome::Pending),
 
         // ── legacy vocabulary ──
         "condition_not_satisfied" => Some(RunOutcome::Normal),
@@ -746,6 +754,8 @@ pub enum UsageType {
     Traces,
     #[serde(rename = "/otlp/v1/metrics")]
     Metrics,
+    #[serde(rename = "/otlp/v1/profiles")]
+    Profiles,
     #[serde(rename = "/prometheus/v1/write")]
     PrometheusRemoteWrite,
     #[serde(rename = "/metrics/_json")]
@@ -805,6 +815,7 @@ impl UsageType {
                 | UsageType::Logs
                 | UsageType::Traces
                 | UsageType::Metrics
+                | UsageType::Profiles
                 | UsageType::PrometheusRemoteWrite
                 | UsageType::JsonMetrics
                 | UsageType::RUM
@@ -843,6 +854,7 @@ impl std::fmt::Display for UsageType {
             UsageType::Logs => write!(f, "/otlp/v1/logs"),
             UsageType::Traces => write!(f, "/otlp/v1/traces"),
             UsageType::Metrics => write!(f, "/otlp/v1/metrics"),
+            UsageType::Profiles => write!(f, "/otlp/v1/profiles"),
             UsageType::PrometheusRemoteWrite => write!(f, "/prometheus/v1/write"),
             UsageType::JsonMetrics => write!(f, "/metrics/_json"),
             UsageType::RUM => write!(f, "/v1/rum"),
@@ -1571,6 +1583,7 @@ mod tests {
         assert_eq!(UsageEvent::from(UsageType::Logs), UsageEvent::Ingestion);
         assert_eq!(UsageEvent::from(UsageType::Traces), UsageEvent::Ingestion);
         assert_eq!(UsageEvent::from(UsageType::Metrics), UsageEvent::Ingestion);
+        assert_eq!(UsageEvent::from(UsageType::Profiles), UsageEvent::Ingestion);
         assert_eq!(UsageEvent::from(UsageType::Search), UsageEvent::Search);
         assert_eq!(
             UsageEvent::from(UsageType::MetricSearch),
@@ -1602,6 +1615,7 @@ mod tests {
         assert_eq!(format!("{}", UsageType::Logs), "/otlp/v1/logs");
         assert_eq!(format!("{}", UsageType::Traces), "/otlp/v1/traces");
         assert_eq!(format!("{}", UsageType::Metrics), "/otlp/v1/metrics");
+        assert_eq!(format!("{}", UsageType::Profiles), "/otlp/v1/profiles");
         assert_eq!(
             format!("{}", UsageType::PrometheusRemoteWrite),
             "/prometheus/v1/write"
@@ -1648,6 +1662,7 @@ mod tests {
         assert!(UsageType::Logs.is_ingestion());
         assert!(UsageType::Traces.is_ingestion());
         assert!(UsageType::Metrics.is_ingestion());
+        assert!(UsageType::Profiles.is_ingestion());
         assert!(UsageType::PrometheusRemoteWrite.is_ingestion());
         assert!(UsageType::JsonMetrics.is_ingestion());
         assert!(UsageType::RUM.is_ingestion());

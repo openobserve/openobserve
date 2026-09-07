@@ -84,6 +84,7 @@ vi.mock("@/composables/rum/useTraceCorrelation", () => ({
     backendSpanCount: mockBackendSpanCount,
     performanceData: mockPerformanceData,
     fetchCorrelation: mockFetchCorrelation,
+    cancelTracesStream: vi.fn(),
   }),
 }));
 

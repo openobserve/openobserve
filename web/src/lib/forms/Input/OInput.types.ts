@@ -73,6 +73,12 @@ export interface InputProps {
   mask?: string;
   /** Maximum character length — shows a counter when set */
   maxlength?: number;
+  /** Minimum value — `type="number"`/`"date"`/`"datetime-local"` only */
+  min?: number | string;
+  /** Maximum value — `type="number"`/`"date"`/`"datetime-local"` only */
+  max?: number | string;
+  /** Step increment — `type="number"` only */
+  step?: number | string;
   /** Rows for textarea type */
   rows?: number;
   /** Control size */

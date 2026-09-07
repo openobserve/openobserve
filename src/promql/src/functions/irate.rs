@@ -15,14 +15,9 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 
 use crate::functions::RangeFunc;
-
-pub(crate) fn irate(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, IrateFunc::new(), eval_ctx)
-}
 
 pub struct IrateFunc;
 
@@ -60,9 +55,14 @@ impl RangeFunc for IrateFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Labels, RangeValue, TimeWindow, Value};
+    use datafusion::error::Result;
 
     use super::*;
+
+    fn irate(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        crate::functions::eval_range(data, IrateFunc::new(), eval_ctx)
+    }
 
     // Test helper function that creates an EvalContext for instant queries
     fn irate_test_helper(data: Value) -> Result<Value> {

@@ -30,7 +30,7 @@ use config::{
     meta::{
         alerts::alert,
         otlp::OtlpRequestType,
-        promql::*,
+        promql::{METRICS_HASH_EXCLUDED_LABELS, *},
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamPartition, StreamType},
     },
@@ -64,7 +64,6 @@ use crate::{
         grpc::{get_exemplar_val, get_metric_val, get_val},
         write_file,
     },
-    metrics::get_exclude_labels,
     pipeline::batch_execution::ExecutablePipeline,
 };
 
@@ -558,7 +557,7 @@ pub async fn handle_otlp_request(
         ));
         let mut triggers: TriggerAlertData =
             Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
-        let mut evaluated_alerts = HashSet::new();
+        let mut trigger_slots: HashMap<String, super::TriggerSlot> = HashMap::new();
 
         for val_map in json_data {
             let timestamp = val_map
@@ -599,10 +598,9 @@ pub async fn handle_otlp_request(
             hour_buf.records_size += value_str.len();
 
             // start check for alert trigger
-            if let Some(alerts) = cur_stream_alerts
-                && triggers.len() < alerts.len()
-            {
+            if let Some(alerts) = cur_stream_alerts {
                 let end_time = now_micros();
+                let dedup = super::series_signature(&val_map);
                 for alert in alerts {
                     let key = format!(
                         "{}/{}/{}/{}",
@@ -611,15 +609,20 @@ pub async fn handle_otlp_request(
                         alert.stream_name,
                         alert.get_unique_key()
                     );
-                    // For one alert, only one trigger per request
-                    // Trigger for this alert is already added.
-                    if evaluated_alerts.contains(&key) {
+                    // One row per label set: a series repeats its labels on every sample.
+                    if !super::trigger_wants_labels(&trigger_slots, &key, dedup) {
                         continue;
                     }
                     match alert.evaluate(Some(&val_map), (None, end_time), None).await {
                         Ok(trigger_results) if trigger_results.data.is_some() => {
-                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
-                            evaluated_alerts.insert(key);
+                            super::merge_trigger_rows(
+                                &mut triggers,
+                                &mut trigger_slots,
+                                &key,
+                                dedup,
+                                alert,
+                                trigger_results.data.unwrap(),
+                            );
                         }
                         Ok(_) => {
                             // the data doesn't satisfy the alert condition
@@ -774,7 +777,7 @@ fn process_gauge(
             continue;
         }
         let val_map = dp_rec.as_object_mut().unwrap();
-        let hash = super::signature_without_labels(val_map, get_exclude_labels());
+        let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(dp_rec);
     }
@@ -803,7 +806,7 @@ fn process_sum(
             continue;
         }
         let val_map = dp_rec.as_object_mut().unwrap();
-        let hash = super::signature_without_labels(val_map, get_exclude_labels());
+        let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
         val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
         records.push(dp_rec);
     }
@@ -829,7 +832,7 @@ fn process_histogram(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
@@ -855,7 +858,7 @@ fn process_exponential_histogram(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_exp_hist_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }
@@ -881,7 +884,7 @@ fn process_summary(
         let mut dp_rec = rec.clone();
         for mut bucket_rec in process_summary_data_point(&mut dp_rec, data_point) {
             let val_map = bucket_rec.as_object_mut().unwrap();
-            let hash = super::signature_without_labels(val_map, get_exclude_labels());
+            let hash = super::signature_without_labels(val_map, METRICS_HASH_EXCLUDED_LABELS);
             val_map.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
             records.push(bucket_rec);
         }

@@ -22,14 +22,13 @@ test.describe('Workflows CRUD & builder', { tag: ['@workflows', '@enterprise', '
   let pm;
 
   test.beforeEach(async ({ page }, testInfo) => {
-    // Workflows feature is under rework — skipped until it stabilizes.
-    test.skip(true, 'Workflows feature under rework');
     testLogger.testStart(testInfo.title, testInfo.file);
     await navigateToBase(page);
     pm = new PageManager(page);
     // Enterprise-only feature: these specs run ONLY in the ENT playwright matrix (never wired into
     // OSS), where Workflows is enabled by default. No runtime availability skip — if the feature is
     // missing where this runs, the test must fail loudly rather than silently pass as skipped.
+    await pm.workflowsPage.assertEnabled();
   });
 
   // CT-01 / WF-NEG-02 — a workflow requires at least one step after the trigger.

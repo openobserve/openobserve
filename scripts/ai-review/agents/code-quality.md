@@ -33,17 +33,21 @@ You are a **Code Quality Reviewer** for the OpenObserve project. Your focus is b
 
 ## TypeScript/Vue Checks
 
-For any change under `web/`, **read the tracked skills `.claude/skills/ui-architect/SKILL.md` (UI
-house rules) and `.claude/skills/eslint-error-handling/SKILL.md` (lint/type-check playbook) first** —
-they hold the authoritative, ESLint-encoded conventions. Flag changed code that violates them:
+Your remit under `web/` is **correctness**: logic, reactivity, lifecycle, typing.
 
-- Verify component reactivity (computed, ref, reactive) is used correctly
-- Check for missing cleanup in `onUnmounted` / `watch` teardown
-- Watch for memory leaks from retained references in long-lived components
+- Verify component reactivity (computed, ref, reactive) is used correctly — a `ref` read without
+  `.value`, a `computed` with a side effect, a prop destructured out of reactivity
+- Check for missing cleanup in `onUnmounted` / `watch` teardown (listeners, timers, observers,
+  subscriptions), and memory leaks from retained references in long-lived components
 - **No `any`, no `!` non-null assertions, no use-site `as` casts** (except `as const` and
-  `Array/Object as PropType<T>`) — type at the declaration site instead
-- **Mutating a prop** directly (`vue/no-mutating-props`) — must go through a computed alias / emit
-- Bare HTML controls or third-party UI primitives where an O2 component / `toast()` exists
-  (ESLint `vue/no-restricted-html-elements` / `no-restricted-imports` gives the exact replacement)
-- Hardcoded px / hex colors / user-facing strings instead of design tokens + i18n
-- New code that is not type-clean or lint-clean (the gates are a hard 0)
+  `Array/Object as PropType<T>`) — type at the declaration site instead. See
+  `.claude/skills/eslint-error-handling/SKILL.md` for the conventions
+- Unhandled promise rejections, `await` missing on a service call, races between a fetch and a
+  component teardown
+
+**Do NOT flag UI house-rule violations** — hand-rolled headers, non-O2 components, layout /
+token / spacing choices, form-container weight, i18n semantics. The **Frontend UI Reviewer** owns
+those and runs on every PR that touches `web/src`; duplicating it produces two lines for one
+issue. Nor should you flag anything ESLint or `type-check` already errors on (hardcoded px, hex,
+bare template strings, `vue/no-mutating-props`, `useI18n` from `vue-i18n`) — those turn the PR red
+on their own.

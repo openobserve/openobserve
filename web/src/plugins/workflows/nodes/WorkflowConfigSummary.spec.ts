@@ -192,6 +192,20 @@ describe("WorkflowConfigSummary — destination", () => {
     ).toBe(false);
   });
 
+  // The backend omits `destination_type_name` when it was never set, so an untyped
+  // pipeline destination is one the workflow runs fine — badging it "unsupported"
+  // would contradict the server, which accepts any pipeline-module destination.
+  it("does not flag an untyped destination", async () => {
+    const { destination_type_name: _t, ...untyped } = CUSTOM;
+    mockList.mockResolvedValue({ data: [untyped] });
+    seedDestinationNode();
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(
+      wrapper.find('[data-test="workflow-config-summary-destination-unsupported"]').exists(),
+    ).toBe(false);
+  });
+
   // ── Missing vs unknown ────────────────────────────────────────────────────
   // These two must not be conflated: claiming "no longer exists" because the lookup
   // itself failed is exactly the false report this panel is meant to prevent.
@@ -226,5 +240,217 @@ describe("WorkflowConfigSummary — destination", () => {
     expect(
       wrapper.find('[data-test="workflow-config-summary-destination-unsupported"]').exists(),
     ).toBe(false);
+  });
+});
+
+// ── Branch ──────────────────────────────────────────────────────────────────
+// A Branch's config IS its routing table. Without it the pane fell through to the
+// trigger catch-all and rendered another node's title ("Alert Trigger").
+
+const seedBranchNode = (cases: any[], else_handle = "else") => {
+  workflowObj.currentSelectedNodeData = {
+    id: "b1",
+    data: { node_type: "branch", cases, else_handle },
+  } as any;
+};
+
+const branchCard = (w: any) => w.find('[data-test="workflow-config-summary-branch"]');
+
+describe("WorkflowConfigSummary — branch", () => {
+  beforeEach(() => {
+    resetWorkflowDestinations();
+    workflowObj.currentSelectedNodeData = null;
+    mockList.mockResolvedValue({ data: [] });
+  });
+  afterEach(() => vi.clearAllMocks());
+
+  // The reported bug: a Branch rendered the literal text "Alert Trigger" — the
+  // trigger catch-all's title, not this node's config.
+  it("never renders the trigger title for a branch", async () => {
+    seedBranchNode([
+      {
+        handle: "case-0",
+        label: "Severe",
+        conditions: { conditions: { and: [{ column: "n", operator: ">=", value: "1000" }] } },
+      },
+    ]);
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("Alert Trigger");
+    expect(wrapper.find('[data-test="workflow-config-summary-trigger"]').exists()).toBe(false);
+  });
+
+  it("lists every authored path label with its rule, plus the fallback", async () => {
+    seedBranchNode([
+      {
+        handle: "case-0",
+        label: "Severe (>=1000)",
+        conditions: {
+          conditions: { and: [{ column: "meta_alert_count", operator: ">=", value: "1000" }] },
+        },
+      },
+      {
+        handle: "case-1",
+        label: "Moderate (>=200)",
+        conditions: {
+          conditions: { and: [{ column: "meta_alert_count", operator: ">=", value: "200" }] },
+        },
+      },
+    ]);
+    const wrapper = createWrapper();
+    await flushPromises();
+    const text = branchCard(wrapper).text();
+    expect(text).toContain("Severe (>=1000)");
+    expect(text).toContain("meta_alert_count >= '1000'");
+    expect(text).toContain("Moderate (>=200)");
+    expect(text).toContain("meta_alert_count >= '200'");
+    expect(text).toContain("Everything Else");
+  });
+
+  // Handles are stable ids, not array positions: a deleted middle path leaves
+  // case-0/case-2 behind. Numbering an unlabelled path off its handle would call
+  // the SECOND surviving path "Path 3".
+  it("numbers an unlabelled path by position among survivors, not by its handle", async () => {
+    seedBranchNode([
+      {
+        handle: "case-0",
+        conditions: { conditions: { and: [{ column: "a", operator: "=", value: "1" }] } },
+      },
+      {
+        handle: "case-2",
+        conditions: { conditions: { and: [{ column: "b", operator: "=", value: "2" }] } },
+      },
+    ]);
+    const wrapper = createWrapper();
+    await flushPromises();
+    const text = branchCard(wrapper).text();
+    expect(text).toContain("Path 1");
+    expect(text).toContain("Path 2");
+    expect(text).not.toContain("Path 3");
+  });
+
+  // First match wins, so the listed order is the evaluation order and must follow
+  // the stored array, never the handle ids.
+  it("keeps paths in stored evaluation order", async () => {
+    seedBranchNode([
+      {
+        handle: "case-2",
+        label: "Checked First",
+        conditions: { conditions: { and: [{ column: "a", operator: "=", value: "1" }] } },
+      },
+      {
+        handle: "case-0",
+        label: "Checked Second",
+        conditions: { conditions: { and: [{ column: "b", operator: "=", value: "2" }] } },
+      },
+    ]);
+    const wrapper = createWrapper();
+    await flushPromises();
+    const text = branchCard(wrapper).text();
+    expect(text.indexOf("Checked First")).toBeLessThan(text.indexOf("Checked Second"));
+  });
+
+  // A path whose rule was never finished still routes (its handle and edges are
+  // live), so it must be listed — silently dropping it hides a real arm.
+  it("lists a path whose rule is empty rather than dropping it", async () => {
+    seedBranchNode([{ handle: "case-0", label: "Unfinished", conditions: { conditions: null } }]);
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(branchCard(wrapper).text()).toContain("Unfinished");
+  });
+
+  it("falls back to the no-config notice for a branch with no paths", async () => {
+    seedBranchNode([]);
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(wrapper.text()).toContain("No Configuration");
+  });
+});
+
+// ── Condition ───────────────────────────────────────────────────────────────
+// The node persists { version, conditions }; the readout must unwrap that before
+// previewing, or a fully configured rule reads as "No Configuration".
+
+describe("WorkflowConfigSummary — condition", () => {
+  beforeEach(() => {
+    resetWorkflowDestinations();
+    workflowObj.currentSelectedNodeData = null;
+    mockList.mockResolvedValue({ data: [] });
+  });
+  afterEach(() => vi.clearAllMocks());
+
+  it("previews a rule stored in the persisted { version, conditions } wrapper", async () => {
+    workflowObj.currentSelectedNodeData = {
+      id: "c1",
+      data: {
+        node_type: "condition",
+        conditions: {
+          version: 2,
+          conditions: { and: [{ column: "severity", operator: ">=", value: "5" }] },
+        },
+      },
+    } as any;
+    const wrapper = createWrapper();
+    await flushPromises();
+    const text = wrapper.find('[data-test="workflow-config-summary-condition"]').text();
+    expect(text).toContain("severity >= '5'");
+  });
+
+  it("still previews a rule stored unwrapped", async () => {
+    workflowObj.currentSelectedNodeData = {
+      id: "c2",
+      data: {
+        node_type: "condition",
+        conditions: { and: [{ column: "env", operator: "=", value: "prod" }] },
+      },
+    } as any;
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(wrapper.find('[data-test="workflow-config-summary-condition"]').text()).toContain(
+      "env = 'prod'",
+    );
+  });
+
+  it("shows the no-config notice for an unconfigured condition", async () => {
+    workflowObj.currentSelectedNodeData = {
+      id: "c3",
+      data: { node_type: "condition", conditions: { version: 2, conditions: null } },
+    } as any;
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(wrapper.text()).toContain("No Configuration");
+  });
+});
+
+// ── Trigger and unknown types ───────────────────────────────────────────────
+// The trigger arm was the template's CATCH-ALL, so every type without an arm of
+// its own rendered the trigger's title and claimed to be a node it is not.
+
+describe("WorkflowConfigSummary — trigger and unknown types", () => {
+  beforeEach(() => {
+    resetWorkflowDestinations();
+    workflowObj.currentSelectedNodeData = null;
+    mockList.mockResolvedValue({ data: [] });
+  });
+  afterEach(() => vi.clearAllMocks());
+
+  it("shows the trigger kind for an actual trigger node", async () => {
+    workflowObj.currentSelectedNodeData = {
+      id: "t1",
+      data: { node_type: "workflow_trigger", trigger_kind: "alert_fired" },
+    } as any;
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(wrapper.find('[data-test="workflow-config-summary-trigger"]').text()).toBe(
+      "Alert Trigger",
+    );
+  });
+
+  it("never attributes the trigger title to a node of another type", async () => {
+    workflowObj.currentSelectedNodeData = { id: "u1", data: { node_type: "future_type" } } as any;
+    const wrapper = createWrapper();
+    await flushPromises();
+    expect(wrapper.text()).not.toContain("Alert Trigger");
+    expect(wrapper.text()).toContain("No Configuration");
   });
 });

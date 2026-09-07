@@ -206,6 +206,34 @@ fn model_to_api_json(mut val: serde_json::Value) -> serde_json::Value {
     val
 }
 
+/// Merge the run state the scheduler recorded on the trigger into a config row.
+///
+/// These key names are the contract `anomaly_config_to_list_item` reads; the
+/// alert list has no other source for an anomaly's outcome.
+fn merge_trigger_run_state(obj: &mut serde_json::Map<String, serde_json::Value>, data: &str) {
+    let Ok(td) = ScheduledTriggerData::from_json_string(data) else {
+        return;
+    };
+    if let Some(sat) = td.last_satisfied_at {
+        obj.insert(
+            "last_anomaly_detected_at".to_string(),
+            serde_json::Value::Number(sat.into()),
+        );
+    }
+    if let Some(outcome) = td.last_outcome {
+        obj.insert(
+            "last_outcome".to_string(),
+            serde_json::Value::String(outcome),
+        );
+    }
+    if let Some(at) = td.last_outcome_at {
+        obj.insert(
+            "last_outcome_at".to_string(),
+            serde_json::Value::Number(at.into()),
+        );
+    }
+}
+
 /// List all anomaly detection configurations for an organization.
 ///
 /// Mirrors the alerts list pattern: enriches each config with live trigger state
@@ -315,15 +343,7 @@ pub async fn list_configs(
                         serde_json::Value::Number(start_time.into()),
                     );
                 }
-                // last_anomaly_detected_at: from trigger.data JSON
-                if let Ok(td) = ScheduledTriggerData::from_json_string(&trigger.data)
-                    && let Some(sat) = td.last_satisfied_at
-                {
-                    obj.insert(
-                        "last_anomaly_detected_at".to_string(),
-                        serde_json::Value::Number(sat.into()),
-                    );
-                }
+                merge_trigger_run_state(obj, &trigger.data);
             }
             val
         })
@@ -2257,5 +2277,50 @@ mod tests {
     fn test_extract_value_from_hit_non_numeric_value_field_returns_error() {
         let hit = serde_json::json!({"value": "not_a_number"});
         assert!(extract_value_from_hit(&hit).is_err());
+    }
+
+    /// The key names here are a cross-crate contract:
+    /// `anomaly_config_to_list_item` reads them by these exact strings, and a
+    /// rename on either side silently blanks the list's Last Outcome column.
+    mod merge_trigger_run_state_tests {
+        use config::meta::triggers::ScheduledTriggerData;
+
+        use super::*;
+
+        #[test]
+        fn emits_the_keys_the_api_layer_reads() {
+            let td = ScheduledTriggerData {
+                last_satisfied_at: Some(900),
+                last_outcome: Some("firing".to_string()),
+                last_outcome_at: Some(1_000),
+                ..Default::default()
+            };
+
+            let mut obj = serde_json::Map::new();
+            merge_trigger_run_state(&mut obj, &td.to_json_string());
+
+            assert_eq!(obj["last_anomaly_detected_at"], serde_json::json!(900));
+            assert_eq!(obj["last_outcome"], serde_json::json!("firing"));
+            assert_eq!(obj["last_outcome_at"], serde_json::json!(1_000));
+        }
+
+        /// A config that has not run since the upgrade has no recorded outcome;
+        /// absent keys are what make the list render an em dash.
+        #[test]
+        fn omits_what_was_never_recorded() {
+            let mut obj = serde_json::Map::new();
+            merge_trigger_run_state(&mut obj, "{}");
+
+            assert!(!obj.contains_key("last_outcome"));
+            assert!(!obj.contains_key("last_outcome_at"));
+        }
+
+        #[test]
+        fn ignores_an_unparseable_blob() {
+            let mut obj = serde_json::Map::new();
+            merge_trigger_run_state(&mut obj, "{not json");
+
+            assert!(obj.is_empty());
+        }
     }
 }

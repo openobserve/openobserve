@@ -66,10 +66,13 @@ export function aiExperimentCompareRoute(
   };
 }
 
-/** The create form. `datasetId` preselects the dataset the user came from. */
+/**
+ * The create form. `datasetId` preselects the dataset the user came from;
+ * `cloneOf` opens it as an editable copy of that run, dataset already pinned.
+ */
 export function aiExperimentCreateRoute(
   orgIdentifier: string,
-  options: Pick<AiExperimentsRouteOptions, "datasetId" | "query"> = {},
+  options: Pick<AiExperimentsRouteOptions, "datasetId" | "query"> & { cloneOf?: string } = {},
 ): RouteLocationRaw {
   return {
     name: "aiExperimentCreate",
@@ -77,6 +80,7 @@ export function aiExperimentCreateRoute(
       ...options.query,
       org_identifier: orgIdentifier,
       ...(options.datasetId ? { dataset: options.datasetId } : {}),
+      ...(options.cloneOf ? { clone_of: options.cloneOf } : {}),
     },
   };
 }

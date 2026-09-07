@@ -993,7 +993,7 @@ function openInLogs() {
                 >
                   <OIcon name="info-outline" size="xs" class="text-text-secondary cursor-help" />
                 </OTooltip>
-                <div class="ml-auto shrink-0">
+                <div class="ms-auto shrink-0">
                   <ODropdown side="bottom" align="end">
                     <template #trigger>
                       <OButton
@@ -1051,7 +1051,7 @@ function openInLogs() {
                         :class="[
                           'dld-ctx-dot rounded-full',
                           String(ev._timestamp) === String(selectedEvent!._timestamp) &&
-                            'dld-ctx-dot--current ring-accent/25 ring-2',
+                            'dld-ctx-dot--current ring-focus-ring-accent ring-2',
                         ]"
                       />
                       <div
@@ -1060,7 +1060,7 @@ function openInLogs() {
                       />
                     </div>
                     <!-- Content -->
-                    <div class="flex min-w-0 flex-1 flex-col py-2 pr-2">
+                    <div class="flex min-w-0 flex-1 flex-col py-2 pe-2">
                       <!-- Row: rel time + timestamp + body preview (like the Logs page) + expand -->
                       <div class="flex items-center gap-2">
                         <span

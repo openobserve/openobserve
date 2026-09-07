@@ -15,7 +15,7 @@
         <slot name="dropdown" :field="field" :value="value" />
       </div>
     </ODropdown>
-    <span class="truncate pl-1">{{ value }}</span>
+    <span class="truncate ps-1">{{ value }}</span>
   </div>
 </template>
 

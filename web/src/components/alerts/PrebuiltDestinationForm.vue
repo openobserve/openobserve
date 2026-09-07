@@ -23,25 +23,7 @@ limitations under the License.
          these credentials via `makePrebuiltDestinationSchema`. No nested <form>. -->
     <!-- Slack Fields -->
     <template v-if="destinationType === 'slack'">
-      <div class="w-1/2 py-1">
-        <OFormInput
-          name="credentials.webhookUrl"
-          data-test="slack-webhook-url-input"
-          :label="t('alerts.prebuiltDestinations.slackWebhookUrl')"
-          required
-          :helpText="t('alerts.prebuiltDestinations.slackWebhookUrlHelp')"
-          tabindex="0"
-        />
-      </div>
-      <div class="w-1/2 py-1">
-        <OFormInput
-          name="credentials.channel"
-          data-test="slack-channel-input"
-          :label="t('alerts.prebuiltDestinations.slackChannel')"
-          :helpText="t('alerts.prebuiltDestinations.slackChannelHelp')"
-          tabindex="0"
-        />
-      </div>
+      <SlackWebhookFields />
     </template>
 
     <!-- Discord Fields -->
@@ -239,6 +221,7 @@ import OButton from "@/lib/core/Button/OButton.vue";
 import OFormInput from "@/lib/forms/Input/OFormInput.vue";
 import OFormSelect from "@/lib/forms/Select/OFormSelect.vue";
 import OFormSwitch from "@/lib/forms/Switch/OFormSwitch.vue";
+import SlackWebhookFields from "./SlackWebhookFields.vue";
 
 // Presentational only: renders the active type's credential OForm* fields into
 // the parent AddDestination form (they carry `name="credentials.<key>"` and

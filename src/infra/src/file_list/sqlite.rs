@@ -106,7 +106,11 @@ impl super::FileList for SqliteFileList {
         self.inner_batch_process("file_list", files).await
     }
 
-    async fn update_dump_records(&self, file: &FileKey, dumped_ids: &[i64]) -> Result<()> {
+    async fn update_dump_records(
+        &self,
+        file: &FileKey,
+        dumped_ids: &[(i64, String)],
+    ) -> Result<()> {
         let client = CLIENT_RW.clone();
         let mut tx = client.begin().await?;
 
@@ -142,14 +146,14 @@ impl super::FileList for SqliteFileList {
             return Err(e.into());
         }
 
-        // delete the dumped ids from file_list table
+        // delete the dumped ids from file_list table; sqlite is unpartitioned, so no date needed
         for chunk in dumped_ids.chunks(get_config().compact.file_list_deleted_batch_size) {
             if chunk.is_empty() {
                 continue;
             }
             let ids = chunk
                 .iter()
-                .map(|id| id.to_string())
+                .map(|(id, _)| id.to_string())
                 .collect::<Vec<String>>()
                 .join(",");
             let query_str = format!("DELETE FROM file_list WHERE id IN ({ids})");

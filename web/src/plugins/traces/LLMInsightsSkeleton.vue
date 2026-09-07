@@ -30,20 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div
         v-for="n in 5"
         :key="n"
-        class="rounded-default tile-content flex h-32.5 flex-col gap-2 border border-(--tile-border) bg-(--tile-bg) px-3.5 py-2.5 text-(--text-primary)"
+        class="rounded-default tile-content flex flex-col gap-1 border border-(--tile-border) bg-(--tile-bg) px-3.5 py-2.5 text-(--text-primary)"
       >
-        <OSkeleton type="text" class="h-3 w-[60%]" />
-        <OSkeleton type="text" class="h-5.5 w-[55%]" />
-        <OSkeleton type="text" class="h-2.5 w-[40%]" />
-        <div class="mt-auto flex h-8 items-end gap-[0.15rem]">
-          <OSkeleton
-            type="text"
-            v-for="bar in 16"
-            :key="bar"
-            :style="{ height: `${30 + ((bar * 23) % 65)}%` }"
-            class="w-full"
-          />
+        <div class="mb-1 flex items-center justify-between gap-2">
+          <OSkeleton type="text" class="h-3 w-[60%]" />
+          <OSkeleton type="text" class="h-6 w-6 shrink-0" />
         </div>
+        <OSkeleton type="text" class="h-6 w-[55%]" />
       </div>
     </div>
 
