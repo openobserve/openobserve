@@ -288,6 +288,7 @@ const thresholdTooltip = computed(() =>
   }),
 );
 
+
 const selectedDimensions = computed(
   () => props.outcomeDimensions ?? comparison.value.outcomeDimensions,
 );
@@ -344,6 +345,7 @@ const outcomeTooltip = computed(() => {
     .join(", ");
   return t("aiObservability.experiments.comparePage.panel.outcomeTooltipPartial", { names });
 });
+
 /** Rows in either run — what "All" counts. */
 const totalRows = computed(
   () =>
