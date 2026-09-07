@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSearchInput
                   data-test="enrichment-tables-search-input"
                   v-model="filterQuery"
-                  class="ml-auto w-64"
+                  class="ms-auto w-64"
                   :placeholder="t('function.searchEnrichmentTable')"
                 />
               </div>
@@ -298,7 +298,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #bottom>
               <div class="flex w-full items-center justify-between py-2">
-                <div class="mr-4 flex items-center text-xs font-normal">
+                <div class="me-4 flex items-center text-xs font-normal">
                   {{ resultTotal }} {{ t("function.enrichmentTables") }}
                 </div>
                 <OButton

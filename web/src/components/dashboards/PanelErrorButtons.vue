@@ -114,10 +114,10 @@
     <!-- Universal Last Refreshed Clock Icon and Time -->
     <span
       v-if="lastTriggeredAt && !viewOnly && !simplifiedPanelView"
-      class="lastRefreshedAt ml-1.25 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap"
+      class="lastRefreshedAt ms-1.25 overflow-hidden text-[smaller] text-ellipsis whitespace-nowrap"
       data-test="panel-last-refreshed-at"
     >
-      <span class="lastRefreshedAtIcon mr-0.5 text-[smaller]">
+      <span class="lastRefreshedAtIcon me-0.5 text-[smaller]">
         {{ "🕑" }}
         <OTooltip side="bottom" align="end">
           <template #content

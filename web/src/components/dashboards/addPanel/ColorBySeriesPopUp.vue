@@ -60,7 +60,7 @@
               <OIcon
                 name="drag-indicator"
                 size="sm"
-                class="mr-1"
+                class="me-1"
                 :data-test="`dashboard-addpanel-config-color-by-series-drag-handle-${index}`"
               />
             </div>

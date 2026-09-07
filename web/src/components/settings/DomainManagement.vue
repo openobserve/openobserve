@@ -91,7 +91,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div class="rounded-default bg-surface-subtle mb-4 p-4">
               <div class="mb-2 font-medium">{{ t("settings.claimParserFunctionOutputTitle") }}</div>
               <div class="mb-2">{{ t("settings.claimParserFunctionOutputDescription") }}</div>
-              <div class="ml-4">
+              <div class="ms-4">
                 <div class="mb-1">{{ t("settings.claimParserFunctionOutputExample1") }}</div>
                 <div>{{ t("settings.claimParserFunctionOutputExample2") }}</div>
               </div>
@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Recent Errors Section -->
             <div
               v-if="claimParserFunction"
-              class="rounded-default bg-surface-subtle border-l-status-negative border-l-3 p-4"
+              class="rounded-default bg-surface-subtle border-s-status-negative border-s-3 p-4"
             >
               <div class="mb-2 flex items-center">
                 <div class="flex-1 font-medium">{{ t("settings.claimParserRecentErrors") }}</div>
@@ -129,10 +129,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="(error, index) in recentErrors.slice(0, 3)"
                   :key="index"
-                  class="rounded-default bg-status-error-bg border-l-status-negative mb-1 border-l-2 p-2"
+                  class="rounded-default bg-status-error-bg border-s-status-negative mb-1 border-s-2 p-2"
                 >
                   <div class="mb-1 flex items-start">
-                    <OIcon name="error" size="xs" class="mt-1 mr-1" />
+                    <OIcon name="error" size="xs" class="me-1 mt-1" />
                     <div class="flex-1">
                       <div class="text-xs font-medium">{{ error.error_type }}</div>
                       <div class="text-text-muted text-xs">
@@ -288,7 +288,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Specific allowed users section -->
-              <div v-if="domain.policy === 'allow_specific'" class="specific-users-section ml-6">
+              <div v-if="domain.policy === 'allow_specific'" class="specific-users-section ms-6">
                 <OForm
                   :ref="(el) => setEmailFormRef(domain.name, el)"
                   :schema="getEmailSchema(domain.name)"
@@ -340,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
 
               <!-- Specific blocked users section (mirrors the allow-email OForm pattern) -->
-              <div v-if="domain.policy === 'block_specific'" class="specific-users-section ml-6">
+              <div v-if="domain.policy === 'block_specific'" class="specific-users-section ms-6">
                 <OForm
                   :ref="(el) => setBlockedEmailFormRef(domain.name, el)"
                   :schema="getEmailSchema(domain.name)"

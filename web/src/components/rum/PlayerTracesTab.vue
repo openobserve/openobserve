@@ -147,12 +147,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- List view -->
     <div v-else class="flex h-full flex-col overflow-hidden px-2">
       <!-- Filter bar -->
-      <div class="flex min-h-8 shrink-0 items-center py-1 pr-2">
+      <div class="flex min-h-8 shrink-0 items-center py-1 pe-2">
         <OTag
           type="logsResultChip"
           value="neutral"
           data-test="rum-player-traces-tab-count-badge"
-          class="mr-[0.6rem]"
+          class="me-[0.6rem]"
           >{{
             `${formatLargeNumber(correlatedViews.length)} ${t("menu.traces").toLowerCase()}`
           }}</OTag

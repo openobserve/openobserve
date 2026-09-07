@@ -62,10 +62,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flow-node__icon flex items-center">
       <!-- `icon` may be a glyph name or an "img:<url>" string; OIcon renders both
            (same as the pipeline node), so canvas icons match exactly. -->
-      <OIcon :name="icon || 'help'" size="md" class="my-2 mr-2" />
+      <OIcon :name="icon || 'help'" size="md" class="my-2 me-2" />
     </div>
 
-    <OSeparator vertical class="mr-2" />
+    <OSeparator vertical class="me-2" />
 
     <!-- Shared node typography (0.9375rem = the old 15px / bold / left) lives
          here so every #body slot inherits it — wrappers supply content, not

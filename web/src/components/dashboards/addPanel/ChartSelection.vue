@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           v-for="(item, index) in ChartsArray"
           :key="index"
           :class="[
-            'border-card-glass-border border-r border-b',
+            'border-card-glass-border border-e border-b',
             'hover:bg-surface-subtle transition-colors duration-150 ease-in-out',
             selectedChartType === item.id ? 'bg-label-chip-url-bg' : '',
             isChartDisabled(item) ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',

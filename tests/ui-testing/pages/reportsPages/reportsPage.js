@@ -186,8 +186,12 @@ export class ReportsPage {
 
   async createReportReportNameInput(TEST_REPORT_NAME) {
     await this.reportNameInputField.waitFor({ state: 'visible', timeout: 10000 });
-    await this.reportNameInputField.fill(TEST_REPORT_NAME);
-    await this.page.waitForTimeout(5000);
+    // onBeforeMount seeds the form via an async form.reset() that can land after this fill and wipe name to "" — re-fill until it survives, else the submit is silently blocked by "Name is required".
+    await expect(async () => {
+      await this.reportNameInputField.fill(TEST_REPORT_NAME);
+      await this.page.waitForTimeout(1000);
+      await expect(this.reportNameInputField).toHaveValue(TEST_REPORT_NAME);
+    }).toPass({ timeout: 20000, intervals: [1000, 2000, 3000] });
   }
 
   async createReportFolderInput() {

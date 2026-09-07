@@ -22,7 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     >
       <div
         :title="span.operation_name"
-        class="flex w-[calc(100%-1.5rem)] items-center truncate pb-0 pl-1"
+        class="flex w-[calc(100%-1.5rem)] items-center truncate ps-1 pb-0"
         data-test="trace-details-sidebar-header-operation-name"
       >
         <!-- Status Code Badge -->
@@ -31,14 +31,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="inline-flex items-center"
           data-test="trace-details-sidebar-header-toolbar-status-code"
         >
-          <OIcon name="error" size="sm" class="text-status-error-text! mr-1" />
+          <OIcon name="error" size="sm" class="text-status-error-text! me-1" />
         </span>
         <!-- Observation Type Badge (for LLM spans) -->
         <OTag
           v-if="isLLMSpan"
           type="observationType"
           :value="span.gen_ai_operation_name"
-          class="mr-1 normal-case!"
+          class="me-1 normal-case!"
           data-test="trace-details-sidebar-observation-badge"
           >{{
             span.gen_ai_operation_name?.charAt(0) +
@@ -68,14 +68,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Service Badge -->
           <OTag
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default border-l-badge-blue-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default border-s-badge-blue-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="span.service_name"
             data-test="trace-details-sidebar-header-toolbar-service"
           >
             <template #icon>
               <img :src="serviceIconUrl" class="h-3.5 w-3.5 shrink-0" aria-hidden="true" alt="" />
             </template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.service")
             }}</span>
             <span
@@ -89,12 +89,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Duration Badge -->
           <OTag
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default border-l-badge-indigo-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default border-s-badge-indigo-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="getDuration"
             data-test="trace-details-sidebar-header-toolbar-duration"
           >
             <template #icon><OIcon name="schedule" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.duration")
             }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ getDuration }}</span>
@@ -104,12 +104,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="getTTFT"
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default border-l-badge-purple-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default border-s-badge-purple-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="getTTFT"
             data-test="trace-details-sidebar-header-toolbar-ttft"
           >
             <template #icon><OIcon name="speed" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.ttft")
             }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ getTTFT }}</span>
@@ -118,12 +118,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Start Time Badge -->
           <OTag
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default border-l-badge-amber-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default border-s-badge-amber-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="getStartTime"
             data-test="trace-details-sidebar-header-toolbar-start-time"
           >
             <template #icon><OIcon name="access-time" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.start")
             }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ getStartTime }}</span>
@@ -133,12 +133,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             v-if="spanHttpResendCount"
             type="metricChip"
-            class="text-2xs bg-surface-base border-border-default hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 border border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-2xs bg-surface-base border-border-default hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 border border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="t('traces.traceDetailsSidebar.requestResent', { count: spanHttpResendCount })"
             data-test="trace-details-sidebar-header-toolbar-resend-count"
           >
             <template #icon><OIcon name="replay" size="xs" /></template>
-            <span class="text-3xs text-text-secondary mr-0.75 font-medium">{{
+            <span class="text-3xs text-text-secondary me-0.75 font-medium">{{
               t("traces.traceDetailsSidebar.resends")
             }}</span>
             <span class="text-3xs text-text-body font-semibold">{{ spanHttpResendCount }}</span>
@@ -150,7 +150,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             clickable
-            class="group text-2xs bg-surface-base border-border-default border-l-badge-teal-ol-border hover:bg-surface-panel mr-[0.325rem] h-5.5 shrink-0 cursor-pointer border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="group text-2xs bg-surface-base border-border-default border-s-badge-teal-ol-border hover:bg-surface-panel me-[0.325rem] h-5.5 shrink-0 cursor-pointer border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="t('traces.traceDetailsSidebar.spanIdTitle', { id: span.span_id })"
             @click="copySpanId"
             data-test="trace-details-sidebar-header-toolbar-span-id"
@@ -160,7 +160,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OIcon
               name="content-copy"
               size="xs"
-              class="ml-1 opacity-60 transition-opacity duration-200 group-hover:opacity-100"
+              class="ms-1 opacity-60 transition-opacity duration-200 group-hover:opacity-100"
               data-test="trace-details-sidebar-header-toolbar-span-id-copy-icon"
             />
           </OTag>
@@ -187,7 +187,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- LLM workflow actions — icon-only, matching the trace header. The
                row itself has no gap (its children carry their own margins), so
                these three are grouped and spaced on the header's rhythm. -->
-          <div class="ml-2 flex items-center gap-2">
+          <div class="ms-2 flex items-center gap-2">
             <OButton
               v-if="showEvaluateButton && canPreviewSpan"
               variant="outline"
@@ -251,7 +251,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             icon="psychology"
-            class="text-3xs bg-surface-base border-border-default border-l-badge-purple-ol-border h-5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-3xs bg-surface-base border-border-default border-s-badge-purple-ol-border h-5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="span.gen_ai_response_model"
           >
             <span class="text-3xs text-badge-purple-ol-text font-semibold">{{
@@ -264,11 +264,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Input Tokens -->
             <OTag
               type="metricChip"
-              class="text-3xs bg-surface-base border-border-default border-l-badge-blue-ol-border text-badge-blue-ol-text h-5 min-w-15 shrink-0 justify-center border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+              class="text-3xs bg-surface-base border-border-default border-s-badge-blue-ol-border text-badge-blue-ol-text h-5 min-w-15 shrink-0 justify-center border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
               :title="t('traces.traceDetailsSidebar.inputTokens')"
             >
               <template #icon><OIcon name="arrow-upward" size="xs" /></template>
-              <span class="text-3xs mr-0.5 font-medium">{{
+              <span class="text-3xs me-0.5 font-medium">{{
                 t("traces.traceDetailsSidebar.in")
               }}</span>
               <span class="text-3xs font-medium">{{ llmMetrics.usage.input }}</span>
@@ -277,11 +277,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Output Tokens -->
             <OTag
               type="metricChip"
-              class="text-3xs bg-surface-base border-border-default border-l-badge-success-ol-border text-badge-success-ol-text h-5 min-w-15 shrink-0 justify-center border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+              class="text-3xs bg-surface-base border-border-default border-s-badge-success-ol-border text-badge-success-ol-text h-5 min-w-15 shrink-0 justify-center border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
               :title="t('traces.traceDetailsSidebar.outputTokens')"
             >
               <template #icon><OIcon name="arrow-downward" size="xs" /></template>
-              <span class="text-3xs mr-0.5 font-medium">{{
+              <span class="text-3xs me-0.5 font-medium">{{
                 t("traces.traceDetailsSidebar.out")
               }}</span>
               <span class="text-3xs font-medium">{{ llmMetrics.usage.output }}</span>
@@ -292,7 +292,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTag
             type="metricChip"
             icon="attach-money"
-            class="text-3xs bg-surface-base border-border-default border-l-badge-orange-ol-border h-5 shrink-0 border border-l-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
+            class="text-3xs bg-surface-base border-border-default border-s-badge-orange-ol-border h-5 shrink-0 border border-s-[0.1875rem] border-solid px-1.5 transition-all duration-200 hover:-translate-y-px"
             :title="t('traces.traceDetailsSidebar.totalCost')"
           >
             <span class="text-3xs text-badge-orange-ol-text font-semibold"
@@ -347,7 +347,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="hasExceptionEvents.length"
             type="countChip"
             value="error"
-            class="ml-0"
+            class="ms-0"
             data-test="trace-details-sidebar-tabs-error-count"
             >{{ hasExceptionEvents.length }}</OTag
           >
@@ -414,7 +414,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               <!-- Input Section -->
               <div
-                class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pr-2"
+                class="io-section flex h-full w-1/2 shrink-0 grow-0 basis-[calc(50%-0.4rem)] flex-col pe-2"
               >
                 <div
                   class="section-label text-text-heading mb-2 flex items-center justify-between text-sm font-bold"
@@ -594,7 +594,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                       })
                     "
                   >
-                    <span class="mr-1 inline-flex shrink-0">
+                    <span class="me-1 inline-flex shrink-0">
                       <OButton variant="ghost" size="icon-xs-circle">
                         <OIcon color="currentColor" class="h-[0.7rem]! w-[0.7rem]! pb-[0.185rem]!">
                           <component :is="action.iconComponent" />
@@ -645,7 +645,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           })
                         "
                       >
-                        <span class="mr-1 inline-flex shrink-0">
+                        <span class="me-1 inline-flex shrink-0">
                           <OButton variant="ghost" size="icon-xs-circle">
                             <OIcon
                               color="currentColor"
@@ -670,7 +670,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                  this span's own duration so "when within the span" is a glance
                  rather than a subtraction. -->
             <div
-              class="shrink-0 pr-1 pb-[0.325rem] pl-1"
+              class="shrink-0 ps-1 pe-1 pb-[0.325rem]"
               data-test="trace-details-sidebar-events-timeline"
             >
               <div class="text-3xs text-text-muted flex items-center justify-between pb-1">
@@ -698,7 +698,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </div>
             </div>
             <!-- Wrap toggle toolbar -->
-            <div class="flex items-center gap-1 pb-[0.325rem] pl-1">
+            <div class="flex items-center gap-1 ps-1 pb-[0.325rem]">
               <OSwitch v-model="eventsWrap" :label="t('common.wrap')" size="md" class="gap-1!" />
             </div>
             <!-- TenstackTable for events -->
@@ -734,7 +734,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <template #expansion="{ row }">
                   <JsonPreview
                     :value="row"
-                    class="py-1.5 pl-1.5"
+                    class="py-1.5 ps-1.5"
                     copyButtonClass="left-1! w-fit! sticky!"
                     mode="expanded"
                     @copy="copyContentToClipboard"
@@ -952,6 +952,7 @@ import {
 import DeployedCode from "@/components/icons/DeployedCode.vue";
 import { getServiceIconDataUrl } from "@/utils/traces/convertTraceData";
 import LLMContentRenderer from "@/plugins/traces/LLMContentRenderer.vue";
+import { extractGenAiPartText } from "@/plugins/traces/genAiParts";
 import OTable from "@/lib/core/Table/OTable.vue";
 import {
   hasTracePreview,
@@ -1244,8 +1245,8 @@ export default defineComponent({
         header: t("traces.traceDetailsSidebar.field"),
         size: 200,
         meta: {
-          headerClass: "border-b border-r border-b-card-glass-border",
-          cellClass: "border-r border-b-card-glass-border text-json-key",
+          headerClass: "border-b border-e border-b-card-glass-border",
+          cellClass: "border-e border-b-card-glass-border text-json-key",
         },
       },
       {
@@ -1529,8 +1530,8 @@ export default defineComponent({
           accessorFn: (row: any) =>
             timestampToTimezoneDate(row[tsCol] / 1000000, store.state.timezone, HUMAN_TZ_FORMAT),
           meta: {
-            headerClass: "border-b border-r border-b-card-glass-border",
-            cellClass: "border-r border-b-card-glass-border",
+            headerClass: "border-b border-e border-b-card-glass-border",
+            cellClass: "border-e border-b-card-glass-border",
           },
         });
         allKeys.delete(tsCol);
@@ -1556,8 +1557,8 @@ export default defineComponent({
             return typeof val === "object" ? JSON.stringify(val) : String(val);
           },
           meta: {
-            headerClass: "border-b border-r border-b-card-glass-border",
-            cellClass: "border-r border-b-card-glass-border",
+            headerClass: "border-b border-e border-b-card-glass-border",
+            cellClass: "border-e border-b-card-glass-border",
           },
         });
       });
@@ -2177,10 +2178,11 @@ export default defineComponent({
           parsed = raw;
         }
         if (Array.isArray(parsed)) {
+          // filter drops both null (unsupported part type) and "" (no content); "" from join -> null so callers get one consistent falsy value.
           return (
             parsed
-              .filter((p: any) => p.type === "text" && p.content)
-              .map((p: any) => p.content)
+              .map((p: any) => extractGenAiPartText(p))
+              .filter((text): text is string => !!text)
               .join("\n") || null
           );
         }

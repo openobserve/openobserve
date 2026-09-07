@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     class="rounded-default border-card-glass-border inline-flex items-center gap-1.5 border px-2.5 py-1 font-mono text-xs font-medium"
                     :class="'bg-surface-base text-text-secondary'"
                   >
-                    <div class="mr-0.5 flex items-center gap-0.5">
+                    <div class="me-0.5 flex items-center gap-0.5">
                       <span
                         v-for="st in field.streamTypes"
                         :key="st"
@@ -167,7 +167,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :label="t('settings.correlation.serviceOptionalLabel')"
               size="md"
             />
-            <div class="mt-1 ml-9 text-xs leading-snug" :class="'text-text-secondary'">
+            <div class="ms-9 mt-1 text-xs leading-snug" :class="'text-text-secondary'">
               {{ t("settings.correlation.serviceOptionalHelp") }}
             </div>
           </div>
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-for="fieldId in (setDistinguishBy[envKey] ?? []).filter(Boolean)"
                     :key="fieldId"
-                    class="rounded-default border-card-glass-border flex items-center gap-1 border py-1 pr-1 pl-3 text-xs font-medium transition-colors"
+                    class="rounded-default border-card-glass-border flex items-center gap-1 border py-1 ps-3 pe-1 text-xs font-medium transition-colors"
                     :class="'bg-surface-base text-text-secondary'"
                   >
                     <span>{{ getGroupByValue(fieldId)?.display ?? fieldId }}</span>
@@ -459,7 +459,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-for="alias in resolvedTrackedAliases"
                   :key="alias.id"
-                  class="rounded-default border-card-glass-border flex items-center gap-1 border py-1 pr-1 pl-3 text-xs font-medium transition-colors"
+                  class="rounded-default border-card-glass-border flex items-center gap-1 border py-1 ps-3 pe-1 text-xs font-medium transition-colors"
                   :class="'bg-surface-base text-text-secondary'"
                 >
                   <span>{{ alias.label }}</span>
@@ -615,7 +615,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <span class="text-2xs font-medium" :class="'text-text-secondary'">{{
                     card.label
                   }}</span>
-                  <span class="ml-auto text-lg font-bold" :class="card.theme.countClass">{{
+                  <span class="ms-auto text-lg font-bold" :class="card.theme.countClass">{{
                     card.count
                   }}</span>
                 </div>
@@ -628,7 +628,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="val"
                     @click.stop="openInsightDialogByIdx(val, idx)"
                     ><span class="truncate">{{ val }}</span
-                    ><span v-if="card.dim" class="ml-0.5 inline-flex shrink-0 gap-0.5"
+                    ><span v-if="card.dim" class="ms-0.5 inline-flex shrink-0 gap-0.5"
                       ><span
                         v-for="st in getValueStreamTypes(card.dim.group_id, val)"
                         :key="st"
@@ -667,7 +667,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                           dimCardMoreMenuOpen[idx] = false;
                         "
                         ><span class="truncate">{{ val }}</span
-                        ><span v-if="card.dim" class="ml-0.5 inline-flex shrink-0 gap-0.5"
+                        ><span v-if="card.dim" class="ms-0.5 inline-flex shrink-0 gap-0.5"
                           ><span
                             v-for="st in getValueStreamTypes(card.dim.group_id, val)"
                             :key="st"
@@ -686,7 +686,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
 
           <!-- Stream type legend -->
-          <div class="mt-2 ml-1 flex items-center gap-3">
+          <div class="ms-1 mt-2 flex items-center gap-3">
             <div class="text-3xs flex items-center gap-1" :class="'text-text-secondary'">
               <span class="bg-badge-blue-solid-bg inline-block h-1.5 w-1.5 rounded-full" />
               <span>{{ t("settings.correlation.foundInLogs") }}</span>
@@ -759,7 +759,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 {{ insightData.subtitle }}
                 <span
                   :class="[
-                    'rounded-default ml-2 inline-block px-2 py-0.5 font-semibold',
+                    'rounded-default ms-2 inline-block px-2 py-0.5 font-semibold',
                     'text-status-info-text bg-status-info-bg',
                   ]"
                 >
@@ -846,7 +846,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 >
                   <div class="flex items-center justify-between text-xs">
                     <span class="min-w-0 truncate font-medium">{{ child.name }}</span>
-                    <span class="ml-2 shrink-0 tabular-nums" :class="'text-text-secondary'"
+                    <span class="ms-2 shrink-0 tabular-nums" :class="'text-text-secondary'"
                       >{{ child.count }} {{ insightData.childCountLabel }}</span
                     >
                   </div>
@@ -895,7 +895,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   v-for="(dim, dimIdx) in insightRelatedDimensions"
                   :key="dim.label + dimIdx"
                   class="flex min-w-0 flex-1 flex-col px-3"
-                  :class="[dimIdx > 0 ? 'border-border-default border-l' : '']"
+                  :class="[dimIdx > 0 ? 'border-border-default border-s' : '']"
                 >
                   <div class="text-compact mb-2 font-bold" :class="'text-text-body'">
                     {{ dim.label }}
@@ -994,7 +994,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="flex h-75"
           >
             <!-- Left Pane: Streams List -->
-            <div class="bg-surface-subtle flex w-1/3 flex-col border-r">
+            <div class="bg-surface-subtle flex w-1/3 flex-col border-e">
               <!-- Static column header — never scrolls, never gets covered -->
               <div
                 class="text-text-label bg-surface-subtle flex shrink-0 items-center justify-between border-b px-4 py-2 text-xs font-medium uppercase"
@@ -1075,7 +1075,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 v-for="(col, colIdx) in popupColumns"
                 :key="col.group_id"
                 class="min-w-40 flex-1 overflow-y-auto"
-                :class="{ 'border-l': colIdx > 0 }"
+                :class="{ 'border-s': colIdx > 0 }"
               >
                 <div
                   class="text-text-label bg-surface-subtle sticky top-0 z-10 border-b px-4 py-2 text-xs font-medium uppercase"

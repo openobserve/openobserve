@@ -71,7 +71,7 @@
         {{ cell.text
         }}<span
           v-if="cell.status === 'streaming'"
-          class="bg-accent ml-0.5 inline-block h-3 w-1.5 animate-pulse align-text-bottom"
+          class="bg-accent ms-0.5 inline-block h-3 w-1.5 animate-pulse align-text-bottom"
         />
       </div>
     </template>

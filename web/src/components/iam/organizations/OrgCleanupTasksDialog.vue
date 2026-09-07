@@ -46,7 +46,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               v-if="overallStatus === 'in_progress'"
               name="autorenew"
               size="xs"
-              class="mr-1 animate-spin"
+              class="me-1 animate-spin"
             />
             {{
               overallStatus === "completed"
@@ -128,7 +128,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               <div
                 v-for="child in row.children"
                 :key="child.id"
-                class="rounded-default flex flex-col gap-1 py-1.5 pr-2 pl-6"
+                class="rounded-default flex flex-col gap-1 py-1.5 ps-6 pe-2"
                 :class="rowAccentClass(child.status)"
               >
                 <div class="flex items-center gap-3">
@@ -158,7 +158,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 </div>
                 <div
                   v-if="child.last_error"
-                  class="text-error bg-surface-secondary rounded-default ml-6 px-2 py-1 text-xs break-words whitespace-pre-wrap"
+                  class="text-error bg-surface-secondary rounded-default ms-6 px-2 py-1 text-xs break-words whitespace-pre-wrap"
                 >
                   {{ child.last_error }}
                 </div>
@@ -208,7 +208,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <!-- Error message — full, wrapping, contained (no cut-off) -->
             <div
               v-if="row.task.last_error"
-              class="text-error bg-surface-secondary rounded-default ml-8 px-2 py-1 text-xs break-words whitespace-pre-wrap"
+              class="text-error bg-surface-secondary rounded-default ms-8 px-2 py-1 text-xs break-words whitespace-pre-wrap"
             >
               {{ row.task.last_error }}
             </div>

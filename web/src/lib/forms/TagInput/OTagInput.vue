@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <label
         v-if="label"
         data-test="tag-input-label"
-        class="group-focus-within:text-theme-accent pointer-events-none absolute top-4 left-3 -ml-1 origin-top-left bg-transparent px-1 text-base transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.5,1)]"
+        class="group-focus-within:text-theme-accent pointer-events-none absolute top-4 left-3 -ms-1 origin-top-left bg-transparent px-1 text-base transition-all duration-300 ease-[cubic-bezier(0.25,0.8,0.5,1)]"
         :class="
           hasContent || isFocused
             ? 'text-theme-accent -translate-y-2 scale-75'

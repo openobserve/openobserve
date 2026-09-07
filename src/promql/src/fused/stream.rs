@@ -23,7 +23,7 @@ use std::{sync::Arc, time::Duration};
 use config::{
     TIMESTAMP_COL_NAME,
     meta::promql::{
-        EXEMPLARS_LABEL, HASH_LABEL, NAME_LABEL, STREAMING_AGG_TABLE_SUFFIX, VALUE_LABEL,
+        EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX, NAME_LABEL, VALUE_LABEL,
         value::{EvalContext, Value},
     },
 };
@@ -58,7 +58,8 @@ pub(crate) struct FusedShape {
     pub range: Duration,
 }
 
-/// Folds from per-shard ordered streams; `None` when the layout or shape cannot stream.
+/// Folds from per-shard ordered streams; `None` when the layout or shape cannot stream. The
+/// caller bounds it: dropping the future aborts the shard folds.
 pub(crate) async fn fused_agg(
     ctx: &SessionContext,
     schema: &Schema,
@@ -66,7 +67,6 @@ pub(crate) async fn fused_agg(
     shape: FusedShape,
     modifier: &Option<LabelModifier>,
     eval_ctx: &EvalContext,
-    timeout: u64,
 ) -> Result<Option<Value>> {
     let start_time = std::time::Instant::now();
     let trace_id = eval_ctx.trace_id.clone();
@@ -80,7 +80,7 @@ pub(crate) async fn fused_agg(
     let Some(group_cols) = group_label_columns(modifier, schema, shape.func.name()) else {
         return Ok(None);
     };
-    let sorted_table = format!("{}{STREAMING_AGG_TABLE_SUFFIX}", selector.table_name);
+    let sorted_table = format!("{}{HASH_SORTED_TABLE_SUFFIX}", selector.table_name);
     let Ok(df) = ctx.table(sorted_table.as_str()).await else {
         return Ok(None);
     };
@@ -113,7 +113,7 @@ pub(crate) async fn fused_agg(
         .into_iter()
         .map(|streams| StreamSource::start(streams, group_cols.clone(), selector.offset))
         .collect();
-    let (value, series_count) = fold_sources(sources, params, timeout).await?;
+    let (value, series_count) = fold_sources(sources, params).await?;
 
     log::info!(
         "[trace_id: {trace_id}] [PromQL Timing] streaming fused {}({}) execution took: {:?}, folded {series_count} series into {} series",
@@ -282,7 +282,7 @@ mod tests {
         let table = MemTable::try_new(arrow_schema(), sorted_partitions())
             .unwrap()
             .with_sort_order(vec![sort_order]);
-        ctx.register_table(format!("m{STREAMING_AGG_TABLE_SUFFIX}"), Arc::new(table))
+        ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
             .unwrap();
     }
 
@@ -330,7 +330,6 @@ mod tests {
             FusedShape { op, func, range },
             modifier,
             &eval_ctx,
-            10,
         )
         .await
         .unwrap()
@@ -441,7 +440,7 @@ mod tests {
         // same data registered under the sorted name but without the ordering
         // declaration: the plan needs a real sort, so the gate must reject it
         let table = MemTable::try_new(arrow_schema(), sorted_partitions()).unwrap();
-        ctx.register_table(format!("m{STREAMING_AGG_TABLE_SUFFIX}"), Arc::new(table))
+        ctx.register_table(format!("m{HASH_SORTED_TABLE_SUFFIX}"), Arc::new(table))
             .unwrap();
 
         let result = run_streaming(

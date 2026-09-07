@@ -99,7 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #before>
         <div
           v-if="sidebarVisible"
-          class="border-border-default flex h-full w-full flex-col overflow-hidden border-r"
+          class="border-border-default flex h-full w-full flex-col overflow-hidden border-e"
         >
           <slot name="sidebar" />
         </div>
@@ -121,7 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- ── Body: fixed-width sidebar + main ─────────────────────── -->
     <div v-else-if="!!slots.sidebar" class="flex min-h-0 flex-1">
       <aside
-        class="border-border-default flex h-full shrink-0 flex-col overflow-hidden border-r"
+        class="border-border-default flex h-full shrink-0 flex-col overflow-hidden border-e"
         :style="{ width: sidebarWidth + 'px' }"
       >
         <slot name="sidebar" />

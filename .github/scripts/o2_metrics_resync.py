@@ -28,7 +28,7 @@ if os.environ.get("O2_REPORTING_INSECURE", "") == "true":
 TARGETS = [
     ("playwright.yml", "ci_test_runs", "ui", False),
     ("api-testing.yml", "ci_test_runs", "api", False),
-    ("playwright_regression.yml", "ci_regression", "regression", True),
+    ("playwright_bugfix_regression.yml", "ci_regression", "regression", True),
 ]
 
 def gh(path):

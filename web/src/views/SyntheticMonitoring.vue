@@ -355,7 +355,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       data-test="synthetic-monitoring-check-type-picker-dialog"
     >
       <div class="flex flex-col gap-4">
-        <div class="flex items-center gap-1.5 pl-3">
+        <div class="flex items-center gap-1.5 ps-3">
           <OIcon name="folder-outline" size="sm" class="text-text-secondary" />
           <OText variant="meta">
             {{ t("synthetics.newCheck.willBeCreatedIn") }} <strong>{{ activeFolderName }}</strong>
