@@ -10,9 +10,9 @@
 //
 // ENTERPRISE-ONLY. `anomaly_detection_enabled` is false unless the binary is
 // built with --features enterprise, and OSS CI is not, so every test here skips
-// there. It is listed under `disabled` in the OSS ci_matrix.json for the record
-// and runs through the ENT gate, which needs it in o2-enterprise's
-// ci_matrix.ent.json under `append.Alerts` (same-named sister branch).
+// there. Deliberately absent from the OSS ci_matrix.json — build-ci-matrix.js
+// rejects a spec listed in both the base and the overlay — and registered in
+// o2-enterprise's ci_matrix.ent.json under `append.Alerts` instead.
 
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
