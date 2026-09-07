@@ -13274,6 +13274,14 @@
       "deleteConfirm": "Delete {name}?",
       "deleteFailed": "Could not delete the variable",
       "deleteTitle": "Delete variable",
+      "deleteEnvFallback": "{env} will then use the global value.",
+      "deleteGlobalFallback": "{envs} keep their own values; other environments stop resolving {name}.",
+      "overriddenInNote": "Overridden in {envs}",
+      "overridesGlobalNote": "Overrides global",
+      "shadowGlobalTitle": "Override the global value?",
+      "shadowGlobalMessage": "{name} will override the global value in {env}. Other environments keep using the global.",
+      "shadowedGlobalTitle": "Some environments keep their own values",
+      "shadowedGlobalMessage": "{name} already has its own value in: {envs}. Those environments keep theirs; everywhere else uses this one.",
       "deleteUsed": "{name} is referenced by {n} checks. They will resolve it as literal text until you update them. Delete anyway?",
       "deleted": "Variable deleted",
       "description": "Description",
@@ -13371,6 +13379,7 @@
     },
     "inherited": {
       "notIn": "Not in {envs}",
+      "overridesGlobal": "overrides global",
       "notInMany": "Not in {count} environments",
       "overriddenByCheck": "Overridden by local variable",
       "title": "Inherited",
@@ -13383,12 +13392,15 @@
     },
     "promote": {
       "done": "Variable is now global",
+      "doneShadowed": "Variable is now global. {envs} still override it with their own values.",
       "failed": "Could not make the variable global",
       "secretBlocked": "Secrets can't be moved across environments",
       "toGlobal": "Make global"
     },
     "split": {
       "action": "Scope to environments",
+      "alreadyOwn": "Already has its own value — kept as is.",
+      "overrideHint": "To override in just one environment, create the variable there instead.",
       "confirm": "Scope to environments",
       "description": "Each environment gets its own value. The global variable is replaced.",
       "done": "Variable scoped to environments",

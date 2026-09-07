@@ -29,6 +29,7 @@ to fill three values, with checks unresolved in between.
   >
     <div class="flex flex-col gap-3">
       <p class="text-text-secondary text-sm">{{ t("synthetics.split.description") }}</p>
+      <p class="text-text-muted text-xs">{{ t("synthetics.split.overrideHint") }}</p>
 
       <div
         v-for="row in rows"
@@ -38,10 +39,19 @@ to fill three values, with checks unresolved in between.
       >
         <OCheckbox
           v-model="row.selected"
+          :disabled="row.alreadyOwn"
           :data-test="`synthetics-split-check-${row.environment}`"
         />
         <span class="w-32 shrink-0 font-mono text-sm">{{ row.environment }}</span>
+        <span
+          v-if="row.alreadyOwn"
+          class="text-text-muted flex-1 text-xs"
+          data-test="synthetics-split-owned-note"
+        >
+          {{ t("synthetics.split.alreadyOwn") }}
+        </span>
         <OInput
+          v-else
           v-model="row.value"
           class="flex-1"
           :disabled="!row.selected"
@@ -95,10 +105,14 @@ const emit = defineEmits<{ "update:open": [value: boolean]; done: [] }>();
 
 const { t } = useI18nTyped();
 const store = useStore();
-const rows = ref<{ environment: string; value: string; selected: boolean }[]>([]);
+const rows = ref<{ environment: string; value: string; selected: boolean; alreadyOwn: boolean }[]>(
+  [],
+);
 
 const selected = computed(() => rows.value.filter((r) => r.selected));
-const unselected = computed(() => rows.value.filter((r) => !r.selected).map((r) => r.environment));
+const unselected = computed(() =>
+  rows.value.filter((r) => !r.selected && !r.alreadyOwn).map((r) => r.environment),
+);
 
 watch(
   () => props.open,
@@ -106,11 +120,12 @@ watch(
     if (!isOpen) return;
     // Selected by default: the destructive outcome is an environment being
     // left out, not one being included.
-    rows.value = props.environments.map((e) => ({
-      environment: e.name,
-      value: "",
-      selected: true,
-    }));
+    rows.value = props.environments.map((e) => {
+      // An env that already defines the name keeps its value — the server
+      // skips it too, so offering an input would collect a value it discards.
+      const alreadyOwn = (e.variables ?? []).some((v) => v.name === props.variable?.name);
+      return { environment: e.name, value: "", selected: !alreadyOwn, alreadyOwn };
+    });
   },
 );
 

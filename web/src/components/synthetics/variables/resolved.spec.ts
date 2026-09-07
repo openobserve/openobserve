@@ -181,6 +181,33 @@ describe("inheritedUnion", () => {
   });
 });
 
+describe("inheritedUnion with an env shadowing a global", () => {
+  // One name, two tiers: the union folds both sources into one row.
+  const grouped = {
+    environments: ["staging", "prod"],
+    resolved: {
+      staging: [
+        v({ name: "URL", scope: "global", overridden: true, example: "example.com" }),
+        v({ name: "URL", scope: "staging", example: "stage.example.com" }),
+      ],
+      prod: [v({ name: "URL", scope: "global", example: "example.com" })],
+    },
+  };
+
+  it("folds the pair into one row carrying both sources", () => {
+    const rows = inheritedUnion(grouped, new Set());
+    expect(rows).toHaveLength(1);
+    expect(rows[0].global).toBe(true);
+    expect(rows[0].envs).toEqual(["staging"]);
+    expect(rows[0].hints.map((h) => h.source)).toEqual(["global", "staging"]);
+  });
+
+  it("a shadowed global is not a coverage gap", () => {
+    // The global still covers prod; staging resolves through its own row.
+    expect(coverageGaps(grouped).size).toBe(0);
+  });
+});
+
 describe("coverageGaps", () => {
   it("names every environment a name fails to resolve in", () => {
     const gaps = coverageGaps({

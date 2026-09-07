@@ -476,7 +476,6 @@ pub async fn create_variable(
     validate_variable_request(&req, env_id.as_deref(), false).map_err(|e| anyhow::anyhow!(e))?;
     let name = normalize_variable_name(&req.name);
     let conn = get_orm_client_rw().await;
-    reject_cross_scope_conflict(conn, org_id, &name, env_id.as_deref(), None).await?;
 
     let dek = synthetics_dek(org_id).await?;
     let now = config::utils::time::now_micros();
@@ -516,7 +515,6 @@ pub async fn update_variable(
         .map_err(|e| anyhow::anyhow!(e))?;
 
     let name = normalize_variable_name(&req.name);
-    reject_cross_scope_conflict(conn, org_id, &name, record.env.as_deref(), Some(id)).await?;
 
     if let Some(value) = req.value {
         let dek = synthetics_dek(org_id).await?;
@@ -654,6 +652,12 @@ fn resolved_rows(
     // Names the check defines itself. Looked up as a set because the shared
     // rows below need to know which of them the check shadows.
     let own: std::collections::HashSet<&str> = check_vars.iter().map(|v| v.name.as_str()).collect();
+    // Names an applicable env row defines — each shadows its global fallback.
+    let env_overrides: std::collections::HashSet<&str> = shared
+        .iter()
+        .filter(|v| v.env.is_some() && applies_to(v, env_id))
+        .map(|v| v.name.as_str())
+        .collect();
 
     let mut out: Vec<ResolvedVariableView> = shared
         .iter()
@@ -666,7 +670,8 @@ fn resolved_rows(
                     .find(|e| &e.id == id)
                     .map_or_else(|| id.clone(), |e| e.name.clone()),
             },
-            overridden: own.contains(v.name.as_str()),
+            overridden: own.contains(v.name.as_str())
+                || (v.env.is_none() && env_overrides.contains(v.name.as_str())),
             name: v.name.clone(),
             kind: if v.is_secret() {
                 SyntheticsVariableKind::Secret
@@ -807,7 +812,6 @@ pub async fn promote_check_variable(
         .ok_or_else(|| anyhow::anyhow!("check has no variable named '{name}'"))?;
 
     let env_id = env.map(|e| e.id.clone());
-    reject_cross_scope_conflict(conn, org_id, &normalized, env_id.as_deref(), None).await?;
 
     let source = check.variables[position].clone();
     let now = config::utils::time::now_micros();
@@ -859,24 +863,8 @@ pub async fn promote_to_global(
         );
     }
 
-    // The same name in another environment has no single correct global value,
-    // so name the conflict rather than silently picking one.
-    let others: Vec<String> = synthetics_variables::list(conn, org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        .into_iter()
-        .filter(|v| v.name == record.name && v.id != record.id && v.env.is_some())
-        .map(|v| v.env.unwrap_or_default())
-        .collect();
-    if !others.is_empty() {
-        anyhow::bail!(
-            "'{}' also exists in {} other environment(s). Remove those first — there is no single \
-             correct global value.",
-            record.name,
-            others.len()
-        );
-    }
-
+    // Other environments may keep rows of the same name: they simply shadow
+    // the promoted value, which becomes the fallback everywhere else.
     record.updated_at = config::utils::time::now_micros();
     synthetics_variables::set_env(conn, org_id, id, None, record.updated_at)
         .await
@@ -916,6 +904,18 @@ pub async fn split_to_environments(
         resolved.push((env.clone(), target.value.clone()));
     }
 
+    let shared = synthetics_variables::list(conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let resolved = split_targets_without_own_row(&source.name, resolved, &shared);
+    if resolved.is_empty() {
+        anyhow::bail!(
+            "every selected environment already has its own '{}' — deleting the global is a \
+             delete, not a split",
+            source.name
+        );
+    }
+
     let dek = synthetics_dek(org_id).await?;
     let now = config::utils::time::now_micros();
     let mut created = Vec::with_capacity(resolved.len());
@@ -936,9 +936,8 @@ pub async fn split_to_environments(
         });
     }
 
-    // One transaction: a half-applied split leaves the name defined both
-    // globally and per-environment, which the cross-scope rule forbids and
-    // which resolves non-deterministically until someone notices.
+    // One transaction: a half-applied split deletes the fallback before every
+    // copy exists, leaving some environments resolving nothing.
     let txn = conn.begin().await?;
     for record in &created {
         synthetics_variables::insert_row(&txn, record)
@@ -968,8 +967,9 @@ pub async fn resolve_shared_variables(
     let rows = synthetics_variables::list_cached(conn, org_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
+    let applicable = order_for_merge(rows.into_iter().filter(|v| applies_to(v, env_id)).collect());
     let mut out = Vec::new();
-    for row in rows.iter().filter(|v| applies_to(v, env_id)) {
+    for row in applicable.iter() {
         let value = if row.value.starts_with("AESenc:") {
             decrypt_secret(dek, &row.value)?
         } else {
@@ -1008,21 +1008,33 @@ fn applies_to(var: &SyntheticsVariableRecord, env_id: Option<&str>) -> bool {
     }
 }
 
-/// Whether an existing row makes `name` ambiguous in the scope being written.
+/// Globals first, environment rows after, stable order within each half.
 ///
-/// Ambiguity is exactly the unscoped/scoped split: two rows with the same name,
-/// one carrying an environment and one not, both match a run in that
-/// environment. Two rows in *different* environments are fine — only one of them
-/// ever applies.
-fn conflicts_across_scopes(
-    existing: &SyntheticsVariableRecord,
+/// The runtime merge folds into a name-keyed map where the last writer wins,
+/// so this ordering IS the env-beats-global rule — remove it and the winner
+/// becomes whatever the store listed last.
+fn order_for_merge(mut rows: Vec<SyntheticsVariableRecord>) -> Vec<SyntheticsVariableRecord> {
+    rows.sort_by_key(|v| v.env.is_some());
+    rows
+}
+
+/// Split targets minus the environments that already define the name (S7).
+///
+/// An env with its own row keeps its value — inserting a second row would trip
+/// the same-scope unique index mid-transaction.
+fn split_targets_without_own_row(
     name: &str,
-    env_id: Option<&str>,
-    skip_id: Option<&str>,
-) -> bool {
-    existing.name == name
-        && Some(existing.id.as_str()) != skip_id
-        && existing.env.is_none() != env_id.is_none()
+    targets: Vec<(SyntheticsEnvironmentRecord, String)>,
+    shared: &[SyntheticsVariableRecord],
+) -> Vec<(SyntheticsEnvironmentRecord, String)> {
+    targets
+        .into_iter()
+        .filter(|(env, _)| {
+            !shared
+                .iter()
+                .any(|v| v.name == name && v.env.as_deref() == Some(env.id.as_str()))
+        })
+        .collect()
 }
 
 fn kind_str(kind: SyntheticsVariableKind) -> &'static str {
@@ -1066,38 +1078,6 @@ async fn scoped_variable<C: sea_orm::ConnectionTrait>(
     Ok(found.filter(|v| v.env.as_deref() == env.map(|e| e.id.as_str())))
 }
 
-/// Rejects a name that would exist both unscoped and env-scoped.
-///
-/// Both rows would match the same run, so which value the check saw would
-/// depend on row order. The unique index cannot see this — the two rows differ
-/// in `env`, which is exactly what makes them unique to the database.
-async fn reject_cross_scope_conflict<C: sea_orm::ConnectionTrait>(
-    conn: &C,
-    org_id: &str,
-    name: &str,
-    env_id: Option<&str>,
-    skip_id: Option<&str>,
-) -> anyhow::Result<()> {
-    let rows = synthetics_variables::list(conn, org_id)
-        .await
-        .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-    let conflict = rows
-        .iter()
-        .find(|v| conflicts_across_scopes(v, name, env_id, skip_id));
-    if let Some(other) = conflict {
-        let (here, there) = match env_id {
-            Some(_) => ("an environment", "no environment"),
-            None => ("no environment", "an environment"),
-        };
-        anyhow::bail!(
-            "name: '{name}' already exists with {there}; a name cannot be defined both with {here} \
-             and without — both would apply to the same run (id {})",
-            other.id
-        );
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1131,56 +1111,6 @@ mod tests {
         assert!(!applies_to(&var(Some("prod")), Some("staging")));
         // An unscoped run resolves the unscoped tier only.
         assert!(!applies_to(&var(Some("prod")), None));
-    }
-
-    #[test]
-    fn a_name_cannot_be_both_unscoped_and_scoped() {
-        // Both rows would apply to a prod run, so which value the check saw
-        // would depend on row order. The unique index cannot see this: the two
-        // rows differ in `env`, which is what makes them unique to the database.
-        assert!(conflicts_across_scopes(
-            &var(None),
-            "BASE_URL",
-            Some("prod"),
-            None
-        ));
-        assert!(conflicts_across_scopes(
-            &var(Some("prod")),
-            "BASE_URL",
-            None,
-            None
-        ));
-    }
-
-    #[test]
-    fn the_same_name_in_two_environments_is_fine() {
-        // Only one of them ever applies to a given run.
-        assert!(!conflicts_across_scopes(
-            &var(Some("prod")),
-            "BASE_URL",
-            Some("staging"),
-            None
-        ));
-    }
-
-    #[test]
-    fn a_variable_does_not_conflict_with_itself_on_update() {
-        assert!(!conflicts_across_scopes(
-            &var(None),
-            "BASE_URL",
-            Some("prod"),
-            Some("v1")
-        ));
-    }
-
-    #[test]
-    fn a_different_name_never_conflicts() {
-        assert!(!conflicts_across_scopes(
-            &var(None),
-            "API_TOKEN",
-            Some("prod"),
-            None
-        ));
     }
 
     #[test]
@@ -1312,6 +1242,98 @@ mod tests {
         assert_eq!(qa.len(), 1);
         assert_eq!(qa[0].scope, "check");
         assert!(!qa[0].overridden);
+    }
+
+    #[test]
+    fn an_environment_row_marks_the_global_it_shadows_only_where_it_applies() {
+        // S2 — staging overrides the global; prod still runs on it.
+        let shared = vec![
+            named_var("g1", "URL", None),
+            named_var("s1", "URL", Some("e-stg")),
+        ];
+        let envs = vec![env_record("e-stg", "staging"), env_record("e-prod", "prod")];
+
+        let staging = resolved_rows(&shared, &envs, &[], Some("e-stg"));
+        let flags: Vec<(&str, bool)> = staging
+            .iter()
+            .map(|v| (v.scope.as_str(), v.overridden))
+            .collect();
+        // Loser kept and marked, winner identified by scope — same contract as
+        // check-shadowing.
+        assert_eq!(flags, [("global", true), ("staging", false)]);
+
+        let prod = resolved_rows(&shared, &envs, &[], Some("e-prod"));
+        assert_eq!(prod.len(), 1);
+        assert_eq!(prod[0].scope, "global");
+        assert!(!prod[0].overridden);
+    }
+
+    #[test]
+    fn a_check_variable_marks_both_shared_tiers_in_the_chain() {
+        // S3 — check beats env beats global: every non-winner reads overridden.
+        let shared = vec![
+            named_var("g1", "URL", None),
+            named_var("s1", "URL", Some("e-stg")),
+        ];
+        let envs = vec![env_record("e-stg", "staging")];
+
+        let rows = resolved_rows(&shared, &envs, &[check_var("URL")], Some("e-stg"));
+        let flags: Vec<(&str, bool)> = rows
+            .iter()
+            .map(|v| (v.scope.as_str(), v.overridden))
+            .collect();
+        assert_eq!(
+            flags,
+            [("check", false), ("global", true), ("staging", true)]
+        );
+    }
+
+    #[test]
+    fn an_unscoped_run_never_sees_an_environment_override() {
+        // S9 — env rows filter by env; with no env, only the global applies.
+        let shared = vec![
+            named_var("g1", "URL", None),
+            named_var("s1", "URL", Some("e-stg")),
+        ];
+        let envs = vec![env_record("e-stg", "staging")];
+
+        let rows = resolved_rows(&shared, &envs, &[], None);
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].scope, "global");
+        assert!(!rows[0].overridden);
+    }
+
+    #[test]
+    fn split_skips_environments_that_already_own_the_name() {
+        // S7 — staging already overrides URL; its row survives untouched and
+        // only prod gets a copy. Inserting into staging would trip the
+        // same-scope unique index mid-transaction.
+        let shared = vec![
+            named_var("g1", "URL", None),
+            named_var("s1", "URL", Some("e-stg")),
+        ];
+        let targets = vec![
+            (env_record("e-stg", "staging"), "ignored".to_string()),
+            (env_record("e-prod", "prod"), "prod-value".to_string()),
+        ];
+        let kept = split_targets_without_own_row("URL", targets, &shared);
+        assert_eq!(kept.len(), 1);
+        assert_eq!(kept[0].0.id, "e-prod");
+        assert_eq!(kept[0].1, "prod-value");
+    }
+
+    #[test]
+    fn merge_order_puts_globals_before_environment_rows() {
+        // The runtime map folds last-writer-wins, so this order IS the
+        // env-beats-global rule.
+        let rows = vec![
+            named_var("s1", "URL", Some("e-stg")),
+            named_var("g1", "URL", None),
+            named_var("g2", "ORG", None),
+        ];
+        let ordered = order_for_merge(rows);
+        let ids: Vec<&str> = ordered.iter().map(|v| v.id.as_str()).collect();
+        assert_eq!(ids, ["g1", "g2", "s1"]);
     }
 
     #[test]

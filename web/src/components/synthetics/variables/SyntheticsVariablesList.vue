@@ -80,6 +80,13 @@ already says which scope you are in, so there is no Environment column.
 
       <template #cell-name="{ row }">
         <span class="font-mono" data-test="synthetics-variable-name">{{ row.name }}</span>
+        <span
+          v-if="shadowNoteFor(row)"
+          class="text-text-muted text-2xs ml-2"
+          data-test="synthetics-variable-shadow-note"
+        >
+          {{ shadowNoteFor(row) }}
+        </span>
       </template>
 
       <template #cell-kind="{ row }">
@@ -215,6 +222,7 @@ already says which scope you are in, so there is no Environment column.
       :is-edit="drawer.isEdit"
       :data="drawer.data"
       :environment="environment"
+      :other-tier-names="otherTierNames"
       @update:list="$emit('refresh')"
     />
   </div>
@@ -242,7 +250,7 @@ import SyntheticsVariableForm from "./SyntheticsVariableForm.vue";
 import SyntheticsSplitVariableDialog from "./SyntheticsSplitVariableDialog.vue";
 import SyntheticsDuplicateVariableDialog from "./SyntheticsDuplicateVariableDialog.vue";
 import { filterVariables, relativeTime } from "./usage";
-import { duplicatePrefill } from "./scope";
+import { crossTierShadow, duplicatePrefill } from "./scope";
 
 export default defineComponent({
   name: "SyntheticsVariablesList",
@@ -265,6 +273,8 @@ export default defineComponent({
     environment: { type: String as PropType<string | null>, default: null },
     /** Split destinations. Empty on the global tab means there is nowhere to split to. */
     environments: { type: Array as PropType<SyntheticsEnvironment[]>, default: () => [] },
+    /** The unscoped tier, for cross-tier shadow awareness in every scope. */
+    globals: { type: Array as PropType<SyntheticsVariable[]>, default: () => [] },
     /** Scope identity, rendered in the toolbar — the pane has no header band. */
     scopeLabel: { type: String, default: "" },
     scopeSummary: { type: String, default: "" },
@@ -274,6 +284,23 @@ export default defineComponent({
     const store = useStore();
     const { confirm } = useConfirmDialog();
     const filterQuery = ref("");
+
+    // Names in the OTHER tier -> env names involved, for the form's shadow
+    // confirm: on an env scope the globals it could override; on the global
+    // scope the env-defined names that would keep their own values.
+    const otherTierNames = computed<Record<string, string[]>>(() => {
+      const map: Record<string, string[]> = {};
+      if (props.environment) {
+        for (const g of props.globals) map[g.name] = [];
+        return map;
+      }
+      for (const env of props.environments) {
+        for (const v of env.variables ?? []) {
+          (map[v.name] ??= []).push(env.name);
+        }
+      }
+      return map;
+    });
     const drawer = ref({ show: false, isEdit: false, data: null as SyntheticsVariable | null });
     const splitDialog = ref({ show: false, data: null as SyntheticsVariable | null });
     const duplicateDialog = ref({ show: false, data: null as SyntheticsVariable | null });
@@ -372,7 +399,21 @@ export default defineComponent({
       try {
         await syntheticsService.promoteEnvironmentVariable(org, props.environment, row.id);
         emit("refresh");
-        toast({ variant: "success", message: t("synthetics.promote.done") });
+        // Other envs' rows now shadow the promoted value — say so, or the
+        // author expects it to apply everywhere.
+        const stillOverriding = props.environments
+          .filter(
+            (env) =>
+              env.name !== props.environment &&
+              (env.variables ?? []).some((v) => v.name === row.name),
+          )
+          .map((env) => env.name);
+        toast({
+          variant: "success",
+          message: stillOverriding.length
+            ? t("synthetics.promote.doneShadowed", { envs: stillOverriding.join(", ") })
+            : t("synthetics.promote.done"),
+        });
       } catch (error: any) {
         // The server names the conflicting environments, or explains why a
         // secret cannot leave one — both are written to be shown verbatim.
@@ -383,14 +424,46 @@ export default defineComponent({
       }
     }
 
+    function shadowNoteFor(row: SyntheticsVariable) {
+      const relation = crossTierShadow(
+        row.name,
+        props.environment,
+        props.environments,
+        props.globals,
+      );
+      if (!relation) return "";
+      return relation.kind === "overrides-global"
+        ? t("synthetics.variables.overridesGlobalNote")
+        : t("synthetics.variables.overriddenInNote", { envs: relation.envs.join(", ") });
+    }
+
+    /** Names the fallback a delete uncovers, so the dialog states the blast radius. */
+    function deleteFallbackNote(row: SyntheticsVariable) {
+      const relation = crossTierShadow(
+        row.name,
+        props.environment,
+        props.environments,
+        props.globals,
+      );
+      if (!relation) return "";
+      return relation.kind === "overrides-global"
+        ? t("synthetics.variables.deleteEnvFallback", { env: props.environment ?? "" })
+        : t("synthetics.variables.deleteGlobalFallback", {
+            envs: relation.envs.join(", "),
+            name: row.name,
+          });
+    }
+
     async function removeVariable(row: SyntheticsVariable) {
+      const base =
+        row.used_by_checks > 0
+          ? t("synthetics.variables.deleteUsed", { name: row.name, n: row.used_by_checks })
+          : t("synthetics.variables.deleteConfirm", { name: row.name });
+      const fallback = deleteFallbackNote(row);
       const ok = await confirm({
         title: t("synthetics.variables.deleteTitle"),
         // Name the blast radius before asking, not after.
-        message:
-          row.used_by_checks > 0
-            ? t("synthetics.variables.deleteUsed", { name: row.name, n: row.used_by_checks })
-            : t("synthetics.variables.deleteConfirm", { name: row.name }),
+        message: fallback ? raw(`${base} ${fallback}`) : base,
       });
       if (!ok) return;
 
@@ -420,6 +493,8 @@ export default defineComponent({
       t,
       raw,
       columns,
+      otherTierNames,
+      shadowNoteFor,
       filterQuery,
       visibleRows,
       drawer,

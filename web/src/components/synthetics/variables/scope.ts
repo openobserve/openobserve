@@ -23,6 +23,30 @@ import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/syntheti
  */
 export const GLOBAL_SCOPE = "_global";
 
+/** The cross-tier relation of one name, for notes and delete dialogs. */
+export type CrossTierShadow =
+  { kind: "overrides-global" } | { kind: "overridden-in"; envs: string[] } | null;
+
+/**
+ * How `name` in the given scope relates to the other tier — an env row that
+ * overrides a global, or a global that env rows shadow. Null when the name
+ * lives in one tier only.
+ */
+export function crossTierShadow(
+  name: string,
+  environment: string | null,
+  environments: SyntheticsEnvironment[],
+  globals: SyntheticsVariable[],
+): CrossTierShadow {
+  if (environment) {
+    return globals.some((g) => g.name === name) ? { kind: "overrides-global" } : null;
+  }
+  const envs = environments
+    .filter((env) => (env.variables ?? []).some((v) => v.name === name))
+    .map((env) => env.name);
+  return envs.length ? { kind: "overridden-in", envs } : null;
+}
+
 /** What the right-hand pane renders for the selected scope. */
 export interface ScopeView {
   /** The environment, or null when Global is selected. */

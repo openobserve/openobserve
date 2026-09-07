@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 import type { SyntheticsEnvironment, SyntheticsVariable } from "@/types/synthetics";
 import {
   GLOBAL_SCOPE,
+  crossTierShadow,
   duplicateNameFor,
   duplicateSummary,
   duplicatePrefill,
@@ -170,5 +171,32 @@ describe("duplicateSummary", () => {
 
   it("handles an empty environment", () => {
     expect(duplicateSummary([])).toEqual({ total: 0, secrets: 0 });
+  });
+});
+
+describe("crossTierShadow", () => {
+  const envs = [
+    { id: "e1", name: "staging", variables: [{ name: "URL" }, { name: "API_KEY" }] },
+    { id: "e2", name: "ap1", variables: [{ name: "URL" }] },
+  ] as any[];
+  const globals = [{ name: "URL" }, { name: "ORG" }] as any[];
+
+  it("an env row that also exists globally overrides the global", () => {
+    expect(crossTierShadow("URL", "staging", envs, globals)).toEqual({ kind: "overrides-global" });
+  });
+
+  it("an env row with no global counterpart shadows nothing", () => {
+    expect(crossTierShadow("API_KEY", "staging", envs, globals)).toBeNull();
+  });
+
+  it("a global names every environment that keeps its own value", () => {
+    expect(crossTierShadow("URL", null, envs, globals)).toEqual({
+      kind: "overridden-in",
+      envs: ["staging", "ap1"],
+    });
+  });
+
+  it("an unshadowed global reports nothing", () => {
+    expect(crossTierShadow("ORG", null, envs, globals)).toBeNull();
   });
 });

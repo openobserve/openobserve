@@ -179,7 +179,12 @@ function hintsLine(row: InheritedUnionRow): I18nText {
         (hint.has_value
           ? t("synthetics.inherited.valueSet")
           : t("synthetics.inherited.valueNotSet"));
-    return `${label}: ${value}`;
+    // An env source beside a global source is a shadow — say who it beats.
+    const relation =
+      hint.source !== "global" && row.global
+        ? ` — ${t("synthetics.inherited.overridesGlobal")}`
+        : "";
+    return `${label}: ${value}${relation}`;
   });
   return raw(`${row.name} — ${hints.join(" · ")}`);
 }

@@ -41,6 +41,7 @@ production - the most frequent movement here - costs no network call.
           :loading="loading"
           :environment="scope.isGlobal ? null : (scope.environment?.name ?? null)"
           :environments="environments"
+          :globals="globals"
           :scope-label="scopeLabel"
           :scope-summary="scopeSummary"
           @refresh="refresh"

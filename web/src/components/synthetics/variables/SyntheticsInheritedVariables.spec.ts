@@ -127,6 +127,27 @@ describe("SyntheticsInheritedVariables", () => {
     expect(tip.find("div").classes()).toContain("text-warning");
   });
 
+  it("names the shadow relation when an env row overrides a global", () => {
+    // S2 — the union row carries both sources; the env hint says who it beats.
+    wrapper = mountInherited({
+      rows: [
+        row({
+          name: "URL",
+          envs: ["staging"],
+          global: true,
+          hints: [
+            { source: "global", example: "example.com", has_value: true },
+            { source: "staging", example: "stage.example.com", has_value: true },
+          ],
+        }),
+      ],
+    });
+    const tip = wrapper.find(`${rowSel} .tip-slot`).text();
+    expect(tip).toContain("staging: stage.example.com — overrides global");
+    expect(tip).toContain("Global: example.com");
+    expect(tip).not.toContain("Global: example.com — overrides");
+  });
+
   it("masks a secret's hints and marks the row with the lock", () => {
     wrapper = mountInherited({
       rows: [

@@ -113,6 +113,7 @@ import OFormTextarea from "@/lib/forms/Input/OFormTextarea.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import { toast } from "@/lib/feedback/Toast/useToast";
+import { useConfirmDialog } from "@/composables/useConfirmDialog";
 import syntheticsService from "@/services/synthetics";
 import type { SyntheticsVariablePayload } from "@/services/synthetics";
 import type { SyntheticsVariable } from "@/types/synthetics";
@@ -137,10 +138,17 @@ export default defineComponent({
     data: { type: Object as PropType<SyntheticsVariable | null>, default: null },
     /** Environment NAME, or null for the unscoped tier. Fixed, never chosen here. */
     environment: { type: String as PropType<string | null>, default: null },
+    /** Normalized names defined in the OTHER tier → env names involved.
+     *  Creating one of these is a shadow, which must be a deliberate act. */
+    otherTierNames: {
+      type: Object as PropType<Record<string, string[]>>,
+      default: () => ({}),
+    },
   },
   setup(props, { emit }) {
     const { t } = useI18nTyped();
     const store = useStore();
+    const { confirm } = useConfirmDialog();
     const replacing = ref(false);
     const kindValue = ref<"plain" | "secret">("plain");
 
@@ -185,8 +193,39 @@ export default defineComponent({
       emit("close");
     }
 
+    /** True once the author has seen what the save shadows — or when it shadows nothing. */
+    async function acknowledgeShadow(name: string): Promise<boolean> {
+      const envs = props.otherTierNames[name];
+      if (envs === undefined) return true;
+      // Editing without renaming re-saves an acknowledged state — only a new
+      // name (create or rename) creates a shadow.
+      const original = (props.data?.name ?? "").trim().toUpperCase();
+      if (props.isEdit && name === original) return true;
+      return confirm(
+        props.environment
+          ? {
+              title: t("synthetics.variables.shadowGlobalTitle"),
+              message: t("synthetics.variables.shadowGlobalMessage", {
+                name,
+                env: props.environment,
+              }),
+            }
+          : {
+              title: t("synthetics.variables.shadowedGlobalTitle"),
+              message: t("synthetics.variables.shadowedGlobalMessage", {
+                name,
+                envs: envs.join(", "),
+              }),
+            },
+      );
+    }
+
     async function save(values: Record<string, unknown>) {
       const org = store.state.selectedOrganization.identifier;
+      const normalized = String(values.name ?? "")
+        .trim()
+        .toUpperCase();
+      if (!(await acknowledgeShadow(normalized))) return;
       const payload: SyntheticsVariablePayload = {
         name: String(values.name ?? ""),
         kind: (values.kind as "plain" | "secret") ?? "plain",
