@@ -1,14 +1,15 @@
 <template>
-  <div class="m-4 flex flex-col gap-3" data-test="oncall-members">
+  <div class="flex h-full w-full flex-col gap-3" data-test="oncall-members">
     <OTable
       :data="rows"
       :columns="columns"
       row-key="id"
-      :frame="true"
+      :frame="false"
       pagination="client"
       :show-global-filter="false"
       :row-class="rowClass"
       table-id="oncall-team-members"
+      class="h-full min-h-0"
       data-test="oncall-members-table"
     >
       <!-- Add on the left, the state of the roster on the right: the toolbar
