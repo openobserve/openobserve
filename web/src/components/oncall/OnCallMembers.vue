@@ -149,11 +149,8 @@
 
       <template #empty>
         <OEmptyState
-          size="inline"
-          icon="group-add"
-          :title="t('oncall.noMembers')"
-          :action-label="t('oncall.addMember')"
-          action-icon="add"
+          size="hero"
+          preset="no-oncall-members"
           data-test="oncall-members-empty"
           @action="focusMemberPicker"
         />
@@ -600,10 +597,11 @@ const selected = ref<string[]>([]);
 const fallbackEmails = ref("");
 const adding = ref(false);
 /** Whichever of OSelect/OInput is currently mounted in the toolbar. Both
- * expose `focus()`, so the empty state's action can land the cursor there
- * without a dialog of its own. */
-const memberPickerRef = ref<{ focus: () => void } | null>(null);
+ * expose `focus()` (OSelect also opens its dropdown), so the empty state's
+ * action can land the cursor there without a dialog of its own. */
+const memberPickerRef = ref<{ focus: () => void; $el?: HTMLElement } | null>(null);
 function focusMemberPicker() {
+  memberPickerRef.value?.$el?.scrollIntoView({ behavior: "smooth", block: "center" });
   memberPickerRef.value?.focus();
 }
 const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);

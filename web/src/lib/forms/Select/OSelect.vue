@@ -607,10 +607,16 @@ function close() {
   searchTerm.value = "";
 }
 
-/** Focus the trigger programmatically (both listbox and native-select modes). */
+/** Focus the trigger and open it, so a programmatic call reads as more than a ring. */
 function focus() {
   if (typeof document === "undefined") return;
   document.getElementById(inputId.value)?.focus();
+  if (props.disabled) return;
+  if (listboxModeEnabled.value) {
+    popoverOpen.value = true;
+  } else {
+    selectOpen.value = true;
+  }
 }
 
 defineExpose({ close, focus });

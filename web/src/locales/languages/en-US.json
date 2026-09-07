@@ -470,6 +470,12 @@
       "action": "Create a team",
       "actionDesc": "Name it, pick a timezone, then add a rotation"
     },
+    "noOncallMembers": {
+      "title": "No members yet",
+      "description": "Add people from the org to put them in the paging order for this team.",
+      "action": "Add member",
+      "actionDesc": "Pick from your org, or paste a list of emails"
+    },
     "noOncallResponses": {
       "title": "Nothing is paging",
       "description": "Open pages appear here as soon as an alert routes to a team."
@@ -17533,9 +17539,7 @@
     "members": "Members",
     "membersHint": "Everyone who can be paged for this team. Levels are set in Schedule, not here.",
     "memberEmailPlaceholder": "engineer{'@'}example.com, another{'@'}example.com",
-    "addMember": "Add member",
     "removeMember": "Remove member",
-    "noMembers": "No members found.",
     "addMemberFailed": "Could not add the member",
     "removeMemberFailed": "Could not remove the member",
     "schedule": "Schedule",

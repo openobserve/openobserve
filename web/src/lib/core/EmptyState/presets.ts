@@ -477,6 +477,20 @@ export const emptyStatePresets = {
       },
     ],
   },
+  "no-oncall-members": {
+    illustration: "users",
+    variant: "create",
+    titleKey: "emptyState.noOncallMembers.title",
+    descriptionKey: "emptyState.noOncallMembers.description",
+    actions: [
+      {
+        id: "add",
+        icon: "add",
+        titleKey: "emptyState.noOncallMembers.action",
+        descriptionKey: "emptyState.noOncallMembers.actionDesc",
+      },
+    ],
+  },
   // Nothing open is the GOOD state here, so this is neutral rather than a
   // create prompt - a responder should not be nudged to make a page exist.
   "no-oncall-responses": {
