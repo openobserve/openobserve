@@ -1582,6 +1582,12 @@ pub struct Limit {
     )]
     pub inverted_index_result_cache_max_entry_size: usize,
     #[env_config(
+        name = "ZO_INVERTED_INDEX_FOOTER_CACHE_MAX_SIZE",
+        default = 0, // MB, default is 5% of total memory, clamped to 100-1024 MB
+        help = "Maximum memory size in MB for the Tantivy and Puffin footer cache. Higher values allow caching more file footers but increase memory usage."
+    )]
+    pub inverted_index_footer_cache_max_size: usize,
+    #[env_config(
         name = "ZO_INVERTED_INDEX_SKIP_THRESHOLD",
         default = 35,
         help = "If the inverted index returns row_id more than this threshold(%), it will skip the inverted index."
@@ -2842,6 +2848,14 @@ fn check_memory_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     }
     if cfg.limit.query_default_limit == 0 {
         cfg.limit.query_default_limit = 1000;
+    }
+
+    if cfg.limit.inverted_index_footer_cache_max_size == 0 {
+        cfg.limit.inverted_index_footer_cache_max_size =
+            ((cfg.limit.mem_total as f64 / SIZE_IN_MB * 0.05) as usize).clamp(100, 1024)
+                * (SIZE_IN_MB as usize);
+    } else {
+        cfg.limit.inverted_index_footer_cache_max_size *= SIZE_IN_MB as usize;
     }
     Ok(())
 }
