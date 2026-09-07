@@ -799,7 +799,7 @@ describe("PlayerTracesTab", () => {
       const sql = operationSearch?.[0].query.query.sql;
       expect(sql).toContain("trace_id IN ('trace-1','trace-2')");
       expect(sql).toContain("first_value(operation_name ORDER BY _timestamp ASC)");
-      expect(sql).toContain("span_kind=2");
+      expect(sql).toContain("span_kind='2'");
       expect(sql).toContain("http_route IS NOT NULL");
       expect(
         mockSearch.mock.calls.filter(([params]) => params.page_type === "traces"),

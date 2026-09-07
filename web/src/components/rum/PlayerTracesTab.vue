@@ -472,7 +472,7 @@ async function fetchTraceMetadata(
         org_identifier: orgId,
         query: {
           query: {
-            sql: `SELECT trace_id, first_value(operation_name ORDER BY ${timestamp} ASC) AS operation_name FROM ${stream} WHERE ${filter} AND span_kind=2 AND http_route IS NOT NULL AND operation_name IS NOT NULL AND operation_name != '' GROUP BY trace_id`,
+            sql: `SELECT trace_id, first_value(operation_name ORDER BY ${timestamp} ASC) AS operation_name FROM ${stream} WHERE ${filter} AND span_kind='2' AND http_route IS NOT NULL AND operation_name IS NOT NULL AND operation_name != '' GROUP BY trace_id`,
             start_time: searchStartTime,
             end_time: searchEndTime,
             from: 0,
