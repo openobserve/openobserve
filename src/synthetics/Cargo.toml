@@ -14,7 +14,7 @@ default = []
 # through it, and the private-agent code over there must therefore NOT depend on
 # this crate — cargo rejects the package cycle outright, `optional` and feature
 # gating included. Anything both sides need lives in `config` or `infra`.
-enterprise = ["dep:o2_enterprise", "dep:o2_openfga"]
+enterprise = ["dep:o2_enterprise", "dep:o2_openfga", "usage_reporting/enterprise"]
 # `infra/cloud` is needed directly: it gates `OrganizationRecord::trial_ends_at`,
 # which the trial gate reads, and this crate does not depend on openobserve-core
 # to inherit it transitively.
