@@ -18,7 +18,7 @@ use chrono::Utc;
 use config::{
     meta::{
         destinations::{DestinationType, Module},
-        folder::{DEFAULT_FOLDER, Folder, FolderType},
+        folder::{DEFAULT_FOLDER, FolderType},
         stream::StreamType,
         triggers::{ScheduledTriggerData, TriggerModule},
     },
@@ -152,13 +152,7 @@ async fn resolve_folder_pk(org_id: &str, name: &str) -> Option<String> {
 
     // Auto-create the default Alerts folder on first use, same as alert::create does.
     if name == DEFAULT_FOLDER {
-        let folder = Folder {
-            folder_id: DEFAULT_FOLDER.to_owned(),
-            name: "default".to_owned(),
-            description: "default".to_owned(),
-            icon: None,
-        };
-        if crate::folders::save_folder(org_id, folder, FolderType::Alerts, true)
+        if crate::folders::ensure_default_folder(org_id, FolderType::Alerts)
             .await
             .is_ok()
         {
