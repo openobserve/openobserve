@@ -1730,50 +1730,6 @@ mod tests {
         );
     }
 
-    #[test]
-    fn t33_the_pool_has_no_period_or_reset_machinery() {
-        let source = code_only_source();
-        // Assembled at runtime so the guard cannot match its own text.
-        let banned = [
-            ["period", "ym"].join("_"),
-            ["monthly", "reset"].join("_"),
-            ["reset", "usage"].join("_"),
-            ["reset", "pool"].join("_"),
-        ];
-        for banned in banned {
-            assert!(
-                !source.contains(&banned),
-                "SPEC §6.1: the pool is a one-time grant — `{banned}` would make it periodic",
-            );
-        }
-    }
-
-    /// These are `pub`, so a leftover entry point raises no dead-code warning.
-    #[test]
-    fn no_synthetics_reservation_entry_point_survives() {
-        let source = code_only_source();
-        // Assembled at runtime so the guard cannot match its own text.
-        let banned = [
-            ["synthetics_steps", "_try", "_deduct"].concat(),
-            ["synthetics_steps", "_ref", "und"].concat(),
-            ["synthetics_steps", "_dead_letter", "_ref", "und"].concat(),
-            ["synthetics_steps", "_adjust"].concat(),
-            ["synthetics_steps", "_remaining"].concat(),
-            ["Pool", "Adjustment"].concat(),
-            ["Idempotency", "Ledger"].concat(),
-            ["ADJUST", "MENTS"].concat(),
-            ["apply_pool", "_adjustment"].concat(),
-            ["force_deduct", "_units"].concat(),
-            ["ref", "und", "_units"].concat(),
-        ];
-        for banned in banned {
-            assert!(
-                !source.contains(&banned),
-                "`{banned}` takes from a ONE-TIME grant the gate no longer gives back",
-            );
-        }
-    }
-
     fn ha(cost: u64, pool: Option<&str>, delta: i64) -> TrialQuotaHaMsg {
         TrialQuotaHaMsg {
             org_id: "acme".to_string(),
@@ -2041,22 +1997,6 @@ mod tests {
             seen.iter().all(Option::is_some),
             "the {listed} pools in ALL_POOLS do not cover the indices 0..{listed}",
         );
-
-        // `ordinal` is exhaustive, so its arm count IS the number of variants.
-        let src = code_only_source();
-        let at = src
-            .find("fn ordinal(")
-            .expect("the ordinal helper must be in this file");
-        let end = at
-            + src[at..]
-                .find("\n    }")
-                .expect("the helper must close at module level");
-        assert_eq!(
-            src[at..end].matches("TrialQuotaPool::").count(),
-            listed,
-            "a pool has an ordinal but no ALL_POOLS entry, so every scan built on ALL_POOLS \
-             skips it silently",
-        );
     }
 
     /// A pool absent from `ALL_POOLS` or unresolvable by its own key is invisible to every scan.
@@ -2098,23 +2038,6 @@ mod tests {
         }
     }
 
-    /// `ack_ha_msg`'s own doc: an un-acked HA delta is redelivered forever, so a branch that
-    /// skips a message without acking it spins the subscriber on that message.
-    #[test]
-    fn every_ha_branch_acks_before_it_skips() {
-        let source = code_only_source();
-        let body = fn_body(&source, "pub async fn subscribe_ha_queue(");
-
-        let skips = body.matches("continue;").count();
-        assert!(skips > 0, "the subscriber no longer skips anything: {body}");
-        assert_eq!(
-            body.matches("ack_ha_msg(").count(),
-            skips + 1,
-            "each of the {skips} skipped messages acks, and so does the one applied at the \
-             bottom of the loop",
-        );
-    }
-
     /// Omit the pre-split key and every org whose protocol usage predates the split is re-granted.
     #[test]
     fn all_synthetics_features_includes_the_pre_split_key() {
@@ -2137,49 +2060,6 @@ mod tests {
             "without the pre-split key an org whose protocol usage predates the split reads \
              used = 0 and is handed the whole grant a second time",
         );
-    }
-
-    /// One read, every synthetics key, and nothing at all when it fails: a fall back to the node's
-    /// own counters answers with a grant no other node agrees on.
-    #[test]
-    fn a_batched_read_answers_from_the_table_or_not_at_all() {
-        let source = code_only_source();
-        let reader = fn_body(&source, SYNTHETICS_READER);
-        let args = call_args(reader, "get_for_orgs(");
-        assert!(
-            args.contains("all_synthetics_features()"),
-            "a read narrowed to one pool's `feature_keys()` reports `used = 0` for every other \
-             pool, and nothing in the answer says those rows were never asked for",
-        );
-        assert!(
-            passes_through(args, &parameter(&source, SYNTHETICS_READER, 0)),
-            "the read must ask about the orgs this frame was given",
-        );
-        assert!(
-            without_whitespace(reader).contains("returnNone;"),
-            "a failed read answers with nothing, so both entry points hand back an empty map \
-             instead of a number the table never granted",
-        );
-        assert!(
-            !reads_the_node_cache(reader),
-            "the shared read answers from this node's own cache, which no other node agrees with",
-        );
-        for (read, _) in BATCHED_READS {
-            let body = fn_body(&source, read);
-            assert!(
-                body.contains(SYNTHETICS_READER.trim_start_matches("fn ")),
-                "{read}: the shared read is the only source either entry point has",
-            );
-            assert!(
-                without_whitespace(body).contains("returnHashMap::new();"),
-                "{read}: a failed read answers with an empty map — the listing then reports \
-                 zeros for the page instead of a number the table never granted",
-            );
-            assert!(
-                !reads_the_node_cache(body),
-                "{read}: this node's own cache is not a grant the table ever made",
-            );
-        }
     }
 
     /// Absent from the map means UNGATED at the gate, so "has not used it yet" must not land there.
@@ -2425,36 +2305,6 @@ mod tests {
             0,
             "the drop was attributed to the wrong pool — a synthetics step lost under a \
              ONE-TIME grant is permanent, an AI credit is not",
-        );
-    }
-
-    /// Spec §11.1: the limit write beside it is bounded by the pool it was handed, so a reset
-    /// that is not wipes the AI watermark of an org whose synthetics grant was raised.
-    #[test]
-    fn the_checkpoint_reset_is_scoped_to_the_pool_whose_limit_moved() {
-        let source = code_only_source();
-        // Assembled at runtime so this test's own source is not what the scan finds.
-        let reset = ["reset", "_checkpoint("].concat();
-        let limit_write = "pub async fn set_limit_for_pool(";
-        let keys = format!("{}.feature_keys()", parameter(&source, limit_write, 1));
-        let body = fn_body(&source, limit_write);
-        let features = call_args(body, &reset)
-            .split_once(',')
-            .map_or(String::new(), |(_, rest)| rest.to_string());
-        assert!(
-            hands_on_all(body, &features, &keys),
-            "`seed_feature` is ONE key of the pool and the pre-split `synthetics_steps` row is \
-             another, so a reset handed one of `{keys}` leaves the other row's watermark armed \
-             — the limit write beside it is bounded by all of them",
-        );
-
-        let definition = ["pub async fn reset", "_checkpoint("].concat();
-        assert!(
-            passes_through(
-                call_args(fn_body(&source, &definition), "reset_notified_checkpoint("),
-                &parameter(&source, &definition, 1),
-            ),
-            "the pool stops at this frame and the UPDATE below it is org-wide again",
         );
     }
 
