@@ -746,12 +746,12 @@ function normalizeComparisonDimension(input: any): ExperimentComparisonDimension
     null,
   );
   return {
-    // The compare endpoint never sends a separate `id` field — `name` is
-    // already the stable per-dimension identity (`"<scorerId> · v<version>"`
-    // for scores, a fixed literal for cost/latency), so it doubles as the id.
-    // Falling back to `input?.id` would silently collapse every dimension to
-    // the same empty string, since that field never exists.
-    id: String(input?.name ?? ""),
+    // The backend computes a stable per-dimension `id` (score dimensions:
+    // `score:<encoded identity>`; cost/latency: fixed literals) and that is
+    // the exact value the `outcomeDimensions` filter expects back — sending
+    // `name` instead is rejected server-side. Falling back to `name` only
+    // covers a backend that omits `id`; it isn't the primary source.
+    id: String(input?.id || input?.name || ""),
     name: String(input?.name ?? ""),
     kind: input?.kind,
     dataType: value(input, "dataType", "data_type", null),
