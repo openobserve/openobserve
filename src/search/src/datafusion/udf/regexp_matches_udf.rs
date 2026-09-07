@@ -150,7 +150,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
     let is_scalar_pattern = regex.len() == 1;
 
     // Precompile the regex if it's scalar
-    let scalar_regex = if is_scalar_pattern {
+    let scalar_regex = if is_scalar_pattern && !regex.is_null(0) {
         Some(
             Regex::new(regex.value(0))
                 .map_err(|e| DataFusionError::Execution(format!("Invalid regex pattern: {e}")))?,
@@ -162,7 +162,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
     let mut list_builder = ListBuilder::new(GenericStringBuilder::<T>::new());
 
     for i in 0..values.len() {
-        if values.is_null(i) || (!is_scalar_pattern && regex.is_null(i)) {
+        if values.is_null(i) || regex.is_null(if is_scalar_pattern { 0 } else { i }) {
             // Append NULL for this row
             list_builder.append(false);
             continue;

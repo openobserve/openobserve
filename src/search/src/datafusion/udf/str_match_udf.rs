@@ -121,14 +121,10 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
     }
 
     // 1. cast both arguments to be aligned with the signature
-    let ColumnarValue::Array(haystack) = &args[0] else {
-        return Err(DataFusionError::SQL(
-            Box::new(ParserError::ParserError(
-                "Invalid argument types[haystack] to str_match function".to_string(),
-            )),
-            None,
-        ));
-    };
+    // Parquet pushdown can replace constant or missing columns with scalars.
+    // Keep all-scalar calls scalar so DataFusion can fold the predicate once.
+    let is_scalar = matches!(&args[0], ColumnarValue::Scalar(_));
+    let haystack = args[0].clone().into_array(1)?;
     let haystack = as_string_array(&haystack)?;
     let ColumnarValue::Scalar(needle) = &args[1] else {
         return Err(DataFusionError::SQL(
@@ -151,43 +147,42 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
             ));
         }
     }
-    .as_ref()
-    .ok_or_else(|| {
-        DataFusionError::SQL(
-            Box::new(ParserError::ParserError(
-                "Invalid argument types[needle] to str_match function".to_string(),
-            )),
-            None,
-        )
-    })?
-    .to_string();
+    .clone();
 
-    // pre-compute the needle
-    if case_insensitive {
+    // Pre-compute the needle once per batch, including its searcher.
+    if case_insensitive && let Some(needle) = needle.as_mut() {
         needle.make_ascii_lowercase();
-    };
-
-    let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
+    }
+    let mem_finder = needle
+        .as_ref()
+        .map(|needle| memchr::memmem::Finder::new(needle.as_bytes()));
 
     // 2. perform the computation
     let array = haystack
         .iter()
         .map(|haystack| {
-            haystack.map(|haystack| {
-                if case_insensitive {
+            haystack.and_then(|haystack| {
+                let mem_finder = mem_finder.as_ref()?;
+                Some(if case_insensitive {
                     mem_finder
                         .find(haystack.to_lowercase().as_bytes())
                         .is_some()
                 } else {
                     mem_finder.find(haystack.as_bytes()).is_some()
-                }
+                })
             })
         })
         .collect::<BooleanArray>();
 
     // `Ok` because no error occurred during the calculation
     // `Arc` because arrays are immutable, thread-safe, trait objects.
-    Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
+    if is_scalar {
+        Ok(ColumnarValue::Scalar(ScalarValue::try_from_array(
+            &array, 0,
+        )?))
+    } else {
+        Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
+    }
 }
 
 #[cfg(test)]
