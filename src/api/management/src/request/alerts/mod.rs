@@ -86,7 +86,7 @@ pub mod templates;
 
 /// Stripped on export: re-importing this state would claim a model the destination never trained.
 #[cfg(feature = "enterprise")]
-const ANOMALY_EXPORT_STRIPPED_KEYS: [&str; 9] = [
+const ANOMALY_EXPORT_STRIPPED_KEYS: &[&str] = &[
     "is_trained",
     "training_started_at",
     "training_completed_at",
@@ -1587,7 +1587,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
 /// Removes the runtime/training keys from an anomaly config's export payload, in place.
 #[cfg(feature = "enterprise")]
 fn strip_anomaly_runtime_state(obj: &mut serde_json::Map<String, serde_json::Value>) {
-    for key in ANOMALY_EXPORT_STRIPPED_KEYS {
+    for &key in ANOMALY_EXPORT_STRIPPED_KEYS {
         obj.remove(key);
     }
 }
