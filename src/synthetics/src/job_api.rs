@@ -93,10 +93,6 @@ pub(crate) mod billing {
         pub now_us: i64,
         /// See the call site in [`super::ack`].
         pub region: Option<String>,
-        /// The org's one-time free step grant as it stood when this ack
-        /// arrived. Decides the free/billable split and whether the reconcile
-        /// touches the pool at all.
-        pub pool: super::StepPoolView,
     }
 
     /// What one ack bills, and which of the two guards fired.
@@ -124,6 +120,7 @@ pub(crate) mod billing {
         hour: u32,
         event_time_hour: String,
         org_id: String,
+        synthetics_id: String,
         region: Option<String>,
     }
 
@@ -141,34 +138,8 @@ pub(crate) mod billing {
         /// it is so a corrupt or negative value cannot produce a ZERO ceiling,
         /// which would clamp real executed work down to nothing.
         pub(crate) fn frozen_definition(&self) -> u32 {
-            super::enqueue_reservation(self.steps_configured, self.combos)
-        }
-
-        /// Exactly one of `SyntheticsSteps` and `SyntheticsFreeSteps` per ack,
-        /// and this is the predicate that chooses.
-        fn pool_funded(&self) -> bool {
-            self.pool == super::StepPoolView::Funded
-        }
-    }
-
-    /// The pool reconcile, as pure arithmetic: billed under the reservation
-    /// REFUNDS the difference, over it TOPS UP, equal moves nothing.
-    ///
-    /// `None` for the equal case rather than a zero-valued adjustment: a zero
-    /// movement still burns an idempotency key and still costs a flush record,
-    /// and equal is the common case.
-    pub(crate) fn reconcile(reserved: u32, billed: u32) -> Option<super::PoolMovement> {
-        use std::cmp::Ordering;
-        match billed.cmp(&reserved) {
-            Ordering::Less => Some(super::PoolMovement {
-                direction: super::StepPoolDirection::Refund,
-                steps: u64::from(reserved - billed),
-            }),
-            Ordering::Greater => Some(super::PoolMovement {
-                direction: super::StepPoolDirection::TopUp,
-                steps: u64::from(billed - reserved),
-            }),
-            Ordering::Equal => None,
+            let configured = u32::try_from(self.steps_configured.max(1)).unwrap_or(u32::MAX);
+            configured.saturating_mul(self.combos.unwrap_or(1).max(1))
         }
     }
 
@@ -191,11 +162,18 @@ pub(crate) mod billing {
                     now.hour()
                 ),
                 org_id: i.org_id.to_string(),
+                synthetics_id: i.synthetics_id.to_string(),
                 region: i.region.clone(),
             }
         }
 
-        fn build(&self, event: UsageEvent, size: f64, unit: &str) -> UsageData {
+        fn build(
+            &self,
+            event: UsageEvent,
+            size: f64,
+            unit: &str,
+            stream_name: Option<&str>,
+        ) -> UsageData {
             UsageData {
                 _timestamp: self.timestamp,
                 event,
@@ -213,18 +191,16 @@ pub(crate) mod billing {
                 // same event. Nothing bills on it, but a disagreement reads as a
                 // bug to whoever finds it.
                 unit: unit.to_string(),
-                // Empty rather than a synthetic address: `user_email` is part of
-                // `GroupKey`, so a per-probe value would shard the hour's bucket.
+                // A synthetic address would only shard `GroupKey`; nothing reads a per-probe split.
                 user_email: String::new(),
                 // MUST stay 0.0. `ingest_usages` AVERAGES this field, so it can
                 // never carry a summable quantity (see the type doc).
                 response_time: 0.0,
                 stream_type: StreamType::Logs,
-                // Sums to "acks this org made this hour".
+                // Sums to the acks in THIS row's `GroupKey` bucket, not the org's hour.
                 num_records: 1,
                 dropped_records: 0,
-                // No source stream behind a synthetics step.
-                stream_name: String::new(),
+                stream_name: stream_name.unwrap_or_default().to_string(),
                 trace_id: None,
                 cached_ratio: None,
                 scan_files: None,
@@ -303,7 +279,6 @@ pub(crate) mod billing {
         venue: Venue,
         now_us: i64,
         region: Option<String>,
-        pool: super::StepPoolView,
     ) -> BillingInputs<'a> {
         BillingInputs {
             org_id: &row.org_id,
@@ -319,7 +294,6 @@ pub(crate) mod billing {
             retries: live_retries,
             now_us,
             region,
-            pool,
         }
     }
 
@@ -466,29 +440,19 @@ pub(crate) mod billing {
         let row = RowTemplate::new(&i);
         let mut events = Vec::with_capacity(3);
 
-        // Exactly ONE step event per ack, picked on two axes. The free ones are
-        // non-billable in `MeteringEventName::is_billable`, so they burn down the
-        // grant without reaching an invoice. The free/billable predicate is the
-        // POOL, not the plan:
-        //
-        //   Funded         the grant still had room  ⇒ free
-        //   Spent          the grant is gone         ⇒ billable overage
-        //   NotApplicable  no pool is consulted      ⇒ billable
-        //
-        // `NotApplicable` covers a non-metering build or node, the master switch
-        // being off, and — deliberately — an **ExternalContract** org: never
-        // pool-gated, and its acks must stay billable for the true-up.
-        //
-        // Browser and protocol are separate events because they carry different
-        // Stripe meters and so different rates; the free pair splits too, since
-        // a trial org's mix is what predicts its invoice on conversion.
-        let step_event = match (i.pool_funded(), i.is_browser()) {
-            (true, true) => UsageEvent::SyntheticsFreeBrowserSteps,
-            (true, false) => UsageEvent::SyntheticsFreeProtocolSteps,
-            (false, true) => UsageEvent::SyntheticsBrowserSteps,
-            (false, false) => UsageEvent::SyntheticsProtocolSteps,
+        // Separate events because the two carry different Stripe meters and rates.
+        let step_event = if i.is_browser() {
+            UsageEvent::SyntheticsBrowserSteps
+        } else {
+            UsageEvent::SyntheticsProtocolSteps
         };
-        events.push(row.build(step_event, f64::from(steps.billable), "steps"));
+        // STEP row only: `stream_name` is in `GroupKey`, so a per-check value shards the bucket.
+        events.push(row.build(
+            step_event,
+            f64::from(steps.billable),
+            "steps",
+            Some(&row.synthetics_id),
+        ));
 
         // ALWAYS, alongside every billable ack: half of the `executed/defined`
         // ratio, and unreconstructable once the definition is edited.
@@ -496,65 +460,22 @@ pub(crate) mod billing {
             UsageEvent::_SyntheticsStepsDefined,
             f64::from(steps.defined),
             "steps",
+            None,
         ));
 
         // The v2 duration hedge. Skipped at zero: browser-only, and a 0 adds
         // nothing to `SUM(size)` while adding a permanent empty bucket to every
         // protocol org's every hour.
         if i.browser_ms > 0 {
-            events.push(row.build(UsageEvent::_SyntheticsBrowserMs, i.browser_ms as f64, "ms"));
+            events.push(row.build(
+                UsageEvent::_SyntheticsBrowserMs,
+                i.browser_ms as f64,
+                "ms",
+                None,
+            ));
         }
 
         events
-    }
-
-    /// The pool reconcile: the movement this ack owes the org's one-time grant,
-    /// or `None` when the pool must not be touched. Applied by the caller, for
-    /// the same reason the usage rows are.
-    ///
-    /// Separate from [`events_for_ack`] because the two disagree on exactly one
-    /// input: an `error_source = "queue"` ack emits NOTHING **and** refunds the
-    /// WHOLE reservation — no step ran, so none may be held against the grant.
-    ///
-    /// Nothing records what the enqueue reserved, so "was this run pool-funded?"
-    /// is answered by the pool's state NOW. Both boundary cases are bounded by
-    /// one run and err towards leaving the pool alone: a grant exhausted between
-    /// enqueue and ack leaves an over-deduct unrefunded, and a limit raised
-    /// mid-run reconciles against a reservation that never happened.
-    pub(crate) fn pool_adjustment_for_ack(
-        flags: BillingFlags,
-        i: &BillingInputs<'_>,
-    ) -> Option<super::PoolMovement> {
-        // Only a grant currently funding this org may be moved. `Spent` and
-        // `NotApplicable` both mean the enqueue reserved nothing: an exhausted
-        // org runs as overage, a contract org is never pool-gated at all.
-        if !i.pool_funded() {
-            return None;
-        }
-
-        // The venue gate, read the same way the enqueue read it: a private agent
-        // is never gated, deducted or billed, so there is nothing to give back.
-        // `Unresolved` is treated the same rather than refunded, because a
-        // lookup error is FLEET-WIDE (see `resolve_venue`) and refunding every
-        // ack during an outage would hand every free org its grant back at once.
-        if i.venue != Venue::Public {
-            return None;
-        }
-
-        let reserved = i.frozen_definition();
-
-        // The job never ran, so the whole reservation goes back. Checked BEFORE
-        // `resolve_billable`: a queue-errored ack carries `steps_executed = 0`,
-        // and the zero fallback would otherwise turn "no steps ran" into "bill
-        // the whole definition".
-        if i.error_source == "queue" {
-            return Some(super::PoolMovement {
-                direction: super::StepPoolDirection::Refund,
-                steps: u64::from(reserved),
-            });
-        }
-
-        reconcile(reserved, resolve_billable(flags, i).billable)
     }
 }
 
@@ -1053,133 +974,6 @@ pub async fn presign_artifacts(
     })
 }
 
-/// The **no-retry baseline**: what one enqueue reserves from the free pool, and
-/// the same number the ack reconciles against.
-///
-/// `configured x combos`, deliberately NOT `x (retries + 1)`, which would let one
-/// flaky check hold 3x the pool it usually needs; a retry's extra steps are taken
-/// at ack time as a top-up, where they are known.
-///
-/// **ONE function, TWO call sites** — [`crate::scheduler`] deducts,
-/// `billing::BillingInputs::frozen_definition` reconciles — and they MUST agree,
-/// because nothing records what the enqueue actually took. Floored at one step:
-/// a zero reservation is a zero ceiling, which bills real work as nothing.
-pub(crate) fn enqueue_reservation(steps_configured: i32, combos: Option<u32>) -> u32 {
-    let configured = u32::try_from(steps_configured.max(1)).unwrap_or(u32::MAX);
-    configured.saturating_mul(combos.unwrap_or(1).max(1))
-}
-
-/// The org's one-time free step grant, as it stood when an ack arrived.
-/// Resolved by the ack's caller and passed in, because the pool lives in
-/// `openobserve-core`. Three states, because a bool loses the one that matters:
-///
-/// | state | event | reconcile |
-/// |---|---|---|
-/// | [`Funded`](Self::Funded) | `SyntheticsFreeSteps` | yes |
-/// | [`Spent`](Self::Spent) | `SyntheticsSteps` (overage) | no |
-/// | [`NotApplicable`](Self::NotApplicable) | `SyntheticsSteps` | no |
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub enum StepPoolView {
-    /// No pool is consulted for this ack: a build without `cloud`, a node with
-    /// `O2_SYNTHETICS_BILLING_ENABLED` off, or an **ExternalContract** org —
-    /// never pool-gated, and its acks must stay billable so the NoOp provider
-    /// advances a true-up.
-    ///
-    /// The default, so a build that never sets it bills rather than silently
-    /// consuming a grant it is not tracking.
-    #[default]
-    NotApplicable,
-    /// The org's one-time grant still had room. This ack is free.
-    Funded,
-    /// The grant is spent. This ack runs as metered overage.
-    Spent,
-}
-
-/// Both step grants as the caller resolved them. Two, because the caller cannot
-/// know a job's check type — that is frozen on the row `ack` itself reads — and
-/// browser and protocol draw on independent pools.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub struct StepPoolViews {
-    pub browser: StepPoolView,
-    pub protocol: StepPoolView,
-}
-
-impl StepPoolViews {
-    /// Both sides the same — a build or node that consults no pool at all.
-    pub fn uniform(view: StepPoolView) -> Self {
-        Self {
-            browser: view,
-            protocol: view,
-        }
-    }
-
-    /// The grant this job spends from. `browser_devices` is written iff the check
-    /// is a browser check, and unlike the live `check_type` it cannot change under
-    /// an in-flight job.
-    #[cfg(feature = "cloud")]
-    fn for_job(&self, browser_devices: Option<&str>) -> StepPoolView {
-        if browser_devices.is_some() {
-            self.browser
-        } else {
-            self.protocol
-        }
-    }
-}
-
-/// Which way a [`PoolMovement`] moves the grant.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum StepPoolDirection {
-    /// The run executed FEWER steps than the enqueue reserved — give the
-    /// difference back.
-    Refund,
-    /// The run executed MORE (a retry fired) — take the difference.
-    ///
-    /// **Never refused**: a top-up that would exhaust the pool mid-run still
-    /// completes the run and is recorded.
-    TopUp,
-}
-
-/// How far, and which way, one ack moves the free step pool.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct PoolMovement {
-    pub direction: StepPoolDirection,
-    pub steps: u64,
-}
-
-/// One ack's pool reconcile, ready to apply. Returned as DATA for the same
-/// reason `usage_events` is: this crate does not depend on the pool.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct StepPoolAdjustment {
-    pub org_id: String,
-    /// Which grant to move — the two are independent and a movement applied to
-    /// the wrong one both overstates that grant and silently strands the other.
-    pub is_browser: bool,
-    pub movement: PoolMovement,
-    /// See [`adjustment_key`].
-    pub idempotency_key: String,
-}
-
-/// The idempotency key: **`(synthetics_id, location, scheduled_ts, job_id)`**.
-/// All four, and each earns its place:
-///
-///   * `job_id` is a KSUID minted at enqueue and says nothing about which slot it belongs to;
-///   * `scheduled_ts` is the SLOT, not the wall clock — every node derives the same value, so the
-///     key is stable across nodes and across clock skew;
-///   * `synthetics_id` + `location` make it the same tuple as `synthetics_jobs_dedup_uq`, which is
-///     what lets the reconciliation job join a `_usage` row to its pool movement.
-///
-/// `\u{1f}` (ASCII unit separator) as the separator: a location name is
-/// operator-chosen, and a printable one it could contain would let two different
-/// tuples produce one key — a collision that silently DROPS an adjustment.
-pub fn adjustment_key(
-    synthetics_id: &str,
-    location: &str,
-    scheduled_ts: i64,
-    job_id: &str,
-) -> String {
-    format!("{synthetics_id}\u{1f}{location}\u{1f}{scheduled_ts}\u{1f}{job_id}")
-}
-
 #[derive(Debug, Serialize)]
 pub struct AckResponse {
     pub run_complete: bool,
@@ -1236,12 +1030,6 @@ pub struct AckResponse {
     /// probe agent. Pinned by a test.
     #[serde(skip)]
     pub usage_events: Vec<UsageData>,
-    /// The free-pool movement this ack owes; `None` on every path that must not
-    /// touch the pool. Returned as data and applied by the caller, exactly like
-    /// `usage_events`, and `#[serde(skip)]` for the same reason: a probe agent
-    /// has no business knowing an org's grant balance.
-    #[serde(skip)]
-    pub pool_adjustment: Option<StepPoolAdjustment>,
 }
 
 /// The notification a completed run should send, resolved against the check's
@@ -1550,10 +1338,6 @@ fn stale_lease_response(
         failing_locations: Vec::new(),
         passing_locations: Vec::new(),
         usage_events: Vec::new(),
-        // Nothing billed, so nothing to reconcile: a duplicate or evicted ack
-        // must not move the pool either, and this is the only way out of `ack`
-        // that skips the emit.
-        pool_adjustment: None,
     }
 }
 
@@ -1562,16 +1346,7 @@ fn stale_lease_response(
 /// Marks the job complete, increments the run counter, and returns context for
 /// notifications. Returns `run_complete = true` when all jobs in the run have
 /// acked.
-///
-/// `pools` carries BOTH free step grants as the CALLER resolved them. Parameters
-/// rather than a global because a `OnceCell` installed from `init()` would be
-/// unset on the API nodes that serve acks; a required argument cannot be unset.
-/// Both, because only the row read below says which grant this job spends from.
-pub async fn ack(
-    req: AckRequest,
-    token_org: &str,
-    pools: StepPoolViews,
-) -> anyhow::Result<AckResponse> {
+pub async fn ack(req: AckRequest, token_org: &str) -> anyhow::Result<AckResponse> {
     let conn = get_orm_client_rw().await;
 
     // Fetch the leased row first for context (location, check_id, org_id).
@@ -1714,9 +1489,9 @@ pub async fn ack(
     // Step billing. Computed here, emitted by the `job_ack` handler (see the
     // `billing` module doc). Placed after the live check is in hand because the
     // ceiling reads `retries` from it, and after the duplicate-ack early return
-    // because a duplicate must bill nothing. The reconcile rides along.
+    // because a duplicate must bill nothing.
     #[cfg(feature = "cloud")]
-    let (usage_events, pool_adjustment) = {
+    let usage_events = {
         let ent = o2_enterprise::enterprise::common::config::get_config();
         let flags = billing::BillingFlags {
             clamp_enabled: ent.cloud.synthetics_step_clamp_enabled,
@@ -1733,35 +1508,13 @@ pub async fn ack(
         // number of super-cluster PUBLISHES, and this is a read.
         let sc = &ent.super_cluster;
         let region = (sc.enabled && !sc.region.is_empty()).then(|| sc.region.clone());
-        // The grant is chosen from the FROZEN row, so the reserve, the reconcile
-        // and this ack cannot disagree about which pool the job spends from.
-        let pool = pools.for_job(check.browser_devices.as_deref());
-        let inputs =
-            billing::inputs_from(&check, &req, synthetic.retries, venue, now_us, region, pool);
-        // Built BEFORE `events_for_ack` consumes `inputs`. The two read the same
-        // struct and must not be able to see different ones.
-        let adjustment =
-            billing::pool_adjustment_for_ack(flags, &inputs).map(|movement| StepPoolAdjustment {
-                org_id: inputs.org_id.to_string(),
-                is_browser: check.browser_devices.is_some(),
-                movement,
-                idempotency_key: adjustment_key(
-                    inputs.synthetics_id,
-                    &check.location,
-                    check.scheduled_ts,
-                    inputs.job_id,
-                ),
-            });
-        (billing::events_for_ack(flags, inputs), adjustment)
+        let inputs = billing::inputs_from(&check, &req, synthetic.retries, venue, now_us, region);
+        billing::events_for_ack(flags, inputs)
     };
     // A self-hosted Enterprise build has `enterprise` and NOT `cloud`; gating on
     // `enterprise` would write usage rows onto every customer's own cluster.
     #[cfg(not(feature = "cloud"))]
-    let (usage_events, pool_adjustment) = {
-        // `pools` is the caller's answer for grants this build does not have.
-        let _ = pools;
-        (Vec::new(), None)
-    };
+    let usage_events = Vec::new();
 
     // Decide the notification, once per RUN. Per-job would alert once per
     // location for the same outage, and would advance the failure streak by the
@@ -1821,7 +1574,6 @@ pub async fn ack(
         failing_locations,
         passing_locations,
         usage_events,
-        pool_adjustment,
     })
 }
 
@@ -1950,6 +1702,18 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::test_source::{block_from, code_only, production};
+
+    /// `production` slices at the FIRST marker, so a second one would make every scan vacuous.
+    fn production_code() -> String {
+        let raw = include_str!("job_api.rs");
+        assert_eq!(
+            raw.matches("\n#[cfg(test)]").count(),
+            1,
+            "a test module above this one would truncate these scans to a prefix",
+        );
+        code_only(production(raw))
+    }
 
     /// The minimum an ack has ever had to carry. Everything else on
     /// `AckRequest` is `#[serde(default)]`, which is what makes rollback safe.
@@ -2063,6 +1827,86 @@ mod tests {
         assert_eq!(req.browser_ms, 0);
     }
 
+    /// The ack no longer decides free from paid, so no free step event may be nameable.
+    #[test]
+    fn ack_never_emits_a_free_event() {
+        let source = production_code();
+        // Assembled at runtime so this test's own text cannot satisfy the scan.
+        for banned in [
+            ["Synthetics", "Free", "BrowserSteps"].concat(),
+            ["Synthetics", "Free", "ProtocolSteps"].concat(),
+        ] {
+            assert!(
+                !source.contains(&banned),
+                "`{banned}` is a free step event the ack must have no way to emit",
+            );
+        }
+    }
+
+    /// Nothing at the ack reads a counter, so the ack can owe the pool nothing.
+    #[test]
+    fn ack_carries_no_pool_adjustment() {
+        let source = production_code();
+        assert!(
+            source.contains("pub struct AckResponse"),
+            "the ack must still answer with a response type",
+        );
+        // Assembled at runtime so this test's own text cannot satisfy the scan.
+        for banned in [
+            ["pool", "_adjustment"].concat(),
+            ["StepPool", "View"].concat(),
+            ["StepPool", "Direction"].concat(),
+            ["StepPool", "Adjustment"].concat(),
+            ["Pool", "Movement"].concat(),
+            ["adjustment", "_key"].concat(),
+        ] {
+            assert!(
+                !source.contains(&banned),
+                "`{banned}` belongs to the pool machinery the ack no longer has",
+            );
+        }
+    }
+
+    /// The metering split keys on `stream_name`; the value test that guards it is `cloud`-gated.
+    #[test]
+    fn the_row_template_stamps_the_check_id_as_stream_name() {
+        let source = production_code();
+        // Assembled at runtime so this test's own text cannot satisfy the scan.
+        let field = ["synthetics", "_id"].concat();
+
+        let at = source
+            .find(&["struct Row", "Template"].concat())
+            .expect("the shared row template");
+        let (open, close) = block_from(&source, at);
+        assert!(
+            source[open..close].contains(&field),
+            "the row template carries no `{field}`, so no row it builds can name the check",
+        );
+
+        let at = source
+            .find(&["fn events_for", "_ack("].concat())
+            .expect("the emit");
+        let (open, close) = block_from(&source, at);
+        let block = &source[open..close];
+        let calls: Vec<&str> = block
+            .split(&["row.bu", "ild("].concat())
+            .skip(1)
+            .map(|call| &call[..call.find("));").unwrap_or(call.len())])
+            .collect();
+        assert_eq!(calls.len(), 3, "the ack builds three rows");
+        assert!(
+            calls[0].contains(&["Some(&row.", field.as_str()].concat()),
+            "the step row's `stream_name` must be the check id, not left blank or taken from the org",
+        );
+        for call in &calls[1..] {
+            assert!(
+                call.contains("None") && !call.contains("Some("),
+                "only the step row may name the check: `stream_name` is in `GroupKey`, so \
+                 stamping the other two shatters every publish batch three ways",
+            );
+        }
+    }
+
     // Step billing. Every guard is a pure function, so these need no database.
     #[cfg(feature = "cloud")]
     mod billing {
@@ -2073,13 +1917,11 @@ mod tests {
         use infra::table::synthetics_jobs::LeasedRow;
 
         use crate::job_api::{
-            AckRequest, AlertDecision, PoolMovement, StepPoolDirection, StepPoolView,
-            adjustment_key,
+            AckRequest, AlertDecision,
             billing::{
                 BillingFlags, BillingInputs, Venue, events_for_ack, frozen_combos, inputs_from,
-                pool_adjustment_for_ack, reconcile,
             },
-            enqueue_reservation, stale_lease_response,
+            stale_lease_response,
         };
 
         /// 2026-08-25T13:47:11Z, so the derived hour fields are checkable literals.
@@ -2111,9 +1953,6 @@ mod tests {
                 combos: Some(combos),
                 retries,
                 now_us: NOW_US,
-                // The default: the BILLABLE row, which is what an org with no
-                // pool, or a node with no metering, produces.
-                pool: StepPoolView::NotApplicable,
                 region: None,
             }
         }
@@ -2143,6 +1982,19 @@ mod tests {
         fn billed(events: &[UsageData]) -> Option<f64> {
             size_for(events, UsageEvent::SyntheticsBrowserSteps)
                 .or_else(|| size_for(events, UsageEvent::SyntheticsProtocolSteps))
+        }
+
+        /// The step rows, and only those — the rows the metering split buckets.
+        fn step_events(events: &[UsageData]) -> Vec<&UsageData> {
+            events
+                .iter()
+                .filter(|e| {
+                    matches!(
+                        e.event,
+                        UsageEvent::SyntheticsBrowserSteps | UsageEvent::SyntheticsProtocolSteps
+                    )
+                })
+                .collect()
         }
 
         fn defined(events: &[UsageData]) -> Option<f64> {
@@ -2241,7 +2093,6 @@ mod tests {
         fn the_clamp_can_be_disabled_at_runtime() {
             let flags = BillingFlags {
                 clamp_enabled: false,
-                ..LIVE
             };
             assert_eq!(
                 billed(&events_for_ack(flags, browser(14, 1, 0, 9_999))),
@@ -2313,15 +2164,7 @@ mod tests {
             // A ceiling from the edited definition would clamp this to 8.
             let events = events_for_ack(
                 LIVE,
-                inputs_from(
-                    &row,
-                    &req,
-                    0,
-                    Venue::Public,
-                    NOW_US,
-                    None,
-                    StepPoolView::NotApplicable,
-                ),
+                inputs_from(&row, &req, 0, Venue::Public, NOW_US, None),
             );
             assert_eq!(billed(&events), Some(14.0));
         }
@@ -2337,30 +2180,14 @@ mod tests {
             // retries = 1 ⇒ ceiling 8 × (1 + 1) = 16.
             let events = events_for_ack(
                 LIVE,
-                inputs_from(
-                    &row,
-                    &req,
-                    1,
-                    Venue::Public,
-                    NOW_US,
-                    None,
-                    StepPoolView::NotApplicable,
-                ),
+                inputs_from(&row, &req, 1, Venue::Public, NOW_US, None),
             );
             assert_eq!(billed(&events), Some(16.0));
 
             // retries = 0 ⇒ ceiling 8, and the same ack clamps.
             let events = events_for_ack(
                 LIVE,
-                inputs_from(
-                    &row,
-                    &req,
-                    0,
-                    Venue::Public,
-                    NOW_US,
-                    None,
-                    StepPoolView::NotApplicable,
-                ),
+                inputs_from(&row, &req, 0, Venue::Public, NOW_US, None),
             );
             assert_eq!(billed(&events), Some(8.0));
         }
@@ -2382,15 +2209,7 @@ mod tests {
             req.browser_ms = 42_137;
             req.error_source = "probe".to_string();
 
-            let i = inputs_from(
-                &row,
-                &req,
-                3,
-                Venue::Public,
-                NOW_US,
-                Some("eu-1".into()),
-                StepPoolView::NotApplicable,
-            );
+            let i = inputs_from(&row, &req, 3, Venue::Public, NOW_US, Some("eu-1".into()));
 
             // From the FROZEN row.
             assert_eq!(i.steps_configured, 14);
@@ -2419,15 +2238,7 @@ mod tests {
 
             let events = events_for_ack(
                 LIVE,
-                inputs_from(
-                    &row,
-                    &req,
-                    0,
-                    Venue::Public,
-                    NOW_US,
-                    None,
-                    StepPoolView::NotApplicable,
-                ),
+                inputs_from(&row, &req, 0, Venue::Public, NOW_US, None),
             );
             assert_eq!(billed(&events), Some(1.0));
         }
@@ -2570,7 +2381,7 @@ mod tests {
         }
 
         #[test]
-        fn t21_phase_one_emits_the_billable_variant_and_never_the_free_one() {
+        fn t21_an_ack_emits_the_step_row_the_defined_row_and_the_duration_row() {
             let events = events_for_ack(
                 LIVE,
                 BillingInputs {
@@ -2587,32 +2398,24 @@ mod tests {
                     "_SyntheticsBrowserMs".to_string(),
                 ]
             );
-            assert!(
-                !events.iter().any(|e| matches!(
-                    e.event,
-                    UsageEvent::SyntheticsFreeBrowserSteps
-                        | UsageEvent::SyntheticsFreeProtocolSteps
-                )),
-                "an unfunded pool must not emit a free step event"
-            );
         }
 
+        /// The metering split keys on `stream_name`, so the one step row must carry the check id.
         #[test]
-        fn exactly_one_billable_or_free_step_event_per_ack() {
-            let events = events_for_ack(LIVE, browser(14, 1, 0, 14));
-            let count = events
-                .iter()
-                .filter(|e| {
-                    matches!(
-                        e.event,
-                        UsageEvent::SyntheticsBrowserSteps
-                            | UsageEvent::SyntheticsProtocolSteps
-                            | UsageEvent::SyntheticsFreeBrowserSteps
-                            | UsageEvent::SyntheticsFreeProtocolSteps
-                    )
-                })
-                .count();
-            assert_eq!(count, 1);
+        fn ack_emits_one_neutral_step_event_with_the_check_id() {
+            for (i, expected) in [
+                (browser(14, 1, 0, 14), UsageEvent::SyntheticsBrowserSteps),
+                (protocol(0, 1), UsageEvent::SyntheticsProtocolSteps),
+            ] {
+                let synthetics_id = i.synthetics_id.to_string();
+
+                let events = events_for_ack(LIVE, i);
+                let steps = step_events(&events);
+
+                assert_eq!(steps.len(), 1, "exactly one step event per ack");
+                assert_eq!(steps[0].event, expected, "the event follows is_browser");
+                assert_eq!(steps[0].stream_name, synthetics_id);
+            }
         }
 
         #[test]
@@ -2654,7 +2457,7 @@ mod tests {
                     e.response_time, 0.0,
                     "response_time is averaged, not summed"
                 );
-                assert_eq!(e.num_records, 1, "sums to the ack count for the hour");
+                assert_eq!(e.num_records, 1, "sums to the acks in this row's bucket");
             }
             // And every number that must survive summation is in `size`.
             assert_eq!(billed(&events), Some(18.0));
@@ -2684,7 +2487,6 @@ mod tests {
                 assert_eq!(e.hour, 13);
                 assert_eq!(e.event_time_hour, "2026082513");
                 assert_eq!(e.stream_type, StreamType::Logs);
-                assert_eq!(e.stream_name, "");
                 assert_eq!(e.user_email, "", "a probe acked, not a user");
                 assert_eq!(e.dropped_records, 0);
                 assert!(!e.is_partial);
@@ -2692,6 +2494,18 @@ mod tests {
                 assert!(e.trace_id.is_none());
                 assert!(e.search_type.is_none());
                 assert!(e.dashboard_info.is_none());
+                let expected = match e.event {
+                    UsageEvent::SyntheticsBrowserSteps | UsageEvent::SyntheticsProtocolSteps => {
+                        "chk_1"
+                    }
+                    // Blank so these keep collapsing per org: `stream_name` is in `GroupKey`.
+                    _ => "",
+                };
+                assert_eq!(
+                    e.stream_name, expected,
+                    "{} carries the wrong stream_name",
+                    e.event
+                );
             }
             // `unit` mirrors `MeteringEventName::unit()` — never "MB".
             for e in &events {
@@ -2722,35 +2536,6 @@ mod tests {
                 assert_eq!(
                     (e.year, e.month, e.day, e.hour),
                     (first.year, first.month, first.day, first.hour)
-                );
-            }
-        }
-
-        /// The flag stops the emit ITSELF: the rollback for a mis-metering
-        /// incident is a config flip, which is a no-op unless it gates the WRITE.
-        #[test]
-        fn the_master_switch_off_emits_nothing() {
-            let off = BillingFlags { ..LIVE };
-            assert!(events_for_ack(off, browser(14, 1, 0, 14)).is_empty());
-            assert!(events_for_ack(off, protocol(0, 1)).is_empty());
-        }
-
-        /// `BILLING_ENABLED = false` with the emit code live is a supported
-        /// configuration: the path is REACHED, inert, and clamp-independent.
-        #[test]
-        fn both_flag_positions_are_supported_and_the_two_flags_are_independent() {
-            for clamp_enabled in [true, false] {
-                let off = BillingFlags { clamp_enabled };
-                assert!(
-                    events_for_ack(off, browser(14, 1, 0, 9_999)).is_empty(),
-                    "the master switch wins regardless of the clamp switch"
-                );
-                let on = BillingFlags { clamp_enabled };
-                let expected = if clamp_enabled { 14.0 } else { 9_999.0 };
-                assert_eq!(
-                    billed(&events_for_ack(on, browser(14, 1, 0, 9_999))),
-                    Some(expected),
-                    "the clamp switch decides only the clamp"
                 );
             }
         }
@@ -2872,67 +2657,26 @@ mod tests {
             );
         }
 
-        fn funded(i: BillingInputs<'static>) -> BillingInputs<'static> {
-            BillingInputs {
-                pool: StepPoolView::Funded,
-                ..i
-            }
-        }
-
-        /// Whichever free step event the ack emitted — the check type picks it.
-        fn free_billed(events: &[UsageData]) -> Option<f64> {
-            size_for(events, UsageEvent::SyntheticsFreeBrowserSteps)
-                .or_else(|| size_for(events, UsageEvent::SyntheticsFreeProtocolSteps))
-        }
-
-        /// MUST be exactly one whenever the ack bills at all.
-        fn step_rows(events: &[UsageData]) -> usize {
-            events
-                .iter()
-                .filter(|e| {
-                    matches!(
-                        e.event,
-                        UsageEvent::SyntheticsBrowserSteps
-                            | UsageEvent::SyntheticsProtocolSteps
-                            | UsageEvent::SyntheticsFreeBrowserSteps
-                            | UsageEvent::SyntheticsFreeProtocolSteps
-                    )
-                })
-                .count()
-        }
-
-        /// The enqueue reserves `configured x combos` and the ack reconciles
-        /// against `frozen_definition()`. Nothing records what the enqueue took,
-        /// so if these ever differed every ack would move a phantom difference.
+        /// A zero definition is a zero clamp ceiling, which bills real work as nothing.
         #[test]
-        fn the_reservation_and_the_reconcile_baseline_are_the_same_number() {
-            for configured in [1i32, 5, 14, 50] {
-                for combos in [None, Some(1u32), Some(2), Some(12)] {
-                    let i = BillingInputs {
-                        steps_configured: configured,
-                        combos,
-                        ..browser(configured, 1, 0, 0)
-                    };
-                    assert_eq!(
-                        enqueue_reservation(configured, combos),
-                        i.frozen_definition(),
-                        "configured={configured} combos={combos:?}",
-                    );
+        fn the_frozen_definition_is_never_zero() {
+            let definition = |configured: i32, combos: Option<u32>| {
+                BillingInputs {
+                    steps_configured: configured,
+                    combos,
+                    ..browser(configured, 1, 0, 0)
                 }
-            }
+                .frozen_definition()
+            };
+            assert_eq!(definition(14, Some(2)), 28);
+            assert_eq!(definition(0, Some(2)), 2, "configured floors to 1");
+            assert_eq!(definition(-7, None), 1, "a negative floors to 1");
+            assert_eq!(definition(14, Some(0)), 14, "combos floor to 1");
+            assert_eq!(definition(1, None), 1, "a protocol check");
         }
 
         #[test]
-        fn a_reservation_is_never_zero() {
-            assert_eq!(enqueue_reservation(14, Some(2)), 28);
-            assert_eq!(enqueue_reservation(0, Some(2)), 2, "configured floors to 1");
-            assert_eq!(enqueue_reservation(-7, None), 1, "a negative floors to 1");
-            assert_eq!(enqueue_reservation(14, Some(0)), 14, "combos floor to 1");
-            assert_eq!(enqueue_reservation(1, None), 1, "a protocol check");
-        }
-
-        #[test]
-        fn the_reservation_ignores_the_retry_multiplier() {
+        fn the_frozen_definition_ignores_the_retry_multiplier() {
             let no_retry = BillingInputs {
                 retries: 0,
                 ..browser(14, 2, 0, 28)
@@ -2945,288 +2689,8 @@ mod tests {
             assert_eq!(
                 three_attempts.frozen_definition(),
                 28,
-                "the reservation must not scale with retries — the clamp ceiling does, \
+                "the definition must not scale with retries — the clamp ceiling does, \
                  and they are different numbers",
-            );
-        }
-
-        #[test]
-        fn reconcile_refunds_tops_up_and_stays_silent_when_they_match() {
-            assert_eq!(
-                reconcile(14, 4),
-                Some(PoolMovement {
-                    direction: StepPoolDirection::Refund,
-                    steps: 10
-                }),
-            );
-            assert_eq!(
-                reconcile(14, 18),
-                Some(PoolMovement {
-                    direction: StepPoolDirection::TopUp,
-                    steps: 4
-                }),
-            );
-            assert_eq!(reconcile(14, 14), None, "the common case moves nothing");
-            assert_eq!(reconcile(0, 0), None);
-        }
-
-        #[test]
-        fn t25_an_ack_billing_4_of_a_14_step_reservation_refunds_10() {
-            let i = funded(browser(14, 1, 0, 4));
-            assert_eq!(
-                pool_adjustment_for_ack(LIVE, &i),
-                Some(PoolMovement {
-                    direction: StepPoolDirection::Refund,
-                    steps: 10
-                }),
-            );
-            // …and the row it emits is the FREE one, for the executed count.
-            let events = events_for_ack(LIVE, funded(browser(14, 1, 0, 4)));
-            assert_eq!(free_billed(&events), Some(4.0));
-            assert_eq!(billed(&events), None);
-        }
-
-        #[test]
-        fn t26_an_ack_billing_18_of_a_14_step_reservation_tops_up_4() {
-            let i = funded(browser(14, 1, 1, 18));
-            assert_eq!(
-                pool_adjustment_for_ack(LIVE, &i),
-                Some(PoolMovement {
-                    direction: StepPoolDirection::TopUp,
-                    steps: 4
-                }),
-            );
-            let events = events_for_ack(LIVE, funded(browser(14, 1, 1, 18)));
-            assert_eq!(free_billed(&events), Some(18.0));
-        }
-
-        /// The clean completion — the common ack — moves nothing. A zero-valued
-        /// adjustment would burn an idempotency key and a flush record.
-        #[test]
-        fn a_clean_ack_moves_the_pool_by_nothing() {
-            assert_eq!(
-                pool_adjustment_for_ack(LIVE, &funded(browser(14, 2, 0, 28))),
-                None
-            );
-        }
-
-        /// Exactly one of the two step events, ever: both rows would make the
-        /// free and billable series double-count the same steps.
-        #[test]
-        fn exactly_one_step_row_per_billing_ack() {
-            for pool in [
-                StepPoolView::Funded,
-                StepPoolView::Spent,
-                StepPoolView::NotApplicable,
-            ] {
-                let events = events_for_ack(
-                    LIVE,
-                    BillingInputs {
-                        pool,
-                        ..browser(14, 1, 0, 14)
-                    },
-                );
-                assert_eq!(step_rows(&events), 1, "pool={pool:?}");
-            }
-        }
-
-        #[test]
-        fn a_funded_ack_emits_free_steps_and_never_the_billable_row() {
-            let events = events_for_ack(LIVE, funded(browser(14, 2, 0, 28)));
-            assert_eq!(free_billed(&events), Some(28.0));
-            assert_eq!(billed(&events), None);
-            // The defined row rides along with a FREE ack too.
-            assert_eq!(defined(&events), Some(28.0));
-        }
-
-        #[test]
-        fn t31_a_spent_pool_emits_the_billable_row() {
-            let spent = BillingInputs {
-                pool: StepPoolView::Spent,
-                ..browser(14, 1, 0, 14)
-            };
-            let events = events_for_ack(LIVE, spent);
-            assert_eq!(billed(&events), Some(14.0));
-            assert_eq!(free_billed(&events), None);
-        }
-
-        /// An exhausted org reserved nothing at enqueue, so its ack has nothing
-        /// to reconcile — refunding would hand it grant it never took.
-        #[test]
-        fn t31_a_spent_pool_is_never_moved_by_an_ack() {
-            for executed in [1u32, 4, 14, 18] {
-                let spent = BillingInputs {
-                    pool: StepPoolView::Spent,
-                    ..browser(14, 1, 1, executed)
-                };
-                assert_eq!(pool_adjustment_for_ack(LIVE, &spent), None, "{executed}");
-            }
-        }
-
-        /// A contract org is never pool-gated, so its acks are `NotApplicable`:
-        /// BILLABLE row, which the true-up needs, and no grant movement.
-        #[test]
-        fn t36_a_contract_org_bills_and_never_moves_the_pool() {
-            let contract = BillingInputs {
-                pool: StepPoolView::NotApplicable,
-                ..browser(14, 1, 0, 4)
-            };
-            let events = events_for_ack(
-                LIVE,
-                BillingInputs {
-                    pool: StepPoolView::NotApplicable,
-                    ..browser(14, 1, 0, 4)
-                },
-            );
-            assert_eq!(billed(&events), Some(4.0), "§7.4 needs the billable event");
-            assert_eq!(free_billed(&events), None);
-            assert_eq!(pool_adjustment_for_ack(LIVE, &contract), None);
-        }
-
-        /// The default is the billable row: a build that forgets to resolve the
-        /// pool must under-consume the grant, never over-consume it.
-        #[test]
-        fn the_default_pool_view_bills() {
-            assert_eq!(StepPoolView::default(), StepPoolView::NotApplicable);
-        }
-
-        /// The job never ran: it emits nothing AND the WHOLE reservation goes
-        /// back. A reservation held against it is reconciled by nothing else.
-        #[test]
-        fn t16_a_queue_errored_ack_refunds_the_whole_reservation() {
-            let queued = BillingInputs {
-                error_source: "queue",
-                ..funded(browser(14, 2, 0, 0))
-            };
-            assert!(
-                events_for_ack(
-                    LIVE,
-                    BillingInputs {
-                        error_source: "queue",
-                        ..funded(browser(14, 2, 0, 0))
-                    },
-                )
-                .is_empty()
-            );
-            assert_eq!(
-                pool_adjustment_for_ack(LIVE, &queued),
-                Some(PoolMovement {
-                    direction: StepPoolDirection::Refund,
-                    steps: 28
-                }),
-                "configured 14 x 2 combos, all of it",
-            );
-        }
-
-        /// A queue-errored ack must NOT take the zero fallback: that turns
-        /// `steps_executed = 0` into "bill the whole definition", which here
-        /// produces a zero adjustment and quietly keeps the reservation.
-        #[test]
-        fn a_queue_errored_ack_does_not_take_the_zero_fallback_path() {
-            let queued = BillingInputs {
-                error_source: "queue",
-                steps_executed: 0,
-                ..funded(browser(14, 1, 0, 0))
-            };
-            let adjustment = pool_adjustment_for_ack(LIVE, &queued);
-            assert_eq!(
-                adjustment,
-                Some(PoolMovement {
-                    direction: StepPoolDirection::Refund,
-                    steps: 14
-                }),
-            );
-        }
-
-        /// No gate, no deduct, no bill — so nothing may be given back either.
-        #[test]
-        fn t17_a_private_venue_never_moves_the_pool() {
-            for venue in [Venue::Private, Venue::Unresolved] {
-                let i = BillingInputs {
-                    venue,
-                    ..funded(browser(14, 1, 0, 4))
-                };
-                assert!(
-                    events_for_ack(
-                        LIVE,
-                        BillingInputs {
-                            venue,
-                            ..funded(browser(14, 1, 0, 4))
-                        }
-                    )
-                    .is_empty()
-                );
-                assert_eq!(pool_adjustment_for_ack(LIVE, &i), None, "{venue:?}");
-            }
-        }
-
-        /// The master switch gates the reconcile as well as the emit: a rollback
-        /// that stopped the rows but kept draining grants would be half a one.
-        #[test]
-        fn the_master_switch_off_moves_no_pool_at_all() {
-            const DARK: BillingFlags = BillingFlags {
-                clamp_enabled: true,
-            };
-            let i = funded(browser(14, 1, 0, 4));
-            assert!(events_for_ack(DARK, funded(browser(14, 1, 0, 4))).is_empty());
-            assert_eq!(pool_adjustment_for_ack(DARK, &i), None);
-        }
-
-        /// The one way out of `ack` that skips the emit also skips the reconcile.
-        #[test]
-        fn a_stale_lease_response_carries_no_pool_adjustment() {
-            let resp = stale_lease_response(
-                "2MNfNTxePfZ1pnY5gKVLkwsVRXv".to_string(),
-                "scheduled".to_string(),
-                leased_row(),
-            );
-            assert!(resp.pool_adjustment.is_none());
-        }
-
-        /// All four fields, and each one alone changes the key: a key missing one
-        /// would collapse two different adjustments and silently drop the second.
-        #[test]
-        fn the_idempotency_key_covers_all_four_fields() {
-            let base = adjustment_key("chk_1", "us-east-1", 1_787_665_631_000_000, "job-a");
-            assert_ne!(
-                base,
-                adjustment_key("chk_2", "us-east-1", 1_787_665_631_000_000, "job-a"),
-            );
-            assert_ne!(
-                base,
-                adjustment_key("chk_1", "eu-west-1", 1_787_665_631_000_000, "job-a"),
-            );
-            assert_ne!(
-                base,
-                adjustment_key("chk_1", "us-east-1", 1_787_665_631_000_001, "job-a"),
-            );
-            assert_ne!(
-                base,
-                adjustment_key("chk_1", "us-east-1", 1_787_665_631_000_000, "job-b"),
-            );
-            // …and the same tuple is the same key: idempotent, not merely unique.
-            assert_eq!(
-                base,
-                adjustment_key("chk_1", "us-east-1", 1_787_665_631_000_000, "job-a"),
-            );
-        }
-
-        /// A location name is operator-chosen, so a separator it could CONTAIN
-        /// would let two different tuples produce one key — and a collision
-        /// silently DROPS the second adjustment. Both pairs below are
-        /// byte-identical under a printable separator (`|`, `/`), and differ only
-        /// because the real one is a control character no name or KSUID holds.
-        #[test]
-        fn the_idempotency_key_cannot_be_forged_from_a_location_name() {
-            // "x|y|1|2|j" both ways, under a `|` separator.
-            assert_ne!(
-                adjustment_key("x", "y|1", 2, "j"),
-                adjustment_key("x", "y", 1, "2|j"),
-            );
-            // "x/y/1/2/j" both ways, under a `/` separator.
-            assert_ne!(
-                adjustment_key("x", "y/1", 2, "j"),
-                adjustment_key("x", "y", 1, "2/j"),
             );
         }
 
