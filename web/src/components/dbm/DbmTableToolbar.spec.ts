@@ -54,7 +54,7 @@ describe("DbmTableToolbar", () => {
       ]),
     );
     expect(wrapper.get('[data-test="dbm-samples-search"]').element.parentElement?.className).toBe(
-      "w-64 shrink-0",
+      "w-64 shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink",
     );
   });
 

@@ -26,7 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 <template>
   <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
-    <div class="w-64 shrink-0">
+    <!-- < md the fixed 16rem box pushed the trailing controls under the page edge. -->
+    <div class="w-64 shrink-0 max-md:w-auto max-md:min-w-0 max-md:flex-1 max-md:shrink">
       <OSearchInput
         :model-value="search"
         :placeholder="placeholder"

@@ -31,10 +31,41 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   #tabs slot — it receives { tabs, filter } so you can render/filter yourself.
 -->
 <template>
-  <!-- < md: the data-source rail moves into a left drawer behind a toggle bar
-       (same pattern as OPageLayout's mobile sidebar). -->
-  <div v-if="isMobile" class="flex h-full min-h-0 flex-col">
-    <div class="border-border-default flex shrink-0 items-center border-b px-2 py-1">
+  <!-- < lg: the data-source rail moves into a left drawer behind a toggle bar
+       (same pattern as OPageLayout's mobile sidebar); beside a second rail it
+       left the tablet content column under 6rem. -->
+  <div v-if="compact" class="flex h-full min-h-0 flex-col">
+    <!-- strip mode: a short rail (Logs/Metrics/Traces) reads better as one tab
+         row than as a second drawer trigger stacked under its parent's. -->
+    <div
+      v-if="compactMode === 'strip'"
+      class="border-border-default shrink-0 border-b px-2"
+      :data-test="panelDataTest || undefined"
+    >
+      <OTabs
+        :model-value="modelValue"
+        dense
+        :class="tabsClass"
+        @update:model-value="(v) => emit('update:modelValue', v)"
+      >
+        <slot name="tabs" :tabs="filteredTabs" :filter="filter">
+          <ORouteTab
+            v-for="(tab, index) in filteredTabs"
+            :key="tab.name"
+            :title="tab.title || tab.name"
+            :default="index === 0"
+            :name="tab.name"
+            :to="tab.to"
+            :icon="tab.icon"
+            :label="tab.label"
+            :data-test="
+              tab.dataTest || (tabDataTestPrefix ? tabDataTestPrefix + tab.name : undefined)
+            "
+          />
+        </slot>
+      </OTabs>
+    </div>
+    <div v-else class="border-border-default flex shrink-0 items-center border-b px-2 py-1">
       <OButton
         variant="ghost"
         size="sm"
@@ -42,13 +73,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         @click="mobileSidebarOpen = true"
       >
         <template #icon-left><OIcon name="menu" size="sm" /></template>
-        {{ t("common.sidePanel") }}
+        {{ triggerLabel }}
       </OButton>
     </div>
     <div class="min-h-0 flex-1 overflow-hidden">
       <slot />
     </div>
     <ODrawer
+      v-if="compactMode !== 'strip'"
       v-model:open="mobileSidebarOpen"
       side="left"
       size="sm"
@@ -193,6 +225,8 @@ const props = withDefaults(
     panelDataTest?: string;
     /** Prefix to derive each tab's data-test as `${prefix}${tab.name}` (when tab.dataTest is unset). */
     tabDataTestPrefix?: string;
+    /** < lg: "drawer" hides the rail behind a trigger; "strip" renders it as a horizontal tab row. */
+    compactMode?: "drawer" | "strip";
   }>(),
   {
     modelValue: "",
@@ -204,6 +238,7 @@ const props = withDefaults(
     tabsClass: "",
     panelDataTest: "",
     tabDataTestPrefix: "",
+    compactMode: "drawer",
   },
 );
 
@@ -224,9 +259,15 @@ watch(
 
 const filter = ref("");
 
-// < md the rail is a drawer (see template).
-const { isMobile } = useBreakpoint();
+// < lg the rail is a drawer (see template).
+const { lgUp } = useBreakpoint();
+const compact = computed(() => !lgUp.value);
 const mobileSidebarOpen = ref(false);
+// Nested layouts (signal rail + tool rail) each show a trigger; the active tab's label tells them apart.
+const triggerLabel = computed(() => {
+  const active = props.tabs.find((tab) => tab.name === props.modelValue);
+  return active ? active.label : t("common.sidePanel");
+});
 const filteredTabs = computed(() => {
   if (!props.searchable || !filter.value) {
     return props.tabs;
