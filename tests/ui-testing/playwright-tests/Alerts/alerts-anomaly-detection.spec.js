@@ -17,7 +17,7 @@
 const { test, expect, navigateToBase } = require('../utils/enhanced-baseFixtures.js');
 const testLogger = require('../utils/test-logger.js');
 const PageManager = require('../../pages/page-manager.js');
-const { listAnomalyDetections, triggerAnomalyDetection, getAnomalyHistory, deleteDestination, deleteTemplate, createMockDestination, destinationExists, seedAnomalyStream, waitForStream,
+const { listAnomalyDetections, triggerAnomalyDetection, getAnomalyHistory, deleteDestination, deleteTemplate, createMockDestination, destinationExists, searchSql, seedAnomalyStream, waitForStream,
   triggerAnomalyTraining, waitForAnomalyTrained } = require('../utils/api-helper.js');
 
 test.describe('Anomaly Detection', () => {
@@ -697,6 +697,53 @@ test.describe('Anomaly Detection', () => {
       await expect(pm.anomalyDetectionPage.getDetectionChartsLocator()).toBeVisible();
       for (const key of ['metric', 'score', 'deviation']) {
         await expect(pm.anomalyDetectionPage.getChartPanelLocator(key)).toBeVisible();
+      }
+
+      // The flagged overlay must sit exactly ON the metric it marks. The
+      // renderer colours a series, not a segment, so the flagged buckets are a
+      // second null-gapped line — and taking max(actual_value) over the flagged
+      // ROWS instead of the bucket reads a different row wherever a bucket holds
+      // both a flagged and an unflagged point, drawing the overlay BELOW the
+      // metric. The SQL shape is unit-tested; this checks the values it returns.
+      const chartRows = await searchSql(
+        page,
+        `SELECT histogram(_timestamp, '5m') AS zo_sql_key, ` +
+          `max(actual_value) AS zo_sql_num, ` +
+          `CASE WHEN max(CASE WHEN is_anomaly THEN 1 ELSE 0 END) = 1 ` +
+          `THEN max(actual_value) END AS anomaly_value ` +
+          `FROM "_anomalies" WHERE anomaly_id = '${id}' ` +
+          `GROUP BY zo_sql_key ORDER BY zo_sql_key`,
+      );
+      const flagged = chartRows.filter((r) => r.anomaly_value !== null && r.anomaly_value !== undefined);
+      expect(flagged.length, 'the charted series must flag at least one bucket').toBeGreaterThan(0);
+      for (const row of flagged) {
+        expect(
+          row.anomaly_value,
+          `overlay ${row.anomaly_value} must equal the metric ${row.zo_sql_num} at ${row.zo_sql_key}`,
+        ).toBe(row.zo_sql_num);
+      }
+      expect(Math.max(...flagged.map((r) => r.anomaly_value))).toBe(120);
+
+      // Delivery. The notification is sent inline by the detection run, so a
+      // regression that stops it would otherwise pass every assertion above.
+      // Where the webhook points back at this instance's own ingest endpoint
+      // the alert becomes a queryable receipt; that only works where loopback
+      // is allowlisted (ZO_SSRF_ALLOW_LOOPBACK), so an external webhook is
+      // simply not readable and the check is skipped rather than faked.
+      const webhook = process.env.MOCK_WEBHOOK_URL || '';
+      const receiptStream = webhook.match(/\/api\/[^/]+\/([^/]+)\/_json/)?.[1];
+      if (/localhost|127\.0\.0\.1/.test(webhook) && receiptStream) {
+        await expect
+          .poll(
+            async () =>
+              (await searchSql(page, `SELECT * FROM "${receiptStream}"`, 3600)).filter((r) =>
+                JSON.stringify(r).includes(firingName),
+              ).length,
+            { timeout: 60000, message: `no webhook receipt for ${firingName} in ${receiptStream}` },
+          )
+          .toBeGreaterThan(0);
+      } else {
+        testLogger.info('Skipping delivery receipt — webhook is not a loopback ingest URL', { webhook });
       }
     });
   });

@@ -94,6 +94,22 @@ async function createMockDestination(page, name, template = 'Slack') {
  * @param {import('@playwright/test').Page} page
  * @param {string} name
  */
+/**
+ * Run a SQL search and return the hits.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} sql
+ * @param {number} sinceSeconds how far back to search
+ */
+async function searchSql(page, sql, sinceSeconds = 259200) {
+  const org = getOrgName();
+  const end = Date.now() * 1000;
+  const start = end - sinceSeconds * 1_000_000;
+  const res = await apiCall(page, 'POST', `/api/${org}/_search?type=logs`, {
+    query: { sql, start_time: start, end_time: end, size: 1000 },
+  });
+  return res.data?.hits || [];
+}
+
 /** True when a destination with this name exists. */
 async function destinationExists(page, name) {
   const org = getOrgName();
@@ -264,6 +280,7 @@ module.exports = {
   deleteDestination,
   deleteTemplate,
   destinationExists,
+  searchSql,
   seedAnomalyStream,
   waitForStream,
   triggerAnomalyTraining,
