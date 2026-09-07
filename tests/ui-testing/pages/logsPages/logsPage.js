@@ -10250,7 +10250,7 @@ export class LogsPage {
     async selectChartType(chartId) {
         // The Build and Visualize tabs each mount a PanelEditor, so the chart list is in
         // the DOM twice; the cached one is zero-size and .first() would resolve to it.
-        const chartItem = this.page.locator(this.chartTypeItem(chartId)).locator('visible=true').first();
+        const chartItem = this.page.locator(`${this.chartTypeItem(chartId)}:visible`).first();
 
         await chartItem.waitFor({ state: 'visible', timeout: 15000 });
         await chartItem.scrollIntoViewIfNeeded();
@@ -10264,7 +10264,7 @@ export class LogsPage {
      * @param {string} chartId - The chart type ID
      */
     async expectChartTypeVisible(chartId) {
-        const chartItem = this.page.locator(this.chartTypeItem(chartId)).locator('visible=true').first();
+        const chartItem = this.page.locator(`${this.chartTypeItem(chartId)}:visible`).first();
         await expect(chartItem).toBeVisible({ timeout: 15000 });
         testLogger.info(`Chart type "${chartId}" is visible`);
     }
