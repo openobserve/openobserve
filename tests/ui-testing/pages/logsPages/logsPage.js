@@ -2047,6 +2047,20 @@ export class LogsPage {
         return await element.click();
     }
 
+    /**
+     * Assert the "view applied successfully" notification is shown.
+     * The apply flow is async and settles after ~1s; this waits for the toast.
+     * @param {string} viewName - The applied saved view name (used for logging only)
+     */
+    async expectApplySuccessNotification(viewName = '') {
+        const notification = this.page
+            .locator(this.notificationMessage)
+            .filter({ hasText: 'view applied successfully.' })
+            .first();
+        await expect(notification).toBeVisible({ timeout: 20000 });
+        testLogger.info(`Saved view${viewName ? ` "${viewName}"` : ''} applied successfully`);
+    }
+
     async clickDeleteButton() {
         return await this.page.getByText('delete').click();
     }
@@ -6371,6 +6385,18 @@ export class LogsPage {
     }
 
     /**
+     * Expect the Custom SQL query type button to be selected (has "selected" class).
+     * Used to assert that a saved view restored the builder to Custom mode
+     * (stronger than expectCustomModeActive, which only checks visibility).
+     */
+    async expectCustomModeSelected(timeout = 15000) {
+        const customTypeBtn = this.page.locator(this.customQueryType);
+        await expect(customTypeBtn).toBeVisible({ timeout });
+        await expect(customTypeBtn).toHaveClass(/selected/, { timeout });
+        testLogger.info('Custom SQL mode is selected');
+    }
+
+    /**
      * Click Builder/Auto query type toggle
      */
     async clickBuilderQueryType() {
@@ -6605,6 +6631,31 @@ export class LogsPage {
         await this.page.locator(this.fieldListSearchInput).clear();
         await this.page.waitForTimeout(300);
         testLogger.info('Cleared field search');
+    }
+
+    /**
+     * Add a field to the X-axis in the Build tab builder.
+     * Searches the field list for the field, then clicks its "add to X" button.
+     * @param {string} fieldName - The field name to add (e.g., 'log')
+     */
+    async addFieldToXAxis(fieldName) {
+        // Search the builder field list so the matching field row is revealed
+        await this.searchFieldInBuilder(fieldName);
+
+        // Field rows use data-test="field-list-item-{streamType}-{streamName}-{fieldName}"
+        const fieldItems = this.page.locator(
+            `[data-test^="field-list-item-"][data-test$="-${fieldName}"]`
+        );
+        await fieldItems.first().waitFor({ state: 'visible', timeout: 10000 });
+
+        // Click the "add to X axis" button inside the matched field row
+        const addXButton = fieldItems.first().locator(this.addToXAxis);
+        await addXButton.waitFor({ state: 'visible', timeout: 10000 });
+        await addXButton.click();
+
+        // Clear the search so the full field list is restored for any further action
+        await this.clearFieldSearch();
+        testLogger.info(`Added field "${fieldName}" to X axis`);
     }
 
     /**

@@ -1,0 +1,32 @@
+diff --git a/web/src/plugins/logs/BuildQueryPage.vue b/web/src/plugins/logs/BuildQueryPage.vue
+index 7c1d7d83648..fe41a6f5a46 100644
+--- a/web/src/plugins/logs/BuildQueryPage.vue
++++ b/web/src/plugins/logs/BuildQueryPage.vue
+@@ -49,6 +49,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ import {
+   ref,
+   onMounted,
++  watch,
+   defineAsyncComponent,
+   provide,
+   defineExpose,
+@@ -501,6 +502,19 @@ const addPanelToDashboard = () => {
+ // Watchers
+ // ============================================================================
+ 
++// Applying a saved view while already on the build tab does not remount this
++// component, so onMounted never re-reads savedBuildConfig. Re-initialize here so
++// the applied view is reflected. initializeFromQuery consumes and nulls it, so a
++// fresh non-null value always signals a newly applied saved view.
++watch(
++  () => searchObj.meta.savedBuildConfig,
++  (config) => {
++    if (config) {
++      initializeFromQuery();
++    }
++  },
++);
++
+ // NOTE: URL sync for build mode fields is handled by explicit actions (runQuery, apply)
+ // rather than a deep watcher. A deep watcher here would call router.push on every
+ // field/filter mutation, which causes Quasar q-menu popups to auto-close

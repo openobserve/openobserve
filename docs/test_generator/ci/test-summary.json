@@ -1,0 +1,7 @@
+[
+  { "title": "Applying a build-tab saved view restores builder state (onMounted path)", "action": "new", "verifies": "a view saved on the Build tab (line chart + X-axis field) restores that exact state when applied from the Logs tab" },
+  { "title": "Applying a saved view while already on the Build tab re-initializes the builder (watcher path)", "action": "new", "verifies": "applying different views while the Build tab is already mounted swaps the builder to each view's chart type in place (no remount)" },
+  { "title": "Custom-query saved view restores to Custom mode + table chart", "action": "new", "verifies": "a view saved in Custom query mode restores to Custom mode with a table chart rather than a re-parsed builder query" },
+  { "title": "View saved without buildData (Logs-tab save) applies without breaking Build tab", "action": "new", "verifies": "a view saved from the Logs tab (no buildData) applies cleanly and the Build tab re-derives defaults without error" },
+  { "title": "One-shot semantics: toggling away and back re-derives instead of re-restoring", "action": "new", "verifies": "savedBuildConfig is consumed once; a Logs→Build round-trip after apply re-derives the chart type instead of re-applying the saved view" }
+]

@@ -1,0 +1,16 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Logs/savedView.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Logs/logsQueryBuilder.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/monaco-query-prefill.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logsqueries.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logspage.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/region.spec.js",
+    "tests/ui-testing/playwright-tests/RegressionSet/logs-regression.spec.js",
+    "tests/ui-testing/playwright-tests/Streams/multiselect-stream.spec.js"
+  ],
+  "needs_registration": true,
+  "registration_note": "Add 'savedView.spec.js' to the 'Logs-Core' shard run_files list in .github/workflows/playwright.yml (matrix entry at line ~138). Playwright auto-discovers *.spec.js under testDir, but the CI matrix run_files list is explicit.",
+  "rationale": "No existing spec covers the saved-view-apply-on-build-tab flow. logsQueryBuilder.spec.js covers Build-tab open/chart auto-selection/query-mode but never saves+applies a view. The saved-view specs (monaco-query-prefill, logsqueries, logspage, region, RegressionSet, multiselect-stream) only exercise save/apply against the LOGS query editor, never the Build-tab builder-state restore. The diff adds a watch() to re-initialize BuildQueryPage when a saved view is applied while already on the Build tab — no existing test exercises either the onMounted restore path or the new watcher path. A new spec is required; the run-context spec_path matches the conventional Logs area folder and 'Logs-Core' shard."
+}

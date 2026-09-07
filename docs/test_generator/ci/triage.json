@@ -1,0 +1,25 @@
+{
+  "feature_slug": "saved-view-apply",
+  "feature_title": "Logs Saved View Apply on Build Tab",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "savedView.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/savedView.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/BuildQueryPage.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "The only changed path is web/src/plugins/logs/BuildQueryPage.vue, which lives in the open-source web source tree, not under any enterprise directory (enterprise/, o2_enterprise/, src/enterprise/). No enterprise-gated keywords (cipher/SSO/SAML/RBAC/SDR) appear in the path or the changed symbols, so this is an OSS change.",
+    "skip": "Not skipping: the change alters a user-facing UI flow (applying a saved view while on the build tab now re-initializes the query builder), and there is no explicit opt-out marker — no tests-added label was passed and trigger_comment.txt is empty.",
+    "e2e": "E2E is warranted because the diff adds a watcher that re-initializes the logs query builder when a saved view is applied without remounting the component. This is user-exercisable behavior — applying a saved view on the build tab should reflect the saved build config — that a Playwright test should verify.",
+    "area": "Area is Logs: the changed file lives under web/src/plugins/logs/, and the saved-view concept is a Logs feature. Sibling Playwright specs for logs live under tests/ui-testing/playwright-tests/Logs/.",
+    "group": "Logs-Core is the closest existing matrix shard: it maps to the Logs folder and already carries general logs UI specs (logspage.spec.js, shareLink.spec.js, logstable.spec.js). Saved-view application is a general Logs feature, so the new spec should join this shard; the Engineer may move it to Logs-Queries if it ends up being query-builder-only.",
+    "existing_tests": "No E2E specs in the diff. The diff only touches web/src/plugins/logs/BuildQueryPage.vue (a Vue component), with no files under tests/ui-testing/playwright-tests/, so there is no existing Playwright coverage to enhance — this flag stays false and a new spec is authored."
+  }
+}

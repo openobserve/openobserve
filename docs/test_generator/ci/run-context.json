@@ -1,0 +1,17 @@
+{
+  "feature_slug": "saved-view-apply",
+  "feature_title": "Logs Saved View Apply on Build Tab",
+  "area": "Logs",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "savedView.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Logs/savedView.spec.js",
+  "playwright_group": "Logs-Core",
+  "source_files": [
+    "web/src/plugins/logs/BuildQueryPage.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}
