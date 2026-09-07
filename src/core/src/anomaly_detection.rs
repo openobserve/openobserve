@@ -1263,7 +1263,7 @@ pub async fn detect_anomalies(org_id: &str, anomaly_id: &str) -> Result<serde_js
         }
 
         // Send alert if anomalies found and alert is configured
-        if result.anomaly_count > 0 && config.alert_enabled {
+        if dispatch_allowed(result.anomaly_count, config.alert_enabled) {
             let destinations: Vec<String> = config
                 .alert_destinations
                 .as_ref()
@@ -1448,13 +1448,25 @@ fn validation_error(e: anyhow::Error) -> anyhow::Error {
     anyhow::anyhow!("validation error: {e}")
 }
 
+/// P0.6 TDD stub — implementation surface, not behaviour. The guard every manual training
+/// entry point must call before delegating to the enterprise `trigger_training`, which has
+/// no `enabled` check of its own. Only `enabled` gates training: `alert_enabled` gates
+/// dispatch and `status` (including the dead `Disabled`) gates nothing here.
+// Unused until the implementation phase calls it from train_model and force_retrain_for_threshold.
+#[allow(dead_code)]
+fn ensure_trainable(_config: &infra::table::entity::anomaly_detection_config::Model) -> Result<()> {
+    unimplemented!("P0.6: manual-training enabled guard not implemented yet")
+}
+
+/// The one place `alert_enabled` is allowed to decide anything: dispatch, never training.
+fn dispatch_allowed(anomaly_count: i32, alert_enabled: bool) -> bool {
+    anomaly_count > 0 && alert_enabled
+}
+
 /// P0.4 TDD stub — implementation surface, not behaviour. The pure interval rule both
 /// create and update must share; today create inlines it and update has no check at all.
 fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> Result<()> {
-    let _ = (
-        parse_interval(schedule_interval),
-        parse_interval(histogram_interval),
-    );
+    let _ = (schedule_interval, histogram_interval);
     unimplemented!("P0.4: pure interval-pair rule not implemented yet")
 }
 
@@ -2807,6 +2819,148 @@ mod tests {
                 ..Default::default()
             };
             assert!(validated_intervals(&repaired, &broken).is_ok());
+        }
+    }
+
+    // ── P0.6: `enabled` gates training on EVERY entry point, not just the SELECT ──
+
+    mod training_flag_hygiene {
+        use super::*;
+
+        /// An enabled, never-trained config: the row every manual entry point starts from.
+        fn trainable_config() -> infra::table::entity::anomaly_detection_config::Model {
+            infra::table::entity::anomaly_detection_config::Model {
+                anomaly_id: "a1".to_string(),
+                org_id: "default".to_string(),
+                stream_name: "logs".to_string(),
+                stream_type: "logs".to_string(),
+                enabled: true,
+                name: "test".to_string(),
+                description: None,
+                query_mode: "filters".to_string(),
+                filters: Some(serde_json::json!([])),
+                custom_sql: None,
+                detection_function: "count(*)".to_string(),
+                histogram_interval: "5m".to_string(),
+                schedule_interval: "1h".to_string(),
+                detection_window_seconds: 3600,
+                training_window_days: 7,
+                retrain_interval_days: 7,
+                threshold: 97,
+                seasonality: "none".to_string(),
+                is_trained: false,
+                training_started_at: None,
+                training_completed_at: None,
+                last_error: None,
+                last_processed_timestamp: None,
+                current_model_version: 0,
+                rcf_num_trees: 50,
+                rcf_tree_size: 256,
+                rcf_shingle_size: 8,
+                alert_enabled: true,
+                alert_destinations: None,
+                folder_id: "f1".to_string(),
+                owner: None,
+                priority: None,
+                tags: None,
+                status: 0,
+                retries: 0,
+                last_failed_at: None,
+                last_alert_fired_at: None,
+                last_updated: 0,
+                created_at: 1000,
+                updated_at: 1000,
+            }
+        }
+
+        /// The gap this task closes: the automatic SELECT filters `Enabled.eq(true)` but the
+        /// manual path does not, so a disabled config can still be retrained by hand.
+        #[test]
+        fn a_disabled_config_is_refused_by_the_manual_training_guard() {
+            let mut disabled = trainable_config();
+            disabled.enabled = false;
+            assert!(ensure_trainable(&disabled).is_err());
+        }
+
+        /// The guard must not become a second obstacle for the normal path.
+        #[test]
+        fn an_enabled_config_is_accepted() {
+            assert!(ensure_trainable(&trainable_config()).is_ok());
+        }
+
+        /// The exact conflation this task exists to prevent: an implementation that reads
+        /// `alert_enabled` where `enabled` was meant passes every other test but fails here.
+        #[test]
+        fn the_guard_reads_enabled_and_never_alert_enabled() {
+            let mut alerts_off = trainable_config();
+            alerts_off.alert_enabled = false;
+            assert!(
+                ensure_trainable(&alerts_off).is_ok(),
+                "alert_enabled gates dispatch, never training"
+            );
+
+            let mut disabled_but_alerting = trainable_config();
+            disabled_but_alerting.enabled = false;
+            disabled_but_alerting.alert_enabled = true;
+            assert!(ensure_trainable(&disabled_but_alerting).is_err());
+        }
+
+        /// Pinned policy: `default/test` sat at 44,572 retries with `alert_enabled=false`.
+        /// Turning alerts off is not a training kill switch and must not become one.
+        #[test]
+        fn alert_enabled_false_does_not_stop_a_failing_config_from_retraining() {
+            let mut burning = trainable_config();
+            burning.alert_enabled = false;
+            burning.retries = 44_572;
+            burning.last_failed_at = Some(1_700_000_000_000_000);
+            assert!(ensure_trainable(&burning).is_ok());
+        }
+
+        /// `alert_enabled=false` DOES suppress dispatch — the other half of the same policy.
+        /// Targets the predicate `detect_anomalies` calls, so the test cannot drift from it.
+        #[test]
+        fn alert_enabled_false_suppresses_dispatch() {
+            assert!(!dispatch_allowed(7, false));
+            assert!(dispatch_allowed(7, true));
+        }
+
+        /// Dispatch still needs anomalies: `alert_enabled` alone must not fire an empty run.
+        #[test]
+        fn dispatch_needs_both_anomalies_and_the_alert_flag() {
+            assert!(!dispatch_allowed(0, true));
+            assert!(!dispatch_allowed(0, false));
+        }
+
+        /// `Status::Disabled` (4) is dead: nothing writes it, and the guard keys off
+        /// `enabled`, so a row carrying it is still trainable. Documents current reality.
+        #[test]
+        fn status_disabled_is_dead_and_does_not_gate_the_guard() {
+            let mut odd = trainable_config();
+            odd.status = 4;
+            assert!(ensure_trainable(&odd).is_ok());
+
+            let mut disabled_and_status_four = trainable_config();
+            disabled_and_status_four.enabled = false;
+            disabled_and_status_four.status = 4;
+            assert!(ensure_trainable(&disabled_and_status_four).is_err());
+        }
+
+        /// Nothing in the OSS tree constructs status 4, so the dead state cannot be reached.
+        /// The needle is split so this assertion's own source line is not a false positive.
+        #[test]
+        fn no_oss_write_site_produces_status_four() {
+            let needle = format!("status = {}(4", "Set");
+            let source = include_str!("anomaly_detection.rs");
+            for line in source.lines() {
+                let code = line.trim();
+                if code.starts_with("//") {
+                    continue;
+                }
+                assert!(
+                    !code.contains(&needle),
+                    "OSS must not write the dead Disabled status: {code}"
+                );
+            }
         }
     }
 }
