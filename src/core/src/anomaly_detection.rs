@@ -578,6 +578,8 @@ pub async fn update_config(
     // folder move or tag edit cannot reset the counter on dozens of configs at once.
     let mut retryable_change = false;
 
+    validated_intervals(&req, &existing).map_err(validation_error)?;
+
     let mut active_model = existing.into_active_model();
 
     // Update only provided fields
@@ -1437,33 +1439,8 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
         anyhow::bail!("custom_sql required when query_mode is 'custom_sql'");
     }
 
-    // Validate interval strings
-    let histogram_secs = parse_interval(&req.histogram_interval)?;
-    let schedule_secs = parse_interval(&req.schedule_interval)?;
-
-    // The two intervals must match. Both mismatches are live production faults:
-    // `default/ingester_health` runs a 1m schedule against 5m buckets, so every run
-    // scores a fifth of a bucket against a full-bucket baseline -- an apparent 80%
-    // drop, forever, at a ceiling of 1440 alerts/day. `default/ingester_offline`
-    // is the inverse, 5m against 1m buckets, which silently skips buckets.
-    if schedule_secs < histogram_secs {
-        anyhow::bail!(
-            "schedule_interval ({}) must not be shorter than histogram_interval ({}): each run \
-             would score a partial bucket against a full-bucket baseline",
-            req.schedule_interval,
-            req.histogram_interval
-        );
-    }
-    if schedule_secs % histogram_secs != 0 {
-        anyhow::bail!(
-            "schedule_interval ({}) must be a whole multiple of histogram_interval ({}): \
-             otherwise runs straddle bucket boundaries and rescore partial data",
-            req.schedule_interval,
-            req.histogram_interval
-        );
-    }
-
-    Ok(())
+    // Delegated so create and update cannot drift to two differently-worded rules.
+    validate_interval_pair(&req.schedule_interval, &req.histogram_interval)
 }
 
 /// Marks a rejected request with the prefix the API layer matches to answer 400, not 500.
@@ -1473,7 +1450,11 @@ fn validation_error(e: anyhow::Error) -> anyhow::Error {
 
 /// P0.4 TDD stub — implementation surface, not behaviour. The pure interval rule both
 /// create and update must share; today create inlines it and update has no check at all.
-fn validate_interval_pair(_schedule_interval: &str, _histogram_interval: &str) -> Result<()> {
+fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> Result<()> {
+    let _ = (
+        parse_interval(schedule_interval),
+        parse_interval(histogram_interval),
+    );
     unimplemented!("P0.4: pure interval-pair rule not implemented yet")
 }
 
@@ -1484,6 +1465,18 @@ fn merged_interval_pair(
     _existing: &infra::table::entity::anomaly_detection_config::Model,
 ) -> (String, String) {
     unimplemented!("P0.4: merged interval resolution not implemented yet")
+}
+
+/// P0.4 TDD stub — implementation surface, not behaviour. The single line `update_config`
+/// calls: merge, then the rule, but ONLY when the update actually touches an interval.
+/// Untouched intervals are grandfathered so the two live broken rows stay disable-able —
+/// validation on write must not become an accidental migration.
+fn validated_intervals(
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> Result<()> {
+    let (schedule, histogram) = merged_interval_pair(req, existing);
+    validate_interval_pair(&schedule, &histogram)
 }
 
 /// Collapses the `filters` shapes that mean "no filters" to `[]`; rejects any other non-array.
@@ -2546,10 +2539,16 @@ mod tests {
             assert!(validate_interval_pair("7m", "2m").is_err());
         }
 
+        /// Pinned to the parse contract's own wording: an impl that swallowed the parse
+        /// error and substituted its own text would otherwise satisfy a bare `is_err()`.
         #[test]
         fn rejects_unparseable_intervals_rather_than_ignoring_them() {
-            assert!(validate_interval_pair("bad", "5m").is_err());
-            assert!(validate_interval_pair("5m", "10d").is_err());
+            for bad in ["bad", "10d", "", "5"] {
+                let err = validate_interval_pair(bad, "5m").unwrap_err().to_string();
+                assert!(err.contains("Invalid interval format"), "{bad}: {err}");
+            }
+            let err = validate_interval_pair("5m", "10d").unwrap_err().to_string();
+            assert!(err.contains("Invalid interval format"), "got: {err}");
         }
 
         /// `%` by a zero divisor panics, so a zero histogram must be refused BEFORE the
@@ -2620,16 +2619,33 @@ mod tests {
             }
         }
 
-        /// The merged pair is what gets written, so it is what must be validated.
-        fn merged_result(req: UpdateAnomalyConfigRequest) -> Result<()> {
-            let stored = stored_config();
-            let (schedule, histogram) = merged_interval_pair(&req, &stored);
-            validate_interval_pair(&schedule, &histogram).map_err(validation_error)
+        /// The ingester_health shape, as already persisted: a row that create would now
+        /// refuse but that exists in production and must stay administrable.
+        fn broken_legacy_config() -> infra::table::entity::anomaly_detection_config::Model {
+            let mut stored = stored_config();
+            stored.schedule_interval = "1m".to_string();
+            stored.histogram_interval = "5m".to_string();
+            stored
         }
 
-        /// Update must reuse the create rule verbatim. `merged_result` wraps the error in
-        /// the test, so this pins that create really does emit the same text for the same
-        /// pair -- otherwise update could drift to a second, differently-worded rule.
+        /// Targets the same fn `update_config` calls, so tests cannot drift from the product.
+        fn update_result(req: UpdateAnomalyConfigRequest) -> Result<()> {
+            validated_intervals(&req, &stored_config()).map_err(validation_error)
+        }
+
+        /// Structural proof that create DELEGATES rather than keeping a copy: a `0m`
+        /// histogram panics on `% 0` in the old inline rule, so only a create path routed
+        /// through the shared guard can return Err here. Copy-paste cannot satisfy this.
+        #[test]
+        fn create_delegates_so_the_zero_histogram_panic_is_gone() {
+            let mut req = make_valid_filters_req();
+            req.schedule_interval = "5m".to_string();
+            req.histogram_interval = "0m".to_string();
+            assert!(validate_config_request(&req).is_err());
+        }
+
+        /// Update must reuse the create rule verbatim, otherwise update could drift to a
+        /// second, differently-worded rule saying the same thing.
         #[test]
         fn shares_the_create_paths_wording_for_the_same_pair() {
             for (schedule, histogram) in [("1m", "5m"), ("7m", "5m")] {
@@ -2673,7 +2689,7 @@ mod tests {
                 schedule_interval: Some("1m".to_string()),
                 ..Default::default()
             };
-            let err = merged_result(req).unwrap_err().to_string();
+            let err = update_result(req).unwrap_err().to_string();
             assert!(err.contains("validation error"), "got: {err}");
             assert!(err.contains("must not be shorter"), "got: {err}");
         }
@@ -2685,7 +2701,7 @@ mod tests {
                 histogram_interval: Some("7m".to_string()),
                 ..Default::default()
             };
-            let err = merged_result(req).unwrap_err().to_string();
+            let err = update_result(req).unwrap_err().to_string();
             assert!(err.contains("validation error"), "got: {err}");
             assert!(err.contains("whole multiple"), "got: {err}");
         }
@@ -2698,7 +2714,7 @@ mod tests {
                 histogram_interval: Some("5m".to_string()),
                 ..Default::default()
             };
-            let err = merged_result(req).unwrap_err().to_string();
+            let err = update_result(req).unwrap_err().to_string();
             assert!(err.contains("validation error"), "got: {err}");
             assert!(err.contains("must not be shorter"), "got: {err}");
         }
@@ -2711,7 +2727,7 @@ mod tests {
                 histogram_interval: Some("2h".to_string()),
                 ..Default::default()
             };
-            let err = merged_result(req).unwrap_err().to_string();
+            let err = update_result(req).unwrap_err().to_string();
             assert!(err.contains("must not be shorter"), "got: {err}");
         }
 
@@ -2728,21 +2744,69 @@ mod tests {
                     ..Default::default()
                 };
                 assert!(
-                    merged_result(req).is_ok(),
+                    update_result(req).is_ok(),
                     "{schedule:?}/{histogram:?} must be accepted"
                 );
             }
         }
 
-        /// No false rejection when the update touches neither interval.
+        /// Grandfathering, the binding product decision: an update that touches NEITHER
+        /// interval must not re-litigate a row that is already broken on disk. Validating
+        /// unconditionally would make the live ingester_health row impossible to disable.
         #[test]
-        fn accepts_an_update_touching_neither_interval() {
-            let req = UpdateAnomalyConfigRequest {
-                name: Some("renamed".to_string()),
-                enabled: Some(false),
+        fn a_broken_legacy_row_can_still_be_moved_or_disabled() {
+            let broken = broken_legacy_config();
+            for (label, req) in [
+                (
+                    "folder move",
+                    UpdateAnomalyConfigRequest {
+                        folder_id: Some("other".to_string()),
+                        ..Default::default()
+                    },
+                ),
+                (
+                    "disable a misfiring alert",
+                    UpdateAnomalyConfigRequest {
+                        enabled: Some(false),
+                        ..Default::default()
+                    },
+                ),
+                (
+                    "bulk enable",
+                    UpdateAnomalyConfigRequest {
+                        enabled: Some(true),
+                        ..Default::default()
+                    },
+                ),
+                ("rename only", UpdateAnomalyConfigRequest::default()),
+            ] {
+                assert!(
+                    validated_intervals(&req, &broken).is_ok(),
+                    "{label} must not be blocked by a pre-existing bad pair"
+                );
+            }
+        }
+
+        /// Grandfathering does not extend to editing an interval: touching one field on a
+        /// broken row validates it against the persisted other, so the row can only improve.
+        #[test]
+        fn editing_one_interval_on_a_broken_row_is_still_validated() {
+            let broken = broken_legacy_config();
+            let worse = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("2m".to_string()),
                 ..Default::default()
             };
-            assert!(merged_result(req).is_ok());
+            let err = validated_intervals(&worse, &broken)
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("must not be shorter"), "got: {err}");
+
+            // Repairing the pair in a single field must still be allowed through.
+            let repaired = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("10m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&repaired, &broken).is_ok());
         }
     }
 }
