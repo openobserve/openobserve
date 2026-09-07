@@ -1172,7 +1172,6 @@
     "failedToFetchFieldValues": "فشل في جلب قيم الحقول",
     "fieldMissingInStreams": "الحقل '{field}' غير موجود في التدفق أو أكثر.\n",
     "fieldStreamCountMismatch": "الحقل '{field}' موجود بعدد مختلف من التيارات.\n",
-    "histogramNotAvailableMultiStream": "المدرج التكراري غير متوفر للبحث في وضع SQL متعدد التدفقات.",
     "histogramSearchQueryCancelled": "تم إلغاء استعلام البحث عن المدرج التكراري",
     "histogramUnavailableForQueries": "المدرج التكراري غير متاح لاستعلامات CTE، واستعلامات DISTINCT، JOIN وLIMIT.",
     "invalidDateFormat": "صيغة تاريخ غير صحيحة.",
@@ -3928,8 +3927,6 @@
       "rnTroubleCleartextQ": "بناء الإصدار/Debug على Android لا يرسل أي شيء عبر HTTP العادي",
       "rnTroubleIosBuildA": "شغّل `npx pod-install` (أو `cd ios && pod install`) بعد إضافة الحزم، ثم أعد البناء من Xcode أو `npx react-native run-ios`. لن يقوم إعادة تحميل Metro فقط بالتقاط الوحدات الأصلية الجديدة.",
       "rnTroubleIosBuildQ": "يفشل بناء iOS أو الوحدة الأصلية مفقودة",
-      "rnTroubleIosReplayA": "القيود المعروفة للإصدار الحالي من React Native SDK: على نظام iOS، يضيف مساره الخاص إلى `customEndpoint` لإعادة تشغيل الجلسة، لذا فإن التحميلات لا تصل إلى مسار `/replay` الخاص بـ OpenObserve. يستخدم Android الرابط كما هو ويعمل بشكل صحيح. أحداث RUM، والسجلات، وتقارير الأعطال غير متأثرة على كلا النظامين.",
-      "rnTroubleIosReplayQ": "إعادة تشغيل الجلسة تعمل على Android ولكن ليس على iOS",
       "rnTroubleMaskedA": "هذا هو الإعداد الافتراضي. `textAndInputPrivacyLevel`، `imagePrivacyLevel` و `touchPrivacyLevel` جميعها افتراضيًا في أقصى إعداد لها (`MASK_ALL`). قم بتخفيفها فقط بقدر ما يسمح به سياسة الخصوصية الخاصة بك — `MASK_SENSITIVE_INPUTS` يحافظ على حجب كلمات المرور وحقول البطاقات مع عرض الباقي.",
       "rnTroubleMaskedQ": "تتم عرض إعادة التشغيل ولكن كل شيء مخفي",
       "rnTroubleNoReplayA": "عادةً ما يكون نقطة النهاية هي السبب. يتم تكوين Session Replay بشكل منفصل ولا يرث `rumConfiguration.customEndpoint`؛ إذا تُرك فارغًا، فإنه افتراضيًا يكون سلسلة فارغة والتحميلات لا تصل إلى أي مكان تراه. قم بتمرير الرابط الكامل بوضوح: `customEndpoint: '{replayUrl}'` — لاحظ `/replay` في النهاية، والتي لا يحتوي عليها رابط SDK الأساسي.",
@@ -7613,7 +7610,6 @@
   "alert_library": {
     "header": "مكتبة التنبيه",
     "subtitle": "تنبيهات منتقاة وجاهزة للاستخدام، متوافقة مع البيانات التي تستقبلها بالفعل",
-    "sectionTab": "المكتبة",
     "contribute": "المساهمة على GitHub",
     "searchPlaceholder": "البحث بالاسم أو الوصف أو التدفق",
     "searchLabel": "البحث في مكتبة التنبيهات",
@@ -7644,7 +7640,6 @@
     "clearFilters": "مسح الفلاتر",
     "loadFailedTitle": "تعذر تحميل مكتبة التنبيهات",
     "retry": "إعادة المحاولة",
-    "openDetails": "فتح {title}",
     "selectAlert": "تحديد {title}",
     "selectAllInView": "تحديد كل ما يظهر",
     "selectAllInGroup": "تحديد | تحديد كل {count}",
@@ -7956,7 +7951,6 @@
     "destinationsLoadError": "وجهات تحميل أخطاء"
   },
   "alert_destinations": {
-    "sectionTab": "الوجهات",
     "chooseTypeTitle": "اختر النوع",
     "selectDestinationType": "اختر نوع الوجهة",
     "connectionStepTitle": "الاتصال",
@@ -11013,7 +11007,6 @@
         "candidate": "المرشح",
         "baselinePlaceholder": "اختر خط أساس",
         "candidatePlaceholder": "اختيار مرشح",
-        "commonRows": "استنادا إلى {common} من {total} الصفوف",
         "optionsError": "فشل في تحميل التجارب المتاحة للمقارنة",
         "swap": "تبديل خط الأساس والمرشح",
         "panel": {
@@ -11024,7 +11017,6 @@
           "bucketInconclusive": "غير حاسم",
           "bucketNew": "الجديد",
           "bucketMissing": "مفقود",
-          "datasetRow": "صف مجموعة البيانات",
           "outcome": "النتيجة",
           "oneSidedCoverage": "{baseline} فقط على خط الأساس · {candidate} للمرشحين فقط",
           "oneSided": "من جانب واحد",
@@ -11601,8 +11593,6 @@
       "title": "الملعب",
       "runAll": "شغل الجميع",
       "runAllTooltip": "شغل كل الأنواع",
-      "running": "يركض... ({done}/{total})",
-      "stop": "توقف",
       "recentDrafts": "المسودات الأخيرة",
       "recentDraftsSection": "هذا المتصفح · آخر 10",
       "draftVersus": "مقابل",
@@ -11901,7 +11891,6 @@
         "legendFalseCount": "false ({count})",
         "kpis": {
           "average": "المتوسط",
-          "p50p95": "P50 / P95",
           "unhealthy": "غير صحي",
           "healthy": "سليم",
           "trueRate": "المعدل الحقيقي",
@@ -12010,8 +11999,6 @@
       "remoteCta": "تكوين نقطة النهاية"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "العودة إلى مقدمي الخدمات",
       "createTitle": "إنشاء مزود LLM",
       "editTitle": "تعديل مزود LLM",
@@ -12903,8 +12890,6 @@
       "selectStarNotSupportedForVisualization": "اختيار * استعلام غير مدعوم للتصور",
       "errorUpdatingVisualization": "خطأ في تحديث التصور",
       "queryEmptySelectFieldsToBuild": "الاستعلام فارغ، يرجى اختيار الحقول لبناء الاستعلام",
-      "histogramUnavailableCtesDistinctJoinLimit": "المدرج التكراري غير متاح لاستعلامات CTE، واستعلامات DISTINCT، JOIN وLIMIT.",
-      "histogramNotAvailableMultiStream": "المدرج التكراري غير متاح للبحث متعدد التدفقات.",
       "histogramUnavailableCtesDistinctLimit": "المدرج التكراري غير متاح لاستعلامات CTE، واستعلامات DISTINCT وLIMIT."
     },
     "searchSchedulersList": {
