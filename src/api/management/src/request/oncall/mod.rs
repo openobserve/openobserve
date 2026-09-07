@@ -606,6 +606,9 @@ fn to_response(e: anyhow::Error) -> Response {
         Some(OncallError::TeamNotFound(_)) | Some(OncallError::ResponseNotFound(_)) => {
             StatusCode::NOT_FOUND
         }
+        // Not 404: the record exists and the caller may well know it does. The
+        // honest answer is that working it is not theirs to do.
+        Some(OncallError::NotOnThisTeam { .. }) => StatusCode::FORBIDDEN,
         // A conflict, not a 400: the request is well-formed and the state of
         // the org is what refuses it, and the caller fixes it by changing that
         // state rather than by changing the request.
@@ -4615,6 +4618,17 @@ pub async fn promote_to_incident(
                 .into_response();
             }
         };
+        // Promotion opens an incident before it notes the record, so the team
+        // check cannot be inherited from `add_note` further down — a stranger
+        // would create the incident and only then be refused.
+        if let Err(e) = o2_enterprise::enterprise::oncall::service::refuse_if_not_on_the_paged_team(
+            &record.team_id,
+            &user_email.user_id,
+        )
+        .await
+        {
+            return to_response(e);
+        }
         if let Some(existing) = record.incident_id.as_deref() {
             return MetaHttpResponse::error(
                 StatusCode::CONFLICT.as_u16(),
