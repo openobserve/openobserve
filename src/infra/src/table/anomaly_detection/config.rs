@@ -525,6 +525,7 @@ mod tests {
     /// The super-cluster broadcasts whole rows, so this list is the only thing keeping a
     /// region-local column from being clobbered by a peer. Adding a column breaks this
     /// destructure and forces the replicated-vs-region-local decision to be made here.
+    #[allow(unused_variables)]
     fn replication_scope(m: Model) -> Vec<(&'static str, Scope)> {
         let Model {
             anomaly_id,
@@ -568,48 +569,6 @@ mod tests {
             created_at,
             updated_at,
         } = m;
-        let _ = (
-            &anomaly_id,
-            &org_id,
-            &stream_name,
-            &stream_type,
-            &enabled,
-            &name,
-            &description,
-            &query_mode,
-            &filters,
-            &custom_sql,
-            &detection_function,
-            &histogram_interval,
-            &schedule_interval,
-            &detection_window_seconds,
-            &training_window_days,
-            &retrain_interval_days,
-            &threshold,
-            &seasonality,
-            &is_trained,
-            &training_started_at,
-            &training_completed_at,
-            &last_error,
-            &last_processed_timestamp,
-            &current_model_version,
-            &rcf_num_trees,
-            &rcf_tree_size,
-            &rcf_shingle_size,
-            &alert_enabled,
-            &alert_destinations,
-            &folder_id,
-            &owner,
-            &priority,
-            &tags,
-            &status,
-            &retries,
-            &last_failed_at,
-            &last_alert_fired_at,
-            &last_updated,
-            &created_at,
-            &updated_at,
-        );
         vec![
             ("anomaly_id", Scope::PrimaryKey),
             ("org_id", Scope::Replicated),
@@ -736,6 +695,7 @@ mod tests {
 
         let table = replication_scope(peer);
         // Closes the `field: _` escape hatch: destructuring alone lets a new column be ignored.
+        // A `#[sea_orm(ignore)]` field escapes this, but it is not a Column and never broadcasts.
         assert_eq!(
             table.len(),
             anomaly_detection_config::Column::iter().count(),
@@ -751,6 +711,12 @@ mod tests {
                     "{field} is replicated and must take the peer's value"
                 ),
                 Scope::RegionLocal => {
+                    // Without this the label is free parking: any column relabelled here would
+                    // stop replicating with a green suite.
+                    assert!(
+                        matches!(field, "retries" | "last_failed_at" | "last_alert_fired_at"),
+                        "{field} was relabelled region-local; that is a replication change"
+                    );
                     assert_eq!(
                         got,
                         active_field(&local_active, field),
@@ -769,6 +735,10 @@ mod tests {
                     );
                 }
                 Scope::Immutable => {
+                    assert!(
+                        matches!(field, "created_at"),
+                        "{field} was relabelled immutable; that is a replication change"
+                    );
                     assert_eq!(
                         got,
                         active_field(&local_active, field),
@@ -786,23 +756,37 @@ mod tests {
                         "{field} is not region-local, so an insert must carry the peer's value"
                     );
                 }
-                // Deliberately accepts both outcomes: this pins the gap without blocking its fix.
                 Scope::KnownGap => {
-                    let local = active_field(&local_active, field);
-                    let peer_value = active_field(&peer_raw, field);
-                    assert_ne!(local, peer_value, "{field} verifies nothing if it matches");
                     assert!(
-                        got == local || got == peer_value,
-                        "{field} must either stay local (today's gap) or take the peer's value"
+                        matches!(field, "priority" | "tags"),
+                        "{field} was relabelled a known gap; that is a replication change"
                     );
-                    // An insert carries it either way — the gap is in patch_all_fields alone.
+                    let peer_value = active_field(&peer_raw, field);
+                    assert_ne!(
+                        active_field(&local_active, field),
+                        peer_value,
+                        "{field} verifies nothing if it matches the peer"
+                    );
+                    assert_eq!(
+                        got,
+                        active_field(&local_active, field),
+                        "{field} stays local today; closing the gap means relabelling it Replicated"
+                    );
+                    // Only patch_all_fields skips it — an insert already carries the peer's value.
                     assert_eq!(active_field(&replicated_expected, field), peer_value);
                 }
-                Scope::PrimaryKey => assert_eq!(
-                    got,
-                    active_field(&local_active, field),
-                    "{field} must keep this region's value"
-                ),
+                Scope::PrimaryKey => {
+                    assert!(
+                        matches!(field, "anomaly_id"),
+                        "{field} was relabelled the primary key; that is a replication change"
+                    );
+                    // No assert_ne here: the PK is the join key, so it necessarily equals the peer.
+                    assert_eq!(
+                        got,
+                        active_field(&local_active, field),
+                        "{field} must keep this region's value"
+                    );
+                }
             }
         }
     }
