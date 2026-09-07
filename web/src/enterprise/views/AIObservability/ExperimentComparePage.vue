@@ -92,7 +92,7 @@
         @inspect="inspectRow"
       />
       <div
-        v-else-if="!loading"
+        v-else
         class="border-border-default text-text-secondary rounded-default m-page-edge border border-dashed p-6 text-center"
         data-test="ai-experiment-compare-empty"
       >
