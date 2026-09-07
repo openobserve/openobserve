@@ -1,0 +1,20 @@
+{
+  "feature_slug": "alerts-folder-creation",
+  "feature_title": "Alerts & SLO Folder-scoped Creation",
+  "area": "Alerts",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alerts-folder-creation.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-folder-creation.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/ImportAlert.vue",
+    "web/src/composables/useAlertForm.ts",
+    "web/src/services/anomaly_detection.ts",
+    "web/src/views/slos/AddSlo.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

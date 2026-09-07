@@ -1,0 +1,14 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/Alerts/alerts-folder-creation.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/Alerts/alerts-import.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-anomaly-detection.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-e2e-flow.spec.js",
+    "tests/ui-testing/playwright-tests/Alerts/alerts-add-alert-org-identifier.spec.js",
+    "tests/ui-testing/playwright-tests/SLO/slo-crud.spec.js",
+    "tests/ui-testing/playwright-tests/SLO/slo-timeslice.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "Folder-scoped CREATION is untested today. alerts-import.spec.js imports into the default folder without selecting a folder or asserting the ?folder= param; alerts-anomaly-detection.spec.js and Anomaly/anomaly-detection.spec.js create anomaly configs with no folder assertion; slo-crud.spec.js creates SLOs with no folder assertion; alerts-e2e-flow.spec.js covers folder MOVE/search, not scoped creation. The diff changes where objects land (anomaly create/import now sends ?folder=; SLO edit now round-trips folder_id), so a dedicated Alerts spec is the least-duplicative home. Secondary SLO folder-scoping is noted in the plan for the SLO area, not crammed here."
+}

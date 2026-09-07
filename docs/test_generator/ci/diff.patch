@@ -1,0 +1,1144 @@
+===== COMPLETE LIST OF CHANGED FILES (19 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+src/api/http/src/handler/http/router/openapi.rs
+src/api/management/src/models/alerts/requests.rs
+src/api/management/src/request/alerts/mod.rs
+src/api/management/src/request/anomaly_detection/mod.rs
+src/api/management/src/request/dashboards/mod.rs
+src/api/management/src/request/dashboards/reports.rs
+src/api/management/src/request/slos/mod.rs
+src/api/management/src/request/synthetics/mod.rs
+src/config/src/meta/synthetics.rs
+src/core/src/alerts/alert.rs
+src/core/src/auth.rs
+src/core/src/dashboards/mod.rs
+src/core/src/slo/service.rs
+src/synthetics/src/service/checks.rs
+web/src/components/alerts/ImportAlert.vue
+web/src/composables/useAlertForm.ts
+web/src/services/anomaly_detection.spec.ts
+web/src/services/anomaly_detection.ts
+web/src/views/slos/AddSlo.vue
+===== END CHANGED FILES =====
+
+diff --git a/src/api/http/src/handler/http/router/openapi.rs b/src/api/http/src/handler/http/router/openapi.rs
+index 00931d8e62a..a4d227ab80f 100644
+--- a/src/api/http/src/handler/http/router/openapi.rs
++++ b/src/api/http/src/handler/http/router/openapi.rs
+@@ -284,6 +284,7 @@ use crate::{
+         synthetics::get_synthetic,
+         synthetics::update_synthetic,
+         synthetics::delete_synthetic,
++        synthetics::move_synthetics,
+         synthetics::set_synthetic_enabled,
+         synthetics::run_synthetic_now,
+         synthetics::list_locations,
+@@ -718,3 +719,48 @@ mod experiment_tests {
+         assert!(comparison.responses.responses.contains_key("403"));
+     }
+ }
++
++#[cfg(test)]
++mod tests {
++    use utoipa::OpenApi;
++
++    use super::ApiDoc;
++
++    // Handlers that gained a folder-destination authorization check must
++    // advertise the 403 it returns, or clients cannot distinguish it from a bug.
++    // The /{org}/anomaly_detection pair is annotated but enterprise-gated, so it
++    // is absent from this ApiDoc and cannot be asserted from an OSS build.
++    #[test]
++    fn folder_scoped_writes_document_forbidden() {
++        let spec = serde_json::to_value(ApiDoc::openapi()).unwrap();
++        let paths = spec.get("paths").unwrap().as_object().unwrap();
++
++        let cases: &[(&str, &str)] = &[
++            ("/api/v2/{org_id}/alerts", "post"),
++            ("/api/v2/{org_id}/alerts/{alert_id}", "put"),
++            ("/api/v2/{org_id}/alerts/{alert_id}/clone", "post"),
++            ("/api/v2/{org_id}/alerts/move", "patch"),
++            ("/api/{org_id}/slos", "post"),
++            ("/api/{org_id}/slos/{slo_id}", "put"),
++            ("/api/{org_id}/slos/move", "post"),
++            ("/api/{org_id}/synthetics/{id}", "put"),
++            ("/api/v2/{org_id}/synthetics/move", "patch"),
++            ("/api/v2/{org_id}/reports/{report_id}", "put"),
++            ("/api/v2/{org_id}/reports/move", "patch"),
++            ("/api/{org_id}/folders/dashboards/{dashboard_id}", "put"),
++            ("/api/{org_id}/dashboards/move", "patch"),
++        ];
++
++        let mut missing = Vec::new();
++        for (path, method) in cases {
++            let Some(item) = paths.get(*path).and_then(|p| p.get(*method)) else {
++                missing.push(format!("{method} {path}: not found in spec"));
++                continue;
++            };
++            if item.get("responses").and_then(|r| r.get("403")).is_none() {
++                missing.push(format!("{method} {path}: no 403 documented"));
++            }
++        }
++        assert!(missing.is_empty(), "{missing:#?}");
++    }
++}
+diff --git a/src/api/management/src/models/alerts/requests.rs b/src/api/management/src/models/alerts/requests.rs
+index a100c69b48a..a20b0b399ac 100644
+--- a/src/api/management/src/models/alerts/requests.rs
++++ b/src/api/management/src/models/alerts/requests.rs
+@@ -52,9 +52,11 @@ use super::{Alert, QueryCondition, StreamType};
+ /// ```
+ #[derive(Clone, Debug, Deserialize, ToSchema)]
+ pub struct CreateAlertRequestBody {
+-    /// Optional folder ID. Pass the destination folder in the `folder` query parameter;
+-    /// the default folder is used when no folder is given.
+-    #[schema(example = "default")]
++    /// Deprecated. The destination folder is taken from the `folder` query
++    /// parameter, which is what the permission check authorizes; the default
++    /// folder is used when it is absent. A value here that disagrees with the
++    /// query parameter is rejected with 400 rather than silently ignored.
++    #[schema(deprecated, example = "default")]
+     pub folder_id: Option<String>,
+ 
+     /// Discriminates the alert type. Defaults to scheduled alert when absent.
+@@ -344,6 +346,8 @@ pub struct UpdateAnomalyAlertFields {
+     pub percentile: Option<f64>,
+     pub alert_enabled: Option<bool>,
+     pub enabled: Option<bool>,
++    /// Moves the config to this folder. Naming a folder you cannot write to
++    /// returns 403; omit it to leave the config where it is.
+     pub folder_id: Option<String>,
+     pub owner: Option<String>,
+ }
+diff --git a/src/api/management/src/request/alerts/mod.rs b/src/api/management/src/request/alerts/mod.rs
+index 826b71d8bd1..be51e385764 100644
+--- a/src/api/management/src/request/alerts/mod.rs
++++ b/src/api/management/src/request/alerts/mod.rs
+@@ -41,7 +41,7 @@ use openobserve_core::{
+ use svix_ksuid::Ksuid;
+ #[cfg(feature = "enterprise")]
+ use {
+-    openobserve_core::auth::check_permissions,
++    openobserve_core::auth::{check_folder_write_permissions, check_permissions},
+     openobserve_core::authz::{StreamPermissionResourceType, check_stream_permissions},
+ };
+ 
+@@ -98,12 +98,13 @@ pub mod templates;
+     ),
+     params(
+         ("org_id" = String, Path, description = "Organization name"),
+-        ("folder" = Option<String>, Query, description = "Folder ID for the alert. The default folder is used when absent."),
++        ("folder" = Option<String>, Query, description = "Folder ID for the alert. Authoritative: it overrides any folder_id in the body. The default folder is used when absent."),
+       ),
+     request_body(content = inline(CreateAlertRequestBody), description = "Alert data", content_type = "application/json"),
+     responses(
+         (status = 200, description = "Success", content_type = "application/json", body = Object),
+         (status = 400, description = "Error",   content_type = "application/json", body = ()),
++        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+     ),
+     extensions(
+         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "create"})),
+@@ -119,6 +120,17 @@ pub async fn create_alert(
+     let query_str = uri.query().unwrap_or("");
+     let folder_id = get_folder(query_str);
+ 
++    // The body folder is ignored in favour of the gated `?folder=`. Rejecting a
++    // disagreement rather than silently creating elsewhere: a client that sets
++    // only the body field would otherwise land in the default folder unnoticed.
++    if let Some(body_folder) = req_body.folder_id.as_deref().filter(|f| !f.is_empty())
++        && body_folder != folder_id
++    {
++        return MetaHttpResponse::bad_request(format!(
++            "folder_id in the body ({body_folder}) disagrees with the folder query parameter ({folder_id}); send the folder as ?folder= only"
++        ));
++    }
++
+     // Anomaly detection path: delegate to anomaly config creation (enterprise only).
+     #[cfg(feature = "enterprise")]
+     if req_body.alert_type == Some(AlertTypeFilter::AnomalyDetection) {
+@@ -1155,12 +1167,9 @@ async fn create_anomaly_alert(
+         alert_enabled: anomaly_fields.alert_enabled,
+         alert_destinations: req_body.alert.destinations,
+         enabled: Some(req_body.alert.enabled),
+-        // Prefer explicit folder_id in JSON body; fall back to the ?folder= query param
+-        // (same mechanism regular alerts use — the UI sends folder as a query param).
+-        folder_id: req_body
+-            .folder_id
+-            .filter(|f| !f.is_empty())
+-            .or_else(|| Some(query_folder_id.to_string()).filter(|f| !f.is_empty())),
++        // The route's permission gate resolves `?folder=`, so the write must use the same value — a
++        // body folder_id would create the config in an unauthorized folder.
++        folder_id: Some(query_folder_id.to_string()).filter(|f| !f.is_empty()),
+         owner,
+         // Feature 2: anomaly configs take the same triage metadata as
+         // alerts, threaded from the shared request body.
+@@ -1562,7 +1571,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
+     tag = "Alerts",
+     operation_id = "CloneAlert",
+     summary = "Clone an alert or anomaly detection config",
+-    description = "Creates a copy of an existing alert or anomaly detection config. For anomaly configs, the clone starts untrained with counters reset. Provide an optional name and folder_id in the request body.",
++    description = "Creates a copy of an existing alert or anomaly detection config. For anomaly configs, the clone starts untrained with counters reset. Provide an optional name and folder_id in the request body; a folder_id requires write access to that destination folder.",
+     security(
+         ("Authorization"= [])
+     ),
+@@ -1574,6 +1583,7 @@ pub async fn export_alert(Path((org_id, alert_id)): Path<(String, String)>) -> R
+     request_body(content = inline(CloneAlertRequestBody), description = "Clone options", content_type = "application/json"),
+     responses(
+         (status = 200, description = "Success", content_type = "application/json", body = Object),
++        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+         (status = 500, description = "Failure", content_type = "application/json", body = ()),
+     ),
+@@ -1598,13 +1608,47 @@ pub async fn clone_alert(
+     // Check if this is a regular alert first
+     match alert::get_by_id(client, &org_id, alert_id).await {
+         Ok((folder, mut src_alert)) => {
++            // A clone copies the whole definition, so reading the source must be
++            // authorized too — the destination check alone would let a caller
++            // lift an alert out of a folder they cannot read.
++            #[cfg(feature = "enterprise")]
++            if !check_permissions(
++                &alert_id_str,
++                &org_id,
++                &user_email.user_id,
++                "alerts",
++                "GET",
++                Some(&folder.folder_id),
++                false,
++                true,
++                false,
++            )
++            .await
++            {
++                return MetaHttpResponse::forbidden("Unauthorized Access");
++            }
+             // Clone the alert: copy fields, generate new name
+             let new_name = req_body
+                 .name
+                 .unwrap_or_else(|| format!("{}_copy", src_alert.name));
++            // Resolve the effective destination BEFORE authorizing it: an absent
++            // folder_id falls back to the source folder, which `?folder=` need
++            // not have covered.
+             let dst_folder = req_body
+                 .folder_id
++                .filter(|f| !f.is_empty())
+                 .unwrap_or_else(|| folder.folder_id.clone());
++            #[cfg(feature = "enterprise")]
++            if !check_folder_write_permissions(
++                &org_id,
++                &user_email.user_id,
++                "alert_folders",
++                &dst_folder,
++            )
++            .await
++            {
++                return MetaHttpResponse::forbidden("Unauthorized Access");
++            }
+             src_alert.name = new_name;
+             // Clear the ID so a new one is assigned on insert
+             src_alert.id = None;
+@@ -1630,6 +1674,26 @@ pub async fn clone_alert(
+                 {
+                     return MetaHttpResponse::forbidden("Unauthorized Access");
+                 }
++                // clone_composite falls back to the source folder internally, so
++                // authorize the folder the clone actually lands in.
++                #[cfg(feature = "enterprise")]
++                {
++                    let dst_folder = req_body
++                        .folder_id
++                        .clone()
++                        .filter(|f| !f.is_empty())
++                        .unwrap_or_else(|| _composite.definition.folder_id.clone());
++                    if !check_folder_write_permissions(
++                        &org_id,
++                        &user_email.user_id,
++                        "alert_folders",
++                        &dst_folder,
++                    )
++                    .await
++                    {
++                        return MetaHttpResponse::forbidden("Unauthorized Access");
++                    }
++                }
+                 return match openobserve_core::alerts::composite::clone_composite(
+                     &org_id,
+                     &alert_id_str,
+@@ -1653,6 +1717,57 @@ pub async fn clone_alert(
+             }
+             #[cfg(feature = "enterprise")]
+             {
++                // Source read, then the folder the clone actually lands in —
++                // clone_config inherits the source folder when none is given.
++                let src_cfg =
++                    match openobserve_core::anomaly_detection::get_config(&org_id, &alert_id_str)
++                        .await
++                    {
++                        Ok(Some(cfg)) => cfg,
++                        Ok(None) => {
++                            return MetaHttpResponse::not_found(format!(
++                                "alert {alert_id_str} not found"
++                            ));
++                        }
++                        Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
++                    };
++                let Some(src_folder) = src_cfg
++                    .get("folder_id")
++                    .and_then(|f| f.as_str())
++                    .map(str::to_string)
++                else {
++                    return MetaHttpResponse::forbidden("Unauthorized Access");
++                };
++                if !check_permissions(
++                    &alert_id_str,
++                    &org_id,
++                    &user_email.user_id,
++                    "alerts",
++                    "GET",
++                    Some(&src_folder),
++                    false,
++                    true,
++                    false,
++                )
++                .await
++                {
++                    return MetaHttpResponse::forbidden("Unauthorized Access");
++                }
++                let dst_folder = req_body
++                    .folder_id
++                    .clone()
++                    .filter(|f| !f.is_empty())
++                    .unwrap_or(src_folder);
++                if !check_folder_write_permissions(
++                    &org_id,
++                    &user_email.user_id,
++                    "alert_folders",
++                    &dst_folder,
++                )
++                .await
++                {
++                    return MetaHttpResponse::forbidden("Unauthorized Access");
++                }
+                 // Fall back to anomaly detection config clone
+                 match openobserve_core::anomaly_detection::clone_config(
+                     &org_id,
+@@ -1699,6 +1814,7 @@ pub async fn clone_alert(
+     responses(
+         (status = 200, description = "Success", content_type = "application/json", body = Object),
+         (status = 400, description = "Error",   content_type = "application/json", body = ()),
++        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+     ),
+     extensions(
+         ("x-o2-ratelimit" = json!({"module": "Alerts", "operation": "update"})),
+@@ -1781,6 +1897,13 @@ async fn build_and_run_anomaly_update(
+ ) -> Response {
+     use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
+ 
++    // A folder_id on the update is a move, and the route gate only covers `?folder=`.
++    if let Some(folder) = fields.folder_id.as_deref().filter(|f| !f.is_empty())
++        && !check_folder_write_permissions(org_id, &user_id, "alert_folders", folder).await
++    {
++        return MetaHttpResponse::forbidden("Unauthorized Access");
++    }
++
+     let owner = fields
+         .owner
+         .or_else(|| alert.owner.clone())
+@@ -3261,6 +3384,7 @@ pub async fn retrain_alert(Path((org_id, alert_id)): Path<(String, String)>) ->
+     request_body(content = inline(MoveAlertsRequestBody), description = "Identifies alerts and the destination folder", content_type = "application/json"),
+     responses(
+         (status = 200, description = "Success", content_type = "application/json", body = Object),
++        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+     ),
+@@ -3303,11 +3427,58 @@ pub async fn move_alerts(
+     #[cfg(feature = "enterprise")]
+     let anomaly_ids: Vec<Ksuid> = req_body.anomaly_config_ids;
+ 
++    // The route is bypass:true, so the destination is only authorized here — the
++    // anomaly and composite branches below have no folder check of their own.
++    #[cfg(feature = "enterprise")]
++    if !check_folder_write_permissions(
++        &org_id,
++        &user_email.user_id,
++        "alert_folders",
++        &req_body.dst_folder_id,
++    )
++    .await
++    {
++        return MetaHttpResponse::forbidden("Unauthorized Access");
++    }
++
+     // Move anomaly configs first (enterprise only) so that if this fails,
+     // regular alerts have not yet been relocated (reduces partial-move risk).
+     #[cfg(feature = "enterprise")]
+     for id in anomaly_ids {
+         use openobserve_core::anomaly_detection::UpdateAnomalyConfigRequest;
++        // Source side: `update_config` performs no check of its own, so without
++        // this a caller could pull a config out of a folder they cannot reach.
++        let id_str = id.to_string();
++        // Fail closed: a read error or a config without a folder must deny, not
++        // skip the check and let the move through.
++        let src_folder = match openobserve_core::anomaly_detection::get_config(&org_id, &id_str)
++            .await
++        {
++            Ok(Some(cfg)) => cfg
++                .get("folder_id")
++                .and_then(|f| f.as_str())
++                .map(str::to_string),
++            Ok(None) => return MetaHttpResponse::not_found(format!("alert {id_str} not found")),
++            Err(e) => return MetaHttpResponse::internal_error(e.to_string()),
++        };
++        let Some(src_folder) = src_folder else {
++            return MetaHttpResponse::forbidden("Unauthorized Access");
++        };
++        if !check_permissions(
++            &id_str,
++            &org_id,
++            &user_email.user_id,
++            "alerts",
++            "PUT",
++            Some(&src_folder),
++            false,
++            true,
++            false,
++        )
++        .await
++        {
++            return MetaHttpResponse::forbidden("Unauthorized Access");
++        }
+         let req = UpdateAnomalyConfigRequest {
+             folder_id: Some(req_body.dst_folder_id.clone()),
+             ..Default::default()
+diff --git a/src/api/management/src/request/anomaly_detection/mod.rs b/src/api/management/src/request/anomaly_detection/mod.rs
+index d64f626df57..f0f0bf1d313 100644
+--- a/src/api/management/src/request/anomaly_detection/mod.rs
++++ b/src/api/management/src/request/anomaly_detection/mod.rs
+@@ -24,6 +24,8 @@ pub use openobserve_core::anomaly_detection::{
+     CreateAnomalyConfigRequest, UpdateAnomalyConfigRequest,
+ };
+ use openobserve_core::auth::UserEmail;
++#[cfg(feature = "enterprise")]
++use openobserve_core::auth::check_folder_write_permissions;
+ use serde::{Deserialize, Serialize};
+ use utoipa::ToSchema;
+ 
+@@ -150,6 +152,7 @@ fn resolve_owner(owner: Option<String>, fallback: &str) -> Option<String> {
+     responses(
+         (status = 201, description = "Created", content_type = "application/json", body = AnomalyConfigResponse),
+         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
++        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
+         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
+     ),
+     request_body(
+@@ -168,6 +171,14 @@ pub async fn create_config(
+         return resp;
+     }
+     req.owner = resolve_owner(req.owner, &user_email.user_id);
++    // The route gate resolves `?folder=`; this body folder is what actually gets written.
++    #[cfg(feature = "enterprise")]
++    if let Some(folder) = req.folder_id.as_deref().filter(|f| !f.is_empty())
++        && !check_folder_write_permissions(&org_id, &user_email.user_id, "alert_folders", folder)
++            .await
++    {
++        return MetaHttpResponse::forbidden("Unauthorized Access");
++    }
+     match anomaly_service::create_config(&org_id, req).await {
+         Ok(config) => MetaHttpResponse::json(config),
+         Err(e) => {
+@@ -198,6 +209,7 @@ pub async fn create_config(
+     ),
+     responses(
+         (status = 200, description = "Success", content_type = "application/json", body = AnomalyConfigResponse),
++        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
+         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
+         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
+         (status = 500, description = "Internal Server Error", content_type = "application/json", body = MetaHttpResponse),
+@@ -225,6 +237,14 @@ pub async fn update_config(
+             o
+         }
+     });
++    // An update carrying a folder_id is also a move, so the destination needs its own check.
++    #[cfg(feature = "enterprise")]
++    if let Some(folder) = req.folder_id.as_deref().filter(|f| !f.is_empty())
++        && !check_folder_write_permissions(&org_id, &user_email.user_id, "alert_folders", folder)
++            .await
++    {
++        return MetaHttpResponse::forbidden("Unauthorized Access");
++    }
+     match anomaly_service::update_config(&org_id, &anomaly_id, req).await {
+         Ok(config) => MetaHttpResponse::json(config),
+         Err(e) if e.to_string().contains("not found") => {
+diff --git a/src/api/management/src/request/dashboards/mod.rs b/src/api/management/src/request/dashboards/mod.rs
+index e869e0f8fc0..946608fbfcb 100644
+--- a/src/api/management/src/request/dashboards/mod.rs
++++ b/src/api/management/src/request/dashboards/mod.rs
+@@ -389,6 +389,7 @@ pub async fn delete_dashboard_bulk(
+     ),
+     responses(
+         (status = StatusCode::OK, description = "Dashboard Moved", body = Object),
++        (status = StatusCode::FORBIDDEN, description = "Forbidden", body = ()),
+         (status = StatusCode::NOT_FOUND, description = "Dashboard not found", body = ()),
+     ),
+     extensions(
+@@ -404,7 +405,8 @@ pub async fn move_dashboard(
+     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
+         return MetaHttpResponse::not_found("Dashboard not found");
+     }
+-    // For this endpoint, openfga check is already done in the middleware
++    // The destination is authorized inside `dashboards::move_dashboard`, which
++    // both routes go through — see the check hoisted out of `_check_openfga`.
+     match dashboards::move_dashboard(
+         &org_id,
+         &dashboard_id,
+@@ -437,6 +439,7 @@ pub async fn move_dashboard(
+     request_body(content = inline(MoveDashboardsRequestBody), description = "Identifies dashboards and the destination folder", content_type = "application/json"),
+     responses(
+         (status = 200, description = "Success", content_type = "application/json", body = Object),
++        (status = 403, description = "Forbidden", content_type = "application/json", body = ()),
+         (status = 404, description = "NotFound", content_type = "application/json", body = ()),
+         (status = 500, description = "Failure",  content_type = "application/json", body = ()),
+     ),
+diff --git a/src/api/management/src/request/dashboards/reports.rs b/src/api/management/src/request/dashboards/reports.rs
+index c4ae1a18273..d0727ce1943 100644
+--- a/src/api/management/src/request/dashboards/reports.rs
++++ b/src/api/management/src/request/dashboards/reports.rs
+@@ -27,7 +27,7 @@ use config::meta::{
+ use db::scheduler;
+ use openobserve_api_common::extractors::Headers;
+ #[cfg(feature = "enterprise")]
+-use openobserve_core::auth::check_permissions;
++use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
+ use openobserve_core::{
+     auth::UserEmail,
+     dashboards::reports::{self, ReportError},
+@@ -669,6 +669,7 @@ pub async fn get_report_v2(Path((org_id, report_id)): Path<(String, String)>) ->
+     request_body(content = inline(Report), description = "Report details"),
+     responses(
+         (status = StatusCode::OK, description = "Updated", body = ()),
++        (status = StatusCode::FORBIDDEN, description = "Forbidden", body = ()),
+         (status = StatusCode::NOT_FOUND, description = "Not found", body = ()),
+     ),
+     extensions(
+@@ -681,13 +682,41 @@ pub async fn update_report_v2(
+     Headers(user_email): Headers<UserEmail>,
+     axum::Json(mut report): axum::Json<Report>,
+ ) -> Response {
+-    report.last_edited_by = user_email.user_id;
++    // The authorization subject comes from the header, never from the body.
++    let user_id = user_email.user_id;
++    report.last_edited_by = user_id.clone();
+     // ?folder on update means "move to this folder"; absent means stay in current folder.
+     let new_folder: Option<String> = uri.query().and_then(|q| {
+         url::form_urlencoded::parse(q.as_bytes())
+             .find(|(k, _)| k == "folder")
+             .map(|(_, v)| v.into_owned())
+     });
++    // The route gate resolves `?folder=`, which HERE names the DESTINATION, so a
++    // move is authorized against the folder it lands in and never against the one
++    // it leaves. Check the source before honouring the move.
++    #[cfg(feature = "enterprise")]
++    if new_folder.is_some() {
++        let curr_folder = match reports::get_by_id(&org_id, &report_id).await {
++            Ok((folder, _)) => folder.folder_id,
++            Err(e) => return e.into(),
++        };
++        if !check_permissions(
++            &report_id,
++            &org_id,
++            &user_id,
++            "reports",
++            "PUT",
++            Some(&curr_folder),
++            false,
++            true,
++            false,
++        )
++        .await
++        {
++            return MetaHttpResponse::forbidden("Unauthorized Access");
++        }
++    }
++
+     match reports::update_by_id(&org_id, &report_id, new_folder.as_deref(), report).await {
+         Ok(_) => MetaHttpResponse::ok("Report updated"),
+         Err(e) => e.into(),
+@@ -881,6 +910,7 @@ pub async fn trigger_report_v2(Path((org_id, report_id)): Path<(String, String)>
+     ),
+     responses(
+         (status = 200, description = "Success", body = Object),
++        (status = 403, description = "Forbidden", body = ()),
+         (status = 404, description = "Not found", body = ()),
+     ),
+     extensions(
+@@ -889,22 +919,26 @@ pub async fn trigger_report_v2(Path((org_id, report_id)): Path<(String, String)>
+ )]
+ pub async fn move_reports(
+     Path(org_id): Path<String>,
+-    OriginalUri(uri): OriginalUri,
+     Headers(user_email): Headers<UserEmail>,
+     axum::Json(req): axum::Json<MoveReportsRequestBody>,
+ ) -> Response {
+     let _user_id = user_email.user_id;
+-    let _folder_id = get_folder(uri.query().unwrap_or(""));
+-
+     #[cfg(feature = "enterprise")]
+     for id in &req.report_ids {
++        // The report's stored folder, not `?folder=`: the query param is caller
++        // supplied, so authorizing against it lets the caller name a folder they
++        // do hold and move a report out of one they do not.
++        let curr_folder = match reports::get_by_id(&org_id, id).await {
++            Ok((folder, _)) => folder.folder_id,
++            Err(e) => return e.into(),
++        };
+         if !check_permissions(
+             id,
+             &org_id,
+             &_user_id,
+             "reports",
+             "PUT",
+-            Some(&_folder_id),
++            Some(&curr_folder),
+             false,
+             true,
+             false,
+@@ -915,6 +949,13 @@ pub async fn move_reports(
+         }
+     }
+ 
++    #[cfg(feature = "enterprise")]
++    if !check_folder_write_permissions(&org_id, &_user_id, "report_folders", &req.dst_folder_id)
++        .await
++    {
++        return MetaHttpResponse::forbidden("Unauthorized Access");
++    }
++
+     match reports::move_to_folder(&org_id, &req.report_ids, &req.dst_folder_id).await {
+         Ok(_) => MetaHttpResponse::ok(if req.report_ids.len() == 1 {
+             "Report moved"
+diff --git a/src/api/management/src/request/slos/mod.rs b/src/api/management/src/request/slos/mod.rs
+index cce9c63ac49..16effee6db3 100644
+--- a/src/api/management/src/request/slos/mod.rs
++++ b/src/api/management/src/request/slos/mod.rs
+@@ -28,6 +28,8 @@ use axum::{
+ };
+ use config::meta::slo::{Slo, SloStatusView};
+ use openobserve_api_common::extractors::Headers;
++#[cfg(feature = "enterprise")]
++use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
+ use openobserve_core::{auth::UserEmail, slo::service as slo_service};
+ use serde::{Deserialize, Serialize};
+ use utoipa::ToSchema;
+@@ -128,6 +130,7 @@ pub async fn get_slo(Path((org_id, slo_id)): Path<(String, String)>) -> Response
+     responses(
+         (status = 200, description = "Created", content_type = "application/json", body = MetaHttpResponse),
+         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
++        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
+     ),
+ )]
+ #[tracing::instrument(skip_all, fields(org_id = %org_id))]
+@@ -142,9 +145,23 @@ pub async fn create_slo(
+     if slo.id.is_empty() {
+         slo.id = config::ider::generate();
+     }
++    // Resolve the effective destination BEFORE authorizing it: an empty
++    // folder_id writes to the default folder, which the `?folder=` gate did not
++    // necessarily cover, so skipping the check on empty would leave a hole.
+     if slo.folder_id.is_empty() {
+         slo.folder_id = config::meta::folder::DEFAULT_FOLDER.to_string();
+     }
++    #[cfg(feature = "enterprise")]
++    if !check_folder_write_permissions(
++        &slo.org,
++        &user_email.user_id,
++        "alert_folders",
++        &slo.folder_id,
++    )
++    .await
++    {
++        return MetaHttpResponse::forbidden("Unauthorized Access");
++    }
+     if slo.owner.is_none() {
+         slo.owner = Some(user_email.user_id.clone());
+     }
+@@ -181,6 +198,7 @@ pub async fn create_slo(
+     responses(
+         (status = 200, description = "Updated", content_type = "application/json", body = MetaHttpResponse),
+         (status = 400, description = "Bad Request", content_type = "application/json", body = MetaHttpResponse),
++        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
+     ),
+ )]
+ #[tracing::instrument(skip_all, fields(org_id = %org_id, slo_id = %slo_id))]
+@@ -193,6 +211,27 @@ pub async fn update_slo(
+     // the permission check ran against.
+     slo.org = org_id;
+     slo.id = slo_id;
++    // An update that changes folder_id is also a move, so the destination needs
++    // its own check. Compared against the stored folder because a plain edit
++    // round-trips the current one unchanged.
++    #[cfg(feature = "enterprise")]
++    if !slo.folder_id.is_empty() {
++        let current = slo_service::folders_of(&slo.org, std::slice::from_ref(&slo.id))
++            .await
++            .ok()
++            .and_then(|mut found| found.pop().map(|(_, folder_id)| folder_id));
++        if current.as_deref() != Some(slo.folder_id.as_str())
++            && !check_folder_write_permissions(
++                &slo.org,
++                &user_email.user_id,
++                "alert_folders",
++                &slo.folder_id,
++            )
++            .await
++        {
++            return MetaHttpResponse::forbidden("Unauthorized Access");
++        }
++    }
+     if slo.owner.is_none() {
+         slo.owner = Some(user_email.user_id.clone());
+     }
+@@ -254,12 +293,13 @@ pub struct MoveSlosRequestBody {
+     tag = "SLOs",
+     operation_id = "MoveSlos",
+     summary = "Move SLOs between folders",
+-    description = "Relocates one or more SLOs into another folder. SLOs share the alert folder namespace, so the destination is an alert folder. A move never changes an SLO's definition and never restarts its measurement.",
++    description = "Relocates one or more SLOs into another folder. SLOs share the alert folder namespace, so the destination is an alert folder. Requires write access to each SLO being moved, and to the destination folder. A move never changes an SLO's definition and never restarts its measurement.",
+     security(("Authorization" = [])),
+     params(("org_id" = String, Path, description = "Organization identifier")),
+     request_body(content = inline(MoveSlosRequestBody), description = "The SLOs and the destination folder", content_type = "application/json"),
+     responses(
+         (status = 200, description = "Moved", content_type = "application/json", body = MetaHttpResponse),
++        (status = 403, description = "Forbidden", content_type = "application/json", body = MetaHttpResponse),
+         (status = 404, description = "Not Found", content_type = "application/json", body = MetaHttpResponse),
+         (status = 409, description = "Name already used in the destination", content_type = "application/json", body = MetaHttpResponse),
+     ),
+@@ -280,6 +320,47 @@ pub async fn move_slos(
+         )
+         .into_response();
+     }
++    // The move route is bypass:true, so both sides are authorized here. Source
++    // first: an SLO is checked as an alert parented by its current folder, the
++    // same shape /{org}/slos/{id} PUT resolves to.
++    #[cfg(feature = "enterprise")]
++    {
++        let sources = match slo_service::folders_of(&org_id, &req_body.slo_ids).await {
++            Ok(sources) => sources,
++            Err(e) => return save_error(e),
++        };
++        for (slo_id, folder_id) in &sources {
++            if !check_permissions(
++                slo_id,
++                &org_id,
++                &user_email.user_id,
++                "alerts",
++                "PUT",
++                Some(folder_id),
++                false,
++                true,
++                false,
++            )
++            .await
++            {
++                return MetaHttpResponse::forbidden("Unauthorized Access");
++            }
++        }
++    }
++
++    // SLOs share the alert folder namespace, so the destination is an alert folder.
++    #[cfg(feature = "enterprise")]
++    if !check_folder_write_permissions(
++        &org_id,
++        &user_email.user_id,
++        "alert_folders",
++        &req_body.dst_folder_id,
++    )
++    .await
++    {
++        return MetaHttpResponse::forbidden("Unauthorized Access");
++    }
++
+     match slo_service::move_to_folder(
+         &org_id,
+         &req_body.slo_ids,
+diff --git a/src/api/management/src/request/synthetics/mod.rs b/src/api/management/src/request/synthetics/mod.rs
+index bc85eae1bf6..30bd99f721e 100644
+--- a/src/api/management/src/request/synthetics/mod.rs
++++ b/src/api/management/src/request/synthetics/mod.rs
+@@ -30,7 +30,7 @@ use crate::service::auth::UserEmail;
+ // rather than relying on it — per-resource RBAC is enterprise, and an OSS build
+ // must not 403 its way through a feature it ships.
+ #[cfg(feature = "enterprise")]
+-use crate::service::auth::check_permissions;
++use crate::service::auth::{check_folder_write_permissions, check_permissions};
+ 
+ // ── Local query / body types ──────────────────────────────────────────────────
+ 
+@@ -450,6 +450,7 @@ pub async fn get_synthetic(
+     request_body(content = config::meta::synthetics::Synthetic, description = "Updated synthetic definition", content_type = "application/json"),
+     responses(
+         (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics::Synthetic),
++        (status = 403, description = "Forbidden"),
+         (status = 404, description = "Not found"),
+         (status = 500, description = "Error",     content_type = "application/json", body = Object),
+     ),
+@@ -476,6 +477,29 @@ pub async fn update_synthetic(
+     {
+         return MetaHttpResponse::forbidden("Forbidden");
+     }
++
++    // An update that changes folder_id is also a move, so the destination needs
++    // its own check — the gate above only covers `?folder=`. Compared against the
++    // stored folder because a plain edit round-trips the current one unchanged.
++    #[cfg(feature = "enterprise")]
++    if !body.folder_id.is_empty() {
++        let current = openobserve_synthetics::service::folder_of(&org_id, &id)
++            .await
++            .ok()
++            .flatten();
++        if current.as_deref() != Some(body.folder_id.as_str())
++            && !check_folder_write_permissions(
++                &org_id,
++                &user_email.user_id,
++                "synthetic_folder",
++                &body.folder_id,
++            )
++            .await
++        {
++            return MetaHttpResponse::forbidden("Forbidden");
++        }
++    }
++
+     match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
+         Ok(check) => MetaHttpResponse::json(check),
+         Err(e) => {
+@@ -597,6 +621,7 @@ pub async fn delete_synthetics_bulk(
+     request_body(content = MoveSyntheticsRequestBody, description = "IDs and destination folder", content_type = "application/json"),
+     responses(
+         (status = 200, description = "Moved"),
++        (status = 403, description = "Forbidden"),
+         (status = 500, description = "Error", content_type = "application/json", body = Object),
+     ),
+ )]
+@@ -629,6 +654,19 @@ pub async fn move_synthetics(
+             return MetaHttpResponse::forbidden("Forbidden");
+         }
+     }
++
++    #[cfg(feature = "enterprise")]
++    if !check_folder_write_permissions(
++        &org_id,
++        &user_email.user_id,
++        "synthetic_folder",
++        &body.dst_folder_id,
++    )
++    .await
++    {
++        return MetaHttpResponse::forbidden("Forbidden");
++    }
++
+     match openobserve_synthetics::service::move_synthetics(
+         &org_id,
+         &body.synthetic_ids,
+diff --git a/src/config/src/meta/synthetics.rs b/src/config/src/meta/synthetics.rs
+index d37b8243691..995476b3f33 100644
+--- a/src/config/src/meta/synthetics.rs
++++ b/src/config/src/meta/synthetics.rs
+@@ -111,7 +111,8 @@ pub struct Synthetic {
+     pub id: String,
+     #[serde(default)]
+     pub org_id: String,
+-    /// KSUID of the folder this synthetic belongs to (`folders.id`).
++    /// Folder this synthetic belongs to, as the public folder slug the API
++    /// accepts and returns; it is resolved to the `folders.id` KSUID on write.
+     #[serde(default)]
+     pub folder_id: String,
+     /// Timezone offset in minutes from UTC (e.g. -300 = EST). Used for cron scheduling.
+diff --git a/src/core/src/alerts/alert.rs b/src/core/src/alerts/alert.rs
+index 0edc5548dff..445608b5c1d 100644
+--- a/src/core/src/alerts/alert.rs
++++ b/src/core/src/alerts/alert.rs
+@@ -71,7 +71,7 @@ use search::{
+ use svix_ksuid::Ksuid;
+ 
+ #[cfg(feature = "enterprise")]
+-use crate::auth::check_permissions;
++use crate::auth::{check_folder_write_permissions, check_permissions};
+ use crate::{
+     alerts::{
+         QueryConditionExt, build_sql, destinations,
+@@ -953,6 +953,13 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
+     dst_folder_id: &str,
+     _user_id: &str,
+ ) -> Result<(), AlertError> {
++    #[cfg(feature = "enterprise")]
++    if get_openfga_config().enabled
++        && !check_folder_write_permissions(org_id, _user_id, "alert_folders", dst_folder_id).await
++    {
++        return Err(AlertError::PermissionDenied);
++    }
++
+     for alert_id in alert_ids {
+         let _alert_id_str = alert_id.to_string();
+ 
+diff --git a/src/core/src/auth.rs b/src/core/src/auth.rs
+index e574a1b847c..e1c77eef64d 100644
+--- a/src/core/src/auth.rs
++++ b/src/core/src/auth.rs
+@@ -692,6 +692,45 @@ pub async fn check_permissions(
+     true
+ }
+ 
++// OSS has no folder boundary to cross, so this allows where the `check_permissions`
++// stub above denies: there is no folder ACL to consult, not a failed lookup.
++#[cfg(not(feature = "enterprise"))]
++pub async fn check_folder_write_permissions(
++    _org_id: &str,
++    _user_id: &str,
++    _folder_type: &str,
++    _folder_id: &str,
++) -> bool {
++    true
++}
++
++/// A source-folder check proves the caller may take the object out, never that
++/// they may put it into a destination folder they cannot otherwise reach.
++///
++/// Checks POST, the verb the create routes require on a folder: putting an
++/// object into a folder is authorized the same way whether it arrives by
++/// create, move or clone.
++#[cfg(feature = "enterprise")]
++pub async fn check_folder_write_permissions(
++    org_id: &str,
++    user_id: &str,
++    folder_type: &str,
++    folder_id: &str,
++) -> bool {
++    check_permissions(
++        folder_id,
++        org_id,
++        user_id,
++        folder_type,
++        "POST",
++        None,
++        false,
++        false,
++        true,
++    )
++    .await
++}
++
+ #[cfg(feature = "enterprise")]
+ pub async fn extract_auth_expiry_and_user_id(
+     parts: &Parts,
+@@ -1011,6 +1050,18 @@ mod tests {
+         assert!(!result);
+     }
+ 
++    // OSS has no folder boundary to cross, so the destination check must never
++    // block a move there — only enterprise+OpenFGA gates folders.
++    #[cfg(not(feature = "enterprise"))]
++    #[tokio::test]
++    async fn test_check_folder_write_permissions_non_enterprise_allows() {
++        let result =
++            check_folder_write_permissions("test_org", "test_user", "alert_folders", "dst_folder")
++                .await;
++
++        assert!(result);
++    }
++
+     #[test]
+     fn test_regex_compilation() {
+         // Smoke-test the re-exported regexes compile and behave. Exhaustive
+diff --git a/src/core/src/dashboards/mod.rs b/src/core/src/dashboards/mod.rs
+index cebec0f8047..ce2c485bd8d 100644
+--- a/src/core/src/dashboards/mod.rs
++++ b/src/core/src/dashboards/mod.rs
+@@ -57,7 +57,7 @@ use o2_openfga::{
+ };
+ 
+ #[cfg(feature = "enterprise")]
+-use crate::auth::check_permissions;
++use crate::auth::{check_folder_write_permissions, check_permissions};
+ 
+ /// An error that occurs interacting with dashboards.
+ #[derive(Debug, thiserror::Error)]
+@@ -632,6 +632,16 @@ pub async fn move_dashboard(
+         }
+     }
+ 
++    // Outside `_check_openfga`: the source gate differs per route (the single
++    // move relies on the middleware), but the destination is never authorized
++    // anywhere else, so this must run for every caller.
++    #[cfg(feature = "enterprise")]
++    if get_openfga_config().enabled
++        && !check_folder_write_permissions(org_id, _user_id, "folders", to_folder).await
++    {
++        return Err(DashboardError::PermissionDenied);
++    }
++
+     let hash = dashboard.hash.clone();
+     let _updated_dashboard = put(
+         org_id,
+diff --git a/src/core/src/slo/service.rs b/src/core/src/slo/service.rs
+index 2fa4a53c5cf..1c36ef6811f 100644
+--- a/src/core/src/slo/service.rs
++++ b/src/core/src/slo/service.rs
+@@ -936,6 +936,21 @@ pub async fn set_enabled(org: &str, id: &str, enabled: bool) -> Result<bool, Slo
+ // read path
+ // ---------------------------------------------------------------------------
+ 
++/// The folder each named SLO currently lives in, skipping ids that do not resolve.
++///
++/// Callers authorize a move's source side with this: an SLO has no OFGA object
++/// type of its own, so it is checked as an alert parented by its folder.
++pub async fn folders_of(org: &str, ids: &[String]) -> Result<Vec<(String, String)>, SloError> {
++    let db = get_orm_client_ro().await;
++    let mut out = Vec::with_capacity(ids.len());
++    for id in ids {
++        if let Some(slo) = slos_table::get(db, org, id).await? {
++            out.push((slo.id, slo.folder_id));
++        }
++    }
++    Ok(out)
++}
++
+ /// One SLO with its rollup measurement.
+ pub async fn get_with_status(
+     org: &str,
+diff --git a/src/synthetics/src/service/checks.rs b/src/synthetics/src/service/checks.rs
+index c4069195130..8a874241ca9 100644
+--- a/src/synthetics/src/service/checks.rs
++++ b/src/synthetics/src/service/checks.rs
+@@ -128,6 +128,24 @@ pub async fn get_synthetic(org_id: &str, id: &str) -> anyhow::Result<Option<Synt
+     Ok(check)
+ }
+ 
++/// The folder slug a check currently lives in, in the same public form request
++/// bodies use — so a caller can tell an actual move from an unchanged round-trip.
++pub async fn folder_of(org_id: &str, id: &str) -> anyhow::Result<Option<String>> {
++    let conn = get_orm_client_ro().await;
++    let Some(check) = synthetics_checks::get(conn, org_id, id)
++        .await
++        .map_err(|e| anyhow::anyhow!(e.to_string()))?
++    else {
++        return Ok(None);
++    };
++    Ok(Some(
++        folders::get_name_by_pk(&check.folder_id)
++            .await
++            .unwrap_or(None)
++            .unwrap_or(check.folder_id),
++    ))
++}
++
+ /// Updates a synthetic. Recomputes `next_run_at` if the frequency changed so the
+ /// scheduler fires on the correct schedule without waiting for the old window.
+ pub async fn update_synthetic(
+diff --git a/web/src/components/alerts/ImportAlert.vue b/web/src/components/alerts/ImportAlert.vue
+index a7534ed9113..051c5400e1c 100644
+--- a/web/src/components/alerts/ImportAlert.vue
++++ b/web/src/components/alerts/ImportAlert.vue
+@@ -574,7 +574,7 @@ export default defineComponent({
+             alert_enabled: jsonObj.alert_enabled ?? true,
+           },
+         };
+-        await anomalyDetectionService.create(org, payload);
++        await anomalyDetectionService.create(org, payload, selectedFolderId.value || "default");
+         alertCreators.value.push({
+           message: t("alerts.import.anomalyImportSuccess", { index, name: jsonObj.name }),
+           success: true,
+diff --git a/web/src/composables/useAlertForm.ts b/web/src/composables/useAlertForm.ts
+index f49517e94e9..18adb78daf4 100644
+--- a/web/src/composables/useAlertForm.ts
++++ b/web/src/composables/useAlertForm.ts
+@@ -1931,7 +1931,11 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
+           message: t("alerts.messages.anomalyConfigUpdated"),
+         });
+       } else {
+-        await anomalyDetectionService.create(orgId, payload);
++        await anomalyDetectionService.create(
++          orgId,
++          payload,
++          (activeFolderId.value as string) || "default",
++        );
+         toast({
+           variant: "success",
+           message: t("alerts.anomalyCreated"),
+diff --git a/web/src/services/anomaly_detection.spec.ts b/web/src/services/anomaly_detection.spec.ts
+index 0ff4d135ee6..9c16f117036 100644
+--- a/web/src/services/anomaly_detection.spec.ts
++++ b/web/src/services/anomaly_detection.spec.ts
+@@ -130,6 +130,36 @@ describe("anomaly_detection service", () => {
+ 
+       expect(mockHttpInstance.post).toHaveBeenCalledWith(`/api/v2/${org_identifier}/alerts`, data);
+     });
++
++    // The folder must travel as ?folder=: it is what the permission gate
++    // authorizes, and a body-only copy lands the config in the default folder.
++    it("should send the folder as a query param when one is given", async () => {
++      const org_identifier = "org123";
++      const data = { name: "cpu-anomaly" };
++
++      mockHttpInstance.post.mockResolvedValue({ data: { id: "id" } });
++
++      await anomaly_detection.create(org_identifier, data, "payments");
++
++      expect(mockHttpInstance.post).toHaveBeenCalledWith(
++        `/api/v2/${org_identifier}/alerts?folder=payments`,
++        data,
++      );
++    });
++
++    it("should encode folder names that need escaping", async () => {
++      const org_identifier = "org123";
++      const data = { name: "cpu-anomaly" };
++
++      mockHttpInstance.post.mockResolvedValue({ data: { id: "id" } });
++
++      await anomaly_detection.create(org_identifier, data, "my folder&x");
++
++      expect(mockHttpInstance.post).toHaveBeenCalledWith(
++        `/api/v2/${org_identifier}/alerts?folder=my%20folder%26x`,
++        data,
++      );
++    });
+   });
+ 
+   describe("update", () => {
+diff --git a/web/src/services/anomaly_detection.ts b/web/src/services/anomaly_detection.ts
+index 6bbd1971afe..4ae141c3ebc 100644
+--- a/web/src/services/anomaly_detection.ts
++++ b/web/src/services/anomaly_detection.ts
+@@ -30,8 +30,14 @@ const anomaly_detection = {
+   },
+ 
+   // POST /api/v2/{org}/alerts — delegates to anomaly config creation when alert_type is "anomaly_detection"
+-  create: (org_identifier: string, data: object) => {
+-    return http().post(`/api/v2/${org_identifier}/alerts`, data);
++  // The folder travels as ?folder=: it is what the permission gate authorizes,
++  // so the body copy alone would create the config in the default folder.
++  create: (org_identifier: string, data: object, folder_id?: string) => {
++    let url = `/api/v2/${org_identifier}/alerts`;
++    if (folder_id) {
++      url += `?folder=${encodeURIComponent(folder_id)}`;
++    }
++    return http().post(url, data);
+   },
+ 
+   // PUT /api/v2/{org}/alerts/{id} — delegates to anomaly config update when alert_type is "anomaly_detection"
+diff --git a/web/src/views/slos/AddSlo.vue b/web/src/views/slos/AddSlo.vue
+index c42d80b73eb..271c76caeaa 100644
+--- a/web/src/views/slos/AddSlo.vue
++++ b/web/src/views/slos/AddSlo.vue
+@@ -1093,6 +1093,9 @@ async function load() {
+     name: body.name,
+     description: body.description ?? "",
+     tags: body.tags ?? [],
++    // Without this the seeded default is sent back on every edit, which reads
++    // as a move out of the SLO's real folder.
++    folder_id: body.folder_id || form.folder_id,
+     sli_type: body.sli_type,
+     config: { stream_type: countStreamType, ...flat },
+     target: body.target,

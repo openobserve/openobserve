@@ -1,0 +1,6 @@
+[
+  { "title": "should import alerts into a chosen folder", "action": "new", "verifies": "importing an exported alerts JSON with a non-default folder selected creates the alert in that folder (and not in default)" },
+  { "title": "should create a regular alert in a chosen folder", "action": "new", "verifies": "a regular alert created while scoped to a chosen folder lands there, not in default" },
+  { "title": "should create an anomaly config in a chosen folder", "action": "new", "verifies": "an anomaly config created with a folder chosen in the inline picker is written to that folder via the ?folder= param" },
+  { "title": "should default to the default folder when no folder is selected", "action": "new", "verifies": "creation with no folder picked falls back to the default folder" }
+]

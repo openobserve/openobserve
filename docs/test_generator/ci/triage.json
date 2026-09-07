@@ -1,0 +1,28 @@
+{
+  "feature_slug": "alerts-folder-creation",
+  "feature_title": "Alerts & SLO Folder-scoped Creation",
+  "area": "Alerts",
+  "edition": "both",
+  "needs_e2e": true,
+  "needs_api": true,
+  "spec_filename": "alerts-folder-creation.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/Alerts/alerts-folder-creation.spec.js",
+  "playwright_group": "Alerts",
+  "source_files": [
+    "web/src/components/alerts/ImportAlert.vue",
+    "web/src/composables/useAlertForm.ts",
+    "web/src/services/anomaly_detection.ts",
+    "web/src/views/slos/AddSlo.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "Every changed path lives in the OSS repo (src/... and web/src/...) — no enterprise-owned directory appears in changed_files.txt. But the diff spans both layers: it adds an OSS stub of check_folder_write_permissions (returns true on non-enterprise builds, since OSS has no folder boundary) AND an enterprise-gated layer (#[cfg(feature = \"enterprise\")] folder-write permission checks on alert/anomaly/SLO/synthetic/dashboard/report create/move/clone routes). Folder-permission/RBAC keywords corroborate the enterprise angle, but path evidence shows both an OSS implementation and an enterprise layer are present, so edition = both.",
+    "skip": "Not skipped. The change touches user-facing UI in web/src (ImportAlert.vue, useAlertForm.ts, anomaly_detection.ts, AddSlo.vue); no tests-added label or skip marker was passed and trigger_comment.txt is empty.",
+    "e2e": "E2E is warranted. User-facing flows changed: creating/importing an anomaly-detection alert now sends the selected folder as a ?folder= query param (so the config lands in the right folder instead of default), and editing an SLO now round-trips its real folder_id instead of the seeded default (which previously read as an unwanted move). These alter where objects land and need UI verification.",
+    "area": "Alerts. The bulk of the UI changes live in the alert surface (ImportAlert.vue, useAlertForm.ts, anomaly_detection.ts); the SLO edit (AddSlo.vue) shares the alert folder namespace and there is no separate SLO shard in the matrix, so Alerts is the closest area with sibling specs (alerts-import.spec.js, alerts-ui-operations.spec.js).",
+    "group": "Alerts is the existing shard in tests/ui-testing/ci-matrix/ci_matrix_env.json (actual_folder Alerts) that already groups alert UI specs including alerts-import.spec.js, the closest sibling to the changed ImportAlert.vue.",
+    "existing_tests": "No Playwright E2E specs in the diff. The only changed test file is web/src/services/anomaly_detection.spec.ts, a Vitest unit test, which is not E2E coverage and does not count."
+  }
+}

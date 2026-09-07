@@ -22,7 +22,7 @@ import { openOSelectDropdown } from './oselectHelpers.js';
 import { AlertManagement } from './alertManagement.js';
 import { AlertBulkOperations } from './alertBulkOperations.js';
 const testLogger = require('../../playwright-tests/utils/test-logger.js');
-const { getAuthHeaders, isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
+const { getAuthHeaders, getOrgIdentifier, isCloudEnvironment } = require('../../playwright-tests/utils/cloud-auth.js');
 
 export class AlertsPage {
     constructor(page) {
@@ -281,6 +281,8 @@ export class AlertsPage {
             alertImportJsonFileInput: '[data-test="alert-import-json-file-input"]',
             alertImportJsonFileInputField: '[data-test="alert-import-json-file-input-field"]',
             alertImportFileTab: '[data-test="tab-import_json_file"]',
+            // Inline folder picker in the AddAlert/AddAnomaly header
+            inlineSelectFolderDropdown: '[data-test="inline-select-folder-dropdown"]',
 
             // Page structure locators
             alertListPage: '[data-test="alert-list-page"]',
@@ -1662,6 +1664,85 @@ export class AlertsPage {
         testLogger.info('Successfully deleted folder', { folderName });
     }
 
+    /**
+     * Resolve an alert folder's id (KSUID) from its name via the v2 folders API.
+     */
+    async resolveAlertFolderId(folderName) {
+        const baseUrl = process.env["ZO_BASE_URL"];
+        const org = getOrgIdentifier();
+        const headers = getAuthHeaders();
+        const resp = await this.page.request.get(`${baseUrl}/api/v2/${org}/folders/alerts`, { headers });
+        if (!resp.ok()) {
+            throw new Error(`Failed to resolve folder id for "${folderName}": HTTP ${resp.status()}`);
+        }
+        const data = await resp.json().catch(() => ({}));
+        const list = Array.isArray(data?.list) ? data.list : [];
+        const folder = list.find((f) => f.name === folderName);
+        if (!folder) {
+            throw new Error(`Folder "${folderName}" not found in the alerts folder list`);
+        }
+        return folder.folderId;
+    }
+
+    /**
+     * Drive a folder OSelect picker by folder id, retrying until the trigger
+     * reports the selection (OSelect commits asynchronously).
+     */
+    async _selectFolderDropdown(rootSelector, folderId, folderName) {
+        const root = this.page.locator(rootSelector).first();
+        await openOSelectDropdown(this.page, root);
+        const dataTest = rootSelector.match(/\[data-test="([^"]+)"\]/)?.[1];
+        const trigger = this.page.locator(`[data-test="${dataTest}-trigger"]`).first();
+        const option = this.page.locator(`[data-test="${dataTest}-option"][data-test-value="${folderId}"]`).first();
+
+        // Searchable OSelects virtualize the list; filter so the target row renders.
+        const search = this.page.locator(`[data-test="${dataTest}-search"]`);
+        if ((await search.count()) > 0) {
+            await search.fill(folderName);
+            await this.page.waitForTimeout(400);
+        }
+
+        const committed = async () => {
+            const attr = await trigger.getAttribute('data-test-selected-value').catch(() => null);
+            if (attr !== null) return attr === String(folderId);
+            const text = (await trigger.textContent().catch(() => '')) ?? '';
+            return text.trim().includes(folderName.trim());
+        };
+
+        const deadline = Date.now() + 20000;
+        let attempt = 0;
+        while (Date.now() < deadline) {
+            attempt += 1;
+            try {
+                await option.waitFor({ state: 'visible', timeout: 5000 });
+                await option.click();
+            } catch {
+                await openOSelectDropdown(this.page, root);
+                continue;
+            }
+            if (await committed()) return;
+            await openOSelectDropdown(this.page, root);
+        }
+        throw new Error(`Folder picker "${dataTest}" never committed folder "${folderName}" (${folderId}) after ${attempt} attempts`);
+    }
+
+    /**
+     * Select a folder in the import screen's folder picker (SelectFolderDropDown).
+     * Scoped to the visible tab — the file/URL tabs render one picker each.
+     */
+    async selectImportFolder(folderName) {
+        const folderId = await this.resolveAlertFolderId(folderName);
+        await this._selectFolderDropdown(`${this.locators.folderDropdown}:visible`, folderId, folderName);
+    }
+
+    /**
+     * Select a folder in the AddAlert/AddAnomaly header's inline folder picker.
+     */
+    async selectAlertFormFolder(folderName) {
+        const folderId = await this.resolveAlertFolderId(folderName);
+        await this._selectFolderDropdown(this.locators.inlineSelectFolderDropdown, folderId, folderName);
+    }
+
     // ==================== VERIFICATION METHODS ====================
 
     async alertsURLValidation() {
@@ -3000,6 +3081,25 @@ export class AlertsPage {
 
         await expect(this.page.getByRole('cell').filter({ hasText: this.currentAlertName }).first()).toBeVisible({ timeout: 30000 });
         testLogger.info('Imported alert visible in list', { alertName: this.currentAlertName });
+    }
+
+    /**
+     * Import an exported alerts JSON file into a chosen (non-default) folder.
+     * Opens the import screen, selects the folder, uploads the file, imports, and
+     * waits for the 400ms-delayed redirect back to the folder-scoped alert list.
+     */
+    async importAlertsIntoFolder(filePath, folderName, expectedAlertName) {
+        await this.page.locator(this.locators.alertImportButton).click();
+        await expect(this.page.locator(this.locators.alertImportJsonBtn)).toBeVisible({ timeout: 10000 });
+        await this.selectImportFolder(folderName);
+        await this.page.locator(this.locators.alertImportJsonFileInputField).setInputFiles(filePath);
+        await this.page.waitForTimeout(3000);
+        await this.page.locator(this.locators.alertImportJsonBtn).click();
+        await this.page.waitForTimeout(1000);
+        await this.page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
+        if (expectedAlertName) {
+            await expect(this.page.getByRole('cell').filter({ hasText: expectedAlertName }).first()).toBeVisible({ timeout: 30000 });
+        }
     }
 
     async cleanupDownloadedFile(filePath) {
