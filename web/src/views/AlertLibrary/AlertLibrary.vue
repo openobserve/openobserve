@@ -48,6 +48,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-library-refresh"
           @click="refresh"
         />
+      </template>
+      <template #actions-overflow>
         <OButton
           variant="outline"
           size="sm"

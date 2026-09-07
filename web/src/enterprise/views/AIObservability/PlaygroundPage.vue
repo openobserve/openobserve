@@ -18,8 +18,10 @@
     icon="play-circle"
     title-data-test="ai-playground-title"
     bleed
+    overflow-first
   >
-    <template #actions>
+    <!-- Secondary: inline on desktop, behind "More" < md so Run All keeps the title row. -->
+    <template #actions-overflow>
       <ODropdown v-if="recentDrafts.length" align="end" content-class="w-100">
         <template #trigger>
           <OButton
@@ -57,7 +59,7 @@
       >
         {{ t("aiObservability.playground.reset") }}
       </OButton>
-      <span class="text-text-secondary text-xs" data-test="ai-playground-window-count">
+      <span v-if="!isMobile" class="text-text-secondary text-xs" data-test="ai-playground-window-count">
         {{
           t("aiObservability.playground.windowCount", {
             count: draft.variants.length,
@@ -86,6 +88,17 @@
       >
         {{ t("aiObservability.playground.share") }}
       </OButton>
+    </template>
+
+    <template #actions>
+      <span v-if="isMobile" class="text-text-secondary text-xs" data-test="ai-playground-window-count">
+        {{
+          t("aiObservability.playground.windowCount", {
+            count: draft.variants.length,
+            max: MAX_VARIANTS,
+          })
+        }}
+      </span>
       <OButton
         v-if="runningAll"
         variant="cancel-query"
@@ -286,6 +299,7 @@ import PlaygroundExpectedBar from "@/enterprise/components/AIObservability/Playg
 import PlaygroundSampleDialog from "@/enterprise/components/AIObservability/PlaygroundSampleDialog.vue";
 import PlaygroundScorersMenu from "@/enterprise/components/AIObservability/PlaygroundScorersMenu.vue";
 import PlaygroundShareDialog from "@/enterprise/components/AIObservability/PlaygroundShareDialog.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import PlaygroundVariableBar from "@/enterprise/components/AIObservability/PlaygroundVariableBar.vue";
 import PlaygroundVariantColumn from "@/enterprise/components/AIObservability/PlaygroundVariantColumn.vue";
 import onlineEvalsService, { type Provider, type Scorer } from "@/services/online-evals.service";
@@ -350,6 +364,7 @@ const results = reactive<PlaygroundResults>({});
 const providers = ref<Provider[]>([]);
 const loadingProviders = ref(true);
 const scorers = ref<Scorer[]>([]);
+const { isMobile } = useBreakpoint();
 const scoring = ref(false);
 const datasets = ref<LlmDataset[]>([]);
 

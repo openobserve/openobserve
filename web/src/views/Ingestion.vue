@@ -36,7 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
       <OSelect
-        v-if="!isRUMPage && tokenOptions.length > 0"
+        v-if="!isMobile && !isRUMPage && tokenOptions.length > 0"
         v-model="selectedTokenName"
         :options="tokenOptions"
         label-key="label"
@@ -45,14 +45,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         style="min-width: 13.75rem"
         @update:model-value="onTokenSelected"
       />
+      <!-- < md icon-only so the search and this button share the title row. -->
       <OButton
         v-if="!isRUMPage"
         variant="primary"
         size="sm"
         icon-left="key"
+        :title="t('ingestion.manageTokensBtnLabel')"
         @click="navigateToIngestionTokens"
       >
-        {{ t("ingestion.manageTokensBtnLabel") }}
+        <span class="max-md:hidden">{{ t("ingestion.manageTokensBtnLabel") }}</span>
       </OButton>
       <OButton
         v-if="
@@ -83,6 +85,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <!-- Pull the strip left (cancel the header's px-4) so the first tab lines
              up with the vertical sub-nav (Kubernetes/…) in the section below. -->
       <div class="-ms-3 w-full">
+        <!-- < md the token select leaves the actions row (its full width would
+             push the search under the title) and sits above the tab strip. -->
+        <div v-if="isMobile && !isRUMPage && tokenOptions.length > 0" class="ms-3 pb-2">
+          <OSelect
+            v-model="selectedTokenName"
+            :options="tokenOptions"
+            label-key="label"
+            value-key="value"
+            @update:model-value="onTokenSelected"
+          />
+        </div>
         <OTabs v-model="ingestTabType" align="left">
           <ORouteTab
             name="recommended"
@@ -226,6 +239,7 @@ import { getImageURL } from "@/utils/zincutils";
 import apiKeysService from "@/services/api_keys";
 import ConfirmDialog from "@/components/ConfirmDialog.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
+import useBreakpoint from "@/composables/useBreakpoint";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import { searchIngestionItems } from "@/utils/ingestionSearchIndex";
@@ -245,6 +259,7 @@ export default defineComponent({
     OBanner,
   },
   setup() {
+    const { isMobile } = useBreakpoint();
     const { t } = useI18nTyped();
     const store = useStore();
     const router: any = useRouter();
@@ -626,6 +641,7 @@ export default defineComponent({
     });
 
     return {
+      isMobile,
       t,
       store,
       router,

@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       title-overflow="visible"
       :back="{ label: t('workflow.header'), onClick: goBack, dataTest: 'workflow-editor-back' }"
       class="border-border-default border-b px-4"
+      overflow-first
     >
       <!-- Beta tag inside the title line (see WorkflowsList: #title-trail sits
            after the title+subtitle column, stranding it far from the title). -->
@@ -61,9 +62,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
 
       <template #title>
+        <!-- < md: the name's sizer grid can't shrink below its text, so cap it and
+             drop the badges — otherwise the actions paint over the title. -->
         <span class="inline-flex min-w-0 items-center gap-2">
           <OInlineEdit
             v-model="workflowObj.currentSelectedWorkflow.name"
+            class="max-md:max-w-40"
             data-test="workflow-editor-name"
             :placeholder="t('workflow.namePlaceholder')"
             :aria-label="t('workflow.name')"
@@ -73,11 +77,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :error-message="workflowObj.nameError ? t('workflow.nameRequired') : undefined"
             @update:model-value="onNameChange"
           />
-          <BetaBadge />
+          <BetaBadge class="max-md:hidden" />
           <OTag
             v-if="workflowObj.currentSelectedWorkflow.isDraft"
             variant="warning-soft"
             size="sm"
+            class="max-md:hidden"
             :label="t('workflow.draft')"
             data-test="workflow-editor-draft-tag"
           />
@@ -88,7 +93,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            gated to the create route). Enable/disable status isn't shown here —
            it's managed from the list, same as pipelines. -->
 
-      <template #actions>
+      <!-- Secondary: inline on desktop, behind "More" < md so Publish keeps the title row. -->
+      <template #actions-overflow>
         <!-- Past-run chip — shown when a run is loaded onto the canvas (arrived via
              "Fix This Step" or picked from History). Compact provenance in place of
              the old full-width banner: the tooltip carries "edit freely — never
@@ -155,6 +161,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("common.cancel") }}
         </OButton>
+        <OButton
+          v-if="!isExistingPublished"
+          variant="outline"
+          size="sm-action"
+          data-test="workflow-editor-save-draft"
+          :loading="saving"
+          :disabled="saving"
+          @click="onSaveDraft"
+        >
+          {{ t("workflow.saveDraft") }}
+        </OButton>
+      </template>
+
+      <template #actions>
         <!-- An already-published workflow saves as a single validated update.
              A new or draft workflow gets two actions: Save as Draft (lenient —
              persists an incomplete graph) and Publish (validates + promotes). -->
@@ -170,28 +190,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("common.save") }}
         </OButton>
-        <template v-else>
-          <OButton
-            variant="outline"
-            size="sm-action"
-            data-test="workflow-editor-save-draft"
-            :loading="saving"
-            :disabled="saving"
-            @click="onSaveDraft"
-          >
-            {{ t("workflow.saveDraft") }}
-          </OButton>
-          <OButton
-            variant="primary"
-            size="sm-action"
-            data-test="workflow-editor-publish"
-            :loading="saving"
-            :disabled="saving"
-            @click="onPublish"
-          >
-            {{ t("workflow.publish") }}
-          </OButton>
-        </template>
+        <OButton
+          v-else
+          variant="primary"
+          size="sm-action"
+          data-test="workflow-editor-publish"
+          :loading="saving"
+          :disabled="saving"
+          @click="onPublish"
+        >
+          {{ t("workflow.publish") }}
+        </OButton>
       </template>
     </OPageHeader>
 

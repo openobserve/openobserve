@@ -136,7 +136,7 @@ const globalStubs = {
       '<button class="header-back" @click="back && back.onClick()" />' +
       '<div class="header-title"><slot name="title" /></div>' +
       '<div class="header-subtitle"><slot name="subtitle" /></div>' +
-      '<slot name="title-trail" /><slot name="actions" /></div>',
+      '<slot name="title-trail" /><slot name="actions-overflow" /><slot name="actions" /></div>',
   },
   OButton: {
     name: "OButton",

@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- Main List View -->
     <OPageLayout
+      overflow-first
       v-if="!showImportModelPricingPage"
       icon="paid"
       :subtitle="t('settings.modelPricingList.subtitle')"
@@ -41,7 +42,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('modelPricing.matchingPriorityTooltip')" />
         </OButton>
       </template>
-      <template #actions>
+      <!-- Secondary: inline on desktop, behind "More" < md. -->
+      <template #actions-overflow>
         <OButton
           variant="outline"
           size="sm"
@@ -67,6 +69,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           {{ t("modelPricing.importBtn") }}
         </OButton>
+      </template>
+      <template #actions>
         <OButton
           variant="primary"
           size="sm"
