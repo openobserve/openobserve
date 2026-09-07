@@ -18,7 +18,7 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
-use config::get_config;
+use config::{get_config, metrics};
 use hashlink::LruCache;
 
 pub(super) static METRICS_INDEX_SELECTION_CACHE: LazyLock<Mutex<MetricsIndexSelectionCache>> =
@@ -57,18 +57,29 @@ impl MetricsIndexSelectionCache {
             return;
         }
         if let Some(previous) = self.entries.insert(key.clone(), selection) {
-            self.memory_size = self
-                .memory_size
-                .saturating_sub(Self::entry_size(&key, &previous.0));
+            self.release(Self::entry_size(&key, &previous.0));
         }
         self.memory_size += size;
+        metrics::METRICS_INDEX_SELECTION_CACHE_MEMORY_USAGE
+            .with_label_values::<&str>(&[])
+            .add(size as i64);
+        if self.memory_size > max_bytes {
+            metrics::METRICS_INDEX_SELECTION_CACHE_GC_TOTAL
+                .with_label_values::<&str>(&[])
+                .inc();
+        }
         while self.memory_size > max_bytes {
             let Some((key, evicted)) = self.entries.remove_lru() else {
                 break;
             };
-            self.memory_size = self
-                .memory_size
-                .saturating_sub(Self::entry_size(&key, &evicted.0));
+            self.release(Self::entry_size(&key, &evicted.0));
         }
+    }
+
+    fn release(&mut self, size: usize) {
+        self.memory_size = self.memory_size.saturating_sub(size);
+        metrics::METRICS_INDEX_SELECTION_CACHE_MEMORY_USAGE
+            .with_label_values::<&str>(&[])
+            .sub(size as i64);
     }
 }

@@ -25,6 +25,7 @@ use config::{
         promql::is_metrics_hash_excluded_label,
         stream::{FileKey, FileSelection},
     },
+    metrics,
 };
 use datafusion::{
     common::{DFSchema, DataFusionError, Result},
@@ -119,7 +120,13 @@ pub async fn search(
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         for (data_path, (account, sidecar_path, cache_key, expected_rows)) in index_files {
+            metrics::METRICS_INDEX_SELECTION_CACHE_REQUESTS_TOTAL
+                .with_label_values::<&str>(&[])
+                .inc();
             if let Some((ranges, row_group_size)) = cache.get(&cache_key) {
+                metrics::METRICS_INDEX_SELECTION_CACHE_HITS_TOTAL
+                    .with_label_values::<&str>(&[])
+                    .inc();
                 // only complete selections are cached, so a hit implies exactness
                 evaluated.push((data_path, ranges, true, row_group_size));
             } else {
