@@ -30,7 +30,7 @@ use crate::service::auth::UserEmail;
 // rather than relying on it — per-resource RBAC is enterprise, and an OSS build
 // must not 403 its way through a feature it ships.
 #[cfg(feature = "enterprise")]
-use crate::service::auth::check_permissions;
+use crate::service::auth::{check_folder_write_permissions, check_permissions};
 
 // ── Local query / body types ──────────────────────────────────────────────────
 
@@ -450,6 +450,7 @@ pub async fn get_synthetic(
     request_body(content = config::meta::synthetics::Synthetic, description = "Updated synthetic definition", content_type = "application/json"),
     responses(
         (status = 200, description = "Updated",   content_type = "application/json", body = config::meta::synthetics::Synthetic),
+        (status = 403, description = "Forbidden"),
         (status = 404, description = "Not found"),
         (status = 500, description = "Error",     content_type = "application/json", body = Object),
     ),
@@ -476,6 +477,29 @@ pub async fn update_synthetic(
     {
         return MetaHttpResponse::forbidden("Forbidden");
     }
+
+    // An update that changes folder_id is also a move, so the destination needs
+    // its own check — the gate above only covers `?folder=`. Compared against the
+    // stored folder because a plain edit round-trips the current one unchanged.
+    #[cfg(feature = "enterprise")]
+    if !body.folder_id.is_empty() {
+        let current = openobserve_synthetics::service::folder_of(&org_id, &id)
+            .await
+            .ok()
+            .flatten();
+        if current.as_deref() != Some(body.folder_id.as_str())
+            && !check_folder_write_permissions(
+                &org_id,
+                &user_email.user_id,
+                "synthetic_folder",
+                &body.folder_id,
+            )
+            .await
+        {
+            return MetaHttpResponse::forbidden("Forbidden");
+        }
+    }
+
     match openobserve_synthetics::service::update_synthetic(&org_id, &id, body).await {
         Ok(check) => MetaHttpResponse::json(check),
         Err(e) => {
@@ -597,6 +621,7 @@ pub async fn delete_synthetics_bulk(
     request_body(content = MoveSyntheticsRequestBody, description = "IDs and destination folder", content_type = "application/json"),
     responses(
         (status = 200, description = "Moved"),
+        (status = 403, description = "Forbidden"),
         (status = 500, description = "Error", content_type = "application/json", body = Object),
     ),
 )]
@@ -629,6 +654,19 @@ pub async fn move_synthetics(
             return MetaHttpResponse::forbidden("Forbidden");
         }
     }
+
+    #[cfg(feature = "enterprise")]
+    if !check_folder_write_permissions(
+        &org_id,
+        &user_email.user_id,
+        "synthetic_folder",
+        &body.dst_folder_id,
+    )
+    .await
+    {
+        return MetaHttpResponse::forbidden("Forbidden");
+    }
+
     match openobserve_synthetics::service::move_synthetics(
         &org_id,
         &body.synthetic_ids,

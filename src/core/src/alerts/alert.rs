@@ -71,7 +71,7 @@ use search::{
 use svix_ksuid::Ksuid;
 
 #[cfg(feature = "enterprise")]
-use crate::auth::check_permissions;
+use crate::auth::{check_folder_write_permissions, check_permissions};
 use crate::{
     alerts::{
         QueryConditionExt, build_sql, destinations,
@@ -344,15 +344,12 @@ pub async fn save(
 /// `pub(crate)` because SLOs live in these same folders (§6b, D28) and their
 /// save path needs the identical create-on-demand behaviour.
 pub(crate) async fn create_default_alerts_folder(org_id: &str) -> Result<Folder, AlertError> {
-    let default_folder = Folder {
-        folder_id: DEFAULT_FOLDER.to_owned(),
-        name: "default".to_owned(),
-        description: "default".to_owned(),
-        icon: None,
-    };
-    folders::save_folder(org_id, default_folder, FolderType::Alerts, true)
+    folders::ensure_default_folder(org_id, FolderType::Alerts)
         .await
-        .map_err(|_| AlertError::CreateDefaultFolderError)
+        .map_err(|e| {
+            log::error!("[alerts] creating default folder for org {org_id}: {e}");
+            AlertError::CreateDefaultFolderError
+        })
 }
 
 /// Per-group alerting admissibility (M-9/M-10, §5.5 MN-11).
@@ -956,6 +953,13 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
     dst_folder_id: &str,
     _user_id: &str,
 ) -> Result<(), AlertError> {
+    #[cfg(feature = "enterprise")]
+    if get_openfga_config().enabled
+        && !check_folder_write_permissions(org_id, _user_id, "alert_folders", dst_folder_id).await
+    {
+        return Err(AlertError::PermissionDenied);
+    }
+
     for alert_id in alert_ids {
         let _alert_id_str = alert_id.to_string();
 
