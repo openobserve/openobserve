@@ -200,8 +200,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <template #cell-actions="{ row }">
           <div class="flex justify-end">
             <OButton
-              :variant="row.status === 'reviewed' ? 'outline' : 'primary'"
-              size="sm"
+              variant="outline"
+              size="sm-toolbar"
               icon-right="arrow-forward"
               :data-test="`ai-queue-detail-review-${row.id}`"
               @click.stop="startReviewing(row)"
@@ -376,7 +376,7 @@ const columns = computed<OTableColumnDef<LlmQueueItem>[]>(() => [
   },
   {
     id: "actions",
-    header: raw(""),
+    header: t("aiObservability.queues.detail.columns.actions"),
     accessorKey: "actions",
     sortable: false,
     isAction: true,

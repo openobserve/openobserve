@@ -10848,7 +10848,8 @@
           "refType": "Ref",
           "refId": "Reference",
           "added": "Added",
-          "status": "Status"
+          "status": "Status",
+          "actions": "Actions"
         },
         "status": {
           "pending": "Pending",
