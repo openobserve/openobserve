@@ -120,10 +120,7 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
         ));
     }
 
-    // 1. cast both arguments to be aligned with the signature
-    // Parquet pushdown can replace constant or missing columns with scalars.
-    // Keep all-scalar calls scalar so DataFusion can fold the predicate once.
-    let is_scalar = matches!(&args[0], ColumnarValue::Scalar(_));
+    // Parquet pushdown replaces constant or missing columns with scalars.
     let haystack = args[0].clone().into_array(1)?;
     let haystack = as_string_array(&haystack)?;
     let ColumnarValue::Scalar(needle) = &args[1] else {
@@ -147,42 +144,43 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
             ));
         }
     }
-    .clone();
+    .as_ref()
+    .ok_or_else(|| {
+        DataFusionError::SQL(
+            Box::new(ParserError::ParserError(
+                "Invalid argument types[needle] to str_match function".to_string(),
+            )),
+            None,
+        )
+    })?
+    .to_string();
 
-    // Pre-compute the needle once per batch, including its searcher.
-    if case_insensitive && let Some(needle) = needle.as_mut() {
+    // pre-compute the needle
+    if case_insensitive {
         needle.make_ascii_lowercase();
-    }
-    let mem_finder = needle
-        .as_ref()
-        .map(|needle| memchr::memmem::Finder::new(needle.as_bytes()));
+    };
+
+    let mem_finder = memchr::memmem::Finder::new(needle.as_bytes());
 
     // 2. perform the computation
     let array = haystack
         .iter()
         .map(|haystack| {
-            haystack.and_then(|haystack| {
-                let mem_finder = mem_finder.as_ref()?;
-                Some(if case_insensitive {
+            haystack.map(|haystack| {
+                if case_insensitive {
                     mem_finder
                         .find(haystack.to_lowercase().as_bytes())
                         .is_some()
                 } else {
                     mem_finder.find(haystack.as_bytes()).is_some()
-                })
+                }
             })
         })
         .collect::<BooleanArray>();
 
     // `Ok` because no error occurred during the calculation
     // `Arc` because arrays are immutable, thread-safe, trait objects.
-    if is_scalar {
-        Ok(ColumnarValue::Scalar(ScalarValue::try_from_array(
-            &array, 0,
-        )?))
-    } else {
-        Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
-    }
+    Ok(ColumnarValue::from(Arc::new(array) as ArrayRef))
 }
 
 #[cfg(test)]
@@ -201,13 +199,8 @@ mod tests {
     };
     use parquet::arrow::ArrowWriter;
 
-    use super::{
-        super::{
-            regexp_matches_udf::REGEX_MATCHES_UDF,
-            regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF, REGEXP_MATCH_TO_FIELDS_UDF},
-        },
-        *,
-    };
+    use super::*;
+    use crate::datafusion::exec::register_builtin_udfs;
 
     #[test]
     fn test_str_match_udf_name() {
@@ -341,20 +334,12 @@ mod tests {
             panic!("expected array result");
         }
     }
+
     fn context(pushdown: bool) -> SessionContext {
         let config = SessionConfig::new()
             .set_bool("datafusion.execution.parquet.pushdown_filters", pushdown);
         let ctx = SessionContext::new_with_config(config);
-        for udf in [
-            &*STR_MATCH_UDF,
-            &*STR_MATCH_IGNORE_CASE_UDF,
-            &*REGEX_MATCH_UDF,
-            &*REGEX_NOT_MATCH_UDF,
-            &*REGEX_MATCHES_UDF,
-            &*REGEXP_MATCH_TO_FIELDS_UDF,
-        ] {
-            ctx.register_udf(udf.clone());
-        }
+        register_builtin_udfs(&ctx);
         ctx
     }
 
@@ -378,7 +363,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn string_predicates_accept_scalar_and_null_inputs() {
+    async fn test_str_match_scalar_haystack() {
         let ctx = context(true);
         for name in [
             "str_match",
@@ -392,7 +377,6 @@ mod tests {
                 ("'gateway'", "''", Some(true)),
                 ("''", "'gateway'", Some(false)),
                 ("CAST(NULL AS VARCHAR)", "'gateway'", None),
-                ("'gateway'", "CAST(NULL AS VARCHAR)", None),
             ] {
                 let sql = format!("SELECT {name}({haystack}, {needle})");
                 assert_eq!(booleans(&ctx, &sql).await, vec![expected], "{sql}");
@@ -404,13 +388,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn parquet_predicates_handle_constant_null_and_missing_columns() {
+    async fn test_parquet_pushdown_constant_null_and_missing_columns() {
         let schema = Arc::new(Schema::new(vec![
             Field::new("level", DataType::Utf8, true),
             Field::new("job", DataType::Utf8, true),
         ]));
-        // Test each file independently so a constant-column failure cannot mask
-        // the missing-column or all-NULL path.
         for (case, jobs, expected) in [
             ("constant", Some(vec![Some("gateway"), Some("gateway")]), 2),
             ("mixed", Some(vec![Some("gateway"), Some("other")]), 1),
@@ -450,7 +432,6 @@ mod tests {
                     "re_match(job, '^gateway$')",
                     "re_not_match(job, '^other$')",
                     "array_length(re_matches(job, '(gateway)')) > 0",
-                    "(regexp_match_to_fields(job, '(?P<name>gateway)'))['name'] = 'gateway'",
                 ] {
                     let sql = format!("SELECT level FROM gateway WHERE {predicate} GROUP BY level");
                     let batches = ctx

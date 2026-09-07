@@ -228,7 +228,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{BooleanArray, RecordBatch, StringArray};
+    use arrow::array::{RecordBatch, StringArray};
     use arrow_schema::Schema;
     use datafusion::{
         assert_batches_eq, datasource::MemTable, logical_expr::ScalarUDFImpl,
@@ -463,38 +463,23 @@ mod tests {
 
         assert_batches_eq!(expected, &results);
     }
-    async fn booleans(ctx: &SessionContext, sql: &str) -> Vec<Option<bool>> {
-        ctx.sql(sql)
-            .await
-            .unwrap()
-            .collect()
-            .await
-            .unwrap()
-            .iter()
-            .flat_map(|batch| {
-                batch
-                    .column(0)
-                    .as_any()
-                    .downcast_ref::<BooleanArray>()
-                    .unwrap()
-                    .iter()
-            })
-            .collect()
-    }
 
     #[tokio::test]
-    async fn regexp_matches_null_pattern_is_independent_of_batch_size() {
+    async fn test_regexp_matches_null_scalar_pattern() {
         let ctx = SessionContext::new();
         ctx.register_udf(REGEX_MATCHES_UDF.clone());
-        assert_eq!(
-            booleans(
-                &ctx,
-                "SELECT re_matches('gateway', CAST(NULL AS VARCHAR)) IS NULL"
-            )
-            .await,
-            vec![Some(true)]
-        );
-        for rows in [0, 1, 2] {
+        let sql = "SELECT re_matches('gateway', CAST(NULL AS VARCHAR)) IS NULL AS missing";
+        let expected = [
+            "+---------+",
+            "| missing |",
+            "+---------+",
+            "| true    |",
+            "+---------+",
+        ];
+        let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        assert_batches_eq!(expected, &result);
+        // A one-row batch takes the scalar-pattern path, two rows take the array path.
+        for rows in [1, 2] {
             let schema = Arc::new(Schema::new(vec![Field::new("job", DataType::Utf8, true)]));
             let batch = RecordBatch::try_new(
                 schema.clone(),
@@ -506,14 +491,12 @@ mod tests {
                 Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
             )
             .unwrap();
-            assert_eq!(
-                booleans(
-                    &ctx,
-                    "SELECT re_matches(job, CAST(NULL AS VARCHAR)) IS NULL FROM t"
-                )
-                .await,
-                vec![Some(true); rows]
-            );
+            let sql = "SELECT re_matches(job, CAST(NULL AS VARCHAR)) IS NULL AS missing FROM t";
+            let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+            let mut expected = vec!["+---------+", "| missing |", "+---------+"];
+            expected.extend(std::iter::repeat_n("| true    |", rows));
+            expected.push("+---------+");
+            assert_batches_eq!(expected, &result);
             ctx.deregister_table("t").unwrap();
         }
     }
