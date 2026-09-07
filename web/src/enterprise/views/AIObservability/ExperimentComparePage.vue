@@ -78,15 +78,12 @@
     </template>
 
     <div class="flex h-full min-h-0 flex-col">
-      <div
-        v-if="loading"
-        class="border-border-default text-text-secondary rounded-default m-page-edge border p-4 text-center"
-        data-test="ai-experiment-compare-loading"
-      >
-        {{ t("aiObservability.experiments.comparePage.loading") }}
-      </div>
+      <!-- The panel now tolerates `comparison === null` (empty stats, empty
+           table) so it can mount immediately and show ITS OWN `loading`
+           skeleton on the real table — no separate placeholder needed for
+           the first load. -->
       <ExperimentComparisonPanel
-        v-if="comparison"
+        v-if="comparison || loading"
         :comparison="comparison"
         :outcome-dimensions="outcomeDimensions"
         :loading="loading"
@@ -95,7 +92,7 @@
         @inspect="inspectRow"
       />
       <div
-        v-else-if="!loading"
+        v-else
         class="border-border-default text-text-secondary rounded-default m-page-edge border border-dashed p-6 text-center"
         data-test="ai-experiment-compare-empty"
       >
@@ -147,6 +144,7 @@ import { aiExperimentCompareRoute, aiExperimentsRoute } from "./experimentRoutes
 defineOptions({ name: "AIExperimentComparePage" });
 
 const { t } = useI18nTyped();
+
 const store = useStore();
 const route = useRoute();
 const router = useRouter();

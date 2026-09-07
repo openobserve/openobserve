@@ -6,6 +6,7 @@
       <OTable
         :data="visibleRows"
         :columns="comparisonColumns"
+        :loading="loading"
         row-key="logicalId"
         pagination="client"
         :page-size="20"
@@ -144,7 +145,9 @@ import type {
 } from "@/services/llm-experiments.service";
 
 const props = defineProps<{
-  comparison: ExperimentComparison;
+  /** `null` while the first comparison is still loading — the table then
+   *  shows nothing but its own `loading` skeleton, same shape either way. */
+  comparison: ExperimentComparison | null;
   outcomeDimensions?: string[];
   loading?: boolean;
 }>();
@@ -155,6 +158,33 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+const EMPTY_COMPARISON: ExperimentComparison = {
+  baselineId: "",
+  candidateId: "",
+  datasetId: "",
+  threshold: 0.05,
+  outcomeDimensions: [],
+  assignmentRule: "",
+  counts: {
+    baselineRows: 0,
+    candidateRows: 0,
+    commonRows: 0,
+    regressed: 0,
+    improved: 0,
+    unchanged: 0,
+    inconclusive: 0,
+    new: 0,
+    missing: 0,
+  },
+  dimensions: [],
+  rows: [],
+};
+
+/** Every other computed reads through here, never `props.comparison`
+ *  directly, so the whole panel — including the real `<OTable>` and its real
+ *  columns — renders correctly (just empty) before the first response. */
+const comparison = computed(() => props.comparison ?? EMPTY_COMPARISON);
 
 // The summary tile, matching the Alerts strip: it clears rather than filters.
 const TOTAL = "total";
@@ -228,21 +258,21 @@ const THRESHOLD_STEPS = [0.02, 0.05, 0.1, 0.15];
 
 /** Whatever the server is using stays selectable even if it is off the ladder. */
 const thresholdOptions = computed(() => {
-  const steps = THRESHOLD_STEPS.includes(props.comparison.threshold)
+  const steps = THRESHOLD_STEPS.includes(comparison.value.threshold)
     ? THRESHOLD_STEPS
-    : [...THRESHOLD_STEPS, props.comparison.threshold].sort((a, b) => a - b);
+    : [...THRESHOLD_STEPS, comparison.value.threshold].sort((a, b) => a - b);
   return steps.map((step) => ({ label: raw(step.toFixed(2)), value: step }));
 });
 
 function selectThreshold(next: SelectModelValue) {
-  if (typeof next === "number" && next !== props.comparison.threshold) {
+  if (typeof next === "number" && next !== comparison.value.threshold) {
     emit("apply-threshold", next);
   }
 }
 
-const selectedDimensions = computed(() => props.outcomeDimensions ?? props.comparison.outcomeDimensions);
+const selectedDimensions = computed(() => props.outcomeDimensions ?? comparison.value.outcomeDimensions);
 
-const outcomeOptions = computed(() => props.comparison.dimensions.map((dimension) => {
+const outcomeOptions = computed(() => comparison.value.dimensions.map((dimension) => {
   const label = dimension.kind === "cost"
     ? t("aiObservability.experiments.comparePage.panel.tileCost")
     : dimension.kind === "latency"
@@ -275,9 +305,9 @@ function selectOutcomeDimensions(next: SelectModelValue) {
 /** Rows in either run — what "All" counts. */
 const totalRows = computed(
   () =>
-    props.comparison.counts.commonRows +
-    props.comparison.counts.new +
-    props.comparison.counts.missing,
+    comparison.value.counts.commonRows +
+    comparison.value.counts.new +
+    comparison.value.counts.missing,
 );
 
 // Outcomes first, All last — the same shape as the Alerts / Eval Jobs strips,
@@ -286,7 +316,7 @@ const bucketStats = computed<StatItem[]>(() => [
   ...FILTER_GROUPS.map((group) => ({
     key: group.key,
     label: FILTER_LABELS[group.key],
-    value: group.buckets.reduce((sum, bucket) => sum + props.comparison.counts[bucket], 0),
+    value: group.buckets.reduce((sum, bucket) => sum + comparison.value.counts[bucket], 0),
     icon: FILTER_ICONS[group.key],
     tone: FILTER_TONES[group.key],
     max: totalRows.value || undefined,
@@ -306,9 +336,9 @@ const bucketStats = computed<StatItem[]>(() => [
 
 const visibleRows = computed(() => {
   const group = FILTER_GROUPS.find(({ key }) => key === bucketFilter.value);
-  if (!group) return props.comparison.rows;
+  if (!group) return comparison.value.rows;
   const buckets = group.buckets as readonly ExperimentComparisonBucket[];
-  return props.comparison.rows.filter((row) => buckets.includes(row.bucket));
+  return comparison.value.rows.filter((row) => buckets.includes(row.bucket));
 });
 
 // All clears; any other tile toggles, so re-clicking the active one also gets
@@ -338,12 +368,12 @@ const comparisonColumns = computed<OTableColumnDef<ExperimentComparisonRow>[]>((
   // A component header, not a label: the movement counts describe THIS column.
   // `header` already accepts a component, so none of this asks the shared table
   // to change.
-  ...props.comparison.dimensions.map((dimension) => ({
+  ...comparison.value.dimensions.map((dimension) => ({
     id: dimensionColumnId(dimension),
     header: () =>
       h(ExperimentDimensionHeader, {
         dimension,
-        counts: dimensionMovementCounts(props.comparison.rows, dimension),
+        counts: dimensionMovementCounts(comparison.value.rows, dimension),
       }),
     accessorKey: dimensionColumnId(dimension),
   })),
