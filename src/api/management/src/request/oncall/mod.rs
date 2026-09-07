@@ -4524,12 +4524,12 @@ async fn carry_page_history_into_incident(
 
     // One line naming the things a reader of the incident would otherwise have
     // to open the page to learn. Written first so it heads the timeline.
-    let team = infra::table::oncall_teams::get(org_id, &record.team_id)
+    let team = infra::table::oncall_teams::get(org_id, record.team())
         .await
         .ok()
         .flatten()
         .map(|t| t.name)
-        .unwrap_or_else(|| record.team_id.clone());
+        .unwrap_or_else(|| record.team().to_string());
     let mut summary = format!(
         "Promoted from on-call page {response_id} — paged {team} at P{}",
         record.priority
@@ -4622,7 +4622,7 @@ pub async fn promote_to_incident(
         // check cannot be inherited from `add_note` further down — a stranger
         // would create the incident and only then be refused.
         if let Err(e) = o2_enterprise::enterprise::oncall::service::refuse_if_not_on_the_paged_team(
-            &record.team_id,
+            record.team(),
             &user_email.user_id,
         )
         .await
@@ -5459,7 +5459,7 @@ mod tests {
             id: "resp_1".into(),
             org_id: "default".into(),
             subject: SubjectRef::new(SubjectType::Alert, "al_ckt", 1),
-            team_id: "team_1".into(),
+            team_id: Some("team_1".into()),
             title: Some("payment_gateway_error_rate".into()),
             cause: None,
             cause_note: None,

@@ -492,7 +492,7 @@ mod tests {
             id: "resp_1".to_string(),
             org_id: "org".to_string(),
             subject: SubjectRef::new(SubjectType::Alert, "al_1", 3),
-            team_id: "team_1".to_string(),
+            team_id: Some("team_1".to_string()),
             title: Some("disk full".to_string()),
             cause: None,
             cause_note: None,

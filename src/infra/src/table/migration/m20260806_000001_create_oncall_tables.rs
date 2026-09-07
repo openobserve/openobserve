@@ -263,7 +263,12 @@ impl MigrationTrait for Migration {
                             .string()
                             .not_null(),
                     )
-                    .col(ColumnDef::new(OncallResponses::TeamId).string().not_null())
+                    // Nullable: a firing nobody owns still opens a record, with
+                    // no team rather than no record (R-D6). `null` IS the
+                    // teamless case — a sentinel string would be an invariant
+                    // nobody knows about until something compares it to a real
+                    // id.
+                    .col(ColumnDef::new(OncallResponses::TeamId).string().null())
                     // What the page says it is about. Stored rather than
                     // re-read from the alert on every tick, and it must
                     // survive the alert being renamed or deleted.

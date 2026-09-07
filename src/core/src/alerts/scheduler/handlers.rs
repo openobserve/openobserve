@@ -6018,7 +6018,7 @@ mod tests {
             id: "resp_1".into(),
             org_id: "default".into(),
             subject: SubjectRef::new(SubjectType::Alert, "al_1", 1),
-            team_id: "team_1".into(),
+            team_id: Some("team_1".into()),
             title: None,
             cause: None,
             cause_note: None,

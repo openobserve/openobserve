@@ -93,7 +93,7 @@ fn to_event(m: oncall_response_events::Model) -> Option<ResponseEvent> {
 pub async fn open(
     org_id: &str,
     subject: &SubjectRef,
-    team_id: &str,
+    team_id: Option<&str>,
     priority: i32,
     title: Option<&str>,
     role: ResponderRole,
@@ -105,7 +105,7 @@ pub async fn open(
         org_id: Set(org_id.to_string()),
         subject_type: Set(subject.subject_type.to_i32()),
         subject_id: Set(subject.subject_id()),
-        team_id: Set(team_id.to_string()),
+        team_id: Set(team_id.map(str::to_string)),
         title: Set(title.map(|t| t.to_string())),
         cause: Set(None),
         cause_note: Set(None),
@@ -138,7 +138,7 @@ pub async fn open(
 pub async fn open_or_get(
     org_id: &str,
     subject: &SubjectRef,
-    team_id: &str,
+    team_id: Option<&str>,
     priority: i32,
     title: Option<&str>,
     role: ResponderRole,
@@ -1416,7 +1416,7 @@ mod tests {
             org_id: "default".into(),
             subject_type: SubjectType::Alert.to_i32(),
             subject_id: "al_ckt#2".into(),
-            team_id: "team_1".into(),
+            team_id: Some("team_1".into()),
             title: Some("payment_gateway_error_rate".into()),
             cause: None,
             cause_note: None,
@@ -1600,7 +1600,7 @@ mod tests {
         m.acked_at = Some(1_200);
         let next = to_response(m).unwrap().handed_over(Some("team_2"), 5_000);
 
-        assert_eq!(next.team_id, "team_2");
+        assert_eq!(next.team_id.as_deref(), Some("team_2"));
         assert_eq!(next.state, ResponseState::Triggered);
         assert_eq!(next.acked_by, None);
         assert_eq!(next.ladder_anchor, Some(5_000));

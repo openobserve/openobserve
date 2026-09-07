@@ -563,7 +563,14 @@ pub struct Response {
     pub id: String,
     pub org_id: String,
     pub subject: SubjectRef,
-    pub team_id: String,
+    /// The team that owns this firing, or `None` when routing found nobody.
+    ///
+    /// A teamless record pages nobody — there is no policy, no rotation and no
+    /// ladder, not an empty one — and it exists so the firing appears beside
+    /// the ones that did page rather than only on the unrouted queue. Handing
+    /// it to a team is what gives it an owner and starts its ladder (R-D6).
+    #[serde(default)]
+    pub team_id: Option<String>,
     /// What the page is about. Kept on the record so it survives the alert
     /// being renamed or deleted.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -627,6 +634,22 @@ pub struct Response {
 }
 
 impl Response {
+    /// The owning team on a path that only ever runs for a routed record.
+    ///
+    /// A teamless record never reaches the ladder — `start_with` returns before
+    /// dispatching and no escalation job is armed (R6.2) — so the paging path's
+    /// reads are unreachable for one. This exists so those reads stay one line
+    /// rather than eighteen guards for a case that cannot arrive, and it
+    /// degrades safely if one ever does: the empty id misses every lookup, so
+    /// the answer is no policy, no rotation and no channel.
+    ///
+    /// **Not for anything that WRITES keyed on the team.** `get_or_create` on
+    /// an empty id would mint a row for a team that does not exist; those
+    /// callers ask `team_id` directly and bail.
+    pub fn team(&self) -> &str {
+        self.team_id.as_deref().unwrap_or_default()
+    }
+
     /// How long the page went unacknowledged, in microseconds.
     pub fn time_to_ack(&self) -> Option<i64> {
         self.acked_at.map(|a| a - self.opened_at)
@@ -660,7 +683,9 @@ impl Response {
     /// problem.
     pub fn handed_over(&self, to_team_id: Option<&str>, now: i64) -> Self {
         Self {
-            team_id: to_team_id.unwrap_or(&self.team_id).to_string(),
+            team_id: to_team_id
+                .map(str::to_string)
+                .or_else(|| self.team_id.clone()),
             state: ResponseState::Triggered,
             acked_by: None,
             acked_at: None,
@@ -1480,7 +1505,7 @@ mod tests {
             id: "resp_1".into(),
             org_id: "default".into(),
             subject: SubjectRef::new(SubjectType::Alert, "al_ckt", 1),
-            team_id: "team_1".into(),
+            team_id: Some("team_1".into()),
             title: None,
             cause: None,
             cause_note: None,
@@ -1558,7 +1583,7 @@ mod tests {
         r.ladder_anchor = Some(1_050);
 
         let moved = r.handed_over(Some("team_2"), 9_000);
-        assert_eq!(moved.team_id, "team_2");
+        assert_eq!(moved.team_id.as_deref(), Some("team_2"));
         assert_eq!(
             moved.state,
             ResponseState::Triggered,
@@ -1921,7 +1946,7 @@ mod tests {
         let mut acked = record(ResponseState::Acknowledged);
         acked.acked_by = Some("ana@o2.ai".into());
         acked.ladder_run = Some(4);
-        acked.team_id = "another_team".into();
+        acked.team_id = Some("another_team".into());
         let acked = channel_post(&acked, "Platform", ChannelPostStage::Acknowledged, URL);
 
         assert_eq!(paged.key, acked.key, "one message, edited, for one record");
