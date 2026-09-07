@@ -1,0 +1,4 @@
+web/src/components/O2AIChat.spec.ts
+web/src/components/O2AIChat.vue
+web/src/layouts/MainLayout.shortcuts.spec.ts
+web/src/layouts/MainLayout.vue

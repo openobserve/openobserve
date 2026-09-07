@@ -1,0 +1,216 @@
+===== COMPLETE LIST OF CHANGED FILES (4 files) =====
+# AUTHORITATIVE: this list is never truncated. The diff BODY below may be trimmed for
+# very large PRs, so decide WHICH files/areas changed (e.g. web/src frontend) from THIS list.
+web/src/components/O2AIChat.spec.ts
+web/src/components/O2AIChat.vue
+web/src/layouts/MainLayout.shortcuts.spec.ts
+web/src/layouts/MainLayout.vue
+===== END CHANGED FILES =====
+
+diff --git a/web/src/components/O2AIChat.spec.ts b/web/src/components/O2AIChat.spec.ts
+index 730fdfdc864..eb31c9b41ad 100644
+--- a/web/src/components/O2AIChat.spec.ts
++++ b/web/src/components/O2AIChat.spec.ts
+@@ -113,6 +113,7 @@ vi.mock("@/composables/contextProviders", () => ({
+ 
+ // Component import must come after all vi.mock() declarations.
+ import O2AIChat from "./O2AIChat.vue";
++import { getManager, resetManager } from "@/lib/vue-shortcut-manager";
+ 
+ // ── Stub definitions ─────────────────────────────────────────────────────────
+ 
+@@ -241,6 +242,23 @@ describe("O2AIChat", () => {
+     });
+   });
+ 
++  describe("Ctrl+B ownership", () => {
++    beforeEach(() => resetManager());
++    afterEach(() => resetManager());
++
++    // A second ctrl+b here overwrites MainLayout's gated aiChatToggle (same key + scope).
++    it("should not register ctrl+b, leaving the gated global binding in place", () => {
++      wrapper = mountO2AIChat({ isOpen: false });
++
++      const keys = getManager()!
++        .getAll()
++        .map((s) => s.key);
++      expect(keys).not.toContain("ctrl+b");
++      expect(keys).not.toContain("meta+b");
++      expect(keys).toContain("escape");
++    });
++  });
++
+   describe("addNewChat", () => {
+     beforeEach(() => {
+       wrapper = mountO2AIChat({ isOpen: true });
+diff --git a/web/src/components/O2AIChat.vue b/web/src/components/O2AIChat.vue
+index 74779afdea2..842de0fa389 100644
+--- a/web/src/components/O2AIChat.vue
++++ b/web/src/components/O2AIChat.vue
+@@ -3536,13 +3536,6 @@ export default defineComponent({
+           }
+         },
+       },
+-      {
+-        id: "aiChatExpand",
+-        key: "ctrl+b",
+-        keyForMac: "meta+b",
+-        description: t("shortcuts.actions.aiChatExpand"),
+-        handler: toggleExpand,
+-      },
+     ]);
+ 
+     const addNewChat = () => {
+diff --git a/web/src/layouts/MainLayout.shortcuts.spec.ts b/web/src/layouts/MainLayout.shortcuts.spec.ts
+new file mode 100644
+index 00000000000..eec275aab86
+--- /dev/null
++++ b/web/src/layouts/MainLayout.shortcuts.spec.ts
+@@ -0,0 +1,122 @@
++// Copyright 2026 OpenObserve Inc.
++//
++// This program is free software: you can redistribute it and/or modify
++// it under the terms of the GNU Affero General Public License as published by
++// the Free Software Foundation, either version 3 of the License, or
++// (at your option) any later version.
++//
++// This program is distributed in the hope that it will be useful
++// but WITHOUT ANY WARRANTY; without even the implied warranty of
++// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++// GNU Affero General Public License for more details.
++//
++// You should have received a copy of the GNU Affero General Public License
++// along with this program.  If not, see <http://www.gnu.org/licenses/>.
++
++import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
++import { mount, VueWrapper, flushPromises } from "@vue/test-utils";
++import { defineComponent, h } from "vue";
++import store from "@/test/unit/helpers/store";
++import i18n from "@/locales";
++import router from "@/test/unit/helpers/router";
++import { getManager, resetManager } from "@/lib/vue-shortcut-manager";
++import config from "@/aws-exports";
++
++vi.mock("@/services/config", () => ({
++  default: { get_config_full: vi.fn(() => new Promise(() => {})) },
++}));
++
++vi.mock("@openobserve/browser-rum", () => ({
++  openobserveRum: { setUser: vi.fn(), startView: vi.fn() },
++}));
++
++import MainLayout from "./MainLayout.vue";
++
++const StubDiv = defineComponent({ setup: () => () => h("div") });
++
++function mountMainLayout() {
++  return mount(MainLayout, {
++    global: {
++      plugins: [store, i18n, router],
++      stubs: {
++        AppHeader: StubDiv,
++        ONavbar: StubDiv,
++        O2AIChat: StubDiv,
++        WebinarBanner: StubDiv,
++        AnnouncementBanner: StubDiv,
++        ShortcutCheatsheet: StubDiv,
++        GetStarted: StubDiv,
++        CommunitySlackInvite: StubDiv,
++        ThemeSwitcher: StubDiv,
++        PredefinedThemes: StubDiv,
++        SlackIcon: StubDiv,
++        ManagementIcon: StubDiv,
++        ODialog: StubDiv,
++        "router-view": StubDiv,
++      },
++    },
++  });
++}
++
++describe("MainLayout — AI chat shortcut gate", () => {
++  let wrapper: VueWrapper | undefined;
++  const originalIsEnterprise = config.isEnterprise;
++
++  beforeEach(() => {
++    resetManager();
++  });
++
++  afterEach(() => {
++    wrapper?.unmount();
++    wrapper = undefined;
++    config.isEnterprise = originalIsEnterprise;
++    store.state.zoConfig.ai_enabled = false;
++    store.state.isAiChatEnabled = false;
++    resetManager();
++  });
++
++  const ctrlB = () => getManager()?.getById("aiChatToggle");
++
++  it("should not register ctrl+b on OSS builds", async () => {
++    config.isEnterprise = "false";
++    store.state.zoConfig.ai_enabled = true;
++
++    wrapper = mountMainLayout();
++    await flushPromises();
++
++    expect(ctrlB()).toBeUndefined();
++  });
++
++  it("should register ctrl+b on enterprise builds", async () => {
++    config.isEnterprise = "true";
++
++    wrapper = mountMainLayout();
++    await flushPromises();
++
++    expect(ctrlB()?.key).toBe("ctrl+b");
++  });
++
++  it("should not open the chat while ai_enabled is off", async () => {
++    config.isEnterprise = "true";
++    store.state.zoConfig.ai_enabled = false;
++
++    wrapper = mountMainLayout();
++    await router.push({ name: "logs" });
++    await flushPromises();
++
++    ctrlB()!.handler();
++    expect(store.state.isAiChatEnabled).toBe(false);
++  });
++
++  it("should open the chat when ai_enabled is on", async () => {
++    config.isEnterprise = "true";
++    store.state.zoConfig.ai_enabled = true;
++
++    wrapper = mountMainLayout();
++    await router.push({ name: "logs" });
++    await flushPromises();
++
++    ctrlB()!.handler();
++    expect(store.state.isAiChatEnabled).toBe(true);
++  });
++});
+diff --git a/web/src/layouts/MainLayout.vue b/web/src/layouts/MainLayout.vue
+index 3374e7b87b0..fcadca7b6ef 100644
+--- a/web/src/layouts/MainLayout.vue
++++ b/web/src/layouts/MainLayout.vue
+@@ -1248,6 +1248,8 @@ export default defineComponent({
+     };
+ 
+     const toggleAIChat = () => {
++      // ai_enabled arrives with the async /config response, so it can't gate registration.
++      if (!store.state.zoConfig.ai_enabled) return;
+       // On the home page, switch to the AI tab instead of opening the side panel
+       if (router.currentRoute.value.name === "home") {
+         window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
+@@ -1360,7 +1362,10 @@ export default defineComponent({
+     };
+ 
+     // ── Global shortcuts: AI Chat ─────────────────────────────────────────
+-    useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
++    // O2 AI is enterprise-only: on OSS the Ctrl+B binding must not exist at all.
++    if (config.isEnterprise == "true") {
++      useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
++    }
+ 
+     return {
+       isDark,

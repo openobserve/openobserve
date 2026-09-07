@@ -1,0 +1,26 @@
+{
+  "feature_slug": "ai-chat-shortcut-gate",
+  "feature_title": "AI Chat Keyboard Shortcut Gate",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "aiChatShortcut.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/aiChatShortcut.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/layouts/MainLayout.vue",
+    "web/src/components/O2AIChat.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": "",
+  "rationale": {
+    "edition": "All four changed paths (web/src/components/O2AIChat.vue, web/src/components/O2AIChat.spec.ts, web/src/layouts/MainLayout.vue, web/src/layouts/MainLayout.shortcuts.spec.ts) live under web/src/, which is the OSS frontend. None are under enterprise/, o2_enterprise/, src/enterprise/, or any o2-enterprise-owned path. The word 'enterprise' appears only inside the code to gate a feature (config.isEnterprise), not in any file path or symbol that would make the change ENT-owned, so this is an OSS change.",
+    "skip": "Not skipped. No tests-added label or skip comment was passed, and the change is not docs/CI-only: it alters real Vue component behavior (MainLayout.vue and O2AIChat.vue) that a user can exercise via the Ctrl+B / Cmd+B shortcut.",
+    "e2e": "E2E is warranted. The change alters a user-facing interaction: the global Ctrl+B (Cmd+B on Mac) AI-chat toggle is now registered only on enterprise builds, the duplicate ctrl+b 'expand' binding was removed from O2AIChat, and toggleAIChat now returns early when ai_enabled is off. A user pressing the shortcut is a real, verifiable UI flow.",
+    "area": "The change is a global app-layout feature: the AI chat lives in MainLayout.vue and its O2AIChat.vue component, which are app-wide (not tied to Logs/Metrics/etc). The existing GeneralTests shard already holds global/layout features such as theme-management, languageTranslation, landingPage and shortcut/cheatsheet-adjacent specs, so this global keyboard-shortcut behavior belongs there.",
+    "group": "GeneralTests is the closest existing shard in tests/ui-testing/ci-matrix/ci_matrix_cloud.json (actual_folder GeneralTests), holding global app-level specs. No AI/Chat shard exists, so the new spec should join GeneralTests rather than invent a new shard.",
+    "existing_tests": "No E2E specs in the diff. The only test files changed are Vitest unit tests (web/src/components/O2AIChat.spec.ts and web/src/layouts/MainLayout.shortcuts.spec.ts) under web/src/**/*.spec.ts, which are unit coverage, not Playwright E2E specs under tests/ui-testing/playwright-tests/. They do not set existing_tests_in_diff and the Architect should not extend them as E2E coverage."
+  }
+}

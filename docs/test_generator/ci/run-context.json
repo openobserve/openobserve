@@ -1,0 +1,18 @@
+{
+  "feature_slug": "ai-chat-shortcut-gate",
+  "feature_title": "AI Chat Keyboard Shortcut Gate",
+  "area": "GeneralTests",
+  "edition": "oss",
+  "needs_e2e": true,
+  "needs_api": false,
+  "spec_filename": "aiChatShortcut.spec.js",
+  "spec_path": "tests/ui-testing/playwright-tests/GeneralTests/aiChatShortcut.spec.js",
+  "playwright_group": "GeneralTests",
+  "source_files": [
+    "web/src/layouts/MainLayout.vue",
+    "web/src/components/O2AIChat.vue"
+  ],
+  "existing_tests_in_diff": false,
+  "skip": false,
+  "skip_reason": ""
+}

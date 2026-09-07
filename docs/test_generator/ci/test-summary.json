@@ -1,0 +1,12 @@
+[
+  {
+    "title": "OSS - Ctrl+B does not open the AI chat panel and the header AI button is hidden",
+    "action": "new",
+    "verifies": "on OSS the header AI button is absent and the platform AI-chat key combo leaves the panel closed with the main content at full width"
+  },
+  {
+    "title": "ENT - Ctrl+B toggles the AI chat sidebar",
+    "action": "new",
+    "verifies": "on enterprise the header AI button is present and the platform combo opens then closes the AI chat sidebar"
+  }
+]

@@ -1,0 +1,11 @@
+{
+  "action": "new",
+  "target_spec": "tests/ui-testing/playwright-tests/GeneralTests/aiChatShortcut.spec.js",
+  "existing_tests_considered": [
+    "tests/ui-testing/playwright-tests/GeneralTests/status-pages-enterprise-gating.spec.js",
+    "tests/ui-testing/playwright-tests/GeneralTests/edition-features.spec.js",
+    "tests/ui-testing/playwright-tests/Logs/logstable.spec.js"
+  ],
+  "needs_registration": true,
+  "rationale": "No existing spec covers the AI-chat keyboard shortcut gate. status-pages-enterprise-gating.spec.js and edition-features.spec.js are the closest analogs (edition-gated UI assertions) but both target their own features, not the Ctrl+B AI-chat binding or the menu-link-ai-item header button. logstable.spec.js only matched the keyword 'shortcut' incidentally. This is a distinct feature area (global layout keyboard gate), so a new GeneralTests spec is warranted and must be registered in ci_matrix.json under the GeneralTests run_files."
+}
