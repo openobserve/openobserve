@@ -30,12 +30,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <component
     :is="as"
-    class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5 transition-shadow duration-200 ease-in-out hover:shadow-md"
+    class="bg-card-glass-bg rounded-default border-border-default flex flex-col gap-1 border px-3.5 py-2.5 transition-shadow duration-200 ease-in-out hover:shadow-md max-lg:shrink-0 max-lg:basis-auto max-lg:flex-row-reverse max-lg:items-center max-lg:gap-1.5 max-lg:px-1.5 max-lg:py-1"
     :data-test="dataTest"
+    :title="label ? String(label) : undefined"
   >
-    <div class="mb-1 flex items-center justify-between gap-2">
+    <div class="mb-1 flex items-center justify-between gap-2 max-lg:mb-0">
       <div
-        class="min-w-0 truncate"
+        class="min-w-0 truncate max-lg:hidden"
         :class="labelClass || 'text-2xs text-text-secondary leading-normal font-semibold'"
       >
         <slot name="label">{{ label }}</slot>
@@ -44,7 +45,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="icon || $slots.icon"
         class="rounded-default inline-flex shrink-0 items-center justify-center"
         :class="[
-          iconSize === 'md' ? 'h-10 w-10' : 'h-6 w-6',
+          iconSize === 'md' ? 'h-10 w-10 max-lg:h-6 max-lg:w-6 max-lg:*:size-4' : 'h-6 w-6',
+
           iconClass || 'bg-surface-subtle text-text-secondary',
         ]"
       >
@@ -54,15 +56,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </span>
     </div>
 
-    <div v-if="$slots.value" class="flex items-baseline gap-1">
+    <div
+      v-if="$slots.value"
+      class="flex items-baseline gap-1 max-lg:[&>:first-child]:text-lg max-lg:[&>:first-child]:leading-none"
+    >
       <slot name="value" />
     </div>
 
-    <div v-if="$slots.trend" class="text-3xs flex items-center gap-1 font-medium">
+    <div v-if="$slots.trend" class="text-3xs flex items-center gap-1 font-medium max-lg:hidden">
       <slot name="trend" />
     </div>
 
-    <slot name="footer" />
+    <div v-if="$slots.footer" class="contents max-lg:hidden">
+      <slot name="footer" />
+    </div>
   </component>
 </template>
 

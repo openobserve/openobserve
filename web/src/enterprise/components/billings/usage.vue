@@ -101,17 +101,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              base so large numbers stay readable. -->
       <div
         v-if="!dataLoading && Object.keys(usageData).length > 0"
-        class="grid w-full grid-cols-3 gap-3 max-md:grid-cols-2 xl:grid-cols-6"
+        class="grid w-full grid-cols-3 gap-3 max-lg:flex max-lg:flex-wrap max-lg:gap-1.5 xl:grid-cols-6"
       >
         <div
           v-for="tile in usageTiles"
           :key="tile.key"
           data-test="billings-usage-tile"
-          class="usage-tile bg-card-glass-bg border-card-glass-border rounded-default flex flex-col gap-2 border px-3 py-3 transition-shadow duration-200 ease-in-out"
+          class="usage-tile bg-card-glass-bg border-card-glass-border rounded-default flex flex-col gap-2 border px-3 py-3 transition-shadow duration-200 ease-in-out max-lg:shrink-0 max-lg:basis-auto max-lg:flex-row-reverse max-lg:items-center max-lg:gap-1.5 max-lg:px-1.5 max-lg:py-1"
+          :title="tile.label"
         >
           <div class="flex items-center justify-between gap-2">
             <div
-              class="text-text-secondary truncate text-(length:--text-xs) font-medium"
+              class="text-text-secondary truncate text-(length:--text-xs) font-medium max-lg:hidden"
               data-test="billings-usage-tile-title"
               :title="tile.label"
             >
@@ -124,7 +125,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
           <div class="flex items-baseline gap-1 whitespace-nowrap">
-            <span class="text-text-body text-(length:--text-xl) leading-none font-bold">
+            <span
+              class="text-text-body text-(length:--text-xl) leading-none font-bold max-lg:text-(length:--text-lg)"
+            >
               {{ tile.value }}
             </span>
             <span class="text-text-secondary text-(length:--text-xs) font-medium">
@@ -133,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="usageCost[tile.key]"
-            class="text-text-secondary text-(length:--text-xs) font-medium"
+            class="text-text-secondary text-(length:--text-xs) font-medium max-lg:hidden"
           >
             {{ "$" + usageCost[tile.key] }}
           </div>
