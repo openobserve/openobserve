@@ -39,44 +39,47 @@
                  bucket stats need — same idea as a labeled form field. -->
             <div class="flex shrink-0 items-end gap-3">
               <div class="flex flex-col gap-0.5">
-                <OTooltip
-                  :content="t('aiObservability.experiments.comparePage.panel.outcomeDimensionsHint')"
-                >
-                  <span class="text-text-tertiary text-xs">
-                    {{ t("aiObservability.experiments.comparePage.panel.outcomeDimensions") }}
-                  </span>
+                <span class="text-text-tertiary text-xs">
+                  {{ t("aiObservability.experiments.comparePage.panel.outcomeDimensions") }}
+                </span>
+                <!-- The tooltip sits on the select itself, not the label, so it
+                     describes what the CURRENT selection does rather than a
+                     generic hint disconnected from the visible value. -->
+                <OTooltip :content="outcomeTooltip">
+                  <OSelect
+                    :model-value="selectedDimensions"
+                    :options="outcomeOptions"
+                    :aria-label="t('aiObservability.experiments.comparePage.panel.outcomeDimensions')"
+                    :disabled="loading"
+                    :searchable="true"
+                    multiple
+                    select-all
+                    option-tooltip
+                    size="md"
+                    width="sm"
+                    data-test="ai-experiment-comparison-outcome-dimensions"
+                    @update:model-value="selectOutcomeDimensions"
+                  >
+                    <template #trigger>{{ selectionLabel }}</template>
+                  </OSelect>
                 </OTooltip>
-                <OSelect
-                  :model-value="selectedDimensions"
-                  :options="outcomeOptions"
-                  :aria-label="t('aiObservability.experiments.comparePage.panel.outcomeDimensions')"
-                  :disabled="loading"
-                  :searchable="true"
-                  multiple
-                  select-all
-                  option-tooltip
-                  size="md"
-                  width="sm"
-                  data-test="ai-experiment-comparison-outcome-dimensions"
-                  @update:model-value="selectOutcomeDimensions"
-                >
-                  <template #trigger>{{ selectionLabel }}</template>
-                </OSelect>
               </div>
               <div class="flex flex-col gap-0.5">
                 <span class="text-text-tertiary text-xs">
                   {{ t("aiObservability.experiments.comparePage.panel.threshold") }}
                 </span>
-                <OSelect
-                  :model-value="comparison.threshold"
-                  :options="thresholdOptions"
-                  :searchable="false"
-                  :disabled="loading"
-                  size="md"
-                  width="xs"
-                  data-test="ai-experiment-comparison-threshold"
-                  @update:model-value="selectThreshold"
-                />
+                <OTooltip :content="thresholdTooltip">
+                  <OSelect
+                    :model-value="comparison.threshold"
+                    :options="thresholdOptions"
+                    :searchable="false"
+                    :disabled="loading"
+                    size="md"
+                    width="xs"
+                    data-test="ai-experiment-comparison-threshold"
+                    @update:model-value="selectThreshold"
+                  />
+                </OTooltip>
               </div>
             </div>
           </div>
@@ -256,12 +259,19 @@ const bucketFilter = ref<string | null>(null);
 // silently reclassifies the whole run.
 const THRESHOLD_STEPS = [0.02, 0.05, 0.1, 0.15];
 
+// The server (and the wire format everywhere else) speaks in the raw fraction
+// (0.05) — only the label a person reads is a percentage. Rounding to 2
+// decimal places before trimming avoids float noise (0.1 * 100 !== 10 exactly).
+function thresholdPercentLabel(step: number): string {
+  return `${Number((step * 100).toFixed(2))}%`;
+}
+
 /** Whatever the server is using stays selectable even if it is off the ladder. */
 const thresholdOptions = computed(() => {
   const steps = THRESHOLD_STEPS.includes(comparison.value.threshold)
     ? THRESHOLD_STEPS
     : [...THRESHOLD_STEPS, comparison.value.threshold].sort((a, b) => a - b);
-  return steps.map((step) => ({ label: raw(step.toFixed(2)), value: step }));
+  return steps.map((step) => ({ label: raw(thresholdPercentLabel(step)), value: step }));
 });
 
 function selectThreshold(next: SelectModelValue) {
@@ -269,6 +279,12 @@ function selectThreshold(next: SelectModelValue) {
     emit("apply-threshold", next);
   }
 }
+
+const thresholdTooltip = computed(() =>
+  t("aiObservability.experiments.comparePage.panel.thresholdTooltip", {
+    percent: thresholdPercentLabel(comparison.value.threshold),
+  }),
+);
 
 const selectedDimensions = computed(() => props.outcomeDimensions ?? comparison.value.outcomeDimensions);
 
@@ -301,6 +317,24 @@ function selectOutcomeDimensions(next: SelectModelValue) {
     emit("select-outcome-dimensions", next);
   }
 }
+
+/** What the current selection actually does, read on hover over the select
+ *  itself rather than a generic hint disconnected from the visible value. */
+const outcomeTooltip = computed(() => {
+  const selected = new Set(selectedDimensions.value);
+  const eligible = outcomeOptions.value.filter((option) => !option.disabled);
+  if (selected.size === 0) {
+    return t("aiObservability.experiments.comparePage.panel.outcomeTooltipNone");
+  }
+  if (selected.size === eligible.length) {
+    return t("aiObservability.experiments.comparePage.panel.outcomeTooltipAll");
+  }
+  const names = eligible
+    .filter((option) => selected.has(String(option.value)))
+    .map((option) => option.label)
+    .join(", ");
+  return t("aiObservability.experiments.comparePage.panel.outcomeTooltipPartial", { names });
+});
 
 /** Rows in either run — what "All" counts. */
 const totalRows = computed(

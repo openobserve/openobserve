@@ -209,24 +209,29 @@
           <!-- No gap: icon-sm buttons are square hit targets that already carry
                their own whitespace, the same as the Alerts row actions. -->
           <div class="flex items-center">
-            <OButton
-              size="icon-sm"
-              variant="ghost"
-              :icon-left="isBaseline(row) ? 'keep' : 'keep-outline'"
-              :title="
-                isBaseline(row)
-                  ? t('aiObservability.experiments.clearBaseline')
-                  : t('aiObservability.experiments.setBaseline')
-              "
-              :aria-label="
-                isBaseline(row)
-                  ? t('aiObservability.experiments.clearBaseline')
-                  : t('aiObservability.experiments.setBaseline')
-              "
-              :disabled="baselineChangingId === row.id"
-              :data-test="`ai-experiment-baseline-${row.id}`"
-              @click.stop="toggleBaseline(row)"
-            />
+            <OTooltip
+              :content="t('aiObservability.experiments.baselineRequiresCompleted')"
+              :disabled="canSetBaseline(row)"
+            >
+              <OButton
+                size="icon-sm"
+                variant="ghost"
+                :icon-left="isBaseline(row) ? 'keep' : 'keep-outline'"
+                :title="
+                  isBaseline(row)
+                    ? t('aiObservability.experiments.clearBaseline')
+                    : t('aiObservability.experiments.setBaseline')
+                "
+                :aria-label="
+                  isBaseline(row)
+                    ? t('aiObservability.experiments.clearBaseline')
+                    : t('aiObservability.experiments.setBaseline')
+                "
+                :disabled="baselineChangingId === row.id || !canSetBaseline(row)"
+                :data-test="`ai-experiment-baseline-${row.id}`"
+                @click.stop="toggleBaseline(row)"
+              />
+            </OTooltip>
             <OButton
               size="icon-sm"
               variant="ghost"
@@ -546,6 +551,14 @@ function costLabel(experiment: LlmExperiment) {
 
 function isBaseline(experiment: LlmExperiment) {
   return experiment.isBaseline;
+}
+
+// A baseline is the fixed reference every later run gets compared against, so
+// it must point at a run with final results — pending/running/failed/cancelled
+// runs have nothing stable to pin. Already-baseline experiments can still be
+// cleared regardless of status: unpinning is always safe.
+function canSetBaseline(experiment: LlmExperiment) {
+  return experiment.isBaseline || experiment.status === "completed";
 }
 
 // Cloning opens the create form seeded from the source rather than starting a

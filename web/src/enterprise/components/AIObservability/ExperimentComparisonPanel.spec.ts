@@ -153,7 +153,7 @@ const stubs = {
       OButton: { template: "<button @click=\"$emit('click')\"><slot /></button>" },
       OTooltip: {
         props: ["content"],
-        template: '<span data-test="tooltip" :data-content="content" />',
+        template: '<span data-test="tooltip" :data-content="content"><slot /></span>',
       },
       OTag: {
         props: ["label", "variant"],
@@ -344,7 +344,7 @@ describe("ExperimentComparisonPanel", () => {
     const wrapper = mountPanel();
     const select = wrapper.get('[data-test="ai-experiment-comparison-threshold"]');
 
-    expect(select.findAll("option").map((o) => o.text())).toEqual(["0.02", "0.05", "0.10", "0.15"]);
+    expect(select.findAll("option").map((o) => o.text())).toEqual(["2%", "5%", "10%", "15%"]);
 
     await select.setValue("0.15");
     expect(wrapper.emitted("apply-threshold")?.[0]).toEqual([0.15]);
@@ -358,7 +358,7 @@ describe("ExperimentComparisonPanel", () => {
         .get('[data-test="ai-experiment-comparison-threshold"]')
         .findAll("option")
         .map((o) => o.text()),
-    ).toEqual(["0.02", "0.05", "0.10", "0.15", "0.50"]);
+    ).toEqual(["2%", "5%", "10%", "15%", "50%"]);
   });
 
   it("opens the row from a click anywhere on it, with no action button", async () => {
