@@ -16,9 +16,10 @@
 use std::sync::Arc;
 
 use anyhow::{Result, anyhow, ensure};
-use bytes::Buf;
+use bytes::Bytes;
 
 use super::*;
+use crate::service::tantivy::puffin_directory::footer_cache::FOOTER_DATA_CACHE;
 
 #[derive(Debug)]
 pub struct PuffinBytesReader {
@@ -119,7 +120,36 @@ impl PuffinFooterBytesReader {
 
 impl PuffinFooterBytesReader {
     async fn parse(mut self) -> Result<PuffinMeta> {
-        // read footer
+        // the location is unique key for the footer cache
+        let cache_key = format!("puffin_footer_{}", self.source.location);
+
+        let payload = match FOOTER_DATA_CACHE.get(&cache_key) {
+            Some(cached) => {
+                // Combined cache: first FOOTER_SIZE bytes = footer tail, rest = payload
+                let footer = cached.slice(0..FOOTER_SIZE as usize);
+                let payload = cached.slice(FOOTER_SIZE as usize..);
+                self.parse_footer_metadata(&footer)?;
+                payload
+            }
+            None => {
+                let footer = self.read_footer_metadata().await?;
+                let payload = self.read_payload().await?;
+                let mut combined = Vec::with_capacity(footer.len() + payload.len());
+                combined.extend_from_slice(&footer);
+                combined.extend_from_slice(&payload);
+                FOOTER_DATA_CACHE.put(cache_key, Bytes::from(combined));
+                payload
+            }
+        };
+
+        self.metadata = Some(self.parse_payload(&payload.slice(MAGIC_SIZE as usize..))?);
+        self.validate_payload()?;
+
+        Ok(self.metadata.unwrap())
+    }
+
+    /// Read the footer tail and populate flags + payload_size. Returns the raw footer bytes.
+    async fn read_footer_metadata(&mut self) -> Result<Bytes> {
         if self.source.size < FOOTER_SIZE {
             return Err(anyhow!(
                 "Unexpected footer size: expected size {} vs actual size {}",
@@ -134,34 +164,32 @@ impl PuffinFooterBytesReader {
         )
         .await?;
 
+        self.parse_footer_metadata(&footer)?;
+        Ok(footer)
+    }
+
+    /// Parse footer metadata from in-memory bytes. Sets flags and payload_size on self.
+    fn parse_footer_metadata(&mut self, footer: &[u8]) -> Result<()> {
         // check the footer magic
         ensure!(
-            footer
-                .slice((FOOTER_SIZE - MAGIC_SIZE) as usize..FOOTER_SIZE as usize)
-                .to_vec()
-                == MAGIC,
+            footer[(FOOTER_SIZE - MAGIC_SIZE) as usize..FOOTER_SIZE as usize].to_vec() == MAGIC,
             anyhow!("Footer MAGIC mismatch")
         );
 
         // check the flags
         let mut flags = [0u8; 4];
-        footer
-            .slice(
-                (FOOTER_SIZE - MAGIC_SIZE - FLAGS_SIZE) as usize
-                    ..(FOOTER_SIZE - MAGIC_SIZE) as usize,
-            )
-            .copy_to_slice(&mut flags);
+        flags.copy_from_slice(
+            &footer[(FOOTER_SIZE - MAGIC_SIZE - FLAGS_SIZE) as usize
+                ..(FOOTER_SIZE - MAGIC_SIZE) as usize],
+        );
         self.flags = PuffinFooterFlags::from_bits(u32::from_le_bytes(flags))
             .ok_or_else(|| anyhow!("Error parsing Puffin flags from bytes"))?;
 
         // check the payload size
         let mut payload_size = [0u8; 4];
-        footer
-            .slice(0..FOOTER_PAYLOAD_SIZE_SIZE as usize)
-            .copy_to_slice(&mut payload_size);
+        payload_size.copy_from_slice(&footer[0..FOOTER_PAYLOAD_SIZE_SIZE as usize]);
         self.payload_size = i32::from_le_bytes(payload_size) as u64;
 
-        // read the payload
         if self.source.size < FOOTER_SIZE + self.payload_size {
             return Err(anyhow!(
                 "Unexpected payload size: expected size {} vs actual size {}",
@@ -169,24 +197,29 @@ impl PuffinFooterBytesReader {
                 self.source.size
             ));
         }
-        let payload = infra::cache::storage::get_range(
+
+        Ok(())
+    }
+
+    /// Read the payload region from storage. Requires self.payload_size to be set first.
+    async fn read_payload(&self) -> Result<Bytes> {
+        match infra::cache::storage::get_range(
             &self.account,
             &self.source.location,
             (self.source.size - FOOTER_SIZE - self.payload_size - MAGIC_SIZE)
                 ..(self.source.size - FOOTER_SIZE),
         )
-        .await?;
-
-        // check the footer magic
-        ensure!(
-            payload.slice(0..MAGIC_SIZE as usize).to_vec() == MAGIC,
-            anyhow!("Footer MAGIC mismatch")
-        );
-
-        self.metadata = Some(self.parse_payload(&payload.slice(MAGIC_SIZE as usize..))?);
-        self.validate_payload()?;
-
-        Ok(self.metadata.unwrap())
+        .await
+        {
+            Ok(payload) => {
+                ensure!(
+                    payload.slice(0..MAGIC_SIZE as usize).to_vec() == MAGIC,
+                    anyhow!("Footer MAGIC mismatch")
+                );
+                Ok(payload)
+            }
+            Err(e) => Err(anyhow!("Error reading footer payload: {e}")),
+        }
     }
 
     fn parse_payload(&self, bytes: &[u8]) -> Result<PuffinMeta> {
@@ -241,6 +274,36 @@ mod tests {
             e_tag: None,
             version: None,
         }
+    }
+
+    #[tokio::test]
+    async fn test_puffin_footer_cache_hit_without_storage() {
+        let metadata = PuffinMeta {
+            blobs: vec![],
+            properties: HashMap::new(),
+        };
+        let payload = serde_json::to_vec(&metadata).unwrap();
+        let mut source = create_mock_object_meta(0);
+        source.location = Path::from("test/cached-puffin-footer");
+        source.size = MAGIC_SIZE * 2 + payload.len() as u64 + FOOTER_SIZE;
+        let mut cached = Vec::new();
+        cached.extend_from_slice(&(payload.len() as i32).to_le_bytes());
+        cached.extend_from_slice(&PuffinFooterFlags::DEFAULT.bits().to_le_bytes());
+        cached.extend_from_slice(&MAGIC);
+        cached.extend_from_slice(&MAGIC);
+        cached.extend_from_slice(&payload);
+        FOOTER_DATA_CACHE.put(
+            format!("puffin_footer_{}", source.location),
+            Bytes::from(cached),
+        );
+
+        // No object exists at this path; parsing must use the cached footer and payload.
+        let parsed = PuffinFooterBytesReader::new("test".to_string(), Arc::new(source))
+            .parse()
+            .await
+            .unwrap();
+        assert!(parsed.blobs.is_empty());
+        assert!(parsed.properties.is_empty());
     }
 
     #[test]
