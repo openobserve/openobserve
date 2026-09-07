@@ -20,7 +20,7 @@
 //   - trigger_condition.silence  (cooldown, minutes)   — required, ≥ 0
 //   - trigger_condition.period   (evaluation window)   — required, ≥ 1
 //                                                         (SCHEDULED-only, see below)
-//   - destinations               (multi-select)        — at least one required
+//   - destinations               (multi-select)        — optional
 //   - creates_incident           (switch)              — optional boolean
 //   - _ui.pendingPeriod          (display value, in the
 //     selected unit — minutes/hours) — optional, ≥ 0. Blank = 0 (fire
@@ -92,10 +92,9 @@ export const makePeriodSchema = (t: Translator) =>
 export const makePendingPeriodSchema = (t: Translator) =>
   z.coerce.number().min(0, t("alerts.validation.pendingPeriodNonNegative")).optional();
 
-/** destinations: at least one required. Elements are destination NAME strings
- *  (the OSelect options are `formattedDestinations` = array of names). */
-export const makeDestinationsSchema = (t: Translator) =>
-  z.array(z.string()).min(1, t("alerts.validation.destinationRequired"));
+/** destinations: OPTIONAL — an alert with none evaluates, records history and
+ *  notifies nobody. Elements are destination NAME strings. */
+export const makeDestinationsSchema = (_t: Translator) => z.array(z.string()).optional();
 
 /** creates_incident: optional boolean. */
 export const alertSettingsCreatesIncidentSchema = z.boolean().optional();
@@ -126,42 +125,16 @@ export const makeAlertSettingsShape = (t: Translator) =>
  * ≥ 1) only for scheduled alerts. In realtime mode period is not rendered and
  * keeps its default value, so it is a plain `z.coerce.number()` with no min.
  */
-export const createAlertSettingsSchema = (
-  t: Translator,
-  isRealTime: boolean,
-  // ENTERPRISE/CLOUD only. An alert can be delivered to a destination OR to a
-  // linked workflow, so with workflows available the "destinations ≥ 1" rule
-  // becomes "at least ONE of the two". Defaults to false so OSS — and every
-  // existing caller/spec passing two args — keeps main's exact rule and message.
-  allowWorkflows = false,
-) => {
-  const base = z.object({
+export const createAlertSettingsSchema = (t: Translator, isRealTime: boolean) =>
+  z.object({
     trigger_condition: z.object({
       silence: makeSilenceSchema(t),
       period: isRealTime ? z.coerce.number() : makePeriodSchema(t),
     }),
     _ui: z.object({ pendingPeriod: makePendingPeriodSchema(t) }).optional(),
-    // With workflows in play the per-field `min(1)` can't express the rule (it
-    // is cross-field), so it moves to the refinement below.
-    destinations: allowWorkflows ? z.array(z.string()).optional() : makeDestinationsSchema(t),
+    destinations: makeDestinationsSchema(t),
     workflows: z.array(z.string()).optional(),
     creates_incident: alertSettingsCreatesIncidentSchema,
   });
-
-  if (!allowWorkflows) return base;
-
-  return base.superRefine((val, ctx) => {
-    const hasDestination = (val.destinations?.length ?? 0) > 0;
-    const hasWorkflow = (val.workflows?.length ?? 0) > 0;
-    if (hasDestination || hasWorkflow) return;
-    // Reported on `destinations` so it renders under the combined targets
-    // control (AlertSettings surfaces it via fieldError("destinations")).
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ["destinations"],
-      message: t("alerts.destinationOrWorkflowRequired"),
-    });
-  });
-};
 
 export type AlertSettingsForm = z.infer<ReturnType<typeof createAlertSettingsSchema>>;

@@ -6482,7 +6482,8 @@
       "thresholdPositiveNumber": "Avviso - {index}: la soglia deve essere un numero positivo maggiore di 0 e deve essere un numero.",
       "silenceNonNegativeNumber": "Avviso - {index}: il periodo di raffreddamento deve essere maggiore o uguale a 0 e deve essere un numero.",
       "frequencyTypeInvalid": "Avviso - {index}: il tipo di frequenza deve essere 'minutes' o 'cron' e deve essere una stringa.",
-      "cronExpressionInvalid": "Avviso - {index}: l'espressione cron deve essere un'espressione cron valida."
+      "cronExpressionInvalid": "Avviso - {index}: l'espressione cron deve essere un'espressione cron valida.",
+      "destinationsArray": "Avviso - {index}: Le destinazioni devono essere un array."
     },
     "composite": {
       "child": "Avviso figlio",
@@ -6930,7 +6931,8 @@
         "pendingPeriodClause": ", dopo un'attesa di {duration}",
         "cooldownClause": ", ma non più di una volta ogni {cooldown}",
         "defaultConditions": "Avvisami quando le condizioni configurate sono soddisfatte"
-      }
+      },
+      "notifiesNobody": "non notifica ancora nessuno"
     },
     "correlation": {
       "title": "Correlazione degli avvisi",
@@ -7368,7 +7370,8 @@
         "alertTriggerTimeSeconds": "Orario di attivazione in secondi epoch",
         "alertTriggerTimeStr": "Orario di attivazione, leggibile",
         "rows": "Tutte le righe corrispondenti, formattate dal modello di riga"
-      }
+      },
+      "noDestinationNote": "Nessuna destinazione selezionata. Questo avviso continua a essere valutato e la sua cronologia registrata: semplicemente non notificherà nessuno."
     },
     "advanced": {
       "addVariable": "Aggiungi variabile",
@@ -7549,7 +7552,8 @@
       "summaryTrainingDays": "{days} giorni",
       "timestampAliasBanned": "{column} non può essere utilizzato come alias di colonna. Usa {timeBucket} invece.",
       "trainingWindowSeasonality": "giorni (stagionalità: {seasonality})",
-      "trainingWindowTooltip": "Quanti giorni di dati storici utilizzare per l'addestramento. Minimo 1 giorno. La stagionalità viene rilevata automaticamente: <7 giorni → ora del giorno; ≥7 giorni → ora del giorno + giorno della settimana."
+      "trainingWindowTooltip": "Quanti giorni di dati storici utilizzare per l'addestramento. Minimo 1 giorno. La stagionalità viene rilevata automaticamente: <7 giorni → ora del giorno; ≥7 giorni → ora del giorno + giorno della settimana.",
+      "noDestinationNote": "Nessuna destinazione selezionata. Le anomalie vengono comunque rilevate e registrate: semplicemente non notificheranno nessuno."
     },
     "variables": {
       "label": "Variabile"
@@ -7881,7 +7885,8 @@
     "sloKind": "Tipo di condizione",
     "sloLongWindow": "Finestra lunga",
     "sloShortWindow": "Finestra breve",
-    "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui."
+    "sloCloneDisabled": "Gli avvisi SLO vengono creati nella loro pagina SLO, quindi non possono essere clonati da qui.",
+    "destinationsOptionalLabel": "Destinazioni"
   },
   "alert_dependencies": {
     "actionOpen": "Apri",
@@ -7978,18 +7983,19 @@
     },
     "install": {
       "title": "Aggiungi avvisi dalla libreria",
-      "subtitle": "Scegli dove notificano gli avvisi, quali avvisi aggiungere e dove vengono archiviati.",
+      "subtitle": "Scegli quali avvisi aggiungere, dove vengono archiviati e, facoltativamente, dove notificano.",
       "stepDestination": "Destinazione",
       "stepAlerts": "Avvisi",
       "stepFolder": "Cartella",
       "stepTune": "Regola",
       "stepInstall": "Aggiungi",
-      "destinationIntro": "Ogni avviso in questo lotto invia una notifica alla destinazione che scegli qui. I file della libreria nominano le destinazioni dell'organizzazione da cui sono stati esportati, che non esistono nella tua.",
+      "destinationIntro": "Ogni avviso di questo lotto invia la notifica alla destinazione che scegli qui. Questo passaggio è facoltativo: saltalo e gli avvisi verranno aggiunti senza destinazione. I file della libreria indicano le destinazioni dell'organizzazione da cui sono stati esportati, che nella tua non esistono.",
       "destinationLabel": "Destinazione",
       "destinationPlaceholder": "Scegli una destinazione",
+      "destinationNone": "Nessuna: non notifica ancora",
       "destinationsLoadFailed": "Non è stato possibile caricare le destinazioni esistenti.",
       "retry": "Riprova",
-      "destinationsNoneBody": "Questa organizzazione non ha ancora destinazioni per gli avvisi, quindi non c'è dove questi avvisi possano inviare notifiche. Creane una nella pagina Destinazioni, poi torna qui e selezionala.",
+      "destinationsNoneBody": "Questa organizzazione non ha ancora destinazioni per gli avvisi. Puoi comunque aggiungere questi avvisi: verranno valutati e ne verrà registrata la cronologia, semplicemente non notificheranno ancora nessuno. Crea una destinazione nella pagina Destinazioni quando vuoi e poi aggiungila agli avvisi.",
       "openDestinations": "Apri Destinazioni",
       "selectAll": "Seleziona tutto",
       "clear": "Cancella",
@@ -8012,6 +8018,7 @@
       "next": "Avanti",
       "cancel": "Annulla",
       "done": "Fatto",
+      "confirmLargeNoDestination": "Ho capito che questo crea {count} avvisi in {folder}, nessuno dei quali notifica ancora.",
       "confirmLarge": "Ho capito che questo crea {count} avvisi in {folder}, ciascuno con notifica a {destination}."
     },
     "error": {

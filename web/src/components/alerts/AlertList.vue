@@ -43,8 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="alert-list-add-alert-btn"
           variant="primary"
           size="sm"
-          :disabled="!destinations.length || !templates.length"
-          :title="!destinations.length ? t('alerts.noDestinations') : ''"
+          :disabled="!templates.length"
           @click="
             activeTab === 'anomalyDetection'
               ? router.push({
@@ -716,14 +715,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   :description="t('alerts.noTemplatesMsg')"
                   data-test="alert-list-create-template-text"
                   @action="routeTo('alertTemplates')"
-                />
-                <OEmptyState
-                  v-else-if="!destinations.length"
-                  size="hero"
-                  preset="no-alert-destinations"
-                  :description="t('alerts.noDestinationsMsg')"
-                  data-test="alert-list-create-destination-text"
-                  @action="routeTo('alertDestinations')"
                 />
                 <OEmptyState
                   v-else
@@ -3513,7 +3504,7 @@ export default defineComponent({
           if (isInputFocused()) return;
           // Mirror the Add button so the URL updates (action=add / route push),
           // otherwise "go back"/discard can't return to the list.
-          if (!destinations.value.length || !templates.value.length) return;
+          if (!templates.value.length) return;
           if (activeTab.value === "anomalyDetection") {
             router.push({
               name: "addAnomalyDetection",

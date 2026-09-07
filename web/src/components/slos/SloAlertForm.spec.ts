@@ -222,6 +222,26 @@ describe("SloAlertForm", () => {
     });
   });
 
+  // The shared destinations field used to default `required` to true, which put
+  // a "*" on a field no alert family actually requires.
+  it("labels the destination field without a required marker", async () => {
+    const wrapper = await mountForm();
+    const field = wrapper.findComponent({ name: "AlertDestinationsField" });
+
+    expect(field.exists()).toBe(true);
+    expect(field.props("required")).toBe(false);
+    expect(field.text()).not.toContain("*");
+  });
+
+  it("saves an SLO alert with no destination at all", async () => {
+    const wrapper = await mountForm();
+    await wrapper.find('[data-test="slo-alert-form-submit"]').trigger("click");
+    await flushPromises();
+
+    expect(createSpy).toHaveBeenCalled();
+    expect(createSpy.mock.calls[0][1].destinations).toEqual([]);
+  });
+
   it("emits cancel without calling the API", async () => {
     const wrapper = await mountForm();
     await wrapper.find('[data-test="slo-alert-form-cancel"]').trigger("click");

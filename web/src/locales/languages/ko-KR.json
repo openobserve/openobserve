@@ -6482,7 +6482,8 @@
       "thresholdPositiveNumber": "Alert - {index}: 임계값은 0보다 큰 양수여야 하며 숫자여야 합니다.",
       "silenceNonNegativeNumber": "알림 - {index}: 쿨다운 기간은 0보다 크거나 같은 숫자여야 합니다.",
       "frequencyTypeInvalid": "Alert - {index}: 빈도 유형은 'minutes' 또는 'cron'이어야 하며 문자열이어야 합니다.",
-      "cronExpressionInvalid": "Alert - {index}: Cron 표현식은 유효한 cron 표현식이어야 합니다."
+      "cronExpressionInvalid": "Alert - {index}: Cron 표현식은 유효한 cron 표현식이어야 합니다.",
+      "destinationsArray": "알림 - {index}: 대상은 배열이어야 합니다."
     },
     "composite": {
       "child": "하위 알림",
@@ -6930,7 +6931,8 @@
         "pendingPeriodClause": ", {duration} 동안 대기한 후",
         "cooldownClause": ", 단, {cooldown}마다 최대 한 번",
         "defaultConditions": "구성된 조건이 충족되면 알림 받기"
-      }
+      },
+      "notifiesNobody": "아직 아무에게도 알리지 않음"
     },
     "correlation": {
       "title": "경고 상관관계",
@@ -7368,7 +7370,8 @@
         "alertTriggerTimeSeconds": "에포크 초 단위의 트리거 시간",
         "alertTriggerTimeStr": "사람이 읽을 수 있는 트리거 시간",
         "rows": "행 템플릿으로 형식화된 모든 일치 행"
-      }
+      },
+      "noDestinationNote": "선택된 대상이 없습니다. 이 알림은 계속 평가되고 기록되지만 아무에게도 통지하지 않습니다."
     },
     "advanced": {
       "addVariable": "변수 추가",
@@ -7549,7 +7552,8 @@
       "summaryTrainingDays": "{days}일",
       "timestampAliasBanned": "{column}은(는) 열 별칭으로 사용할 수 없습니다. 대신 {timeBucket}을(를) 사용하세요.",
       "trainingWindowSeasonality": "일 (계절성: {seasonality})",
-      "trainingWindowTooltip": "훈련에 사용할 과거 데이터의 일 수입니다. 최소 1일. 계절성은 자동 감지됩니다: <7일 → 시간대; ≥7일 → 시간대 + 요일."
+      "trainingWindowTooltip": "훈련에 사용할 과거 데이터의 일 수입니다. 최소 1일. 계절성은 자동 감지됩니다: <7일 → 시간대; ≥7일 → 시간대 + 요일.",
+      "noDestinationNote": "선택된 대상이 없습니다. 이상 징후는 계속 감지되고 기록되지만 아무에게도 통지하지 않습니다."
     },
     "variables": {
       "label": "변수"
@@ -7881,7 +7885,8 @@
     "sloKind": "조건 유형",
     "sloLongWindow": "긴 기간",
     "sloShortWindow": "짧은 기간",
-    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다."
+    "sloCloneDisabled": "SLO 경고는 SLO 페이지에서 생성되므로 여기서 복제할 수 없습니다.",
+    "destinationsOptionalLabel": "대상"
   },
   "alert_dependencies": {
     "actionOpen": "열기",
@@ -7978,18 +7983,19 @@
     },
     "install": {
       "title": "라이브러리에서 알림 추가",
-      "subtitle": "알림을 보낼 위치, 추가할 알림, 보관할 위치를 선택하세요.",
+      "subtitle": "추가할 알림, 보관할 위치, 그리고 필요하면 알림을 보낼 대상을 선택하세요.",
       "stepDestination": "대상",
       "stepAlerts": "알림",
       "stepFolder": "폴더",
       "stepTune": "조정",
       "stepInstall": "추가",
-      "destinationIntro": "이 배치의 모든 알림은 여기서 선택한 대상으로 알림을 보냅니다. 라이브러리 파일에는 해당 파일이 내보내진 조직의 대상 이름이 포함되어 있으며, 이는 현재 조직에는 존재하지 않습니다.",
+      "destinationIntro": "이 배치의 모든 알림은 여기에서 선택한 대상으로 알립니다. 이 단계는 선택 사항이며, 건너뛰면 알림이 대상 없이 추가됩니다. 라이브러리 파일에는 내보낸 조직의 대상이 지정되어 있지만 이 조직에는 존재하지 않습니다.",
       "destinationLabel": "대상",
       "destinationPlaceholder": "대상 선택",
+      "destinationNone": "없음 - 아직 알리지 않음",
       "destinationsLoadFailed": "기존 대상을 불러올 수 없습니다.",
       "retry": "다시 시도",
-      "destinationsNoneBody": "이 조직에는 아직 알림 대상이 없어 알림을 보낼 곳이 없습니다. 대상 페이지에서 대상을 만든 후 다시 돌아와 여기서 선택하세요.",
+      "destinationsNoneBody": "이 조직에는 아직 알림 대상이 없습니다. 그래도 이 알림들을 추가할 수 있습니다. 평가되고 기록도 남지만 아직 아무에게도 알리지 않습니다. 준비되면 대상 페이지에서 대상을 만든 뒤 알림에 추가하세요.",
       "openDestinations": "대상 열기",
       "selectAll": "모두 선택",
       "clear": "선택 해제",
@@ -8012,6 +8018,7 @@
       "next": "다음",
       "cancel": "취소",
       "done": "완료",
+      "confirmLargeNoDestination": "{folder}에 알림 {count}개를 만들고, 그중 어느 것도 아직 알리지 않는다는 점을 이해합니다.",
       "confirmLarge": "{folder}에 알림 {count}개를 만들고 각각 {destination}(으)로 알린다는 점을 이해합니다."
     },
     "error": {

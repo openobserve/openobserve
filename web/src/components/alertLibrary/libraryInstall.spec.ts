@@ -17,6 +17,7 @@ import { describe, expect, it } from "vitest";
 
 import type { AlertLibraryEntry, AlertLibraryFile } from "@/types/alertLibrary";
 
+import type { InstallPayloadInput } from "./libraryInstall";
 import { buildInstallPayload, InstallPayloadError } from "./libraryInstall";
 
 const entry = (over: Partial<AlertLibraryEntry> = {}): AlertLibraryEntry => ({
@@ -80,6 +81,54 @@ describe("buildInstallPayload", () => {
       const bare = file();
       delete bare.destinations;
       expect(build({ file: bare }).destinations).toEqual(["ops-slack"]);
+    });
+
+    describe("installing without a destination", () => {
+      // The cast lives here, not in the interface: today `destination` is a
+      // required string and making it optional is the implementation's commit.
+      const buildUnaddressed = (over: Record<string, unknown> = {}) =>
+        buildInstallPayload({
+          entry: entry(),
+          file: file(),
+          folderId: "folder-7",
+          owner: "someone@example.com",
+          timezone: "Asia/Kolkata",
+          ...over,
+        } as unknown as InstallPayloadInput);
+
+      it("keeps the chosen destination when the user picked one", () => {
+        expect(buildUnaddressed({ destination: "ops-slack" }).destinations).toEqual(["ops-slack"]);
+      });
+
+      it("sends an empty destinations list when no destination was chosen", () => {
+        const payload = buildUnaddressed();
+        expect(payload.destinations).toEqual([]);
+        // Present and empty, not absent: the key is what overwrites the file's own.
+        expect("destinations" in payload).toBe(true);
+      });
+
+      it("reads an empty destination name as no destination, never as a nameless one", () => {
+        expect(buildUnaddressed({ destination: "" }).destinations).toEqual([]);
+      });
+
+      it("reads a whitespace-only destination name as no destination", () => {
+        expect(buildUnaddressed({ destination: "   " }).destinations).toEqual([]);
+      });
+
+      it("still overwrites the pack's own destination when none was chosen", () => {
+        // "o2_to_slack" is the pack author's channel; leaking it into the org is
+        // the whole reason this field is overwritten rather than merged.
+        const payload = buildUnaddressed({ file: file({ destinations: ["o2_to_slack"] }) });
+        expect(payload.destinations).toEqual([]);
+      });
+
+      it("still overwrites the pack's own destination when one was chosen", () => {
+        const payload = buildUnaddressed({
+          file: file({ destinations: ["o2_to_slack"] }),
+          destination: "ops-slack",
+        });
+        expect(payload.destinations).toEqual(["ops-slack"]);
+      });
     });
 
     it("stamps the library id and content hash without dropping the file's own attributes", () => {

@@ -6,10 +6,9 @@ export interface AlertSourceIntegration {
   token: string;
   enabled: boolean;
   config: Record<string, any>;
-  /** Where notifications go when this source's alerts create/join an
-   * incident. Empty means "use the org default" — see the review's
-   * finding that incidents with no destination fire silently. */
-  destinations: string[];
+  /** Where notifications go when this source's alerts create/join an incident.
+   * Optional: the API omits the key for a source never given one. */
+  destinations?: string[];
   created_by: string;
   created_at: number;
   updated_at: number;

@@ -56,6 +56,7 @@ vi.mock("@/services/alert_destination", () => ({
 }));
 
 import AlertList from "@/components/alerts/AlertList.vue";
+import { getManager } from "@/lib/vue-shortcut-manager/manager";
 import config from "@/aws-exports";
 import i18n from "@/locales";
 import store from "@/test/unit/helpers/store";
@@ -493,6 +494,50 @@ describe("AlertList - basic rendering", () => {
     const wrapper = await mountAlertList();
     await waitData(wrapper);
     expect(wrapper.find('[data-test="alert-list-table"]').exists()).toBe(true);
+  });
+});
+
+// An org with zero destinations used to be locked out of creating ANY alert:
+// the Add button was disabled, the empty state replaced the create path with
+// "create a destination first", and the keyboard shortcut silently no-opped.
+// An alert that notifies nobody is a valid configuration, so all three are gone.
+describe("AlertList - an org with no destinations can still create alerts", () => {
+  beforeEach(() => {
+    destinationsSvc.list.mockImplementation(() => Promise.resolve({ data: [] } as any));
+  });
+
+  it("leaves the Add button ENABLED", async () => {
+    const wrapper = await mountAlertList();
+    await waitData(wrapper);
+    const btn = wrapper.find('[data-test="alert-list-add-alert-btn"]');
+    expect(btn.exists()).toBe(true);
+    expect(btn.attributes("disabled")).toBeUndefined();
+  });
+
+  it("does not replace the empty state with a create-a-destination dead end", async () => {
+    alertsDB = [];
+    const wrapper = await mountAlertList();
+    await waitData(wrapper);
+    expect(wrapper.find('[data-test="alert-list-create-destination-text"]').exists()).toBe(false);
+  });
+
+  it("keeps the alertsCreate shortcut working", async () => {
+    // push is stubbed rather than let through: a real navigation to action=add
+    // outlives this test and re-opens the add dialog under later ones.
+    const pushSpy = vi.spyOn(router, "push").mockResolvedValue(undefined as any);
+    await mountAlertList();
+    const create = getManager()
+      ?.getAll()
+      .find((s: any) => s.id === "alertsCreate");
+    expect(create).toBeTruthy();
+
+    create!.handler();
+    await flushPromises();
+
+    expect(pushSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ query: expect.objectContaining({ action: "add" }) }),
+    );
+    pushSpy.mockRestore();
   });
 });
 

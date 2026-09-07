@@ -689,6 +689,15 @@ pub async fn create_org(
                     org.identifier
                 );
             }
+            // Best-effort: a failure here is only re-attempted by the next restart's backfill.
+            if let Err(e) =
+                crate::alerts::prebuilt::seed_prebuilt_alerts_for_org(&org.identifier).await
+            {
+                log::warn!(
+                    "Failed to seed prebuilt alerts for org '{}': {e}",
+                    org.identifier
+                );
+            }
             #[cfg(feature = "cloud")]
             enqueue_cloud_event(CloudEvent {
                 org_id: org.identifier.clone(),
@@ -818,6 +827,15 @@ pub async fn check_and_create_org(org_id: &str) -> Result<Organization, anyhow::
                     org.identifier
                 );
             }
+            // Lazily-created orgs skip `create_org`, which is the only other seeder.
+            if let Err(e) =
+                crate::alerts::prebuilt::seed_prebuilt_alerts_for_org(&org.identifier).await
+            {
+                log::warn!(
+                    "Failed to seed prebuilt alerts for org '{}': {e}",
+                    org.identifier
+                );
+            }
             Ok(org.clone())
         }
         Err(e) => {
@@ -861,6 +879,15 @@ pub async fn check_and_create_org_without_ofga(
             {
                 log::error!(
                     "Failed to create synthetics probe token for org '{}': {e}",
+                    org.identifier
+                );
+            }
+            // Lazily-created orgs skip `create_org`, which is the only other seeder.
+            if let Err(e) =
+                crate::alerts::prebuilt::seed_prebuilt_alerts_for_org(&org.identifier).await
+            {
+                log::warn!(
+                    "Failed to seed prebuilt alerts for org '{}': {e}",
                     org.identifier
                 );
             }

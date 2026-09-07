@@ -177,7 +177,7 @@ export function generateAlertSummary(
   const selectedDestinations: string[] = formData.destinations || [];
   if (selectedDestinations.length === 0) {
     parts.push(
-      `✓ ${translate("alerts.summary.sendsTo")}: ${clickable(translate("alerts.summary.noDestination"), "destinations")} ${translate("alerts.summary.notSetupYet")} ⚠️`,
+      `✓ ${translate("alerts.summary.sendsTo")}: ${clickable(translate("alerts.summary.noDestination"), "destinations")} — ${translate("alerts.summary.notifiesNobody")}`,
     );
   } else {
     const uniqueNames = Array.from(new Set(selectedDestinations));

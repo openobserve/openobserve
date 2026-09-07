@@ -72,6 +72,29 @@ describe("alertsToTerraform", () => {
     );
   });
 
+  // An alert that deliberately notifies nobody is a valid configuration, so the
+  // export has to carry the empty list rather than omit the attribute — an
+  // omitted `destinations` reads as "unset" and does not round-trip.
+  it("emits destinations = [] for an alert that notifies nobody", () => {
+    const { hcl } = alertsToTerraform([{ ...sqlAlert, destinations: [] }]);
+
+    expect(hcl).toContain("destinations = []");
+  });
+
+  it("still omits destinations entirely when the alert carries no such key", () => {
+    const { destinations: _omitted, ...noKey } = sqlAlert;
+    const { hcl } = alertsToTerraform([noKey]);
+
+    expect(hcl).not.toContain("destinations");
+  });
+
+  it("leaves other empty lists omitted — only destinations round-trips empty", () => {
+    const { hcl } = alertsToTerraform([{ ...sqlAlert, tags: [], workflows: [] }]);
+
+    expect(hcl).not.toContain("tags");
+    expect(hcl).not.toContain("workflows");
+  });
+
   it("names the provider in a header so the config is usable on its own", () => {
     const { hcl } = alertsToTerraform([sqlAlert]);
 

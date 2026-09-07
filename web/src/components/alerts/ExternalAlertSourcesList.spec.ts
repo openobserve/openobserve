@@ -566,6 +566,33 @@ describe("ExternalAlertSourcesList", () => {
       ]);
     });
 
+    // Regression: `row.destinations.some(...)` ran unguarded, so searching with
+    // a source whose payload omits the key threw instead of filtering.
+    it("filters without throwing when a source carries no destinations key", async () => {
+      const { destinations: _omitted, ...noKey } = DEFAULT_SOURCE;
+      (alertSources.list as any).mockResolvedValue({
+        data: {
+          integrations: [noKey, { ...DEFAULT_SOURCE, id: "int-2", name: "grafana-staging" }],
+        },
+      });
+      const wrapper = await mountAndSettle();
+
+      await wrapper.find('[data-test="alert-sources-search-input"] input').setValue("grafana");
+
+      expect((wrapper.vm as any).visibleRows.map((r: any) => r.displayName)).toEqual([
+        "grafana-staging",
+      ]);
+    });
+
+    // A source with no incident destination is a valid configuration, so the row
+    // must not be tinted as though something were wrong with it.
+    it("does not tint a zero-destination row as an error", async () => {
+      (alertSources.list as any).mockResolvedValue(TWO_SOURCES);
+      const wrapper = await mountAndSettle();
+
+      expect(wrapper.html()).not.toContain("bg-banner-error-soft-bg");
+    });
+
     it("refetches integrations and senders when the toolbar refresh button is clicked", async () => {
       const wrapper = await mountAndSettle();
       (alertSources.list as any).mockClear();

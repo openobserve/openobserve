@@ -6482,7 +6482,8 @@
       "thresholdPositiveNumber": "Uyarı - {index}: Eşik, 0'dan büyük bir sayı olmalıdır.",
       "silenceNonNegativeNumber": "Uyarı - {index}: Soğuma süresi 0 veya daha büyük bir sayı olmalıdır.",
       "frequencyTypeInvalid": "Uyarı - {index}: Sıklık Türü 'minutes' veya 'cron' olmalı ve bir dize olmalıdır.",
-      "cronExpressionInvalid": "Uyarı - {index}: Cron ifadesi geçerli bir cron ifadesi olmalıdır."
+      "cronExpressionInvalid": "Uyarı - {index}: Cron ifadesi geçerli bir cron ifadesi olmalıdır.",
+      "destinationsArray": "Uyarı - {index}: Hedefler bir dizi olmalıdır."
     },
     "composite": {
       "child": "Alt uyarı",
@@ -6930,7 +6931,8 @@
         "pendingPeriodClause": ", {duration} bekledikten sonra",
         "cooldownClause": ", ancak her {cooldown} sürede en fazla bir kez",
         "defaultConditions": "Yapılandırılan koşullar yerine getirildiğinde beni uyarın"
-      }
+      },
+      "notifiesNobody": "henüz kimseye bildirim göndermiyor"
     },
     "correlation": {
       "title": "Uyarı Korelasyonu",
@@ -7368,7 +7370,8 @@
         "alertTriggerTimeSeconds": "Epoch saniye cinsinden tetikleme zamanı",
         "alertTriggerTimeStr": "İnsan tarafından okunabilir tetikleme zamanı",
         "rows": "Satır şablonuna göre biçimlendirilmiş tüm eşleşen satırlar"
-      }
+      },
+      "noDestinationNote": "Hedef seçilmedi. Bu uyarı yine de değerlendirilir ve geçmişi kaydedilir — yalnızca kimseye bildirim göndermez."
     },
     "advanced": {
       "addVariable": "Değişken Ekle",
@@ -7549,7 +7552,8 @@
       "summaryTrainingDays": "{days} gün",
       "timestampAliasBanned": "{column} sütun takma adı olarak kullanılamaz. Bunun yerine {timeBucket} kullanın.",
       "trainingWindowSeasonality": "gün (mevsimsellik: {seasonality})",
-      "trainingWindowTooltip": "Eğitim için kullanılacak geçmiş verilerin kaç gün olduğu. En az 1 gün. Mevsimsellik otomatik olarak algılanır: <7 gün → günün saati; ≥7 gün → günün saati + haftanın günü."
+      "trainingWindowTooltip": "Eğitim için kullanılacak geçmiş verilerin kaç gün olduğu. En az 1 gün. Mevsimsellik otomatik olarak algılanır: <7 gün → günün saati; ≥7 gün → günün saati + haftanın günü.",
+      "noDestinationNote": "Hedef seçilmedi. Anormallikler yine de algılanır ve kaydedilir — yalnızca kimseye bildirim göndermez."
     },
     "variables": {
       "label": "Değişken"
@@ -7881,7 +7885,8 @@
     "sloKind": "Koşul türü",
     "sloLongWindow": "Uzun pencere",
     "sloShortWindow": "Kısa pencere",
-    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz."
+    "sloCloneDisabled": "SLO uyarıları kendi SLO sayfalarında oluşturulur, bu nedenle buradan kopyalanamaz.",
+    "destinationsOptionalLabel": "Hedefler"
   },
   "alert_dependencies": {
     "actionOpen": "Aç",
@@ -7978,18 +7983,19 @@
     },
     "install": {
       "title": "Kütüphaneden uyarı ekle",
-      "subtitle": "Uyarıların nereye bildirim göndereceğini, hangi uyarıların ekleneceğini ve nereye kaydedileceğini seçin.",
+      "subtitle": "Hangi uyarıların ekleneceğini, nereye kaydedileceklerini ve isteğe bağlı olarak nereye bildirim göndereceklerini seçin.",
       "stepDestination": "Hedef",
       "stepAlerts": "Uyarılar",
       "stepFolder": "Klasör",
       "stepTune": "Ayarla",
       "stepInstall": "Ekle",
-      "destinationIntro": "Bu gruptaki her uyarı, burada seçtiğiniz hedefe bildirim gönderir. Kütüphane dosyaları, dışa aktarıldıkları kuruluşun hedeflerini adlandırır; bu hedefler sizin kuruluşunuzda bulunmaz.",
+      "destinationIntro": "Bu gruptaki her uyarı, burada seçtiğiniz hedefe bildirim gönderir. Bu adım isteğe bağlıdır: atlarsanız uyarılar hedefsiz olarak eklenir. Kitaplık dosyaları, dışa aktarıldıkları kuruluşun hedeflerini adlandırır; bunlar sizin kuruluşunuzda bulunmaz.",
       "destinationLabel": "Hedef",
       "destinationPlaceholder": "Bir hedef seçin",
+      "destinationNone": "Yok - henüz bildirim göndermiyor",
       "destinationsLoadFailed": "Mevcut hedefleriniz yüklenemedi.",
       "retry": "Tekrar dene",
-      "destinationsNoneBody": "Bu kuruluşun henüz uyarı hedefi yok, bu yüzden bu uyarıların bildirim gönderebileceği bir yer yok. Hedefler sayfasında bir tane oluşturun, ardından buraya dönüp seçin.",
+      "destinationsNoneBody": "Bu kuruluşun henüz uyarı hedefi yok. Yine de bu uyarıları ekleyebilirsiniz: değerlendirilir ve geçmişleri kaydedilir, yalnızca henüz kimseye bildirim göndermezler. Hazır olduğunuzda Hedefler sayfasında bir tane oluşturun, ardından uyarılara ekleyin.",
       "openDestinations": "Hedefleri Aç",
       "selectAll": "Tümünü seç",
       "clear": "Temizle",
@@ -8012,6 +8018,7 @@
       "next": "İleri",
       "cancel": "İptal",
       "done": "Bitti",
+      "confirmLargeNoDestination": "Bunun {folder} içinde {count} uyarı oluşturacağını ve hiçbirinin henüz bildirim göndermediğini anlıyorum.",
       "confirmLarge": "Bunun {folder} içinde {count} uyarı oluşturacağını ve her birinin {destination} adresine bildirim göndereceğini anlıyorum."
     },
     "error": {

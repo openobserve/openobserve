@@ -6477,7 +6477,8 @@
       "thresholdPositiveNumber": "警示 - {index}：閾值應為大於 0 的正數，且必須是數字。",
       "silenceNonNegativeNumber": "警示 - {index}：冷卻時間應大於或等於 0，且必須為數字。",
       "frequencyTypeInvalid": "警示 - {index}：頻率類型必須是 'minutes' 或 'cron'，且應為字串。",
-      "cronExpressionInvalid": "警示 - {index}：Cron 表達式應為有效的 cron 表達式。"
+      "cronExpressionInvalid": "警示 - {index}：Cron 表達式應為有效的 cron 表達式。",
+      "destinationsArray": "警示 - {index}：目標必須是陣列。"
     },
     "composite": {
       "child": "子警示",
@@ -6925,7 +6926,8 @@
         "pendingPeriodClause": "，在等待 {duration} 後",
         "cooldownClause": "，但每 {cooldown} 不超過一次",
         "defaultConditions": "當設定的條件被滿足時發出警示"
-      }
+      },
+      "notifiesNobody": "尚未通知任何人"
     },
     "correlation": {
       "title": "警示關聯",
@@ -7363,7 +7365,8 @@
         "alertTriggerTimeSeconds": "觸發時間（epoch 秒）",
         "alertTriggerTimeStr": "觸發時間（可讀格式）",
         "rows": "所有符合的列，由列範本格式化"
-      }
+      },
+      "noDestinationNote": "未選擇目標。此警示仍會評估並記錄其歷史，只是不會通知任何人。"
     },
     "advanced": {
       "addVariable": "新增變數",
@@ -7544,7 +7547,8 @@
       "summaryTrainingDays": "{days} 天",
       "timestampAliasBanned": "{column} 不能用作欄位別名。請改用 {timeBucket}。",
       "trainingWindowSeasonality": "天（季節性：{seasonality}）",
-      "trainingWindowTooltip": "訓練使用的歷史資料天數。最少 1 天。季節性自動偵測：<7 天 → 小時；≥7 天 → 小時 + 星期幾。"
+      "trainingWindowTooltip": "訓練使用的歷史資料天數。最少 1 天。季節性自動偵測：<7 天 → 小時；≥7 天 → 小時 + 星期幾。",
+      "noDestinationNote": "未選擇目標。異常仍會被偵測並記錄，只是不會通知任何人。"
     },
     "variables": {
       "label": "變數"
@@ -7876,7 +7880,8 @@
     "sloKind": "條件類型",
     "sloLongWindow": "長視窗",
     "sloShortWindow": "短視窗",
-    "sloCloneDisabled": "SLO 警示是在其 SLO 頁面上建立，因此無法從此處複製。"
+    "sloCloneDisabled": "SLO 警示是在其 SLO 頁面上建立，因此無法從此處複製。",
+    "destinationsOptionalLabel": "目標"
   },
   "alert_dependencies": {
     "actionOpen": "開啟",
@@ -7973,18 +7978,19 @@
     },
     "install": {
       "title": "從警示庫新增警示",
-      "subtitle": "選擇警示通知的位置、要新增的警示，以及存放位置。",
+      "subtitle": "選擇要新增的警示、存放位置，以及（可選）通知位置。",
       "stepDestination": "目標",
       "stepAlerts": "警示",
       "stepFolder": "資料夾",
       "stepTune": "調整",
       "stepInstall": "新增",
-      "destinationIntro": "此批次中的每個警示都會通知您在此處選擇的目標。程式庫檔案會命名其匯出來源組織的目標，這些目標不存在於您的組織中。",
+      "destinationIntro": "此批次中的每個警示都會通知您在此處選擇的目標。此步驟為選用：略過後，警示將不帶目標新增。程式庫檔案命名的是其匯出時所屬組織的目標，這些目標在您的組織中並不存在。",
       "destinationLabel": "目標",
       "destinationPlaceholder": "選擇目標",
+      "destinationNone": "無（暫不通知）",
       "destinationsLoadFailed": "無法載入您現有的目標。",
       "retry": "再試一次",
-      "destinationsNoneBody": "此組織尚無任何警示目標，因此這些警示無處通知。請先在「目標」頁面建立一個，然後再回來這裡選擇。",
+      "destinationsNoneBody": "此組織尚無任何警示目標。您仍然可以新增這些警示：它們會照常評估並記錄歷程，只是暫時不會通知任何人。準備好後請在「目標」頁面建立一個，再將其加入警示。",
       "openDestinations": "開啟目標",
       "selectAll": "全選",
       "clear": "清除",
@@ -8007,6 +8013,7 @@
       "next": "下一步",
       "cancel": "取消",
       "done": "完成",
+      "confirmLargeNoDestination": "我了解此操作會在 {folder} 中建立 {count} 個警示，且它們暫時都不會通知任何人。",
       "confirmLarge": "我了解此操作會在 {folder} 中建立 {count} 個警示，每個都會通知 {destination}。"
     },
     "error": {

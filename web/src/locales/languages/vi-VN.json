@@ -6482,7 +6482,8 @@
       "thresholdPositiveNumber": "Cảnh báo - {index}: Ngưỡng phải là một số dương lớn hơn 0 và phải là một số.",
       "silenceNonNegativeNumber": "Cảnh báo - {index}: Thời gian chờ phải là một số dương lớn hơn hoặc bằng 0 và phải là số.",
       "frequencyTypeInvalid": "Cảnh báo - {index}: Loại tần suất phải là 'minutes' hoặc 'cron' và phải là một chuỗi.",
-      "cronExpressionInvalid": "Cảnh báo - {index}: Biểu thức Cron phải là một biểu thức Cron hợp lệ."
+      "cronExpressionInvalid": "Cảnh báo - {index}: Biểu thức Cron phải là một biểu thức Cron hợp lệ.",
+      "destinationsArray": "Cảnh báo - {index}: Đích đến phải là một mảng."
     },
     "composite": {
       "child": "Cảnh báo con",
@@ -6930,7 +6931,8 @@
         "pendingPeriodClause": ", sau khi chờ {duration}",
         "cooldownClause": ", nhưng không quá một lần mỗi {cooldown}",
         "defaultConditions": "Cảnh báo tôi khi các điều kiện đã cấu hình được đáp ứng"
-      }
+      },
+      "notifiesNobody": "chưa thông báo cho ai"
     },
     "correlation": {
       "title": "Tương quan cảnh báo",
@@ -7368,7 +7370,8 @@
         "alertTriggerTimeSeconds": "Thời gian kích hoạt theo epoch giây",
         "alertTriggerTimeStr": "Thời gian kích hoạt, dễ đọc cho con người",
         "rows": "Tất cả các hàng khớp, được định dạng theo mẫu hàng"
-      }
+      },
+      "noDestinationNote": "Chưa chọn đích đến. Cảnh báo này vẫn được đánh giá và ghi lại lịch sử — chỉ là nó sẽ không thông báo cho ai."
     },
     "advanced": {
       "addVariable": "Thêm biến",
@@ -7549,7 +7552,8 @@
       "summaryTrainingDays": "{days} ngày",
       "timestampAliasBanned": "{column} không thể được sử dụng làm bí danh cột. Sử dụng {timeBucket} thay thế.",
       "trainingWindowSeasonality": "ngày (tính thời vụ: {seasonality})",
-      "trainingWindowTooltip": "Số ngày dữ liệu lịch sử được sử dụng để huấn luyện. Tối thiểu 1 ngày. Tính thời vụ được tự động phát hiện: <7 ngày → giờ trong ngày; ≥7 ngày → giờ trong ngày + ngày trong tuần."
+      "trainingWindowTooltip": "Số ngày dữ liệu lịch sử được sử dụng để huấn luyện. Tối thiểu 1 ngày. Tính thời vụ được tự động phát hiện: <7 ngày → giờ trong ngày; ≥7 ngày → giờ trong ngày + ngày trong tuần.",
+      "noDestinationNote": "Chưa chọn đích đến. Các bất thường vẫn được phát hiện và ghi lại — chỉ là chúng sẽ không thông báo cho ai."
     },
     "variables": {
       "label": "Biến"
@@ -7881,7 +7885,8 @@
     "sloKind": "Loại điều kiện",
     "sloLongWindow": "Cửa sổ dài",
     "sloShortWindow": "Cửa sổ ngắn",
-    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây."
+    "sloCloneDisabled": "Cảnh báo SLO được tạo trên trang SLO của chúng, vì vậy không thể nhân bản từ đây.",
+    "destinationsOptionalLabel": "Đích đến"
   },
   "alert_dependencies": {
     "actionOpen": "Mở",
@@ -7978,18 +7983,19 @@
     },
     "install": {
       "title": "Thêm cảnh báo từ thư viện",
-      "subtitle": "Chọn nơi cảnh báo thông báo, cảnh báo nào để thêm và nơi chúng được lưu trữ.",
+      "subtitle": "Chọn cảnh báo nào để thêm, nơi chúng được lưu trữ và tùy chọn nơi chúng thông báo.",
       "stepDestination": "Đích",
       "stepAlerts": "Cảnh báo",
       "stepFolder": "Thư mục",
       "stepTune": "Tinh chỉnh",
       "stepInstall": "Thêm",
-      "destinationIntro": "Mọi cảnh báo trong lô này sẽ thông báo đến đích bạn chọn tại đây. Các tệp thư viện đặt tên cho các đích của tổ chức mà chúng được xuất ra, vốn không tồn tại trong tổ chức của bạn.",
+      "destinationIntro": "Mọi cảnh báo trong lô này sẽ thông báo tới đích bạn chọn ở đây. Bước này là tùy chọn: bỏ qua và các cảnh báo sẽ được thêm mà không có đích. Tệp thư viện nêu tên các đích của tổ chức đã xuất chúng, những đích đó không tồn tại trong tổ chức của bạn.",
       "destinationLabel": "Đích",
       "destinationPlaceholder": "Chọn một đích",
+      "destinationNone": "Không có - chưa thông báo",
       "destinationsLoadFailed": "Không thể tải các đích hiện có của bạn.",
       "retry": "Thử lại",
-      "destinationsNoneBody": "Tổ chức này chưa có đích cảnh báo nào, vì vậy không có nơi nào để các cảnh báo này gửi thông báo. Hãy tạo một đích trên trang Đích, sau đó quay lại và chọn nó tại đây.",
+      "destinationsNoneBody": "Tổ chức này chưa có đích cảnh báo nào. Bạn vẫn có thể thêm các cảnh báo này: chúng sẽ được đánh giá và ghi lại lịch sử, chỉ là chưa thông báo cho ai. Hãy tạo một đích trên trang Đích khi bạn sẵn sàng, rồi thêm nó vào các cảnh báo.",
       "openDestinations": "Mở Đích",
       "selectAll": "Chọn tất cả",
       "clear": "Xóa",
@@ -8012,6 +8018,7 @@
       "next": "Tiếp theo",
       "cancel": "Hủy",
       "done": "Hoàn tất",
+      "confirmLargeNoDestination": "Tôi hiểu rằng thao tác này tạo {count} cảnh báo trong {folder}, và chưa cảnh báo nào thông báo tới đâu.",
       "confirmLarge": "Tôi hiểu rằng thao tác này tạo {count} cảnh báo trong {folder}, mỗi cảnh báo thông báo tới {destination}."
     },
     "error": {

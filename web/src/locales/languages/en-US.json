@@ -6482,7 +6482,8 @@
       "thresholdPositiveNumber": "Alert - {index}: Threshold should be a positive number greater than 0 and should be a number.",
       "silenceNonNegativeNumber": "Alert - {index}: Cooldown period should be a positive number greater than or equal to 0 and should be a number.",
       "frequencyTypeInvalid": "Alert - {index}: Frequency Type must be 'minutes' or 'cron' and should be a string.",
-      "cronExpressionInvalid": "Alert - {index}: Cron expression should be a valid cron expression."
+      "cronExpressionInvalid": "Alert - {index}: Cron expression should be a valid cron expression.",
+      "destinationsArray": "Alert - {index}: Destinations must be an array."
     },
     "composite": {
       "child": "Child alert",
@@ -6930,7 +6931,8 @@
         "pendingPeriodClause": ", after holding for {duration}",
         "cooldownClause": ", but no more than once every {cooldown}",
         "defaultConditions": "Alert me when the configured conditions are met"
-      }
+      },
+      "notifiesNobody": "notifies nobody yet"
     },
     "correlation": {
       "title": "Alert Correlation",
@@ -7368,7 +7370,8 @@
         "alertTriggerTimeSeconds": "Trigger time in epoch seconds",
         "alertTriggerTimeStr": "Trigger time, human-readable",
         "rows": "All matching rows, formatted by the row template"
-      }
+      },
+      "noDestinationNote": "No destination selected. This alert still evaluates and records its history — it just will not notify anyone."
     },
     "advanced": {
       "addVariable": "Add Variable",
@@ -7549,7 +7552,8 @@
       "summaryTrainingDays": "{days} days",
       "timestampAliasBanned": "{column} cannot be used as a column alias. Use {timeBucket} instead.",
       "trainingWindowSeasonality": "days (seasonality: {seasonality})",
-      "trainingWindowTooltip": "How many days of historical data to use for training. Min 1 day. Seasonality is auto-detected: <7 days → hour-of-day; ≥7 days → hour-of-day + day-of-week."
+      "trainingWindowTooltip": "How many days of historical data to use for training. Min 1 day. Seasonality is auto-detected: <7 days → hour-of-day; ≥7 days → hour-of-day + day-of-week.",
+      "noDestinationNote": "No destination selected. Anomalies are still detected and recorded — they just will not notify anyone."
     },
     "variables": {
       "label": "Variable"
@@ -7881,7 +7885,8 @@
     "sloKind": "Condition type",
     "sloLongWindow": "Long window",
     "sloShortWindow": "Short window",
-    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here."
+    "sloCloneDisabled": "SLO alerts are created on their SLO page, so they cannot be cloned from here.",
+    "destinationsOptionalLabel": "Destinations"
   },
   "alert_dependencies": {
     "actionOpen": "Open",
@@ -7978,18 +7983,19 @@
     },
     "install": {
       "title": "Add alerts from the library",
-      "subtitle": "Choose where alerts notify, which alerts to add, and where they are filed.",
+      "subtitle": "Choose which alerts to add, where they are filed, and optionally where they notify.",
       "stepDestination": "Destination",
       "stepAlerts": "Alerts",
       "stepFolder": "Folder",
       "stepTune": "Tune",
       "stepInstall": "Add",
-      "destinationIntro": "Every alert in this batch notifies the destination you choose here. Library files name the destinations of the organization they were exported from, which do not exist in yours.",
+      "destinationIntro": "Every alert in this batch notifies the destination you choose here. This step is optional: skip it and the alerts are added without one. Library files name the destinations of the organization they were exported from, which do not exist in yours.",
       "destinationLabel": "Destination",
       "destinationPlaceholder": "Choose a destination",
+      "destinationNone": "None - notifies nowhere yet",
       "destinationsLoadFailed": "Your existing destinations could not be loaded.",
       "retry": "Try again",
-      "destinationsNoneBody": "This organization has no alert destinations yet, so there is nowhere for these alerts to notify. Create one on the Destinations page, then come back and pick it here.",
+      "destinationsNoneBody": "This organization has no alert destinations yet. You can still add these alerts: they will evaluate and record their history, they just will not notify anyone yet. Create a destination on the Destinations page whenever you are ready, then add it to the alerts.",
       "openDestinations": "Open Destinations",
       "selectAll": "Select all",
       "clear": "Clear",
@@ -8012,6 +8018,7 @@
       "next": "Next",
       "cancel": "Cancel",
       "done": "Done",
+      "confirmLargeNoDestination": "I understand this creates {count} alerts in {folder}, none of which notify anywhere yet.",
       "confirmLarge": "I understand this creates {count} alerts in {folder}, each notifying {destination}."
     },
     "error": {

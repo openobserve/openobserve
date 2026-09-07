@@ -47,7 +47,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           pagination="client"
           :page-size="20"
           :page-size-options="[10, 20, 50, 100]"
-          :row-class="noDestinationRowClass"
           :footer-title="t('alert_sources.header')"
           wrap
           horizontal-scroll
@@ -531,7 +530,7 @@ export default defineComponent({
             status: "not_connected",
             integration: this.defaultSource,
             sharesDefaultToken: false,
-            destinations: this.defaultSource.destinations,
+            destinations: this.defaultSource.destinations ?? [],
             resolveWiringHint: false,
             lastEventLabel: "—",
           });
@@ -545,7 +544,7 @@ export default defineComponent({
               // Only the first sender row carries the shared URL/token actions.
               integration: idx === 0 ? this.defaultSource : undefined,
               sharesDefaultToken: true,
-              destinations: this.defaultSource!.destinations,
+              destinations: this.defaultSource!.destinations ?? [],
               resolveWiringHint: s.resolveWiringHint,
               lastEventLabel: formatTimeAgoUs(s.lastReceivedAt),
             });
@@ -562,7 +561,7 @@ export default defineComponent({
           status: this.additionalStatusById[integration.id] ?? "not_connected",
           integration,
           sharesDefaultToken: false,
-          destinations: integration.destinations,
+          destinations: integration.destinations ?? [],
           resolveWiringHint: this.additionalResolveWiringHintById[integration.id] ?? false,
           lastEventLabel: lastReceivedAt ? formatTimeAgoUs(lastReceivedAt) : "—",
         });
@@ -743,10 +742,6 @@ export default defineComponent({
     openEditFor(integration: AlertSourceIntegration) {
       this.editTargetIntegration = integration;
       this.showAddDrawer = true;
-    },
-    // Tints rows that have no incident destination configured.
-    noDestinationRowClass(row: SourceTableRow): string {
-      return row.integration && row.destinations.length === 0 ? "bg-banner-error-soft-bg" : "";
     },
     // `id` is optional: OEmptyState's simple-button mode emits no id.
     onEmptyAction(id?: string) {

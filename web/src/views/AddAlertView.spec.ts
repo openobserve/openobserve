@@ -97,10 +97,14 @@ describe("AddAlertView.vue", () => {
     });
   });
 
-  it("should not render AddAlert when destinations are empty", async () => {
+  // INVERTED, not deleted: an org with no destinations used to get a blank
+  // screen and a bounce back to the list. An alert that notifies nobody is a
+  // valid configuration, so the form has to be reachable.
+  it("renders AddAlert when the org has no destinations at all", async () => {
     vi.mocked(destinationService.list).mockResolvedValue({
       data: [],
     } as any);
+    const pushSpy = vi.spyOn(router, "push");
 
     const wrapper = mount(AddAlertView, {
       global: {
@@ -116,7 +120,9 @@ describe("AddAlertView.vue", () => {
 
     await flushPromises();
 
-    expect(wrapper.find(".add-alert-stub").exists()).toBe(false);
+    expect(wrapper.find(".add-alert-stub").exists()).toBe(true);
+    expect(pushSpy).not.toHaveBeenCalledWith(expect.objectContaining({ name: "alertList" }));
+    pushSpy.mockRestore();
   });
 
   it("should handle getDestinations error", async () => {

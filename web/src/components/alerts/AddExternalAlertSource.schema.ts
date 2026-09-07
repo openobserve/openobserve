@@ -33,7 +33,7 @@ export const makeAlertSourceSchema = (
 export type AlertSourceForm = z.infer<ReturnType<typeof makeAlertSourceSchema>>;
 
 export const alertSourceDefaults = (
-  integration?: { name: string; destinations: string[] } | undefined,
+  integration?: { name: string; destinations?: string[] } | undefined,
 ): AlertSourceForm => ({
   name: integration?.name ?? "",
   destinations: [...(integration?.destinations ?? [])],

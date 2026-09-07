@@ -804,11 +804,20 @@ describe("Alert Validation", () => {
       expect(result.errors).toContain("Destinations must be an array");
     });
 
-    it("should fail if destinations array is empty", () => {
+    // INVERTED, not deleted: an alert with no destination evaluates, records its
+    // history and notifies nobody — the JSON editor must accept it.
+    it("should pass if destinations array is empty", () => {
       const alert = { ...validAlert, destinations: [] };
       const result = validateAlert(alert, validContext);
-      expect(result.isValid).toBe(false);
-      expect(result.errors).toContain("At least one destination is required");
+      expect(result.isValid).toBe(true);
+      expect(result.errors).not.toContain("At least one destination is required");
+    });
+
+    it("should pass if the destinations key is absent entirely", () => {
+      const { destinations: _omitted, ...alert } = validAlert;
+      const result = validateAlert(alert as any, validContext);
+      expect(result.isValid).toBe(true);
+      expect(result.errors).not.toContain("Destinations must be an array");
     });
 
     it("should fail for invalid destinations", () => {

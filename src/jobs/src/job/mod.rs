@@ -663,6 +663,11 @@ pub async fn init() -> Result<(), anyhow::Error> {
         log::error!("[TEMPLATES] default_alert_template backfill failed: {e}");
     }
 
+    // Must precede the alert cache below, which would otherwise predate the seed.
+    if let Err(e) = alerts::prebuilt::seed_prebuilt_alerts().await {
+        log::error!("[PREBUILT_ALERTS] seeding failed: {e}");
+    }
+
     // cache alerts (this will include the system templates we just created)
     db::alerts::templates::cache()
         .await

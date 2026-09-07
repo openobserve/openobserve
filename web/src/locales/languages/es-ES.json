@@ -6482,7 +6482,8 @@
       "thresholdPositiveNumber": "Alerta - {index}: El umbral debe ser un número positivo mayor que 0 y debe ser un número.",
       "silenceNonNegativeNumber": "Alerta - {index}: El tiempo de espera debe ser un número mayor o igual a 0.",
       "frequencyTypeInvalid": "Alerta - {index}: El tipo de frecuencia debe ser 'minutes' o 'cron' y debe ser una cadena.",
-      "cronExpressionInvalid": "Alerta - {index}: La expresión cron debe ser una expresión cron válida."
+      "cronExpressionInvalid": "Alerta - {index}: La expresión cron debe ser una expresión cron válida.",
+      "destinationsArray": "Alerta - {index}: Los destinos deben ser un array."
     },
     "composite": {
       "child": "Alerta hija",
@@ -6930,7 +6931,8 @@
         "pendingPeriodClause": ", después de esperar durante {duration}",
         "cooldownClause": ", pero no más de una vez cada {cooldown}",
         "defaultConditions": "Avisarme cuando se cumplan las condiciones configuradas"
-      }
+      },
+      "notifiesNobody": "todavía no notifica a nadie"
     },
     "correlation": {
       "title": "Correlación de alertas",
@@ -7368,7 +7370,8 @@
         "alertTriggerTimeSeconds": "Hora de activación en segundos epoch",
         "alertTriggerTimeStr": "Hora de activación, en formato legible",
         "rows": "Todas las filas coincidentes, formateadas por la plantilla de fila"
-      }
+      },
+      "noDestinationNote": "No se ha seleccionado ningún destino. Esta alerta se sigue evaluando y registrando su historial; simplemente no notificará a nadie."
     },
     "advanced": {
       "addVariable": "Agregar variable",
@@ -7549,7 +7552,8 @@
       "summaryTrainingDays": "{days} días",
       "timestampAliasBanned": "{column} no se puede usar como alias de columna. Use {timeBucket} en su lugar.",
       "trainingWindowSeasonality": "días (estacionalidad: {seasonality})",
-      "trainingWindowTooltip": "Cuántos días de datos históricos usar para el entrenamiento. Mín. 1 día. La estacionalidad se detecta automáticamente: <7 días → hora del día; ≥7 días → hora del día + día de la semana."
+      "trainingWindowTooltip": "Cuántos días de datos históricos usar para el entrenamiento. Mín. 1 día. La estacionalidad se detecta automáticamente: <7 días → hora del día; ≥7 días → hora del día + día de la semana.",
+      "noDestinationNote": "No se ha seleccionado ningún destino. Las anomalías se siguen detectando y registrando; simplemente no notificarán a nadie."
     },
     "variables": {
       "label": "Variable"
@@ -7881,7 +7885,8 @@
     "sloKind": "Tipo de condición",
     "sloLongWindow": "Ventana larga",
     "sloShortWindow": "Ventana corta",
-    "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí."
+    "sloCloneDisabled": "Las alertas SLO se crean en su página SLO, por lo que no se pueden clonar desde aquí.",
+    "destinationsOptionalLabel": "Destinos"
   },
   "alert_dependencies": {
     "actionOpen": "Abrir",
@@ -7978,18 +7983,19 @@
     },
     "install": {
       "title": "Añadir alertas de la biblioteca",
-      "subtitle": "Elige dónde notifican las alertas, qué alertas añadir y dónde se archivan.",
+      "subtitle": "Elige qué alertas añadir, dónde se archivan y, opcionalmente, dónde notifican.",
       "stepDestination": "Destino",
       "stepAlerts": "Alertas",
       "stepFolder": "Carpeta",
       "stepTune": "Ajustar",
       "stepInstall": "Añadir",
-      "destinationIntro": "Cada alerta de este lote notifica al destino que elijas aquí. Los archivos de la biblioteca nombran los destinos de la organización de la que se exportaron, que no existen en la tuya.",
+      "destinationIntro": "Cada alerta de este lote notifica al destino que elijas aquí. Este paso es opcional: omítelo y las alertas se añadirán sin destino. Los archivos de la biblioteca nombran los destinos de la organización desde la que se exportaron, que no existen en la tuya.",
       "destinationLabel": "Destino",
       "destinationPlaceholder": "Elige un destino",
+      "destinationNone": "Ninguno: todavía no notifica",
       "destinationsLoadFailed": "No se pudieron cargar tus destinos existentes.",
       "retry": "Inténtalo de nuevo",
-      "destinationsNoneBody": "Esta organización aún no tiene destinos de alerta, por lo que no hay a dónde notificar estas alertas. Crea uno en la página de Destinos y luego vuelve a elegirlo aquí.",
+      "destinationsNoneBody": "Esta organización aún no tiene destinos de alerta. Aun así puedes añadir estas alertas: se evaluarán y registrarán su historial, simplemente todavía no notificarán a nadie. Crea un destino en la página de Destinos cuando quieras y añádelo después a las alertas.",
       "openDestinations": "Abrir Destinos",
       "selectAll": "Seleccionar todo",
       "clear": "Limpiar",
@@ -8012,6 +8018,7 @@
       "next": "Siguiente",
       "cancel": "Cancelar",
       "done": "Listo",
+      "confirmLargeNoDestination": "Entiendo que esto crea {count} alertas en {folder}, ninguna de las cuales notifica todavía.",
       "confirmLarge": "Entiendo que esto crea {count} alertas en {folder}, cada una notificando a {destination}."
     },
     "error": {

@@ -60,6 +60,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
         {{ error }}
       </div>
+      <div
+        v-else-if="notifiesNobody"
+        class="text-text-secondary flex max-w-125 items-start gap-1 pt-1 text-xs"
+        data-test="alert-settings-destinations-note"
+      >
+        <OIcon name="info" size="sm" class="mt-px flex-shrink-0" />
+        <span>{{ t("alerts.alertSettings.noDestinationNote") }}</span>
+      </div>
     </div>
   </div>
 </template>
@@ -87,7 +95,7 @@ const props = withDefaults(
     error?: string;
     /** Override the label; defaults to the alert form's "Destination". */
     label?: string;
-    /** Whether this alert family requires a destination; drives the "*". */
+    /** Drives the "*". Defaults to false — no alert family requires a destination. */
     required?: boolean;
     /** Override the tooltip; pass "" for alert families that need none. */
     tooltip?: string;
@@ -96,7 +104,7 @@ const props = withDefaults(
      *  enterprise, so the picker cannot offer options that would not save. */
     supportsWorkflows?: boolean;
   }>(),
-  { required: true, supportsWorkflows: true },
+  { required: false, supportsWorkflows: true },
 );
 
 const emit = defineEmits<{
@@ -116,6 +124,11 @@ const labelText = computed<I18nText>(() =>
 // `undefined` means "the default tooltip"; an explicit "" means "none".
 const tooltipText = computed<I18nText>(() =>
   props.tooltip === undefined ? t("alerts.alertSettings.destinationsTooltip") : raw(props.tooltip),
+);
+
+// Informational only: this note replaces the requiredness the field used to enforce.
+const notifiesNobody = computed(
+  () => props.destinations.length === 0 && props.workflows.length === 0,
 );
 
 // The family must support workflows AND the deployment must serve them —

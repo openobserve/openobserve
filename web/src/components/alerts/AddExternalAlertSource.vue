@@ -352,7 +352,7 @@ export default defineComponent({
         const nameChanged = name !== this.editingIntegration.name;
         const destinationsChanged =
           JSON.stringify([...values.destinations].sort()) !==
-          JSON.stringify([...this.editingIntegration.destinations].sort());
+          JSON.stringify([...(this.editingIntegration.destinations ?? [])].sort());
         if (nameChanged || destinationsChanged) {
           await alertSources.update(this.orgIdentifier, this.editingIntegration.id, {
             ...(nameChanged ? { name } : {}),

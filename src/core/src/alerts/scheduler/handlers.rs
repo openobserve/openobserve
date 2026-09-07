@@ -295,6 +295,36 @@ struct GroupDispatchOutcome {
     state_failed: bool,
 }
 
+/// What to do after a composite alert's delivery attempt failed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CompositeDelivery {
+    Retry {
+        retries: i32,
+        at: i64,
+    },
+    /// Budget exhausted: the call site must close the delivery out the way the
+    /// simple path does, not merely stop rescheduling.
+    GiveUp,
+}
+
+/// How one group's send ended, as the per-group state layer reads it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GroupDelivery {
+    Delivered,
+    /// Nothing was wired up, so nothing was attempted and no state may advance.
+    NothingToDeliver,
+    Failed,
+}
+
+/// A send that reached nobody is neither a delivery nor a failure, so it must advance no state.
+fn group_delivery(send_ok: bool, nothing_to_deliver: bool) -> GroupDelivery {
+    match (send_ok, nothing_to_deliver) {
+        (false, _) => GroupDelivery::Failed,
+        (true, true) => GroupDelivery::NothingToDeliver,
+        (true, false) => GroupDelivery::Delivered,
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 async fn dispatch_per_group(
     alert: &config::meta::alerts::alert::Alert,
@@ -421,7 +451,7 @@ async fn dispatch_per_group(
         );
     }
 
-    let (mut delivered, mut failed) = (0usize, 0usize);
+    let (mut delivered, mut failed, mut unwired) = (0usize, 0usize, 0usize);
     let mut errors: Vec<String> = Vec::new();
     let mut delivered_groups: std::collections::HashSet<String> = Default::default();
     for item in &plan.items {
@@ -452,7 +482,7 @@ async fn dispatch_per_group(
         // expire while that notification is still in flight.
         let resolved_at = now_micros();
 
-        let ok = match outcome {
+        let verdict = match outcome {
             Ok(outcome) => {
                 let err_msg = outcome.error_message.trim().to_owned();
                 if !err_msg.is_empty() {
@@ -465,7 +495,7 @@ async fn dispatch_per_group(
                     );
                     errors.push(format!("group {}: {err_msg}", item.group_key));
                 }
-                true
+                group_delivery(true, outcome.nothing_to_deliver)
             }
             Err(e) => {
                 log::error!(
@@ -473,7 +503,7 @@ async fn dispatch_per_group(
                     item.group_key
                 );
                 errors.push(format!("group {}: {e}", item.group_key));
-                false
+                group_delivery(false, false)
             }
         };
 
@@ -485,25 +515,33 @@ async fn dispatch_per_group(
         // scheduler only says how long the alert's silence is. Computing it
         // here as well would put the same rule in two places, which is exactly
         // how the pure and SQL layers drifted apart before.
-        let record = if ok {
-            delivered += 1;
-            delivered_groups.insert(item.group_key.clone());
-            infra::table::alert_states::DeliveryOutcome::Delivered {
-                silence_minutes: alert.trigger_condition.silence,
-                at: resolved_at,
+        let record = match verdict {
+            GroupDelivery::Delivered => {
+                delivered += 1;
+                delivered_groups.insert(item.group_key.clone());
+                Some(infra::table::alert_states::DeliveryOutcome::Delivered {
+                    silence_minutes: alert.trigger_condition.silence,
+                    at: resolved_at,
+                })
             }
-        } else {
-            failed += 1;
-            infra::table::alert_states::DeliveryOutcome::Failed { at: resolved_at }
+            GroupDelivery::Failed => {
+                failed += 1;
+                Some(infra::table::alert_states::DeliveryOutcome::Failed { at: resolved_at })
+            }
+            GroupDelivery::NothingToDeliver => {
+                unwired += 1;
+                None
+            }
         };
 
-        if let Err(e) = db::alerts::alert_states::advance_delivery_state(
-            &alert_id,
-            &item.group_key,
-            item.episode,
-            record,
-        )
-        .await
+        if let Some(record) = record
+            && let Err(e) = db::alerts::alert_states::advance_delivery_state(
+                &alert_id,
+                &item.group_key,
+                item.episode,
+                record,
+            )
+            .await
         {
             log::error!(
                 "[SCHEDULER trace_id {trace_id}] alert {alert_id} group {}: could not record \
@@ -515,7 +553,7 @@ async fn dispatch_per_group(
 
     log::info!(
         "[SCHEDULER trace_id {trace_id}] alert {alert_id}: per-group dispatch delivered={delivered} \
-         pending={} failed={failed} suppressed={} candidates={}",
+         pending={} failed={failed} unwired={unwired} suppressed={} candidates={}",
         plan.suppressed,
         plan.pending,
         plan.items.len()
@@ -957,6 +995,11 @@ async fn handle_composite_alert_trigger(
     infra::table::alert_states::persist_update_in_transaction(&transaction, &update).await?;
     transaction.commit().await?;
 
+    let (_, max_retries) = get_scheduler_max_retries();
+    // Read before the match: giving up zeroes it, hiding an exhausted budget from history.
+    let attempted_retries = trigger.retries;
+    // A stale count would make the cap fire on a later firing's first failure.
+    trigger.retries = 0;
     let mut delivery_retry_at = None;
     if evaluated.result {
         scheduled_data.last_satisfied_at = Some(now);
@@ -1064,16 +1107,41 @@ async fn handle_composite_alert_trigger(
                             scheduled_data.notified_destinations.push(destination);
                         }
                     }
-                    trigger.retries = trigger.retries.saturating_add(1);
-                    delivery_retry_at = Some(now.saturating_add(10_000_000));
+                    match composite_delivery_retry(attempted_retries, max_retries, now) {
+                        CompositeDelivery::Retry { retries, at } => {
+                            trigger.retries = retries;
+                            delivery_retry_at = Some(at);
+                        }
+                        CompositeDelivery::GiveUp => {
+                            // Terminal: something did land this cycle, so stamp it or the
+                            // destinations that succeeded are re-paged every sweep.
+                            scheduled_data.notified_destinations.clear();
+                            scheduled_data.last_notified_level = Some(evaluated.level.to_i32());
+                            scheduled_data.delivery_silenced_until = definition
+                                .definition
+                                .silence_seconds
+                                .checked_mul(1_000_000)
+                                .and_then(|window| now.checked_add(window));
+                            delivery_retry_at = None;
+                        }
+                    }
                 }
                 Err(error) => {
                     log::error!(
                         "[COMPOSITE_ALERT] delivery failed for {}: {error}",
                         definition.definition.id
                     );
-                    trigger.retries = trigger.retries.saturating_add(1);
-                    delivery_retry_at = Some(now.saturating_add(10_000_000));
+                    match composite_delivery_retry(attempted_retries, max_retries, now) {
+                        CompositeDelivery::Retry { retries, at } => {
+                            trigger.retries = retries;
+                            delivery_retry_at = Some(at);
+                        }
+                        CompositeDelivery::GiveUp => {
+                            // Nothing landed, so no stamp: one here suppresses the next firing.
+                            scheduled_data.notified_destinations.clear();
+                            delivery_retry_at = None;
+                        }
+                    }
                 }
             }
         }
@@ -1106,7 +1174,7 @@ async fn handle_composite_alert_trigger(
         actual_value: Some(i32::from(evaluated.result) as f64),
         level: Some(evaluated.level.to_i32()),
         scheduler_trace_id: Some(trace_id.to_string()),
-        retries: trigger.retries,
+        retries: attempted_retries,
         is_realtime: trigger.is_realtime,
         is_silenced: trigger.is_silenced,
         start_time: now,
@@ -1180,6 +1248,17 @@ async fn handle_composite_alert_trigger(
     trigger.data = config::utils::json::to_string(&scheduled_data)?;
     let _ = infra::scheduler::complete_claim(trigger).await?;
     Ok(())
+}
+
+fn composite_delivery_retry(retries: i32, max_retries: i32, now: i64) -> CompositeDelivery {
+    // Same comparison as the simple path, so the two cannot drift apart on budget.
+    if retries.saturating_add(1) >= max_retries {
+        return CompositeDelivery::GiveUp;
+    }
+    CompositeDelivery::Retry {
+        retries: retries.saturating_add(1),
+        at: now.saturating_add(10_000_000),
+    }
 }
 
 fn composite_notification_alert(
@@ -1893,37 +1972,6 @@ async fn handle_alert_triggers(
     // Set the is_realtime field according to the alert
     new_trigger.is_realtime = alert.is_real_time;
 
-    // [ENTERPRISE] Initialize RCA batch tracking for this scheduler run
-    // #[cfg(feature = "enterprise")]
-    // let rca_enabled =
-    //     o2_enterprise::enterprise::ai::rca::integration::is_rca_enabled_for_org(&new_trigger.
-    // org); #[cfg(not(feature = "enterprise"))]
-    let _rca_enabled = false;
-
-    // Helper closure to mark alert completion and process batch if needed
-    // #[cfg(feature = "enterprise")]
-    // let mark_rca_completion = || async {
-    //     if rca_enabled {
-    //         let is_batch_complete =
-    //             o2_enterprise::enterprise::ai::rca::mark_alert_completed(trace_id);
-    //         if is_batch_complete {
-    //             log::info!(
-    //                 "[SCHEDULER trace_id {scheduler_trace_id}] Batch {} complete, processing
-    // incidents",                 trace_id
-    //             );
-    //             if let Err(e) =
-    // o2_enterprise::enterprise::ai::rca::integration::process_batch_and_create_incidents(
-    //                 trace_id
-    //             ).await {
-    //                 log::error!(
-    //                     "[SCHEDULER trace_id {scheduler_trace_id}] Error creating incidents from
-    // batch {}: {}",                     trace_id, e
-    //                 );
-    //             }
-    //         }
-    //     }
-    // };
-
     #[cfg(feature = "cloud")]
     {
         if !is_org_in_free_trial_period(&trigger.org).await? {
@@ -2237,10 +2285,6 @@ async fn handle_alert_triggers(
             .await;
         }
         publish_triggers_usage(trigger_data_stream);
-
-        // [ENTERPRISE] Mark completion even on failure
-        // #[cfg(feature = "enterprise")]
-        // mark_rca_completion().await;
 
         return Err(err);
     }
@@ -2644,7 +2688,9 @@ async fn handle_alert_triggers(
                 // actually succeeded — stamping a failed send would start a
                 // silence window with zero destinations reached and suppress
                 // the retry.
-                let mut grouped_delivery_ok = true;
+                // An alert wired to nothing cannot notify, so its batch opens no silence window.
+                let mut grouped_delivery_ok =
+                    !alert.destinations.is_empty() || !alert.workflows.is_empty();
                 if batch_ready {
                     log::info!(
                         "[SCHEDULER trace_id {scheduler_trace_id}] Batch {fingerprint} reached max size, sending immediately",
@@ -2778,33 +2824,9 @@ async fn handle_alert_triggers(
             }
         };
 
-        // [ENTERPRISE] Collect alert events for batched incident creation
-        // #[cfg(feature = "enterprise")]
-        // if rca_enabled && !data.is_empty() {
-        //     // Collect each deduplicated result row as an alert event
-        //     // Use parent trace_id for cross-alert correlation (not scheduler_trace_id)
-        //     for row in &data {
-        //         if let Err(e) =
-        // o2_enterprise::enterprise::ai::rca::integration::collect_alert_event(
-        // trace_id, // Use parent trace_id for cross-alert batch             &alert,
-        //             row,
-        //             triggered_at,
-        //         ) {
-        //             log::error!(
-        //                 "[SCHEDULER trace_id {scheduler_trace_id}] Error collecting alert event
-        // for RCA: {}",                 e
-        //             );
-        //             // Don't fail alert evaluation if RCA collection fails
-        //         }
-        //     }
-        //     log::debug!(
-        //         "[SCHEDULER trace_id {scheduler_trace_id}] Collected {} alert events for RCA
-        // batch {}",         data.len(),
-        //         trace_id
-        //     );
-        // }
-
-        // True when correlation sent or suppressed the notification itself; false sends below.
+        // True when incident correlation ran and handled the notification internally
+        // (either sent it for a new incident/alert type, or suppressed it for a repeat).
+        // When false, the direct send_notification() call below fires instead.
         #[cfg(feature = "enterprise")]
         let incident_handled_notification = if alert.creates_incident
             && o2_enterprise::enterprise::common::config::get_config()
@@ -3029,18 +3051,17 @@ async fn handle_alert_triggers(
                     let NotificationOutcome {
                         succeeded,
                         failed,
+                        nothing_to_deliver,
                         success_message: success_msg,
                         error_message: err_msg,
                     } = outcome;
                     let partial_failure = !failed.is_empty();
-                    // At least one destination delivered, so the reservations
-                    // this evaluation made are now real suppressions — one
-                    // send covered every reserved row.
+                    // A send that reached nobody suppresses nothing, so its reservations stay open.
                     let fingerprints: Vec<String> = dedup_reservations
                         .iter()
                         .map(|(_, fingerprint)| fingerprint.clone())
                         .collect();
-                    confirm_dedup_reservations(&fingerprints, true).await;
+                    confirm_dedup_reservations(&fingerprints, !nothing_to_deliver).await;
                     let success_msg = success_msg.trim().to_owned();
                     let err_msg = err_msg.trim().to_owned();
                     if !err_msg.is_empty() {
@@ -3130,11 +3151,13 @@ async fn handle_alert_triggers(
                         // set would make the next firing skip every listed
                         // destination and silently deliver nothing to them.
                         //
-                        // The notification was sent (possibly partially) — this
-                        // IS a delivery for silence/escalation purposes. Stamped
-                        // only here, on the terminal branch, so no retry can be
-                        // suppressed by a window this same cycle opened.
-                        record_delivery(&mut trigger_data);
+                        // A send that reached someone IS a delivery for
+                        // silence/escalation purposes. Stamped only here, on the
+                        // terminal branch, so no retry can be suppressed by a
+                        // window this same cycle opened.
+                        if !nothing_to_deliver {
+                            record_delivery(&mut trigger_data);
+                        }
                         if partial_failure {
                             log::error!(
                                 "[SCHEDULER trace_id {scheduler_trace_id}] Alert {}/{}: \
@@ -3292,10 +3315,6 @@ async fn handle_alert_triggers(
     );
     // publish the triggers as stream
     publish_triggers_usage(trigger_data_stream);
-
-    // [ENTERPRISE] Mark alert completed and process batch if this was the last alert
-    // #[cfg(feature = "enterprise")]
-    // mark_rca_completion().await;
 
     Ok(())
 }
@@ -6009,6 +6028,45 @@ mod tests {
         );
     }
 
+    const HANDLERS_SOURCE: &str = include_str!("handlers.rs");
+    const WORKER_SOURCE: &str = include_str!("worker.rs");
+
+    // Test code names the very needles below, so scanning it would match itself.
+    fn live_source(source: &str) -> &str {
+        match source.find("#[cfg(test)]") {
+            Some(end) => &source[..end],
+            None => source,
+        }
+    }
+
+    /// Pins the absence of scaffolding for an enterprise module that never existed.
+    #[test]
+    fn the_scheduler_names_no_rca_integration_module() {
+        for (file, source) in [
+            ("handlers.rs", HANDLERS_SOURCE),
+            ("worker.rs", WORKER_SOURCE),
+        ] {
+            for needle in [
+                "rca::integration",
+                "collect_alert_event",
+                "mark_rca_completion",
+                "is_rca_enabled_for_org",
+                "process_batch_and_create_incidents",
+                "rca::register_batch",
+                "rca::mark_alert_completed",
+            ] {
+                assert!(
+                    !live_source(source).contains(needle),
+                    "{file} names `{needle}`, but o2_enterprise's `enterprise::ai` module has \
+                     only ever contained agent/client/evaluation/openapi/toolsets — there is no \
+                     `rca` submodule to call into. Such a reference cannot compile under \
+                     --features enterprise, so it is dead scaffolding rather than a TODO, and \
+                     restoring it (commented or not) only misleads the next reader."
+                );
+            }
+        }
+    }
+
     // ── Task 11: per-destination retry ledger (§6.1) ────────────────────────
 
     #[test]
@@ -6101,13 +6159,18 @@ mod tests {
             .cloned()
             .collect();
 
+        // The real send reports this only when neither destinations nor workflows exist.
+        let nothing_to_deliver = all_destinations.is_empty();
+
         let partial_failure = !failed.is_empty();
         if partial_failure && retries + 1 < max_retries {
             // Retry branch: ledger merged, delivery state NOT stamped.
             data.notified_destinations = merge_ledger(&data.notified_destinations, &succeeded);
         } else {
             // Terminal branch: stamp delivery state, clear ledger.
-            record_delivery_model(&mut data, level, triggered_at);
+            if !nothing_to_deliver {
+                record_delivery_model(&mut data, level, triggered_at);
+            }
             data.notified_destinations.clear();
         }
         (data, succeeded)
@@ -6252,6 +6315,44 @@ mod tests {
             data.notified_destinations.is_empty(),
             "ledger must not outlive a cycle abandoned at max retries"
         );
+    }
+
+    /// An alert wired to nothing delivers nothing, so the terminal branch must
+    /// leave the delivery state untouched — a silence window opened here would
+    /// suppress the first firing after a destination is finally wired up.
+    #[test]
+    fn an_unwired_alert_stamps_no_delivery_state() {
+        let t0 = 1_700_000_000_000_000;
+        let (data, delivered) = run_attempt(
+            ScheduledTriggerData::default(),
+            &[],
+            &[],
+            AlertLevel::Critical,
+            t0,
+            0,
+            3,
+        );
+        assert!(delivered.is_empty());
+        assert_eq!(data.last_notified_level, None);
+        assert_eq!(data.delivery_silenced_until, None);
+        // The next firing, once a destination exists, must not be pre-suppressed.
+        let next = delivery_decision(
+            AlertLevel::Critical,
+            data.last_notified_level.and_then(AlertLevel::from_i32),
+            data.delivery_silenced_until,
+            t0 + SILENCE_MICROS / 2,
+            None,
+        );
+        assert!(next.should_deliver());
+    }
+
+    #[test]
+    fn group_delivery_verdicts() {
+        assert_eq!(group_delivery(true, false), GroupDelivery::Delivered);
+        assert_eq!(group_delivery(true, true), GroupDelivery::NothingToDeliver);
+        assert_eq!(group_delivery(false, false), GroupDelivery::Failed);
+        // An errored send carries no outcome, so the flag is unreadable there.
+        assert_eq!(group_delivery(false, true), GroupDelivery::Failed);
     }
 
     /// C2 regression. The fifth cycle exit — condition no longer matches, or
@@ -7082,6 +7183,95 @@ mod tests {
             record_anomaly_outcome(&mut trigger, &RunOutcome::Normal, 2);
             assert!(trigger.data.contains("\"normal\""));
             assert!(!trigger.data.contains("\"error\""));
+        }
+    }
+    /// A composite whose delivery never succeeds must stop rescheduling itself
+    /// every 10s, so the cap decision is pinned here rather than in the handler.
+    mod composite_delivery_retry_tests {
+        use super::*;
+
+        const MAX_RETRIES: i32 = 5;
+        const TEN_SECONDS_MICROS: i64 = 10_000_000;
+
+        fn retry(retries: i32, at: i64) -> CompositeDelivery {
+            CompositeDelivery::Retry { retries, at }
+        }
+
+        #[test]
+        fn the_first_delivery_failure_well_under_the_cap_schedules_a_retry_ten_seconds_out() {
+            assert_eq!(
+                composite_delivery_retry(0, MAX_RETRIES, 1_000),
+                retry(1, 1_000 + TEN_SECONDS_MICROS)
+            );
+        }
+
+        /// The cap comparison must match the simple path's `retries + 1 >= max`,
+        /// or composites quietly get a different delivery budget.
+        #[test]
+        fn the_last_attempt_still_within_the_cap_schedules_another_retry() {
+            assert_eq!(
+                composite_delivery_retry(MAX_RETRIES - 2, MAX_RETRIES, 1_000),
+                retry(MAX_RETRIES - 1, 1_000 + TEN_SECONDS_MICROS)
+            );
+        }
+
+        #[test]
+        fn reaching_the_cap_gives_up_instead_of_rescheduling() {
+            assert_eq!(
+                composite_delivery_retry(MAX_RETRIES - 1, MAX_RETRIES, 1_000),
+                CompositeDelivery::GiveUp
+            );
+        }
+
+        #[test]
+        fn a_retry_count_already_past_the_cap_gives_up_instead_of_rescheduling_forever() {
+            for retries_so_far in [MAX_RETRIES, MAX_RETRIES + 1, MAX_RETRIES * 2] {
+                assert_eq!(
+                    composite_delivery_retry(retries_so_far, MAX_RETRIES, 1_000),
+                    CompositeDelivery::GiveUp,
+                    "retries={retries_so_far} past cap {MAX_RETRIES} must give up"
+                );
+            }
+        }
+
+        /// A wrapping add would hand the scheduler a negative retry count, which
+        /// reads as a fresh budget and restarts the ten-second loop.
+        #[test]
+        fn a_saturated_retry_count_never_wraps_into_a_negative_budget() {
+            assert_eq!(
+                composite_delivery_retry(i32::MAX, i32::MAX, 1_000),
+                CompositeDelivery::GiveUp
+            );
+        }
+
+        #[test]
+        fn a_saturated_clock_does_not_panic_when_computing_the_retry_deadline() {
+            assert_eq!(
+                composite_delivery_retry(0, MAX_RETRIES, i64::MAX),
+                retry(1, i64::MAX)
+            );
+        }
+
+        /// A cap of one allows the first attempt and no retry at all.
+        #[test]
+        fn a_cap_of_one_allows_no_retry_at_all() {
+            assert_eq!(
+                composite_delivery_retry(0, 1, 1_000),
+                CompositeDelivery::GiveUp
+            );
+        }
+
+        /// A non-positive cap means retries are disabled, not unlimited.
+        #[test]
+        fn a_zero_or_negative_cap_gives_up_immediately_rather_than_looping() {
+            assert_eq!(
+                composite_delivery_retry(0, 0, 1_000),
+                CompositeDelivery::GiveUp
+            );
+            assert_eq!(
+                composite_delivery_retry(0, -1, 1_000),
+                CompositeDelivery::GiveUp
+            );
         }
     }
 }

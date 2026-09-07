@@ -6482,7 +6482,8 @@
       "thresholdPositiveNumber": "告警 - {index}：阈值应为大于 0 的正数，并且应为数字。",
       "silenceNonNegativeNumber": "告警 - {index}：冷却期应大于等于 0，且必须为数字。",
       "frequencyTypeInvalid": "告警 - {index}：频率类型必须为 'minutes' 或 'cron'，并且应为字符串。",
-      "cronExpressionInvalid": "告警 - {index}：Cron 表达式应为有效的 cron 表达式。"
+      "cronExpressionInvalid": "告警 - {index}：Cron 表达式应为有效的 cron 表达式。",
+      "destinationsArray": "告警 - {index}：目标必须是数组。"
     },
     "composite": {
       "child": "子告警",
@@ -6930,7 +6931,8 @@
         "pendingPeriodClause": "，等待 {duration} 后",
         "cooldownClause": "，但每 {cooldown} 至多一次",
         "defaultConditions": "满足配置条件时提醒我"
-      }
+      },
+      "notifiesNobody": "尚未通知任何人"
     },
     "correlation": {
       "title": "告警关联",
@@ -7368,7 +7370,8 @@
         "alertTriggerTimeSeconds": "触发时间（epoch 秒）",
         "alertTriggerTimeStr": "人类可读的触发时间",
         "rows": "所有匹配行，按行模板格式化"
-      }
+      },
+      "noDestinationNote": "未选择目标。此告警仍会评估并记录其历史，只是不会通知任何人。"
     },
     "advanced": {
       "addVariable": "添加变量",
@@ -7549,7 +7552,8 @@
       "summaryTrainingDays": "{days} 天",
       "timestampAliasBanned": "{column} 不能用作列别名。请改用 {timeBucket}。",
       "trainingWindowSeasonality": "天（季节性：{seasonality}）",
-      "trainingWindowTooltip": "用于训练的历史数据天数。最少 1 天。季节性自动检测：<7 天 → 小时级别；≥7 天 → 小时级别 + 星期级别。"
+      "trainingWindowTooltip": "用于训练的历史数据天数。最少 1 天。季节性自动检测：<7 天 → 小时级别；≥7 天 → 小时级别 + 星期级别。",
+      "noDestinationNote": "未选择目标。异常仍会被检测并记录，只是不会通知任何人。"
     },
     "variables": {
       "label": "变量"
@@ -7881,7 +7885,8 @@
     "sloKind": "条件类型",
     "sloLongWindow": "长窗口",
     "sloShortWindow": "短窗口",
-    "sloCloneDisabled": "SLO 告警是在其 SLO 页面上创建的，因此无法从此处克隆。"
+    "sloCloneDisabled": "SLO 告警是在其 SLO 页面上创建的，因此无法从此处克隆。",
+    "destinationsOptionalLabel": "目标"
   },
   "alert_dependencies": {
     "actionOpen": "打开",
@@ -7978,18 +7983,19 @@
     },
     "install": {
       "title": "从库中添加告警",
-      "subtitle": "选择告警的通知位置、要添加的告警以及它们的存放位置。",
+      "subtitle": "选择要添加的告警、它们的存放位置，以及（可选）通知位置。",
       "stepDestination": "目标",
       "stepAlerts": "告警",
       "stepFolder": "文件夹",
       "stepTune": "调整",
       "stepInstall": "添加",
-      "destinationIntro": "此批次中的每个告警都会通知您在此处选择的目标。库文件命名的是它们导出时所属组织的目标，这些目标在您的组织中不存在。",
+      "destinationIntro": "此批次中的每个告警都会通知您在此处选择的目标。此步骤是可选的：跳过后，告警将不带目标添加。库文件命名的是它们导出时所属组织的目标，这些目标在您的组织中不存在。",
       "destinationLabel": "目标",
       "destinationPlaceholder": "选择目标",
+      "destinationNone": "无（暂不通知）",
       "destinationsLoadFailed": "无法加载您现有的目标。",
       "retry": "重试",
-      "destinationsNoneBody": "此组织还没有告警目标，因此这些告警无处通知。请在“目标”页面上创建一个，然后返回此处选择它。",
+      "destinationsNoneBody": "此组织还没有告警目标。您仍然可以添加这些告警：它们会照常评估并记录历史，只是暂时不会通知任何人。准备好后请在“目标”页面创建一个，再将其添加到告警中。",
       "openDestinations": "打开目标",
       "selectAll": "全选",
       "clear": "清除",
@@ -8012,6 +8018,7 @@
       "next": "下一步",
       "cancel": "取消",
       "done": "完成",
+      "confirmLargeNoDestination": "我了解此操作会在 {folder} 中创建 {count} 个告警，且它们暂时都不会通知任何人。",
       "confirmLarge": "我了解此操作会在 {folder} 中创建 {count} 个告警，每个都通知 {destination}。"
     },
     "error": {

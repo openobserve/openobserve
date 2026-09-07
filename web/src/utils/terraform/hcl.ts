@@ -161,6 +161,12 @@ export function list(value: unknown): string | null {
   return `[${items.map(quote).join(", ")}]`;
 }
 
+/** Like `list`, but an empty array renders as `[]` — for attributes where "explicitly none" differs from "unset". */
+export function listOrEmpty(value: unknown): string | null {
+  if (!Array.isArray(value)) return null;
+  return list(value) ?? "[]";
+}
+
 /** A map of string→string, rendered multi-line. */
 export function map(value: unknown, indent: string): string | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;

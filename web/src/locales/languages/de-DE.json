@@ -6482,7 +6482,8 @@
       "thresholdPositiveNumber": "Alarm - {index}: Der Schwellenwert sollte eine positive Zahl größer als 0 sein und eine Zahl sein.",
       "silenceNonNegativeNumber": "Warnmeldung - {index}: Der Cooldown-Zeitraum sollte eine Zahl größer oder gleich 0 sein.",
       "frequencyTypeInvalid": "Alarm - {index}: Der Häufigkeitstyp muss 'minutes' oder 'cron' sein und sollte eine Zeichenfolge sein.",
-      "cronExpressionInvalid": "Alarm - {index}: Der Cron-Ausdruck sollte ein gültiger Cron-Ausdruck sein."
+      "cronExpressionInvalid": "Alarm - {index}: Der Cron-Ausdruck sollte ein gültiger Cron-Ausdruck sein.",
+      "destinationsArray": "Warnung - {index}: Ziele müssen ein Array sein."
     },
     "composite": {
       "child": "Kind-Alarm",
@@ -6930,7 +6931,8 @@
         "pendingPeriodClause": ", nach einer Wartezeit von {duration}",
         "cooldownClause": ", aber höchstens einmal alle {cooldown}",
         "defaultConditions": "Mich benachrichtigen, wenn die konfigurierten Bedingungen erfüllt sind"
-      }
+      },
+      "notifiesNobody": "benachrichtigt noch niemanden"
     },
     "correlation": {
       "title": "Korrelation von Warnmeldungen",
@@ -7368,7 +7370,8 @@
         "alertTriggerTimeSeconds": "Auslösezeit in Epoch-Sekunden",
         "alertTriggerTimeStr": "Auslösezeit (menschenlesbar)",
         "rows": "Alle übereinstimmenden Zeilen, formatiert durch die Zeilenvorlage"
-      }
+      },
+      "noDestinationNote": "Kein Ziel ausgewählt. Diese Warnung wird weiterhin ausgewertet und ihr Verlauf aufgezeichnet — sie benachrichtigt lediglich niemanden."
     },
     "advanced": {
       "addVariable": "Variable hinzufügen",
@@ -7549,7 +7552,8 @@
       "summaryTrainingDays": "{days} Tage",
       "timestampAliasBanned": "{column} kann nicht als Spaltenalias verwendet werden. Verwenden Sie stattdessen {timeBucket}.",
       "trainingWindowSeasonality": "Tage (Saisonalität: {seasonality})",
-      "trainingWindowTooltip": "Wie viele Tage historischer Daten für das Training verwendet werden sollen. Mindestens 1 Tag. Saisonalität wird automatisch erkannt: <7 Tage → Stunde des Tages; ≥7 Tage → Stunde des Tages + Wochentag."
+      "trainingWindowTooltip": "Wie viele Tage historischer Daten für das Training verwendet werden sollen. Mindestens 1 Tag. Saisonalität wird automatisch erkannt: <7 Tage → Stunde des Tages; ≥7 Tage → Stunde des Tages + Wochentag.",
+      "noDestinationNote": "Kein Ziel ausgewählt. Anomalien werden weiterhin erkannt und aufgezeichnet — sie benachrichtigen lediglich niemanden."
     },
     "variables": {
       "label": "Variable"
@@ -7881,7 +7885,8 @@
     "sloKind": "Bedingungstyp",
     "sloLongWindow": "Langes Zeitfenster",
     "sloShortWindow": "Kurzes Zeitfenster",
-    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden."
+    "sloCloneDisabled": "SLO-Alerts werden auf ihrer SLO-Seite erstellt und können daher nicht von hier geklont werden.",
+    "destinationsOptionalLabel": "Ziele"
   },
   "alert_dependencies": {
     "actionOpen": "Öffnen",
@@ -7978,18 +7983,19 @@
     },
     "install": {
       "title": "Warnmeldungen aus der Bibliothek hinzufügen",
-      "subtitle": "Wählen Sie, wohin Warnmeldungen gesendet werden, welche Sie hinzufügen möchten und wo sie abgelegt werden.",
+      "subtitle": "Wählen Sie, welche Warnmeldungen hinzugefügt werden, wo sie abgelegt werden und optional, wohin sie benachrichtigen.",
       "stepDestination": "Ziel",
       "stepAlerts": "Alarme",
       "stepFolder": "Ordner",
       "stepTune": "Anpassen",
       "stepInstall": "Hinzufügen",
-      "destinationIntro": "Jede Warnmeldung in diesem Stapel benachrichtigt das Ziel, das Sie hier auswählen. Bibliotheksdateien nennen die Ziele der Organisation, aus der sie exportiert wurden, die in Ihrer Organisation nicht vorhanden sind.",
+      "destinationIntro": "Jede Warnmeldung in diesem Stapel benachrichtigt das Ziel, das Sie hier auswählen. Dieser Schritt ist optional: Überspringen Sie ihn, und die Warnmeldungen werden ohne Ziel hinzugefügt. Bibliotheksdateien nennen die Ziele der Organisation, aus der sie exportiert wurden, die in Ihrer Organisation nicht vorhanden sind.",
       "destinationLabel": "Ziel",
       "destinationPlaceholder": "Ziel auswählen",
+      "destinationNone": "Keines - benachrichtigt noch niemanden",
       "destinationsLoadFailed": "Ihre vorhandenen Ziele konnten nicht geladen werden.",
       "retry": "Erneut versuchen",
-      "destinationsNoneBody": "Diese Organisation hat noch keine Ziele für Warnmeldungen, daher gibt es kein Ziel, an das diese Warnmeldungen gesendet werden können. Erstellen Sie eines auf der Seite 'Ziele' und kehren Sie dann zurück, um es hier auszuwählen.",
+      "destinationsNoneBody": "Diese Organisation hat noch keine Ziele für Warnmeldungen. Sie können diese Warnmeldungen trotzdem hinzufügen: Sie werden ausgewertet und ihr Verlauf wird aufgezeichnet, sie benachrichtigen nur noch niemanden. Erstellen Sie ein Ziel auf der Seite 'Ziele', wenn Sie so weit sind, und fügen Sie es dann den Warnmeldungen hinzu.",
       "openDestinations": "Ziele öffnen",
       "selectAll": "Alle auswählen",
       "clear": "Löschen",
@@ -8012,6 +8018,7 @@
       "next": "Weiter",
       "cancel": "Abbrechen",
       "done": "Fertig",
+      "confirmLargeNoDestination": "Mir ist klar, dass dies {count} Alarme in {folder} erstellt, von denen noch keiner benachrichtigt.",
       "confirmLarge": "Mir ist klar, dass dies {count} Alarme in {folder} erstellt, die jeweils {destination} benachrichtigen."
     },
     "error": {

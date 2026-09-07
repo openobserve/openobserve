@@ -18,10 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   LibraryInstallDialog — the five answers an install needs, in the order the
   answer stops being obvious: Destination -> Alerts -> Folder -> Tune -> Install.
 
-  Destination comes FIRST because it is the only step that can fail before
-  anything is chosen: a library file names the destinations of the org it was
-  exported from, so a customer org with none has nothing to install to. Asking
-  last would mean picking twelve alerts and then being told to go elsewhere.
+  Destination comes FIRST because it is the one answer the library file cannot
+  supply: it names the destinations of the org it was exported from, which this
+  org does not have. It is OPTIONAL — an alert with no destination is valid,
+  evaluates, and records its history, so nothing here is a dead end.
 
   The batch arrives as `seed` from one alert's drawer or `preselect` from the
   gallery's selection. The seed wins.
@@ -85,8 +85,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </OBanner>
 
-          <!-- Genuinely no destinations yet. Not an error, and not something
-               this dialog can fix any more — say so and point somewhere real. -->
+          <!-- Genuinely no destinations yet. Not an error and not a blocker —
+               the install still runs, so this only says where to create one. -->
           <template v-if="!isLoadingDestinations && !destinationsFailed && !hasDestinations">
             <OBanner
               variant="info"
@@ -279,7 +279,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="alert-library-install-summary"
           >
             <dt class="text-text-secondary">{{ t("alert_library.install.stepDestination") }}</dt>
-            <dd class="text-text-heading">{{ chosenDestination }}</dd>
+            <dd class="text-text-heading">
+              {{ chosenDestination || t("alert_library.install.destinationNone") }}
+            </dd>
             <dt class="text-text-secondary">{{ t("alert_library.install.stepFolder") }}</dt>
             <dd class="text-text-heading">{{ folderLabel }}</dd>
             <dt class="text-text-secondary">{{ t("alert_library.install.stepAlerts") }}</dt>
@@ -554,11 +556,16 @@ const tuningSummary = computed<I18nText>(() =>
 const needsLargeBatchConfirm = computed(() => selectedIds.value.length > LARGE_BATCH);
 
 const largeBatchPrompt = computed(() =>
-  t("alert_library.install.confirmLarge", {
-    count: selectedIds.value.length,
-    folder: folderLabel.value,
-    destination: chosenDestination.value,
-  }),
+  chosenDestination.value === ""
+    ? t("alert_library.install.confirmLargeNoDestination", {
+        count: selectedIds.value.length,
+        folder: folderLabel.value,
+      })
+    : t("alert_library.install.confirmLarge", {
+        count: selectedIds.value.length,
+        folder: folderLabel.value,
+        destination: chosenDestination.value,
+      }),
 );
 
 // The tick is a statement about THIS batch, folder and destination; any of the three changing
@@ -572,7 +579,6 @@ const failedIds = computed(() =>
 );
 
 const canAdvance = computed(() => {
-  if (step.value === 1) return chosenDestination.value !== "";
   if (step.value === 2) return selectedIds.value.length > 0;
   return true;
 });
@@ -759,9 +765,6 @@ const setResult = (id: string, patch: Partial<InstallResult>) => {
 
 const install = async (ids: string[]) => {
   if (isInstalling.value) return;
-  // Defensive: every path to step 5 sets this, but installing against an empty
-  // destination is a guaranteed 400 for the whole batch, so never start one.
-  if (!chosenDestination.value) return;
 
   // Freeze the roster on the FIRST run; a retry reports on the same set.
   if (!hasRun.value) {

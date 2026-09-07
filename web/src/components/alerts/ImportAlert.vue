@@ -166,13 +166,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         data-test="alert-import-destination-name-input"
                         :model-value="userSelectedDestinations[index] || []"
                         :options="filteredDestinations"
-                        :label="t('alerts.destinationsRequiredLabel')"
+                        :label="t('alerts.destinationsOptionalLabel')"
                         multiple
                         searchable
                         @search="filterDestinations"
                         class="w-75!"
-                        :error="!userSelectedDestinations[index]?.length"
-                        :error-message="t('alerts.validation.fieldRequired')"
                         @update:model-value="
                           (val) => {
                             userSelectedDestinations[index] = val as string[];
@@ -898,13 +896,10 @@ export default defineComponent({
         alertErrors.push(t("alerts.import.cronExpressionInvalid", { index }));
       }
 
-      if (
-        !input.destinations ||
-        !Array.isArray(input.destinations) ||
-        input.destinations.length === 0
-      ) {
+      // An empty or absent list is a valid alert; only a malformed value is an error.
+      if (input.destinations !== undefined && !Array.isArray(input.destinations)) {
         alertErrors.push({
-          message: t("alerts.import.destinationsRequired", { index }),
+          message: t("alerts.import.destinationsArray", { index }),
           field: "destination_name",
         });
       }
@@ -928,14 +923,17 @@ export default defineComponent({
         });
       }
 
-      input.destinations.forEach((destination: any) => {
-        if (!checkDestinationInList(props.destinations, destination)) {
-          alertErrors.push({
-            message: t("alerts.import.destinationNotExist", { index, destination }),
-            field: "destination_name",
-          });
-        }
-      });
+      // Guarded: the key is optional, and an unguarded access threw a TypeError swallowed into a toast.
+      if (Array.isArray(input.destinations)) {
+        input.destinations.forEach((destination: any) => {
+          if (!checkDestinationInList(props.destinations, destination)) {
+            alertErrors.push({
+              message: t("alerts.import.destinationNotExist", { index, destination }),
+              field: "destination_name",
+            });
+          }
+        });
+      }
 
       // This condition is added to avoid the error when the updated_at is not a number
       if (typeof input.updated_at !== "number") {

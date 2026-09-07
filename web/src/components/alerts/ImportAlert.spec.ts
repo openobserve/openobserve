@@ -483,6 +483,68 @@ describe("ImportAlert Component - Comprehensive Function Tests", () => {
           expect(error).toBeDefined();
         }
       });
+
+      // An alert that notifies nobody is a valid backend configuration, so the
+      // importer has to take one — with the key empty AND with it absent.
+      const importableAlert = (over: Record<string, any> = {}) => ({
+        name: "test-alert",
+        org_id: "test-org",
+        stream_type: "logs",
+        stream_name: "test-stream",
+        is_real_time: false,
+        enabled: true,
+        updated_at: 1,
+        query_condition: {
+          type: "custom",
+          conditions: { filterType: "group", conditions: [] },
+          multi_time_range: [],
+        },
+        trigger_condition: {
+          period: 10,
+          operator: ">=",
+          frequency: 10,
+          threshold: 3,
+          silence: 10,
+          frequency_type: "minutes",
+          timezone: "UTC",
+          cron: "",
+        },
+        destinations: ["test-destination-1"],
+        ...over,
+      });
+
+      it("ACCEPTS an alert whose destinations list is empty", async () => {
+        const result = await wrapper.vm.validateAlertInputs(
+          importableAlert({ destinations: [] }),
+          1,
+        );
+        expect(result).toBe(true);
+        expect(wrapper.vm.alertErrorsToDisplay).toEqual([]);
+      });
+
+      it("ACCEPTS an alert with NO destinations key, without throwing", async () => {
+        const { destinations: _omitted, ...input } = importableAlert();
+        // Regression: `input.destinations.forEach(...)` ran unguarded here and
+        // threw a TypeError that surfaced as a generic "import failed" toast.
+        await expect(wrapper.vm.validateAlertInputs(input, 1)).resolves.toBe(true);
+        expect(wrapper.vm.alertErrorsToDisplay).toEqual([]);
+      });
+
+      it("still REJECTS a destinations value that is not an array", async () => {
+        const result = await wrapper.vm.validateAlertInputs(
+          importableAlert({ destinations: "test-destination-1" }),
+          1,
+        );
+        expect(result).toBe(false);
+      });
+
+      it("still REJECTS a destination the org does not have", async () => {
+        const result = await wrapper.vm.validateAlertInputs(
+          importableAlert({ destinations: ["nope"] }),
+          1,
+        );
+        expect(result).toBe(false);
+      });
     });
   });
 

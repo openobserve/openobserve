@@ -245,7 +245,10 @@ describe("AddAlert (OForm owner)", () => {
       expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
     });
 
-    it("blocks save when there are no destinations", async () => {
+    // INVERTED, not deleted: an alert with no destination is a valid backend
+    // configuration (it evaluates, records history and notifies nobody), so the
+    // save must go through. Kept here so the block cannot be reintroduced.
+    it("SAVES when there are no destinations", async () => {
       wrapper = mountAlert();
       await flushPromises();
       const form = wrapper.vm.form;
@@ -255,8 +258,8 @@ describe("AddAlert (OForm owner)", () => {
       await form.handleSubmit();
       await flushPromises();
 
-      expect(form.state.isValid).toBe(false);
-      expect(alertsService.create_by_alert_id).not.toHaveBeenCalled();
+      expect(form.state.isValid).toBe(true);
+      expect(alertsService.create_by_alert_id).toHaveBeenCalled();
     });
   });
 
@@ -848,6 +851,27 @@ describe("AddAlert (OForm owner)", () => {
       const [, payload] = (anomalyDetectionService.create as any).mock.calls[0];
       expect(payload.anomaly_config.alert_budget_per_day).toBe(2);
       expect(payload.anomaly_config).not.toHaveProperty("threshold");
+    });
+
+    it("SAVES an alerting anomaly detector that has no destination", async () => {
+      wrapper = mountAlert();
+      await flushPromises();
+      const form = wrapper.vm.form;
+
+      form.setFieldValue("is_real_time", "anomaly");
+      await flushPromises();
+      form.setFieldValue("name", "anom_alert");
+      form.setFieldValue("stream_type", "logs");
+      form.setFieldValue("stream_name", "_rundata");
+      await flushPromises();
+      wrapper.vm.anomalyConfig.alert_enabled = true;
+      wrapper.vm.anomalyConfig.alert_destination_ids = [];
+      wrapper.vm.anomalyConfig.query_mode = "filters";
+
+      await wrapper.vm.handleSave();
+      await flushPromises();
+
+      expect(anomalyDetectionService.create).toHaveBeenCalledTimes(1);
     });
 
     it("blocks anomaly save when the anomaly name is empty", async () => {

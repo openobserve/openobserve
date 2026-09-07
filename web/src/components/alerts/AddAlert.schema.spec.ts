@@ -137,9 +137,23 @@ describe("addAlertSchema (composed orchestrator schema)", () => {
   });
 
   // ── AlertSettings (reused) ──────────────────────────────────────────────────
-  it("requires at least one destination", () => {
+  // INVERTED, not deleted: an alert that notifies nobody is a valid backend
+  // configuration, so the orchestrator must not raise on the destinations path.
+  it("does NOT require a destination", () => {
     const m = issuesByPath(validScheduled({ destinations: [] }));
-    expect(m["destinations"]?.length).toBeGreaterThan(0);
+    expect(m["destinations"]).toBeUndefined();
+  });
+
+  it("does NOT require a destination for a composite alert either", () => {
+    const m = issuesByPath(
+      validScheduled({
+        destinations: [],
+        is_real_time: "composite",
+        composite_condition: { expression: "a" },
+        children: [{ alias: "a", alert_id: "1" }],
+      }),
+    );
+    expect(m["destinations"]).toBeUndefined();
   });
 
   it("requires period ≥ 1 for scheduled alerts", () => {

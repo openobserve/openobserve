@@ -89,11 +89,23 @@ function makeFormData(overrides: Record<string, any> = {}) {
 // AddAlert.schema.ts reuses the same fragments via createAlertSettingsSchema).
 const parentSchema = z.object({ ...makeAlertSettingsShape(t) });
 
-function makeDescendantHost(isRealTime = "true", defaultOverrides: Record<string, any> = {}) {
+// A destinations rule the PRODUCT no longer has. Only the error CHROME is still
+// product behaviour (see the [role=alert] regression below), so the spec has to
+// supply its own rule to make an error exist at all.
+const syntheticDestinationsRequiredSchema = z.object({
+  ...makeAlertSettingsShape(t),
+  destinations: z.array(z.string()).min(1, DESTINATIONS_REQUIRED_MESSAGE),
+});
+
+function makeDescendantHost(
+  isRealTime = "true",
+  defaultOverrides: Record<string, any> = {},
+  hostSchema: z.ZodTypeAny = parentSchema,
+) {
   return defineComponent({
     components: { OForm, AlertSettings },
     setup() {
-      const schema = parentSchema;
+      const schema = hostSchema;
       const defaultValues = {
         trigger_condition: { silence: 10, period: 10 },
         destinations: [] as string[],
@@ -101,14 +113,17 @@ function makeDescendantHost(isRealTime = "true", defaultOverrides: Record<string
         ...defaultOverrides,
       };
       const formData = makeFormData();
-      return { schema, defaultValues, formData, isRealTime };
+      // The step takes the SELECTED destinations as a prop, not off the form —
+      // seed it from the same override the form defaults use.
+      const selected = (defaultOverrides.destinations as string[]) ?? [];
+      return { schema, defaultValues, formData, isRealTime, selected };
     },
     template: `
       <OForm :schema="schema" :default-values="defaultValues" @submit="() => {}">
         <AlertSettings
           :form-data="formData"
           :is-real-time="isRealTime"
-          :destinations="[]"
+          :destinations="selected"
           :formatted-destinations="['dest-a','dest-b']"
         />
       </OForm>
@@ -116,8 +131,12 @@ function makeDescendantHost(isRealTime = "true", defaultOverrides: Record<string
   });
 }
 
-function mountDescendant(isRealTime = "true", defaultOverrides: Record<string, any> = {}) {
-  return mount(makeDescendantHost(isRealTime, defaultOverrides), {
+function mountDescendant(
+  isRealTime = "true",
+  defaultOverrides: Record<string, any> = {},
+  hostSchema: z.ZodTypeAny = parentSchema,
+) {
+  return mount(makeDescendantHost(isRealTime, defaultOverrides, hostSchema), {
     global: { plugins: [makeStore(), i18n] },
   });
 }
@@ -144,8 +163,11 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     expect(parentForm.state.values.trigger_condition.silence).toBe("7");
   });
 
+  // REWRITTEN: this used to submit an empty-destinations form and read the
+  // "destination required" message back out of the step. Destinations are
+  // optional now, so it proves the same plumbing through the silence rule.
   it("the parent handleSubmit surfaces the step's field errors", async () => {
-    const host = mountDescendant("true");
+    const host = mountDescendant("true", { trigger_condition: { silence: "", period: 10 } });
     const parentForm = hostForm(host);
 
     await parentForm.handleSubmit();
@@ -153,8 +175,34 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
     await nextTick();
 
     expect(parentForm.state.isValid).toBe(false);
-    // The destinations rule (from the composed shape) renders in the step's field.
-    expect(host.text()).toContain(DESTINATIONS_REQUIRED_MESSAGE);
+    expect(host.text()).toContain(t("alerts.validation.silenceNonNegative"));
+  });
+
+  it("submits with NO destinations — the alert simply notifies nobody", async () => {
+    const host = mountDescendant("true");
+    const parentForm = hostForm(host);
+
+    await parentForm.handleSubmit();
+    await flushPromises();
+    await nextTick();
+
+    expect(parentForm.state.isValid).toBe(true);
+    expect(host.find('[data-test="alert-settings-destinations-error"]').exists()).toBe(false);
+  });
+
+  it("says so, non-blockingly, when nothing is targeted", async () => {
+    const host = mountDescendant("true");
+    const note = host.find('[data-test="alert-settings-destinations-note"]');
+
+    expect(note.exists()).toBe(true);
+    expect(note.text()).toBe(t("alerts.alertSettings.noDestinationNote"));
+    // A note, not an error: it carries no [role=alert] for focusOnFirstError.
+    expect(note.attributes("role")).toBeUndefined();
+  });
+
+  it("drops the note once a destination is chosen", () => {
+    const host = mountDescendant("true", { destinations: ["dest-a"] });
+    expect(host.find('[data-test="alert-settings-destinations-note"]').exists()).toBe(false);
   });
 
   // Regression (#13156): AlertTargetsSelect replaced the name=-bound destinations
@@ -165,8 +213,11 @@ describe("AlertSettings — descendant (binds into ancestor OForm) mode", () => 
   // never brought the Alert Rules tab forward. The cross-tab specs in
   // AddAlert.spec.ts seed a synthetic message (steps are stubbed there), so the
   // REAL markup's marker must be pinned here.
+  // The rule that produced this error is gone, so the host supplies a synthetic
+  // one — the error CHROME is what this pins, and it is still reachable from any
+  // ancestor schema that reports on the `destinations` path.
   it("renders the destinations error as [role=alert] so focusOnFirstError can find its tab", async () => {
-    const host = mountDescendant("true");
+    const host = mountDescendant("true", {}, syntheticDestinationsRequiredSchema);
     await hostForm(host).handleSubmit();
     await flushPromises();
     await nextTick();
@@ -361,48 +412,56 @@ describe("AlertSettings.schema — period rules unchanged by the silence fix", (
   });
 });
 
-// ── "destination OR workflow" (enterprise/cloud) ─────────────────────────────
-// Pre-migration this lived in the component's hand-rolled validate(); that method
-// was deleted by the zod migration, so the rule now rides on the schema via the
-// `allowWorkflows` flag. OSS must be untouched: the flag defaults to false and
-// keeps the original "destinations >= 1" rule and message. Enterprise/cloud
-// relaxes it to "at least ONE of destinations | workflows", reported on the
-// `destinations` path so AlertSettings can surface it under the combined
-// AlertTargetsSelect control.
-describe("AlertSettings.schema — destination OR workflow", () => {
+// ── destinations / workflows are OPTIONAL ────────────────────────────────────
+// INVERTED, not deleted. This block used to pin "destinations >= 1" (OSS) and
+// "at least ONE of destinations | workflows" (enterprise/cloud). The backend now
+// accepts an alert with no delivery target at all — it evaluates and records its
+// firing history and notifies nobody — so the schema must not block the save.
+// The cases below are the same matrix, with the outcomes flipped where the rule
+// used to reject; the ACCEPTS cases are kept verbatim so the relaxation cannot
+// quietly break a combination that already worked.
+describe("AlertSettings.schema — destinations and workflows are optional", () => {
   const DEST_ONLY = t("alerts.validation.destinationRequired");
   const EITHER = t("alerts.destinationOrWorkflowRequired");
   const base = {
     trigger_condition: { silence: 10, period: 10 },
     creates_incident: false,
   };
+  const messages = (r: any): string[] =>
+    r.success ? [] : r.error.issues.map((i: any) => i.message);
 
-  describe("OSS (allowWorkflows omitted — default false)", () => {
+  describe("OSS", () => {
     const schema = createAlertSettingsSchema(t, false);
 
-    it("REJECTS empty destinations with the ORIGINAL message", () => {
+    it("ACCEPTS empty destinations, with no requiredness message", () => {
       const r = schema.safeParse({ ...base, destinations: [] });
-      expect(r.success).toBe(false);
-      expect(r.success ? [] : r.error.issues.map((i: any) => i.message)).toContain(DEST_ONLY);
+      expect(r.success).toBe(true);
+      expect(messages(r)).not.toContain(DEST_ONLY);
     });
 
-    it("does NOT accept a workflow as a substitute for a destination", () => {
-      // OSS has no workflows feature; a stray value must not satisfy the rule.
+    it("ACCEPTS empty destinations even with a stray workflow value", () => {
+      // OSS has no workflows feature; the stray value is neither required nor
+      // rejected — nothing about delivery blocks the parse any more.
       const r = schema.safeParse({
         ...base,
         destinations: [],
         workflows: ["wf-1"],
       });
-      expect(r.success).toBe(false);
+      expect(r.success).toBe(true);
     });
 
     it("ACCEPTS a destination", () => {
       expect(schema.safeParse({ ...base, destinations: ["email"] }).success).toBe(true);
     });
+
+    it("still REJECTS a malformed destinations value", () => {
+      // Optional is not "anything goes": the field is still a string array.
+      expect(schema.safeParse({ ...base, destinations: "email" }).success).toBe(false);
+    });
   });
 
-  describe("enterprise/cloud (allowWorkflows = true)", () => {
-    const schema = createAlertSettingsSchema(t, false, true);
+  describe("enterprise/cloud", () => {
+    const schema = createAlertSettingsSchema(t, false);
 
     it("ACCEPTS a destination and no workflow", () => {
       const r = schema.safeParse({
@@ -413,7 +472,7 @@ describe("AlertSettings.schema — destination OR workflow", () => {
       expect(r.success).toBe(true);
     });
 
-    it("ACCEPTS a workflow and NO destination (the new capability)", () => {
+    it("ACCEPTS a workflow and NO destination", () => {
       const r = schema.safeParse({
         ...base,
         destinations: [],
@@ -431,17 +490,14 @@ describe("AlertSettings.schema — destination OR workflow", () => {
       expect(r.success).toBe(true);
     });
 
-    it("REJECTS neither, with the combined message on the destinations path", () => {
+    it("ACCEPTS neither, with no combined-requiredness message", () => {
       const r = schema.safeParse({ ...base, destinations: [], workflows: [] });
-      expect(r.success).toBe(false);
-      const issues = r.success ? [] : r.error.issues;
-      expect(issues.map((i: any) => i.message)).toContain(EITHER);
-      // Path matters: AlertSettings reads fieldError("destinations") to render it.
-      expect(issues.some((i: any) => i.path.join(".") === "destinations")).toBe(true);
+      expect(r.success).toBe(true);
+      expect(messages(r)).not.toContain(EITHER);
     });
 
-    it("REJECTS when both keys are absent entirely", () => {
-      expect(schema.safeParse({ ...base }).success).toBe(false);
+    it("ACCEPTS both keys being absent entirely", () => {
+      expect(schema.safeParse({ ...base }).success).toBe(true);
     });
   });
 });
@@ -515,10 +571,11 @@ describe("AlertSettings — combined destinations + workflows target control", (
     }
   });
 
-  it("still renders the destinations validation error under the control", async () => {
+  it("still renders a destinations validation error under the control", async () => {
     // The control is no longer an OForm* wrapper, so the schema error has no
     // renderer of its own — the step surfaces it via fieldError("destinations").
-    const host = mountDescendant("true");
+    // The product schema no longer produces one, so the host supplies the rule.
+    const host = mountDescendant("true", {}, syntheticDestinationsRequiredSchema);
     const parentForm = hostForm(host);
 
     await parentForm.handleSubmit();
@@ -526,5 +583,12 @@ describe("AlertSettings — combined destinations + workflows target control", (
     await nextTick();
 
     expect(host.text()).toContain(DESTINATIONS_REQUIRED_MESSAGE);
+  });
+
+  it("renders the non-blocking note under the control when nothing is targeted", () => {
+    const host = mountDescendant("true");
+    expect(host.find('[data-test="alert-settings-destinations-note"]').text()).toBe(
+      t("alerts.alertSettings.noDestinationNote"),
+    );
   });
 });

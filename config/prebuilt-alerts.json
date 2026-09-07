@@ -1,0 +1,71 @@
+{
+  "revision": 1,
+  "alerts": [
+    {
+      "id": "scheduler-alert-evaluation-failures",
+      "revision": 1,
+      "name": "o2_alert_evaluation_failures",
+      "description": "An alert's own evaluation query failed (query error or timeout). Silent alert coverage loss: the alert is scheduled but is not actually checking anything.",
+      "stream_type": "logs",
+      "stream_name": "triggers",
+      "query_condition": {
+        "type": "sql",
+        "sql": "SELECT _timestamp, org, \"key\", error FROM \"triggers\" WHERE org = '{org_id}' AND module = 'alert' AND status = 'error'"
+      },
+      "trigger_condition": {
+        "period": 15,
+        "operator": ">=",
+        "threshold": 1,
+        "frequency": 300,
+        "frequency_type": "minutes",
+        "silence": 60
+      },
+      "destinations": [],
+      "enabled": false
+    },
+    {
+      "id": "scheduler-notification-delivery-failures",
+      "revision": 1,
+      "name": "o2_alert_notification_failures",
+      "description": "An alert condition matched but the notification could not be delivered. Without this, a webhook or SMTP outage silently swallows every firing.",
+      "stream_type": "logs",
+      "stream_name": "triggers",
+      "query_condition": {
+        "type": "sql",
+        "sql": "SELECT _timestamp, org, \"key\", error FROM \"triggers\" WHERE org = '{org_id}' AND module = 'alert' AND status = 'notify_failed' AND \"key\" NOT LIKE 'o2_alert_notification_failures/%'"
+      },
+      "trigger_condition": {
+        "period": 15,
+        "operator": ">=",
+        "threshold": 1,
+        "frequency": 300,
+        "frequency_type": "minutes",
+        "silence": 60
+      },
+      "destinations": [],
+      "enabled": false
+    },
+    {
+      "id": "scheduler-job-backlog",
+      "revision": 1,
+      "name": "o2_scheduler_job_backlog",
+      "description": "Scheduled jobs are running well after their due time, so alerts and reports are evaluating on stale windows.",
+      "stream_type": "logs",
+      "stream_name": "triggers",
+      "query_condition": {
+        "type": "sql",
+        "sql": "SELECT _timestamp, org, module, \"key\", delay_in_secs FROM \"triggers\" WHERE org = '{org_id}' AND delay_in_secs > 300"
+      },
+      "trigger_condition": {
+        "period": 15,
+        "operator": ">=",
+        "threshold": 5,
+        "frequency": 300,
+        "frequency_type": "minutes",
+        "silence": 60
+      },
+      "destinations": [],
+      "enabled": false
+    }
+  ]
+}

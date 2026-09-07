@@ -6482,7 +6482,8 @@
       "thresholdPositiveNumber": "Alerte - {index} : le seuil doit être un nombre positif supérieur à 0 et doit être un nombre.",
       "silenceNonNegativeNumber": "Alerte - {index} : la période de silence doit être un nombre positif supérieur ou égal à 0 et doit être un nombre.",
       "frequencyTypeInvalid": "Alerte - {index} : le type de fréquence doit être 'minutes' ou 'cron' et doit être une chaîne.",
-      "cronExpressionInvalid": "Alerte - {index} : l'expression Cron doit être une expression Cron valide."
+      "cronExpressionInvalid": "Alerte - {index} : l'expression Cron doit être une expression Cron valide.",
+      "destinationsArray": "Alerte - {index} : Les destinations doivent être un tableau."
     },
     "composite": {
       "child": "Alerte enfant",
@@ -6930,7 +6931,8 @@
         "pendingPeriodClause": ", après une période d'attente de {duration}",
         "cooldownClause": ", mais pas plus d'une fois tous les {cooldown}",
         "defaultConditions": "M'avertir lorsque les conditions configurées sont remplies"
-      }
+      },
+      "notifiesNobody": "ne notifie encore personne"
     },
     "correlation": {
       "title": "Corrélation des alertes",
@@ -7368,7 +7370,8 @@
         "alertTriggerTimeSeconds": "Heure de déclenchement en secondes epoch",
         "alertTriggerTimeStr": "Heure de déclenchement lisible",
         "rows": "Toutes les lignes correspondantes, formatées selon le modèle de ligne"
-      }
+      },
+      "noDestinationNote": "Aucune destination sélectionnée. Cette alerte continue d'être évaluée et son historique enregistré — elle ne notifiera simplement personne."
     },
     "advanced": {
       "addVariable": "Ajouter une variable",
@@ -7549,7 +7552,8 @@
       "summaryTrainingDays": "{days} jours",
       "timestampAliasBanned": "{column} ne peut pas être utilisé comme alias de colonne. Utilisez {timeBucket} à la place.",
       "trainingWindowSeasonality": "jours (saisonnalité : {seasonality})",
-      "trainingWindowTooltip": "Combien de jours de données historiques utiliser pour l'entraînement. Minimum 1 jour. La saisonnalité est détectée automatiquement : <7 jours → heure du jour ; ≥7 jours → heure du jour + jour de la semaine."
+      "trainingWindowTooltip": "Combien de jours de données historiques utiliser pour l'entraînement. Minimum 1 jour. La saisonnalité est détectée automatiquement : <7 jours → heure du jour ; ≥7 jours → heure du jour + jour de la semaine.",
+      "noDestinationNote": "Aucune destination sélectionnée. Les anomalies sont toujours détectées et enregistrées — elles ne notifieront simplement personne."
     },
     "variables": {
       "label": "Variable"
@@ -7881,7 +7885,8 @@
     "sloKind": "Type de condition",
     "sloLongWindow": "Fenêtre longue",
     "sloShortWindow": "Fenêtre courte",
-    "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici."
+    "sloCloneDisabled": "Les alertes SLO sont créées sur leur page SLO, elles ne peuvent donc pas être clonées depuis ici.",
+    "destinationsOptionalLabel": "Destinations"
   },
   "alert_dependencies": {
     "actionOpen": "Ouvrir",
@@ -7978,18 +7983,19 @@
     },
     "install": {
       "title": "Ajouter des alertes depuis la bibliothèque",
-      "subtitle": "Choisissez où les alertes sont envoyées, quelles alertes ajouter et où elles sont classées.",
+      "subtitle": "Choisissez les alertes à ajouter, où elles sont classées et, si vous le souhaitez, où elles envoient leurs notifications.",
       "stepDestination": "Destination",
       "stepAlerts": "Alertes",
       "stepFolder": "Dossier",
       "stepTune": "Réglage",
       "stepInstall": "Ajouter",
-      "destinationIntro": "Chaque alerte de ce lot notifie la destination que vous choisissez ici. Les fichiers de bibliothèque nomment les destinations de l'organisation d'où ils ont été exportés, qui n'existent pas dans la vôtre.",
+      "destinationIntro": "Chaque alerte de ce lot envoie ses notifications à la destination que vous choisissez ici. Cette étape est facultative : ignorez-la et les alertes seront ajoutées sans destination. Les fichiers de la bibliothèque nomment les destinations de l'organisation depuis laquelle ils ont été exportés, qui n'existent pas dans la vôtre.",
       "destinationLabel": "Destination",
       "destinationPlaceholder": "Choisir une destination",
+      "destinationNone": "Aucune : ne notifie encore personne",
       "destinationsLoadFailed": "Vos destinations existantes n'ont pas pu être chargées.",
       "retry": "Réessayer",
-      "destinationsNoneBody": "Cette organisation n'a pas encore de destinations d'alerte, il n'y a donc aucun endroit où ces alertes peuvent envoyer leurs notifications. Créez-en une sur la page Destinations, puis revenez et sélectionnez-la ici.",
+      "destinationsNoneBody": "Cette organisation n'a pas encore de destinations d'alerte. Vous pouvez tout de même ajouter ces alertes : elles seront évaluées et leur historique enregistré, elles ne notifieront simplement personne pour l'instant. Créez une destination sur la page Destinations quand vous le souhaitez, puis ajoutez-la aux alertes.",
       "openDestinations": "Ouvrir Destinations",
       "selectAll": "Tout sélectionner",
       "clear": "Effacer",
@@ -8012,6 +8018,7 @@
       "next": "Suivant",
       "cancel": "Annuler",
       "done": "Terminé",
+      "confirmLargeNoDestination": "Je comprends que cela crée {count} alertes dans {folder}, dont aucune ne notifie pour l'instant.",
       "confirmLarge": "Je comprends que cela crée {count} alertes dans {folder}, chacune notifiant {destination}."
     },
     "error": {

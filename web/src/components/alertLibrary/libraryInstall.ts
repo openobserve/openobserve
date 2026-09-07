@@ -24,8 +24,9 @@
 //      — that is the only place in the app that has ever turned a stored alert
 //      document back into a create, and divergence here is a bug by definition.
 //   2. Three things only the library needs: the org's destination replaces the
-//      author's, provenance is stamped so Phase 5 can recognise the alert
-//      later, and the library's severity becomes the product's priority.
+//      author's, or nothing at all when none was chosen, provenance is stamped
+//      so Phase 5 can recognise the alert later, and the library's severity
+//      becomes the product's priority.
 //
 // Pure and file-in/payload-out, so the wizard stays markup and this stays
 // tested — same split as libraryTunables.ts.
@@ -52,8 +53,8 @@ export interface InstallPayloadInput {
   /** The tuned file, straight from the drawer, or freshly fetched. */
   file: AlertLibraryFile;
   folderId: string;
-  /** A destination NAME that exists in this org. */
-  destination: string;
+  /** A destination NAME that exists in this org. Absent or blank notifies nowhere. */
+  destination?: string;
   /** Installing user's email — becomes owner and last editor. */
   owner: string;
   /** Org timezone, used only when the file carries none. */
@@ -176,7 +177,8 @@ export function buildInstallPayload(input: InstallPayloadInput): Record<string, 
   // ── library-specific ─────────────────────────────────────────────────────
   // Overwrite, never merge: the packs hardcode "k8s_alert"/"o2_to_slack",
   // which no customer org has, and the alert API rejects an unknown name.
-  payload.destinations = [destination];
+  const destinationName = destination?.trim() ?? "";
+  payload.destinations = destinationName === "" ? [] : [destinationName];
 
   // Phase 5 input, recorded here because this is where the promise is made:
   // `context_attributes` is USER-EDITABLE — the alert form renders it as

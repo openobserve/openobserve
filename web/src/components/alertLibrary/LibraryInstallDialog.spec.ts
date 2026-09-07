@@ -264,6 +264,14 @@ const advanceAllToInstall = async (wrapper: any) => {
   await click(wrapper, "alert-library-install-next");
 };
 
+/** The same walk with step 1 left untouched — no destination is ever chosen. */
+const advanceUnaddressedToInstall = async (wrapper: any) => {
+  await click(wrapper, "alert-library-install-next");
+  await click(wrapper, "alert-library-install-next");
+  await click(wrapper, "alert-library-install-next");
+  await click(wrapper, "alert-library-install-next");
+};
+
 /** Per-alert outcome as the results list reports it. */
 const statusOf = (wrapper: any, id: string) =>
   wrapper.find(`[data-test="alert-library-install-result-${id}"]`).attributes("data-status");
@@ -333,16 +341,19 @@ describe("LibraryInstallDialog", () => {
       expect(options).toEqual(expect.arrayContaining(["ops-slack", "oncall-pagerduty"]));
     });
 
-    it("will not advance until a destination is chosen", async () => {
+    it("advances whether or not a destination is chosen", async () => {
       const wrapper = await mountDialog();
       expect(
         wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
-      ).toBeDefined();
+      ).toBeUndefined();
 
       await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
       expect(
         wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
       ).toBeUndefined();
+      expect(
+        wrapper.find('[data-test="alert-library-install-destination"]').attributes("data-value"),
+      ).toBe("ops-slack");
     });
 
     it("does not mistake a failed request for an org with no destinations", async () => {
@@ -371,8 +382,8 @@ describe("LibraryInstallDialog", () => {
     });
 
     it("says so plainly when the org genuinely has no destinations", async () => {
-      // A legitimate first-run condition, not an error — and no longer
-      // something this dialog can fix, so it has to point somewhere real.
+      // A legitimate first-run condition, not an error and not a blocker — so
+      // it has to point somewhere real without standing in the way.
       mocks.listDestinations.mockResolvedValue({ data: [] });
       const wrapper = await mountDialog();
 
@@ -385,10 +396,10 @@ describe("LibraryInstallDialog", () => {
       expect(wrapper.find('[data-test="alert-library-install-open-destinations"]').exists()).toBe(
         true,
       );
-      // Nothing to pick, so nothing to advance with.
+      // Nothing to pick is not a reason to stop: the alerts install unaddressed.
       expect(
         wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
-      ).toBeDefined();
+      ).toBeUndefined();
     });
 
     it("routes to the Destinations page for every type, not just a custom one", async () => {
@@ -418,6 +429,83 @@ describe("LibraryInstallDialog", () => {
       expect(
         wrapper.find('[data-test="alert-library-install-destination"]').attributes("data-options"),
       ).toBe("ops-slack");
+    });
+  });
+
+  // A destination is no longer required: an alert with none is valid server-side,
+  // which is what makes installing from the library a single click.
+  describe("installing without a destination", () => {
+    it("advances past the destination step with nothing chosen", async () => {
+      const wrapper = await mountDialog();
+
+      expect(
+        wrapper.find('[data-test="alert-library-install-destination"]').attributes("data-value"),
+      ).toBe("");
+      expect(
+        wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
+      ).toBeUndefined();
+
+      await click(wrapper, "alert-library-install-next");
+      expect(wrapper.find('[data-test="alert-library-install-alerts-step"]').exists()).toBe(true);
+    });
+
+    it("starts the run instead of silently doing nothing when no destination was chosen", async () => {
+      const wrapper = await mountDialog();
+      await advanceUnaddressedToInstall(wrapper);
+
+      // Reaching the run button is half the claim; a guard that no-ops the
+      // install would satisfy every later assertion by never posting at all.
+      expect(wrapper.find('[data-test="alert-library-install-run"]').exists()).toBe(true);
+      await click(wrapper, "alert-library-install-run");
+
+      expect(mocks.createAlert).toHaveBeenCalledTimes(1);
+      expect(statusOf(wrapper, "k8s/pod-oom-killed")).toBe("installed");
+    });
+
+    it("posts an empty destinations list when no destination was chosen", async () => {
+      const wrapper = await mountDialog();
+      await advanceUnaddressedToInstall(wrapper);
+      await click(wrapper, "alert-library-install-run");
+
+      const payload = mocks.createAlert.mock.calls[0][1] as Record<string, any>;
+      expect(payload.destinations).toEqual([]);
+      // Present and empty, not absent: the key is what overwrites the pack's own.
+      expect("destinations" in payload).toBe(true);
+    });
+
+    it("installs for an org that has no destinations at all", async () => {
+      mocks.listDestinations.mockResolvedValue({ data: [] });
+      const wrapper = await mountDialog();
+      await advanceUnaddressedToInstall(wrapper);
+
+      expect(wrapper.find('[data-test="alert-library-install-run"]').exists()).toBe(true);
+      await click(wrapper, "alert-library-install-run");
+
+      expect(mocks.createAlert).toHaveBeenCalledTimes(1);
+      expect(mocks.createAlert.mock.calls[0][1].destinations).toEqual([]);
+      expect(statusOf(wrapper, "k8s/pod-oom-killed")).toBe("installed");
+    });
+
+    it("leaves an org with no destinations a way forward, not a dead end", async () => {
+      mocks.listDestinations.mockResolvedValue({ data: [] });
+      const wrapper = await mountDialog();
+
+      expect(wrapper.find('[data-test="alert-library-install-destinations-empty"]').exists()).toBe(
+        true,
+      );
+      // Back is hidden on step 1, so a disabled Next is the whole trap.
+      expect(wrapper.find('[data-test="alert-library-install-back"]').exists()).toBe(false);
+      expect(
+        wrapper.find('[data-test="alert-library-install-next"]').attributes("disabled"),
+      ).toBeUndefined();
+    });
+
+    it("still posts the destination the user picked", async () => {
+      const wrapper = await mountDialog();
+      await advanceToInstall(wrapper);
+      await click(wrapper, "alert-library-install-run");
+
+      expect(mocks.createAlert.mock.calls[0][1].destinations).toEqual(["ops-slack"]);
     });
   });
 

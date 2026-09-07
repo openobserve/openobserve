@@ -97,7 +97,6 @@ import {
   operatorNeedsValue,
 } from "@/utils/alerts/anomalyFilterOperators";
 import { toDetectionFunctionSql } from "@/utils/alerts/anomalySqlBuilder";
-import config from "@/aws-exports";
 import { useOForm } from "@/lib/forms/Form/useOForm";
 import { makeAddAlertSchema, defaultAddAlertMeta } from "@/components/alerts/AddAlert.schema";
 import { anomalyBudgetPerDay } from "@/components/anomaly_detection/steps/AnomalyDetectionConfig.schema";
@@ -360,21 +359,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
   };
 
   // i18n-driven validation schema (messages resolve via `t` — see AddAlert.schema).
-  // Workflows are enterprise/cloud-only; where they exist an alert may be
-  // delivered to a destination OR a workflow, which relaxes "destinations ≥ 1"
-  // into "at least one of the two". In OSS this stays false and the rule (and
-  // its message) is byte-identical to before.
-  // Also respects the backend /config flag: on an enterprise build with
-  // workflows switched OFF the picker has no Workflows group, so relaxing the
-  // rule would surface "destination or workflow required" for a choice the user
-  // cannot make. Falls back to the strict "destination required" rule, which is
-  // the same rule OSS gets. (Built once in setup — if /config has not landed
-  // yet this is the stricter of the two, which is the safe direction.)
-  const addAlertSchema = makeAddAlertSchema(
-    t,
-    (config.isEnterprise === "true" || config.isCloud === "true") &&
-      store.state.zoConfig?.workflows_enabled === true,
-  );
+  const addAlertSchema = makeAddAlertSchema(t);
   const form = useOForm<AlertFormValues>({
     defaultValues: buildDefaultForm() as AlertFormValues,
     schema: addAlertSchema,
@@ -1821,12 +1806,7 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       return;
     }
 
-    // These two gates must move the user to the tab holding the offending field.
-    // They used to set `wizardStep`, which the V2 stepper navigated by — the V3
-    // single-pane layout navigates by `activeTab` and passes a hardcoded
-    // wizard-step to the summary, so setting it here steered nothing and Save &
-    // Train just appeared dead. Toast as well: the invalid field is on a tab the
-    // user isn't looking at, so the highlight alone is invisible.
+    // Navigates by `activeTab`, not the `wizardStep` the V2 stepper used — setting the latter steered nothing.
     if (anomalyStep2Ref.value) {
       const step2Valid = await anomalyStep2Ref.value.validate();
       if (!step2Valid) {
@@ -1839,16 +1819,15 @@ export function useAlertForm(props: AlertFormProps, emit: AlertFormEmit) {
       }
     }
 
+    // Informational, not a gate: a detector with no destination still detects and records.
     if (
       anomalyConfig.value.alert_enabled &&
       anomalyConfig.value.alert_destination_ids.length === 0
     ) {
-      activeTab.value = "anomaly-alerting";
       toast({
-        variant: "error",
-        message: t("alerts.validation.destinationRequired"),
+        variant: "warning",
+        message: t("alerts.anomaly.noDestinationNote"),
       });
-      return;
     }
 
     anomalySaving.value = true;

@@ -6482,7 +6482,8 @@
       "thresholdPositiveNumber": "アラート - {index}: しきい値は0より大きい正の数値で、数値である必要があります。",
       "silenceNonNegativeNumber": "アラート - {index}: クールダウン期間は0以上で、数値である必要があります。",
       "frequencyTypeInvalid": "アラート - {index}: 頻度タイプは'minutes'または'cron'である必要があり、文字列である必要があります。",
-      "cronExpressionInvalid": "アラート - {index}: Cron式は有効なCron式である必要があります。"
+      "cronExpressionInvalid": "アラート - {index}: Cron式は有効なCron式である必要があります。",
+      "destinationsArray": "アラート - {index}: 宛先は配列である必要があります。"
     },
     "composite": {
       "child": "子アラート",
@@ -6930,7 +6931,8 @@
         "pendingPeriodClause": "、{duration} の保留後",
         "cooldownClause": "、ただし {cooldown} ごとに最大1回",
         "defaultConditions": "設定した条件が満たされたら通知を受け取る"
-      }
+      },
+      "notifiesNobody": "まだ誰にも通知しません"
     },
     "correlation": {
       "title": "アラート相関",
@@ -7368,7 +7370,8 @@
         "alertTriggerTimeSeconds": "トリガー時刻（エポック秒）",
         "alertTriggerTimeStr": "トリガー時刻（人間が読める形式）",
         "rows": "行テンプレートでフォーマットされたすべての一致行"
-      }
+      },
+      "noDestinationNote": "宛先が選択されていません。このアラートは引き続き評価され履歴も記録されますが、誰にも通知されません。"
     },
     "advanced": {
       "addVariable": "[変数を追加]",
@@ -7549,7 +7552,8 @@
       "summaryTrainingDays": "{days}日",
       "timestampAliasBanned": "{column}は列エイリアスとして使用できません。代わりに{timeBucket}を使用してください。",
       "trainingWindowSeasonality": "日 (季節性: {seasonality})",
-      "trainingWindowTooltip": "トレーニングに使用する過去データの日数。最小1日。季節性は自動検出: <7日 → 時間帯; ≥7日 → 時間帯 + 曜日。"
+      "trainingWindowTooltip": "トレーニングに使用する過去データの日数。最小1日。季節性は自動検出: <7日 → 時間帯; ≥7日 → 時間帯 + 曜日。",
+      "noDestinationNote": "宛先が選択されていません。異常は引き続き検出され記録されますが、誰にも通知されません。"
     },
     "variables": {
       "label": "変数"
@@ -7881,7 +7885,8 @@
     "sloKind": "条件タイプ",
     "sloLongWindow": "長期ウィンドウ",
     "sloShortWindow": "短期ウィンドウ",
-    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。"
+    "sloCloneDisabled": "SLOアラートはSLOページで作成されるため、ここから複製することはできません。",
+    "destinationsOptionalLabel": "宛先"
   },
   "alert_dependencies": {
     "actionOpen": "開く",
@@ -7978,18 +7983,19 @@
     },
     "install": {
       "title": "ライブラリからアラートを追加",
-      "subtitle": "アラートの通知先、追加するアラート、および保存先を選択します。",
+      "subtitle": "追加するアラート、保存先、および必要に応じて通知先を選択します。",
       "stepDestination": "宛先",
       "stepAlerts": "アラート",
       "stepFolder": "フォルダー",
       "stepTune": "調整",
       "stepInstall": "追加",
-      "destinationIntro": "このバッチ内のすべてのアラートは、ここで選択した宛先に通知します。ライブラリファイルには、エクスポート元の組織の宛先が指定されていますが、それらはお客様の組織には存在しません。",
+      "destinationIntro": "このバッチ内のすべてのアラートは、ここで選択した宛先に通知します。この手順は省略できます。省略した場合、アラートは宛先なしで追加されます。ライブラリファイルには、エクスポート元の組織の宛先が指定されていますが、それらはお客様の組織には存在しません。",
       "destinationLabel": "宛先",
       "destinationPlaceholder": "宛先を選択",
+      "destinationNone": "なし（まだ通知しません）",
       "destinationsLoadFailed": "既存の宛先を読み込めませんでした。",
       "retry": "再試行",
-      "destinationsNoneBody": "この組織にはまだアラート宛先がないため、これらのアラートの通知先がありません。宛先ページで作成してから、ここに戻って選択してください。",
+      "destinationsNoneBody": "この組織にはまだアラート宛先がありません。それでもこれらのアラートは追加できます。評価され履歴も記録されますが、まだ誰にも通知されません。準備ができたら宛先ページで作成し、アラートに追加してください。",
       "openDestinations": "宛先を開く",
       "selectAll": "すべて選択",
       "clear": "クリア",
@@ -8012,6 +8018,7 @@
       "next": "次へ",
       "cancel": "キャンセル",
       "done": "完了",
+      "confirmLargeNoDestination": "{folder} に {count} 件のアラートを作成し、そのいずれもまだ通知しないことを理解しました。",
       "confirmLarge": "{folder} に {count} 件のアラートを作成し、それぞれが {destination} に通知することを理解しました。"
     },
     "error": {

@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="h-full max-h-full overflow-hidden">
     <AddAlert
-      v-if="(destinations.length > 0 || hasPrefill || isUpdated) && !isLoadingAlert"
+      v-if="!isLoadingAlert"
       :modelValue="editedAlert"
       :isUpdated="isUpdated"
       :destinations="destinations"
@@ -53,21 +53,9 @@ export default defineComponent({
     const isUpdated = ref(false);
 
     // A prefill means the user arrived from another surface carrying work with
-    // them (a logs search, a panel, a pattern set). That changes two behaviours
-    // below: we must not bounce them off this page, and we own clearing the
+    // them (a logs search, a panel, a pattern set) — this page owns clearing the
     // stashed payload once they leave.
     const hasPrefill = computed(() => !!route.query.prefill);
-
-    /**
-     * How the user ARRIVED, captured once at setup.
-     *
-     * `hasPrefill` reads the live route, which stops describing this page the
-     * moment the user navigates away. The destinations fetch below is awaited,
-     * so on a slow call it can resolve after the user has already left — and
-     * re-reading the route then said "no prefill", which sent them to the alert
-     * list from whatever page they had moved on to.
-     */
-    const arrivedWithPrefill = hasPrefill.value;
 
     /**
      * False once this view is gone. An async continuation that outlives the
@@ -174,28 +162,10 @@ export default defineComponent({
       if (!isViewActive) return;
       if (destinations.value.length) return;
 
-      // Bouncing a prefilled form would throw away work the user did on another
-      // page — they arrived here with a query in hand. Editing is the same
-      // story: the alert already exists, and refusing to open it because the
-      // org has no destinations left would be absurd. Warn and let them
-      // continue; the destinations step offers creating one inline.
-      if (arrivedWithPrefill || isUpdated.value) {
-        toast({
-          variant: "warning",
-          message: t("toastMessages.views.noDestinationsCreateOneBeforeSaving"),
-        });
-        return;
-      }
-
+      // A heads-up, not a reason to bounce the user off a form that can still save.
       toast({
         variant: "warning",
-        message: t("toastMessages.views.noDestinationsFoundPleaseCreateA"),
-      });
-      router.push({
-        name: "alertList",
-        query: {
-          org_identifier: store.state.selectedOrganization.identifier,
-        },
+        message: t("alerts.alertSettings.noDestinationNote"),
       });
     });
 

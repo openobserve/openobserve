@@ -6482,7 +6482,8 @@
       "thresholdPositiveNumber": "Alert - {index}: Drempelwaarde moet een positief getal groter dan 0 zijn en moet een getal zijn.",
       "silenceNonNegativeNumber": "Alert - {index}: De afkoelingsperiode moet een positief getal groter dan of gelijk aan 0 zijn en moet een getal zijn.",
       "frequencyTypeInvalid": "Alert - {index}: Frequentie Type moet 'minutes' of 'cron' zijn en moet een string zijn.",
-      "cronExpressionInvalid": "Alert - {index}: Cron-expressie moet een geldige cron-expressie zijn."
+      "cronExpressionInvalid": "Alert - {index}: Cron-expressie moet een geldige cron-expressie zijn.",
+      "destinationsArray": "Waarschuwing - {index}: Bestemmingen moeten een array zijn."
     },
     "composite": {
       "child": "Subalert",
@@ -6930,7 +6931,8 @@
         "pendingPeriodClause": ", na {duration} te hebben aangehouden",
         "cooldownClause": ", maar niet vaker dan één keer per {cooldown}",
         "defaultConditions": "Waarschuw me wanneer aan de geconfigureerde voorwaarden is voldaan"
-      }
+      },
+      "notifiesNobody": "waarschuwt nog niemand"
     },
     "correlation": {
       "title": "Correlatie tussen waarschuwingen",
@@ -7368,7 +7370,8 @@
         "alertTriggerTimeSeconds": "Triggentijd in epoch-seconden",
         "alertTriggerTimeStr": "Triggentijd, mensleesbaar",
         "rows": "Alle overeenkomende rijen, opgemaakt door de rijtemplate"
-      }
+      },
+      "noDestinationNote": "Geen bestemming geselecteerd. Deze waarschuwing wordt nog steeds geëvalueerd en de geschiedenis vastgelegd — er wordt alleen niemand op de hoogte gebracht."
     },
     "advanced": {
       "addVariable": "Variabele toevoegen",
@@ -7549,7 +7552,8 @@
       "summaryTrainingDays": "{days} dagen",
       "timestampAliasBanned": "{column} kan niet worden gebruikt als kolomalias. Gebruik in plaats daarvan {timeBucket}.",
       "trainingWindowSeasonality": "dagen (seizoensgebondenheid: {seasonality})",
-      "trainingWindowTooltip": "Hoeveel dagen historische gegevens gebruikt u voor training. Min 1 dag. Seizoensgebondenheid wordt automatisch gedetecteerd: <7 dagen → uur-van-de-dag; ≥7 dagen → uur-van-de-dag + dag-van-de-week."
+      "trainingWindowTooltip": "Hoeveel dagen historische gegevens gebruikt u voor training. Min 1 dag. Seizoensgebondenheid wordt automatisch gedetecteerd: <7 dagen → uur-van-de-dag; ≥7 dagen → uur-van-de-dag + dag-van-de-week.",
+      "noDestinationNote": "Geen bestemming geselecteerd. Anomalieën worden nog steeds gedetecteerd en vastgelegd — er wordt alleen niemand op de hoogte gebracht."
     },
     "variables": {
       "label": "Variabele"
@@ -7881,7 +7885,8 @@
     "sloKind": "Conditietype",
     "sloLongWindow": "Lang venster",
     "sloShortWindow": "Kort venster",
-    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond."
+    "sloCloneDisabled": "SLO-waarschuwingen worden aangemaakt op hun SLO-pagina, dus ze kunnen hier niet worden gekloond.",
+    "destinationsOptionalLabel": "Bestemmingen"
   },
   "alert_dependencies": {
     "actionOpen": "Openen",
@@ -7978,18 +7983,19 @@
     },
     "install": {
       "title": "Alarmen uit de bibliotheek toevoegen",
-      "subtitle": "Kies waar alarmen meldingen sturen, welke alarmen u toevoegt en waar ze worden opgeslagen.",
+      "subtitle": "Kies welke alarmen u toevoegt, waar ze worden opgeslagen en eventueel waar ze meldingen sturen.",
       "stepDestination": "Bestemming",
       "stepAlerts": "Alerts",
       "stepFolder": "Map",
       "stepTune": "Afstemmen",
       "stepInstall": "Toevoegen",
-      "destinationIntro": "Elk alarm in deze batch stuurt een melding naar de bestemming die je hier kiest. Bibliotheekbestanden vermelden de bestemmingen van de organisatie waaruit ze zijn geëxporteerd, die in de jouwe niet bestaan.",
+      "destinationIntro": "Elk alarm in deze reeks stuurt meldingen naar de bestemming die u hier kiest. Deze stap is optioneel: sla hem over en de alarmen worden zonder bestemming toegevoegd. Bibliotheekbestanden noemen de bestemmingen van de organisatie waaruit ze zijn geëxporteerd, die in de uwe niet bestaan.",
       "destinationLabel": "Bestemming",
       "destinationPlaceholder": "Kies een bestemming",
+      "destinationNone": "Geen - stuurt nog geen meldingen",
       "destinationsLoadFailed": "Je bestaande bestemmingen konden niet worden geladen.",
       "retry": "Probeer opnieuw",
-      "destinationsNoneBody": "Deze organisatie heeft nog geen alarmbestemmingen, dus er is geen plaats om deze alarmen naartoe te sturen. Maak er een aan op de pagina Bestemmingen en kom dan terug om deze hier te kiezen.",
+      "destinationsNoneBody": "Deze organisatie heeft nog geen alarmbestemmingen. U kunt deze alarmen toch toevoegen: ze worden geëvalueerd en hun geschiedenis wordt vastgelegd, ze sturen alleen nog geen meldingen. Maak er een aan op de pagina Bestemmingen wanneer u zover bent en voeg die dan toe aan de alarmen.",
       "openDestinations": "Bestemmingen openen",
       "selectAll": "Alles selecteren",
       "clear": "Wissen",
@@ -8012,6 +8018,7 @@
       "next": "Volgende",
       "cancel": "Annuleren",
       "done": "Klaar",
+      "confirmLargeNoDestination": "Ik begrijp dat dit {count} meldingen aanmaakt in {folder}, waarvan er nog geen enkele iemand waarschuwt.",
       "confirmLarge": "Ik begrijp dat dit {count} meldingen aanmaakt in {folder}, die elk {destination} waarschuwen."
     },
     "error": {

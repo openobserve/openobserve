@@ -42,6 +42,7 @@ import {
   document,
   isFilled,
   list,
+  listOrEmpty,
   literal,
   map,
   num,
@@ -218,7 +219,8 @@ function alertResource(
     ...attr("tags", list(alert.tags)),
     // Destination and template names must already exist in the target org, or be
     // managed by their own openobserve_alert_destination / _template resources.
-    ...attr("destinations", list(alert.destinations)),
+    // `listOrEmpty`: an alert that notifies nobody must round-trip as `destinations = []`, not as omitted.
+    ...attr("destinations", listOrEmpty(alert.destinations)),
     ...attr("template", str(alert.template)),
     ...attr("context_attributes", map(alert.context_attributes, INDENT)),
     ...attr("row_template", str(alert.row_template)),

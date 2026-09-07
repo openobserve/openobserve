@@ -6482,7 +6482,8 @@
       "thresholdPositiveNumber": "Alert - {index}: Próg powinien być liczbą dodatnią większą od 0 i powinien być liczbą.",
       "silenceNonNegativeNumber": "Alert - {index}: Okres cooldownu powinien być liczbą nieujemną (większą lub równą 0).",
       "frequencyTypeInvalid": "Alert - {index}: Typ częstotliwości musi być 'minutes' lub 'cron' i powinien być ciągiem znaków.",
-      "cronExpressionInvalid": "Alert - {index}: Wyrażenie cron powinno być prawidłowym wyrażeniem cron."
+      "cronExpressionInvalid": "Alert - {index}: Wyrażenie cron powinno być prawidłowym wyrażeniem cron.",
+      "destinationsArray": "Alert - {index}: Miejsca docelowe muszą być tablicą."
     },
     "composite": {
       "child": "Alert podrzędny",
@@ -6930,7 +6931,8 @@
         "pendingPeriodClause": ", po utrzymaniu przez {duration}",
         "cooldownClause": ", ale nie częściej niż raz na {cooldown}",
         "defaultConditions": "Powiadom mnie, gdy skonfigurowane warunki są spełnione"
-      }
+      },
+      "notifiesNobody": "jeszcze nikogo nie powiadamia"
     },
     "correlation": {
       "title": "Korelacja alertów",
@@ -7368,7 +7370,8 @@
         "alertTriggerTimeSeconds": "Czas wyzwolenia w sekundach epoch",
         "alertTriggerTimeStr": "Czas wyzwolenia (czytelny dla człowieka)",
         "rows": "Wszystkie pasujące wiersze, sformatowane według szablonu wiersza"
-      }
+      },
+      "noDestinationNote": "Nie wybrano miejsca docelowego. Ten alert nadal jest oceniany, a jego historia zapisywana — po prostu nikogo nie powiadomi."
     },
     "advanced": {
       "addVariable": "Dodaj zmienną",
@@ -7549,7 +7552,8 @@
       "summaryTrainingDays": "{days} dni",
       "timestampAliasBanned": "{column} nie może być użyty jako alias kolumny. Użyj {timeBucket} zamiast tego.",
       "trainingWindowSeasonality": "dni (sezonowość: {seasonality})",
-      "trainingWindowTooltip": "Ile dni danych historycznych użyć do trenowania. Minimum 1 dzień. Sezonowość jest wykrywana automatycznie: <7 dni → godzina dnia; ≥7 dni → godzina dnia + dzień tygodnia."
+      "trainingWindowTooltip": "Ile dni danych historycznych użyć do trenowania. Minimum 1 dzień. Sezonowość jest wykrywana automatycznie: <7 dni → godzina dnia; ≥7 dni → godzina dnia + dzień tygodnia.",
+      "noDestinationNote": "Nie wybrano miejsca docelowego. Anomalie nadal są wykrywane i zapisywane — po prostu nikogo nie powiadomią."
     },
     "variables": {
       "label": "Zmienna"
@@ -7881,7 +7885,8 @@
     "sloKind": "Typ warunku",
     "sloLongWindow": "Długie okno",
     "sloShortWindow": "Krótkie okno",
-    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować."
+    "sloCloneDisabled": "Alerty SLO są tworzone na ich stronie SLO, więc nie można ich stąd klonować.",
+    "destinationsOptionalLabel": "Miejsca docelowe"
   },
   "alert_dependencies": {
     "actionOpen": "Otwórz",
@@ -7978,18 +7983,19 @@
     },
     "install": {
       "title": "Dodaj alerty z biblioteki",
-      "subtitle": "Wybierz, gdzie alerty mają powiadamiać, które alerty dodać i gdzie zostaną umieszczone.",
+      "subtitle": "Wybierz, które alerty dodać, gdzie zostaną umieszczone i opcjonalnie, gdzie mają powiadamiać.",
       "stepDestination": "Cel",
       "stepAlerts": "Alerty",
       "stepFolder": "Folder",
       "stepTune": "Dostosuj",
       "stepInstall": "Dodaj",
-      "destinationIntro": "Każdy alert w tej partii powiadamia cel wybrany tutaj. Pliki biblioteki podają nazwy celów organizacji, z której zostały wyeksportowane, a które nie istnieją w Twojej.",
+      "destinationIntro": "Każdy alert w tej partii powiadamia cel wybrany tutaj. Ten krok jest opcjonalny: pomiń go, a alerty zostaną dodane bez celu. Pliki biblioteki wskazują cele organizacji, z której je wyeksportowano, a te nie istnieją w Twojej.",
       "destinationLabel": "Cel",
       "destinationPlaceholder": "Wybierz cel",
+      "destinationNone": "Brak - jeszcze nie powiadamia",
       "destinationsLoadFailed": "Nie można było wczytać istniejących celów.",
       "retry": "Spróbuj ponownie",
-      "destinationsNoneBody": "Ta organizacja nie ma jeszcze celów alertów, więc te alerty nie mają dokąd wysyłać powiadomień. Utwórz jeden na stronie Cele, a następnie wróć i wybierz go tutaj.",
+      "destinationsNoneBody": "Ta organizacja nie ma jeszcze celów alertów. Nadal możesz dodać te alerty: będą oceniane i zapiszą swoją historię, po prostu nikogo jeszcze nie powiadomią. Utwórz cel na stronie Cele, gdy będziesz gotowy, i dodaj go wtedy do alertów.",
       "openDestinations": "Otwórz cele",
       "selectAll": "Zaznacz wszystkie",
       "clear": "Wyczyść",
@@ -8012,6 +8018,7 @@
       "next": "Dalej",
       "cancel": "Anuluj",
       "done": "Gotowe",
+      "confirmLargeNoDestination": "Rozumiem, że utworzy to {count} alertów w {folder}, z których żaden jeszcze nie powiadamia.",
       "confirmLarge": "Rozumiem, że utworzy to {count} alertów w {folder}, z których każdy powiadamia {destination}."
     },
     "error": {

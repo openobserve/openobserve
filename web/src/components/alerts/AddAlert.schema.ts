@@ -26,7 +26,7 @@
 //   • stream_name  — required (min 1)
 //   + QueryConfig  — queryConfigSchema, self-gated by its `_meta` discriminators.
 //   + AlertSettings — createAlertSettingsSchema(isRealTime) (silence ≥ 0,
-//                     destinations ≥ 1, period ≥ 1 scheduled-only).
+//                     period ≥ 1 scheduled-only; destinations optional).
 //
 // Discriminator `is_real_time`: "false" (scheduled) | "true" (realtime) |
 // "anomaly". The anomaly branch enforces only `name`; AnomalyDetectionConfig
@@ -121,12 +121,7 @@ export const multiTimeRangeSchema = z.array(multiTimeRangeRowSchema);
  * `is_real_time` discriminates; the QueryConfig `_meta` discriminators (bridged
  * into this form by QueryConfig's syncMeta watcher) gate the QueryConfig rules.
  */
-export const makeAddAlertSchema = (
-  t: Translator,
-  // ENTERPRISE/CLOUD only — see createAlertSettingsSchema. Defaults to false so
-  // OSS (and existing callers/specs passing only `t`) keep main's exact rules.
-  allowWorkflows = false,
-) =>
+export const makeAddAlertSchema = (t: Translator) =>
   z
     .looseObject({
       name: z.string().optional(),
@@ -220,20 +215,6 @@ export const makeAddAlertSchema = (
             message: t("alerts.validation.pendingPeriodNonNegative"),
           });
         }
-        if (
-          (val.destinations?.length ?? 0) === 0 &&
-          (!allowWorkflows || (val.workflows?.length ?? 0) === 0)
-        ) {
-          ctx.addIssue({
-            code: z.ZodIssueCode.custom,
-            path: ["destinations"],
-            message: t(
-              allowWorkflows
-                ? "alerts.destinationOrWorkflowRequired"
-                : "alerts.validation.destinationRequired",
-            ),
-          });
-        }
         return;
       }
 
@@ -286,9 +267,9 @@ export const makeAddAlertSchema = (
 
       // AlertSettings rules. Period is enforced ≥ 1 for scheduled only; realtime
       // keeps period rule-free (createAlertSettingsSchema toggles it). silence ≥ 0
-      // + destinations ≥ 1 apply in both non-anomaly modes.
+      // applies in both non-anomaly modes; destinations are optional.
       const isRealTime = mode === "true";
-      const as = createAlertSettingsSchema(t, isRealTime, allowWorkflows).safeParse(val);
+      const as = createAlertSettingsSchema(t, isRealTime).safeParse(val);
       if (!as.success) {
         for (const issue of as.error.issues) {
           ctx.addIssue({

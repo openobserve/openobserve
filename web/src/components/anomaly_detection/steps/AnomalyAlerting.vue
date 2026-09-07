@@ -140,10 +140,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           </div>
           <div
             v-if="config.alert_enabled && config.alert_destination_ids.length === 0"
-            class="text-input-error-text pt-1 text-xs"
-            data-test="anomaly-destination-error"
+            class="text-text-secondary flex items-start gap-2 pt-1 text-xs"
+            data-test="anomaly-destination-note"
           >
-            {{ t("alerts.anomaly.destinationRequired") }}
+            <OIcon name="info" size="sm" class="mt-px flex-shrink-0" />
+            <span>{{ t("alerts.anomaly.noDestinationNote") }}</span>
           </div>
         </div>
       </div>

@@ -566,25 +566,6 @@ async fn prepare_alert(
         });
     }
 
-    // Naming an on-call team IS naming somewhere for this to go. Paging is
-    // documented as additive to destinations, but the check only knew about
-    // destinations and workflows — so an alert whose whole purpose was to wake
-    // the owning team could not be saved without also nominating a webhook it
-    // did not want.
-    #[cfg(feature = "enterprise")]
-    let destination_missing = alert.destinations.is_empty()
-        && alert.workflows.is_empty()
-        && alert
-            .oncall_team
-            .as_deref()
-            .is_none_or(|t| t.trim().is_empty());
-    #[cfg(not(feature = "enterprise"))]
-    let destination_missing = alert.destinations.is_empty();
-
-    // before saving alert check alert destination
-    if destination_missing {
-        return Err(AlertError::AlertDestinationMissing);
-    }
     for dest in alert.destinations.iter() {
         match db::alerts::destinations::get(org_id, dest).await {
             Ok(d) => {
@@ -898,6 +879,72 @@ mod prepare_alert_name_tests {
     #[test]
     fn the_route_name_remains_a_fallback_for_legacy_bodies() {
         assert_eq!(prepared_alert_name("old-name", "  "), "old-name");
+    }
+}
+
+#[cfg(test)]
+mod destination_wiring_tests {
+    use config::meta::alerts::alert::Alert;
+
+    use super::{AlertError, prepare_alert};
+
+    const SOURCE: &str = include_str!("alert.rs");
+
+    fn prepare_alert_body() -> &'static str {
+        let start = SOURCE
+            .find("async fn prepare_alert(")
+            .expect("this file defines prepare_alert");
+        let rest = &SOURCE[start..];
+        // Named, so a later insertion cannot silently widen this span.
+        let end = rest
+            .find("\n#[cfg(test)]\nmod prepare_alert_name_tests")
+            .expect("prepare_alert is followed by mod prepare_alert_name_tests");
+        &rest[..end]
+    }
+
+    /// An alert that notifies nothing is a valid configuration: firings are
+    /// observed through hooks, and the shipped prebuilt alerts arrive unwired.
+    #[tokio::test]
+    async fn an_alert_with_no_destinations_is_not_rejected_for_that() {
+        let mut alert = Alert::default();
+        alert.name = "unwired".to_string();
+        alert.stream_name = "a_stream_that_does_not_exist".to_string();
+
+        let result = prepare_alert(
+            "org",
+            "a_stream_that_does_not_exist",
+            "unwired",
+            &mut alert,
+            true,
+            false,
+        )
+        .await;
+
+        // Reaching StreamNotFound proves the destination gate is behind it, not merely moved.
+        assert!(
+            matches!(result, Err(AlertError::StreamNotFound { .. })),
+            "validation must get past destinations to the stream check, got: {result:?}"
+        );
+    }
+
+    /// Relaxing the emptiness rule must not take the per-name resolution with
+    /// it, or an alert could name a destination the org does not have.
+    #[test]
+    fn every_named_destination_is_still_resolved() {
+        let body = prepare_alert_body();
+        assert!(
+            body.contains("db::alerts::destinations::get("),
+            "prepare_alert must still resolve each named destination"
+        );
+    }
+
+    #[test]
+    fn an_empty_destination_list_is_no_longer_a_rejection() {
+        let body = prepare_alert_body();
+        assert!(
+            !body.contains("AlertDestinationMissing"),
+            "the destination-emptiness rejection must be gone from prepare_alert"
+        );
     }
 }
 
@@ -2158,8 +2205,22 @@ pub struct NotificationOutcome {
     /// Destination names that failed on this attempt, for any reason
     /// (fetch error, missing template, bad content spec, transport error).
     pub failed: Vec<String>,
+    /// No destination and no workflow was wired, so nothing was attempted.
+    pub nothing_to_deliver: bool,
     pub success_message: String,
     pub error_message: String,
+}
+
+/// How one notification attempt ended, as the scheduler reads it: only a
+/// total failure is an `Err` it should retry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DeliveryVerdict {
+    Delivered,
+    /// Nothing was wired up, so nothing was attempted — distinct from a send
+    /// that reached at least one of them.
+    NothingToDeliver,
+    DestinationsFailed,
+    WorkflowsFailed,
 }
 
 /// Alert-level template wins over the destination's (§ precedence).
@@ -2566,39 +2627,47 @@ impl AlertExt for Alert {
         outcome.success_message = success_message;
         outcome.error_message = err_message;
 
-        // Attempted = destinations not skipped by the ledger. An attempt in
-        // which every attempted destination failed is still a hard error, so
-        // the scheduler retries; a partial failure returns Ok and the caller
-        // reads `outcome.failed`.
-        //
-        // DELIBERATE BEHAVIOR CHANGE (`attempted > 0`): previously
-        // `no_of_error == self.destinations.len()` was also true when BOTH
-        // were zero, so an alert with no destinations at all returned
-        // `SendNotificationError` even when its workflows had just fired
-        // successfully. That was a latent bug — a workflow-only alert is a
-        // supported configuration and reporting it as a total delivery
-        // failure made the scheduler retry work that had already succeeded.
-        // With the guard, a zero-destination alert falls through to the
-        // workflow branch below, which errors only when the workflows
-        // themselves all failed. T11's retry logic keys off this return
-        // value, so the change is called out rather than left implicit.
-        let attempted = self.destinations.len() - no_of_skipped;
-        if attempted > 0 && no_of_error == attempted {
-            Err(AlertError::SendNotificationError {
+        match delivery_verdict(
+            self.destinations.len(),
+            no_of_skipped,
+            no_of_error,
+            self.workflows.len(),
+            workflow_error,
+        ) {
+            DeliveryVerdict::DestinationsFailed => Err(AlertError::SendNotificationError {
                 error_message: outcome.error_message,
-            })
-        // Non-empty: with no workflows either, "every workflow failed" is vacuously true, and an
-        // alert that pages an on-call team and nothing else answered a blank 500.
-        } else if self.destinations.is_empty()
-            && !self.workflows.is_empty()
-            && workflow_error == self.workflows.len()
-        {
-            Err(AlertError::SendNotificationError {
+            }),
+            DeliveryVerdict::WorkflowsFailed => Err(AlertError::SendNotificationError {
                 error_message: workflow_err_msg,
-            })
-        } else {
-            Ok(outcome)
+            }),
+            DeliveryVerdict::NothingToDeliver => {
+                outcome.nothing_to_deliver = true;
+                Ok(outcome)
+            }
+            DeliveryVerdict::Delivered => Ok(outcome),
         }
+    }
+}
+
+/// Only a total failure of something actually attempted is an `Err`; the
+/// scheduler retries on `Err`, so a partial success must not report one.
+fn delivery_verdict(
+    destinations: usize,
+    skipped: usize,
+    destination_errors: usize,
+    workflows: usize,
+    workflow_errors: usize,
+) -> DeliveryVerdict {
+    // Skips are counted apart from the list, so this must clamp rather than underflow.
+    let attempted = destinations.saturating_sub(skipped);
+    if destinations == 0 && workflows == 0 {
+        DeliveryVerdict::NothingToDeliver
+    } else if attempted > 0 && destination_errors == attempted {
+        DeliveryVerdict::DestinationsFailed
+    } else if destinations == 0 && workflow_errors == workflows {
+        DeliveryVerdict::WorkflowsFailed
+    } else {
+        DeliveryVerdict::Delivered
     }
 }
 
@@ -4194,11 +4263,16 @@ mod threshold_validation_tests {
 
 #[cfg(test)]
 mod send_path_tests {
-    use config::meta::destinations::{Template, TemplateKind};
+    use config::meta::{
+        alerts::alert::Alert,
+        destinations::{Template, TemplateKind},
+    };
 
     #[cfg(feature = "enterprise")]
     use super::incident_path_notified;
-    use super::{NotificationOutcome, choose_template};
+    use super::{
+        AlertExt, DeliveryVerdict, NotificationOutcome, choose_template, delivery_verdict,
+    };
 
     fn tpl(name: &str) -> Template {
         Template {
@@ -4254,6 +4328,7 @@ mod send_path_tests {
             success_message: " destination slack sent;".into(),
             error_message: " Error sending notification for destination pagerduty err: boom;"
                 .into(),
+            nothing_to_deliver: false,
         };
         assert_eq!(outcome.succeeded, vec!["slack".to_string()]);
         assert_eq!(outcome.failed, vec!["pagerduty".to_string()]);
@@ -4330,6 +4405,136 @@ mod send_path_tests {
                 "{outcome:?} notifies, so its destinations must be skipped"
             );
         }
+    }
+
+    /// An alert wired to neither destinations nor workflows delivered nothing
+    /// because there was nothing to deliver — calling that a failure makes the
+    /// scheduler burn its whole retry budget on every firing.
+    #[test]
+    fn an_alert_wired_to_nothing_is_a_no_op_not_a_failure() {
+        assert_eq!(
+            delivery_verdict(0, 0, 0, 0, 0),
+            DeliveryVerdict::NothingToDeliver,
+            "an alert with no destinations and no workflows has nothing to fail at"
+        );
+    }
+
+    #[test]
+    fn a_workflow_only_alert_whose_every_workflow_failed_is_a_failure() {
+        assert_eq!(
+            delivery_verdict(0, 0, 0, 2, 2),
+            DeliveryVerdict::WorkflowsFailed,
+            "every configured workflow failed, so nothing was delivered"
+        );
+    }
+
+    #[test]
+    fn a_workflow_only_alert_with_one_surviving_workflow_is_delivered() {
+        assert_eq!(
+            delivery_verdict(0, 0, 0, 2, 1),
+            DeliveryVerdict::Delivered,
+            "one workflow fired, so the firing must not be retried"
+        );
+    }
+
+    #[test]
+    fn every_attempted_destination_failing_is_a_failure() {
+        assert_eq!(
+            delivery_verdict(2, 0, 2, 0, 0),
+            DeliveryVerdict::DestinationsFailed,
+            "both destinations failed, so the scheduler must retry"
+        );
+    }
+
+    /// All destinations ledger-skipped means a prior attempt already delivered
+    /// them; counting zero attempts as an all-failure would re-page everyone.
+    #[test]
+    fn destinations_all_skipped_by_the_ledger_is_not_a_failure() {
+        assert_eq!(
+            delivery_verdict(2, 2, 0, 0, 0),
+            DeliveryVerdict::Delivered,
+            "nothing was attempted, so nothing failed"
+        );
+    }
+
+    #[test]
+    fn a_partial_destination_failure_is_delivered_not_retried() {
+        assert_eq!(
+            delivery_verdict(3, 0, 2, 0, 0),
+            DeliveryVerdict::Delivered,
+            "one destination landed, so a retry would duplicate it"
+        );
+    }
+
+    /// Pins today's short-circuit: a non-empty destination list keeps the
+    /// workflow branch unreachable, so failing workflows next to a delivered
+    /// destination are not an error.
+    #[test]
+    fn failing_workflows_alongside_a_delivered_destination_are_not_a_failure() {
+        assert_eq!(
+            delivery_verdict(1, 0, 0, 2, 2),
+            DeliveryVerdict::Delivered,
+            "the destination landed, so the firing is not a total failure"
+        );
+    }
+
+    /// A ledger skip count is tracked independently of the destination list, so
+    /// a stale skip must clamp rather than underflow the attempt count.
+    #[test]
+    fn more_skips_than_destinations_clamps_instead_of_panicking() {
+        assert_eq!(
+            delivery_verdict(1, 3, 0, 0, 0),
+            DeliveryVerdict::Delivered,
+            "an impossible skip count must not underflow into a huge attempt count"
+        );
+    }
+
+    #[test]
+    fn every_unskipped_destination_failing_is_a_failure() {
+        assert_eq!(
+            delivery_verdict(3, 1, 2, 0, 0),
+            DeliveryVerdict::DestinationsFailed,
+            "both remaining destinations failed, so nothing was delivered"
+        );
+    }
+
+    #[tokio::test]
+    async fn send_notification_on_an_alert_with_nothing_configured_returns_ok() {
+        let alert = Alert::default();
+        let outcome = alert
+            .send_notification("t", &[], 0, None, 0, None, None, None, &[])
+            .await
+            .expect("an alert with no destinations and no workflows must not report a failure");
+        assert!(outcome.succeeded.is_empty());
+        assert!(outcome.failed.is_empty());
+        assert!(
+            outcome.nothing_to_deliver,
+            "nothing was attempted, and the caller must be able to tell that from a delivery"
+        );
+    }
+
+    /// The flag means "nothing was attempted", never "nothing succeeded": a
+    /// wired alert must keep stamping delivery state.
+    #[tokio::test]
+    async fn send_notification_with_a_wired_destination_is_not_nothing_to_deliver() {
+        let mut alert = Alert::default();
+        alert.destinations.push("slack".to_string());
+        // Ledger-skipped rather than sent: keeps the case free of a destination lookup.
+        let outcome = alert
+            .send_notification(
+                "t",
+                &[],
+                0,
+                None,
+                0,
+                None,
+                None,
+                None,
+                &["slack".to_string()],
+            )
+            .await
+            .expect("a destination already delivered on a prior attempt is not a failure");
+        assert!(!outcome.nothing_to_deliver);
     }
 }
 

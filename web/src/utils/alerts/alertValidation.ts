@@ -374,15 +374,14 @@ export function validateAlert(alert: Alert, context?: AlertValidationContext): V
   } else {
     result.errors.push(t("alerts.validation.triggerConditionRequired"));
   }
-  // Validate destinations
-  if (!Array.isArray(alert.destinations)) {
+  // An EMPTY list is legal — the alert evaluates and records history, notifying nobody.
+  if (alert.destinations !== undefined && !Array.isArray(alert.destinations)) {
     result.errors.push(t("alerts.validation.destinationsArray"));
-  } else if (alert.destinations.length === 0) {
-    // NOTE: no trailing period — deliberately NOT the same string as
-    // `alerts.validation.destinationRequired` ("At least one destination is
-    // required."), which the AlertSettings schema owns.
-    result.errors.push(t("alerts.validation.destinationRequiredPlain"));
-  } else if (context?.destinationsList) {
+  } else if (
+    Array.isArray(alert.destinations) &&
+    alert.destinations.length > 0 &&
+    context?.destinationsList
+  ) {
     // Debug check for destinations list
     if (!Array.isArray(context.destinationsList) || context.destinationsList.length === 0) {
       result.errors.push(t("alerts.validation.noDestinationsInSystem"));
