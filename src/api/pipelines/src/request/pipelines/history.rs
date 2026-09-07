@@ -107,7 +107,7 @@ pub struct PipelineHistoryResponse {
     tag = "Pipelines",
     operation_id = "GetPipelineHistory",
     summary = "Get pipeline execution history",
-    description = "Retrieves the execution history of pipelines for the organization. This endpoint queries the _meta organization's triggers stream to provide details about when pipelines were triggered, their status, and execution details.",
+    description = "Retrieves the execution history of pipelines for the organization. This endpoint queries the organization's own triggers stream to provide details about when pipelines were triggered, their status, and execution details.",
     security(
         ("Authorization"= [])
     ),
@@ -350,7 +350,6 @@ pub async fn get_pipeline_history(
         }
     };
 
-    // Build SQL WHERE clause for the _meta organization's triggers stream
     let mut where_clause = format!(
         "(module in ('derived_stream', 'pipeline')) AND org = '{org_id}' AND _timestamp >= {start_time} AND _timestamp <= {end_time}"
     );
@@ -480,7 +479,6 @@ pub async fn get_pipeline_history(
         ..Default::default()
     };
 
-    // Execute search against _meta organization's triggers stream
     let search_result = match SearchService::search(
         &trace_id,
         &org_id,

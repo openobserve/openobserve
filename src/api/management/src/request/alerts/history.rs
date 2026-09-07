@@ -556,7 +556,6 @@ pub async fn get_alert_history(
         }
     };
 
-    // Build SQL WHERE clause for the _meta organization's triggers stream.
     // Composites publish with module = "composite" and share the ordinary
     // alert outcome vocabulary, so include them in the same history read.
     let mut where_clause = format!(
