@@ -501,6 +501,29 @@ export const emptyStatePresets = {
       },
     ],
   },
+  // No lanes on the calendar. A blank rotation and a preset ladder are two
+  // equally valid ways in, so both get a card rather than one being the
+  // button and the other a smaller afterthought beside it.
+  "no-oncall-schedule": {
+    illustration: "schedule",
+    variant: "create",
+    titleKey: "emptyState.noOncallSchedule.title",
+    descriptionKey: "emptyState.noOncallSchedule.description",
+    actions: [
+      {
+        id: "add",
+        icon: "add",
+        titleKey: "emptyState.noOncallSchedule.action",
+        descriptionKey: "emptyState.noOncallSchedule.actionDesc",
+      },
+      {
+        id: "presets",
+        icon: "rocket-launch",
+        titleKey: "emptyState.noOncallSchedule.presetsAction",
+        descriptionKey: "emptyState.noOncallSchedule.presetsActionDesc",
+      },
+    ],
+  },
   "no-groups": {
     illustration: "users",
     variant: "create",

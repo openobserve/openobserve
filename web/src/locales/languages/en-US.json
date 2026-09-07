@@ -480,6 +480,14 @@
       "action": "Add an ownership rule",
       "actionDesc": "Pick a dimension and a value. No rule language."
     },
+    "noOncallSchedule": {
+      "title": "Create your first rotation",
+      "description": "A rotation decides who's on call and when. Set one up to start covering this schedule.",
+      "action": "New rotation",
+      "actionDesc": "Start from an empty rotation",
+      "presetsAction": "Start from a preset",
+      "presetsActionDesc": "Common patterns like weekly handoffs or follow-the-sun"
+    },
     "emptyStateDemo": {
       "loadError": "Failed to load",
       "noAlerts": "No alerts (create / define)",
@@ -17162,7 +17170,6 @@
     "calendarShownIn": "Times shown in {zone}",
     "calendarTeamTime": "Team time",
     "calendarMyTime": "My time",
-    "calendarEmpty": "Add a rotation and it will appear here.",
     "escalation": "Escalation",
     "escalationLoading": "Loading escalation",
     "ladderNext": "Next: {who}, {when}",
@@ -17520,9 +17527,9 @@
     "members": "Members",
     "membersHint": "Everyone who can be paged for this team. Levels are set in Schedule, not here.",
     "memberEmailPlaceholder": "engineer{'@'}example.com, another{'@'}example.com",
-    "addMember": "Add",
+    "addMember": "Add member",
     "removeMember": "Remove member",
-    "noMembers": "No members yet.",
+    "noMembers": "No members found.",
     "addMemberFailed": "Could not add the member",
     "removeMemberFailed": "Could not remove the member",
     "schedule": "Schedule",

@@ -436,6 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :response-id="row.latest.id"
           :state="row.latest.state"
           :progress="progressById[row.latest.id] ?? null"
+          :progress-loaded="progressLoaded"
           :total-rungs="totalRungsFor(row.latest)"
           :acked-in-micros="ackedInMicros(row.latest)"
         />
@@ -854,6 +855,11 @@ const policyByTeam = ref<Record<string, OnCallPolicy>>({});
 const scheduleByTeam = ref<Record<string, OnCallSchedule>>({});
 const positionsByTeam = ref<Record<string, OnCallPosition[]>>({});
 const progressById = ref<Record<string, EscalationProgress>>({});
+// False until the first escalation-progress fetch completes. Before then, an
+// absent `progressById` entry means "we haven't asked yet", not "confirmed
+// nothing has fired" — OnCallEscalationCell needs to tell those apart so a
+// climbing ladder doesn't flash "Not paged yet" on every list load.
+const progressLoaded = ref(false);
 const escalationCapped = ref(false);
 const expandedIds = ref<string[]>([]);
 const expandedEvents = ref<OnCallResponseEvent[]>([]);
@@ -1749,6 +1755,7 @@ async function fetchEscalationProgress() {
   // Replaced wholesale so a record that resolved since the last poll drops its
   // stale ladder instead of keeping a countdown that will never fire.
   progressById.value = next;
+  progressLoaded.value = true;
 }
 
 /// The expanded row's timeline.

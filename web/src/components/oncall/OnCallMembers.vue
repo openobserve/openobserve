@@ -1,14 +1,15 @@
 <template>
-  <div class="m-4 flex flex-col gap-3" data-test="oncall-members">
+  <div class="flex h-full w-full flex-col gap-3" data-test="oncall-members">
     <OTable
       :data="rows"
       :columns="columns"
       row-key="id"
-      :frame="true"
+      :frame="false"
       pagination="client"
       :show-global-filter="false"
       :row-class="rowClass"
       table-id="oncall-team-members"
+      class="h-full min-h-0"
       data-test="oncall-members-table"
     >
       <!-- Add on the left, the state of the roster on the right: the toolbar
@@ -18,6 +19,7 @@
           <div class="min-w-0 flex-1">
             <OSelect
               v-if="!userLookupFailed"
+              ref="memberPickerRef"
               v-model="selected"
               multiple
               searchable
@@ -28,6 +30,7 @@
             />
             <OInput
               v-else
+              ref="memberPickerRef"
               v-model="fallbackEmails"
               :placeholder="t('oncall.memberEmailPlaceholder')"
               :help-text="t('oncall.memberEmailFallbackHint')"
@@ -147,9 +150,12 @@
       <template #empty>
         <OEmptyState
           size="inline"
-          preset="no-data"
-          :description="t('oncall.noMembers')"
+          icon="group-add"
+          :title="t('oncall.noMembers')"
+          :action-label="t('oncall.addMember')"
+          action-icon="add"
           data-test="oncall-members-empty"
+          @action="focusMemberPicker"
         />
       </template>
     </OTable>
@@ -593,6 +599,13 @@ const columns = computed<OTableColumnDef<MemberRow>[]>(() => [
 const selected = ref<string[]>([]);
 const fallbackEmails = ref("");
 const adding = ref(false);
+/** Whichever of OSelect/OInput is currently mounted in the toolbar. Both
+ * expose `focus()`, so the empty state's action can land the cursor there
+ * without a dialog of its own. */
+const memberPickerRef = ref<{ focus: () => void } | null>(null);
+function focusMemberPicker() {
+  memberPickerRef.value?.focus();
+}
 const orgUsers = ref<{ email: string; first_name?: string; last_name?: string }[]>([]);
 const loadingUsers = ref(false);
 // Losing the picker must not lose the ability to add anybody.
