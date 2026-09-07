@@ -10793,7 +10793,8 @@
         "scoreConfigs": "Score Configs",
         "targetDataset": "Target Dataset",
         "progress": "Progress",
-        "updated": "Updated"
+        "updated": "Updated",
+        "actions": "Actions"
       },
       "create": {
         "title": "New Queue",
