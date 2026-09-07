@@ -62,6 +62,8 @@ pub mod org_users;
 pub mod organizations;
 pub mod pipeline_last_errors;
 pub mod providers;
+pub mod raman_configs;
+pub mod raman_digests;
 pub mod rate_limit_rules;
 pub mod re_pattern_stream_map;
 pub mod re_patterns;

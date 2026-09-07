@@ -195,6 +195,7 @@ mod m20260916_000001_add_folder_id_to_workflow_drafts;
 mod m20260917_000001_create_llm_experiment_slot_retries;
 /// Shared body of the two `folder_id` migrations above; not a migration itself.
 mod workflow_folder_id;
+mod m20260907_000001_create_raman_tables;
 
 #[cfg(test)]
 pub(crate) async fn create_scheduled_jobs_for_test(
@@ -288,6 +289,45 @@ pub(crate) async fn create_slo_tables_for_test(
     m20260727_000001_create_slo_tables::Migration
         .up(&manager)
         .await
+}
+
+#[cfg(test)]
+pub(crate) async fn create_raman_tables_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20260907_000001_create_raman_tables::Migration
+        .up(&manager)
+        .await
+}
+
+#[cfg(test)]
+pub(crate) async fn drop_raman_tables_for_test(
+    db: &sea_orm::DatabaseConnection,
+) -> Result<(), DbErr> {
+    use sea_orm_migration::MigrationTrait;
+    let manager = SchemaManager::new(db);
+    m20260907_000001_create_raman_tables::Migration
+        .down(&manager)
+        .await
+}
+
+#[cfg(test)]
+pub(crate) fn raman_migration_sql_for_test(backend: sea_orm::DatabaseBackend) -> Vec<String> {
+    use m20260907_000001_create_raman_tables as migration;
+
+    let mut sql = vec![
+        backend.build(&migration::configs_statement()).to_string(),
+        backend.build(&migration::digests_statement()).to_string(),
+    ];
+    sql.extend(
+        migration::config_indexes()
+            .iter()
+            .chain(migration::digest_indexes().iter())
+            .map(|statement| backend.build(statement).to_string()),
+    );
+    sql
 }
 
 pub struct Migrator;
@@ -471,6 +511,7 @@ impl MigratorTrait for Migrator {
             Box::new(m20260915_000001_add_profiles_streams_to_service_streams::Migration),
             Box::new(m20260916_000001_add_folder_id_to_workflow_drafts::Migration),
             Box::new(m20260917_000001_create_llm_experiment_slot_retries::Migration),
+            Box::new(m20260907_000001_create_raman_tables::Migration),
         ]
     }
 }
@@ -512,6 +553,7 @@ mod tests {
         (83, "m20260910_000001_add_folder_id_to_workflows"),
         (84, "m20260916_000001_add_folder_id_to_workflow_drafts"),
         (85, "m20260917_000001_create_llm_experiment_slot_retries"),
+        (86, "m20260907_000001_create_raman_tables"),
     ];
 
     #[test]

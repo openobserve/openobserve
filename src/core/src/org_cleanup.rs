@@ -451,9 +451,9 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     use infra::table::{
         alert_incidents, backfill_jobs, compactor_manual_jobs, dashboards, destinations,
         distinct_values, enrichment_table_urls, enrichment_tables, folders, incident_events,
-        kv_store, org_storage_providers, re_pattern, re_pattern_stream_map, reports, search_queue,
-        short_urls, slo, slo_backfill_jobs, slo_budget, slos, system_settings, templates,
-        timed_annotations,
+        kv_store, org_storage_providers, raman, re_pattern, re_pattern_stream_map, reports,
+        search_queue, short_urls, slo, slo_backfill_jobs, slo_budget, slos, system_settings,
+        templates, timed_annotations,
     };
 
     // FK-constrained children must be deleted before their parents.
@@ -621,6 +621,11 @@ async fn step_delete_db_resources(org_id: &str) -> Result<(), anyhow::Error> {
     compactor_manual_jobs::delete_by_org(org_id)
         .await
         .map_err(|e| anyhow::anyhow!("step_delete_db_resources/compactor_manual_jobs: {e}"))?;
+    // org ids are re-usable and the config row is UNIQUE per org: a leftover breaks the next org.
+    let raman_conn = get_orm_client_rw().await;
+    raman::delete_by_org(raman_conn, org_id)
+        .await
+        .map_err(|e| anyhow::anyhow!("step_delete_db_resources/raman: {e}"))?;
     // Delete the S3 result objects backing this org's search jobs BEFORE dropping
     // the DB rows — the result paths are derived from each job's created_at/trace_id,
     // so once the rows are gone the objects can no longer be located and would leak.
@@ -1282,5 +1287,25 @@ mod tests {
             !body.contains("delete_by_id_user"),
             "org teardown must never route through the user-facing guard"
         );
+    }
+
+    // ===================== Raman teardown =================================
+    //
+    // Same technique, same limit as the SLO block above: the call is pinned as
+    // WRITTEN, not as run. What each raman TABLE contains after the call is
+    // pinned behaviourally instead, by `infra::table::raman`'s own tests, which
+    // enumerate the tables from the migration rather than from a list — so a
+    // third raman table would have to be swept there without anyone editing a
+    // whitelist. This block only guarantees the sweep is reached at all.
+
+    /// Both raman tables go in this one transactional call, against the org
+    /// being torn down — not some other one.
+    const RAMAN_DELETES: [&str; 1] = ["raman::delete_by_org(raman_conn, org_id)"];
+
+    #[test]
+    fn test_db_resources_deletes_the_raman_tables() {
+        for call in RAMAN_DELETES {
+            position_of(call);
+        }
     }
 }
