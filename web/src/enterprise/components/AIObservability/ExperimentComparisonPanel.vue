@@ -104,7 +104,7 @@
           <div class="flex items-center gap-1.5">
             <span class="text-text-body text-xs">{{ rowDimensionValue(row, dimension) }}</span>
             <OTag
-              v-if="rowDimension(row, dimension)?.delta != null"
+              v-if="hasDeltaTag(row, dimension)"
               size="sm"
               icon=""
               :variant="deltaVariant(rowDimension(row, dimension)!)"
@@ -400,6 +400,15 @@ function dimensionSlot(dimension: ExperimentComparisonDimension) {
 function rowDimension(row: ExperimentComparisonRow, dimension: ExperimentComparisonDimension) {
   const identity = dimensionIdentity(dimension);
   return row.dimensions.find((candidate) => dimensionIdentity(candidate) === identity);
+}
+
+// A raw numeric delta is only meaningful for a numeric score (or cost/latency,
+// which have no dataType at all): "true → true" or a category swap is already
+// fully explained by the value itself, and a "+0"/"-1" chip beside it reads as
+// a measurement that doesn't actually exist.
+function hasDeltaTag(row: ExperimentComparisonRow, dimension: ExperimentComparisonDimension) {
+  if (dimension.dataType === "boolean" || dimension.dataType === "categorical") return false;
+  return rowDimension(row, dimension)?.delta != null;
 }
 
 /** Trailing zeros carry no information — `34.0000` is just `34`. */
