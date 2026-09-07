@@ -218,7 +218,7 @@ async fn run_partition_job(
         stream_type,
         Some(job.user_id.clone()),
         &req,
-        Some(RoleGroup::Interactive),
+        Some(RoleGroup::Background),
     )
     .await;
     if let Err(e) = res {
