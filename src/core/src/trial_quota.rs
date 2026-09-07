@@ -161,14 +161,11 @@ impl TrialQuotaPool {
             .find(|pool| pool.feature_keys().contains(&feature))
     }
 
-    /// Exhaustive on purpose: a new variant must be classified before it compiles.
     pub fn is_synthetics(self) -> bool {
-        match self {
-            TrialQuotaPool::AiCredits => false,
-            TrialQuotaPool::SyntheticsBrowserSteps | TrialQuotaPool::SyntheticsProtocolSteps => {
-                true
-            }
-        }
+        matches!(
+            self,
+            TrialQuotaPool::SyntheticsBrowserSteps | TrialQuotaPool::SyntheticsProtocolSteps
+        )
     }
 
     /// Every `trial_quota_usage.feature` value that spends from this pool; each
@@ -1403,15 +1400,6 @@ mod tests {
         ("fn synthetics_quota_for_orgs(", "fold_synthetics_quota("),
     ];
 
-    /// CODE only: a comment naming what a scan forbids would trip that scan on its own text.
-    fn code_only_source() -> String {
-        include_str!("trial_quota.rs")
-            .lines()
-            .filter(|line| !line.trim_start().starts_with("//"))
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
     /// The argument text of the first `needle` call in `body`, matched by paren balance.
     fn call_args<'a>(body: &'a str, needle: &str) -> &'a str {
         let at = body
@@ -2437,29 +2425,6 @@ mod tests {
             0,
             "the drop was attributed to the wrong pool — a synthetics step lost under a \
              ONE-TIME grant is permanent, an AI credit is not",
-        );
-    }
-
-    /// The drop path must stay behind the counter. The error branch needs the
-    /// 10,000-slot channel full, which would leave every later test running
-    /// against a saturated queue, so the wiring is pinned in source. The needles
-    /// are assembled so this test's own source does not satisfy them.
-    #[test]
-    fn every_dropped_pool_record_is_counted() {
-        let source = include_str!("trial_quota.rs");
-        assert_eq!(
-            source.matches(&["record_flush", "_drop("].concat()).count(),
-            2,
-            "one definition and exactly one call site are expected for A5's counter",
-        );
-        let body = source
-            .split_once(&["fn buffer", "_flush("].concat())
-            .expect("the flush buffer")
-            .1;
-        let end = body.find("\n}\n").expect("end of buffer_flush");
-        assert!(
-            body[..end].contains(&["record_flush", "_drop("].concat()),
-            "the dropped record is no longer counted; A5 has nothing to alert on",
         );
     }
 

@@ -538,15 +538,6 @@ mod tests {
         out
     }
 
-    /// CODE only: a comment naming what a scan forbids would trip that scan on its own text.
-    fn code_only_source() -> String {
-        include_str!("trial_quota_usage.rs")
-            .lines()
-            .filter(|line| !line.trim_start().starts_with("//"))
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
     /// The body of the first `fn name` defined in this file, up to its closing brace.
     fn fn_body<'a>(source: &'a str, name: &str) -> &'a str {
         let needle = format!("fn {name}");

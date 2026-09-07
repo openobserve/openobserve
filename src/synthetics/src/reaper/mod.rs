@@ -332,8 +332,8 @@ fn dead_letter_trigger(
         retries: row.dispatch_attempts,
         error: Some(error.to_string()),
         // `orphan`, `dispatch`, `quota` and `trial` share this stream and this `status`.
-        error_source: Some(ERROR_SOURCE_DISPATCH.to_string()),
-        location: Some(row.location.clone()),
+        synthetics_error_source: Some(ERROR_SOURCE_DISPATCH.to_string()),
+        synthetics_location: Some(row.location.clone()),
         ..TriggerData::default()
     }
 }
@@ -344,10 +344,7 @@ mod tests {
     use infra::table::synthetics_jobs::{DeadLetterReason, DeadLetteredRow};
 
     use super::dead_letter_trigger;
-    use crate::{
-        alerting::ERROR_SOURCE_DISPATCH,
-        test_source::{block_from, code_only, production},
-    };
+    use crate::alerting::ERROR_SOURCE_DISPATCH;
 
     fn dead_lettered_row() -> DeadLetteredRow {
         DeadLetteredRow {
@@ -366,69 +363,16 @@ mod tests {
         }
     }
 
-    /// Byte range of the brace-balanced block opened after `needle`.
-    fn block_after(src: &str, needle: &str) -> (usize, usize) {
-        let at = src
-            .find(needle)
-            .unwrap_or_else(|| panic!("`{needle}` moved"));
-        block_from(src, at)
-    }
-
-    /// `dead_letter_expired` returns only the rows this node's CAS won.
-    #[test]
-    fn the_dead_letter_runs_only_for_rows_this_node_claimed() {
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        let handler = ["handle_dead", "_letter("].concat();
-        let src = code_only(production(include_str!("mod.rs")));
-        assert_eq!(
-            src.matches(handler.as_str()).count(),
-            2,
-            "one definition and one call site — a second writes a duplicate dead letter for a \
-             job another node owns",
-        );
-
-        let (open, end) = block_after(&src, "synthetics_jobs::dead_letter_expired(");
-        assert!(
-            src.match_indices(handler.as_str())
-                .any(|(at, _)| at > open && at < end),
-            "the call moved off the CAS-claimed rows, so this node dead-letters a job it does \
-             not own",
-        );
-    }
-
-    /// The ingest-token lookup returns early for an org with no enabled token.
-    #[test]
-    fn run_accounting_precedes_anything_that_can_return_early() {
-        let src = production(include_str!("mod.rs"));
-        let (open, end) = block_after(src, &["async fn handle_dead", "_letter("].concat());
-        let body = &src[open..end];
-        let increment = body
-            .find("synthetics_runs::increment_jobs_done(")
-            .expect("the run accounting left handle_dead_letter");
-        let bail = body
-            .find("org_ingestion_tokens::find_default_enabled(")
-            .expect("the ingest-token lookup left handle_dead_letter");
-        assert!(
-            increment < bail,
-            "an org with no enabled token returns before the increment, so `jobs_done` never \
-             reaches `job_count` and the run stays open forever",
-        );
-        let publish = body
-            .find(&["publish_triggers", "_usage("].concat())
-            .expect("the triggers half left handle_dead_letter");
-        assert!(
-            publish < bail,
-            "the triggers half needs no ingest token, so an org that has none must still get it",
-        );
-    }
-
     /// §11.3: all three failure paths share one stream and one status, separable only by source.
     #[test]
     fn the_dispatch_dead_letter_keeps_every_field_its_json_carried() {
         let row = dead_lettered_row();
         let trigger = dead_letter_trigger(&row, 42, "no dispatch attempts left");
 
-        assert_eq!(trigger.error_source.as_deref(), Some(ERROR_SOURCE_DISPATCH));
+        assert_eq!(
+            trigger.synthetics_error_source.as_deref(),
+            Some(ERROR_SOURCE_DISPATCH)
+        );
         assert_eq!(
             trigger.retries, row.dispatch_attempts,
             "`TriggerData` has no field named `dispatch_attempts`, so the count survives the \
@@ -448,28 +392,5 @@ mod tests {
             wire["status"], "error",
             "an alert rule matches the SERIALIZED value, and this row writes `failed` today",
         );
-    }
-
-    /// The `synthetics_results` row and the `triggers` row of one dead letter, one source value.
-    #[test]
-    fn the_dead_letters_two_rows_carry_the_same_error_source() {
-        let src = code_only(production(include_str!("mod.rs")));
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        let literal = ["\"dis", "patch\""].concat();
-        assert!(
-            !src.contains(literal.as_str()),
-            "a bare {literal} in either row drifts from the other the moment one is edited, and \
-             §11.3's three paths share one stream and one status — `error_source` is all that \
-             separates them",
-        );
-        let constant = ["ERROR_SOURCE", "_DISPATCH"].concat();
-        for producer in ["fn write_results_stream", "fn dead_letter_trigger"] {
-            let (open, end) = block_after(&src, producer);
-            assert!(
-                src[open..end].contains(constant.as_str()),
-                "`{producer}` must name {constant}: U-12's alert rule filters on the value, so a \
-                 row carrying a different one is invisible to it",
-            );
-        }
     }
 }

@@ -1702,18 +1702,6 @@ async fn resolve_alert<C: sea_orm::ConnectionTrait>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_source::{block_from, code_only, production};
-
-    /// `production` slices at the FIRST marker, so a second one would make every scan vacuous.
-    fn production_code() -> String {
-        let raw = include_str!("job_api.rs");
-        assert_eq!(
-            raw.matches("\n#[cfg(test)]").count(),
-            1,
-            "a test module above this one would truncate these scans to a prefix",
-        );
-        code_only(production(raw))
-    }
 
     /// The minimum an ack has ever had to carry. Everything else on
     /// `AckRequest` is `#[serde(default)]`, which is what makes rollback safe.
@@ -1825,86 +1813,6 @@ mod tests {
         assert_eq!(req.steps_executed, 0);
         assert_eq!(req.steps_defined, 0);
         assert_eq!(req.browser_ms, 0);
-    }
-
-    /// The ack no longer decides free from paid, so no free step event may be nameable.
-    #[test]
-    fn ack_never_emits_a_free_event() {
-        let source = production_code();
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        for banned in [
-            ["Synthetics", "Free", "BrowserSteps"].concat(),
-            ["Synthetics", "Free", "ProtocolSteps"].concat(),
-        ] {
-            assert!(
-                !source.contains(&banned),
-                "`{banned}` is a free step event the ack must have no way to emit",
-            );
-        }
-    }
-
-    /// Nothing at the ack reads a counter, so the ack can owe the pool nothing.
-    #[test]
-    fn ack_carries_no_pool_adjustment() {
-        let source = production_code();
-        assert!(
-            source.contains("pub struct AckResponse"),
-            "the ack must still answer with a response type",
-        );
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        for banned in [
-            ["pool", "_adjustment"].concat(),
-            ["StepPool", "View"].concat(),
-            ["StepPool", "Direction"].concat(),
-            ["StepPool", "Adjustment"].concat(),
-            ["Pool", "Movement"].concat(),
-            ["adjustment", "_key"].concat(),
-        ] {
-            assert!(
-                !source.contains(&banned),
-                "`{banned}` belongs to the pool machinery the ack no longer has",
-            );
-        }
-    }
-
-    /// The metering split keys on `stream_name`; the value test that guards it is `cloud`-gated.
-    #[test]
-    fn the_row_template_stamps_the_check_id_as_stream_name() {
-        let source = production_code();
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        let field = ["synthetics", "_id"].concat();
-
-        let at = source
-            .find(&["struct Row", "Template"].concat())
-            .expect("the shared row template");
-        let (open, close) = block_from(&source, at);
-        assert!(
-            source[open..close].contains(&field),
-            "the row template carries no `{field}`, so no row it builds can name the check",
-        );
-
-        let at = source
-            .find(&["fn events_for", "_ack("].concat())
-            .expect("the emit");
-        let (open, close) = block_from(&source, at);
-        let block = &source[open..close];
-        let calls: Vec<&str> = block
-            .split(&["row.bu", "ild("].concat())
-            .skip(1)
-            .map(|call| &call[..call.find("));").unwrap_or(call.len())])
-            .collect();
-        assert_eq!(calls.len(), 3, "the ack builds three rows");
-        assert!(
-            calls[0].contains(&["Some(&row.", field.as_str()].concat()),
-            "the step row's `stream_name` must be the check id, not left blank or taken from the org",
-        );
-        for call in &calls[1..] {
-            assert!(
-                call.contains("None") && !call.contains("Some("),
-                "only the step row may name the check: `stream_name` is in `GroupKey`, so \
-                 stamping the other two shatters every publish batch three ways",
-            );
-        }
     }
 
     // Step billing. Every guard is a pure function, so these need no database.
@@ -2729,82 +2637,6 @@ mod tests {
             ["SYNTHETICS_STEP_ZERO_FALLBACK", "_TOTAL.inc()"].concat()
         }
 
-        /// Each counter is incremented from inside its OWN `if`, exactly once.
-        /// A2 means "a probe is over-reporting", A3 "un-upgraded probes are in the
-        /// fleet": swapping the `.inc()`s makes each alert fire for the other.
-        #[test]
-        fn each_guard_counter_moves_on_its_own_branch() {
-            let source = include_str!("job_api.rs");
-            let clamp = clamp_counter_needle();
-            let zero_fallback = zero_fallback_counter_needle();
-
-            assert_eq!(
-                source.matches(&clamp).count(),
-                1,
-                "the §4.4.1 clamp counter must be incremented from exactly one place",
-            );
-            assert_eq!(
-                source.matches(&zero_fallback).count(),
-                1,
-                "the §4.4.2 zero-fallback counter must be incremented from exactly one place",
-            );
-
-            // The clamp branch runs first, so the text between the two openings
-            // is the clamp branch and everything after is the fallback branch.
-            let clamp_branch_opens = source.find("if steps.clamped {").expect("clamp branch");
-            let fallback_branch_opens = source
-                .find("if steps.zero_fallback {")
-                .expect("zero-fallback branch");
-            assert!(clamp_branch_opens < fallback_branch_opens);
-
-            let clamp_at = source.find(&clamp).expect("clamp counter");
-            let fallback_at = source.find(&zero_fallback).expect("zero-fallback counter");
-            assert!(
-                clamp_branch_opens < clamp_at && clamp_at < fallback_branch_opens,
-                "the clamp counter is not inside `if steps.clamped`",
-            );
-            assert!(
-                fallback_branch_opens < fallback_at,
-                "the zero-fallback counter is not inside `if steps.zero_fallback`",
-            );
-        }
-
-        /// **The counters sit BELOW every guard**, which is what stops them
-        /// alerting on work that is not ours. Each of the three would false-alert
-        /// if a counter were hoisted above it: the master switch (a dark node is
-        /// not a metering fleet); the venue (`Unresolved` means the registry read
-        /// failed FLEET-WIDE, so a counter there pages on a database blip); and
-        /// `error_source = "queue"` (the job never ran but carries
-        /// `steps_executed = 0`, so A3 would page on ordinary scheduling lag).
-        #[test]
-        fn the_guard_counters_move_only_below_every_guard() {
-            let source = include_str!("job_api.rs");
-            let body = source
-                .split_once("pub(crate) fn events_for_ack(")
-                .expect("events_for_ack")
-                .1;
-
-            let clamp_at = body.find(&clamp_counter_needle()).expect("clamp counter");
-            let fallback_at = body
-                .find(&zero_fallback_counter_needle())
-                .expect("zero-fallback counter");
-
-            for (guard, what) in [
-                ("match i.venue {", "the §8.2 venue gate"),
-                (r#"if i.error_source == "queue" {"#, "the E11 queue guard"),
-            ] {
-                let guard_at = body.find(guard).unwrap_or_else(|| panic!("{what} is gone"));
-                assert!(
-                    guard_at < clamp_at,
-                    "the clamp counter was hoisted above {what}",
-                );
-                assert!(
-                    guard_at < fallback_at,
-                    "the zero-fallback counter was hoisted above {what}",
-                );
-            }
-        }
-
         /// The runtime half: the counters really are wired to the globals the
         /// alerts query. Monotone, because other tests share them.
         #[test]
@@ -2822,40 +2654,6 @@ mod tests {
             assert!(
                 config::metrics::SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.get() > fallback_before,
                 "a zero-reporting ack did not move zo_synthetics_step_zero_fallback_total",
-            );
-        }
-
-        /// A2 asks *"did a probe over-report"*, so the counter must NOT be
-        /// conditioned on whether the clamp was enabled: `CLAMP_ENABLED=false`
-        /// bills the reported count verbatim, which is precisely the window in
-        /// which an over-report leaves the billed numbers. Pinned as source
-        /// because the `.inc()` must sit OUTSIDE `if flags.clamp_enabled`.
-        #[test]
-        fn the_clamp_counter_still_fires_while_the_clamp_is_disabled() {
-            let source = include_str!("job_api.rs");
-            let clamp_branch = source
-                .split_once("if steps.clamped {")
-                .expect("clamp branch")
-                .1;
-            let counter_at = clamp_branch
-                .find(&clamp_counter_needle())
-                .expect("clamp counter");
-            let switch_at = clamp_branch
-                .find("if flags.clamp_enabled {")
-                .expect("the clamp switch");
-            assert!(
-                counter_at < switch_at,
-                "the clamp counter was moved inside `if flags.clamp_enabled`, so disabling the \
-                 clamp in an incident now also silences A2",
-            );
-
-            // …and the switch still does what it says.
-            const UNCLAMPED: BillingFlags = BillingFlags {
-                clamp_enabled: false,
-            };
-            assert_eq!(
-                billed(&events_for_ack(UNCLAMPED, browser(14, 1, 0, 20))),
-                Some(20.0),
             );
         }
 

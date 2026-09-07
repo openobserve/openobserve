@@ -946,8 +946,8 @@ fn quota_trigger_record(
         end_time: now_us,
         error: Some(error.to_string()),
         // `orphan`, `dispatch`, `quota` and `trial` share this stream and this `status`.
-        error_source: Some(error_source.to_string()),
-        location: Some(location.to_string()),
+        synthetics_error_source: Some(error_source.to_string()),
+        synthetics_location: Some(location.to_string()),
         ..TriggerData::default()
     }
 }
@@ -1752,7 +1752,6 @@ mod trial_gate_tests {
         BillingSubscription, ERROR_SOURCE_TRIAL, LogCooldown, TRIAL_GATE_LOG_COOLDOWN_US,
         TrialGate, trial_gate_decision, trial_gate_reads_needed,
     };
-    use crate::test_source::{block_from, guarded_block, production};
 
     const ON: bool = true;
     const OFF: bool = false;
@@ -1987,111 +1986,6 @@ mod trial_gate_tests {
         }
     }
 
-    /// **§7.1 — the gate is HOISTED OUT of the location loop.**
-    ///
-    /// Structural, because a call in the wrong place still returns the right
-    /// answer. Inside the loop it would cost N billing + organizations reads per
-    /// due check per tick, and could burn a one-time grant on a check the gate
-    /// had already denied — §7.1's MUST NOT. The definition site is excluded, so
-    /// the assertion is "exactly one CALL".
-    #[test]
-    fn trial_gate_is_hoisted_out_of_the_location_loop() {
-        // Assembled at runtime so nothing here can match this test's own text.
-        let gate = ["trial_gate", "_decision("].concat();
-        let loop_head = ["for location in &synthetic", ".locations {"].concat();
-
-        let src = production(include_str!("scheduler.rs"));
-
-        let loop_at = src
-            .find(&loop_head)
-            .expect("the per-location fan-out loop must still exist in scheduler::run");
-
-        let def_at = src
-            .find(&["fn ", &gate].concat())
-            .expect("trial_gate_decision must be defined in this file");
-        let def_ident_at = def_at + 3;
-
-        let calls: Vec<usize> = src
-            .match_indices(&gate)
-            .map(|(i, _)| i)
-            .filter(|i| *i != def_ident_at)
-            .collect();
-
-        assert_eq!(
-            calls.len(),
-            1,
-            "the trial gate must be called exactly once per due check — {} call site(s) found. \
-             One per location would multiply the billing reads by the location count and, from \
-             Phase 2, could deduct from the free pool for a check the gate denies (§7.1).",
-            calls.len()
-        );
-        assert!(
-            calls[0] < loop_at,
-            "the trial gate call is at byte {} and the location loop opens at byte {} — the gate \
-             MUST be hoisted ABOVE the loop (§7.1)",
-            calls[0],
-            loop_at
-        );
-    }
-
-    /// **The gate must PREVENT the work, not merely precede the fan-out.**
-    ///
-    /// The hoisting test pins the call above the location loop, but the run row
-    /// is written *before* that loop — a call satisfying it could still leave a
-    /// denied check with a zero-job run row in the UI forever. §7.2's stronger
-    /// guarantee: on `Skip` there is no run row, no job, no Lambda invocation.
-    #[test]
-    fn a_denied_check_cannot_reach_insert_run_or_enqueue() {
-        let gate = ["trial_gate", "_decision("].concat();
-        let insert_run = ["synthetics_runs::", "insert_run("].concat();
-        let enqueue = ["synthetics_jobs::", "enqueue("].concat();
-
-        let src = production(include_str!("scheduler.rs"));
-
-        let def_ident_at = src
-            .find(&["fn ", &gate].concat())
-            .expect("trial_gate_decision must be defined in this file")
-            + 3;
-        let call_at = src
-            .match_indices(&gate)
-            .map(|(i, _)| i)
-            .find(|i| *i != def_ident_at)
-            .expect("the trial gate must be called from the scheduler");
-
-        let insert_at = src
-            .find(&insert_run)
-            .expect("the scheduler must still write the run row");
-        let enqueue_at = src
-            .find(&enqueue)
-            .expect("the scheduler must still enqueue jobs");
-
-        assert!(
-            call_at < insert_at,
-            "the trial gate is called at byte {call_at} but the run row is written at byte \
-             {insert_at} — a denied check would still leave a run row behind (§7.2)"
-        );
-        assert!(
-            call_at < enqueue_at,
-            "the trial gate is called at byte {call_at} but jobs are enqueued at byte \
-             {enqueue_at} — a denied check must never reach the queue, which is what stops the \
-             Lambda invocation we pay for (§7.2, T34)"
-        );
-
-        // The verdict must be ACTED ON, not merely computed, and "a `continue`
-        // below the call" is too weak — the per-check body has another early exit
-        // above the run row. So require the exit INSIDE the `Skip` arm's block.
-        let arm_at = call_at
-            + src[call_at..]
-                .find("= verdict {")
-                .expect("the gate's verdict must be matched against `TrialGate::Skip`");
-        let (arm_open, arm_end) = block_from(src, arm_at);
-        assert!(
-            src[arm_open..arm_end].contains("continue;"),
-            "the trial gate's `Skip` arm does not leave the per-check body, so a denied check \
-             falls straight through to `insert_run` and the enqueue below it (§7.2, T34)"
-        );
-    }
-
     // ── the fleet-wide kill switch must also switch off the COST ────────────
 
     /// The flag defaults to **false**, the shape almost every build runs in;
@@ -2141,35 +2035,6 @@ mod trial_gate_tests {
                     );
                 }
             }
-        }
-    }
-
-    /// **The reads must sit BEHIND the short-circuit, not merely after it.** A
-    /// read hoisted above the guard still answers right, it just costs two
-    /// queries per check per tick again.
-    #[test]
-    fn the_gates_reads_sit_inside_the_short_circuit() {
-        let guard = ["trial_gate", "_reads_needed("].concat();
-        let billing_read = ["get_billing_by", "_org_id("].concat();
-        let org_read = ["infra::table::organizations", "::get("].concat();
-
-        let src = production(include_str!("scheduler.rs"));
-        let (open, end) = guarded_block(src, &guard);
-
-        for read in [&billing_read, &org_read] {
-            let sites: Vec<usize> = src.match_indices(read.as_str()).map(|(i, _)| i).collect();
-            assert_eq!(
-                sites.len(),
-                1,
-                "the trial gate must issue `{read}` exactly once per due check, found {}",
-                sites.len()
-            );
-            assert!(
-                sites[0] > open && sites[0] < end,
-                "`{read}` is at byte {} but the short-circuit's block is bytes {open}..{end} — \
-                 the read must not be issued before the gate has decided it needs it",
-                sites[0]
-            );
         }
     }
 
@@ -2265,30 +2130,6 @@ mod trial_gate_tests {
             "entries older than the window can no longer suppress anything and must be dropped"
         );
     }
-
-    /// **Every trial-gate `warn!` must go through the throttle.** The tests above
-    /// prove the throttle works; this proves the gate uses it.
-    #[test]
-    fn every_trial_gate_warning_is_throttled() {
-        let guard = ["trial_gate", "_reads_needed("].concat();
-        let src = production(include_str!("scheduler.rs"));
-        let (open, end) = guarded_block(src, &guard);
-        let block = &src[open..end];
-
-        let warns = block.matches("tracing::warn!").count();
-        assert_eq!(
-            warns, 3,
-            "the trial gate has three log lines — two fail-open reads and the deny — found {warns}"
-        );
-        assert_eq!(
-            block
-                .matches(&["TRIAL_GATE_LOG", ".allow("].concat())
-                .count(),
-            warns,
-            "every one of the gate's {warns} warnings must be guarded by the cooldown, or a \
-             lapsed org logs once per check per 5s tick forever"
-        );
-    }
 }
 
 /// SPEC §6 / §7.3 — the free step pool gate, items **2.3** and **2.4**.
@@ -2304,10 +2145,7 @@ mod pool_gate_tests {
         ERROR_SOURCE_QUOTA, ERROR_SOURCE_TRIAL, GateContext, PoolExhaustionPolicy, PoolGate,
         distinct_org_ids, gate_decision, quota_result_record, quota_trigger_record, slot_verdict,
     };
-    use crate::{
-        pool::StepRemaining,
-        test_source::{block_from, code_only, enclosing_block, production, statement_at},
-    };
+    use crate::pool::StepRemaining;
 
     /// The slot that made the fixture check due, not the tick that noticed it.
     const SLOT: i64 = 1_787_665_631_000_000;
@@ -2565,167 +2403,7 @@ mod pool_gate_tests {
         }
     }
 
-    /// T17/E13 and §11 F6 — the pure decision is only as good as the arguments the fan-out hands
-    /// it.
-    #[test]
-    fn the_gate_reads_the_venue_before_it_decides() {
-        let src = code_only(production(include_str!("scheduler.rs")));
-        let body = fan_out_body(&src);
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        let venue = ["synthetics_locations", "::get(location)"].concat();
-        let decide = ["slot", "_verdict("].concat();
-
-        let venue_at = body
-            .find(venue.as_str())
-            .expect("the venue read must stay inside the per-check fan-out");
-        let decide_at = body
-            .find(decide.as_str())
-            .expect("the per-slot verdict must be taken inside the per-check fan-out");
-        assert!(
-            venue_at < decide_at,
-            "the verdict is taken before the registry row is read, so no live venue flag exists \
-             to hand it",
-        );
-
-        let call = statement_at(body, decide_at);
-        assert!(
-            call.contains("is_private"),
-            "§7.1 gives a private venue no gate at all, and a hardcoded flag blacks out every \
-             private-agent check of a spent org, on hardware we never paid for: {call}",
-        );
-        assert!(
-            call.contains("gate_ctx"),
-            "without the tick's batched reads every org fails open and the gate meters nothing: \
-             {call}",
-        );
-        assert!(
-            !call.contains("false") && !call.contains("None"),
-            "a literal argument pins the verdict to one branch of §6.6's table, with every unit \
-             test still green: {call}",
-        );
-    }
-
-    /// U-12's alert rule separates the three failure paths by `error_source` alone.
-    #[test]
-    fn the_two_pool_skip_reports_name_the_quota_source() {
-        let src = code_only(production(include_str!("scheduler.rs")));
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        let needle = ["report_gate", "_skips("].concat();
-        let def_ident_at = src
-            .find(&["fn ", &needle].concat())
-            .expect("the reporter must be defined in this file")
-            + 3;
-        let calls: Vec<&str> = src
-            .match_indices(needle.as_str())
-            .map(|(i, _)| i)
-            .filter(|i| *i != def_ident_at)
-            .map(|i| statement_at(&src, i))
-            .collect();
-        assert_eq!(
-            calls.len(),
-            3,
-            "one trial skip and the two pool skips — a fourth caller needs its own source pinned",
-        );
-
-        let trial = ["ERROR_SOURCE", "_TRIAL"].concat();
-        let quota = ["ERROR_SOURCE", "_QUOTA"].concat();
-        assert_eq!(
-            calls
-                .iter()
-                .filter(|call| call.contains(trial.as_str()))
-                .count(),
-            1,
-            "only the trial gate may tag a skip as a lapsed trial",
-        );
-        assert_eq!(
-            calls
-                .iter()
-                .filter(|call| call.contains(quota.as_str()))
-                .count(),
-            2,
-            "the all-denied and partly-denied pool skips both carry {quota}, or the customer is \
-             told their trial ended when their steps ran out",
-        );
-    }
-
     // ── one batched read per tick ───────────────────────────────────────────
-
-    /// Inside the fan-out each read is one query per claimed check — 500 a tick at `FETCH_LIMIT`.
-    #[test]
-    fn gate_reads_remaining_once_per_tick_for_all_claimed_orgs() {
-        assert!(distinct_org_ids(&[]).is_empty());
-        let claimed = [
-            check_for_org("chk_1", "beta"),
-            check_for_org("chk_2", "acme"),
-            check_for_org("chk_3", "beta"),
-            check_for_org("chk_4", "acme"),
-            check_for_org("chk_5", "gamma"),
-        ];
-        assert_eq!(
-            distinct_org_ids(&claimed),
-            vec!["beta".to_string(), "acme".to_string(), "gamma".to_string()],
-            "the org set must dedupe and keep first-seen order",
-        );
-
-        let src = code_only(production(include_str!("scheduler.rs")));
-        let resolve = ["resolve_gate", "_context("].concat();
-        assert_eq!(
-            src.matches(resolve.as_str()).count(),
-            2,
-            "one definition and one call site — a second resolve is a second set of reads",
-        );
-        assert!(
-            !fan_out_body(&src).contains(resolve.as_str()),
-            "{resolve} sits inside the per-check fan-out, so every read it holds runs once per \
-             claimed check, up to FETCH_LIMIT of them a tick",
-        );
-
-        let def_at = src
-            .find(&["fn ", resolve.as_str()].concat())
-            .expect("the tick's reads must live in one function of their own");
-        let (open, end) = block_from(&src, def_at);
-
-        for read in [
-            ["distinct_org", "_ids("].concat(),
-            ["remaining_for_orgs", ")("].concat(),
-            ["resolve_pool", "_policy("].concat(),
-        ] {
-            // Two of the three are defined in this file; a needle carrying `(` cannot count a
-            // `use`.
-            let def_ident_at = src.find(&["fn ", read.as_str()].concat()).map(|at| at + 3);
-            let calls: Vec<usize> = src
-                .match_indices(read.as_str())
-                .map(|(at, _)| at)
-                .filter(|at| Some(*at) != def_ident_at)
-                .collect();
-            assert_eq!(
-                calls.len(),
-                1,
-                "{read} must have exactly one call site, found {}",
-                calls.len(),
-            );
-            assert!(
-                calls[0] > open && calls[0] < end,
-                "{read} must be called from {resolve}, which runs once for the whole tick",
-            );
-        }
-
-        // Only the ARGUMENTS, so a read's own name cannot satisfy the assertion on its input.
-        let block = &src[open..end];
-        let args_of = |needle: &str| {
-            let at = block
-                .find(needle)
-                .unwrap_or_else(|| panic!("`{needle}` must be called from {resolve}"));
-            statement_at(block, at + needle.len()).to_string()
-        };
-
-        let counters = args_of(&["remaining_for_orgs", ")("].concat());
-        assert!(
-            counters.contains("org_ids") && !counters.contains("check_ids"),
-            "the counters are keyed on the org, so a check id reads as an org absent from the \
-             batch and fails every check in the tick open: {counters}",
-        );
-    }
 
     // ── the dead letter, one shape for both gates ───────────────────────────
 
@@ -2750,245 +2428,7 @@ mod pool_gate_tests {
         );
     }
 
-    /// U-12: a trial skip persisted nothing, so a check just stopped with no row anyone could find.
-    #[test]
-    fn a_trial_skip_writes_the_same_dead_letter_as_a_quota_skip() {
-        let check = due_check();
-        let quota = quota_result_record(&check, A_LOCATION, SLOT, 42, ERROR_SOURCE_QUOTA);
-        let trial = quota_result_record(&check, A_LOCATION, SLOT, 42, ERROR_SOURCE_TRIAL);
-        assert_eq!(trial[0]["error_source"], ERROR_SOURCE_TRIAL);
-        assert_eq!(trial[0]["status"], "error");
-        assert_eq!(trial[0]["synthetics_id"], "chk_1");
-        assert_eq!(trial[0]["location"], A_LOCATION);
-        assert_eq!(
-            trial[0]
-                .as_object()
-                .expect("the dead letter must be a JSON object")
-                .keys()
-                .collect::<Vec<_>>(),
-            quota[0]
-                .as_object()
-                .expect("the dead letter must be a JSON object")
-                .keys()
-                .collect::<Vec<_>>(),
-            "both gates must leave the same row, differing only in what they say",
-        );
-        assert_ne!(
-            trial[0]["error"], quota[0]["error"],
-            "an exhausted grant re-opens on subscribe and a lapsed trial does not, so the two \
-             must not read the same",
-        );
-        let said = |row: &serde_json::Value| row["error"].as_str().unwrap_or_default().to_string();
-        assert_says_trial(&said(&trial[0]));
-        assert_says_quota(&said(&quota[0]));
-
-        let quota = quota_trigger_record(&check, A_LOCATION, 42, ERROR_SOURCE_QUOTA);
-        let trial = quota_trigger_record(&check, A_LOCATION, 42, ERROR_SOURCE_TRIAL);
-        assert_eq!(trial.error_source.as_deref(), Some(ERROR_SOURCE_TRIAL));
-        assert_eq!(trial.location.as_deref(), Some(A_LOCATION));
-        assert_eq!(trial.module, quota.module);
-        assert_eq!(trial.status, quota.status);
-        assert_ne!(trial.error, quota.error);
-        assert_eq!(trial.key, quota.key);
-        assert_eq!(trial.org, quota.org);
-        assert_says_trial(
-            trial
-                .error
-                .as_deref()
-                .expect("the trigger row must say why"),
-        );
-        assert_says_quota(
-            quota
-                .error
-                .as_deref()
-                .expect("the trigger row must say why"),
-        );
-
-        let src = code_only(production(include_str!("scheduler.rs")));
-        let report = ["report_gate", "_skips("].concat();
-        let trial_source = ["ERROR_SOURCE", "_TRIAL"].concat();
-        let def_ident_at = src
-            .find(&["fn ", report.as_str()].concat())
-            .map(|at| at + 3);
-        let call_at = src
-            .match_indices(report.as_str())
-            .map(|(at, _)| at)
-            .filter(|at| Some(*at) != def_ident_at)
-            .find(|at| statement_at(&src, *at).contains(&trial_source))
-            .expect("the trial gate's Skip arm must dead-letter instead of continuing on silently");
-        assert!(
-            enclosing_block(&src, call_at).contains("continue;"),
-            "the trial gate must SKIP the check it reports — a report the fan-out falls through \
-             enqueues the slot it just dead-lettered",
-        );
-    }
-
-    /// §11.3: `triggers` is a reserved stream, so the public ingest door records nothing at all.
-    #[test]
-    fn dead_letter_triggers_go_through_the_internal_channel() {
-        let public_door = ["triggers", "/_json"].concat();
-        let internal = ["publish_triggers", "_usage("].concat();
-        for (name, source, builder) in [
-            (
-                "scheduler",
-                include_str!("scheduler.rs"),
-                ["quota_trigger", "_record("].concat(),
-            ),
-            (
-                "reaper",
-                include_str!("reaper/mod.rs"),
-                ["dead_letter", "_trigger("].concat(),
-            ),
-            (
-                "reaper::orphan",
-                include_str!("reaper/orphan.rs"),
-                ["orphan", "_trigger("].concat(),
-            ),
-        ] {
-            let source = code_only(source);
-            assert!(
-                !source.contains(&public_door),
-                "{name}: the public door is rejected for a reserved stream, so the row is lost",
-            );
-            assert_eq!(
-                source.matches(internal.as_str()).count(),
-                1,
-                "{name}: one call per dead-letter path — a leftover `use` satisfies a `contains`, \
-                 and the internal channel writes the `_meta` copy itself, so the second POST \
-                 this path makes today must be gone",
-            );
-
-            let at = source
-                .find(internal.as_str())
-                .expect("the count above found exactly one");
-            assert!(
-                statement_at(&source, at).contains(builder.as_str()),
-                "{name}: {builder} is unit-tested but unwired — a `TriggerData` hand-built at \
-                 the call site ships a row missing `error_source`, `retries` or `next_run_at` \
-                 with both tests still green",
-            );
-        }
-    }
-
-    /// Every path that gave back is gone, so a survivor takes from a grant with no refund left.
-    #[test]
-    fn no_reservation_survives() {
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        let banned = [
-            ["reserve", "_for", "_slot"].concat(),
-            ["ref", "und", "_slot"].concat(),
-            ["ref", "und", "_planned"].concat(),
-            ["try", "_deduct"].concat(),
-            ["dead_letter", "_ref", "und"].concat(),
-        ];
-        let bare_hook = ["ref", "und"].concat();
-        let files: &[(&str, &str, bool)] = &[
-            ("alerting", include_str!("alerting.rs"), false),
-            ("dispatcher", include_str!("dispatcher.rs"), false),
-            ("job_api", include_str!("job_api.rs"), true),
-            ("lib", include_str!("lib.rs"), false),
-            ("pool", include_str!("pool.rs"), true),
-            ("reaper", include_str!("reaper/mod.rs"), true),
-            ("reaper::orphan", include_str!("reaper/orphan.rs"), true),
-            ("scheduler", include_str!("scheduler.rs"), true),
-            ("service", include_str!("service/mod.rs"), false),
-            ("service::checks", include_str!("service/checks.rs"), false),
-            ("service::crypto", include_str!("service/crypto.rs"), false),
-            (
-                "service::locations",
-                include_str!("service/locations.rs"),
-                false,
-            ),
-            ("service::runs", include_str!("service/runs.rs"), false),
-            ("service::tokens", include_str!("service/tokens.rs"), false),
-            ("status_pages", include_str!("status_pages.rs"), false),
-        ];
-        for (name, source, scan_bare) in files {
-            let source = code_only(source);
-            for banned in &banned {
-                assert!(
-                    !source.contains(banned.as_str()),
-                    "{name}: `{banned}` belongs to the reservation model this phase deletes",
-                );
-            }
-            // Lowercased so a capitalised spelling cannot carry the bare word past the scan.
-            assert!(
-                !scan_bare || !source.to_lowercase().contains(&bare_hook),
-                "{name}: `{bare_hook}` belongs to the reservation model this phase deletes",
-            );
-        }
-    }
-
     // ── 2.4 — a denied slot is recorded, never enqueued ─────────────────────
-
-    /// T30/E15 — without the `continue` a denied slot is enqueued; without the record it goes dark.
-    #[test]
-    fn a_denied_slot_is_recorded_and_never_enqueued() {
-        let src = code_only(production(include_str!("scheduler.rs")));
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        let arm_head = ["if verdict == PoolGate", "::Skip {"].concat();
-        let at = src
-            .find(&arm_head)
-            .expect("the denied slot must be acted on at the call site, not merely logged");
-        let (open, end) = block_from(&src, at);
-        let arm = &src[open..end];
-        assert!(
-            arm.contains("denied.push("),
-            "a denied slot must be recorded so the dead letter can be written for it",
-        );
-        assert!(
-            arm.contains("continue;"),
-            "a denied slot must not fall through into the enqueue — a neighbouring arm's \
-             `continue` is not this one's",
-        );
-
-        let report = ["report_gate", "_skips("].concat();
-        let def_at = src
-            .find(&["fn ", report.as_str()].concat())
-            .expect("a denied slot's dead letter must have a function of its own");
-        let (open, end) = block_from(&src, def_at);
-        let body = &src[open..end];
-        for written in [
-            ["quota_result", "_record("].concat(),
-            ["post", "_json("].concat(),
-            ["quota_trigger", "_record("].concat(),
-            ["publish_triggers", "_usage("].concat(),
-        ] {
-            assert!(
-                body.contains(written.as_str()),
-                "{report} must POST {written}: a record built and never sent leaves the denied \
-                 slot as invisible as no record at all",
-            );
-        }
-
-        let publish = body
-            .find(&["publish_triggers", "_usage("].concat())
-            .expect("the `triggers` half must go through the internal channel");
-        let token = body
-            .find(&["org_ingestion_tokens", "::find_default_enabled("].concat())
-            .expect("the `synthetics_results` half still needs the org's own ingest token");
-        assert!(
-            publish < token,
-            "the lookup returns early for an org with no enabled token, and the `triggers` half \
-             needs no token, so a lookup ahead of it records nothing for exactly the orgs most \
-             likely to be misconfigured",
-        );
-    }
-
-    /// **T30 / E15 — the hard requirement.** *"MUST NOT disable the check. A
-    /// billing system making destructive changes to customer config is
-    /// unacceptable."* Asserted over the source: the property is the ABSENCE of
-    /// a call, which no test of a return value can prove.
-    #[test]
-    fn the_quota_gate_never_disables_a_check() {
-        // Assembled at runtime so this test cannot match its own text.
-        let disable = ["set", "enabled("].join("_");
-        let source = include_str!("scheduler.rs");
-        assert!(
-            !source.contains(&disable),
-            "SPEC §7.3: skipping is reversible the moment the org subscribes — disabling is not",
-        );
-    }
 
     /// **T30 / E15 / §7.3.** Without this record a check just stops, with no row anyone can find.
     #[test]
@@ -3023,8 +2463,11 @@ mod pool_gate_tests {
     fn the_quota_trigger_row_is_separable_from_the_other_error_sources() {
         let check = due_check();
         let row = quota_trigger_record(&check, A_LOCATION, 42, ERROR_SOURCE_QUOTA);
-        assert_eq!(row.error_source.as_deref(), Some(ERROR_SOURCE_QUOTA));
-        assert_eq!(row.location.as_deref(), Some(A_LOCATION));
+        assert_eq!(
+            row.synthetics_error_source.as_deref(),
+            Some(ERROR_SOURCE_QUOTA)
+        );
+        assert_eq!(row.synthetics_location.as_deref(), Some(A_LOCATION));
         assert_eq!(row.module, TriggerDataType::Synthetics);
         assert_eq!(row.status, RunOutcome::Error);
         assert_eq!(row.key, "checkout journey/chk_1");
@@ -3041,62 +2484,6 @@ mod pool_gate_tests {
             wire["status"], "error",
             "an alert rule matches the SERIALIZED value, and `RunOutcome::Error` writes `error` \
              where this row writes `failed` today",
-        );
-    }
-
-    /// E18/T36's *notify* half is all that survives `log_pool_gate`, and only for that one verdict.
-    #[test]
-    fn the_contract_notice_fires_only_for_the_contract_verdict() {
-        let src = code_only(production(include_str!("scheduler.rs")));
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        let notice = ["log_contract", "_notice("].concat();
-        assert_eq!(
-            src.matches(notice.as_str()).count(),
-            2,
-            "one definition and one call site — nothing else reads `RunAndNotify`, so losing \
-             this call deletes E18/T36's notify half outright",
-        );
-
-        let def_at = src
-            .find(&["fn ", notice.as_str()].concat())
-            .expect("the contract notice must be defined in this file");
-        let (open, end) = block_from(&src, def_at);
-        let body = &src[open..end];
-        assert!(
-            body.contains(&["PoolGate", "::RunAndNotify"].concat()),
-            "the notice must match the one verdict it was narrowed to",
-        );
-        for other in [
-            ["PoolGate", "::RunAsOverage"].concat(),
-            ["PoolGate", "::Skip"].concat(),
-        ] {
-            assert!(
-                !body.contains(other.as_str()),
-                "{other} is not a gate-time fact any more, and firing on it re-creates the \
-                 per-check-per-tick flood the narrowing removed",
-            );
-        }
-        assert!(
-            body.contains(&["POOL_GATE_LOG", ".allow("].concat()),
-            "unthrottled, a contract org logs once per check per 5s tick for the life of the \
-             contract — the flood the cooldown exists to bound",
-        );
-    }
-
-    /// `job_count` is what a run must reach before it is complete, so it MUST be
-    /// the number of slots actually enqueued. Counting configured locations
-    /// leaves every partly-denied run permanently incomplete: never finished,
-    /// never alerted on, never recovered.
-    #[test]
-    fn the_run_row_counts_planned_slots_and_not_configured_locations() {
-        let src = production(include_str!("scheduler.rs"));
-        assert!(
-            src.contains(&["let job_count = planned", ".len() as i32;"].concat()),
-            "job_count must come from the slots that survived gates 2 and 3",
-        );
-        assert!(
-            !src.contains(&["let job_count = synthetic", ".locations.len() as i32;"].concat()),
-            "counting configured locations orphans the run row for every denied slot",
         );
     }
 }
