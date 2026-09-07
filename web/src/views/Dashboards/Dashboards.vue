@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
   <OPageLayout
+    overflow-first
     bleed
     :key="store.state.selectedOrganization.identifier"
     :title="t('dashboard.header')"
@@ -26,6 +27,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     :main-panel="false"
   >
     <template #actions>
+      <!-- new dashboard button -->
+      <OButton variant="primary" size="sm" data-test="dashboard-new" @click="addDashboard">
+        {{ t(`dashboard.add`) }}
+      </OButton>
+    </template>
+
+    <!-- Secondary: inline on desktop (BEFORE the primary, via overflow-first), behind "More" < md. -->
+    <template #actions-overflow>
       <!-- Org home dashboard shortcut: shows which dashboard is pinned to
              the home page and jumps straight to it. -->
       <OButton
@@ -40,14 +49,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <span class="truncate">{{ homeDashboard.label }}</span>
       </OButton>
       <OTooltip v-if="homeDashboard" side="bottom" :content="t('dashboard.openHomeDashboard')" />
-      <!-- new dashboard button -->
-      <OButton variant="primary" size="sm" data-test="dashboard-new" @click="addDashboard">
-        {{ t(`dashboard.add`) }}
-      </OButton>
-    </template>
-
-    <!-- Secondary: inline on desktop, behind "More" < md. -->
-    <template #actions-overflow>
       <!-- import dashboard button with dropdown -->
       <ODropdown side="bottom" align="end">
         <template #trigger>

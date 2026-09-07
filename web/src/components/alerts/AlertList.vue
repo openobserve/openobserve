@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div data-test="alert-list-page" class="flex h-full flex-col">
     <OPageLayout
+      overflow-first
       bleed
       v-if="!showAddAlertDialog && !showImportAlertDialog"
       :title="t('alerts.header')"
@@ -37,7 +38,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template #actions>
         <!-- The provider behind the Terraform export tab, which is otherwise
              only discoverable once the export dialog is already open. -->
-        <IacRegistryLinks data-test="alert-list-iac-registries" />
         <!-- Add button — routes to anomaly creation on anomaly tab, alert creation otherwise -->
         <OButton
           data-test="alert-list-add-alert-btn"
@@ -61,8 +61,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
       </template>
 
-      <!-- Secondary: inline on desktop, behind "More" < md. -->
+      <!-- Secondary: inline on desktop (BEFORE the primary, via overflow-first), behind "More" < md. -->
       <template #actions-overflow>
+        <IacRegistryLinks data-test="alert-list-iac-registries" />
         <!-- Import button -->
         <OButton
           :class="isCompactToolbar ? 'min-w-0! px-2! py-0!' : ''"

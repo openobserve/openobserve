@@ -17,6 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="flex h-full flex-col p-0">
     <OPageLayout
+      overflow-first
       bleed
       v-if="!showDestinationEditor && !showImportDestination"
       :title="t('alerts.header')"
