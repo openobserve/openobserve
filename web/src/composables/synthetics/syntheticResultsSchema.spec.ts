@@ -24,6 +24,7 @@ import {
   buildHistogramSql,
   buildLastRunSql,
   buildRunsSql,
+  buildRunDetailSql,
   buildRunsWithStepsSql,
   buildStepDefsSql,
   buildRetryAttributionSql,
@@ -32,6 +33,7 @@ import {
   foldStepDefs,
   splitDelimited,
   STATUS_REASON,
+  ERROR_SOURCE,
   deviceIconName,
   deviceLabelKey,
   mapHistogram,
@@ -133,6 +135,29 @@ describe("syntheticResultsSchema query builders", () => {
   it("should escape single quotes in the monitor id to prevent injection", () => {
     const sql = buildHistogramSql("mon'1", "1 hour");
     expect(sql).toContain(`${SYNTHETIC_FIELDS.monitorId} = 'mon''1'`);
+  });
+
+  it("run detail matches by execution_id and only falls back to job_id for rows lacking an execution_id, so an error is not resolved to a passed row sharing its job_id", () => {
+    const sql = buildRunDetailSql("mon-1", "run-1", "exec-1", null);
+    expect(sql).toContain(
+      `(${SYNTHETIC_FIELDS.executionId} = 'exec-1' OR (job_id = 'exec-1' AND (${SYNTHETIC_FIELDS.executionId} = '' OR ${SYNTHETIC_FIELDS.executionId} IS NULL)))`,
+    );
+    // Ordering must NOT be relied on — the search engine ignores a CASE in ORDER BY.
+    expect(sql).not.toContain("CASE WHEN");
+  });
+
+  it("run detail matches job_id unguarded when execution_id is absent from the schema", () => {
+    const schema = new Set(["run_id", "job_id"]); // execution_id not ingested yet
+    const sql = buildRunDetailSql("mon-1", "run-1", "exec-1", schema);
+    expect(sql).toContain("(job_id = 'exec-1')");
+    expect(sql).not.toContain(`${SYNTHETIC_FIELDS.executionId} = 'exec-1'`);
+  });
+
+  it("ERROR_SOURCE covers the control-plane sources the stream can carry", () => {
+    expect(ERROR_SOURCE.dispatch).toBe("dispatch");
+    expect(ERROR_SOURCE.quota).toBe("quota");
+    expect(ERROR_SOURCE.queue).toBe("queue");
+    expect(ERROR_SOURCE.probe).toBe("probe");
   });
 });
 
