@@ -266,7 +266,7 @@ async fn cache_metrics_index_files(trace_id: &str, org_id: &str, files: &[FileKe
         trace_id,
         &sidecars
             .iter()
-            .map(|(f, path)| (f.id, &f.account, path, 0, f.meta.max_ts, f.meta.records))
+            .map(|(f, path)| (f.id, &f.account, path, 0, f.meta.max_ts))
             .collect_vec(),
         &mut sidecar_stats,
         "midx",
