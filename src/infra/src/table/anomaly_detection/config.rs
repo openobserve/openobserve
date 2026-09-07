@@ -305,7 +305,7 @@ fn into_active_model(mut m: Model) -> anomaly_detection_config::ActiveModel {
 
 #[cfg(test)]
 mod tests {
-    use sea_orm::{ActiveModelTrait as _, IntoActiveModel};
+    use sea_orm::{ActiveModelTrait as _, IntoActiveModel, Iterable as _};
 
     use super::*;
 
@@ -315,6 +315,8 @@ mod tests {
         Replicated,
         RegionLocal,
         Immutable,
+        /// Behaves region-local only because `patch_all_fields` omits it — a gap, not a decision.
+        KnownGap,
     }
 
     fn make_model(anomaly_id: &str, org_id: &str) -> Model {
@@ -510,7 +512,7 @@ mod tests {
     }
 
     #[test]
-    fn test_into_active_model_sets_all_fields() {
+    fn test_into_active_model_sets_the_representative_fields() {
         let m = make_model("anom-all", "org-all");
         let active = into_active_model(m);
         assert_eq!(active.anomaly_id.unwrap(), "anom-all");
@@ -640,9 +642,10 @@ mod tests {
             ("alert_destinations", Scope::Replicated),
             ("folder_id", Scope::Replicated),
             ("owner", Scope::Replicated),
-            // Not in patch_all_fields today; pinned as-is so the omission is visible, not silent.
-            ("priority", Scope::RegionLocal),
-            ("tags", Scope::RegionLocal),
+            // User-authored config like `owner`, so these should replicate; patch_all_fields omits
+            // them today and this pins that gap rather than blessing it.
+            ("priority", Scope::KnownGap),
+            ("tags", Scope::KnownGap),
             ("status", Scope::Replicated),
             // P0.7: paired with last_failed_at, or regions back off on each other's failures.
             ("retries", Scope::RegionLocal),
@@ -727,20 +730,78 @@ mod tests {
         patch_all_fields(&mut active, peer.clone());
 
         let local_active = local.into_active_model();
-        let peer_active = into_active_model(peer.clone());
+        let replicated_expected = into_active_model(peer.clone());
+        // Raw, un-normalized: the region-local arm needs the value the peer actually sent.
+        let peer_raw = peer.clone().into_active_model();
 
-        for (field, scope) in replication_scope(peer) {
+        let table = replication_scope(peer);
+        // Closes the `field: _` escape hatch: destructuring alone lets a new column be ignored.
+        assert_eq!(
+            table.len(),
+            anomaly_detection_config::Column::iter().count(),
+            "every column needs a replication-scope decision"
+        );
+
+        for (field, scope) in table {
             let got = active_field(&active, field);
             match scope {
                 Scope::Replicated => assert_eq!(
                     got,
-                    active_field(&peer_active, field),
+                    active_field(&replicated_expected, field),
                     "{field} is replicated and must take the peer's value"
                 ),
-                Scope::PrimaryKey | Scope::Immutable | Scope::RegionLocal => assert_eq!(
+                Scope::RegionLocal => {
+                    assert_eq!(
+                        got,
+                        active_field(&local_active, field),
+                        "{field} is region-local and must keep this region's value"
+                    );
+                    assert_ne!(
+                        got,
+                        active_field(&peer_raw, field),
+                        "{field} matches the peer by accident, so it verifies nothing"
+                    );
+                    // What separates region-local from merely-unpatched: a fresh row starts clean.
+                    assert_eq!(
+                        active_field(&replicated_expected, field),
+                        active_field(&make_model("anom-1", "org").into_active_model(), field),
+                        "{field} is region-local, so an inserted row must not inherit the peer's"
+                    );
+                }
+                Scope::Immutable => {
+                    assert_eq!(
+                        got,
+                        active_field(&local_active, field),
+                        "{field} is immutable and must keep this region's value"
+                    );
+                    assert_ne!(
+                        got,
+                        active_field(&peer_raw, field),
+                        "{field} matches the peer by accident, so it verifies nothing"
+                    );
+                    // Unlike region-local state, these still ride along on an insert.
+                    assert_eq!(
+                        active_field(&replicated_expected, field),
+                        active_field(&peer_raw, field),
+                        "{field} is not region-local, so an insert must carry the peer's value"
+                    );
+                }
+                // Deliberately accepts both outcomes: this pins the gap without blocking its fix.
+                Scope::KnownGap => {
+                    let local = active_field(&local_active, field);
+                    let peer_value = active_field(&peer_raw, field);
+                    assert_ne!(local, peer_value, "{field} verifies nothing if it matches");
+                    assert!(
+                        got == local || got == peer_value,
+                        "{field} must either stay local (today's gap) or take the peer's value"
+                    );
+                    // An insert carries it either way — the gap is in patch_all_fields alone.
+                    assert_eq!(active_field(&replicated_expected, field), peer_value);
+                }
+                Scope::PrimaryKey => assert_eq!(
                     got,
                     active_field(&local_active, field),
-                    "{field} is region-local and must keep this region's value"
+                    "{field} must keep this region's value"
                 ),
             }
         }
