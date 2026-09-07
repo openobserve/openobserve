@@ -117,7 +117,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :variant="drawerRunStatus.variant"
         size="sm"
         :icon="drawerRunStatus.icon"
-        class="ml-3"
+        class="ms-3"
       >
         {{ drawerRunStatus.label }}
       </OBadge>

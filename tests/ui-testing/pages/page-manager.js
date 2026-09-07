@@ -110,6 +110,7 @@ import UnflattenedPage from "./logsPages/unflattened.js";
 import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
 import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
 import { SDRTracesIngestionPage } from "./sdrPages/sdrTracesIngestionPage.js";
+import { GenAiTracesIngestionPage } from "./tracesPages/genAiTracesIngestionPage.js";
 import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
 import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationPage.js";
 
@@ -238,6 +239,7 @@ class PageManager {
     this.sdrPatternsPage = new SDRPatternsPage(page);
     this.sdrVerificationPage = new SDRVerificationPage(page);
     this.sdrTracesPage = new SDRTracesIngestionPage(page);
+    this.genAiTracesIngestionPage = new GenAiTracesIngestionPage(page);
     this.streamAssociationPage = new StreamAssociationPage(page);
     this.streamsFormValidation = new StreamsFormValidationPage(page);
 

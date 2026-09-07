@@ -19,7 +19,7 @@ use arrow_schema::Field;
 use config::{
     FileFormat, TIMESTAMP_COL_NAME, get_batch_size, get_config,
     meta::{
-        promql::{EXEMPLARS_LABEL, HASH_LABEL, STREAMING_AGG_TABLE_SUFFIX},
+        promql::{EXEMPLARS_LABEL, HASH_LABEL, HASH_SORTED_TABLE_SUFFIX},
         search::{Session as SearchSession, StorageType},
         stream::{FileKey, StreamType},
     },
@@ -100,14 +100,14 @@ fn create_session_config(
         };
     // config = config.set_bool("datafusion.execution.parquet.reorder_filters", true);
 
-    // chain non-overlapping sorted files into ordered partitions instead of sorting
+    // any declared order: chain non-overlapping files into ordered partitions instead of sorting
     if sort_order.is_sorted() {
         config
             .options_mut()
             .execution
             .split_file_groups_by_statistics = true;
     }
-    // a round-robin exchange would trade the hash chains' ordering for a re-sort
+    // hash-sorted only: timestamp-ordered sessions still want the round-robin exchange
     if sort_order == FileSortOrder::HashTimestampAsc {
         config
             .options_mut()
@@ -515,9 +515,8 @@ pub fn catalog_functions(org_id: &str) -> Vec<CatalogFunction> {
     by_name.into_values().collect()
 }
 
-/// Registers the metrics files as `table_name`; an all-hash-sorted file set
-/// additionally registers `{table_name}__hash_sorted` with the file order
-/// declared, for the streaming aggregation path.
+/// Registers the metrics files; an all-hash-sorted set also registers the
+/// `HASH_SORTED_TABLE_SUFFIX` table with its order declared.
 pub async fn register_metrics_table(
     session: &SearchSession,
     schema: Arc<Schema>,
@@ -544,7 +543,7 @@ pub async fn register_metrics_table(
             .await?;
         let union_table = Arc::new(NewUnionTable::new(schema.clone(), tables));
         ctx.register_table(
-            format!("{table_name}{STREAMING_AGG_TABLE_SUFFIX}"),
+            format!("{table_name}{HASH_SORTED_TABLE_SUFFIX}"),
             union_table,
         )?;
     }
@@ -735,7 +734,7 @@ impl TableBuilder {
             FileFormat::Vortex => {
                 let vortex_session = VortexSession::default().with_tokio();
                 if self.sort_order.is_sorted() {
-                    // bands already parallelize; per-file spawned read-ahead only buys memory
+                    // the shards already parallelize; per-file spawned read-ahead only buys memory
                     let mut options = VortexTableOptions::default();
                     options.scan_concurrency = Some(1);
                     Arc::new(VortexFormat::new_with_options(vortex_session, options))

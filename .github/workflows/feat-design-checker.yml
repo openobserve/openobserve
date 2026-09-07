@@ -15,8 +15,8 @@ jobs:
       pull-requests: read
       statuses: write
     # Only run on pull requests
-    # Nothing runs on a PR without the 'e2e' label, or on a draft; ci-gate alone reports the state.
-    if: (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'e2e') && github.event.pull_request.draft == false)) || (github.event_name == 'issue_comment' && github.event.issue.pull_request) || github.event_name == 'pull_request_review_comment'
+    # Nothing runs on a PR without the 'ready-for-ci' label, or on a draft; ci-gate alone reports the state.
+    if: (github.event_name == 'pull_request' && (contains(github.event.pull_request.labels.*.name, 'ready-for-ci') && github.event.pull_request.draft == false)) || (github.event_name == 'issue_comment' && github.event.issue.pull_request) || github.event_name == 'pull_request_review_comment'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

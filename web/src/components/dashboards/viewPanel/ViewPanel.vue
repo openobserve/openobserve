@@ -17,7 +17,7 @@
 <template>
   <div class="flex h-full flex-col overflow-hidden" data-test="view-panel-screen">
     <div class="flex items-center justify-between p-3">
-      <div class="mr-3 flex min-w-0 items-center text-xl tracking-[0.005em]">
+      <div class="me-3 flex min-w-0 items-center text-xl tracking-[0.005em]">
         <span class="truncate" data-test="dashboard-viewpanel-title">
           {{ dashboardPanelData.data.title }}
         </span>
@@ -101,7 +101,7 @@
               />
               <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div
-                  class="mr-2 flex shrink-0 items-center justify-end"
+                  class="me-2 flex shrink-0 items-center justify-end"
                   data-test="view-panel-last-refreshed-at"
                 >
                   <!-- Error/Warning tooltips -->

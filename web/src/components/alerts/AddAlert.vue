@@ -172,8 +172,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-card-glass-bg stream-config-card [container-type:inline-size] shrink-0 [container-name:stream-config]"
           >
             <div class="border-border-default flex items-center gap-0 border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
-              <span class="text-compact mr-3 font-semibold tracking-[0.01em]">{{
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
+              <span class="text-compact me-3 font-semibold tracking-[0.01em]">{{
                 t("alerts.alertType")
               }}</span>
               <!-- Alert Type -->
@@ -453,10 +453,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- end LEFT column wrapper -->
 
         <!-- TIER 2: Preview + Summary (RIGHT 30%) -->
-        <!-- border-l: full-height vertical divider flush against the Preview/Summary pane -->
+        <!-- border-s: full-height vertical divider flush against the Preview/Summary pane -->
         <div
           v-if="!isCompositeMode"
-          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-l pt-2 pb-2"
+          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pt-2 pb-2"
         >
           <!-- Preview Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -572,6 +572,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <script lang="ts">
 import { raw } from "@/types/i18n";
 import { defineComponent, computed, watch, provide, ref } from "vue";
+import { useStore } from "vuex";
 // eslint-disable-next-line @typescript-eslint/no-unused-vars -- used only in a template `as` cast (:destinations), which eslint-plugin-vue cannot see; vue-tsc keeps it honest
 import type { SelectOption } from "@/lib/forms/Select/OSelect.types";
 import OButton from "@/lib/core/Button/OButton.vue";
@@ -662,6 +663,7 @@ export default defineComponent({
     CompositeAlertForm,
   },
   setup(props, { emit }) {
+    const store = useStore();
     const alertForm = useAlertForm(props, emit);
 
     // Share server SQL-validation squiggle ranges with the descendant query
@@ -844,6 +846,7 @@ export default defineComponent({
         path: "/alerts",
         query: {
           folder: alertForm.activeFolderId.value ?? "default",
+          org_identifier: store.state.selectedOrganization.identifier,
         },
       });
     };

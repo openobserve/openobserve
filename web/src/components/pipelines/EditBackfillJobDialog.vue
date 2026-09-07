@@ -100,7 +100,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="rounded-default bg-banner-warning-bg border-banner-warning-border mt-2 border p-3"
               >
                 <div class="flex items-start">
-                  <OIcon name="warning" size="sm" class="mt-0.5 mr-2" />
+                  <OIcon name="warning" size="sm" class="me-2 mt-0.5" />
                   <div class="text-banner-warning-text text-xs">
                     <div class="mb-1 font-semibold">
                       {{ t("pipeline.irreversibleDeletionWarning") }}
@@ -111,7 +111,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <div class="mb-1 text-xs font-semibold">
                       {{ t("pipeline.timeAlignmentRequirements") }}
                     </div>
-                    <ul class="ml-5 list-disc space-y-0.5 text-xs">
+                    <ul class="ms-5 list-disc space-y-0.5 text-xs">
                       <li>
                         <strong>{{ t("common.logs") }}</strong>
                         {{ t("pipeline.logsHourBoundaryNote") }}
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
         <!-- Error Message -->
         <div v-if="errorMessage" class="text-status-error-text">
-          <OIcon name="error" size="sm" class="mr-2" />
+          <OIcon name="error" size="sm" class="me-2" />
           {{ errorMessage }}
         </div>
       </OForm>

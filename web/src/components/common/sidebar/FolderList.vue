@@ -17,10 +17,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <!-- eslint-disable vue/v-on-event-hyphenation -->
 <!-- eslint-disable vue/attribute-hyphenation -->
 <template>
-  <div class="bg-surface-panel border-border-default flex h-full flex-col border-r pb-1">
+  <div class="bg-surface-panel border-border-default flex h-full flex-col border-e pb-1">
     <div class="folder-header bg-transparent">
       <div
-        class="text-text-heading pl-page-edge flex items-center justify-between gap-2 py-1.5 pr-1.5 text-sm font-semibold"
+        class="text-text-heading ps-page-edge flex items-center justify-between gap-2 py-1.5 pe-1.5 text-sm font-semibold"
       >
         {{ t("dashboard.folders") }}
         <div>

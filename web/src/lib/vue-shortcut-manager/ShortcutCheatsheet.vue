@@ -119,7 +119,7 @@
                   <span class="text-compact text-text-body truncate leading-snug">{{
                     entry.label
                   }}</span>
-                  <div class="ml-4 flex shrink-0 items-center gap-1">
+                  <div class="ms-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
                       <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
                         t("shortcuts.then")
@@ -138,7 +138,7 @@
         </div>
 
         <!-- Right column -->
-        <div class="border-border-default flex flex-col border-l pl-8">
+        <div class="border-border-default flex flex-col border-s ps-8">
           <div
             v-for="(m, idx) in filteredColumns[1]"
             :key="m.title"
@@ -176,7 +176,7 @@
                   <span class="text-compact text-text-body truncate leading-snug">{{
                     entry.label
                   }}</span>
-                  <div class="ml-4 flex shrink-0 items-center gap-1">
+                  <div class="ms-4 flex shrink-0 items-center gap-1">
                     <template v-for="(part, idx) in formatKey(entry.display)" :key="idx">
                       <span v-if="part === 'then'" class="text-3xs text-text-secondary mx-0.5">{{
                         t("shortcuts.then")

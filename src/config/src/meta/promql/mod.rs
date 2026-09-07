@@ -77,7 +77,7 @@ pub const QUANTILE_LABEL: &str = "quantile";
 pub const METADATA_LABEL: &str = "prom_metadata"; // for schema metadata key
 pub const EXEMPLARS_LABEL: &str = "exemplars";
 /// Suffix of the extra table that declares the `(__hash__, _timestamp)` file order.
-pub const STREAMING_AGG_TABLE_SUFFIX: &str = "__hash_sorted";
+pub const HASH_SORTED_TABLE_SUFFIX: &str = "__hash_sorted";
 
 /// Columns that metrics ingestion may exclude when deriving [`HASH_LABEL`].
 ///

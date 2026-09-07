@@ -1,6 +1,5 @@
 {
   // OpenCode configuration for this repo's CI agents.
-  // - e2e-ci-* agents: used by .github/workflows/e2e-council.yml for CI test-generation, on DeepSeek.
   // - ai-review-* agents: used by scripts/ai-review/run-review.mjs (dispatched via `opencode serve`)
   //   for PR code review. ONE shared set, run once per provider by the matrix in
   //   .github/workflows/ai-code-review.yml (DeepSeek-V4-Pro). The model is
@@ -9,22 +8,7 @@
   "$schema": "https://opencode.ai/config.json",
 
   "provider": {
-    "deepseek": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "DeepSeek",
-      "options": {
-        "baseURL": "https://api.deepseek.com",
-        "apiKey": "{env:DEEPSEEK_API_KEY_E2E}"
-      },
-      "models": {
-        "deepseek-v4-pro": {
-          "name": "DeepSeek-V4-Pro",
-          "limit": { "context": 1048576, "output": 262144 }
-        }
-      }
-    },
-    // Separate DeepSeek provider for PR review — distinct from the `deepseek` provider above so
-    // review usage/billing (DEEPSEEK_API_KEY) is isolated from the e2e council (DEEPSEEK_API_KEY_E2E).
+    // DeepSeek provider for PR review (DEEPSEEK_API_KEY).
     "deepseek-review": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "DeepSeek (review)",
@@ -41,47 +25,11 @@
     }
   },
 
-  // Default model for runs that don't pass --model explicitly.
-  // The workflow passes --model deepseek/deepseek-v4-pro per agent invocation.
-  "model": "deepseek/deepseek-v4-pro",
+  // Default model for runs that don't pass --model explicitly. run-review.mjs sends an explicit
+  // model per call, so this is only a fallback for local/manual runs.
+  "model": "deepseek-review/deepseek-v4-pro",
 
-  // Register the CI agents explicitly so `--agent e2e-ci-*` resolves deterministically.
-  // OpenCode does NOT auto-discover agents nested in .opencode/agents/<subdir>/ (the first CI
-  // run fell back to the default agent), so we point each name at its prompt file here.
   "agent": {
-    "e2e-ci-triage": {
-      "mode": "primary",
-      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-triage.md}"
-    },
-    "e2e-ci-analyst": {
-      "mode": "primary",
-      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-analyst.md}"
-    },
-    "e2e-ci-architect": {
-      "mode": "primary",
-      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-architect.md}"
-    },
-    "e2e-ci-engineer": {
-      "mode": "primary",
-      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-engineer.md}"
-    },
-    "e2e-ci-sentinel": {
-      "mode": "primary",
-      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-sentinel.md}"
-    },
-    "e2e-ci-healer": {
-      "mode": "primary",
-      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-healer.md}"
-    },
-    "e2e-ci-refiner": {
-      "mode": "primary",
-      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-refiner.md}"
-    },
-    "e2e-ci-responder": {
-      "mode": "primary",
-      "prompt": "{file:./.opencode/agents/e2e_ci_council_of_agents/e2e-ci-responder.md}"
-    },
-
     // PR review agents. Prompts are assembled at call time in run-review.mjs
     // (shared-rules.md + agents/<key>.md) and sent via the `system` override on
     // session.prompt, so no `prompt` is registered here.

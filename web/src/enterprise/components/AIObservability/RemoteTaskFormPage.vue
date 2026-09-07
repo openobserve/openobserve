@@ -37,7 +37,7 @@
             data-test="ai-remote-task-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.identitySection") }}
               </span>
@@ -68,7 +68,7 @@
             data-test="ai-remote-task-form-endpoint-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.endpointSection") }}
               </span>
@@ -106,7 +106,7 @@
             data-test="ai-remote-task-form-auth-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.authSection") }}
               </span>
@@ -180,7 +180,7 @@
             data-test="ai-remote-task-form-contract-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.contractSection") }}
               </span>
@@ -290,7 +290,7 @@
               class="border-border-default flex items-center justify-between border-b px-3 py-2.5"
             >
               <div class="flex items-center">
-                <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+                <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
                 <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                   {{ t("aiObservability.remoteTasks.form.limitsSection") }}
                 </span>
@@ -342,7 +342,7 @@
             data-test="ai-remote-task-form-signing-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.signingSection") }}
               </span>

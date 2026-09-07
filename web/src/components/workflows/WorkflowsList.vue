@@ -209,7 +209,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
             <template #bottom>
               <!-- h-12 / w-50 are exact rem equivalents of the pixel sizes this
-                   footer used to hardcode, so it renders unchanged. `mr-md` was
+                   footer used to hardcode, so it renders unchanged. The old margin class was
                    dropped — a legacy CSS-framework class this repo does not
                    generate, so it never applied. -->
               <div class="flex h-12 w-full items-center justify-between">

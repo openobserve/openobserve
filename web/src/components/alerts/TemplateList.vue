@@ -164,7 +164,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #cell-actions="{ row }">
             <OButton
               :title="t('alert_templates.exportTemplate')"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-sm"
               @click.stop="exportTemplate(row)"
@@ -175,7 +175,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-update-template`"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-sm"
               :title="
@@ -189,7 +189,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-clone-template`"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-sm"
               :title="t('alert_templates.clone')"
@@ -200,7 +200,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
             <OButton
               :data-test="`alert-template-list-${row.name}-delete-template`"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-sm"
               :title="

@@ -26,7 +26,7 @@
           class="flex w-full flex-col"
         >
           <div class="flex" :style="{ marginLeft: isChild ? '-3rem' : '0' }">
-            <div class="relative mr-1.5 min-h-12.5 w-2.5">
+            <div class="relative me-1.5 min-h-12.5 w-2.5">
               <!-- Vertical Line using top & bottom instead of height -->
               <div
                 class="bg-accent absolute top-0 w-px opacity-50"
@@ -59,7 +59,7 @@
                   "
                   icon-key="icon"
                   label-position="inside"
-                  class="o2-custom-select-dashboard arg-type-select mr-0.5 w-fit! flex-none!"
+                  class="o2-custom-select-dashboard arg-type-select me-0.5 w-fit! flex-none!"
                   :required="isRequired(fields.functionName, argIndex)"
                   :data-test="`dashboard-function-dropdown-arg-type-selector-${argIndex}`"
                 >

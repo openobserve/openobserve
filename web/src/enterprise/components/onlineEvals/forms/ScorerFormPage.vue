@@ -35,7 +35,7 @@
             data-test="scorer-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.identitySection")
               }}</span>
@@ -114,7 +114,7 @@
             data-test="scorer-form-judge-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.judgeSection")
               }}</span>
@@ -289,7 +289,7 @@
                     @click="addExtraField"
                   >
                     {{ t("onlineEvals.scorer.extraFields.addButton") }}
-                    <span class="text-text-secondary ml-1 font-normal">
+                    <span class="text-text-secondary ms-1 font-normal">
                       ({{ formValues.extraMetadataFields.length }} / {{ MAX_EXTRA_FIELDS }})
                     </span>
                   </OButton>
@@ -315,7 +315,7 @@
             data-test="scorer-form-endpoint-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.endpointSection")
               }}</span>
@@ -324,7 +324,7 @@
               <div>
                 <label class="text-text-heading mb-1 flex items-center text-xs font-semibold">
                   {{ t("onlineEvals.scorer.remoteUrlLabel") }}
-                  <span class="text-status-error-text ml-0.5">*</span>
+                  <span class="text-status-error-text ms-0.5">*</span>
                 </label>
                 <div class="scorer-url-bar grid grid-cols-[6.5rem_minmax(0,1fr)] gap-0">
                   <OFormSelect
@@ -385,7 +385,7 @@
             data-test="scorer-form-auth-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.authSection")
               }}</span>
@@ -488,11 +488,11 @@
             data-test="scorer-form-headers-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.headersSection")
               }}</span>
-              <span class="text-2xs text-text-secondary ml-auto italic">
+              <span class="text-2xs text-text-secondary ms-auto italic">
                 {{ t("onlineEvals.scorer.remoteHeaders.subtitle") }}
               </span>
             </div>
@@ -559,7 +559,7 @@
             data-test="scorer-form-body-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">{{
                 t("onlineEvals.scorer.requestBodySection")
               }}</span>

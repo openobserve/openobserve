@@ -16,7 +16,7 @@
         <OIcon name="content-copy" size="xs" />
       </OButton>
     </span>
-    <span v-if="isStreamField && !hideSearchTermActions" class="mr-1">
+    <span v-if="isStreamField && !hideSearchTermActions" class="me-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"
@@ -29,7 +29,7 @@
         </OIcon>
       </OButton>
     </span>
-    <span v-if="isStreamField && !hideSearchTermActions" class="mr-1">
+    <span v-if="isStreamField && !hideSearchTermActions" class="me-1">
       <OButton
         variant="ghost"
         size="icon-xs-circle"

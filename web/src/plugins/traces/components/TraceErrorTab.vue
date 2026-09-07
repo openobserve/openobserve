@@ -30,7 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="trace-details-sidebar-error-summary"
   >
     <div class="flex-col items-center gap-1">
-      <div class="text-text-label! w-full pb-0.5 pl-2 text-sm tracking-[0.03rem]">
+      <div class="text-text-label! w-full ps-2 pb-0.5 text-sm tracking-[0.03rem]">
         {{
           spanStatusCode
             ? t("traces.traceErrorTab.httpStatusCode")
@@ -61,10 +61,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="trace-details-sidebar-db-response-status-code"
   >
     <div class="flex-col items-center gap-1">
-      <div class="text-text-label! text-3xs w-full pb-0.5 pl-2 tracking-[0.03rem]">
+      <div class="text-text-label! text-3xs w-full ps-2 pb-0.5 tracking-[0.03rem]">
         {{ t("traces.traceErrorTab.dbResponseStatusCode") }}
       </div>
-      <div class="flex items-center pl-2">
+      <div class="flex items-center ps-2">
         <span
           class="text-status-error-text text-sm font-semibold"
           data-test="trace-details-sidebar-db-response-status-code-value"
@@ -82,10 +82,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     data-test="trace-details-sidebar-process-exit-code"
   >
     <div class="flex-col items-center gap-1">
-      <div class="text-text-label! text-3xs w-full pb-0.5 pl-2 tracking-[0.03rem]">
+      <div class="text-text-label! text-3xs w-full ps-2 pb-0.5 tracking-[0.03rem]">
         {{ t("traces.traceErrorTab.processExitCode") }}
       </div>
-      <div class="flex items-center pl-2">
+      <div class="flex items-center ps-2">
         <span
           class="text-status-error-text text-sm font-semibold"
           data-test="trace-details-sidebar-process-exit-code-value"
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <div
       v-if="errorBannerMessage"
-      class="text-text-secondary mb-1 ml-6 text-sm"
+      class="text-text-secondary ms-6 mb-1 text-sm"
       data-test="trace-details-sidebar-error-summary-message"
     >
       {{ errorBannerMessage }}
@@ -166,7 +166,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 t("traces.messageLabel")
               }}</span>
               <div
-                class="text-text-secondary bg-code-bg rounded-default border-l-status-warning-text border-l-3 p-2 text-sm leading-normal break-words whitespace-pre-wrap"
+                class="text-text-secondary bg-code-bg rounded-default border-s-status-warning-text border-s-3 p-2 text-sm leading-normal break-words whitespace-pre-wrap"
               >
                 {{ formatExceptionMessage(row["exception.message"]) }}
               </div>
@@ -213,7 +213,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="bg-code-bg text-text-muted border-border-default rounded-default flex items-center justify-center border border-dashed px-3 py-4 text-xs italic"
                 data-test="exception-stacktrace-empty"
               >
-                <OIcon name="info" size="sm" class="mr-1" />
+                <OIcon name="info" size="sm" class="me-1" />
                 <span>{{ t("traces.noStacktraceAvailable") }}</span>
               </div>
             </div>

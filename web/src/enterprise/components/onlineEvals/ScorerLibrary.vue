@@ -60,7 +60,7 @@ the Free Software Foundation, either version 3 of the License, or
       </div>
 
       <div
-        class="border-border-default mb-3 flex items-center justify-between gap-3 border-b pr-3 pb-2 pl-4.25"
+        class="border-border-default mb-3 flex items-center justify-between gap-3 border-b ps-4.25 pe-3 pb-2"
       >
         <label
           v-if="filteredEntries.length > 0"
@@ -95,7 +95,7 @@ the Free Software Foundation, either version 3 of the License, or
               :data-test="`scorer-library-item-${entry.name}`"
               @click="toggle(entry)"
             >
-              <div class="shrink-0 pr-2">
+              <div class="shrink-0 pe-2">
                 <OCheckbox
                   :model-value="isSelected(entry.name)"
                   @update:model-value="toggle(entry)"

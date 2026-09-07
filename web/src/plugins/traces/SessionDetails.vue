@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     <OIcon
                       name="info"
                       size="xs"
-                      class="text-text-muted ml-[0.15rem] cursor-default"
+                      class="text-text-muted ms-[0.15rem] cursor-default"
                     />
                     <OTooltip max-width="17.5rem">
                       <template #content>
@@ -627,7 +627,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                             </span>
                             <div class="flex-1"></div>
                             <OButton variant="outline" size="sm" @click="openTrace(trace.traceId)">
-                              <OIcon name="open-in-new" size="xs" class="mr-1" />
+                              <OIcon name="open-in-new" size="xs" class="me-1" />
                               {{ t("traces.sessionDetail.openInTraceExplorer") }}
                             </OButton>
                           </div>
