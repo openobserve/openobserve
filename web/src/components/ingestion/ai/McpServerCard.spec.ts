@@ -49,10 +49,11 @@ vi.mock("@/composables/useMcpCredential", async () => {
 import McpServerCard from "./McpServerCard.vue";
 import { MCP_READONLY_ROLE } from "@/composables/useMcpCredential";
 
-const COPY_STUB = {
-  name: "CopyContent",
-  template: '<div data-test="mcp-copy">{{ content }}</div>',
-  props: ["content"],
+// Stubbed so assertions read the props rather than highlight.js-decorated markup.
+const CODE_BLOCK_STUB = {
+  name: "OCodeBlock",
+  template: '<div data-test="mcp-code">{{ codeMasked ?? code }}</div>',
+  props: ["code", "codeMasked", "lang", "chrome", "filename"],
 };
 
 const CREDENTIAL: McpCredential = {
@@ -61,6 +62,12 @@ const CREDENTIAL: McpCredential = {
   role: MCP_READONLY_ROLE,
   scope: "readonly",
 };
+
+// Several blocks render (endpoint, credential, config), so pick by data-test.
+const codeBlock = (wrapper: ReturnType<typeof mount>, test: string) =>
+  wrapper.findAllComponents(CODE_BLOCK_STUB).find((c) => c.attributes("data-test") === test)!;
+const configBlock = (wrapper: ReturnType<typeof mount>) =>
+  codeBlock(wrapper, "ai-integrations-mcp-config");
 
 const mountCard = (zoConfig: Record<string, unknown> = {}) =>
   mount(McpServerCard, {
@@ -74,7 +81,7 @@ const mountCard = (zoConfig: Record<string, unknown> = {}) =>
           routes: [{ path: "/", component: { template: "<div />" } }],
         }),
       ],
-      stubs: { CopyContent: COPY_STUB },
+      stubs: { OCodeBlock: CODE_BLOCK_STUB },
     },
   });
 
@@ -84,6 +91,26 @@ describe("McpServerCard", () => {
     mcp.generating = false;
     mcp.error = "";
     mcp.credential = null;
+  });
+
+  // The card is a host for the shared setup card, not a layout of its own.
+  describe("layout", () => {
+    it("renders two steps through the shared setup card, with no hero of its own", () => {
+      const wrapper = mountCard();
+
+      expect(wrapper.findComponent({ name: "SetupCardRenderer" }).exists()).toBe(true);
+      expect(wrapper.findAllComponents({ name: "OStep" })).toHaveLength(2);
+      // The IAM page header already names the card.
+      expect(wrapper.find(".c-hero").exists()).toBe(false);
+    });
+
+    it("puts the endpoint on the first step", () => {
+      const wrapper = mountCard();
+
+      expect(codeBlock(wrapper, "ai-integrations-mcp-endpoint").props("code")).toBe(
+        "https://o2.example.com/api/default/mcp",
+      );
+    });
   });
 
   describe("auth mode", () => {
@@ -158,16 +185,43 @@ describe("McpServerCard", () => {
       const wrapper = mountCard();
       const expected = `Basic ${b64EncodeStandard(`${CREDENTIAL.email}:${CREDENTIAL.token}`)}`;
 
-      expect(wrapper.text()).toContain(expected);
+      expect(configBlock(wrapper).props("code")).toContain(expected);
+    });
+
+    // The copyable code carries the token; nothing rendered on the page may.
+    it("masks the token in every rendered code block", () => {
+      mcp.credential = CREDENTIAL;
+      const wrapper = mountCard();
+      const header = codeBlock(wrapper, "ai-integrations-mcp-credential-header");
+
+      expect(wrapper.text()).not.toContain(CREDENTIAL.token);
+      expect(configBlock(wrapper).props("codeMasked")).toContain("Basic \u2022");
+      expect(header.props("codeMasked")).toContain("Basic \u2022");
+      expect(header.props("code")).toContain(
+        b64EncodeStandard(`${CREDENTIAL.email}:${CREDENTIAL.token}`),
+      );
+    });
+
+    // CopyContent expanded [BASIC_PASSCODE] on screen, printing a real credential.
+    it("shows a placeholder header, not a credential, before generating", () => {
+      const wrapper = mountCard();
+      const block = configBlock(wrapper);
+
+      expect(block.props("code")).toContain("Basic <base64 of service-account-email:token>");
+      expect(block.props("codeMasked")).toBeUndefined();
       expect(wrapper.text()).not.toContain("[BASIC_PASSCODE]");
     });
 
-    // CopyContent expands [BASIC_PASSCODE] on screen, so it would print a real credential.
-    it("shows a placeholder header, not a credential, before generating", () => {
+    it("labels the snippet with the selected client's config file", async () => {
       const wrapper = mountCard();
 
-      expect(wrapper.text()).toContain("Basic <base64 of service-account-email:token>");
-      expect(wrapper.text()).not.toContain("[BASIC_PASSCODE]");
+      // SSO is off in this mount, so the client picker is the only tab strip.
+      await wrapper.findComponent({ name: "OTabs" }).vm.$emit("update:modelValue", "cursor");
+
+      const block = configBlock(wrapper);
+      expect(block.props("lang")).toBe("json");
+      expect(block.props("filename")).toBe("~/.cursor/mcp.json");
+      expect(block.props("chrome")).toBe("editor");
     });
   });
 

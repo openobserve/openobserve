@@ -3669,10 +3669,10 @@
       "crossLinkBody": "{brand} exposes a {product} (MCP) endpoint so AI clients like {client1}, {client2} and {client3} can query and act on this organization. Setup and credentials live in IAM.",
       "crossLinkCta": "Open MCP setup",
       "tagline": "Connect {client1}, {client2}, {client3} and other AI clients to this organization over the {product} (MCP).",
-      "endpointLabel": "MCP endpoint",
-      "authLabel": "1. Authentication",
-      "clientLabel": "2. Choose your client",
-      "configLabel": "3. Add the configuration",
+      "connectLabel": "Endpoint and authentication",
+      "connectHint": "Point your MCP client at this URL, then choose how it signs in.",
+      "configLabel": "Add the configuration",
+      "configHint": "Pick your client, then copy the config into place.",
       "auth": {
         "oauth": "OAuth — sign in (recommended)",
         "token": "Access token",
@@ -3693,7 +3693,6 @@
       },
       "securityTitle": "Use a dedicated, least-privilege credential",
       "securityBody": "Give the MCP client a scoped, read-only service account rather than your own account credentials, and never commit its token to source control.",
-      "docsCta": "Read the full MCP documentation",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
