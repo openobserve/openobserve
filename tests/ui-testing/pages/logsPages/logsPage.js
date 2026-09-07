@@ -10075,6 +10075,27 @@ export class LogsPage {
     }
 
     /**
+     * Expect the Build tab to be the selected tab.
+     * OToggleGroupItem binds $attrs onto Reka's ToggleGroupItem, so data-test and the
+     * data-state it stamps sit on the same element. BuildQueryPage mounts only while
+     * the tab is selected, so both are checked.
+     */
+    async expectBuildTabSelected(timeout = 15000) {
+        await expect(this.page.locator(this.buildToggle)).toHaveAttribute('data-state', 'on', { timeout });
+        await expect(this.page.locator(this.buildQueryPage)).toBeVisible({ timeout });
+        testLogger.info('Build tab is the selected tab');
+    }
+
+    /**
+     * Expect the Logs tab to be the selected tab (BuildQueryPage unmounted).
+     */
+    async expectLogsTabSelected(timeout = 15000) {
+        await expect(this.page.locator(this.logsToggle)).toHaveAttribute('data-state', 'on', { timeout });
+        await expect(this.page.locator(this.buildQueryPage)).toHaveCount(0, { timeout });
+        testLogger.info('Logs tab is the selected tab');
+    }
+
+    /**
      * Expect Builder mode (Auto mode) to be active
      */
     async expectBuilderModeActive(timeout = 15000) {
@@ -10227,10 +10248,12 @@ export class LogsPage {
      * @param {string} chartId - The chart type ID (e.g., 'bar', 'line', 'metric', 'table')
      */
     async selectChartType(chartId) {
-        // Use .first() to handle multiple matching elements (e.g., from cached panels)
-        const chartItem = this.page.locator(this.chartTypeItem(chartId)).first();
+        // The Build and Visualize tabs each mount a PanelEditor, so the chart list is in
+        // the DOM twice; the cached one is zero-size and .first() would resolve to it.
+        const chartItem = this.page.locator(this.chartTypeItem(chartId)).locator('visible=true').first();
 
-        // Click the chart item (tests should check visibility before calling this)
+        await chartItem.waitFor({ state: 'visible', timeout: 15000 });
+        await chartItem.scrollIntoViewIfNeeded();
         await chartItem.click();
         await this.page.waitForTimeout(500);
         testLogger.info(`Selected chart type: ${chartId}`);
@@ -10241,8 +10264,8 @@ export class LogsPage {
      * @param {string} chartId - The chart type ID
      */
     async expectChartTypeVisible(chartId) {
-        const chartItem = this.page.locator(this.chartTypeItem(chartId)).first();
-        await expect(chartItem).toBeVisible();
+        const chartItem = this.page.locator(this.chartTypeItem(chartId)).locator('visible=true').first();
+        await expect(chartItem).toBeVisible({ timeout: 15000 });
         testLogger.info(`Chart type "${chartId}" is visible`);
     }
 
