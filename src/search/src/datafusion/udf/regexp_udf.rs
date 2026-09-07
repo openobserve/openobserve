@@ -293,7 +293,8 @@ impl ScalarUDFImpl for RegxpMatchToFields {
                 ColumnarValue::Array(arr) => Some(arr.len()),
             });
 
-        let inferred_length = len.unwrap_or(0);
+        // All-scalar input still carries one row to match.
+        let inferred_length = len.unwrap_or(1);
         let args_array = args
             .args
             .iter()
@@ -547,5 +548,22 @@ mod tests {
     fn test_regex_pattern_to_fields_empty_pattern_errors() {
         let result = regex_pattern_to_fields("", &DataType::Utf8);
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_regexp_match_to_fields_scalar_input() {
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEXP_MATCH_TO_FIELDS_UDF.clone());
+        let sql =
+            "select regexp_match_to_fields('gateway', '(?P<head>gate)(?P<tail>way)') as fields";
+        let expected = [
+            "+-------------------------+",
+            "| fields                  |",
+            "+-------------------------+",
+            "| {head: gate, tail: way} |",
+            "+-------------------------+",
+        ];
+        let result = ctx.sql(sql).await.unwrap().collect().await.unwrap();
+        assert_batches_eq!(expected, &result);
     }
 }

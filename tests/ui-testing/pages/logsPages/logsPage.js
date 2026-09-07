@@ -2241,6 +2241,16 @@ export class LogsPage {
         // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
         await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
         await this.waitForEditorValue('LIMIT 10');
+        // waitForEditorValue only confirms searchObj.data.query has flushed — it says
+        // nothing about searchObj.meta.sqlMode, a SEPARATE debounced auto-detect effect
+        // (SearchBar.vue's onQueryEditorUpdate) that can still be mid-flight. A LIMIT
+        // clause is invalid outside SQL mode, so callers that skip an explicit SQL-mode
+        // step (e.g. Streams/streaming.spec.js) would race the backend into rejecting it
+        // with "LIMIT is not supported without SQL mode". Force the real flag here so this
+        // query is deterministically SQL-mode regardless of caller or auto-detect timing.
+        if (!(await this._isSqlModeEnabledViaVue())) {
+            await this._setSqlModeViaVue(true);
+        }
     }
 
     async kubernetesContainerNameJoinLike() {
@@ -4772,8 +4782,12 @@ export class LogsPage {
 
     async clickMenuLinkLogsItem() {
         await this.clickMenuLinkByType('logs');
-        // Sidebar nav is an in-SPA route change; gate on the Logs view toggle re-mounting (present in every tab mode) before callers read persisted state.
-        await expect(this.page.locator(this.visualizeToggle)).toBeVisible({ timeout: 15000 });
+        // Sidebar nav is an in-SPA route change; gate on the Search toggle re-mounting before
+        // callers read persisted state. Unlike visualizeToggle, this item has no v-if guard
+        // (zoConfig.timechart_enabled, enterprise, viewport width), so it's present in every
+        // tab mode and every environment — visualizeToggle never renders when timechart_enabled
+        // is off (e.g. alpha1), which left this wait to time out every run.
+        await expect(this.page.locator(this.logsToggle)).toBeVisible({ timeout: 15000 });
     }
 
     async clickMenuLinkTracesItem() {
@@ -7807,6 +7821,18 @@ export class LogsPage {
     }
 
     /**
+     * Read the real searchObj.meta.sqlMode flag via the prod-safe `_vnode` walk.
+     * Unlike isSqlModeEnabled() (a text heuristic on the editor content), this reflects
+     * what the app will actually send as sql_mode on the next search — the app's own
+     * client-side auto-detect (query contains SELECT/FROM) is debounced, so a query typed
+     * programmatically can visibly contain "select"/"from" before searchObj.meta.sqlMode
+     * has actually flipped. Returns null if Vue state could not be located.
+     */
+    async _isSqlModeEnabledViaVue() {
+        return await this._mutateSearchObj((searchObj) => searchObj.meta.sqlMode === true);
+    }
+
+    /**
      * Read `searchObj` via the prod-safe `_vnode` walk and apply `mutate(searchObj)`
      * inside `page.evaluate`. Returns whatever the mutate fn returns (defaults to true
      * on success). Use this instead of `__vueParentComponent` walks anywhere that
@@ -8820,7 +8846,14 @@ export class LogsPage {
      * state access is unavailable.
      */
     async enableSqlModeIfNeeded() {
-        const isSQL = await this.isSqlModeEnabled();
+        // Read the real searchObj.meta.sqlMode flag rather than the editor-text heuristic
+        // (isSqlModeEnabled): when the caller has already typed a full SQL query (e.g. a
+        // join with a LIMIT clause) before calling this, the editor text contains
+        // "select"/"from" immediately, but the app's own auto-detect that flips the real
+        // flag is debounced — so the text-based check reported "already on" while the app
+        // still submitted with sql_mode=false, and the backend rejected the LIMIT clause.
+        // Checking the real flag closes that race instead of gambling on the debounce.
+        const isSQL = await this._isSqlModeEnabledViaVue();
         if (isSQL) {
             testLogger.info('enableSqlModeIfNeeded: SQL mode already on — skipping');
             return;

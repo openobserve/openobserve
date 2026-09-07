@@ -439,20 +439,15 @@ pub async fn move_synthetics(
     // Resolve slug → KSUID PK. Auto-create the default folder when necessary,
     // matching the behaviour of create_synthetic.
     let dst_pk = if dst_folder_id == DEFAULT_FOLDER {
-        if !folders::exists(org_id, DEFAULT_FOLDER, FolderType::Synthetics)
+        let folder = Folder {
+            folder_id: DEFAULT_FOLDER.to_owned(),
+            name: "default".to_owned(),
+            description: "default".to_owned(),
+            icon: None,
+        };
+        folders::get_or_create(org_id, folder, FolderType::Synthetics)
             .await
-            .map_err(|e| anyhow::anyhow!(e.to_string()))?
-        {
-            let folder = Folder {
-                folder_id: DEFAULT_FOLDER.to_owned(),
-                name: "default".to_owned(),
-                description: "default".to_owned(),
-                icon: None,
-            };
-            folders::put(org_id, None, folder, FolderType::Synthetics)
-                .await
-                .map_err(|e| anyhow::anyhow!(e.to_string()))?;
-        }
+            .map_err(|e| anyhow::anyhow!(e.to_string()))?;
         folders::get_pk_by_name(org_id, DEFAULT_FOLDER, FolderType::Synthetics)
             .await
             .map_err(|e| anyhow::anyhow!(e.to_string()))?
