@@ -355,6 +355,25 @@ pub static SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL: Lazy<IntCounter> = Lazy::new(|| 
     .expect("Metric created")
 });
 
+/// Free-step counters the metering pass could not write back.
+///
+/// The window is already posted to the provider and the offset already
+/// advanced, so the draw cannot be retried: a persistent failure re-grants the
+/// same free steps every window and bills nothing for them. Silent under-billing
+/// otherwise — the error log at the call site carries the org.
+pub static SYNTHETICS_GRANT_WRITEBACK_FAILURES_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_grant_writeback_failures_total",
+            "Settled synthetics windows whose free-step counters failed to persist.".to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
 /// Usage rows the self-reporting queue REFUSED — SPEC §9B.1 row 8, alerted on
 /// by **A4**. The only observable failure in the emit path: `report_usage`
 /// spawns and returns `()`, so callers cannot see a failure; the enqueue inside
@@ -2482,6 +2501,9 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
+        .register(Box::new(SYNTHETICS_GRANT_WRITEBACK_FAILURES_TOTAL.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(USAGE_ENQUEUE_FAILURES_TOTAL.clone()))
