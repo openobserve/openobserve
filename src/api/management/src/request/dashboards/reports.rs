@@ -682,7 +682,9 @@ pub async fn update_report_v2(
     Headers(user_email): Headers<UserEmail>,
     axum::Json(mut report): axum::Json<Report>,
 ) -> Response {
-    report.last_edited_by = user_email.user_id;
+    // The authorization subject comes from the header, never from the body.
+    let user_id = user_email.user_id;
+    report.last_edited_by = user_id.clone();
     // ?folder on update means "move to this folder"; absent means stay in current folder.
     let new_folder: Option<String> = uri.query().and_then(|q| {
         url::form_urlencoded::parse(q.as_bytes())
@@ -701,7 +703,7 @@ pub async fn update_report_v2(
         if !check_permissions(
             &report_id,
             &org_id,
-            &report.last_edited_by,
+            &user_id,
             "reports",
             "PUT",
             Some(&curr_folder),
@@ -917,22 +919,26 @@ pub async fn trigger_report_v2(Path((org_id, report_id)): Path<(String, String)>
 )]
 pub async fn move_reports(
     Path(org_id): Path<String>,
-    OriginalUri(uri): OriginalUri,
     Headers(user_email): Headers<UserEmail>,
     axum::Json(req): axum::Json<MoveReportsRequestBody>,
 ) -> Response {
     let _user_id = user_email.user_id;
-    let _folder_id = get_folder(uri.query().unwrap_or(""));
-
     #[cfg(feature = "enterprise")]
     for id in &req.report_ids {
+        // The report's stored folder, not `?folder=`: the query param is caller
+        // supplied, so authorizing against it lets the caller name a folder they
+        // do hold and move a report out of one they do not.
+        let curr_folder = match reports::get_by_id(&org_id, id).await {
+            Ok((folder, _)) => folder.folder_id,
+            Err(e) => return e.into(),
+        };
         if !check_permissions(
             id,
             &org_id,
             &_user_id,
             "reports",
             "PUT",
-            Some(&_folder_id),
+            Some(&curr_folder),
             false,
             true,
             false,

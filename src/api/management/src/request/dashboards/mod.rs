@@ -23,7 +23,7 @@ use db::dashboards as dashboards_db;
 use hashbrown::HashMap;
 use openobserve_api_common::extractors::Headers;
 #[cfg(feature = "enterprise")]
-use openobserve_core::auth::{check_folder_write_permissions, check_permissions};
+use openobserve_core::auth::check_permissions;
 use openobserve_core::{auth::UserEmail, dashboards};
 
 use crate::{
@@ -405,12 +405,8 @@ pub async fn move_dashboard(
     if !ensure_dashboard_in_org(&org_id, &dashboard_id).await {
         return MetaHttpResponse::not_found("Dashboard not found");
     }
-    // The middleware gates the source folder only; `req_body.to` is the write target.
-    #[cfg(feature = "enterprise")]
-    if !check_folder_write_permissions(&org_id, &user_email.user_id, "folders", &req_body.to).await
-    {
-        return MetaHttpResponse::forbidden("Unauthorized Access");
-    }
+    // The destination is authorized inside `dashboards::move_dashboard`, which
+    // both routes go through — see the check hoisted out of `_check_openfga`.
     match dashboards::move_dashboard(
         &org_id,
         &dashboard_id,

@@ -52,10 +52,10 @@ use super::{Alert, QueryCondition, StreamType};
 /// ```
 #[derive(Clone, Debug, Deserialize, ToSchema)]
 pub struct CreateAlertRequestBody {
-    /// Ignored. The destination folder is taken from the `folder` query
+    /// Deprecated. The destination folder is taken from the `folder` query
     /// parameter, which is what the permission check authorizes; the default
-    /// folder is used when it is absent. Retained so existing payloads that
-    /// carry it still deserialize.
+    /// folder is used when it is absent. A value here that disagrees with the
+    /// query parameter is rejected with 400 rather than silently ignored.
     #[schema(deprecated, example = "default")]
     pub folder_id: Option<String>,
 

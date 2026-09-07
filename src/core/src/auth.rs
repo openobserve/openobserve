@@ -707,8 +707,9 @@ pub async fn check_folder_write_permissions(
 /// A source-folder check proves the caller may take the object out, never that
 /// they may put it into a destination folder they cannot otherwise reach.
 ///
-/// Accepts POST or PUT: creating an object in a folder is authorized as POST on
-/// the folder, so a move or clone into it must not demand a stricter grant.
+/// Checks POST, the verb the create routes require on a folder: putting an
+/// object into a folder is authorized the same way whether it arrives by
+/// create, move or clone.
 #[cfg(feature = "enterprise")]
 pub async fn check_folder_write_permissions(
     org_id: &str,
@@ -716,24 +717,18 @@ pub async fn check_folder_write_permissions(
     folder_type: &str,
     folder_id: &str,
 ) -> bool {
-    for method in ["POST", "PUT"] {
-        if check_permissions(
-            folder_id,
-            org_id,
-            user_id,
-            folder_type,
-            method,
-            None,
-            false,
-            false,
-            true,
-        )
-        .await
-        {
-            return true;
-        }
-    }
-    false
+    check_permissions(
+        folder_id,
+        org_id,
+        user_id,
+        folder_type,
+        "POST",
+        None,
+        false,
+        false,
+        true,
+    )
+    .await
 }
 
 #[cfg(feature = "enterprise")]
