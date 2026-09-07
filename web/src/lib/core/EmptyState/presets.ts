@@ -501,6 +501,23 @@ export const emptyStatePresets = {
       },
     ],
   },
+  // This team has no ownership rules yet. The catch-all row below still
+  // answers "where do alerts go meanwhile" — this preset only owns the
+  // "nothing pages this team" fact and the one way to fix it.
+  "no-team-routing": {
+    illustration: "connect",
+    variant: "create",
+    titleKey: "emptyState.noTeamRouting.title",
+    descriptionKey: "emptyState.noTeamRouting.description",
+    actions: [
+      {
+        id: "add",
+        icon: "add",
+        titleKey: "emptyState.noTeamRouting.action",
+        descriptionKey: "emptyState.noTeamRouting.actionDesc",
+      },
+    ],
+  },
   // No lanes on the calendar. A blank rotation and a preset ladder are two
   // equally valid ways in, so both get a card rather than one being the
   // button and the other a smaller afterthought beside it.

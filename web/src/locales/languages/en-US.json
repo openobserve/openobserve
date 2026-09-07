@@ -480,6 +480,12 @@
       "action": "Add an ownership rule",
       "actionDesc": "Pick a dimension and a value. No rule language."
     },
+    "noTeamRouting": {
+      "title": "No routing configured for this team",
+      "description": "This team won't be paged until a rule matches an incoming alert.",
+      "action": "Add a rule",
+      "actionDesc": "Pick a service, a place, or both — the same picker as any other rule."
+    },
     "noOncallSchedule": {
       "title": "Create your first rotation",
       "description": "A rotation decides who's on call and when. Set one up to start covering this schedule.",
@@ -18216,7 +18222,7 @@
     "routingListTitle": "What pages this team",
     "routingListHint": "first matching rule wins",
     "routingRuleOverlaps": "overlaps a more specific row",
-    "routingEverythingElseHint": "no rule in this org claims it",
+    "routingEverythingElseHint": "used only when no team's rule claims the alert",
     "routingSetCatchAll": "Set a default team",
     "routingChangeCatchAll": "Change",
     "routingCatchAllRowSet": "Set a team",
@@ -18241,8 +18247,9 @@
     "routingNoLadder": "no escalation ladder yet",
     "routingPagesTeam": "pages {team}",
     "routingCaughtLast": "{count} page · last {when} | {count} pages · last {when}",
-    "routingElseGoesTo": "All other alerts and incidents go to {team}",
-    "routingElseNobody": "All other alerts and incidents page nobody",
+    "routingEmptyBodyNamed": "{team} won't be paged until a rule matches an incoming alert.",
+    "routingElseGoesTo": "Unmatched alerts across the org go to {team}",
+    "routingElseNobody": "Unmatched alerts across the org page nobody",
     "routingCatchAllVolume": "{signals} · {fires}",
     "routingUnclaimedCount": "{count} unclaimed | {count} unclaimed",
     "routingUnclaimedAbsorbed": "landed in the catch-all — claim them to give them an owner.",
@@ -18259,7 +18266,6 @@
     "dimensionNounHost": "host",
     "dimensionNounAccount": "account",
     "dimensionNounDatabase": "database",
-    "routingNoRules": "No rule claims anything for this team yet. Everything falls to the last row.",
     "ruleEditorConditions": "Conditions",
     "ruleEditorConditionsHint": "A page has to match every condition, value for value.",
     "ruleEditorTeamLabel": "Page this team",

@@ -257,7 +257,7 @@ describe("OnCallRoutingList", () => {
       const wrapper = render();
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-routing-catch-all-team"]').text()).toBe(
-        "All other alerts and incidents page nobody",
+        "Unmatched alerts across the org page nobody",
       );
       expect(wrapper.find('[data-test="oncall-routing-catch-all-set"]').text()).toContain(
         "Set a team",
@@ -268,7 +268,7 @@ describe("OnCallRoutingList", () => {
       const wrapper = render({ defaultTeamId: "team_2" });
       await flushPromises();
       expect(wrapper.find('[data-test="oncall-routing-catch-all-team"]').text()).toBe(
-        "All other alerts and incidents go to Payments",
+        "Unmatched alerts across the org go to Payments",
       );
     });
 
@@ -474,12 +474,23 @@ describe("OnCallRoutingList", () => {
     expect((wrapper.emitted("remove")?.[0]?.[0] as { rule_id: string }).rule_id).toBe("r_broad");
   });
 
-  /// An empty rule set is not an empty screen: everything falls to the last
-  /// row, and that row is still there saying so.
-  it("keeps the catch-all row when there are no rules at all", async () => {
+  /// An empty rule set is not an empty screen: it says plainly that nothing
+  /// pages this team, offers the one fix, and the catch-all row still shows
+  /// what happens org-wide in the meantime.
+  it("shows a clear empty state and keeps the catch-all row when there are no rules at all", async () => {
     const wrapper = render({ rules: [] });
     await flushPromises();
     expect(wrapper.find('[data-test="oncall-routing-catch-all"]').exists()).toBe(true);
-    expect(wrapper.find('[data-test="oncall-routing-no-rules"]').exists()).toBe(true);
+    const empty = wrapper.find('[data-test="oncall-routing-empty-state"]');
+    expect(empty.exists()).toBe(true);
+    expect(empty.text()).toContain("No routing configured for this team");
+    expect(empty.text()).toContain("Search won't be paged until a rule matches an incoming alert.");
+  });
+
+  it("opens the new-rule editor from the empty state's action", async () => {
+    const wrapper = render({ rules: [] });
+    await flushPromises();
+    await wrapper.find('[data-test="oncall-routing-empty-state"] button').trigger("click");
+    expect(wrapper.findComponent({ name: "OnCallRuleEditor" }).props("open")).toBe(true);
   });
 });
