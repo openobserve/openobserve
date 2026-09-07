@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`rum-errors-kpi-${card.key}-card`"
     >
       <span
-        class="text-text-label max-md:text-3xs flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase max-md:block max-md:w-full max-md:truncate"
+        class="text-text-label max-md:text-3xs flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase max-md:block max-md:w-full max-md:truncate max-md:tracking-normal max-md:normal-case"
       >
         {{ card.label }}
         <OTag

@@ -284,7 +284,7 @@
               <div class="flex w-25 items-center text-xs font-normal max-md:hidden">
                 {{ resultTotal }} {{ t("search_scheduler_job.results") }}
               </div>
-              <div class="ms-auto me-2">
+              <div class="ms-auto me-2 max-md:hidden">
                 {{ t("search_scheduler_job.max_limit") }} :
                 <b>1000</b>
               </div>

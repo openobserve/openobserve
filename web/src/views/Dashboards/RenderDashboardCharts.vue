@@ -1823,6 +1823,9 @@ export default defineComponent({
    layout back). Section headers keep their natural short height. */
 @media (max-width: 47.99rem) {
   .displayDiv :deep(.grid-stack) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
     height: auto !important;
   }
   .displayDiv :deep(.grid-stack > .grid-stack-item) {
@@ -1833,13 +1836,14 @@ export default defineComponent({
     min-width: 100% !important;
     height: 20rem !important;
     min-height: 20rem !important;
-    margin-bottom: 0.5rem;
   }
-  /* Single-value tiles don't earn a chart's height. */
+  /* Single-value tiles don't earn a chart's height or width: two per row. */
   .displayDiv :deep(.grid-stack > .grid-stack-item:has([data-panel-type="metric"])),
   .displayDiv :deep(.grid-stack > .grid-stack-item:has([data-panel-type="gauge"])) {
-    height: 10rem !important;
-    min-height: 10rem !important;
+    width: calc(50% - 0.25rem) !important;
+    min-width: calc(50% - 0.25rem) !important;
+    height: 8rem !important;
+    min-height: 8rem !important;
   }
   .displayDiv :deep(.grid-stack > .grid-stack-item.panel-section-header) {
     height: 2.5rem !important;

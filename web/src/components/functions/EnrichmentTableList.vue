@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <OSearchInput
                   data-test="enrichment-tables-search-input"
                   v-model="filterQuery"
-                  class="ms-auto w-64 max-md:ms-0 max-md:w-full"
+                  class="ms-auto w-64 max-md:order-last max-md:ms-0 max-md:w-full max-md:basis-full"
                   :placeholder="t('function.searchEnrichmentTable')"
                 />
               </div>
