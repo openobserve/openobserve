@@ -33,7 +33,7 @@ use openobserve_core::llm_evaluations::{
             ExperimentAggregateSummary, ExperimentClientScoreSummary, ExperimentProgress,
             ExperimentResultScore, ExperimentResultScoreStatus, ExperimentResultSlot,
             ExperimentResultTaskStatus, ExperimentScoreSummary, ExperimentSkipSummary,
-            ExperimentSlotStatus, ScoringStatus,
+            ExperimentSlotStatus, ExperimentSummaryStatus, ScoringStatus,
         },
     },
 };
@@ -643,6 +643,12 @@ pub struct ExperimentPreviewQuery {
 
 #[derive(Debug, Clone, Deserialize, IntoParams)]
 #[serde(rename_all = "camelCase")]
+pub struct ExperimentListQuery {
+    pub include_summary: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize, IntoParams)]
+#[serde(rename_all = "camelCase")]
 pub struct ExperimentDetailQuery {
     pub sample_size: Option<usize>,
     pub result_page: Option<usize>,
@@ -917,10 +923,10 @@ pub struct ExperimentResponseBody {
     pub scorers: Vec<PinnedExperimentScorerBody>,
     pub trial_count: u32,
     pub metadata: Option<Value>,
-    pub status: ExperimentStatusBody,
-    pub status_reason: Option<String>,
+    pub execution_status: ExperimentStatusBody,
+    pub execution_status_reason: Option<String>,
     pub deadline_at: i64,
-    pub completed_at: Option<i64>,
+    pub execution_completed_at: Option<i64>,
     pub lifecycle_version: i64,
     pub retry_count: u32,
     pub idempotency_key: Option<String>,
@@ -955,10 +961,10 @@ impl From<Experiment> for ExperimentResponseBody {
             scorers: value.scorers.into_iter().map(Into::into).collect(),
             trial_count: value.trial_count,
             metadata: value.metadata,
-            status: value.status.into(),
-            status_reason: value.status_reason,
+            execution_status: value.status.into(),
+            execution_status_reason: value.status_reason,
             deadline_at: value.deadline_at,
-            completed_at: value.completed_at,
+            execution_completed_at: value.completed_at,
             lifecycle_version: value.lifecycle_version,
             retry_count: value.retry_count,
             idempotency_key: value.idempotency_key,
@@ -967,6 +973,52 @@ impl From<Experiment> for ExperimentResponseBody {
             created_at: value.created_at,
         }
     }
+}
+
+#[derive(Clone, Copy, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ExperimentSummaryStatusBody {
+    Pending,
+    Running,
+    Scoring,
+    Completed,
+    Cancelled,
+    ExecutionFailed,
+    ScoringFailed,
+}
+
+impl From<ExperimentSummaryStatus> for ExperimentSummaryStatusBody {
+    fn from(value: ExperimentSummaryStatus) -> Self {
+        match value {
+            ExperimentSummaryStatus::Pending => Self::Pending,
+            ExperimentSummaryStatus::Running => Self::Running,
+            ExperimentSummaryStatus::Scoring => Self::Scoring,
+            ExperimentSummaryStatus::Completed => Self::Completed,
+            ExperimentSummaryStatus::Cancelled => Self::Cancelled,
+            ExperimentSummaryStatus::ExecutionFailed => Self::ExecutionFailed,
+            ExperimentSummaryStatus::ScoringFailed => Self::ScoringFailed,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ExperimentSummaryResponseBody {
+    pub status: Option<ExperimentSummaryStatusBody>,
+    #[schema(value_type = Option<String>)]
+    pub scoring_status: Option<ScoringStatus>,
+    pub execution_progress: Option<ExperimentProgressBody>,
+    pub scoring_progress: Option<ExperimentProgressBody>,
+    pub score_summaries: Option<Vec<ExperimentScoreSummaryBody>>,
+    pub aggregate_summary: Option<ExperimentAggregateSummaryBody>,
+}
+
+#[derive(Clone, Debug, Serialize, ToSchema)]
+pub struct ExperimentViewResponseBody {
+    #[serde(flatten)]
+    pub experiment: ExperimentResponseBody,
+    #[serde(flatten)]
+    pub summary: Option<ExperimentSummaryResponseBody>,
 }
 
 /// The result of a Baseline change, naming both ends of the move.
@@ -983,7 +1035,7 @@ pub struct ExperimentBaselineResponseBody {
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ExperimentDetailResponseBody {
-    pub experiment: ExperimentResponseBody,
+    pub experiment: ExperimentViewResponseBody,
     pub preview: ExperimentPreviewResponseBody,
     pub results: ExperimentResultsResponseBody,
 }
@@ -1035,18 +1087,10 @@ pub struct ExperimentResultsResponseBody {
     pub scores: Vec<Value>,
     pub slots: Vec<ExperimentResultSlotBody>,
     pub pagination: ExperimentResultPaginationBody,
-    pub task_progress: ExperimentProgressBody,
-    pub scoring_progress: ExperimentProgressBody,
-    /// Derived state of every applicable Score. A final comparison and every CI
-    /// assertion require this to be terminal.
-    #[schema(value_type = String)]
-    pub scoring_status: ScoringStatus,
     pub skip_summary: ExperimentSkipSummaryBody,
-    pub score_summaries: Vec<ExperimentScoreSummaryBody>,
     /// Dimensions the customer's own code reported. Empty for a run whose
     /// Scores all came from platform Scorers.
     pub client_score_summaries: Vec<ExperimentClientScoreSummaryBody>,
-    pub aggregate_summary: ExperimentAggregateSummaryBody,
     /// Trial dispersion for the cases on this page, always measured over the
     /// Experiment's full evidence so paging never splits a case's trials.
     pub row_dispersions: Vec<ExperimentRowDispersionBody>,
@@ -1421,7 +1465,7 @@ impl From<CreateExperimentResult> for CreateExperimentResponseBody {
 #[derive(Clone, Debug, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ListExperimentsResponseBody {
-    pub list: Vec<ExperimentResponseBody>,
+    pub list: Vec<ExperimentViewResponseBody>,
 }
 
 #[cfg(test)]
@@ -1581,5 +1625,143 @@ mod tests {
             serde_json::from_value::<ExperimentResultTaskStatusBody>(serde_json::json!("other"))
                 .is_err()
         );
+    }
+
+    #[test]
+    fn execution_only_response_uses_explicit_execution_field_names() {
+        let body = ExperimentResponseBody::from(Experiment {
+            id: "experiment-1".to_string(),
+            org_id: "org-1".to_string(),
+            name: "Contract".to_string(),
+            description: None,
+            dataset_id: "dataset-1".to_string(),
+            dataset_version: 1,
+            dataset_filter: None,
+            task: ExperimentTaskConfig::Sdk {
+                task_fingerprint: "sha256:test".to_string(),
+                config: serde_json::json!({}),
+            },
+            scorers: Vec::new(),
+            trial_count: 1,
+            metadata: None,
+            status: ExperimentStatus::Completed,
+            status_reason: Some("done".to_string()),
+            deadline_at: 1,
+            completed_at: Some(2),
+            lifecycle_version: 1,
+            retry_count: 0,
+            scores_settled_at: Some(2),
+            idempotency_key: None,
+            is_baseline: false,
+            created_by: "owner@example.com".to_string(),
+            created_at: 1,
+        });
+
+        let value = serde_json::to_value(body).unwrap();
+
+        assert_eq!(value["executionStatus"], serde_json::json!("completed"));
+        assert_eq!(value["executionStatusReason"], serde_json::json!("done"));
+        assert_eq!(value["executionCompletedAt"], serde_json::json!(2));
+        for legacy in ["status", "statusReason", "completedAt"] {
+            assert!(
+                value.get(legacy).is_none(),
+                "legacy field {legacy} was serialized"
+            );
+        }
+    }
+
+    #[test]
+    fn enriched_view_omits_summary_or_serializes_failed_components_as_null() {
+        let experiment = || ExperimentResponseBody {
+            id: "experiment-1".to_string(),
+            org_id: "org-1".to_string(),
+            name: "Contract".to_string(),
+            description: None,
+            dataset_id: "dataset-1".to_string(),
+            dataset_name: Some("Dataset".to_string()),
+            dataset_version: 1,
+            dataset_filter: None,
+            task: ExperimentTaskBody::Sdk {
+                task_fingerprint: "sha256:test".to_string(),
+                config: serde_json::json!({}),
+            },
+            scorers: Vec::new(),
+            trial_count: 1,
+            metadata: None,
+            execution_status: ExperimentStatusBody::Completed,
+            execution_status_reason: None,
+            deadline_at: 1,
+            execution_completed_at: Some(2),
+            lifecycle_version: 1,
+            retry_count: 0,
+            idempotency_key: None,
+            is_baseline: false,
+            created_by: "owner@example.com".to_string(),
+            created_at: 1,
+        };
+        let fields = [
+            "status",
+            "scoringStatus",
+            "executionProgress",
+            "scoringProgress",
+            "scoreSummaries",
+            "aggregateSummary",
+        ];
+
+        let omitted = serde_json::to_value(ExperimentViewResponseBody {
+            experiment: experiment(),
+            summary: None,
+        })
+        .unwrap();
+        for field in fields {
+            assert!(
+                omitted.get(field).is_none(),
+                "summary field {field} was serialized"
+            );
+        }
+
+        let failed = serde_json::to_value(ExperimentViewResponseBody {
+            experiment: experiment(),
+            summary: Some(ExperimentSummaryResponseBody {
+                status: None,
+                scoring_status: None,
+                execution_progress: None,
+                scoring_progress: None,
+                score_summaries: None,
+                aggregate_summary: None,
+            }),
+        })
+        .unwrap();
+        for field in fields {
+            assert_eq!(failed.get(field), Some(&serde_json::Value::Null));
+        }
+    }
+
+    #[test]
+    fn list_summary_is_an_explicit_camel_case_opt_in() {
+        let enabled: ExperimentListQuery =
+            serde_json::from_value(serde_json::json!({"includeSummary": true})).unwrap();
+        let omitted: ExperimentListQuery = serde_json::from_value(serde_json::json!({})).unwrap();
+
+        assert_eq!(enabled.include_summary, Some(true));
+        assert_eq!(omitted.include_summary, None);
+    }
+
+    #[test]
+    fn result_page_omits_fields_moved_to_the_enriched_experiment_view() {
+        let value = serde_json::to_value(ExperimentResultsResponseBody::default()).unwrap();
+
+        for moved in [
+            "taskProgress",
+            "scoringProgress",
+            "scoringStatus",
+            "scoreSummaries",
+            "aggregateSummary",
+        ] {
+            assert!(
+                value.get(moved).is_none(),
+                "moved field {moved} was serialized"
+            );
+        }
     }
 }

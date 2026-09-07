@@ -30,7 +30,7 @@ use openobserve_core::{
             dispersion::{self, NormalizationSpans, RowDispersion},
             ingest::{self, IngestError},
             results::{self, ExperimentResultSlot, ExperimentSlotStatus},
-            usage,
+            summary,
         },
         remote_tasks,
     },
@@ -46,15 +46,17 @@ use crate::{
         experiments::{
             CloneExperimentRequestBody, CreateExperimentRequestBody, CreateExperimentResponseBody,
             ExperimentBaselineResponseBody, ExperimentDetailQuery, ExperimentDetailResponseBody,
-            ExperimentDispersionSummaryBody, ExperimentPreviewQuery, ExperimentPreviewResponseBody,
-            ExperimentResponseBody, ExperimentResultPaginationBody, ExperimentResultRowBody,
-            ExperimentResultRowPageQuery, ExperimentResultRowPageResponseBody,
-            ExperimentResultRowPaginationBody, ExperimentResultRowSortBody,
-            ExperimentResultsResponseBody, ExperimentRowDetailResponseBody,
-            ExperimentRowNavigationBody, ExperimentRowSnapshotBody, ExperimentScoreSummaryBody,
-            ExperimentSlotPageQuery, ExperimentSlotPageResponseBody, ExperimentTaskBody,
-            ListExperimentsResponseBody, RetryExperimentSlotRequestBody,
-            SubmitExperimentRecordsRequestBody, SubmitExperimentRecordsResponseBody,
+            ExperimentDispersionSummaryBody, ExperimentListQuery, ExperimentPreviewQuery,
+            ExperimentPreviewResponseBody, ExperimentResponseBody, ExperimentResultPaginationBody,
+            ExperimentResultRowBody, ExperimentResultRowPageQuery,
+            ExperimentResultRowPageResponseBody, ExperimentResultRowPaginationBody,
+            ExperimentResultRowSortBody, ExperimentResultsResponseBody,
+            ExperimentRowDetailResponseBody, ExperimentRowNavigationBody,
+            ExperimentRowSnapshotBody, ExperimentScoreSummaryBody, ExperimentSlotPageQuery,
+            ExperimentSlotPageResponseBody, ExperimentSummaryResponseBody, ExperimentTaskBody,
+            ExperimentViewResponseBody, ListExperimentsResponseBody,
+            RetryExperimentSlotRequestBody, SubmitExperimentRecordsRequestBody,
+            SubmitExperimentRecordsResponseBody,
         },
     },
 };
@@ -171,6 +173,35 @@ fn score_summary_bodies(
             body
         })
         .collect()
+}
+
+fn experiment_summary_body(
+    summary: summary::ExperimentSummary,
+    score_configs: &[infra::table::score_configs::ScoreConfig],
+) -> ExperimentSummaryResponseBody {
+    let summary::ExperimentSummary {
+        status,
+        execution_progress,
+        scoring_status,
+        scoring_progress,
+        score_summaries,
+        aggregate_summary,
+        scorer_definitions,
+    } = summary;
+    let score_summaries = match (score_summaries, scorer_definitions) {
+        (Some(summaries), Some(definitions)) => {
+            Some(score_summary_bodies(summaries, &definitions, score_configs))
+        }
+        _ => None,
+    };
+    ExperimentSummaryResponseBody {
+        status: status.map(Into::into),
+        scoring_status,
+        execution_progress: execution_progress.map(Into::into),
+        scoring_progress: scoring_progress.map(Into::into),
+        score_summaries,
+        aggregate_summary: aggregate_summary.map(Into::into),
+    }
 }
 
 fn experiment_result_row_status(slots: &[ExperimentResultSlot]) -> ExperimentSlotStatus {
@@ -500,11 +531,15 @@ pub async fn create_experiment(
     context_path = "/api",
     tag = "Experiments",
     operation_id = "ListExperiments",
-    params(("org_id" = String, Path, description = "Organization name")),
+    params(
+        ("org_id" = String, Path, description = "Organization name"),
+        ExperimentListQuery,
+    ),
     responses((status = 200, body = inline(ListExperimentsResponseBody))),
 )]
 pub async fn list_experiments(
     Path(org_id): Path<String>,
+    Query(query): Query<ExperimentListQuery>,
     Headers(user): Headers<UserEmail>,
 ) -> Response {
     let permitted_objects = match openobserve_api_common::auth::validator::list_objects_for_user(
@@ -527,26 +562,55 @@ pub async fn list_experiments(
                 .collect()
         })
         .unwrap_or_default();
-    match experiments::list(&org_id).await {
-        Ok(experiments) => MetaHttpResponse::json(ListExperimentsResponseBody {
-            list: experiments
-                .into_iter()
-                .filter(|experiment| {
-                    is_ofga_object_visible(
-                        &org_id,
-                        "experiment",
-                        &experiment.id,
-                        permitted_objects.as_deref(),
-                    )
-                })
-                .map(|experiment| {
-                    let dataset_name = dataset_names.get(&experiment.dataset_id).cloned();
-                    ExperimentResponseBody::from(experiment).with_dataset_name(dataset_name)
-                })
-                .collect(),
-        }),
-        Err(error) => experiment_error_response(error),
-    }
+    let experiments = match experiments::list(&org_id).await {
+        Ok(experiments) => experiments
+            .into_iter()
+            .filter(|experiment| {
+                is_ofga_object_visible(
+                    &org_id,
+                    "experiment",
+                    &experiment.id,
+                    permitted_objects.as_deref(),
+                )
+            })
+            .collect::<Vec<_>>(),
+        Err(error) => return experiment_error_response(error),
+    };
+    let include_summary = query.include_summary.unwrap_or(false);
+    let mut summaries = if include_summary {
+        summary::load(&experiments).await
+    } else {
+        HashMap::new()
+    };
+    let score_configs = if include_summary {
+        infra::table::score_configs::get_all_by_org(&org_id)
+            .await
+            .unwrap_or_else(|error| {
+                log::warn!("[ExperimentSummary] component=score_configs error={error}");
+                Vec::new()
+            })
+    } else {
+        Vec::new()
+    };
+    MetaHttpResponse::json(ListExperimentsResponseBody {
+        list: experiments
+            .into_iter()
+            .map(|experiment| {
+                let id = experiment.id.clone();
+                let dataset_name = dataset_names.get(&experiment.dataset_id).cloned();
+                ExperimentViewResponseBody {
+                    experiment: ExperimentResponseBody::from(experiment)
+                        .with_dataset_name(dataset_name),
+                    summary: include_summary.then(|| {
+                        experiment_summary_body(
+                            summaries.remove(&id).unwrap_or_default(),
+                            &score_configs,
+                        )
+                    }),
+                }
+            })
+            .collect(),
+    })
 }
 
 #[utoipa::path(
@@ -608,15 +672,6 @@ pub async fn get_experiment(
         }
     };
     let spans = NormalizationSpans::from_configs(&score_configs);
-    let scorer_definitions = match experiments::scorer_definitions(&org_id, &experiment).await {
-        Ok(definitions) => definitions,
-        Err(error) => {
-            log::error!(
-                "[Experiment] failed to load Scorer definitions for {experiment_id}: {error}"
-            );
-            return MetaHttpResponse::internal_error("Failed to load Experiment results");
-        }
-    };
     let results = match openobserve_core::llm_evaluations::experiments::runner::results_page(
         &experiment,
         result_page,
@@ -636,21 +691,6 @@ pub async fn get_experiment(
                 &summary_executions,
                 &summary_scores,
             );
-            let mut aggregate_summary = results::aggregate_summary(
-                &summary_executions,
-                &summary.task_progress,
-                &summary.scoring_progress,
-            );
-            let scoring_cost =
-                usage::scoring_cost(&experiment, &scorer_definitions, &summary.score_summaries)
-                    .await
-                    .unwrap_or_else(|error| {
-                        log::warn!(
-                            "[Experiment] failed to load scoring cost for {experiment_id}: {error}"
-                        );
-                        usage::ScoringCost::unavailable()
-                    });
-            scoring_cost.apply_to(&mut aggregate_summary);
             // Measured over the whole Experiment, then narrowed to this page:
             // a case's trials can straddle a page boundary, and half a case's
             // trials would understate how much it disagreed with itself.
@@ -691,24 +731,12 @@ pub async fn get_experiment(
                     total_slots: results.total_slots,
                     has_more: results.has_more,
                 },
-                task_progress: summary.task_progress.into(),
-                scoring_status: results::scoring_status(
-                    &summary.scoring_progress,
-                    &summary.score_summaries,
-                ),
-                scoring_progress: summary.scoring_progress.into(),
                 skip_summary: summary.skip_summary.into(),
-                score_summaries: score_summary_bodies(
-                    summary.score_summaries,
-                    &scorer_definitions,
-                    &score_configs,
-                ),
                 client_score_summaries: summary
                     .client_score_summaries
                     .into_iter()
                     .map(Into::into)
                     .collect(),
-                aggregate_summary: aggregate_summary.into(),
                 row_dispersions,
                 dispersion_summary,
             }
@@ -722,8 +750,16 @@ pub async fn get_experiment(
         .await
         .ok()
         .map(|dataset| dataset.name);
+    let mut summaries = summary::load(std::slice::from_ref(&experiment)).await;
+    let summary = experiment_summary_body(
+        summaries.remove(&experiment.id).unwrap_or_default(),
+        &score_configs,
+    );
     MetaHttpResponse::json(ExperimentDetailResponseBody {
-        experiment: ExperimentResponseBody::from(experiment).with_dataset_name(dataset_name),
+        experiment: ExperimentViewResponseBody {
+            experiment: ExperimentResponseBody::from(experiment).with_dataset_name(dataset_name),
+            summary: Some(summary),
+        },
         preview: preview.into(),
         results,
     })
