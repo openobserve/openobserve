@@ -3679,18 +3679,20 @@
         "oauthNote": "No credential to manage: your MCP client opens a browser to sign in, and access is scoped by your existing permissions. Use it whenever your client supports OAuth."
       },
       "credential": {
-        "quickStartTitle": "Quick start — your account",
-        "quickStartBody": "Snippets use your own credentials, which carry your full permissions. For production, create a dedicated read-only service account in IAM instead.",
-        "creating": "Creating a read-only credential…",
-        "created": "Read-only credential created",
+        "quickStartTitle": "No token yet",
+        "quickStartBody": "The snippets below carry a placeholder header. Generate a dedicated token for this MCP client, or paste an existing service account token in its place.",
+        "generate": "Generate dedicated token",
+        "created": "Dedicated token created",
         "shownOnce": "For {email}. Copy it now — the token is shown only once and the snippets below now use it.",
         "download": "Download",
         "manage": "Manage / revoke",
-        "readonlyWarn": "The account was created but the read-only role couldn't be applied automatically — review its permissions in Service Accounts.",
+        "readonlyWarn": "The account was created but couldn't be added to the {role} role — it has no permissions until you assign one in IAM.",
+        "readonlyNote": "Scoped read-only through the {role} role — review or extend it in IAM › Roles.",
+        "rbacNote": "RBAC is off in this deployment, so this token can't be scoped read-only — it has the same access as any other credential for this organization.",
         "error": "Couldn't create the credential. Try again, or create a service account manually in IAM."
       },
       "securityTitle": "Use a dedicated, least-privilege credential",
-      "securityBody": "These snippets use your own account credentials, which carry your full permissions. For production, use a scoped read-only service account and never commit tokens to source control.",
+      "securityBody": "Give the MCP client a scoped, read-only service account rather than your own account credentials, and never commit its token to source control.",
       "docsCta": "Read the full MCP documentation",
       "clients": {
         "claudeCode": "Claude Code",

@@ -24,17 +24,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
      Needs Enterprise/Cloud AND SSO enabled: the discovery endpoints are compiled
      out of the OSS build and 404 while Dex is off, so the tab is hidden in both
      cases and token mode is the default.
-   • Access token — Basic auth. Entering this tab mints a scoped, read-only
-     service account and injects its show-once token into every snippet, so the
-     copied config works as-is. Minting needs rbac + service accounts (see
-     useMcpCredential); without them the snippets fall back to the user's own
-     credentials ([BASIC_PASSCODE], masked by CopyContent), which works too.
+   • Access token — Basic auth. Until "Generate" is pressed the snippets show a
+     placeholder header, never a real credential. Generating mints a service
+     account — joined to the shared mcp_readonly role when rbac is on — and
+     injects its show-once token into every snippet. The button is unconditional:
+     the server, not the UI, rejects what it can't do.
 
   Each client's config is produced by a single build(endpoint, auth) function so
   the OAuth (auth=null → no header) and token variants can never drift.
 -->
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, ref } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import { useStore } from "vuex";
 import { useRouter } from "vue-router";
@@ -43,10 +43,9 @@ import type { CardSubstitutions } from "./content/renderMarkdown";
 import { safeHttpUrl } from "./content/renderMarkdown";
 import { b64EncodeStandard } from "@/utils/zincutils";
 import config from "@/aws-exports";
-import { useMcpCredential } from "@/composables/useMcpCredential";
+import { MCP_READONLY_ROLE, useMcpCredential } from "@/composables/useMcpCredential";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
-import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTabs from "@/lib/navigation/Tabs/OTabs.vue";
 import OTab from "@/lib/navigation/Tabs/OTab.vue";
 
@@ -58,7 +57,7 @@ const props = defineProps<{
 const { t } = useI18nTyped();
 const store = useStore();
 const router = useRouter();
-const { generate, generating, error: genError, credential, canGenerate } = useMcpCredential();
+const { generate, generating, error: genError, credential } = useMcpCredential();
 
 const endpoint = computed(() => `${props.subs.url}/api/${props.subs.org}/mcp`);
 
@@ -77,28 +76,17 @@ const authMode = computed<"oauth" | "token">(() =>
   oauthAvailable.value ? selectedAuthMode.value : "token",
 );
 
-// A token snippet is only copy-paste-ready once it carries a real token, so mint on arrival.
-watch(
-  authMode,
-  (mode) => {
-    if (mode === "token" && !credential.value && !generating.value && canGenerate()) {
-      generate();
-    }
-  },
-  { immediate: true },
-);
+// Not [BASIC_PASSCODE]: CopyContent expands it to the user's real credential, which
+// then renders in cleartext because maskText is a no-op.
+const TOKEN_PLACEHOLDER = "Basic <base64 of service-account-email:token>";
 
-// The Authorization header VALUE injected into token-mode snippets:
-//  • generated credential → real base64(email:token), shown once;
-//  • otherwise → the [BASIC_PASSCODE] placeholder, which CopyContent masks on
-//    screen and substitutes with the user's own passcode on copy.
-// OAuth mode passes null so build() omits the header entirely.
-const tokenAuthValue = computed(() => {
-  if (credential.value) {
-    return `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`;
-  }
-  return "Basic [BASIC_PASSCODE]";
-});
+// The Authorization header VALUE injected into token-mode snippets. OAuth mode
+// passes null so build() omits the header entirely.
+const tokenAuthValue = computed(() =>
+  credential.value
+    ? `Basic ${b64EncodeStandard(`${credential.value.email}:${credential.value.token}`)}`
+    : TOKEN_PLACEHOLDER,
+);
 const authValue = computed(() => (authMode.value === "oauth" ? null : tokenAuthValue.value));
 
 // The `Basic <base64>` line for the generated credential's reveal + download.
@@ -305,6 +293,8 @@ const openDeepLink = () => {
   }
 };
 
+const onGenerate = () => generate();
+
 const downloadCredential = () => {
   if (!credentialHeader.value) return;
   const blob = new Blob([credentialHeader.value], { type: "text/plain" });
@@ -380,23 +370,26 @@ const openDocs = () => {
       class="rounded-surface border-border-default bg-surface-panel flex flex-col gap-3 border p-3"
       data-test="ai-integrations-mcp-credential"
     >
-      <!-- Minting the read-only credential -->
-      <template v-if="generating">
-        <div class="flex items-center gap-2" data-test="ai-integrations-mcp-credential-creating">
-          <OSpinner size="sm" />
-          <span class="font-semibold">{{ t("ingestion.mcp.credential.creating") }}</span>
-        </div>
-      </template>
-
       <!-- No dedicated credential: the snippets fall back to the user's own passcode -->
-      <template v-else-if="!credential">
-        <div class="flex flex-col gap-1">
-          <div class="font-semibold">
-            {{ t("ingestion.mcp.credential.quickStartTitle") }}
+      <template v-if="!credential">
+        <div class="flex items-start justify-between gap-3">
+          <div class="flex flex-col gap-1">
+            <div class="font-semibold">
+              {{ t("ingestion.mcp.credential.quickStartTitle") }}
+            </div>
+            <p class="text-text-secondary">
+              {{ t("ingestion.mcp.credential.quickStartBody") }}
+            </p>
           </div>
-          <p class="text-text-secondary">
-            {{ t("ingestion.mcp.credential.quickStartBody") }}
-          </p>
+          <OButton
+            variant="primary"
+            size="sm-action"
+            :loading="generating"
+            data-test="ai-integrations-mcp-generate-btn"
+            @click="onGenerate"
+          >
+            {{ t("ingestion.mcp.credential.generate") }}
+          </OButton>
         </div>
         <p v-if="genError" class="text-error" data-test="ai-integrations-mcp-credential-error">
           {{ genError }}
@@ -436,11 +429,21 @@ const openDocs = () => {
           </OButton>
         </div>
         <p
-          v-if="!credential.readonlyApplied"
+          v-if="credential.scope === 'unscoped'"
           class="text-warning"
           data-test="ai-integrations-mcp-readonly-warn"
         >
-          {{ t("ingestion.mcp.credential.readonlyWarn") }}
+          {{ t("ingestion.mcp.credential.readonlyWarn", { role: MCP_READONLY_ROLE }) }}
+        </p>
+        <p
+          v-else-if="credential.scope === 'rbacDisabled'"
+          class="text-text-secondary"
+          data-test="ai-integrations-mcp-rbac-note"
+        >
+          {{ t("ingestion.mcp.credential.rbacNote") }}
+        </p>
+        <p v-else class="text-text-secondary" data-test="ai-integrations-mcp-readonly-note">
+          {{ t("ingestion.mcp.credential.readonlyNote", { role: credential.role }) }}
         </p>
       </template>
     </div>
