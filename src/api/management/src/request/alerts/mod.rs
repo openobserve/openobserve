@@ -4019,14 +4019,6 @@ mod tests {
     }
 
     #[test]
-    fn test_alert_destination_missing_is_bad_request() {
-        assert_eq!(
-            status(AlertError::AlertDestinationMissing),
-            StatusCode::BAD_REQUEST
-        );
-    }
-
-    #[test]
     fn test_alert_id_missing_is_bad_request() {
         assert_eq!(status(AlertError::AlertIdMissing), StatusCode::BAD_REQUEST);
     }

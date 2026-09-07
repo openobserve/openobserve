@@ -113,9 +113,6 @@ pub enum AlertError {
     #[error("Alert name cannot contain '/'")]
     AlertNameContainsForwardSlash,
 
-    #[error("Alert destination or workflows is required")]
-    AlertDestinationMissing,
-
     /// The warning/critical pair is invalid for the chosen operator.
     /// "Less severe" is direction-dependent — see `level::validate_thresholds`.
     #[error("Invalid warning threshold: {0}")]
@@ -935,15 +932,6 @@ mod destination_wiring_tests {
         assert!(
             body.contains("db::alerts::destinations::get("),
             "prepare_alert must still resolve each named destination"
-        );
-    }
-
-    #[test]
-    fn an_empty_destination_list_is_no_longer_a_rejection() {
-        let body = prepare_alert_body();
-        assert!(
-            !body.contains("AlertDestinationMissing"),
-            "the destination-emptiness rejection must be gone from prepare_alert"
         );
     }
 }
@@ -6150,10 +6138,6 @@ mod tests {
         assert_eq!(
             AlertError::AlertNameMissing.to_string(),
             "Alert name is required"
-        );
-        assert_eq!(
-            AlertError::AlertDestinationMissing.to_string(),
-            "Alert destination or workflows is required"
         );
         assert_eq!(AlertError::AlertNotFound.to_string(), "Alert not found");
         assert_eq!(
