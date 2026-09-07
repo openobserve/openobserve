@@ -57,7 +57,7 @@ use o2_openfga::{
 };
 
 #[cfg(feature = "enterprise")]
-use crate::auth::check_permissions;
+use crate::auth::{check_folder_write_permissions, check_permissions};
 
 /// An error that occurs interacting with dashboards.
 #[derive(Debug, thiserror::Error)]
@@ -630,6 +630,16 @@ pub async fn move_dashboard(
         {
             return Err(DashboardError::PermissionDenied);
         }
+    }
+
+    // Outside `_check_openfga`: the source gate differs per route (the single
+    // move relies on the middleware), but the destination is never authorized
+    // anywhere else, so this must run for every caller.
+    #[cfg(feature = "enterprise")]
+    if get_openfga_config().enabled
+        && !check_folder_write_permissions(org_id, _user_id, "folders", to_folder).await
+    {
+        return Err(DashboardError::PermissionDenied);
     }
 
     let hash = dashboard.hash.clone();

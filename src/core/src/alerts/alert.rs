@@ -71,7 +71,7 @@ use search::{
 use svix_ksuid::Ksuid;
 
 #[cfg(feature = "enterprise")]
-use crate::auth::check_permissions;
+use crate::auth::{check_folder_write_permissions, check_permissions};
 use crate::{
     alerts::{
         QueryConditionExt, build_sql, destinations,
@@ -953,6 +953,13 @@ pub async fn move_to_folder<C: ConnectionTrait + TransactionTrait>(
     dst_folder_id: &str,
     _user_id: &str,
 ) -> Result<(), AlertError> {
+    #[cfg(feature = "enterprise")]
+    if get_openfga_config().enabled
+        && !check_folder_write_permissions(org_id, _user_id, "alert_folders", dst_folder_id).await
+    {
+        return Err(AlertError::PermissionDenied);
+    }
+
     for alert_id in alert_ids {
         let _alert_id_str = alert_id.to_string();
 
