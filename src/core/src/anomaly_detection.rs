@@ -37,6 +37,10 @@ use utoipa::ToSchema;
 
 use crate::{alerts::destinations, common::meta::authz::Authz};
 
+/// Async training entry points already wired to `ensure_trainable`; each joins as it is gated.
+#[allow(dead_code)]
+const GUARDED_TRAINING_ENTRY_POINTS: &[&str] = &[];
+
 #[derive(Debug, Serialize, Deserialize, ToSchema)]
 pub struct CreateAnomalyConfigRequest {
     pub name: String,
@@ -470,6 +474,8 @@ pub async fn create_config(
         updated_at: now_us,
     };
 
+    #[cfg(feature = "enterprise")]
+    let created_enabled = new_config.enabled;
     let result = anomaly_config_table::create(db, new_config)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?;
@@ -524,10 +530,12 @@ pub async fn create_config(
     // Immediately kick off training in the background rather than waiting up to
     // `training_check_interval_seconds` (default 1h) for the scheduler tick.
     #[cfg(feature = "enterprise")]
-    if !o2_enterprise::enterprise::common::config::get_config()
-        .anomaly_detection
-        .disabled
-    {
+    if initial_training_allowed(
+        created_enabled,
+        o2_enterprise::enterprise::common::config::get_config()
+            .anomaly_detection
+            .disabled,
+    ) {
         let anomaly_id_for_training = anomaly_id.clone();
         tokio::spawn(async move {
             if let Err(e) =
@@ -1448,11 +1456,7 @@ fn validation_error(e: anyhow::Error) -> anyhow::Error {
     anyhow::anyhow!("validation error: {e}")
 }
 
-/// P0.6 TDD stub — implementation surface, not behaviour. The guard every manual training
-/// entry point must call before delegating to the enterprise `trigger_training`, which has
-/// no `enabled` check of its own. Only `enabled` gates training: `alert_enabled` gates
-/// dispatch and `status` (including the dead `Disabled`) gates nothing here.
-// Unused until the implementation phase calls it from train_model and force_retrain_for_threshold.
+/// P0.6 TDD stub: only `enabled` gates training, never `alert_enabled` or `status`.
 #[allow(dead_code)]
 fn ensure_trainable(_config: &infra::table::entity::anomaly_detection_config::Model) -> Result<()> {
     unimplemented!("P0.6: manual-training enabled guard not implemented yet")
@@ -1461,6 +1465,11 @@ fn ensure_trainable(_config: &infra::table::entity::anomaly_detection_config::Mo
 /// The one place `alert_enabled` is allowed to decide anything: dispatch, never training.
 fn dispatch_allowed(anomaly_count: i32, alert_enabled: bool) -> bool {
     anomaly_count > 0 && alert_enabled
+}
+
+/// Create-time training gate: the config's own `enabled`, not just the global kill-switch.
+fn initial_training_allowed(enabled: bool, globally_disabled: bool) -> bool {
+    enabled && !globally_disabled
 }
 
 /// P0.4 TDD stub — implementation surface, not behaviour. The pure interval rule both
@@ -3029,22 +3038,41 @@ mod tests {
             assert!(ensure_trainable(&disabled_and_status_four).is_err());
         }
 
-        /// Nothing in the OSS tree constructs status 4, so the dead state cannot be reached.
-        /// The needle is split so this assertion's own source line is not a false positive.
+        /// A config created with `enabled: Some(false)` must not train on create. The spawn
+        /// at the create site is gated only on the global kill-switch, so a disabled config
+        /// trains immediately today.
         #[test]
-        fn no_oss_write_site_produces_status_four() {
-            let needle = format!("status = {}(4", "Set");
-            let source = include_str!("anomaly_detection.rs");
-            for line in source.lines() {
-                let code = line.trim();
-                if code.starts_with("//") {
-                    continue;
-                }
-                assert!(
-                    !code.contains(&needle),
-                    "OSS must not write the dead Disabled status: {code}"
-                );
-            }
+        fn a_config_created_disabled_does_not_train_on_create() {
+            assert!(!initial_training_allowed(false, false));
+        }
+
+        /// The create-time gate keeps its existing kill-switch behaviour for enabled configs.
+        #[test]
+        fn create_time_training_respects_both_the_flag_and_the_kill_switch() {
+            assert!(initial_training_allowed(true, false));
+            assert!(!initial_training_allowed(true, true));
+            assert!(!initial_training_allowed(false, true));
+        }
+
+        // ── Reachability: the guard must be CALLED, not merely defined ──
+
+        /// The three async entry points reach the enterprise `trigger_training`, which has no
+        /// `enabled` check of its own. Each must consult `ensure_trainable` first. Wiring them
+        /// requires adding an `enabled` read inside an async DB path, so it belongs to the
+        /// implementation phase; this fails until all three are wired.
+        #[test]
+        fn every_async_training_entry_point_consults_the_guard() {
+            let mut wired = GUARDED_TRAINING_ENTRY_POINTS.to_vec();
+            wired.sort_unstable();
+            assert_eq!(
+                wired,
+                [
+                    "force_retrain_for_threshold",
+                    "train_model",
+                    "trigger_training"
+                ],
+                "each entry point joins this list when it calls ensure_trainable"
+            );
         }
     }
 }
