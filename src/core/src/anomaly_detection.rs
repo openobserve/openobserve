@@ -1471,6 +1471,21 @@ fn validation_error(e: anyhow::Error) -> anyhow::Error {
     anyhow::anyhow!("validation error: {e}")
 }
 
+/// P0.4 TDD stub — implementation surface, not behaviour. The pure interval rule both
+/// create and update must share; today create inlines it and update has no check at all.
+fn validate_interval_pair(_schedule_interval: &str, _histogram_interval: &str) -> Result<()> {
+    unimplemented!("P0.4: pure interval-pair rule not implemented yet")
+}
+
+/// P0.4 TDD stub — implementation surface, not behaviour. A partial update must be
+/// validated against the merged final row, since either field alone can break the pair.
+fn merged_interval_pair(
+    _req: &UpdateAnomalyConfigRequest,
+    _existing: &infra::table::entity::anomaly_detection_config::Model,
+) -> (String, String) {
+    unimplemented!("P0.4: merged interval resolution not implemented yet")
+}
+
 /// Collapses the `filters` shapes that mean "no filters" to `[]`; rejects any other non-array.
 fn normalize_request_filters(
     filters: Option<serde_json::Value>,
@@ -2493,6 +2508,241 @@ mod tests {
                 validate_config_request(&req).is_ok(),
                 "{sched} against {hist} must be accepted"
             );
+        }
+    }
+
+    // ── P0.4: the interval rule as a shared pure seam ───────────────────────
+
+    mod interval_pair_rule {
+        use super::*;
+
+        #[test]
+        fn accepts_equal_intervals() {
+            assert!(validate_interval_pair("5m", "5m").is_ok());
+            assert!(validate_interval_pair("1h", "1h").is_ok());
+        }
+
+        #[test]
+        fn accepts_whole_multiples() {
+            assert!(validate_interval_pair("10m", "5m").is_ok(), "2x");
+            assert!(validate_interval_pair("1h", "5m").is_ok(), "12x");
+            assert!(validate_interval_pair("5m", "1m").is_ok(), "5x");
+        }
+
+        /// default/ingester_health, live: 1m schedule against 5m buckets scores a fifth of
+        /// a bucket against a full-bucket baseline -- a permanent apparent 80% drop.
+        #[test]
+        fn rejects_prod_shape_ingester_health() {
+            let err = validate_interval_pair("1m", "5m").unwrap_err().to_string();
+            assert!(err.contains("must not be shorter"), "got: {err}");
+        }
+
+        /// default/ingester_offline, live: 5m against 1m is a clean multiple and must stay
+        /// allowed, so the case that pins its class is the non-multiple 7m/5m.
+        #[test]
+        fn rejects_non_multiples() {
+            let err = validate_interval_pair("7m", "5m").unwrap_err().to_string();
+            assert!(err.contains("whole multiple"), "got: {err}");
+            assert!(validate_interval_pair("7m", "2m").is_err());
+        }
+
+        #[test]
+        fn rejects_unparseable_intervals_rather_than_ignoring_them() {
+            assert!(validate_interval_pair("bad", "5m").is_err());
+            assert!(validate_interval_pair("5m", "10d").is_err());
+        }
+
+        /// `%` by a zero divisor panics, so a zero histogram must be refused BEFORE the
+        /// multiple check -- `0m` clears the `schedule < histogram` guard and reaches it.
+        #[test]
+        fn rejects_zero_histogram_without_panicking() {
+            assert!(validate_interval_pair("5m", "0m").is_err());
+            assert!(validate_interval_pair("0h", "0m").is_err());
+        }
+
+        /// `"-5m"` parses to -300 via i64, so a signed interval reaches the rule and would
+        /// otherwise pass `schedule >= histogram` against a negative bucket width.
+        #[test]
+        fn rejects_negative_intervals() {
+            assert!(validate_interval_pair("-5m", "5m").is_err());
+            assert!(validate_interval_pair("5m", "-5m").is_err());
+        }
+    }
+
+    // ── P0.4: partial updates validate the MERGED row, not just the payload ──
+
+    mod update_interval_validation {
+        use super::*;
+
+        /// The persisted side of a partial update: 1h schedule against 5m buckets, valid.
+        fn stored_config() -> infra::table::entity::anomaly_detection_config::Model {
+            infra::table::entity::anomaly_detection_config::Model {
+                anomaly_id: "a1".to_string(),
+                org_id: "default".to_string(),
+                stream_name: "logs".to_string(),
+                stream_type: "logs".to_string(),
+                enabled: true,
+                name: "test".to_string(),
+                description: None,
+                query_mode: "filters".to_string(),
+                filters: Some(serde_json::json!([])),
+                custom_sql: None,
+                detection_function: "count(*)".to_string(),
+                histogram_interval: "5m".to_string(),
+                schedule_interval: "1h".to_string(),
+                detection_window_seconds: 3600,
+                training_window_days: 7,
+                retrain_interval_days: 7,
+                threshold: 97,
+                seasonality: "none".to_string(),
+                is_trained: false,
+                training_started_at: None,
+                training_completed_at: None,
+                last_error: None,
+                last_processed_timestamp: None,
+                current_model_version: 0,
+                rcf_num_trees: 50,
+                rcf_tree_size: 256,
+                rcf_shingle_size: 8,
+                alert_enabled: false,
+                alert_destinations: None,
+                folder_id: "f1".to_string(),
+                owner: None,
+                priority: None,
+                tags: None,
+                status: 0,
+                retries: 0,
+                last_failed_at: None,
+                last_alert_fired_at: None,
+                last_updated: 0,
+                created_at: 1000,
+                updated_at: 1000,
+            }
+        }
+
+        /// The merged pair is what gets written, so it is what must be validated.
+        fn merged_result(req: UpdateAnomalyConfigRequest) -> Result<()> {
+            let stored = stored_config();
+            let (schedule, histogram) = merged_interval_pair(&req, &stored);
+            validate_interval_pair(&schedule, &histogram).map_err(validation_error)
+        }
+
+        /// Update must reuse the create rule verbatim. `merged_result` wraps the error in
+        /// the test, so this pins that create really does emit the same text for the same
+        /// pair -- otherwise update could drift to a second, differently-worded rule.
+        #[test]
+        fn shares_the_create_paths_wording_for_the_same_pair() {
+            for (schedule, histogram) in [("1m", "5m"), ("7m", "5m")] {
+                let mut req = make_valid_filters_req();
+                req.schedule_interval = schedule.to_string();
+                req.histogram_interval = histogram.to_string();
+                let from_create = validate_config_request(&req).unwrap_err().to_string();
+                let from_rule = validate_interval_pair(schedule, histogram)
+                    .unwrap_err()
+                    .to_string();
+                assert_eq!(from_create, from_rule, "{schedule}/{histogram} diverged");
+            }
+        }
+
+        #[test]
+        fn absent_intervals_fall_back_to_the_persisted_values() {
+            let stored = stored_config();
+            let (schedule, histogram) =
+                merged_interval_pair(&UpdateAnomalyConfigRequest::default(), &stored);
+            assert_eq!(schedule, "1h");
+            assert_eq!(histogram, "5m");
+        }
+
+        #[test]
+        fn a_submitted_interval_overrides_the_persisted_one() {
+            let stored = stored_config();
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("10m".to_string()),
+                ..Default::default()
+            };
+            let (schedule, histogram) = merged_interval_pair(&req, &stored);
+            assert_eq!(schedule, "10m");
+            assert_eq!(histogram, "5m", "unchanged field keeps the stored value");
+        }
+
+        /// Mutation shape 1: schedule alone, conflicting with the UNCHANGED stored histogram.
+        /// Validating only the submitted field would miss this entirely.
+        #[test]
+        fn rejects_changing_schedule_alone_into_a_conflict() {
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("1m".to_string()),
+                ..Default::default()
+            };
+            let err = merged_result(req).unwrap_err().to_string();
+            assert!(err.contains("validation error"), "got: {err}");
+            assert!(err.contains("must not be shorter"), "got: {err}");
+        }
+
+        /// Mutation shape 2: histogram alone, conflicting with the UNCHANGED stored schedule.
+        #[test]
+        fn rejects_changing_histogram_alone_into_a_conflict() {
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("7m".to_string()),
+                ..Default::default()
+            };
+            let err = merged_result(req).unwrap_err().to_string();
+            assert!(err.contains("validation error"), "got: {err}");
+            assert!(err.contains("whole multiple"), "got: {err}");
+        }
+
+        /// Mutation shape 3: both fields at once, recreating the live ingester_health row.
+        #[test]
+        fn rejects_changing_both_into_the_ingester_health_shape() {
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("1m".to_string()),
+                histogram_interval: Some("5m".to_string()),
+                ..Default::default()
+            };
+            let err = merged_result(req).unwrap_err().to_string();
+            assert!(err.contains("validation error"), "got: {err}");
+            assert!(err.contains("must not be shorter"), "got: {err}");
+        }
+
+        /// A histogram larger than the stored 1h schedule: valid read on its own, broken
+        /// against the row it lands in. Only merged-state validation catches it.
+        #[test]
+        fn rejects_a_lone_field_that_only_conflicts_once_merged() {
+            let req = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("2h".to_string()),
+                ..Default::default()
+            };
+            let err = merged_result(req).unwrap_err().to_string();
+            assert!(err.contains("must not be shorter"), "got: {err}");
+        }
+
+        #[test]
+        fn accepts_a_valid_interval_change() {
+            for (schedule, histogram) in [
+                (Some("10m"), Some("5m")),
+                (Some("30m"), None),
+                (None, Some("1m")),
+            ] {
+                let req = UpdateAnomalyConfigRequest {
+                    schedule_interval: schedule.map(str::to_string),
+                    histogram_interval: histogram.map(str::to_string),
+                    ..Default::default()
+                };
+                assert!(
+                    merged_result(req).is_ok(),
+                    "{schedule:?}/{histogram:?} must be accepted"
+                );
+            }
+        }
+
+        /// No false rejection when the update touches neither interval.
+        #[test]
+        fn accepts_an_update_touching_neither_interval() {
+            let req = UpdateAnomalyConfigRequest {
+                name: Some("renamed".to_string()),
+                enabled: Some(false),
+                ..Default::default()
+            };
+            assert!(merged_result(req).is_ok());
         }
     }
 }
