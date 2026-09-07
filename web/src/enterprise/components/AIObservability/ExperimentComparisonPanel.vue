@@ -21,7 +21,7 @@
              control that acts on it are the same strip rather than two rows. -->
         <template #subheader>
           <div
-            class="px-page-edge border-table-row-divider flex flex-wrap items-center gap-3 border-b py-1.5"
+            class="px-page-edge border-table-row-divider flex flex-wrap items-end gap-3 border-b py-1.5"
             data-test="ai-experiment-counts"
           >
             <div class="min-w-0 flex-1">
@@ -33,45 +33,50 @@
                 @select="selectBucket"
               />
             </div>
-            <!-- Label sits outside so the control stays a single line, the same
-                 shape as the Baseline / Candidate pickers in the page header. -->
-            <div class="flex shrink-0 items-center gap-2">
-              <OTooltip
-                :content="t('aiObservability.experiments.comparePage.panel.outcomeDimensionsHint')"
-              >
+            <!-- Label sits ABOVE its control (not beside it) so the pair reads
+                 as one compact field instead of eating horizontal room the
+                 bucket stats need — same idea as a labeled form field. -->
+            <div class="flex shrink-0 items-end gap-3">
+              <div class="flex flex-col gap-0.5">
+                <OTooltip
+                  :content="t('aiObservability.experiments.comparePage.panel.outcomeDimensionsHint')"
+                >
+                  <span class="text-text-tertiary text-xs">
+                    {{ t("aiObservability.experiments.comparePage.panel.outcomeDimensions") }}
+                  </span>
+                </OTooltip>
+                <OSelect
+                  :model-value="selectedDimensions"
+                  :options="outcomeOptions"
+                  :aria-label="t('aiObservability.experiments.comparePage.panel.outcomeDimensions')"
+                  :disabled="loading"
+                  :searchable="true"
+                  multiple
+                  select-all
+                  option-tooltip
+                  size="md"
+                  width="sm"
+                  data-test="ai-experiment-comparison-outcome-dimensions"
+                  @update:model-value="selectOutcomeDimensions"
+                >
+                  <template #trigger>{{ selectionLabel }}</template>
+                </OSelect>
+              </div>
+              <div class="flex flex-col gap-0.5">
                 <span class="text-text-tertiary text-xs">
-                  {{ t("aiObservability.experiments.comparePage.panel.outcomeDimensions") }}
+                  {{ t("aiObservability.experiments.comparePage.panel.threshold") }}
                 </span>
-              </OTooltip>
-              <OSelect
-                :model-value="selectedDimensions"
-                :options="outcomeOptions"
-                :aria-label="t('aiObservability.experiments.comparePage.panel.outcomeDimensions')"
-                :disabled="loading"
-                :searchable="true"
-                multiple
-                select-all
-                option-tooltip
-                size="md"
-                width="sm"
-                data-test="ai-experiment-comparison-outcome-dimensions"
-                @update:model-value="selectOutcomeDimensions"
-              >
-                <template #trigger>{{ selectionLabel }}</template>
-              </OSelect>
-              <span class="text-text-tertiary text-xs">
-                {{ t("aiObservability.experiments.comparePage.panel.threshold") }}
-              </span>
-              <OSelect
-                :model-value="comparison.threshold"
-                :options="thresholdOptions"
-                :searchable="false"
-                :disabled="loading"
-                size="md"
-                width="xs"
-                data-test="ai-experiment-comparison-threshold"
-                @update:model-value="selectThreshold"
-              />
+                <OSelect
+                  :model-value="comparison.threshold"
+                  :options="thresholdOptions"
+                  :searchable="false"
+                  :disabled="loading"
+                  size="md"
+                  width="xs"
+                  data-test="ai-experiment-comparison-threshold"
+                  @update:model-value="selectThreshold"
+                />
+              </div>
             </div>
           </div>
         </template>
