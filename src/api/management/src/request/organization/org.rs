@@ -216,6 +216,11 @@ pub async fn all_organizations(
         })
         .collect();
 
+    let quota = openobserve_core::trial_quota::synthetics_quota_for_orgs(
+        all_orgs.iter().map(|org| org.identifier.clone()).collect(),
+    )
+    .await;
+
     let mut id = 1;
     for org in all_orgs {
         let billing_info = all_billing_info.get(&org.identifier);
@@ -229,6 +234,7 @@ pub async fn all_organizations(
         let settings = db::organization::get_org_setting(&org.identifier)
             .await
             .unwrap_or_default();
+        let synthetics = quota.get(&org.identifier).copied().unwrap_or_default();
         let org = AllOrgListDetails {
             id,
             identifier: org.identifier.clone(),
@@ -239,22 +245,12 @@ pub async fn all_organizations(
                 .unwrap_or_default(),
             credits_used: openobserve_core::trial_quota::get_used(&org.identifier),
             credits_limit: openobserve_core::trial_quota::get_limit(&org.identifier),
-            browser_steps_used: openobserve_core::trial_quota::get_used_for_pool(
-                &org.identifier,
-                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsBrowserSteps,
-            ),
-            browser_steps_limit: openobserve_core::trial_quota::get_limit_for_pool(
-                &org.identifier,
-                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsBrowserSteps,
-            ),
-            protocol_steps_used: openobserve_core::trial_quota::get_used_for_pool(
-                &org.identifier,
-                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsProtocolSteps,
-            ),
-            protocol_steps_limit: openobserve_core::trial_quota::get_limit_for_pool(
-                &org.identifier,
-                openobserve_core::trial_quota::TrialQuotaPool::SyntheticsProtocolSteps,
-            ),
+            browser_steps_used: synthetics.browser_used,
+            browser_steps_limit: synthetics.browser_limit,
+            protocol_steps_used: synthetics.protocol_used,
+            protocol_steps_limit: synthetics.protocol_limit,
+            status_steps_used: synthetics.status_used,
+            status_steps_limit: synthetics.status_limit,
             created_at: org.created_at,
             updated_at: org.updated_at,
             trial_expires_at: Some(org.trial_ends_at),
@@ -672,11 +668,11 @@ async fn set_pool_limit(
     context_path = "/api",
     tag = "Organizations",
     operation_id = "SetQuotaUsageLimit",
-    summary = "Set an organization's lifetime allowance for one quota pool",
+    summary = "Set an organization's allowance for one quota pool",
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Must be _meta"),
-        ("pool" = String, Path, description = "ai_credits | synthetics_steps"),
+        ("pool" = String, Path, description = "ai_credits | synthetics_browser_steps | synthetics_protocol_steps | synthetics_status_protocol"),
     ),
     request_body(content = inline(SetQuotaUsageLimitRequest), content_type = "application/json"),
     responses(
@@ -695,12 +691,7 @@ pub async fn set_quota_usage_limit(
 
     // Rejected rather than defaulted: a fallback would credit the wrong pool.
     let Some(pool) = TrialQuotaPool::from_key(&pool) else {
-        return MetaHttpResponse::bad_request(format!(
-            "unknown quota pool '{pool}' (expected one of: {}, {}, {})",
-            TrialQuotaPool::AiCredits.key(),
-            TrialQuotaPool::SyntheticsBrowserSteps.key(),
-            TrialQuotaPool::SyntheticsProtocolSteps.key(),
-        ));
+        return MetaHttpResponse::bad_request(unknown_quota_pool_message(&pool));
     };
 
     match set_pool_limit(&org_id, &req.org_id, pool, req.limit).await {
@@ -1562,4 +1553,357 @@ async fn get_super_cluster_info(regions: &[String]) -> Result<ClusterInfoRespons
     }
 
     Ok(response)
+}
+
+/// The 400 body for an unrecognised pool, listed from `ALL_POOLS` so none is left out.
+#[cfg(feature = "cloud")]
+fn unknown_quota_pool_message(pool: &str) -> String {
+    let expected = openobserve_core::trial_quota::TrialQuotaPool::ALL_POOLS
+        .iter()
+        .map(|pool| pool.key())
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("unknown quota pool '{pool}' (expected one of: {expected})")
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(feature = "cloud")]
+    use openobserve_core::trial_quota::TrialQuotaPool;
+
+    #[cfg(feature = "cloud")]
+    use super::unknown_quota_pool_message;
+
+    /// Each response field pair and the `SyntheticsQuota` pair it copies:
+    /// `browser_steps_used: quota.browser_used`. The names differ — the status pool's rows are
+    /// `status_protocol` and its fields are `status_steps`.
+    const SYNTHETICS_FIELDS: [(&str, &str); 3] = [
+        ("browser_steps", "browser"),
+        ("protocol_steps", "protocol"),
+        ("status_steps", "status"),
+    ];
+
+    /// CODE only: a comment naming what a scan forbids would trip that scan on its own text.
+    fn code_only_source() -> String {
+        include_str!("org.rs")
+            .lines()
+            .filter(|line| !line.trim_start().starts_with("//"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    }
+
+    /// The listing is `#[cfg(feature = "cloud")]`, but its source is in every build, so the
+    /// scans below hold in the featureless job the rest of this module cannot run in.
+    fn listing_body(source: &str) -> &str {
+        let body = source
+            .split_once("pub async fn all_organizations(")
+            .expect("the org listing must live in this file")
+            .1;
+        let end = body.find("\n}\n").expect("end of the org listing");
+        &body[..end]
+    }
+
+    /// rustfmt is free to break an argument list across lines, so every scan of one compares
+    /// against this.
+    fn without_whitespace(text: &str) -> String {
+        text.chars().filter(|c| !c.is_whitespace()).collect()
+    }
+
+    /// Every identifier-shaped token in `text`.
+    fn identifiers(text: &str) -> Vec<&str> {
+        text.split(|c: char| !c.is_alphanumeric() && c != '_')
+            .filter(|token| !token.is_empty())
+            .collect()
+    }
+
+    /// The argument text of the first `needle` call in `body`, matched by paren balance.
+    fn call_args<'a>(body: &'a str, needle: &str) -> &'a str {
+        let at = body
+            .find(needle)
+            .unwrap_or_else(|| panic!("`{needle}` must be called here"))
+            + needle.len();
+        let mut depth = 1usize;
+        for (offset, ch) in body[at..].char_indices() {
+            match ch {
+                '(' => depth += 1,
+                ')' if depth == 1 => return &body[at..at + offset],
+                ')' => depth -= 1,
+                _ => {}
+            }
+        }
+        panic!("`{needle}` call is never closed");
+    }
+
+    /// What `name` is bound to in `scope`, up to the `;` that ends its `let`.
+    fn binding_value<'a>(scope: &'a str, name: &str) -> Option<&'a str> {
+        let mut rest = scope;
+        loop {
+            let at = rest.find("let ")? + "let ".len();
+            rest = &rest[at..];
+            let declared = rest.trim_start_matches("mut ");
+            let end = declared
+                .find(|c: char| !c.is_alphanumeric() && c != '_')
+                .unwrap_or(declared.len());
+            if &declared[..end] == name {
+                let value = declared[end..].split_once('=')?.1;
+                return Some(&value[..value.find(';')?]);
+            }
+        }
+    }
+
+    /// Whether `expr` reaches `name` — as a token of its own, or through a binding built from it
+    /// in `scope`, so hoisting a value into a binding is not a way past the scan.
+    fn reaches(scope: &str, expr: &str, name: &str) -> bool {
+        let handed = identifiers(expr);
+        handed.contains(&name)
+            || handed.iter().any(|token| {
+                binding_value(scope, token).is_some_and(|value| identifiers(value).contains(&name))
+            })
+    }
+
+    /// The loop the listing builds its rows in, as `(its binding, what it iterates, where its
+    /// header starts)` — anchored on the response fields, so a loop above it that collects the
+    /// org ids is not mistaken for it.
+    fn row_loop(body: &str) -> (String, String, usize) {
+        let fields_at = body
+            .find("browser_steps_used:")
+            .expect("the listing must build the synthetics fields");
+        let at = body[..fields_at]
+            .rfind("for ")
+            .expect("the listing must loop over the orgs it lists");
+        let (binding, rest) = body[at + "for ".len()..]
+            .split_once(" in ")
+            .expect("the row loop must iterate a collection");
+        let collection = rest
+            .trim_start()
+            .trim_start_matches('&')
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .collect();
+        (binding.trim().to_string(), collection, at)
+    }
+
+    /// The name the listing binds the batched read's answer to.
+    fn read_binding(body: &str, read_at: usize) -> String {
+        let at = body[..read_at]
+            .rfind("let ")
+            .expect("the batched read's answer must be bound to something");
+        body[at + "let ".len()..]
+            .trim_start_matches("mut ")
+            .chars()
+            .take_while(|c| c.is_alphanumeric() || *c == '_')
+            .collect()
+    }
+
+    /// What `field` is assigned, whitespace stripped, up to the comma that ends it.
+    fn assigned_value(body: &str, field: &str) -> String {
+        let at = body
+            .find(&format!("{field}:"))
+            .unwrap_or_else(|| panic!("`{field}` is missing from the listing's response"));
+        let value = &body[at + field.len() + 1..];
+        let end = value
+            .find(',')
+            .unwrap_or_else(|| panic!("`{field}`'s value must end somewhere"));
+        without_whitespace(&value[..end])
+    }
+
+    /// The value a pool's `used`/`limit` pair is read off — `quota` in
+    /// `browser_steps_used: quota.browser_used` — so a pair computed at the call site, assigned
+    /// a literal, or read off `remaining` has no receiver to return.
+    fn pair_receivers(body: &str, prefix: &str, pool: &str) -> Vec<String> {
+        ["used", "limit"]
+            .iter()
+            .map(|half| {
+                let value = assigned_value(body, &format!("{prefix}_{half}"));
+                value
+                    .strip_suffix(&format!(".{pool}_{half}"))
+                    .unwrap_or_else(|| {
+                        panic!(
+                            "`{prefix}_{half}: {value}` is not the batched read's own \
+                             `{pool}_{half}` — the listing must copy that pair, not derive it",
+                        )
+                    })
+                    .to_string()
+            })
+            .collect()
+    }
+
+    /// The field-prefix half of `SYNTHETICS_FIELDS` for a pool. Exhaustive, so a fourth pool
+    /// is a compile error here rather than a listing that silently never reports it.
+    #[cfg(feature = "cloud")]
+    fn field_prefix(pool: TrialQuotaPool) -> Option<&'static str> {
+        match pool {
+            TrialQuotaPool::AiCredits => None,
+            TrialQuotaPool::SyntheticsBrowserSteps => Some("browser_steps"),
+            TrialQuotaPool::SyntheticsProtocolSteps => Some("protocol_steps"),
+            TrialQuotaPool::SyntheticsStatusProtocol => Some("status_steps"),
+        }
+    }
+
+    /// Defect #5: the in-memory counter is node-local and nothing writes it for synthetics, so
+    /// it reports 0 for every org on every node.
+    #[test]
+    fn the_listing_reads_the_synthetics_counters_from_the_table() {
+        let source = code_only_source();
+        let body = listing_body(&source);
+
+        let (row, collection, loop_at) = row_loop(body);
+        let reads: Vec<usize> = body
+            .match_indices("synthetics_quota_for_orgs(")
+            .map(|(at, _)| at)
+            .collect();
+        assert_eq!(
+            reads.len(),
+            1,
+            "the listing's synthetics numbers must come from ONE batched table read: {} found",
+            reads.len(),
+        );
+        assert!(
+            reads[0] < loop_at,
+            "the read is batched by design; one below the `{collection}` loop is a read per row \
+             of the listing",
+        );
+        assert!(
+            reaches(
+                &body[..reads[0]],
+                call_args(body, "synthetics_quota_for_orgs("),
+                &collection,
+            ),
+            "the read must be handed the ids of `{collection}`, the orgs this page lists — as \
+             the collection itself or as one binding built from it; a read asked about anything \
+             else misses every listed org and reports 0 used against 0 granted",
+        );
+
+        let answer = read_binding(body, reads[0]);
+        let lookup = format!("{answer}.get(");
+        let lookup_at = body
+            .find(&lookup)
+            .unwrap_or_else(|| panic!("`{answer}` must be read once per listed org"));
+        assert!(
+            lookup_at > loop_at,
+            "the answer covers every listed org, so each row takes its own entry out of it",
+        );
+        assert!(
+            without_whitespace(call_args(body, &lookup)).contains(&format!("{row}.identifier")),
+            "the per-row lookup must be keyed on the org's own identifier — any other key misses \
+             for every listed org and reports 0 used against 0 granted",
+        );
+
+        // Assembled at runtime so this file is not itself a call site to `core`'s own scan.
+        for node_local in [
+            ["get_used", "_for_pool("].concat(),
+            ["get_limit", "_for_pool("].concat(),
+            ["get_remaining", "_for_pool("].concat(),
+        ] {
+            assert!(
+                !body.contains(&node_local),
+                "`{node_local}` is the node's own cache, not the table — and its limit is not \
+                 the grant the batched read measured this org's spend against",
+            );
+        }
+    }
+
+    /// Defect #5: the six numbers are three pairs, and a pool reporting another pool's spend or
+    /// another pool's grant is a typo the response body cannot show.
+    #[test]
+    fn the_listing_copies_every_pool_from_the_batched_read() {
+        let source = code_only_source();
+        let body = listing_body(&source);
+
+        let receivers: Vec<String> = SYNTHETICS_FIELDS
+            .iter()
+            .flat_map(|(prefix, pool)| pair_receivers(body, prefix, pool))
+            .collect();
+        let first = receivers.first().expect("three pools, six fields");
+        assert!(
+            !first.is_empty() && receivers.iter().all(|receiver| receiver == first),
+            "all six fields must be copied off the one value the batched read returned for this \
+             org: {receivers:?}",
+        );
+
+        let read_at = body
+            .find("synthetics_quota_for_orgs(")
+            .expect("the listing must read the batched quota");
+        let answer = read_binding(body, read_at);
+        assert!(
+            reaches(body, first, &answer),
+            "`{first}` is not what `{answer}` holds for this org: a default or a value built at \
+             the call site reports 0 used against 0 granted for every org in the listing",
+        );
+    }
+
+    /// The listing writes one pair per pool by hand, so a fourth pool needs a fourth pair —
+    /// on `AllOrgListDetails` as well as here.
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn every_synthetics_pool_has_a_field_pair_in_the_listing() {
+        let source = code_only_source();
+        let body = listing_body(&source);
+
+        for pool in TrialQuotaPool::ALL_POOLS
+            .iter()
+            .filter(|pool| pool.is_synthetics())
+        {
+            let prefix = field_prefix(*pool).unwrap_or_else(|| {
+                panic!(
+                    "`{}` has no field prefix here, so this file's scans never look for it",
+                    pool.key(),
+                )
+            });
+            let (_, half) = SYNTHETICS_FIELDS
+                .iter()
+                .find(|(listed, _)| *listed == prefix)
+                .unwrap_or_else(|| {
+                    panic!("`{prefix}` has no field pair, so the pool is invisible to the admin UI")
+                });
+            pair_receivers(body, prefix, half);
+        }
+    }
+
+    /// The route accepts every key in `ALL_POOLS`, so a hand-written list leaves an admin who
+    /// typos the pool they want reading a 400 that never names it.
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn the_unknown_pool_message_names_every_accepted_pool() {
+        let message = unknown_quota_pool_message("synthetics_stpes");
+        assert!(message.contains("synthetics_stpes"), "{message}");
+        for pool in TrialQuotaPool::ALL_POOLS {
+            assert!(
+                message.contains(pool.key()),
+                "`{}` is accepted by the route but missing from its own 400: {message}",
+                pool.key(),
+            );
+            assert_eq!(
+                TrialQuotaPool::from_key(pool.key()),
+                Some(*pool),
+                "the message lists a key the route would itself reject",
+            );
+        }
+    }
+
+    /// The route's OpenAPI parameter is the same hand-written list the 400 body no longer is, so
+    /// a fifth pool would be accepted, named by the error, and absent from the documentation.
+    #[cfg(feature = "cloud")]
+    #[test]
+    fn the_openapi_pool_parameter_names_every_accepted_pool() {
+        // Assembled at runtime so this test's own source is not what the scan finds.
+        let needle = ["(\"pool\" = String", ", Path, description = "].concat();
+        let source = include_str!("org.rs");
+        let at = source
+            .find(&needle)
+            .expect("the pool path parameter must be documented on the route");
+        let documented = source[at..]
+            .lines()
+            .next()
+            .expect("the parameter's own line");
+
+        for pool in TrialQuotaPool::ALL_POOLS {
+            assert!(
+                documented.contains(pool.key()),
+                "`{}` is accepted by the route but missing from its OpenAPI parameter: \
+                 {documented}",
+                pool.key(),
+            );
+        }
+    }
 }

@@ -73,6 +73,8 @@ pub mod reaper;
 pub mod scheduler;
 pub mod service;
 pub mod status_pages;
+#[cfg(test)]
+pub(crate) mod test_source;
 
 /// One row per execution — the record the UI's run list and run detail read.
 pub const RESULTS_STREAM: &str = "synthetics_results";
@@ -396,7 +398,7 @@ mod tests {
     /// dropped from both.
     /// A call site whose loss is completely silent: `init` still starts every
     /// worker and every `pool_gate_tests` test still passes, but the pool is
-    /// never installed, so `resolve_pool_gate` returns `None` forever and the
+    /// never installed, so `resolve_gate_context` returns `None` forever and the
     /// fleet is unmetered and ungated — SPEC §11 **F6**, one layer down.
     #[test]
     fn init_installs_the_step_pool_it_was_handed() {

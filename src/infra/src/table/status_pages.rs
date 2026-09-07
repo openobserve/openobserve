@@ -960,3 +960,116 @@ pub async fn get_domain_claim_by_host<C: ConnectionTrait>(
         .one(conn)
         .await?)
 }
+
+/// The distinct check ids attached to any status page, optionally narrowed to
+/// the ids of one scheduler tick.
+///
+/// `Some(&[])` returns nothing rather than degrading to an unfiltered read:
+/// `is_in` over an empty slice is not a reliable "match nothing" here, and the
+/// whole join table read as "attached" hands every check the monthly grant.
+pub async fn mapped_check_ids<C: ConnectionTrait>(
+    conn: &C,
+    filter: Option<&[String]>,
+) -> Result<std::collections::HashSet<String>, errors::Error> {
+    if filter.is_some_and(<[String]>::is_empty) {
+        return Ok(std::collections::HashSet::new());
+    }
+    let mut query = status_page_component_checks::Entity::find()
+        .select_only()
+        .column(status_page_component_checks::Column::SyntheticsId)
+        .distinct();
+    if let Some(ids) = filter {
+        query = query.filter(
+            status_page_component_checks::Column::SyntheticsId
+                .is_in(ids.iter().map(String::as_str)),
+        );
+    }
+    let ids: Vec<String> = query.into_tuple().all(conn).await?;
+    Ok(ids.into_iter().collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use sea_orm::{ActiveValue, ConnectOptions, Database, DatabaseConnection, Schema};
+
+    use super::*;
+
+    /// One connection, not a pool: two connections to `sqlite::memory:` are two databases.
+    async fn db() -> DatabaseConnection {
+        let mut opts = ConnectOptions::new("sqlite::memory:".to_string());
+        opts.max_connections(1);
+        let db = Database::connect(opts).await.unwrap();
+        let backend = db.get_database_backend();
+        let schema = Schema::new(backend);
+        db.execute(
+            backend.build(&schema.create_table_from_entity(status_page_component_checks::Entity)),
+        )
+        .await
+        .unwrap();
+        db
+    }
+
+    async fn map_check(db: &DatabaseConnection, id: &str, component_id: &str, synthetics_id: &str) {
+        status_page_component_checks::ActiveModel {
+            id: ActiveValue::Set(id.to_string()),
+            component_id: ActiveValue::Set(component_id.to_string()),
+            synthetics_id: ActiveValue::Set(synthetics_id.to_string()),
+            org_id: ActiveValue::Set("acme".to_string()),
+        }
+        .insert(db)
+        .await
+        .unwrap();
+    }
+
+    async fn seeded() -> DatabaseConnection {
+        let db = db().await;
+        map_check(&db, "m1", "comp_a", "chk_1").await;
+        map_check(&db, "m2", "comp_b", "chk_1").await;
+        map_check(&db, "m3", "comp_a", "chk_2").await;
+        map_check(&db, "m4", "comp_c", "chk_3").await;
+        db
+    }
+
+    fn ids(from: &[&str]) -> Vec<String> {
+        from.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// A leaked id spends the monthly status grant on a check that is not on a status page.
+    #[tokio::test]
+    async fn mapped_check_ids_filters_to_the_given_ids() {
+        let db = seeded().await;
+
+        let asked = ids(&["chk_1", "chk_3", "chk_absent"]);
+        let mapped = mapped_check_ids(&db, Some(&asked)).await.unwrap();
+        assert_eq!(
+            mapped,
+            ["chk_1", "chk_3"]
+                .into_iter()
+                .map(str::to_string)
+                .collect::<std::collections::HashSet<_>>(),
+        );
+
+        let mapped = mapped_check_ids(&db, Some(&ids(&["chk_2"]))).await.unwrap();
+        assert_eq!(mapped.len(), 1);
+        assert!(mapped.contains("chk_2"));
+
+        assert!(
+            mapped_check_ids(&db, Some(&[])).await.unwrap().is_empty(),
+            "a tick that claimed nothing must not read the whole join table",
+        );
+    }
+
+    #[tokio::test]
+    async fn mapped_check_ids_unfiltered_returns_every_mapped_id() {
+        let db = seeded().await;
+        let mapped = mapped_check_ids(&db, None).await.unwrap();
+        assert_eq!(
+            mapped,
+            ["chk_1", "chk_2", "chk_3"]
+                .into_iter()
+                .map(str::to_string)
+                .collect::<std::collections::HashSet<_>>(),
+            "a check mapped from two components is ONE status-attached check",
+        );
+    }
+}
