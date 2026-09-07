@@ -71,6 +71,9 @@ test.describe("Report Folders", () => {
 
     // Refresh the page so the reports table picks up the newly created report
     await pm.reportFoldersPage.navigateToReports();
+    // The page can restore a previously selected folder tab, so pin the folder the
+    // report was created in rather than trusting whatever tab happens to be active.
+    await pm.reportFoldersPage.clickFolderTab('default');
     await pm.reportFoldersPage.expectReportVisibleInTable(REPORT_A);
 
     testLogger.info('Test report visible in default folder');
@@ -89,20 +92,26 @@ test.describe("Report Folders", () => {
 
     testLogger.info(`Moving report "${REPORT_A}" to folder "${FOLDER_B}"`);
 
-    // Open move dialog and move to destination folder
-    await pm.reportFoldersPage.openMoveDialog(REPORT_A);
-    await pm.reportFoldersPage.selectMoveDestination(FOLDER_B);
-    await pm.reportFoldersPage.expectMoveButtonEnabled();
-    await pm.reportFoldersPage.clickMove();
+    try {
+      // Open move dialog and move to destination folder
+      await pm.reportFoldersPage.openMoveDialog(REPORT_A);
+      await pm.reportFoldersPage.selectMoveDestination(FOLDER_B);
+      await pm.reportFoldersPage.expectMoveButtonEnabled();
+      await pm.reportFoldersPage.clickMove();
 
-    // Verify report is now in destination folder
-    await pm.reportFoldersPage.clickFolderTab(FOLDER_B);
-    await pm.reportFoldersPage.expectReportVisibleInTable(REPORT_A);
-
-    // Move it back to default
-    await pm.reportFoldersPage.openMoveDialog(REPORT_A);
-    await pm.reportFoldersPage.selectMoveDestination('default');
-    await pm.reportFoldersPage.clickMove();
+      // Verify report is now in destination folder
+      await pm.reportFoldersPage.clickFolderTab(FOLDER_B);
+      await pm.reportFoldersPage.expectReportVisibleInTable(REPORT_A);
+    } finally {
+      // Later tests expect REPORT_A in default; restore it even if the move above failed
+      // partway, so one failure here does not cascade into the rest of the serial group.
+      await pm.reportFoldersPage.openMoveDialog(REPORT_A)
+        .then(async () => {
+          await pm.reportFoldersPage.selectMoveDestination('default');
+          await pm.reportFoldersPage.clickMove();
+        })
+        .catch(() => testLogger.warn('Could not restore REPORT_A to the default folder'));
+    }
 
     testLogger.info('Report moved to another folder and back successfully');
   });
