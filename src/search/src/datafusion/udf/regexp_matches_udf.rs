@@ -228,7 +228,7 @@ pub fn regexp_matches<T: OffsetSizeTrait>(args: &[ArrayRef]) -> Result<ArrayRef>
 mod tests {
     use std::sync::Arc;
 
-    use arrow::array::{RecordBatch, StringArray};
+    use arrow::array::{BooleanArray, RecordBatch, StringArray};
     use arrow_schema::Schema;
     use datafusion::{
         assert_batches_eq, datasource::MemTable, logical_expr::ScalarUDFImpl,
@@ -462,5 +462,59 @@ mod tests {
         ];
 
         assert_batches_eq!(expected, &results);
+    }
+    async fn booleans(ctx: &SessionContext, sql: &str) -> Vec<Option<bool>> {
+        ctx.sql(sql)
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap()
+            .iter()
+            .flat_map(|batch| {
+                batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<BooleanArray>()
+                    .unwrap()
+                    .iter()
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn regexp_matches_null_pattern_is_independent_of_batch_size() {
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEX_MATCHES_UDF.clone());
+        assert_eq!(
+            booleans(
+                &ctx,
+                "SELECT re_matches('gateway', CAST(NULL AS VARCHAR)) IS NULL"
+            )
+            .await,
+            vec![Some(true)]
+        );
+        for rows in [0, 1, 2] {
+            let schema = Arc::new(Schema::new(vec![Field::new("job", DataType::Utf8, true)]));
+            let batch = RecordBatch::try_new(
+                schema.clone(),
+                vec![Arc::new(StringArray::from(vec!["gateway"; rows]))],
+            )
+            .unwrap();
+            ctx.register_table(
+                "t",
+                Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+            )
+            .unwrap();
+            assert_eq!(
+                booleans(
+                    &ctx,
+                    "SELECT re_matches(job, CAST(NULL AS VARCHAR)) IS NULL FROM t"
+                )
+                .await,
+                vec![Some(true); rows]
+            );
+            ctx.deregister_table("t").unwrap();
+        }
     }
 }

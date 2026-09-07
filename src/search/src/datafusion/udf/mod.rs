@@ -32,8 +32,6 @@ pub mod match_all_hash_udf;
 pub mod match_all_udf;
 pub mod regexp_matches_udf;
 pub mod regexp_udf;
-#[cfg(test)]
-mod scalar_input_tests;
 pub mod spath_udf;
 pub mod str_match_udf;
 pub mod string_to_array_v2_udf;

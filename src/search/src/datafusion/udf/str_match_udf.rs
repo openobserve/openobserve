@@ -187,6 +187,8 @@ fn str_match_impl(args: &[ColumnarValue], case_insensitive: bool) -> Result<Colu
 
 #[cfg(test)]
 mod tests {
+    use std::fs::File;
+
     use arrow::array::StringArray;
     use datafusion::{
         arrow::{
@@ -195,10 +197,17 @@ mod tests {
             record_batch::RecordBatch,
         },
         datasource::MemTable,
-        prelude::SessionContext,
+        prelude::{ParquetReadOptions, SessionConfig, SessionContext},
     };
+    use parquet::arrow::ArrowWriter;
 
-    use super::*;
+    use super::{
+        super::{
+            regexp_matches_udf::REGEX_MATCHES_UDF,
+            regexp_udf::{REGEX_MATCH_UDF, REGEX_NOT_MATCH_UDF, REGEXP_MATCH_TO_FIELDS_UDF},
+        },
+        *,
+    };
 
     #[test]
     fn test_str_match_udf_name() {
@@ -330,6 +339,131 @@ mod tests {
             assert!(out.value(0));
         } else {
             panic!("expected array result");
+        }
+    }
+    fn context(pushdown: bool) -> SessionContext {
+        let config = SessionConfig::new()
+            .set_bool("datafusion.execution.parquet.pushdown_filters", pushdown);
+        let ctx = SessionContext::new_with_config(config);
+        for udf in [
+            &*STR_MATCH_UDF,
+            &*STR_MATCH_IGNORE_CASE_UDF,
+            &*REGEX_MATCH_UDF,
+            &*REGEX_NOT_MATCH_UDF,
+            &*REGEX_MATCHES_UDF,
+            &*REGEXP_MATCH_TO_FIELDS_UDF,
+        ] {
+            ctx.register_udf(udf.clone());
+        }
+        ctx
+    }
+
+    async fn booleans(ctx: &SessionContext, sql: &str) -> Vec<Option<bool>> {
+        ctx.sql(sql)
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap()
+            .iter()
+            .flat_map(|batch| {
+                batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<BooleanArray>()
+                    .unwrap()
+                    .iter()
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn string_predicates_accept_scalar_and_null_inputs() {
+        let ctx = context(true);
+        for name in [
+            "str_match",
+            "str_match_ignore_case",
+            "match_field",
+            "match_field_ignore_case",
+        ] {
+            for (haystack, needle, expected) in [
+                ("'gateway'", "'gate'", Some(true)),
+                ("'other'", "'gate'", Some(false)),
+                ("'gateway'", "''", Some(true)),
+                ("''", "'gateway'", Some(false)),
+                ("CAST(NULL AS VARCHAR)", "'gateway'", None),
+                ("'gateway'", "CAST(NULL AS VARCHAR)", None),
+            ] {
+                let sql = format!("SELECT {name}({haystack}, {needle})");
+                assert_eq!(booleans(&ctx, &sql).await, vec![expected], "{sql}");
+            }
+            let expected = name.contains("ignore_case");
+            let sql = format!("SELECT {name}('Gateway', 'GATEWAY')");
+            assert_eq!(booleans(&ctx, &sql).await, vec![Some(expected)], "{sql}");
+        }
+    }
+
+    #[tokio::test]
+    async fn parquet_predicates_handle_constant_null_and_missing_columns() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("level", DataType::Utf8, true),
+            Field::new("job", DataType::Utf8, true),
+        ]));
+        // Test each file independently so a constant-column failure cannot mask
+        // the missing-column or all-NULL path.
+        for (case, jobs, expected) in [
+            ("constant", Some(vec![Some("gateway"), Some("gateway")]), 2),
+            ("mixed", Some(vec![Some("gateway"), Some("other")]), 1),
+            ("nullable", Some(vec![Some("gateway"), None]), 1),
+            ("null", Some(vec![None, None]), 0),
+            ("missing", None, 0),
+        ] {
+            let dir = tempfile::tempdir().unwrap();
+            let path = dir.path().join("data.parquet");
+            let mut columns: Vec<ArrayRef> =
+                vec![Arc::new(StringArray::from(vec!["info", "error"]))];
+            let file_schema = if let Some(jobs) = jobs {
+                columns.push(Arc::new(StringArray::from(jobs)));
+                schema.clone()
+            } else {
+                Arc::new(Schema::new(vec![schema.field(0).clone()]))
+            };
+            let batch = RecordBatch::try_new(file_schema.clone(), columns).unwrap();
+            let mut writer =
+                ArrowWriter::try_new(File::create(&path).unwrap(), file_schema, None).unwrap();
+            writer.write(&batch).unwrap();
+            writer.close().unwrap();
+            for pushdown in [false, true] {
+                let ctx = context(pushdown);
+                ctx.register_parquet(
+                    "gateway",
+                    path.to_str().unwrap(),
+                    ParquetReadOptions::default().schema(&schema),
+                )
+                .await
+                .unwrap();
+                for predicate in [
+                    "str_match(job, 'gateway')",
+                    "str_match_ignore_case(job, 'GATEWAY')",
+                    "match_field(job, 'gateway')",
+                    "match_field_ignore_case(job, 'GATEWAY')",
+                    "re_match(job, '^gateway$')",
+                    "re_not_match(job, '^other$')",
+                    "array_length(re_matches(job, '(gateway)')) > 0",
+                    "(regexp_match_to_fields(job, '(?P<name>gateway)'))['name'] = 'gateway'",
+                ] {
+                    let sql = format!("SELECT level FROM gateway WHERE {predicate} GROUP BY level");
+                    let batches = ctx
+                        .sql(&sql)
+                        .await
+                        .unwrap()
+                        .collect()
+                        .await
+                        .unwrap_or_else(|err| panic!("{case}, pushdown={pushdown}, {sql}: {err}"));
+                    let count: usize = batches.iter().map(|batch| batch.num_rows()).sum();
+                    assert_eq!(count, expected, "{case}, pushdown={pushdown}, {sql}");
+                }
+            }
         }
     }
 }

@@ -374,6 +374,7 @@ fn regex_pattern_to_fields(pattern: &str, ret_type: &DataType) -> Result<Vec<Fie
 
 #[cfg(test)]
 mod tests {
+    use arrow::array::LargeStringArray;
     use datafusion::{
         arrow::{
             array::{Int64Array, StringArray},
@@ -535,5 +536,125 @@ mod tests {
     fn test_regex_pattern_to_fields_empty_pattern_errors() {
         let result = regex_pattern_to_fields("", &DataType::Utf8);
         assert!(result.is_err());
+    }
+    async fn booleans(ctx: &SessionContext, sql: &str) -> Vec<Option<bool>> {
+        ctx.sql(sql)
+            .await
+            .unwrap()
+            .collect()
+            .await
+            .unwrap()
+            .iter()
+            .flat_map(|batch| {
+                batch
+                    .column(0)
+                    .as_any()
+                    .downcast_ref::<BooleanArray>()
+                    .unwrap()
+                    .iter()
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn regexp_fields_preserve_rows_and_optional_captures() {
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEXP_MATCH_TO_FIELDS_UDF.clone());
+        // The unnamed prefix must not displace either named field. The optional
+        // first named group must not shift the second group when it is absent.
+        let pattern = "(prefix)?(?P<first>a)?(?P<last>b)";
+        for data_type in [DataType::Utf8, DataType::LargeUtf8] {
+            for values in [
+                vec![],
+                vec![Some("ab"), Some("b"), None, Some("other"), Some("prefixab")],
+            ] {
+                let schema = Arc::new(Schema::new(vec![Field::new(
+                    "job",
+                    data_type.clone(),
+                    true,
+                )]));
+                let column: ArrayRef = match data_type {
+                    DataType::Utf8 => Arc::new(StringArray::from(values.clone())),
+                    _ => Arc::new(LargeStringArray::from(values.clone())),
+                };
+                let batch = RecordBatch::try_new(schema.clone(), vec![column]).unwrap();
+                ctx.register_table(
+                    "t",
+                    Arc::new(MemTable::try_new(schema, vec![vec![batch]]).unwrap()),
+                )
+                .unwrap();
+                let sql = format!(
+                    "SELECT (regexp_match_to_fields(job, '{pattern}'))['first'] AS first, (regexp_match_to_fields(job, '{pattern}'))['last'] AS last FROM t"
+                );
+                let batches = ctx.sql(&sql).await.unwrap().collect().await.unwrap();
+                let mut actual = Vec::new();
+                for batch in batches {
+                    for i in 0..batch.num_rows() {
+                        let row: Vec<_> = batch
+                            .columns()
+                            .iter()
+                            .map(|column| {
+                                if column.is_null(i) {
+                                    None
+                                } else {
+                                    Some(match data_type {
+                                        DataType::Utf8 => column
+                                            .as_any()
+                                            .downcast_ref::<StringArray>()
+                                            .unwrap()
+                                            .value(i)
+                                            .to_owned(),
+                                        _ => column
+                                            .as_any()
+                                            .downcast_ref::<LargeStringArray>()
+                                            .unwrap()
+                                            .value(i)
+                                            .to_owned(),
+                                    })
+                                }
+                            })
+                            .collect();
+                        actual.push(row);
+                    }
+                }
+                let expected: Vec<Vec<Option<String>>> = if values.is_empty() {
+                    vec![]
+                } else {
+                    vec![
+                        vec![Some("a"), Some("b")],
+                        vec![None, Some("b")],
+                        vec![None, None],
+                        vec![None, None],
+                        vec![Some("a"), Some("b")],
+                    ]
+                    .into_iter()
+                    .map(|row| row.into_iter().map(|s| s.map(str::to_owned)).collect())
+                    .collect()
+                };
+                assert_eq!(actual, expected, "{data_type:?}");
+                ctx.deregister_table("t").unwrap();
+            }
+        }
+        for (value, expected) in [
+            ("'ab'", false),
+            ("'b'", true),
+            ("'other'", true),
+            ("CAST(NULL AS VARCHAR)", true),
+        ] {
+            let sql =
+                format!("SELECT (regexp_match_to_fields({value}, '{pattern}'))['first'] IS NULL");
+            assert_eq!(booleans(&ctx, &sql).await, vec![Some(expected)], "{sql}");
+        }
+    }
+
+    #[tokio::test]
+    async fn regexp_fields_preserve_literal_quotes() {
+        let ctx = SessionContext::new();
+        ctx.register_udf(REGEXP_MATCH_TO_FIELDS_UDF.clone());
+        let sql = r#"SELECT (regexp_match_to_fields('"gateway"', '"(?P<name>[^"]+)"'))['name'] = 'gateway'"#;
+        assert_eq!(booleans(&ctx, sql).await, vec![Some(true)]);
+        let sql =
+            r#"SELECT (regexp_match_to_fields('gateway', '"(?P<name>[^"]+)"'))['name'] IS NULL"#;
+        assert_eq!(booleans(&ctx, sql).await, vec![Some(true)]);
     }
 }
