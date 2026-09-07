@@ -23,13 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     bleed
   >
     <template #actions>
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        data-test="alert-sources-add-btn"
-        @click="openAddDrawer"
-      >
+      <OButton variant="primary" size="sm" data-test="alert-sources-add-btn" @click="openAddDrawer">
         {{ t("alert_sources.add") }}
       </OButton>
     </template>

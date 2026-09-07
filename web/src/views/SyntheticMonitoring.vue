@@ -43,7 +43,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         variant="primary"
         data-test="status-pages-new-btn"
-        icon-left="add"
         @click="showCreateStatusPage = true"
       >
         {{ t("statusPages.newPage") }}
