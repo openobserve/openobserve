@@ -13,7 +13,6 @@
       "alerts-history.spec.js",
       "alerts-template-prebuilt-guard.spec.js",
       "alerts-form-validation.spec.js",
-      "anomaly-detection-form-validation.spec.js",
       "alerts-priority-tags.spec.js",
       "alerts-multialert-ui.spec.js",
       "alert-library.spec.js",
@@ -31,6 +30,10 @@
       {
         "file": "alerts-scheduled-features.spec.js",
         "reason": ""
+      },
+      {
+        "file": "alerts-anomaly-detection.spec.js",
+        "reason": "Enterprise-only. OSS CI builds without --features enterprise, so anomaly_detection_enabled is false and every test in this spec skips. It runs via the ENT gate; register it in o2-enterprise's ci_matrix.ent.json under append.Alerts."
       }
     ]
   },
