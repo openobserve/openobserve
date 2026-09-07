@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm-action"
         :disabled="!hasPendingChanges"
         @click="handleApply"
-        class="ml-2"
+        class="ms-2"
         data-test="apply-dimension-filters"
       >
         {{ applyLabelComputed }}

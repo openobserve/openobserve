@@ -247,7 +247,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="truncate font-mono text-xs"
               :class="[
                 row.isOther ? 'text-text-secondary italic' : 'text-text-code',
-                row.isTail ? 'pl-4' : '',
+                row.isTail ? 'ps-4' : '',
               ]"
             >
               <OTooltip v-if="row.queryText" :content="raw(row.queryText)" />
@@ -256,7 +256,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               v-if="!row.isOther"
               class="text-text-secondary text-3xs flex min-w-0 items-center gap-1 truncate"
-              :class="row.isTail ? 'pl-4' : ''"
+              :class="row.isTail ? 'ps-4' : ''"
             >
               <OTag type="dbSystem" :value="row.db_system" size="xs" />
               <span class="opacity-45">·</span>

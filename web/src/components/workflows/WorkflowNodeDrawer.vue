@@ -222,12 +222,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the same navigator the results dock had. Click a step to walk the panel to
            it; the active step is highlighted, the count-badge/leaf-dot mirrors its run
            status. Shown with the I/O panes only (showIo). -->
-      <!-- `-mr-2` tightens ONLY the Steps→Input gap (the row's gap-4 is kept elsewhere
+      <!-- `-me-2` tightens ONLY the Steps→Input gap (the row's gap-4 is kept elsewhere
            because the Input/Output resize handles live in those gaps). -->
       <section
         v-if="showIo"
         data-test="workflow-ndv-steps"
-        class="-mr-2 flex shrink-0 flex-col gap-2"
+        class="-me-2 flex shrink-0 flex-col gap-2"
         :class="stepsCollapsed ? 'w-11' : 'w-64'"
       >
         <!-- h-8 matches the Input/Output/Config header height (their dense tabs are
@@ -235,7 +235,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
              drops and the chevron centers (it's the only affordance that fits). -->
         <div
           class="flex h-8 items-center"
-          :class="stepsCollapsed ? 'justify-center' : 'justify-between pl-2'"
+          :class="stepsCollapsed ? 'justify-center' : 'justify-between ps-2'"
         >
           <span v-if="!stepsCollapsed" class="text-text-body text-sm font-bold">
             {{ t("workflow.results.nodesTitle") }}
@@ -277,7 +277,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             :data-test="`workflow-ndv-step-${row.id}`"
             class="relative flex h-9 shrink-0 items-center text-sm"
             :class="[
-              stepsCollapsed ? 'w-full justify-center' : 'w-max min-w-full pr-2 pl-2 text-left',
+              stepsCollapsed ? 'w-full justify-center' : 'w-max min-w-full ps-2 pe-2 text-left',
               row.id === nodeId
                 ? 'bg-select-item-hover-bg text-text-body'
                 : 'text-text-secondary hover:bg-surface-subtle',
@@ -317,7 +317,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               >
                 <span
                   v-if="i < row.depth ? row.guides[i - 1] : true"
-                  class="border-border-default absolute top-0 left-1/2 border-l"
+                  class="border-border-default absolute top-0 left-1/2 border-s"
                   :class="i < row.depth ? 'bottom-0' : row.guides[i - 1] ? 'h-full' : 'h-1/2'"
                 />
                 <span
@@ -340,7 +340,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   aria-hidden="true"
                 />
               </span>
-              <span class="flex min-w-0 items-center gap-1.5 pl-1.5">
+              <span class="flex min-w-0 items-center gap-1.5 ps-1.5">
                 <OIcon :name="row.icon" size="xs" class="shrink-0" />
                 <span class="truncate">{{ row.label }}</span>
                 <span v-if="row.detail" class="text-text-secondary truncate text-xs">
@@ -409,7 +409,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-border-default hover:bg-accent h-full w-0.5 rounded-full transition-colors"
           />
         </div>
-        <div class="flex h-8 items-center gap-2 pl-2">
+        <div class="flex h-8 items-center gap-2 ps-2">
           <div class="text-text-body text-sm font-bold">{{ t("workflow.ndv.input") }}</div>
           <div
             v-if="inputPaged && inputCount > 1"
@@ -440,7 +440,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             v-if="!canvasReadOnly"
             variant="ghost"
             size="xs"
-            class="ml-auto"
+            class="ms-auto"
             data-test="workflow-ndv-input-reset"
             @click="resetEditableInput"
           >
@@ -457,7 +457,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >
           <div
             v-if="!canvasReadOnly || (immediateSrc && immediateRecords.length)"
-            class="flex h-full flex-col pl-2"
+            class="flex h-full flex-col ps-2"
           >
             <CodeQueryEditor
               editor-id="workflow-ndv-input-editor"
@@ -592,7 +592,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             class="bg-border-default hover:bg-accent h-full w-0.5 rounded-full transition-colors"
           />
         </div>
-        <div class="flex h-8 items-center gap-2 pl-2">
+        <div class="flex h-8 items-center gap-2 ps-2">
           <div class="text-text-body text-sm font-bold">{{ t("workflow.ndv.output") }}</div>
           <!-- Run status (Passed / Errored / No Records) — same source as the canvas
                badge and the results dock. -->
@@ -607,7 +607,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <div
             v-if="outputCount > 1"
             data-test="workflow-ndv-output-pager"
-            class="text-text-secondary ml-auto flex items-center gap-1 text-xs"
+            class="text-text-secondary ms-auto flex items-center gap-1 text-xs"
           >
             <span>{{
               t("workflow.ndv.eventPager", { n: outputPage + 1, total: outputCount })
@@ -714,7 +714,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             >
               {{ t("workflow.test.stepResult.forwardedHeading") }}
             </div>
-            <div class="min-h-0 flex-1 pl-2">
+            <div class="min-h-0 flex-1 ps-2">
               <CodeQueryEditor
                 editor-id="workflow-ndv-output-editor"
                 language="json"

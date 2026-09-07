@@ -15,14 +15,9 @@
 
 use std::time::Duration;
 
-use config::meta::promql::value::{EvalContext, Sample, Value};
-use datafusion::error::Result;
+use config::meta::promql::value::Sample;
 
 use crate::functions::RangeFunc;
-
-pub(crate) fn last_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
-    super::eval_range(data, LastOverTimeFunc::new(), eval_ctx)
-}
 
 pub struct LastOverTimeFunc;
 
@@ -54,9 +49,14 @@ impl RangeFunc for LastOverTimeFunc {
 mod tests {
     use std::time::Duration;
 
-    use config::meta::promql::value::{Labels, RangeValue, TimeWindow};
+    use config::meta::promql::value::{EvalContext, Labels, RangeValue, TimeWindow, Value};
+    use datafusion::error::Result;
 
     use super::*;
+
+    fn last_over_time(data: Value, eval_ctx: &EvalContext) -> Result<Value> {
+        crate::functions::eval_range(data, LastOverTimeFunc::new(), eval_ctx)
+    }
 
     // Test helper
     fn last_over_time_test_helper(data: Value) -> Result<Value> {

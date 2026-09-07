@@ -104,7 +104,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <button
             type="button"
             data-test="workflow-editor-run-chip-clear"
-            class="text-text-secondary hover:text-text-body -mr-0.5 flex shrink-0 items-center"
+            class="text-text-secondary hover:text-text-body -me-0.5 flex shrink-0 items-center"
             :aria-label="t('workflow.runOverlay.clear')"
             @click="clearRunOverlay"
           >

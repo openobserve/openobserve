@@ -82,7 +82,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               class="rounded-default border-card-glass-border relative h-8 w-8 shrink-0 border"
               :style="swatchStyle(theme[mode])"
             />
-            <span class="ml-2 min-w-0 flex-1 text-left">
+            <span class="ms-2 min-w-0 flex-1 text-left">
               <span class="block truncate text-sm font-medium">{{
                 themeDisplayName(theme.name)
               }}</span>
@@ -125,7 +125,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2"
               />
             </span>
-            <span class="ml-2 min-w-0 flex-1 text-left">
+            <span class="ms-2 min-w-0 flex-1 text-left">
               <span class="block truncate text-sm font-medium">{{
                 t("components.predefinedThemes.customColor")
               }}</span>

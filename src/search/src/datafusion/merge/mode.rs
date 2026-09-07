@@ -109,11 +109,6 @@ impl MergeMode {
         }
     }
 
-    /// True for the indexed metrics hour-end merge.
-    pub fn is_metrics_indexed(&self) -> bool {
-        matches!(self, Self::MetricsIndexed)
-    }
-
     /// True when the whole hour must be merged as one batch — every file of
     /// the hour, including ones already above the size target, and regardless
     /// of `ZO_COMPACT_MAX_FILE_SIZE` (the writer splits the output itself).
@@ -152,7 +147,7 @@ impl MergeMode {
     pub fn input_sort_order(&self, files: &[FileKey]) -> FileSortOrder {
         let hash_ordered = files
             .iter()
-            .filter(|f| MetricsFileLayout::of(&f.key).is_some())
+            .filter(|f| MetricsFileLayout::is_hash_ordered(&f.key))
             .count();
         match self {
             Self::MetricsHashSorted | Self::MetricsIndexed => {

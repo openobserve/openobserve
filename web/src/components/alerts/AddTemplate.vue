@@ -199,7 +199,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </template>
       <template v-slot:after>
         <div
-          class="bg-card-glass-bg border-border-default flex h-full flex-col overflow-auto border-l px-2 pt-2"
+          class="bg-card-glass-bg border-border-default flex h-full flex-col overflow-auto border-s px-2 pt-2"
         >
           <template v-if="editorMode === 'content'">
             <!--
@@ -215,7 +215,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               column's own `overflow-auto` do the scrolling instead.
             -->
             <TemplatePreviewPanel :spec="contentSpec" data-test="add-template-preview-panel" />
-            <OSeparator class="mt-2 mr-2 -ml-2" />
+            <OSeparator class="-ms-2 me-2 mt-2" />
           </template>
 
           <OCollapsible

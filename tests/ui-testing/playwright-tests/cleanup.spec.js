@@ -348,6 +348,7 @@ test.describe("Pre-Test Cleanup", () => {
     await pm.apiCleanup.cleanupStreams(
       [
         /^sdr_traces_/,                // sdr_traces_* (traces SDR test streams: redact/drop/hash × ingestion/query)
+        /^trace_genai_parts_/,         // trace_genai_parts_* (GenAI v5 parts rendering test streams)
       ],
       ['default'],                     // protect the default traces stream
       { streamType: 'traces' }

@@ -303,7 +303,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <tbody>
                   <tr class="border-table-row-divider border-b last:border-b-0">
                     <td
-                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-r px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
                     >
                       {{ t("about.lincese_id_lbl") }}
                     </td>
@@ -322,13 +322,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </tr>
                   <tr class="border-table-row-divider border-b last:border-b-0">
                     <td
-                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-r px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
                     >
                       {{ t("about.status_lbl") }}
                     </td>
                     <td class="text-text-body px-3.5 py-2.5 text-sm">
                       <span
-                        class="mr-1.5 inline-block h-2 w-2 rounded-full align-middle"
+                        class="me-1.5 inline-block h-2 w-2 rounded-full align-middle"
                         :class="licenseData?.expired ? 'bg-status-negative' : 'bg-status-positive'"
                       />
                       <span
@@ -342,7 +342,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </tr>
                   <tr class="border-table-row-divider border-b last:border-b-0">
                     <td
-                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-r px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
                     >
                       {{ t("about.editionLbl") }}
                     </td>
@@ -352,7 +352,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </tr>
                   <tr class="border-table-row-divider border-b last:border-b-0">
                     <td
-                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-r px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
                     >
                       {{ t("about.create_at_lbl") }}
                     </td>
@@ -362,7 +362,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </tr>
                   <tr class="border-table-row-divider border-b last:border-b-0">
                     <td
-                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-r px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
+                      class="text-table-header-text border-table-row-divider bg-table-header-bg w-2/5 border-e px-3.5 py-2.5 text-sm font-semibold whitespace-nowrap"
                     >
                       {{ t("about.expires_at_lbl") }}
                     </td>

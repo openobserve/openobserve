@@ -279,7 +279,7 @@ const stepSelectOptions = computed<SelectOptionInput[]>(() => {
           class="rounded-default border-status-warning-text/30 border p-2 text-xs"
           data-test="synthetics-evidence-truncated"
         >
-          <OIcon name="warning" size="xs" class="text-status-warning-text mr-1" />
+          <OIcon name="warning" size="xs" class="text-status-warning-text me-1" />
           {{ t("synthetics.evidence.truncated") }}
         </div>
 

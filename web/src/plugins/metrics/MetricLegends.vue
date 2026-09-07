@@ -23,7 +23,7 @@
             :key="metric"
             :data-test="`metrics-legends-item-${metric}`"
           >
-            <OIcon :name="icon" size="md" class="mr-1" />
+            <OIcon :name="icon" size="md" class="me-1" />
             <span>{{ metric }}</span>
           </div>
         </div>
