@@ -49,11 +49,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </template>
     <div class="flex min-h-0 w-full flex-1">
       <div class="flex min-h-0 w-full min-w-0">
-        <!-- < md the form/preview panes stack: side by side leaves the upload pane
+        <!-- < lg the form/preview panes stack: side by side leaves the upload pane
              ~224px and clips its controls. -->
         <OSplitter
           v-model="splitterModel"
-          :horizontal="isMobile"
+          :horizontal="stackPanes"
           class="h-full min-h-0 w-full min-w-0"
         >
           <template #before>
@@ -271,7 +271,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 <script lang="ts">
 // @ts-nocheck
-import { defineComponent, ref, onMounted, reactive, watch } from "vue";
+import { computed, defineComponent, ref, onMounted, reactive, watch } from "vue";
 import { useI18nTyped } from "@/types/i18n";
 import { getAllDashboards, getFoldersList, dedupeDashboardIds } from "../../utils/commons.js";
 import { useStore } from "vuex";
@@ -334,15 +334,16 @@ export default defineComponent({
     const activeTab = ref("import_json_file");
 
     const dashboardErrorsToDisplay = ref([]);
-    const { isMobile } = useBreakpoint();
+    const { lgUp } = useBreakpoint();
+    const stackPanes = computed(() => !lgUp.value);
     const splitterModel = ref(60);
 
-    // < md the error pane earns its half of the screen only once it has
+    // < lg the error pane earns its half of the screen only once it has
     // something to show — empty, it buried the form's own controls.
     watch(
-      [isMobile, () => dashboardErrorsToDisplay.value.length],
-      ([mobile, errCount]) => {
-        if (mobile) splitterModel.value = errCount > 0 ? 55 : 100;
+      [stackPanes, () => dashboardErrorsToDisplay.value.length],
+      ([stacked, errCount]) => {
+        if (stacked) splitterModel.value = errCount > 0 ? 55 : 100;
         else if (splitterModel.value === 100) splitterModel.value = 60;
       },
       { immediate: true },
@@ -880,7 +881,7 @@ export default defineComponent({
       activeTab,
       dashboardErrorsToDisplay,
       splitterModel,
-      isMobile,
+      stackPanes,
       updateActiveTab,
       queryEditorPlaceholderFlag,
       importDashboard,

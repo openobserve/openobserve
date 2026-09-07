@@ -62,14 +62,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          double the inset and push the content past the header icon. -->
     <div class="flex min-h-0 flex-1" :class="contentWrapperClass">
       <div class="flex min-h-0 w-full" :style="contentStyle">
-        <!-- < md the form/output panes stack — side by side neither fits. -->
+        <!-- < lg the form/output panes stack — side by side neither fits. -->
         <OSplitter
           v-if="showSplitter"
           class="logs-search-splitter h-full min-h-0 w-full"
           v-model="splitterModel"
           :style="splitterStyle"
-          :limits="[30, isMobile ? 100 : 60]"
-          :horizontal="isMobile"
+          :limits="[30, stackPanes ? 100 : 60]"
+          :horizontal="stackPanes"
         >
           <template #before>
             <div class="border-border-default flex h-full w-full flex-col border-e">
@@ -327,7 +327,8 @@ export default defineComponent({
   emits: ["back", "cancel", "import", "update:jsonStr", "update:jsonArray", "update:activeTab"],
   setup(props, { emit }) {
     const { t } = useI18nTyped();
-    const { isMobile } = useBreakpoint();
+    const { lgUp } = useBreakpoint();
+    const stackPanes = computed(() => !lgUp.value);
 
     // State
     const jsonStr = ref<any>("");
@@ -522,7 +523,7 @@ export default defineComponent({
     return {
       raw,
       t,
-      isMobile,
+      stackPanes,
       jsonStr,
       jsonFiles,
       url,

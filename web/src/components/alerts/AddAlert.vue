@@ -159,9 +159,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </div>
 
-      <!-- < md the form and Preview/Summary panes stack: side by side each gets
+      <!-- < lg the form and Preview/Summary panes stack: side by side each gets
            ~180px and every control clips. -->
-      <div class="flex min-h-0 flex-1 max-md:flex-col">
+      <div class="flex min-h-0 flex-1 max-lg:flex-col">
         <!-- LEFT column wrapper (flex: 6.5) -->
         <div
           :class="[
@@ -464,7 +464,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- border-s: full-height vertical divider flush against the Preview/Summary pane -->
         <div
           v-if="!isCompositeMode"
-          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pt-2 pb-2 max-md:border-s-0 max-md:border-t"
+          class="border-border-default flex min-h-0 min-w-0 flex-[3.5] flex-col gap-2 overflow-hidden border-s pt-2 pb-2 max-lg:border-s-0 max-lg:border-t"
         >
           <!-- Preview Card -->
           <div class="bg-card-glass-bg flex min-h-0 flex-1 flex-col overflow-hidden">
