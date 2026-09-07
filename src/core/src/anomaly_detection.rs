@@ -1480,14 +1480,16 @@ fn merged_interval_pair(
 }
 
 /// P0.4 TDD stub — implementation surface, not behaviour. The single line `update_config`
-/// calls: merge, then the rule, but ONLY when the update actually touches an interval.
-/// Untouched intervals are grandfathered so the two live broken rows stay disable-able —
-/// validation on write must not become an accidental migration.
+/// calls: merge, then the rule, but ONLY when the merged pair actually DIFFERS from the
+/// persisted one. Keyed on change rather than presence because the alerts v2 PUT replays
+/// the full body, resending both intervals unchanged on an unrelated edit like a rename;
+/// a presence guard would reject that and make the live broken rows uneditable.
 fn validated_intervals(
     req: &UpdateAnomalyConfigRequest,
     existing: &infra::table::entity::anomaly_detection_config::Model,
 ) -> Result<()> {
     let (schedule, histogram) = merged_interval_pair(req, existing);
+    let _ = parse_interval(&schedule);
     validate_interval_pair(&schedule, &histogram)
 }
 
@@ -2578,6 +2580,16 @@ mod tests {
             assert!(validate_interval_pair("-5m", "5m").is_err());
             assert!(validate_interval_pair("5m", "-5m").is_err());
         }
+
+        /// `hours * 3600` is unguarded: i64::MAX hours panics in debug and wraps NEGATIVE
+        /// in release, where it would then sail past `schedule >= histogram` like `-5m`.
+        /// Delegation makes this reachable from the update path, so `checked_mul` is required.
+        #[test]
+        fn rejects_intervals_that_overflow_the_seconds_conversion() {
+            assert!(validate_interval_pair("9223372036854775807h", "5m").is_err());
+            assert!(validate_interval_pair("5m", "9223372036854775807h").is_err());
+            assert!(validate_interval_pair("9223372036854775807m", "5m").is_err());
+        }
     }
 
     // ── P0.4: partial updates validate the MERGED row, not just the payload ──
@@ -2638,6 +2650,27 @@ mod tests {
             stored.schedule_interval = "1m".to_string();
             stored.histogram_interval = "5m".to_string();
             stored
+        }
+
+        /// The other live broken row, ingester_offline: 5m schedule over 1m buckets is a
+        /// clean multiple, so what is wrong with it is the skipped buckets, not the ratio.
+        fn ingester_offline_config() -> infra::table::entity::anomaly_detection_config::Model {
+            let mut stored = stored_config();
+            stored.schedule_interval = "5m".to_string();
+            stored.histogram_interval = "1m".to_string();
+            stored
+        }
+
+        /// A full-body PUT replay: every interval resent at exactly its persisted value.
+        fn full_body_replay(
+            existing: &infra::table::entity::anomaly_detection_config::Model,
+        ) -> UpdateAnomalyConfigRequest {
+            UpdateAnomalyConfigRequest {
+                name: Some("renamed in the UI".to_string()),
+                schedule_interval: Some(existing.schedule_interval.clone()),
+                histogram_interval: Some(existing.histogram_interval.clone()),
+                ..Default::default()
+            }
         }
 
         /// Targets the same fn `update_config` calls, so tests cannot drift from the product.
@@ -2762,47 +2795,77 @@ mod tests {
             }
         }
 
-        /// Grandfathering, the binding product decision: an update that touches NEITHER
-        /// interval must not re-litigate a row that is already broken on disk. Validating
-        /// unconditionally would make the live ingester_health row impossible to disable.
+        /// Grandfathering case 1 of 4, split so always-validate fails four separate tests
+        /// rather than one: a folder move must not re-litigate a row broken on disk.
         #[test]
-        fn a_broken_legacy_row_can_still_be_moved_or_disabled() {
-            let broken = broken_legacy_config();
-            for (label, req) in [
-                (
-                    "folder move",
-                    UpdateAnomalyConfigRequest {
-                        folder_id: Some("other".to_string()),
-                        ..Default::default()
-                    },
-                ),
-                (
-                    "disable a misfiring alert",
-                    UpdateAnomalyConfigRequest {
-                        enabled: Some(false),
-                        ..Default::default()
-                    },
-                ),
-                (
-                    "bulk enable",
-                    UpdateAnomalyConfigRequest {
-                        enabled: Some(true),
-                        ..Default::default()
-                    },
-                ),
-                ("rename only", UpdateAnomalyConfigRequest::default()),
-            ] {
+        fn a_broken_row_can_still_be_moved_between_folders() {
+            let req = UpdateAnomalyConfigRequest {
+                folder_id: Some("other".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &broken_legacy_config()).is_ok());
+        }
+
+        /// The case that matters most operationally: ingester_health is Slack-wired at a
+        /// ceiling of 1440 alerts/day, and validating here would make it undisableable.
+        #[test]
+        fn a_broken_row_can_still_be_disabled() {
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(false),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &broken_legacy_config()).is_ok());
+        }
+
+        /// Bulk enable reaches `update_config` with no 400 path at all, so a rejection here
+        /// surfaces as a 500 on a row the operator never asked to change.
+        #[test]
+        fn a_broken_row_can_still_be_bulk_enabled() {
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(true),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &broken_legacy_config()).is_ok());
+        }
+
+        #[test]
+        fn the_other_broken_prod_row_is_equally_administrable() {
+            let req = UpdateAnomalyConfigRequest {
+                enabled: Some(false),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &ingester_offline_config()).is_ok());
+        }
+
+        /// The alerts v2 PUT replays the FULL body, so a rename resends both intervals at
+        /// their stored values. Keyed on presence this reads as "touching both" and blocks
+        /// the edit through the primary UI path; keyed on change it is correctly a no-op.
+        #[test]
+        fn a_full_body_replay_of_unchanged_intervals_is_not_a_change() {
+            for broken in [broken_legacy_config(), ingester_offline_config()] {
+                let req = full_body_replay(&broken);
                 assert!(
                     validated_intervals(&req, &broken).is_ok(),
-                    "{label} must not be blocked by a pre-existing bad pair"
+                    "a UI rename must not be rejected by resent-but-identical intervals"
                 );
             }
         }
 
-        /// Grandfathering does not extend to editing an interval: touching one field on a
-        /// broken row validates it against the persisted other, so the row can only improve.
+        /// The single-field twin of the replay: resending one interval at its stored value.
         #[test]
-        fn editing_one_interval_on_a_broken_row_is_still_validated() {
+        fn resubmitting_one_interval_unchanged_is_not_a_change() {
+            let broken = broken_legacy_config();
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some(broken.schedule_interval.clone()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &broken).is_ok());
+        }
+
+        /// Grandfathering does not extend to a genuine edit: changing one interval on a
+        /// broken row is validated against the persisted other, so it can only improve.
+        #[test]
+        fn genuinely_changing_one_interval_on_a_broken_row_is_still_validated() {
             let broken = broken_legacy_config();
             let worse = UpdateAnomalyConfigRequest {
                 schedule_interval: Some("2m".to_string()),
@@ -2812,13 +2875,34 @@ mod tests {
                 .unwrap_err()
                 .to_string();
             assert!(err.contains("must not be shorter"), "got: {err}");
+        }
 
-            // Repairing the pair in a single field must still be allowed through.
-            let repaired = UpdateAnomalyConfigRequest {
+        #[test]
+        fn repairing_a_broken_row_from_either_side_is_allowed() {
+            let broken = broken_legacy_config();
+            let by_schedule = UpdateAnomalyConfigRequest {
                 schedule_interval: Some("10m".to_string()),
                 ..Default::default()
             };
-            assert!(validated_intervals(&repaired, &broken).is_ok());
+            assert!(validated_intervals(&by_schedule, &broken).is_ok());
+
+            // The symmetric repair: 1m buckets under the stored 1m schedule is 1:1.
+            let by_histogram = UpdateAnomalyConfigRequest {
+                histogram_interval: Some("1m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&by_histogram, &broken).is_ok());
+        }
+
+        /// The boundary of the `<` comparison, reached through a merge rather than the
+        /// pure rule: equal intervals are the tightest pair that must still be accepted.
+        #[test]
+        fn a_merge_landing_on_equal_intervals_is_accepted() {
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("5m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &stored_config()).is_ok());
         }
     }
 
