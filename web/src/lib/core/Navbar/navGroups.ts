@@ -133,12 +133,9 @@ export const NAV_GROUPS: NavGroupDef[] = [
     children: [
       // ── Alerts ──────────────────────────────────────────────────────────
       // These four are the alerting cluster, and they carry a peer tab strip
-      // (AlertSectionTabs) on every one of their pages. Same ORDER in both, and
-      // one header here — a rail that disagreed with the tabs would make the
-      // two feel like different places. Labels differ on purpose: the rail
-      // names a destination out of context ("Notification Destinations"), the
-      // strip names it inside one ("Destinations"), which is why both keys
-      // exist.
+      // (AlertSectionTabs) on every one of their pages. Same ORDER and same
+      // LABEL in both — a rail that disagreed with the tabs would make the
+      // two feel like different places.
       //
       // Destinations and Templates moved out of Settings: they are alerting
       // configuration, not deployment configuration. None of the three have a
@@ -168,7 +165,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
         requires: "alertList",
         categoryKey: "menu.alerts",
       },
-      // The curated catalog you install alerts FROM — gated the same way, so
+      // The curated catalog you add alerts FROM — gated the same way, so
       // hiding Alerts hides the place to get more. Last, like its tab: you go
       // looking for it once, then work in the other three.
       {

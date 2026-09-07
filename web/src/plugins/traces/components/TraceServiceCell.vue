@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <img
       data-test="trace-row-service-icon"
       :src="serviceIconUrl"
-      class="mr-2 h-5 w-5 shrink-0"
+      class="me-2 h-5 w-5 shrink-0"
       aria-hidden="true"
       alt=""
     />
@@ -55,7 +55,20 @@ const { getOrSetServiceColor } = useTraces();
 
 const rootColor = computed(() => getOrSetServiceColor(props.item.service_name) ?? "#9e9e9e");
 
-const serviceIconUrl = computed(() =>
-  getServiceIconDataUrl(props.item.service_name, isDark.value, rootColor.value),
-);
+const serviceIconUrl = computed(() => {
+  if (props.item.infer_service_system) {
+    return getServiceIconDataUrl(props.item.infer_service_system, isDark.value, rootColor.value);
+  }
+
+  if (props.item.infer_service_type) {
+    return getServiceIconDataUrl(
+      props.item.service_name,
+      isDark.value,
+      rootColor.value,
+      props.item.infer_service_type,
+    );
+  }
+
+  return getServiceIconDataUrl(props.item.service_name, isDark.value, rootColor.value);
+});
 </script>

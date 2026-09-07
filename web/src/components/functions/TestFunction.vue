@@ -29,7 +29,7 @@
             :disabled="!selectedStream.name || !inputQuery || loading.events"
             @click="getResults"
           >
-            <OIcon name="search" size="sm" class="mr-1" />
+            <OIcon name="search" size="sm" class="me-1" />
             {{ t("search.runQuery") }}
           </OButton>
         </template>
@@ -135,7 +135,7 @@
         <template #left>
           <div
             v-if="loading.events"
-            class="text-text-secondary text-compact ml-2 flex items-center font-bold"
+            class="text-text-secondary text-compact ms-2 flex items-center font-bold"
           >
             <OSpinner size="xs" />
             <div class="relative top-0.5">
@@ -163,7 +163,7 @@
             @send-to-ai-chat="sendToAiChat(JSON.stringify(inputEvents))"
             imageHeight="24"
             imageWidth="24"
-            :class="'mr-4 px-2'"
+            :class="'me-4 px-2'"
             style="
               width: 2rem !important;
               height: 2rem !important;
@@ -202,7 +202,7 @@
         <template #left>
           <div
             v-if="loading.output"
-            class="text-text-secondary text-compact ml-2 flex items-center text-sm font-bold font-medium"
+            class="text-text-secondary text-compact ms-2 flex items-center text-sm font-bold font-medium"
           >
             <OSpinner size="xs" />
             <div class="relative top-0.5">
@@ -278,6 +278,7 @@ import { useQueryPlaceholder } from "@/components/logs/useQueryPlaceholder";
 import { debounce } from "lodash-es";
 import useQuery from "@/composables/useQuery";
 import { rangesFromServerError, type SqlErrorRange } from "@/utils/query/sqlDiagnostics";
+import { maxParenDepth, SQL_PARSE_MAX_DEPTH } from "@/utils/query/sqlComplexity";
 import searchService from "@/services/search";
 import { useStore } from "vuex";
 import { getConsumableRelativeTime } from "@/utils/date";
@@ -554,6 +555,10 @@ watch(inputQuery, (value) => {
 // the SQL the user typed.
 const debouncedSyncStreamFromQuery = debounce(async (sql: string) => {
   if (!sql || !parser) return;
+  // parse() is exponential in paren nesting depth — skip a pathologically
+  // nested query rather than freeze the tab. Losing this convenience sync
+  // is fine; the user can still pick the stream from the dropdown.
+  if (maxParenDepth(sql) > SQL_PARSE_MAX_DEPTH) return;
   try {
     const parsed = parser.parse(sql);
     const fromStream = parsed?.ast?.from?.[0]?.table as string | undefined;

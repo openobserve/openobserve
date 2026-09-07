@@ -274,6 +274,10 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await page.waitForTimeout(300);
     await pageManager.pipelinesPage.fillCondition("kubernetes_host", "=", "value-B", 1);
 
+    // Guard: the OR toggle took effect on condition B's join before we rely on
+    // the A OR B combination below.
+    await pageManager.pipelinesPage.verifyOperatorLabel("OR", 0);
+
     // Condition C with AND (default)
     await pageManager.pipelinesPage.addNewCondition();
     await pageManager.pipelinesPage.fillCondition("kubernetes_pod_name", "=", "value-C", 2);
@@ -281,11 +285,10 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     // Verify 3 conditions exist
     await pageManager.pipelinesPage.verifyConditionCount(3);
 
-    // Verify operators are set correctly
-    const operatorLabels = pageManager.pipelinesPage.operatorLabels;
-    if (await operatorLabels.count() >= 2) {
-      await pageManager.pipelinesPage.verifyOperatorLabel("OR", 0);
-    }
+    // Verify BOTH join operators unconditionally: A OR B AND C. The first join
+    // (B) is OR, the second (C) is AND — no `count() >= 2` guard, both must hold.
+    await pageManager.pipelinesPage.verifyOperatorLabel("OR", 0);
+    await pageManager.pipelinesPage.verifyOperatorLabel("AND", 1);
 
     await pageManager.pipelinesPage.saveConditionAndCompletePipeline(pipelineName);
 
@@ -389,12 +392,23 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
     await pageManager.pipelinesPage.addNewCondition();
     await pageManager.pipelinesPage.fillCondition("kubernetes_host", "!=", "excluded", 1);
 
+    // Add Contains operator condition
+    await pageManager.pipelinesPage.addNewCondition();
+    await pageManager.pipelinesPage.fillCondition("kubernetes_pod_name", "Contains", "include", 2);
+
     // Add NotContains operator condition
     await pageManager.pipelinesPage.addNewCondition();
-    await pageManager.pipelinesPage.fillCondition("kubernetes_pod_name", "NotContains", "ignore", 2);
+    await pageManager.pipelinesPage.fillCondition("kubernetes_namespace_name", "NotContains", "ignore", 3);
 
-    // Verify all 3 conditions exist
-    await pageManager.pipelinesPage.verifyConditionCount(3);
+    // Verify all 4 conditions exist
+    await pageManager.pipelinesPage.verifyConditionCount(4);
+
+    // Assert each row's operator actually took effect — the count alone would
+    // let a wrong/failed operator selection pass.
+    await pageManager.pipelinesPage.verifyOperatorSelected(">=", 0);
+    await pageManager.pipelinesPage.verifyOperatorSelected("!=", 1);
+    await pageManager.pipelinesPage.verifyOperatorSelected("Contains", 2);
+    await pageManager.pipelinesPage.verifyOperatorSelected("NotContains", 3);
 
     await pageManager.pipelinesPage.saveConditionAndCompletePipeline(pipelineName);
 
@@ -402,5 +416,104 @@ test.describe("Pipeline Conditions - Comprehensive Tests", () => {
 
     await pageManager.pipelinesPage.openPipelineMenu();
     await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
+  });
+
+  test("should hide the value input for a unary is_null operator and save without error", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@condition-null-empty-operators']
+  }, async ({ page }) => {
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_operators${streamSuffix}`);
+    await pageManager.pipelinesPage.verifyConditionDialogOpen();
+
+    // Select column + unary operator (no value input for unary operators).
+    await pageManager.pipelinesPage.fillUnaryCondition("kubernetes_container_name", "is_null", 0);
+
+    // The value input is v-if-removed for a unary operator.
+    await pageManager.pipelinesPage.verifyValueInputCount(0);
+
+    // Saving a unary condition is complete without a value: no inline error and
+    // the drawer closes (the condition node appears on the canvas).
+    await pageManager.pipelinesPage.saveCondition();
+    await pageManager.pipelinesPage.verifyNoConditionError();
+    await pageManager.pipelinesPage.verifyConditionDialogClosed();
+  });
+
+  test("should round-trip a saved unary operator on edit and restore the value input for a binary operator", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@condition-null-empty-operators']
+  }, async ({ page }) => {
+    const pipelineName = `pipeline-null-empty-roundtrip-${Math.random().toString(36).substring(7)}`;
+    currentPipelineName = pipelineName;
+
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_operators${streamSuffix}`);
+    await pageManager.pipelinesPage.fillUnaryCondition("kubernetes_container_name", "is_null", 0);
+    await pageManager.pipelinesPage.verifyValueInputCount(0);
+    await pageManager.pipelinesPage.saveConditionAndCompletePipeline(pipelineName);
+
+    // Reopen the saved pipeline and edit its condition node.
+    await pageManager.pipelinesPage.openPipelineMenu();
+    await page.waitForTimeout(1000);
+    await pageManager.pipelinesPage.openPipelineForEdit(pipelineName);
+    await pageManager.pipelinesPage.clickConditionNode();
+    await pageManager.pipelinesPage.verifyConditionDialogOpen();
+
+    // The unary operator round-trips and the value input stays hidden on load.
+    await pageManager.pipelinesPage.verifyOperatorSelected("is_null", 0);
+    await pageManager.pipelinesPage.verifyValueInputCount(0);
+
+    // Switching to a binary operator restores the value input for that row.
+    await pageManager.pipelinesPage.selectOperatorFromMenu("=");
+    await pageManager.pipelinesPage.verifyValueInputCount(1);
+
+    // Cleanup
+    await pageManager.pipelinesPage.openPipelineMenu();
+    await page.waitForTimeout(1000);
+    await pageManager.pipelinesPage.deletePipelineByName(pipelineName);
+  });
+
+  test("should offer all four unary operators in the condition operator dropdown", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@condition-null-empty-operators']
+  }, async ({ page }) => {
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_operators${streamSuffix}`);
+    await pageManager.pipelinesPage.verifyConditionDialogOpen();
+
+    // Select a column so the operator menu is in its interactive state.
+    await pageManager.pipelinesPage.fillPartialCondition("kubernetes_container_name");
+
+    // All four unary operators are offered.
+    await pageManager.pipelinesPage.verifyUnaryOperatorsOffered();
+  });
+
+  test("should still require a value for a binary operator after unary operators are added", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@pipelinesValidation', '@condition-null-empty-operators']
+  }, async ({ page }) => {
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_operators${streamSuffix}`);
+    await pageManager.pipelinesPage.fillPartialCondition("kubernetes_container_name");
+    await pageManager.pipelinesPage.selectOperatorFromMenu("=");
+
+    // Guard: the binary operator actually took effect before asserting its error.
+    await pageManager.pipelinesPage.verifyOperatorSelected("=", 0);
+
+    // A binary operator still requires a value: saving with an empty value
+    // surfaces the inline schema error (unary exemption did not weaken this).
+    await pageManager.pipelinesPage.tryToSaveWithoutValidConditions();
+    await pageManager.pipelinesPage.verifyNotificationVisible();
+  });
+
+  test("should clear a previously entered value when switching to a unary operator", {
+    tag: ['@all', '@pipelines', '@pipelinesConditions', '@condition-null-empty-operators']
+  }, async ({ page }) => {
+    await pageManager.pipelinesPage.createPipelineWithCondition(`e2e_conditions_operators${streamSuffix}`);
+
+    // Enter a binary condition with a stale value.
+    await pageManager.pipelinesPage.fillCondition("kubernetes_container_name", "=", "stale-value", 0);
+
+    // Switching to a unary operator drops the stale value and hides the input.
+    await pageManager.pipelinesPage.selectOperatorFromMenu("is_null");
+    await pageManager.pipelinesPage.verifyValueInputCount(0);
+
+    // Switching back to a binary operator restores the input, now empty —
+    // proving the stale value did not leak into the form.
+    await pageManager.pipelinesPage.selectOperatorFromMenu("=");
+    await pageManager.pipelinesPage.verifyValueInputCount(1);
+    await pageManager.pipelinesPage.verifyConditionValueInputValue("", 0);
   });
 });

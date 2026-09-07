@@ -37,7 +37,7 @@
             data-test="ai-remote-task-form-identity-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.identitySection") }}
               </span>
@@ -68,7 +68,7 @@
             data-test="ai-remote-task-form-endpoint-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.endpointSection") }}
               </span>
@@ -106,7 +106,7 @@
             data-test="ai-remote-task-form-auth-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.authSection") }}
               </span>
@@ -180,7 +180,7 @@
             data-test="ai-remote-task-form-contract-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.contractSection") }}
               </span>
@@ -290,7 +290,7 @@
               class="border-border-default flex items-center justify-between border-b px-3 py-2.5"
             >
               <div class="flex items-center">
-                <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+                <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
                 <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                   {{ t("aiObservability.remoteTasks.form.limitsSection") }}
                 </span>
@@ -342,7 +342,7 @@
             data-test="ai-remote-task-form-signing-section"
           >
             <div class="border-border-default flex items-center border-b px-3 py-2.5">
-              <div class="rounded-default bg-theme-accent mr-2 h-4 w-0.75 shrink-0" />
+              <div class="rounded-default bg-theme-accent me-2 h-4 w-0.75 shrink-0" />
               <span class="text-compact text-text-heading font-semibold tracking-[0.01em]">
                 {{ t("aiObservability.remoteTasks.form.signingSection") }}
               </span>
@@ -419,7 +419,7 @@
           :state="testState"
           :report="testReport"
           :error-message="testError"
-          @run="submitFromPanel"
+          @run="runCandidateTest"
         />
       </div>
 
@@ -696,9 +696,36 @@ function goBack() {
   void router.push(aiRemoteTasksRoute(orgId.value));
 }
 
-function submitFromPanel() {
-  submitIntent.value = "publish";
-  void form.handleSubmit();
+/**
+ * Test the form exactly as it stands. `POST /tasks/test` takes the whole
+ * candidate, so nothing is registered, no secret row is written and no version
+ * is published — which is what a button called "Test Connection" should do.
+ *
+ * Publishing still requires a passing test; that check moved to the Publish
+ * button, which runs its own against the saved draft.
+ */
+async function runCandidateTest() {
+  if (!orgId.value) return;
+  testState.value = "running";
+  testError.value = null;
+  testReport.value = null;
+
+  try {
+    const values = form.state.values as RemoteTaskFormValues;
+    const result = await remoteTasksService.testCandidate(orgId.value, {
+      ...toCreatePayload(values),
+      ...currentSample(),
+    });
+    testReport.value = result.report ?? null;
+    testState.value = result.verified ? "passed" : "failed";
+    if (!result.verified) {
+      testError.value = raw(result.error) || t("aiObservability.remoteTasks.form.testFailed");
+    }
+  } catch (error: any) {
+    testState.value = "failed";
+    testError.value =
+      raw(error?.response?.data?.message) || t("aiObservability.remoteTasks.form.testFailed");
+  }
 }
 
 function currentSample() {

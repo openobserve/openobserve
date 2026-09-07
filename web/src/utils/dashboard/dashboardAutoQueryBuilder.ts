@@ -1,5 +1,6 @@
 import { splitQuotedString, escapeSingleQuotes } from "@/utils/zincutils";
 import functionValidation from "@/components/dashboards/addPanel/dynamicFunction/functionValidation.json";
+import { DEFAULT_CAST_TARGET_TYPE, isCastTargetType } from "@/utils/dashboard/castSuggestion";
 
 export function buildSQLQueryFromInput(fields: any, defaultStream: any): string {
   // Handle undefined or null fields
@@ -34,6 +35,7 @@ export function buildSQLQueryFromInput(fields: any, defaultStream: any): string 
   }
 
   const sqlArgs = [];
+  let castTargetType: string | null = null;
   for (let i = 0; i < args.length; i++) {
     // Skip if arg is undefined or null
     if (!args[i]) {
@@ -71,6 +73,11 @@ export function buildSQLQueryFromInput(fields: any, defaultStream: any): string 
     } else if (argType === "number") {
       // Add numbers as-is
       sqlArgs.push(argValue);
+    } else if (argType === "castType") {
+      // A SQL type name, not a value. Held aside rather than pushed so the cast
+      // reads it by kind, not by position, and validated so a hand-edited panel
+      // cannot put arbitrary text where a type name goes.
+      castTargetType = isCastTargetType(argValue) ? argValue : DEFAULT_CAST_TARGET_TYPE;
     } else if (argType === "function") {
       // Recursively build the SQL query for the nested function
       try {
@@ -105,6 +112,16 @@ export function buildSQLQueryFromInput(fields: any, defaultStream: any): string 
       return `approx_percentile_cont(${sqlArgs.join(", ")}, 0.95)`;
     case "p99":
       return `approx_percentile_cont(${sqlArgs.join(", ")}, 0.99)`;
+    case "try_cast":
+    case "cast": {
+      const castValue = sqlArgs[0];
+      if (!castValue) return "";
+      // A panel saved without the type argument still casts rather than dropping
+      // the column out of SELECT, which would fail silently.
+      return `${functionName.toUpperCase()}(${castValue} AS ${
+        castTargetType ?? DEFAULT_CAST_TARGET_TYPE
+      })`;
+    }
   }
 
   // Construct the SQL query string

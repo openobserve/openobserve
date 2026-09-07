@@ -58,6 +58,12 @@ pub enum WorkflowTriggerType {
     AlertFired,
     IncidentEvent,
     Webhook,
+    Manual,
+    Test,
+    Retry,
+    // A trigger type written by a newer node. Decoding to a real variant instead would
+    // relabel it as that trigger, and run history is searched across regions.
+    Unknown,
 }
 
 impl From<&str> for WorkflowTriggerType {
@@ -66,7 +72,10 @@ impl From<&str> for WorkflowTriggerType {
             "AlertFired" => Self::AlertFired,
             "IncidentEvent" => Self::IncidentEvent,
             "Webhook" => Self::Webhook,
-            _ => Self::AlertFired,
+            "Manual" => Self::Manual,
+            "Test" => Self::Test,
+            "Retry" => Self::Retry,
+            _ => Self::Unknown,
         }
     }
 }
@@ -77,6 +86,10 @@ impl std::fmt::Display for WorkflowTriggerType {
             Self::AlertFired => write!(f, "AlertFired"),
             Self::IncidentEvent => write!(f, "IncidentEvent"),
             Self::Webhook => write!(f, "Webhook"),
+            Self::Manual => write!(f, "Manual"),
+            Self::Test => write!(f, "Test"),
+            Self::Retry => write!(f, "Retry"),
+            Self::Unknown => write!(f, "Unknown"),
         }
     }
 }
@@ -463,6 +476,99 @@ pub async fn watch() -> Result<(), anyhow::Error> {
                 CACHE.write().await.remove(id);
             }
             Event::Empty => {}
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unknown_trigger_type_does_not_decode_to_a_real_one() {
+        // A type a NEWER node wrote. Decoding it to a real variant would relabel the run
+        // as that trigger, and run history is searched across regions.
+        assert_eq!(
+            WorkflowTriggerType::from("SomeFutureTrigger"),
+            WorkflowTriggerType::Unknown
+        );
+        assert_eq!(WorkflowTriggerType::from(""), WorkflowTriggerType::Unknown);
+        assert_ne!(
+            WorkflowTriggerType::from("SomeFutureTrigger"),
+            WorkflowTriggerType::AlertFired
+        );
+    }
+
+    #[test]
+    fn known_trigger_types_round_trip_through_the_history_key() {
+        for ty in [
+            WorkflowTriggerType::AlertFired,
+            WorkflowTriggerType::IncidentEvent,
+            WorkflowTriggerType::Webhook,
+        ] {
+            let encoded = ty.to_string();
+            assert!(!encoded.contains('/'), "key separator in {encoded}");
+            assert!(!encoded.contains(' '), "space in {encoded}");
+            assert_eq!(WorkflowTriggerType::from(encoded.as_str()), ty);
+        }
+    }
+
+    #[test]
+    fn manual_test_and_retry_are_distinct_trigger_types() {
+        for ty in [
+            WorkflowTriggerType::Manual,
+            WorkflowTriggerType::Test,
+            WorkflowTriggerType::Retry,
+        ] {
+            assert_ne!(ty, WorkflowTriggerType::Unknown);
+            assert_ne!(ty, WorkflowTriggerType::Webhook);
+        }
+        assert_ne!(WorkflowTriggerType::Manual, WorkflowTriggerType::Test);
+        assert_ne!(WorkflowTriggerType::Test, WorkflowTriggerType::Retry);
+        assert_ne!(WorkflowTriggerType::Manual, WorkflowTriggerType::Retry);
+    }
+
+    #[test]
+    fn manual_test_and_retry_round_trip_through_the_history_key() {
+        for ty in [
+            WorkflowTriggerType::Manual,
+            WorkflowTriggerType::Test,
+            WorkflowTriggerType::Retry,
+        ] {
+            let encoded = ty.to_string();
+            assert!(!encoded.contains('/'), "key separator in {encoded}");
+            assert!(!encoded.contains(' '), "space in {encoded}");
+            assert_eq!(WorkflowTriggerType::from(encoded.as_str()), ty);
+        }
+    }
+
+    #[test]
+    fn manual_encodes_as_manual_not_webhook() {
+        assert_eq!(WorkflowTriggerType::Manual.to_string(), "Manual");
+        assert_eq!(WorkflowTriggerType::Test.to_string(), "Test");
+        assert_eq!(WorkflowTriggerType::Retry.to_string(), "Retry");
+    }
+
+    #[test]
+    fn every_trigger_type_is_fieldless_so_display_stays_positional() {
+        // A fielded variant would Display braces/slashes into the 4-part history key.
+        for ty in [
+            WorkflowTriggerType::AlertFired,
+            WorkflowTriggerType::IncidentEvent,
+            WorkflowTriggerType::Webhook,
+            WorkflowTriggerType::Manual,
+            WorkflowTriggerType::Test,
+            WorkflowTriggerType::Retry,
+            WorkflowTriggerType::Unknown,
+        ] {
+            let encoded = ty.to_string();
+            // The key separator is `/`; a fielded variant would Debug-format braces and
+            // spaces into it. Underscores or hyphens would be harmless, so don't forbid them.
+            assert!(
+                !encoded.contains('/') && !encoded.contains(' ') && !encoded.contains('{'),
+                "trigger type {encoded} would corrupt the positional history key"
+            );
+            assert!(!encoded.is_empty());
         }
     }
 }

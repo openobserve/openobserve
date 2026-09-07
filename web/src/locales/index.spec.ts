@@ -25,7 +25,21 @@ vi.mock("@/utils/cookies", () => ({
 }));
 
 import { getNumberLocale, APP_LOCALE_TO_BCP47 } from "@/locales/numberFormat";
-import { localeFileMap } from "@/locales";
+import { getLocale, localeFileMap } from "@/locales";
+
+const withNavigatorLanguage = (language: string, assertion: () => void) => {
+  const descriptor = Object.getOwnPropertyDescriptor(navigator, "language");
+  Object.defineProperty(navigator, "language", { value: language, configurable: true });
+  try {
+    assertion();
+  } finally {
+    if (descriptor) {
+      Object.defineProperty(navigator, "language", descriptor);
+    } else {
+      Reflect.deleteProperty(navigator, "language");
+    }
+  }
+};
 
 describe("locale registry stays in sync", () => {
   // locales/index.ts code-splits via import.meta.glob("./languages/*.json"), so
@@ -99,5 +113,31 @@ describe("getNumberLocale (locale format unit)", () => {
       maximumFractionDigits: 2,
     }).format(1234567.89);
     expect(en).toBe("1,234,567.89");
+  });
+});
+
+describe("navigator language detection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getLanguage as any).mockReturnValue(undefined);
+  });
+
+  it.each([
+    ["de-DE", "de"],
+    ["fr-IT", "fr"],
+    ["zh-TW", "zh-tw"],
+    ["en-DE", "en-us"],
+    ["en-IT", "en-us"],
+  ])("resolves %s to %s", (language, expected) => {
+    withNavigatorLanguage(language, () => expect(getLocale()).toBe(expected));
+  });
+
+  it.each([
+    ["de-DE", "de-DE"],
+    ["fr-IT", "fr-FR"],
+    ["en-DE", "en-US"],
+    ["en-IT", "en-US"],
+  ])("formats %s with %s", (language, expected) => {
+    withNavigatorLanguage(language, () => expect(getNumberLocale()).toBe(expected));
   });
 });

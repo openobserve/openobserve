@@ -68,8 +68,8 @@ async function cleanupOwnedDashboard(page, pm, dashName) {
     await page
         .goto(`${process.env.ZO_BASE_URL}/web/dashboards?org_identifier=${org}`)
         .catch(() => {});
-    await page
-        .locator('[data-test="dashboard-search"]')
+    await pm.dashboardsFormValidation
+        .getDashboardSearchLocator()
         .waitFor({ state: 'visible', timeout: 20000 })
         .catch(() => {});
 
@@ -912,7 +912,7 @@ test.describe("Dashboard AddCondition form validation", () => {
         // for a cleared column, so the attribute ends up "…-label-0-undefined",
         // never a bare "…-label-0-".
         await expect(
-            page.locator('[data-test^="dashboard-add-condition-label-0-"]').first()
+            pm.dashboardsFormValidation.getConditionLabelLocator()
         ).toBeVisible({ timeout: 5000 });
         testLogger.info('Column cleared, condition row retained');
     });
@@ -1127,10 +1127,14 @@ test.describe("Dashboard AddPanel panel name form validation", () => {
         const nameError  = pm.dashboardsFormValidation.getPanelNameErrorLocator();
         const saveBtn    = pm.dashboardsFormValidation.getPanelSaveBtnLocator();
 
+        // Validation error / disabled-state resolves a tick after submit; poll instead of sampling once.
+        await expect
+            .poll(async () =>
+                (await nameError.isVisible().catch(() => false)) ||
+                (await saveBtn.isDisabled().catch(() => false)),
+            { timeout: 10000, intervals: [200, 500, 1000] })
+            .toBe(true);
         const errorVisible = await nameError.isVisible().catch(() => false);
-        const btnDisabled  = await saveBtn.isDisabled().catch(() => false);
-
-        expect(errorVisible || btnDisabled).toBe(true);
         if (errorVisible) {
             await expect(nameError).toContainText(/required/i);
         }

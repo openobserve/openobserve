@@ -54,7 +54,7 @@ impl MetricsIndexSelectionCache {
         if size > METRICS_INDEX_SELECTION_CACHE_MAX_BYTES {
             return;
         }
-        if let Some(previous) = self.entries.insert(key.clone(), Arc::clone(&ranges)) {
+        if let Some(previous) = self.entries.insert(key.clone(), ranges) {
             self.memory_size = self
                 .memory_size
                 .saturating_sub(Self::entry_size(&key, &previous));

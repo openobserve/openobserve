@@ -51,7 +51,16 @@
 
 <script lang="ts">
 import { useI18nTyped, type I18nText } from "@/types/i18n";
-import { computed, defineComponent, ref, onMounted, watch, nextTick, PropType } from "vue";
+import {
+  computed,
+  defineComponent,
+  ref,
+  onMounted,
+  onUnmounted,
+  watch,
+  nextTick,
+  PropType,
+} from "vue";
 
 export interface ReferenceChip {
   id: string;
@@ -600,6 +609,15 @@ export default defineComponent({
       },
     );
 
+    // Add global click handler to close detail card when clicking outside
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      // Close detail card if clicking outside of chip and card
+      if (!target.closest(".reference-chip") && !target.closest(".chip-detail-card")) {
+        showDetailCard.value = false;
+      }
+    };
+
     onMounted(() => {
       // Initialize empty state
       updateEmptyState();
@@ -608,21 +626,12 @@ export default defineComponent({
         setContent(props.modelValue);
       }
 
-      // Add global click handler to close detail card when clicking outside
-      const handleClickOutside = (event: MouseEvent) => {
-        const target = event.target as HTMLElement;
-        // Close detail card if clicking outside of chip and card
-        if (!target.closest(".reference-chip") && !target.closest(".chip-detail-card")) {
-          showDetailCard.value = false;
-        }
-      };
-
       document.addEventListener("click", handleClickOutside);
+    });
 
-      // Cleanup on unmount
-      return () => {
-        document.removeEventListener("click", handleClickOutside);
-      };
+    // Vue discards a value returned from onMounted, so removal must be its own hook.
+    onUnmounted(() => {
+      document.removeEventListener("click", handleClickOutside);
     });
 
     return {

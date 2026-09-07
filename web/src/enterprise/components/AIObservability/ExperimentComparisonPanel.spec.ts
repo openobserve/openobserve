@@ -17,8 +17,42 @@
 
 import { describe, expect, it } from "vitest";
 import { mount } from "@vue/test-utils";
-import type { ExperimentComparison } from "@/services/llm-experiments.service";
+import type {
+  ExperimentComparison,
+  ExperimentComparisonAssignment,
+  ExperimentComparisonDimension,
+} from "@/services/llm-experiments.service";
 import ExperimentComparisonPanel from "./ExperimentComparisonPanel.vue";
+
+function rowDimension(
+  name: string,
+  kind: "score" | "latency",
+  assignment: ExperimentComparisonAssignment,
+  gating = true,
+): ExperimentComparisonDimension {
+  return {
+    name,
+    kind,
+    dataType: kind === "score" ? "numeric" : null,
+    scoreConfigId: kind === "score" ? `score-${name}` : null,
+    scoreConfigName: kind === "score" ? name : null,
+    scoreConfigVersion: kind === "score" ? "1" : null,
+    baseline: 0.8,
+    candidate: 0.7,
+    delta: -0.1,
+    orientedDelta: kind === "latency" ? 0.1 : -0.1,
+    gating,
+    normalized: kind === "score",
+    baselineSampleCount: 1,
+    candidateSampleCount: 1,
+    baselineLabel: null,
+    candidateLabel: null,
+    baselineDispersion: null,
+    candidateDispersion: null,
+    withinNoise: false,
+    assignment,
+  };
+}
 
 const comparison: ExperimentComparison = {
   baselineId: "baseline",
@@ -86,7 +120,11 @@ const comparison: ExperimentComparison = {
       baselineRowId: "old-row",
       candidateRowId: "new-row",
       bucket: "regressed",
-      dimensions: [],
+      dimensions: [
+        rowDimension("quality", "score", "regressed"),
+        // The same row IMPROVED on latency while regressing overall.
+        rowDimension("latency_ms", "latency", "improved"),
+      ],
     },
     {
       logicalId: "case-2",
@@ -94,7 +132,9 @@ const comparison: ExperimentComparison = {
       baselineRowId: null,
       candidateRowId: "fresh-row",
       bucket: "new",
-      dimensions: [],
+      // Candidate-only: no baseline to have moved from, so it counts toward
+      // no direction at all.
+      dimensions: [rowDimension("quality", "score", "candidate_only")],
     },
   ],
 };
@@ -102,14 +142,12 @@ const comparison: ExperimentComparison = {
 const stubs = {
   global: {
     stubs: {
-      KpiCardRow: { template: "<div><slot /></div>" },
-      KpiCard: {
-        props: ["label", "icon"],
-        template:
-          '<div v-bind="$attrs" :data-icon="icon">{{ label }}<slot name="value" /><slot name="footer" /></div>',
-      },
       OIcon: true,
       OButton: { template: "<button @click=\"$emit('click')\"><slot /></button>" },
+      OTooltip: {
+        props: ["content"],
+        template: '<span data-test="tooltip" :data-content="content" />',
+      },
       OTag: {
         props: ["label", "variant"],
         template: '<span v-bind="$attrs" :data-variant="variant">{{ label }}</span>',
@@ -129,9 +167,12 @@ const stubs = {
           </div>`,
       },
       OTable: {
-        props: ["data"],
+        props: ["data", "columns"],
         emits: ["row-click"],
         template: `<div><slot name="subheader" />
+            <template v-for="col in columns" :key="col.id">
+              <component :is="col.header" v-if="typeof col.header === 'function'" />
+            </template>
             <div v-for="row in data" :key="row.logicalId" data-test="row" @click="$emit('row-click', row, $event)">
               <slot name="cell-input" :row="row" />
               <slot name="cell-bucket" :row="row" />
@@ -149,233 +190,12 @@ function mountPanel(override: Partial<ExperimentComparison> = {}) {
 }
 
 describe("ExperimentComparisonPanel", () => {
-  it("shows honest bucket counts and per-tile coverage", () => {
+  it("shows honest bucket counts", () => {
     const wrapper = mountPanel();
 
     // 3 common + 1 new + 1 missing — rows in EITHER run, not just the joined ones.
     expect(wrapper.get('[data-test="ai-experiment-count-total"]').text()).toBe("5");
     expect(wrapper.get('[data-test="ai-experiment-count-regressed"]').text()).toBe("1");
-  });
-
-  it("keeps each tile to a single caption line", () => {
-    const wrapper = mountPanel();
-    const latency = wrapper.get('[data-test="ai-experiment-tile-latency"]');
-
-    // Three stacked caption lines is what made these tiles tall; the reference
-    // cards carry exactly one.
-    expect(latency.text()).toContain("Mean per row, over trials");
-    expect(latency.text()).not.toContain("comparable rows");
-  });
-
-  it("always renders a cost tile, even when the run recorded no cost", () => {
-    const wrapper = mountPanel();
-
-    // The fixture has no cost dimension — the backend only emits one when the
-    // executions carried a cost, so the gap has to be visible, not absent.
-    expect(wrapper.get('[data-test="ai-experiment-tile-cost"]').text()).toContain("—");
-    expect(wrapper.get('[data-test="ai-experiment-tile-latency"]').text()).toContain("34");
-  });
-
-  it("orders tiles quality-first with cost last, and never shows a gating tile", () => {
-    const wrapper = mountPanel();
-
-    const order = wrapper
-      .findAll('[data-test^="ai-experiment-tile-"]')
-      .map((w) => w.attributes("data-test"))
-      .filter((name) => !/-(delta|warning|unit)$/.test(name ?? ""));
-
-    expect(order).toEqual([
-      "ai-experiment-tile-score-dimensions-regressed",
-      "ai-experiment-tile-weakest-score-dimension",
-      "ai-experiment-tile-latency",
-      "ai-experiment-tile-cost",
-    ]);
-  });
-
-  it("labels a score dimension from comparison metadata and never exposes its raw ID", () => {
-    const scored = {
-      dimensions: [
-        {
-          ...comparison.dimensions[0],
-          name: "749570578629158502 · v1",
-          scoreConfigId: "749570578629158502",
-          scoreConfigName: "answer_quality",
-          scoreConfigVersion: "1",
-        },
-      ],
-    };
-
-    const named = mountPanel(scored);
-    expect(named.get('[data-test="ai-experiment-tile-weakest-score-dimension"]').text()).toContain(
-      "answer_quality · v1",
-    );
-
-    const unresolved = mountPanel({
-      dimensions: [{ ...scored.dimensions[0], scoreConfigName: null }],
-    });
-    const unresolvedTile = unresolved.get(
-      '[data-test="ai-experiment-tile-weakest-score-dimension"]',
-    );
-    expect(unresolvedTile.text()).toContain("Unknown score dimension");
-    expect(unresolvedTile.text()).not.toContain("749570578629158502");
-  });
-
-  it("carries the detail page's icons and value formatting", () => {
-    const wrapper = mountPanel();
-
-    // Same glyphs the Experiment detail cards use for the same two concepts.
-    expect(wrapper.get('[data-test="ai-experiment-tile-latency"]').attributes("data-icon")).toBe(
-      "speed",
-    );
-    expect(wrapper.get('[data-test="ai-experiment-tile-cost"]').attributes("data-icon")).toBe(
-      "payments",
-    );
-    expect(
-      wrapper
-        .get('[data-test="ai-experiment-tile-score-dimensions-regressed"]')
-        .attributes("data-icon"),
-    ).toBe("error-outline");
-
-    // Assert the unit SPAN, not the tile text — the label is "Latency (ms)", so
-    // a text match would pass with no unit rendered at all.
-    expect(wrapper.get('[data-test="ai-experiment-tile-latency-unit"]').text()).toBe("ms");
-    expect(wrapper.find('[data-test="ai-experiment-tile-cost-unit"]').exists()).toBe(false);
-  });
-
-  it("renders cost as currency on both sides and on the delta", () => {
-    const wrapper = mountPanel({
-      dimensions: [
-        {
-          ...comparison.dimensions[1],
-          kind: "cost",
-          name: "cost",
-          baseline: 0.031,
-          candidate: 0.006,
-          delta: -0.025,
-          orientedDelta: 0.025,
-        },
-      ],
-    });
-    const cost = wrapper.get('[data-test="ai-experiment-tile-cost"]');
-
-    expect(cost.text()).toContain("$0.031");
-    expect(cost.text()).toContain("$0.006");
-    expect(wrapper.get('[data-test="ai-experiment-tile-cost-delta"]').text()).toBe("-$0.025");
-  });
-
-  it("says what the latency number measures", () => {
-    const wrapper = mountPanel();
-    const latency = wrapper.get('[data-test="ai-experiment-tile-latency"]');
-
-    // A mean of per-row means over trials — not a p50. The unit sits beside the
-    // numbers rather than in the label, because it is not always ms.
-    expect(latency.text()).toContain("Latency");
-    expect(wrapper.get('[data-test="ai-experiment-tile-latency-unit"]').text()).toBe("ms");
-    expect(latency.text()).toContain("Mean per row, over trials");
-  });
-
-  it("rounds sub-second latency to whole milliseconds", () => {
-    const wrapper = mountPanel({
-      dimensions: [
-        {
-          ...comparison.dimensions[1],
-          kind: "latency",
-          name: "latency",
-          baseline: 303.4821,
-          candidate: 334.9,
-          delta: 31.4179,
-          orientedDelta: -31.4179,
-        },
-      ],
-    });
-
-    const latency = wrapper.get('[data-test="ai-experiment-tile-latency"]');
-    expect(latency.text()).toContain("303");
-    expect(latency.text()).toContain("335");
-    expect(latency.text()).not.toContain("303.4821");
-    expect(wrapper.get('[data-test="ai-experiment-tile-latency-delta"]').text()).toBe("+31");
-  });
-
-  // A tile is 14rem wide; "10449.4821 → 7031.625 ms -3417.8571" is not.
-  it("switches the whole pair to seconds once either side passes a second", () => {
-    const wrapper = mountPanel({
-      dimensions: [
-        {
-          ...comparison.dimensions[1],
-          kind: "latency",
-          name: "latency",
-          baseline: 10449.4821,
-          candidate: 7031.625,
-          delta: -3417.8571,
-          orientedDelta: 3417.8571,
-        },
-      ],
-    });
-
-    const latency = wrapper.get('[data-test="ai-experiment-tile-latency"]');
-    expect(wrapper.get('[data-test="ai-experiment-tile-latency-unit"]').text()).toBe("s");
-    expect(latency.text()).toContain("10.4");
-    // Both sides in one unit: 7031ms is 7.03 s here, never "7,032 ms".
-    expect(latency.text()).toContain("7.03");
-    expect(wrapper.get('[data-test="ai-experiment-tile-latency-delta"]').text()).toBe("-3.42");
-  });
-
-  it("summarises every score dimension in a fixed number of tiles", () => {
-    const wrapper = mountPanel({
-      dimensions: [
-        ...comparison.dimensions,
-        {
-          ...comparison.dimensions[0],
-          name: "grounded",
-          scoreConfigId: "score-grounded",
-          scoreConfigName: "grounded",
-          assignment: "regressed",
-          orientedDelta: -0.4,
-        },
-        {
-          ...comparison.dimensions[0],
-          name: "tone",
-          scoreConfigId: "score-tone",
-          scoreConfigName: "tone",
-          assignment: "regressed",
-          orientedDelta: -0.2,
-        },
-      ],
-    });
-
-    // Three dimensions regressed — one tile regardless of how many there are.
-    expect(
-      wrapper.get('[data-test="ai-experiment-tile-score-dimensions-regressed"]').text(),
-    ).toContain("3");
-    expect(
-      wrapper.get('[data-test="ai-experiment-tile-score-dimensions-regressed"]').text(),
-    ).toContain("of 3 aggregate score dimensions");
-
-    // The weakest is the most negative ORIENTED delta, not the most negative raw one.
-    const weakest = wrapper.get('[data-test="ai-experiment-tile-weakest-score-dimension"]');
-    expect(weakest.text()).toContain("grounded");
-    expect(weakest.text()).toContain("-0.4");
-  });
-
-  it("warns about one-sided coverage on a tile that has it", () => {
-    const wrapper = mountPanel({
-      dimensions: [
-        { ...comparison.dimensions[1], baselineOnlyRowCount: 1, candidateOnlyRowCount: 0 },
-      ],
-    });
-
-    expect(wrapper.get('[data-test="ai-experiment-tile-latency-warning"]').text()).toContain(
-      "1 baseline-only",
-    );
-  });
-
-  it("tints a delta by its oriented direction, not its sign", () => {
-    const wrapper = mountPanel();
-
-    // Latency rose by 31 — a POSITIVE number but a worse result.
-    const latency = wrapper.get('[data-test="ai-experiment-tile-latency-delta"]');
-    expect(latency.text()).toBe("+31");
-    expect(latency.attributes("data-variant")).toBe("error-soft");
   });
 
   it("gathers every no-verdict bucket behind one tile", async () => {
@@ -430,6 +250,69 @@ describe("ExperimentComparisonPanel", () => {
     // Re-picking the active tile clears the filter rather than trapping the user.
     await wrapper.get('[data-test="ai-experiment-count-regressed"]').trigger("click");
     expect(wrapper.findAll('[data-test="row"]')).toHaveLength(2);
+  });
+
+  it("counts how each row moved on the scorer, in its own column header", () => {
+    const wrapper = mountPanel();
+    const header = wrapper.get(
+      '[data-test="ai-experiment-dim-header-score:quality:score-quality:1"]',
+    );
+    const count = (direction: string) =>
+      header
+        .get(`[data-test="ai-experiment-dim-${direction}-score:quality:score-quality:1"]`)
+        .text();
+
+    // One row regressed. The candidate-only row has no baseline to have moved
+    // from, so it is counted toward nothing rather than as unchanged.
+    expect(count("regressed")).toBe("1");
+    expect(count("unchanged")).toBe("0");
+    expect(count("improved")).toBe("0");
+  });
+
+  it("counts a dimension by its own assignment, not the row's bucket", () => {
+    const wrapper = mountPanel();
+    const header = wrapper.get('[data-test="ai-experiment-dim-header-latency:latency_ms::"]');
+
+    // That row is bucketed `regressed` overall while its latency IMPROVED.
+    // Reading the bucket instead of the per-dimension assignment would report
+    // this column backwards.
+    expect(header.get('[data-test="ai-experiment-dim-improved-latency:latency_ms::"]').text()).toBe(
+      "1",
+    );
+    expect(
+      header.get('[data-test="ai-experiment-dim-regressed-latency:latency_ms::"]').text(),
+    ).toBe("0");
+  });
+
+  it("says why a scorer with no comparison policy reports no counts", () => {
+    const descriptive = {
+      ...comparison,
+      dimensions: [
+        { ...comparison.dimensions[0], name: "tone", scoreConfigName: "tone", gating: false },
+      ],
+      rows: [
+        {
+          ...comparison.rows[0],
+          dimensions: [rowDimension("tone", "score", "descriptive", false)],
+        },
+      ],
+    } as ExperimentComparison;
+    const wrapper = mountPanel(descriptive);
+    const header = wrapper.get('[data-test="ai-experiment-dim-header-score:tone:score-quality:1"]');
+
+    // Rendering nothing here reads as a bug. The server never judges a
+    // non-gating dimension, so the absence is a fact about the scorer's setup.
+    expect(header.text()).toContain("Not counted");
+
+    // The label states the fact; the reason and the fix have to be reachable,
+    // or the column just looks broken.
+    const hint = header.get('[data-test="tooltip"]').attributes("data-content");
+    expect(hint).toContain("no comparison policy");
+    expect(hint).toContain("cannot affect the outcome");
+    expect(hint).toContain("direction and a threshold");
+    expect(
+      header.find('[data-test="ai-experiment-dim-regressed-score:tone:score-quality:1"]').exists(),
+    ).toBe(false);
   });
 
   it("offers fixed threshold steps and asks the page to reload on a change", async () => {

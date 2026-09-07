@@ -14,6 +14,8 @@
 //! help a person improve. Sharing a snapshot is the only endpoint here that
 //! stores anything.
 
+use std::collections::HashSet;
+
 use axum::{
     body::Body,
     extract::{Path, rejection::JsonRejection},
@@ -29,8 +31,8 @@ use openobserve_core::{
         experiment_runner::render_prompt,
         playground::{self, PlaygroundError},
         provider::{
-            PreparedProvider, ProviderChatMessage, ProviderChatParams, ProviderStreamStartError,
-            RawProviderConfig,
+            PreparedProvider, ProviderChatMessage, ProviderChatParams, ProviderChatToolCall,
+            ProviderStreamStartError, RawProviderConfig,
         },
         provider_stream::ProviderChatDelta,
         sync_scoring::{self, SyncScoringError},
@@ -314,7 +316,7 @@ fn render_messages(
     column: &PlaygroundColumnBody,
     input: &Value,
 ) -> Result<Vec<ProviderChatMessage>, Response> {
-    column
+    let messages = column
         .messages
         .iter()
         .map(|message| {
@@ -333,9 +335,85 @@ fn render_messages(
             Ok(ProviderChatMessage {
                 role: message.role.clone(),
                 content,
+                reasoning_content: message.reasoning_content.clone(),
+                tool_call_id: message.tool_call_id.clone(),
+                tool_calls: message
+                    .tool_calls
+                    .iter()
+                    .map(|call| ProviderChatToolCall {
+                        id: call.id.clone(),
+                        name: call.name.clone(),
+                        arguments: call.arguments.clone(),
+                    })
+                    .collect(),
             })
         })
-        .collect()
+        .collect::<Result<Vec<_>, Response>>()?;
+    validate_tool_messages(&messages)?;
+    Ok(messages)
+}
+
+fn validate_tool_messages(messages: &[ProviderChatMessage]) -> Result<(), Response> {
+    let mut call_ids = HashSet::new();
+    let mut result_ids = HashSet::new();
+    for message in messages {
+        if message.reasoning_content.is_some() && message.role != "assistant" {
+            return Err(MetaHttpResponse::bad_request(
+                "Only assistant messages may contain reasoningContent",
+            ));
+        }
+        if !message.tool_calls.is_empty() {
+            if message.role != "assistant" {
+                return Err(MetaHttpResponse::bad_request(
+                    "Only assistant messages may contain tool calls",
+                ));
+            }
+            for call in &message.tool_calls {
+                if call.id.trim().is_empty() || call.name.trim().is_empty() {
+                    return Err(MetaHttpResponse::bad_request(
+                        "Tool calls require a non-empty id and name",
+                    ));
+                }
+                if !serde_json::from_str::<Value>(&call.arguments)
+                    .is_ok_and(|value| value.is_object())
+                {
+                    return Err(MetaHttpResponse::bad_request(format!(
+                        "Tool call '{}' arguments must be a JSON object",
+                        call.id
+                    )));
+                }
+                if !call_ids.insert(call.id.as_str()) {
+                    return Err(MetaHttpResponse::bad_request(format!(
+                        "Tool call id '{}' is duplicated",
+                        call.id
+                    )));
+                }
+            }
+        }
+
+        if message.role == "tool" {
+            let Some(call_id) = message.tool_call_id.as_deref() else {
+                return Err(MetaHttpResponse::bad_request(
+                    "Tool result messages require toolCallId",
+                ));
+            };
+            if !call_ids.contains(call_id) {
+                return Err(MetaHttpResponse::bad_request(format!(
+                    "Tool result references unknown call id '{call_id}'"
+                )));
+            }
+            if !result_ids.insert(call_id) {
+                return Err(MetaHttpResponse::bad_request(format!(
+                    "Tool call id '{call_id}' has more than one result"
+                )));
+            }
+        } else if message.tool_call_id.is_some() {
+            return Err(MetaHttpResponse::bad_request(
+                "Only tool result messages may contain toolCallId",
+            ));
+        }
+    }
+    Ok(())
 }
 
 /// Split the column's params into the fields the provider names explicitly and
@@ -461,7 +539,15 @@ pub async fn run_playground_cell(
         "type": "rendered",
         "messages": messages
             .iter()
-            .map(|message| json!({"role": message.role, "content": message.content}))
+            .map(|message| {
+                json!({
+                    "role": message.role,
+                    "content": message.content,
+                    "reasoningContent": message.reasoning_content,
+                    "toolCallId": message.tool_call_id,
+                    "toolCalls": message.tool_calls,
+                })
+            })
             .collect::<Vec<_>>(),
     });
 
@@ -484,6 +570,7 @@ pub async fn run_playground_cell(
                     "type": "done",
                     "model": result.model_used,
                     "latencyMs": result.latency_ms,
+                    "reasoningContent": result.reasoning_content,
                     "usage": {
                         "promptTokens": result.prompt_tokens,
                         "completionTokens": result.completion_tokens,
@@ -571,7 +658,7 @@ pub async fn score_playground_cell(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::models::playground::PlaygroundMessageBody;
+    use crate::models::playground::{PlaygroundMessageBody, PlaygroundToolCallBody};
 
     fn column(params: Value) -> PlaygroundColumnBody {
         PlaygroundColumnBody {
@@ -612,15 +699,55 @@ mod tests {
             PlaygroundMessageBody {
                 role: "user".to_string(),
                 content: Some(json!("Hello {{name}}")),
+                reasoning_content: None,
+                tool_call_id: None,
+                tool_calls: Vec::new(),
             },
             PlaygroundMessageBody {
                 role: "user".to_string(),
                 content: Some(structured.clone()),
+                reasoning_content: None,
+                tool_call_id: None,
+                tool_calls: Vec::new(),
             },
         ];
 
         let rendered = render_messages(&column, &json!({"name": "Ada"})).unwrap();
         assert_eq!(rendered[0].content, json!("Hello Ada"));
         assert_eq!(rendered[1].content, structured);
+    }
+
+    #[test]
+    fn tool_call_metadata_survives_message_rendering() {
+        let mut column = column(json!({}));
+        column.messages = vec![
+            PlaygroundMessageBody {
+                role: "assistant".to_string(),
+                content: Some(json!("")),
+                reasoning_content: Some("I should look up this order.".to_string()),
+                tool_call_id: None,
+                tool_calls: vec![PlaygroundToolCallBody {
+                    id: "call_1".to_string(),
+                    name: "lookup_order".to_string(),
+                    arguments: r#"{"order_id":"123"}"#.to_string(),
+                }],
+            },
+            PlaygroundMessageBody {
+                role: "tool".to_string(),
+                content: Some(json!({"status": "shipped"})),
+                reasoning_content: None,
+                tool_call_id: Some("call_1".to_string()),
+                tool_calls: Vec::new(),
+            },
+        ];
+
+        let rendered = render_messages(&column, &Value::Null).unwrap();
+        assert_eq!(rendered[0].tool_calls[0].id, "call_1");
+        assert_eq!(rendered[0].tool_calls[0].name, "lookup_order");
+        assert_eq!(
+            rendered[0].reasoning_content.as_deref(),
+            Some("I should look up this order.")
+        );
+        assert_eq!(rendered[1].tool_call_id.as_deref(), Some("call_1"));
     }
 }

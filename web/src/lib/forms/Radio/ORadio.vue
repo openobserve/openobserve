@@ -32,6 +32,7 @@ const props = withDefaults(defineProps<RadioProps>(), {
   disabled: false,
   value: undefined,
   val: undefined,
+  variant: "default",
 });
 
 defineSlots<RadioSlots>();
@@ -58,14 +59,26 @@ const dotSize: Record<"xs" | "sm" | "md", string> = {
 };
 
 const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
+
+const surfaceClasses = computed(() => [
+  "inline-flex gap-2",
+  props.variant === "card"
+    ? [
+        "w-full items-start rounded-surface border border-border-default bg-surface-base p-4",
+        "transition-[color,background-color,border-color,box-shadow] duration-150",
+        "hover:border-input-border-hover",
+        "has-[[data-state=checked]]:border-input-border-focus",
+        "has-[[data-state=checked]]:ring-2 has-[[data-state=checked]]:ring-accent/20",
+      ]
+    : "items-center",
+  props.disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer",
+]);
 </script>
 
 <template>
   <label
-    :class="[
-      'inline-flex items-center gap-2',
-      props.disabled ? 'cursor-not-allowed' : 'cursor-pointer',
-    ]"
+    :class="surfaceClasses"
+    :data-variant="props.variant === 'card' ? 'card' : undefined"
     :for="props.id"
   >
     <!--
@@ -107,6 +120,7 @@ const resolvedSize = computed(() => (props.size ?? "md") as "xs" | "sm" | "md");
       v-if="$slots.label || props.label"
       :class="[
         'o-input-label text-compact leading-tight select-none',
+        props.variant === 'card' ? 'flex-1' : '',
         props.disabled
           ? 'text-input-label-text-disabled font-normal'
           : 'text-input-label-text font-medium',

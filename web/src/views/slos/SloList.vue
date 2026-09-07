@@ -156,6 +156,7 @@
             :loading="loading"
             selectable
             :selected-key="healthFilter"
+            default-key="total"
             @select="onStatSelect"
           />
         </div>
@@ -227,7 +228,7 @@
 
       <template #cell-window="{ row }">
         <span class="tabular-nums">{{ formatWindow(row.window_secs) }}</span>
-        <span class="text-text-secondary text-compact ml-1">{{ t("slos.rolling") }}</span>
+        <span class="text-text-secondary text-compact ms-1">{{ t("slos.rolling") }}</span>
       </template>
 
       <template #cell-tags="{ row }">

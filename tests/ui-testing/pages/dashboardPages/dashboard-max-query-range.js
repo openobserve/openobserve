@@ -221,6 +221,10 @@ export default class DashboardMaxQueryRange {
    *   await pm.dateTimeHelper.setRelativeTimeRange("6-w");
    *   await allDone;
    *
+   * Counting short is not proof of a defect: a panel can render without issuing a
+   * countable query, so callers should treat a rejection as "did not settle in time"
+   * and gate on the UI instead.
+   *
    * @param {number} n - number of distinct search responses to wait for
    * @param {number} [timeout=45000] - ms to wait for all n responses
    * @returns {Promise<void>} resolves once n responses arrive; REJECTS on

@@ -6,6 +6,14 @@
     :back="{ onClick: closeSearchHistory }"
     bleed
   >
+    <template #subtitle>
+      <div class="flex min-w-0 items-center gap-2">
+        <OTag type="streamType" :value="activeStreamType" />
+        <span v-if="activeStreamName" class="min-w-0 truncate leading-normal">{{
+          activeStreamName
+        }}</span>
+      </div>
+    </template>
     <template #actions>
       <OButton
         data-test="search-history-wrap-content-btn"
@@ -25,7 +33,7 @@
       <div
         class="text-status-warning-text border-status-warning-text rounded-default flex h-9 items-center border px-2"
       >
-        <OIcon name="info" class="mr-1" size="sm" />
+        <OIcon name="info" class="me-1" size="sm" />
         <div>
           {{ t("search_history.delayMessage") }} <b>{{ delayMessage }}</b>
         </div>
@@ -120,7 +128,7 @@
                       data-test="search-history-copy-sql-btn"
                       variant="outline"
                       size="icon-chip"
-                      class="ml-2"
+                      class="ms-2"
                       @click.stop="
                         copyToClipboard(row.sql, t, {
                           successMessage: t('logs.searchHistory.sqlQueryCopied'),
@@ -141,7 +149,7 @@
                   @click.stop="goToLogs(row)"
                 >
                   <template #icon-left><OIcon name="search" size="xs" /></template>
-                  {{ t("logs.searchHistory.logs") }}
+                  {{ goToLogsLabel(row) }}
                 </OButton>
                 <OButton
                   v-if="
@@ -160,7 +168,7 @@
               </div>
               <div class="flex items-start justify-center">
                 <div
-                  class="border-border-default border-l-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
+                  class="border-border-default border-s-sql-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                 >
                   <!-- Monaco-colorized SQL (sanitized in colorizeRow), same
                            as the dashboard Query Inspector. Falls back to plain
@@ -192,7 +200,7 @@
                       data-test="search-history-copy-function-btn"
                       variant="outline"
                       size="icon-chip"
-                      class="ml-2"
+                      class="ms-2"
                       @click.stop="
                         copyToClipboard(row.function, t, {
                           successMessage: t('logs.searchHistory.functionDefinitionCopied'),
@@ -206,7 +214,7 @@
 
               <div class="flex items-start justify-center">
                 <div
-                  class="border-border-default border-l-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-l-3 p-2.5"
+                  class="border-border-default border-s-function-accent bg-surface-subtle text-text-body o2-colorized-query h-full max-h-50 w-full overflow-y-auto border border-s-3 p-2.5"
                 >
                   <pre
                     v-if="colorizedFunction[row.uuid]"
@@ -245,10 +253,10 @@
 
         <template #bottom>
           <div class="flex h-12 w-full items-center justify-between">
-            <div class="mr-md flex w-25 items-center text-xs font-normal">
+            <div class="flex w-25 items-center text-xs font-normal">
               {{ resultTotal }} {{ t("search_history.results") }}
             </div>
-            <div class="mr-2 ml-auto">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
+            <div class="ms-auto me-2">{{ t("logs.searchHistory.maxLimit") }} <b>1000</b></div>
           </div>
         </template>
       </OTable>
@@ -267,7 +275,7 @@
           {{ t("logs.index.searchHistoryNotEnabled") }}
         </div>
         <div class="mt-2 flex items-center justify-center opacity-80">
-          <OIcon name="info" class="mr-1" size="md" />
+          <OIcon name="info" class="me-1" size="md" />
           <span class="text-center text-xl font-semibold">
             {{ t("logs.index.enableUsageReporting") }}</span
           >
@@ -298,6 +306,8 @@ import AppTabs from "@/components/common/AppTabs.vue";
 import config from "@/aws-exports";
 import OButton from "@/lib/core/Button/OButton.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
+import OTag from "@/lib/core/Badge/OTag.vue";
+import { resolveBadgeLabel } from "@/lib/core/Badge/badgeGroups";
 import OTable from "@/lib/core/Table/OTable.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
@@ -322,6 +332,7 @@ export default defineComponent({
     QueryEditor,
     OButton,
     OIcon,
+    OTag,
     OTooltip,
     OTable,
     OTimeCell,
@@ -360,6 +371,25 @@ export default defineComponent({
     const moreDetailsToDisplay = ref("");
 
     const { extractTimestamps } = logsUtils();
+
+    const ALLOWED_HISTORY_STREAM_TYPES = ["logs", "metrics", "traces"];
+
+    // The route query (set by the page the user navigated from, e.g. Data
+    // Sources or the Logs page itself) is the source of truth for which
+    // telemetry type/stream this history view is scoped to; searchObj is the
+    // fallback for a same-session deep link that didn't carry the query.
+    // The query param is attacker-controlled (URL), so it's whitelisted here
+    // as defense in depth on top of the backend validation.
+    const activeStreamType = computed(() => {
+      const fromRoute = route.query.stream_type as string;
+      if (ALLOWED_HISTORY_STREAM_TYPES.includes(fromRoute)) return fromRoute;
+      return searchObj.data.stream.streamType || "logs";
+    });
+    const activeStreamName = computed(() =>
+      route.query.stream === undefined
+        ? searchObj.data.stream.selectedStream[0] || ""
+        : (route.query.stream as string),
+    );
 
     const activeTab = ref("query");
     const tabs = ref([
@@ -447,7 +477,13 @@ export default defineComponent({
           return;
         }
 
-        const response = await searchService.get_history(org_identifier, startTime, endTime);
+        const response = await searchService.get_history(
+          org_identifier,
+          startTime,
+          endTime,
+          activeStreamType.value,
+          activeStreamName.value,
+        );
         const limitedHits = response.data.hits;
         const filteredHits = limitedHits.filter((hit) => hit.event === "Search");
         if (filteredHits.length > 0) {
@@ -612,6 +648,11 @@ export default defineComponent({
         colorizeRow(row);
       }
     };
+    // goToLogs re-opens the row's own stream_type (logs/metrics/traces), so the
+    // button label must match that destination rather than always saying "Logs".
+    const goToLogsLabel = (row: { stream_type?: string }) =>
+      resolveBadgeLabel("streamType", row.stream_type || "logs");
+
     const goToLogs = (row) => {
       // emit('closeSearchHistory');
       const stream: string = row.stream_name;
@@ -620,7 +661,7 @@ export default defineComponent({
       const query = b64EncodeUnicode(row.sql);
 
       const queryObject = {
-        stream_type: "logs",
+        stream_type: row.stream_type || "logs",
         stream,
         period: "15m",
         refresh,
@@ -698,6 +739,8 @@ export default defineComponent({
     });
     return {
       searchObj,
+      activeStreamType,
+      activeStreamName,
       store,
       generateColumns,
       fetchSearchHistory,
@@ -710,6 +753,7 @@ export default defineComponent({
       searchDateTimeRef,
       expandedIds,
       goToLogs,
+      goToLogsLabel,
       goToInspector,
       onExpandedIdsChange,
       colorizedSql,

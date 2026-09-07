@@ -276,6 +276,7 @@ test.describe("Model Pricing — Edit, Cancel & Delete", () => {
             // Edit → cancel → original name unchanged
             await pm.modelPricingPage.editBtnForModel(originalName).click();
             await pm.modelPricingPage.verifyEditorOnPage();
+            await pm.modelPricingPage.waitForEditorHydrated();
             await pm.modelPricingPage.fillName(`${originalName}_changed`);
             await pm.modelPricingPage.clickCancel();
             await pm.modelPricingPage.verifyModelInList(originalName);
@@ -365,6 +366,7 @@ test.describe("Model Pricing — Duplicate & Clone", () => {
             const builtInName = (await firstRow.locator('td').first().textContent())?.trim() || '';
             await pm.modelPricingPage.cloneBtnForRow(firstRow).click();
             await pm.modelPricingPage.verifyEditorOnPage();
+            await pm.modelPricingPage.waitForEditorHydrated();
             await pm.modelPricingPage.clickSave();
             await expect(pm.modelPricingPage.listTitle).toBeVisible({ timeout: 15000 });
             const afterClone = await apiListModels();

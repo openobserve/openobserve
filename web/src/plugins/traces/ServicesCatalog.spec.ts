@@ -1812,6 +1812,73 @@ describe("ServicesCatalog", () => {
         );
         expect(decodedSql).toContain('FROM "production-stream"');
       });
+
+      it("keeps inferred dependencies with the same name but different identities separate", async () => {
+        mockStreamSchema.mockResolvedValueOnce({
+          data: { schema: [{ name: "infer_service_name" }] },
+        });
+        mockFetchQueryDataWithHttpStream.mockImplementation((_req: any, callbacks: any) => {
+          callbacks.data(null, {
+            type: "search_response_hits",
+            content: {
+              results: {
+                hits: [
+                  {
+                    service_name: "sso",
+                    _infer_service_name: "sso",
+                    _infer_service_type: "database",
+                    _infer_service_system: "mysql",
+                    total_requests: 1,
+                  },
+                  {
+                    service_name: "sso",
+                    _infer_service_name: "sso",
+                    _infer_service_type: "external",
+                    _infer_service_system: "http",
+                    total_requests: 1,
+                  },
+                ],
+              },
+            },
+          });
+          callbacks.complete(null, {});
+        });
+
+        wrapper = mountServicesCatalog();
+        await flushPromises();
+
+        expect(wrapper.vm.services).toHaveLength(2);
+        expect(wrapper.vm.services.map((row: any) => row.id)).toEqual([
+          '["sso","sso","database","mysql"]',
+          '["sso","sso","external","http"]',
+        ]);
+        expect(wrapper.vm.services.map((row: any) => row.infer_service_type)).toEqual([
+          "database",
+          "external",
+        ]);
+
+        wrapper.vm.handleRowClick(wrapper.vm.services[0]);
+        expect(wrapper.vm.selectedServiceNode).toMatchObject({
+          name: "sso",
+          service_type: "database",
+          service_system: "mysql",
+        });
+        wrapper.vm.handleRowClick(wrapper.vm.services[1]);
+        expect(wrapper.vm.selectedServiceNode).toMatchObject({
+          name: "sso",
+          service_type: "external",
+          service_system: "http",
+        });
+
+        const request = mockFetchQueryDataWithHttpStream.mock.calls[0][0];
+        const decodedSql = atob(
+          request.queryReq.query.sql.replace(/-/g, "+").replace(/_/g, "/").replace(/\./g, "="),
+        );
+        const groupBy = decodedSql.split("GROUP BY")[1].split("ORDER BY")[0];
+        expect(groupBy).toContain("NULLIF(infer_service_name, '')");
+        expect(groupBy).toContain("NULLIF(infer_service_system, '')");
+        expect(groupBy).toContain("NULLIF(infer_service_type, '')");
+      });
     });
   });
 

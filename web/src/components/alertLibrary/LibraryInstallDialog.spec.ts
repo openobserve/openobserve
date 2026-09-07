@@ -135,15 +135,17 @@ const OInputStub = {
   emits: ["update:modelValue"],
   template:
     '<input :data-test="$attrs[\'data-test\']" :value="modelValue" :data-error="errorMessage" ' +
+    ':data-label="label" ' +
     "@input=\"$emit('update:modelValue', $event.target.value)\" />",
 };
 
 const OCheckboxStub = {
   name: "OCheckbox",
-  props: ["modelValue", "label", "size", "disabled"],
+  props: ["modelValue", "label", "size", "disabled", "ariaLabel"],
   emits: ["update:modelValue"],
   template:
-    '<input type="checkbox" :data-test="$attrs[\'data-test\']" :checked="modelValue === true" ' +
+    '<input type="checkbox" :data-test="$attrs[\'data-test\']" :data-label="label" ' +
+    ':checked="modelValue === true" ' +
     "@change=\"$emit('update:modelValue', $event.target.checked)\" />",
 };
 
@@ -226,6 +228,7 @@ const mountDialog = async (props: Record<string, unknown> = {}) => {
     props: {
       open: true,
       entries: entries(),
+      preselect: [],
       seed: { entry: seedEntry(), file: libraryFile("pod-oom-killed") },
       ...props,
     },
@@ -1135,6 +1138,7 @@ describe("LibraryInstallDialog", () => {
         props: {
           open: true,
           entries: entries(),
+          preselect: [],
           seed: { entry: seedEntry(), file: libraryFile("pod-oom-killed") },
         },
         global: { plugins: [i18n, store], stubs: checkboxStubs },
@@ -1163,6 +1167,7 @@ describe("LibraryInstallDialog", () => {
         props: {
           open: true,
           entries: entries(),
+          preselect: [],
           seed: { entry: seedEntry(), file: libraryFile("pod-oom-killed") },
         },
         global: { plugins: [i18n, store], stubs: realStubs },
@@ -1199,5 +1204,357 @@ describe("LibraryInstallDialog", () => {
     expect(mocks.listDestinations).not.toHaveBeenCalled();
     expect(mocks.loadAlertFile).not.toHaveBeenCalled();
     expect(mocks.getFoldersListByType).not.toHaveBeenCalled();
+  });
+  describe("the tune step's hint", () => {
+    const hintOf = async () => {
+      const wrapper = await mountDialog();
+      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      return wrapper.get('[data-test="alert-library-install-tune-hint"]').text();
+    };
+
+    it("names the two settings it is talking about", async () => {
+      // "Only these two are safe to set" pointed at nothing: the fields it means
+      // are hidden until the toggle below it is ticked.
+      const hint = await hintOf();
+      expect(hint).toContain(i18n.global.t("alert_library.install.frequency"));
+      expect(hint).toContain(i18n.global.t("alert_library.install.silence"));
+    });
+
+    it("takes those names from the field labels, so they cannot drift apart", async () => {
+      const wrapper = await mountDialog();
+      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await wrapper.find('[data-test="alert-library-install-tune-toggle"]').setValue(true);
+      await flushPromises();
+
+      const hint = wrapper.get('[data-test="alert-library-install-tune-hint"]').text();
+      for (const test of ["tune-frequency", "tune-silence"]) {
+        const label = wrapper
+          .get(`[data-test="alert-library-install-${test}"]`)
+          .attributes("data-label");
+        expect(label).toBeTruthy();
+        expect(hint).toContain(label);
+      }
+    });
+  });
+
+  // ── preselection from the gallery ─────────────────────────────────────────
+  describe("preselect", () => {
+    const ticked = (wrapper: any) =>
+      wrapper
+        .findAll('[data-test^="alert-library-install-alert-"]')
+        .filter((box: any) => box.element.checked)
+        .map((box: any) =>
+          box.attributes("data-test")!.replace("alert-library-install-alert-", ""),
+        );
+
+    it("ticks exactly the alerts the gallery handed over", async () => {
+      const wrapper = await mountDialog({
+        seed: null,
+        preselect: [seedEntry(), thirdEntry()],
+      });
+      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+      await click(wrapper, "alert-library-install-next");
+
+      expect(ticked(wrapper).sort()).toEqual(["k8s/cert-expiring", "k8s/pod-oom-killed"]);
+      expect(
+        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
+      ).toBe("2");
+    });
+
+    it("offers a preselected alert the current filters exclude", async () => {
+      // `entries` is the gallery's FILTERED view. A batch built before the user
+      // narrowed it would otherwise report a count for alerts not in the list.
+      const offView = entry({
+        id: "kafka/consumer-lag",
+        name: "consumer-lag",
+        pack: "kafka",
+        title: "Consumer Lag Growing",
+        content_hash: "hash-9",
+      });
+      const wrapper = await mountDialog({ seed: null, preselect: [offView] });
+      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+      await click(wrapper, "alert-library-install-next");
+
+      expect(
+        wrapper.find('[data-test="alert-library-install-alert-kafka/consumer-lag"]').exists(),
+      ).toBe(true);
+      expect(ticked(wrapper)).toEqual(["kafka/consumer-lag"]);
+      expect(
+        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-total"),
+      ).toBe("4");
+    });
+
+    it("creates the off-view alert, not just lists it", async () => {
+      const offView = entry({
+        id: "kafka/consumer-lag",
+        name: "consumer-lag",
+        pack: "kafka",
+        title: "Consumer Lag Growing",
+        content_hash: "hash-9",
+      });
+      mocks.loadAlertFile.mockResolvedValue(libraryFile("consumer-lag"));
+      mocks.createAlert.mockResolvedValue({ data: {} });
+
+      const wrapper = await mountDialog({ seed: null, preselect: [offView] });
+      await advanceToInstall(wrapper);
+      await click(wrapper, "alert-library-install-run");
+      await flushPromises();
+
+      expect(statusOf(wrapper, "kafka/consumer-lag")).toBe("installed");
+    });
+
+    it("lists the seed first, then the off-view batch, then the visible set", async () => {
+      const offView = entry({ id: "kafka/consumer-lag", name: "consumer-lag", pack: "kafka" });
+      const wrapper = await mountDialog({ preselect: [offView] });
+      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+      await click(wrapper, "alert-library-install-next");
+
+      const order = wrapper
+        .findAll('[data-test^="alert-library-install-alert-"]')
+        .map((b: any) => b.attributes("data-test")!.replace("alert-library-install-alert-", ""));
+      expect(order[0]).toBe("k8s/pod-oom-killed");
+      expect(order[1]).toBe("kafka/consumer-lag");
+    });
+
+    it("lets the drawer's seed win — one alert, whatever the gallery had selected", async () => {
+      const wrapper = await mountDialog({ preselect: [secondEntry(), thirdEntry()] });
+      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+      await click(wrapper, "alert-library-install-next");
+
+      expect(ticked(wrapper)).toEqual(["k8s/pod-oom-killed"]);
+    });
+
+    it("scopes an untick to this run — it tells the gallery nothing", async () => {
+      // The gallery selection is the user's shelf; only a successful add takes
+      // an alert off it. A modal editing that state behind its own backdrop is
+      // the two-selection-models failure this design exists to avoid.
+      const wrapper = await mountDialog({ seed: null, preselect: [seedEntry(), secondEntry()] });
+      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+      await click(wrapper, "alert-library-install-next");
+
+      await wrapper
+        .find('[data-test="alert-library-install-alert-k8s/pod-oom-killed"]')
+        .setValue(false);
+      await flushPromises();
+
+      expect(Object.keys(wrapper.emitted())).not.toContain("installed");
+      expect(Object.keys(wrapper.emitted())).not.toContain("update:preselect");
+      // The row is off for this run, and the dialog said nothing to anyone.
+      expect(
+        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
+      ).toBe("1");
+    });
+
+    it("still widens a preselected batch from step 2", async () => {
+      const wrapper = await mountDialog({ seed: null, preselect: [seedEntry()] });
+      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-select-all");
+
+      expect(
+        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
+      ).toBe("3");
+    });
+
+    it("never lists an alert twice when the gallery preselects a visible one", async () => {
+      const wrapper = await mountDialog({ seed: null, preselect: [secondEntry()] });
+      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+      await click(wrapper, "alert-library-install-next");
+
+      const rows = wrapper.findAll(
+        '[data-test="alert-library-install-alert-k8s/node-disk-pressure"]',
+      );
+      expect(rows).toHaveLength(1);
+    });
+  });
+
+  // ── large batches ─────────────────────────────────────────────────────────
+  describe("large batch confirmation", () => {
+    const many = (count: number) =>
+      Array.from({ length: count }, (_unused, index) =>
+        entry({
+          id: `k8s/bulk-${index}`,
+          name: `bulk-${index}`,
+          title: `Bulk Alert ${index}`,
+          content_hash: `hash-bulk-${index}`,
+        }),
+      );
+
+    const runButton = (wrapper: any) => wrapper.find('[data-test="alert-library-install-run"]');
+
+    it("asks before a run big enough to reshape the org's alerting", async () => {
+      // The catalog is ~1,242 alerts and select-all-in-view is one click, so
+      // the largest batches must be deliberate rather than merely reachable.
+      const wrapper = await mountDialog({ seed: null, entries: many(51), preselect: many(51) });
+      await advanceToInstall(wrapper);
+
+      const confirm = wrapper.find('[data-test="alert-library-install-confirm-large"]');
+      expect(confirm.exists()).toBe(true);
+      // Unticked by default, or the disabled run button is the only guard and
+      // the acknowledgement is one nobody made.
+      expect((confirm.element as HTMLInputElement).checked).toBe(false);
+      expect(runButton(wrapper).attributes("disabled")).toBeDefined();
+
+      await confirm.setValue(true);
+      await flushPromises();
+      expect(runButton(wrapper).attributes("disabled")).toBeUndefined();
+    });
+
+    it("stays out of the way for an ordinary batch", async () => {
+      const wrapper = await mountDialog({ seed: null, entries: many(50), preselect: many(50) });
+      await advanceToInstall(wrapper);
+
+      expect(wrapper.find('[data-test="alert-library-install-confirm-large"]').exists()).toBe(
+        false,
+      );
+      expect(runButton(wrapper).attributes("disabled")).toBeUndefined();
+    });
+
+    it("re-arms the confirmation when a narrowed batch is widened again", async () => {
+      // An acknowledgement given at 51, kept through a dip to 50 and a climb
+      // back to 51, would let the largest run through unacknowledged.
+      const wrapper = await mountDialog({ seed: null, entries: many(51), preselect: many(51) });
+      const row = '[data-test="alert-library-install-alert-k8s/bulk-0"]';
+      const backToAlerts = async () => {
+        await click(wrapper, "alert-library-install-back");
+        await click(wrapper, "alert-library-install-back");
+        await click(wrapper, "alert-library-install-back");
+      };
+      const forwardToRun = async () => {
+        await click(wrapper, "alert-library-install-next");
+        await click(wrapper, "alert-library-install-next");
+        await click(wrapper, "alert-library-install-next");
+      };
+
+      await advanceToInstall(wrapper);
+      await wrapper.find('[data-test="alert-library-install-confirm-large"]').setValue(true);
+      await flushPromises();
+      expect(runButton(wrapper).attributes("disabled")).toBeUndefined();
+
+      await backToAlerts();
+      await wrapper.find(row).setValue(false);
+      await flushPromises();
+      await forwardToRun();
+      expect(wrapper.find('[data-test="alert-library-install-confirm-large"]').exists()).toBe(
+        false,
+      );
+
+      await backToAlerts();
+      await wrapper.find(row).setValue(true);
+      await flushPromises();
+      await forwardToRun();
+
+      const confirm = wrapper.find('[data-test="alert-library-install-confirm-large"]');
+      expect(confirm.exists()).toBe(true);
+      expect((confirm.element as HTMLInputElement).checked).toBe(false);
+      expect(runButton(wrapper).attributes("disabled")).toBeDefined();
+    });
+
+    it("drops the acknowledgement when the batch grows instead of shrinking", async () => {
+      // The dangerous path: acknowledge 51, go back, Select all — which is what
+      // B14 exists to stop — and return to a run button that never re-armed.
+      const wrapper = await mountDialog({ seed: null, entries: many(80), preselect: many(51) });
+      await advanceToInstall(wrapper);
+      await wrapper.find('[data-test="alert-library-install-confirm-large"]').setValue(true);
+      await flushPromises();
+      expect(runButton(wrapper).attributes("disabled")).toBeUndefined();
+
+      await click(wrapper, "alert-library-install-back");
+      await click(wrapper, "alert-library-install-back");
+      await click(wrapper, "alert-library-install-back");
+      await click(wrapper, "alert-library-install-select-all");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+
+      const confirm = wrapper.find('[data-test="alert-library-install-confirm-large"]');
+      expect((confirm.element as HTMLInputElement).checked).toBe(false);
+      expect(runButton(wrapper).attributes("disabled")).toBeDefined();
+    });
+
+    it("states the folder and destination it is asking about", async () => {
+      const wrapper = await mountDialog({ seed: null, entries: many(51), preselect: many(51) });
+      await advanceToInstall(wrapper);
+
+      const label = wrapper
+        .find('[data-test="alert-library-install-confirm-large"]')
+        .attributes("data-label");
+      expect(label).toContain("51");
+      expect(label).toContain("ops-slack");
+    });
+
+    it("drops the acknowledgement when the destination changes under it", async () => {
+      // The tick is a statement about a specific folder and destination — the
+      // two parameters that decide who gets paged 51 times.
+      const wrapper = await mountDialog({ seed: null, entries: many(51), preselect: many(51) });
+      await advanceToInstall(wrapper);
+      await wrapper.find('[data-test="alert-library-install-confirm-large"]').setValue(true);
+      await flushPromises();
+      expect(runButton(wrapper).attributes("disabled")).toBeUndefined();
+
+      for (let back = 0; back < 4; back += 1) await click(wrapper, "alert-library-install-back");
+      await wrapper
+        .get('[data-test="alert-library-install-destination"]')
+        .setValue("oncall-pagerduty");
+      await flushPromises();
+      for (let next = 0; next < 4; next += 1) await click(wrapper, "alert-library-install-next");
+
+      const confirm = wrapper.get('[data-test="alert-library-install-confirm-large"]');
+      expect((confirm.element as HTMLInputElement).checked).toBe(false);
+      expect(runButton(wrapper).attributes("disabled")).toBeDefined();
+    });
+
+    it("drops the acknowledgement when the folder changes under it", async () => {
+      const wrapper = await mountDialog({ seed: null, entries: many(51), preselect: many(51) });
+      await advanceToInstall(wrapper);
+      await wrapper.find('[data-test="alert-library-install-confirm-large"]').setValue(true);
+      await flushPromises();
+
+      await click(wrapper, "alert-library-install-back");
+      await click(wrapper, "alert-library-install-back");
+      wrapper
+        .findComponent({ name: "SelectFolderDropDown" })
+        .vm.$emit("folder-selected", { value: "prod", label: "Production" });
+      await flushPromises();
+      await click(wrapper, "alert-library-install-next");
+      await click(wrapper, "alert-library-install-next");
+
+      const confirm = wrapper.get('[data-test="alert-library-install-confirm-large"]');
+      expect((confirm.element as HTMLInputElement).checked).toBe(false);
+      expect(runButton(wrapper).attributes("disabled")).toBeDefined();
+    });
+
+    it("forgets the acknowledgement when the dialog is reopened", async () => {
+      const wrapper = await mountDialog({ seed: null, entries: many(51), preselect: many(51) });
+      await advanceToInstall(wrapper);
+      await wrapper.find('[data-test="alert-library-install-confirm-large"]').setValue(true);
+      await flushPromises();
+
+      await wrapper.setProps({ open: false });
+      await wrapper.setProps({ open: true });
+      await flushPromises();
+      await advanceToInstall(wrapper);
+
+      const confirm = wrapper.find('[data-test="alert-library-install-confirm-large"]');
+      expect((confirm.element as HTMLInputElement).checked).toBe(false);
+      expect(runButton(wrapper).attributes("disabled")).toBeDefined();
+    });
+
+    it("lists every alert in a large batch — the count is not capped", async () => {
+      const wrapper = await mountDialog({ seed: null, entries: many(100), preselect: many(100) });
+      await wrapper.find('[data-test="alert-library-install-destination"]').setValue("ops-slack");
+      await click(wrapper, "alert-library-install-next");
+
+      expect(wrapper.findAll('[data-test^="alert-library-install-alert-"]')).toHaveLength(100);
+      expect(
+        wrapper.find('[data-test="alert-library-install-count"]').attributes("data-selected"),
+      ).toBe("100");
+    });
   });
 });

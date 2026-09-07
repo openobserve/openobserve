@@ -18,6 +18,8 @@ class RetryBannerReporter {
     this.retried = new Map();
     // Parallel map of testId -> { title, file } for the summary print.
     this.meta = new Map();
+    // Map<string, string> — testId -> status for attempt-0 failures: in a serial block only these are the originating failure, the siblings are merely re-run with it.
+    this.firstFailures = new Map();
   }
 
   /**
@@ -53,14 +55,43 @@ class RetryBannerReporter {
     process.stdout.write(lines.join('\n') + '\n');
   }
 
+  /** `result.status` is known only here, so neither the originating failure nor a skip can be classified in `onTestBegin`. */
+  onTestEnd(test, result) {
+    if (!result) return;
+
+    if (result.status === 'skipped') {
+      // `test.expectedStatus` reflects runtime modifiers too, so key on the attempt instead: only a skip on attempt 1 never ran, a later one follows a real failure whose retry history must survive.
+      if (result.retry === 0) this.retried.delete(test.id);
+      return;
+    }
+
+    // `test.fail()` makes 'failed' the EXPECTED status, so an originating failure must both differ from the expected status and have actually failed — an unexpected pass is not one.
+    if (result.retry === 0 && result.status !== 'passed' && result.status !== test.expectedStatus) {
+      const title = test.titlePath().filter(Boolean).join(' › ') || test.title;
+      const file = this._shortFile(test.location && test.location.file);
+      this.meta.set(test.id, { title, file });
+      this.firstFailures.set(test.id, result.status);
+    }
+  }
+
   onEnd() {
-    if (this.retried.size === 0) return;
+    if (this.retried.size === 0 && this.firstFailures.size === 0) return;
 
     const bar = '🔁🔁🔁' + '═'.repeat(58) + '🔁🔁🔁';
-    const out = ['', bar, `🔁  RETRY SUMMARY — ${this.retried.size} test(s) were retried in this shard:`];
-    for (const [id, retries] of this.retried) {
-      const m = this.meta.get(id) || {};
-      out.push(`🔁    • [${retries} retr${retries === 1 ? 'y' : 'ies'}] ${m.title || id}  (${m.file || 'unknown'})`);
+    const out = ['', bar];
+    if (this.retried.size > 0) {
+      out.push(`🔁  RETRY SUMMARY — ${this.retried.size} test(s) were retried in this shard:`);
+      for (const [id, retries] of this.retried) {
+        const m = this.meta.get(id) || {};
+        out.push(`🔁    • [${retries} retr${retries === 1 ? 'y' : 'ies'}] ${m.title || id}  (${m.file || 'unknown'})`);
+      }
+    }
+    if (this.firstFailures.size > 0) {
+      out.push(`🔁  ORIGINATING FAILURE(S) — ${this.firstFailures.size} test(s) failed on attempt 1:`);
+      for (const [id, status] of this.firstFailures) {
+        const m = this.meta.get(id) || {};
+        out.push(`🔁    ✗ [${status}] ${m.title || id}  (${m.file || 'unknown'})`);
+      }
     }
     out.push(bar, '');
     process.stdout.write(out.join('\n') + '\n');

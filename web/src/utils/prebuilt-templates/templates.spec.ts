@@ -57,7 +57,9 @@ describe("Slack template", () => {
   });
 
   it("validates Slack webhook URLs", () => {
-    expect(slackConfig.urlValidator("https://hooks.slack.com/services/xxx")).toBe(true);
+    expect(slackConfig.urlValidator("https://hooks.slack.com/services/T000/B000/secret")).toBe(
+      true,
+    );
     expect(slackConfig.urlValidator("https://example.com")).toBe(false);
   });
 

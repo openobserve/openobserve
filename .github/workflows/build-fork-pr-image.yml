@@ -48,6 +48,25 @@ jobs:
           # fetch-depth: 0
           # fetch-tags: true
 
+      # Inlined rather than `uses: ./.github/actions/github-auth`: this job checks out a caller-chosen
+      # ref, and running a local action from that checkout is a cache-poisoning vector (CodeQL).
+      - name: Authenticate github.com fetches
+        shell: bash
+        env:
+          TOKEN: ${{ github.token }}
+        run: |
+          # Sent on every github.com request, so throttled anonymous downloads never happen. A credential helper
+          # or a token in the URL is only used after a 401, and GitHub never challenges for a public repository.
+          B64=$(printf 'x-access-token:%s' "$TOKEN" | base64 | tr -d '\n')
+          echo "::add-mask::$B64"
+          git config --global http.https://github.com/.extraheader "AUTHORIZATION: basic $B64"
+          # actions/checkout keeps the same header in each checked-out repository; two copies make GitHub answer 400.
+          for d in "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE"/*/; do
+            [ -d "$d/.git" ] && git -C "$d" config --local --unset-all http.https://github.com/.extraheader || true
+          done
+          echo "GIT_TERMINAL_PROMPT=0" >> "$GITHUB_ENV"
+          # cargo's libgit2 transport ignores http.extraheader; the git CLI honours it.
+          echo "CARGO_NET_GIT_FETCH_WITH_CLI=true" >> "$GITHUB_ENV"
       - name: Set GIT_TAG env
         run: |
           git fetch -f --tags

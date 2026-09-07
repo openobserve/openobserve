@@ -249,7 +249,6 @@ async fn main() -> Result<(), anyhow::Error> {
     let (grpc_stopped_tx, grpc_stopped_rx) = oneshot::channel();
     let grpc_rt_handle = std::thread::spawn(move || {
         let Ok(rt) = create_grpc_runtime() else {
-            grpc_init_tx.send(()).ok();
             panic!("grpc runtime init failed");
         };
 
@@ -272,7 +271,9 @@ async fn main() -> Result<(), anyhow::Error> {
     });
 
     // wait for gRPC init
-    grpc_init_rx.await.ok();
+    grpc_init_rx
+        .await
+        .map_err(|e| anyhow::anyhow!("gRPC server init failed: {e}"))?;
 
     // Register main HTTP runtime for metrics collection
     if let Ok(handle) = tokio::runtime::Handle::try_current() {
@@ -283,7 +284,7 @@ async fn main() -> Result<(), anyhow::Error> {
     openobserve_node::runtime_metrics::start_metrics_collector().await;
 
     // let node online
-    let _ = cluster::set_online().await;
+    cluster::set_online().await?;
 
     // initialize the jobs are deferred until the gRPC service starts
     job::init_deferred()

@@ -1104,6 +1104,7 @@ mod tests {
             dedup_enabled: Set(false),
             creates_incident: Set(false),
             workflows: Set(serde_json::json!([])),
+            pending_period_sec: Set(0),
             ..Default::default()
         }
         .insert(conn)

@@ -26,7 +26,10 @@ use config::{
     TIMESTAMP_COL_NAME,
     meta::{
         alerts::alert::Alert,
-        promql::{HASH_LABEL, METADATA_LABEL, Metadata, NAME_LABEL, TYPE_LABEL, VALUE_LABEL},
+        promql::{
+            HASH_LABEL, METADATA_LABEL, METRICS_HASH_EXCLUDED_LABELS, Metadata, NAME_LABEL,
+            TYPE_LABEL, VALUE_LABEL,
+        },
         self_reporting::usage::UsageType,
         stream::{StreamParams, StreamPartition, StreamType},
     },
@@ -44,7 +47,6 @@ use infra::schema::{SchemaCache, get_partition_time_level};
 use ingestion_common::{IngestionResponse, StreamStatus};
 use schema::check_for_schema;
 
-use super::get_exclude_labels;
 use crate::{
     alerts::alert::AlertExt,
     common::meta::{authz::Authz, stream::SchemaRecords},
@@ -431,7 +433,7 @@ pub async fn ingest(
         ));
         let mut triggers: TriggerAlertData =
             Vec::with_capacity(cur_stream_alerts.map_or(0, |v| v.len()));
-        let mut evaluated_alerts = HashSet::new();
+        let mut trigger_slots: HashMap<String, super::TriggerSlot> = HashMap::new();
         // End get stream alert
 
         for (mut record, metric_type) in json_data {
@@ -449,7 +451,7 @@ pub async fn ingest(
             // remove type from labels
             record.remove(TYPE_LABEL);
             // add hash
-            let hash = super::signature_without_labels(&record, get_exclude_labels());
+            let hash = super::signature_without_labels(&record, METRICS_HASH_EXCLUDED_LABELS);
             record.insert(HASH_LABEL.to_string(), json::Value::Number(hash.into()));
 
             // convert every label to string
@@ -556,10 +558,9 @@ pub async fn ingest(
             stream_status.status.successful += 1;
 
             // start check for alert trigger
-            if let Some(alerts) = cur_stream_alerts
-                && triggers.len() < alerts.len()
-            {
+            if let Some(alerts) = cur_stream_alerts {
                 let end_time = now_micros();
+                let dedup = super::series_signature(&record);
                 for alert in alerts {
                     let key = format!(
                         "{}/{}/{}/{}",
@@ -568,15 +569,20 @@ pub async fn ingest(
                         alert.stream_name,
                         alert.get_unique_key()
                     );
-                    // For one alert, only one trigger per request
-                    // Trigger for this alert is already added.
-                    if evaluated_alerts.contains(&key) {
+                    // One row per label set: a series repeats its labels on every sample.
+                    if !super::trigger_wants_labels(&trigger_slots, &key, dedup) {
                         continue;
                     }
                     match alert.evaluate(Some(&record), (None, end_time), None).await {
                         Ok(trigger_results) if trigger_results.data.is_some() => {
-                            triggers.push((alert.clone(), trigger_results.data.unwrap()));
-                            evaluated_alerts.insert(key);
+                            super::merge_trigger_rows(
+                                &mut triggers,
+                                &mut trigger_slots,
+                                &key,
+                                dedup,
+                                alert,
+                                trigger_results.data.unwrap(),
+                            );
                         }
                         Ok(_) => {
                             // the data doesn't satisfy the alert condition

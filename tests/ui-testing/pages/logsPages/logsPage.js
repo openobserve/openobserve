@@ -2232,32 +2232,38 @@ export class LogsPage {
     }
 
     async kubernetesContainerNameJoin(streamA = 'default', streamB = 'e2e_automate') {
-        await this.clearAndFillQueryEditor(`SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "${streamA}" as a join "${streamB}" as b on a.kubernetes_container_name  = b.kubernetes_container_name`);
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
+        await this.setQueryEditorContent(`SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "${streamA}" as a join "${streamB}" as b on a.kubernetes_container_name  = b.kubernetes_container_name`);
         await this.waitForEditorValue(`FROM "${streamA}"`);
     }
 
     async kubernetesContainerNameJoinLimit() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a left join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name LIMIT 10');
         await this.waitForEditorValue('LIMIT 10');
     }
 
     async kubernetesContainerNameJoinLike() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE \'%ziox%\'');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving stale text.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a join "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name WHERE a.kubernetes_container_name LIKE \'%ziox%\'');
         await this.waitForEditorValue("LIKE '%ziox%'");
     }
 
     async kubernetesContainerNameLeftJoin() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the LEFT JOIN unwritten.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a LEFT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('LEFT JOIN');
     }
 
     async kubernetesContainerNameRightJoin() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the RIGHT JOIN unwritten.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a RIGHT JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('RIGHT JOIN');
     }
 
     async kubernetesContainerNameFullJoin() {
-        await this.clearAndFillQueryEditor('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
+        // setQueryEditorContent atomically replaces the model; clearAndFillQueryEditor's select-all no-ops under CI load, leaving the FULL JOIN unwritten.
+        await this.setQueryEditorContent('SELECT a.kubernetes_container_name , b.kubernetes_container_name  FROM "default" as a FULL JOIN "e2e_automate" as b on a.kubernetes_container_name  = b.kubernetes_container_name');
         await this.waitForEditorValue('FULL JOIN');
     }
 
@@ -2556,7 +2562,21 @@ export class LogsPage {
 
 
     async clickRelative15MinButton() {
-        return await this.page.locator(this.relative15MinButton).click({ force: true });
+        const btn = this.page.locator(this.relative15MinButton);
+        await btn.waitFor({ state: 'visible', timeout: 10000 });
+        // Mirror clickRelative6WeeksButton: settle the toolbar then verify the label so an in-flight-search reflow can't drop the click off-target.
+        await this._waitForQueryButtonIdle();
+        await btn.click();
+        const applied = await this.page
+            .locator(this.dateTimeButton)
+            .filter({ hasText: 'Past 15 Minutes' })
+            .first()
+            .waitFor({ state: 'visible', timeout: 3000 })
+            .then(() => true)
+            .catch(() => false);
+        if (!applied) {
+            await btn.click().catch(() => {});
+        }
     }
 
     /**
@@ -4516,6 +4536,10 @@ export class LogsPage {
         return await expect(this.page.locator(this.resultPagination)).toBeVisible();
     }
 
+    async expectSearchResultTextContains(expectedText, timeout = 15000) {
+        return await expect(this.page.locator(this.searchResultText)).toContainText(expectedText, { timeout });
+    }
+
     async clickPaginationPage(pageNumber) {
         return await this.page.locator(this.resultPaginationPageBtn(pageNumber)).first().click();
     }
@@ -4747,7 +4771,9 @@ export class LogsPage {
     }
 
     async clickMenuLinkLogsItem() {
-        return await this.clickMenuLinkByType('logs');
+        await this.clickMenuLinkByType('logs');
+        // Sidebar nav is an in-SPA route change; gate on the Logs view toggle re-mounting (present in every tab mode) before callers read persisted state.
+        await expect(this.page.locator(this.visualizeToggle)).toBeVisible({ timeout: 15000 });
     }
 
     async clickMenuLinkTracesItem() {

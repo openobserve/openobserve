@@ -535,6 +535,7 @@ pub struct ApiDoc;
     openobserve_api_management::request::experiments::list_experiments,
     openobserve_api_management::request::experiments::compare_experiments,
     openobserve_api_management::request::experiments::get_experiment,
+    openobserve_api_management::request::experiments::list_experiment_result_rows,
     openobserve_api_management::request::experiments::get_experiment_row,
     openobserve_api_management::request::experiments::retry_experiment_slot,
     openobserve_api_management::request::experiments::cancel_experiment,
@@ -570,6 +571,9 @@ pub struct ApiDoc;
     openobserve_api_management::request::remote_tasks::end_remote_task_signing_grace,
     openobserve_api_management::request::remote_tasks::revoke_remote_task_signing_secret,
 ))]
+#[openapi(components(schemas(
+    openobserve_api_management::models::experiments::ExperimentResultRowSortBody,
+)))]
 struct EnterpriseExperimentApiDoc;
 
 pub struct SecurityAddon;

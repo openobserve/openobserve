@@ -20,6 +20,68 @@
     ]
   },
   {
+    "functionName": "try_cast",
+    "functionLabel": "Cast",
+    "args": [
+      {
+        "label": "Expression",
+        "type": [
+          {
+            "label": "Field",
+            "value": "field"
+          },
+          {
+            "label": "Function",
+            "value": "function"
+          }
+        ],
+        "required": true
+      },
+      {
+        "label": "To Type",
+        "type": [
+          {
+            "label": "Type",
+            "value": "castType"
+          }
+        ],
+        "defaultValue": "DOUBLE",
+        "required": false
+      }
+    ]
+  },
+  {
+    "functionName": "cast",
+    "functionLabel": "Cast (strict)",
+    "args": [
+      {
+        "label": "Expression",
+        "type": [
+          {
+            "label": "Field",
+            "value": "field"
+          },
+          {
+            "label": "Function",
+            "value": "function"
+          }
+        ],
+        "required": true
+      },
+      {
+        "label": "To Type",
+        "type": [
+          {
+            "label": "Type",
+            "value": "castType"
+          }
+        ],
+        "defaultValue": "DOUBLE",
+        "required": false
+      }
+    ]
+  },
+  {
     "functionName": "histogram",
     "functionLabel": "Histogram",
     "args": [

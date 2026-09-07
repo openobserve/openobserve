@@ -77,20 +77,6 @@
       </OTooltip>
     </template>
 
-    <template v-if="comparison" #subnav>
-      <div
-        class="px-table-edge text-text-secondary flex flex-wrap items-center gap-x-2 gap-y-1 py-2 text-xs"
-        data-test="ai-experiment-compare-meta"
-      >
-        <span>{{
-          t("aiObservability.experiments.comparePage.commonRows", {
-            common: comparison.counts.commonRows,
-            total: totalRows,
-          })
-        }}</span>
-      </div>
-    </template>
-
     <div class="flex h-full min-h-0 flex-col">
       <div
         v-if="loading"
@@ -202,13 +188,6 @@ const datasetLabel = computed(() =>
     ? raw(`${datasetName.value.slice(0, DATASET_NAME_MAX)}…`)
     : raw(datasetName.value),
 );
-
-/** Rows in either run, so the common-row count reads as a share of the whole set. */
-const totalRows = computed(() => {
-  const counts = comparison.value?.counts;
-  if (!counts) return 0;
-  return counts.commonRows + counts.new + counts.missing;
-});
 
 /** The dataset's experiments — the only pairs the server will compare. */
 const sideOptions = computed(() =>

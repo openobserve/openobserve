@@ -18,13 +18,30 @@ declare global {
   }
 }
 
+// Opening a connection per transaction leaked one IDBDatabase per read/write,
+// so the single connection is memoised and reused for the page's lifetime.
+let dbPromise: Promise<IDBDatabase> | null = null;
+
 // Initialize IndexedDB
 const initDB = (): Promise<IDBDatabase> => {
-  return new Promise((resolve, reject) => {
+  if (dbPromise) return dbPromise;
+
+  dbPromise = new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = () => reject(request.error);
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      // A version change elsewhere closes this handle; drop it so the next call reopens.
+      db.onclose = () => {
+        dbPromise = null;
+      };
+      db.onversionchange = () => {
+        db.close();
+        dbPromise = null;
+      };
+      resolve(db);
+    };
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
@@ -36,6 +53,13 @@ const initDB = (): Promise<IDBDatabase> => {
       }
     };
   });
+
+  // A failed open must not be cached, otherwise every later call rejects.
+  dbPromise.catch(() => {
+    dbPromise = null;
+  });
+
+  return dbPromise;
 };
 
 // Helper function to generate cache key

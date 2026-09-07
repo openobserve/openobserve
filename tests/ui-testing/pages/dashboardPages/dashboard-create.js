@@ -281,6 +281,12 @@ export default class DashboardCreate {
       createRequest = await requestPromise;
       if (createRequest) {
         createResponse = await responsePromise;
+        // Fresh-org concurrent creates race server-side default-folder creation → the loser 500s on a unique-constraint; the folder now exists so a re-submit lands. Retry transient 5xx while attempts remain (nothing was created, so no duplicate); a persistent error still throws below.
+        if (createResponse && createResponse.status() >= 500 && attempt < submitAttempts) {
+          const stillOpen = await this.submitBtn.isVisible().catch(() => false);
+          if (!stillOpen) await this.openCreateDashboardDialog();
+          continue;
+        }
         break;
       }
 
@@ -352,8 +358,22 @@ export default class DashboardCreate {
           `createDashboard: POST succeeded but the app stayed on the dashboards list, and "${dashboardName}" never appeared there.`
         );
       });
-      await nameCell.click();
-      await this.page.waitForURL(/\/dashboards\/view/, { timeout: 30000 });
+      // The list can swallow this click while its own router-replace is still
+      // settling, so re-click instead of spending the whole budget on one attempt.
+      let opened = false;
+      for (let attempt = 1; attempt <= 3 && !opened; attempt++) {
+        await nameCell.click().catch(() => {});
+        opened = await this.page
+          .waitForURL(/\/dashboards\/view/, { timeout: 10000 })
+          .then(() => true)
+          .catch(() => false);
+      }
+
+      if (!opened) {
+        throw new Error(
+          `createDashboard: "${dashboardName}" was created and is listed, but opening it never navigated to the dashboard view.`
+        );
+      }
     }
 
     // Wait for the page to be fully loaded

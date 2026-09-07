@@ -23,6 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   exported from, so a customer org with none has nothing to install to. Asking
   last would mean picking twelve alerts and then being told to go elsewhere.
 
+  The batch arrives as `seed` from one alert's drawer or `preselect` from the
+  gallery's selection. The seed wins.
+
   Installs run SEQUENTIALLY and one failure never stops the rest — a duplicate
   name in the middle of a batch of twelve must not cost the other eleven. Each
   alert gets its own row and the failures get a retry.
@@ -229,7 +232,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
       <OStep :name="4" :title="t('alert_library.install.stepTune')" icon="tune" :done="step > 4">
         <div class="flex flex-col gap-3 pt-2" data-test="alert-library-install-tune-step">
-          <p class="text-text-secondary text-sm">{{ t("alert_library.install.tuneHint") }}</p>
+          <!-- The two settings are named from their own field labels: the fields
+               themselves are hidden until the toggle below is ticked. -->
+          <p class="text-text-secondary text-sm" data-test="alert-library-install-tune-hint">
+            {{
+              t("alert_library.install.tuneHint", {
+                frequency: t("alert_library.install.frequency"),
+                silence: t("alert_library.install.silence"),
+              })
+            }}
+          </p>
           <OCheckbox
             :model-value="tuneEnabled"
             size="sm"
@@ -275,6 +287,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <dt class="text-text-secondary">{{ t("alert_library.install.stepTune") }}</dt>
             <dd class="text-text-heading">{{ tuningSummary }}</dd>
           </dl>
+
+          <!-- Select-all-in-view is one click, so the biggest runs are made deliberate. -->
+          <OCheckbox
+            v-if="needsLargeBatchConfirm"
+            size="sm"
+            :model-value="largeBatchConfirmed"
+            :label="largeBatchPrompt"
+            :aria-label="largeBatchPrompt"
+            data-test="alert-library-install-confirm-large"
+            @update:model-value="largeBatchConfirmed = $event === true"
+          />
 
           <ul
             v-if="results.length > 0"
@@ -345,6 +368,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           variant="primary"
           size="sm-action"
           :loading="isInstalling"
+          :disabled="needsLargeBatchConfirm && !largeBatchConfirmed"
           data-test="alert-library-install-run"
           @click="install(selectedIds)"
         >
@@ -413,6 +437,8 @@ const props = defineProps<{
   entries: AlertLibraryEntry[];
   /** The drawer's alert and the file it already tuned. */
   seed: { entry: AlertLibraryEntry; file: AlertLibraryFile } | null;
+  /** The gallery's frozen batch — entries, not ids, since it may hold alerts `entries` excludes. */
+  preselect: AlertLibraryEntry[];
 }>();
 
 const emit = defineEmits<{
@@ -427,6 +453,9 @@ const emit = defineEmits<{
    */
   (e: "installed", payload: { entryIds: string[] }): void;
 }>();
+
+// A product call, not a derived number: a pack is 10-30 alerts, the catalog is over a thousand.
+const LARGE_BATCH = 50;
 
 const { t } = useI18nTyped();
 const store = useStore();
@@ -460,6 +489,7 @@ const folderId = ref("default");
 const folderName = ref("");
 const foldersLoading = ref(false);
 const tuneEnabled = ref(false);
+const largeBatchConfirmed = ref(false);
 const tuneFrequency = ref(DEFAULT_TUNABLES.frequency);
 const tuneSilence = ref(DEFAULT_TUNABLES.silence);
 
@@ -488,10 +518,11 @@ const minutesSuffix = computed(() => t("alert_library.install.minutes"));
  */
 const candidates = computed<AlertLibraryEntry[]>(() => {
   const seedEntry = props.seed?.entry;
-  const offered =
-    seedEntry && !props.entries.some((entry) => entry.id === seedEntry.id)
-      ? [seedEntry, ...props.entries]
-      : props.entries;
+  const visible = new Set(props.entries.map((entry) => entry.id));
+  // The batch outlives the filters, so dropping these would count alerts the list cannot offer.
+  const offView = props.preselect.filter((entry) => !visible.has(entry.id));
+  // Seed, then the batch the filters hide, then the visible set; the dedupe drops the repeat.
+  const offered = [...(seedEntry ? [seedEntry] : []), ...offView, ...props.entries];
 
   // Deduped by id: the install walks this list, so a manifest that repeats an
   // entry would create that alert twice.
@@ -520,6 +551,22 @@ const tuningSummary = computed<I18nText>(() =>
     : t("alert_library.install.summaryTuningNone"),
 );
 
+const needsLargeBatchConfirm = computed(() => selectedIds.value.length > LARGE_BATCH);
+
+const largeBatchPrompt = computed(() =>
+  t("alert_library.install.confirmLarge", {
+    count: selectedIds.value.length,
+    folder: folderLabel.value,
+    destination: chosenDestination.value,
+  }),
+);
+
+// The tick is a statement about THIS batch, folder and destination; any of the three changing
+// makes it an acknowledgement of a run that is no longer the one about to happen.
+watch([selectedIds, folderId, chosenDestination], () => {
+  largeBatchConfirmed.value = false;
+});
+
 const failedIds = computed(() =>
   results.value.filter((result) => result.status === "failed").map((result) => result.id),
 );
@@ -547,7 +594,8 @@ const reset = () => {
   hasRun.value = false;
   isInstalling.value = false;
 
-  selectedIds.value = props.seed ? [props.seed.entry.id] : [];
+  selectedIds.value = props.seed ? [props.seed.entry.id] : props.preselect.map((entry) => entry.id);
+  largeBatchConfirmed.value = false;
   // Seed the bulk pair from the alert the user was just looking at, so the
   // fields open on values that mean something rather than on a global default.
   const tunables = props.seed ? readTunables(props.seed.file) : DEFAULT_TUNABLES;

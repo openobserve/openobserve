@@ -53,6 +53,7 @@ const makeEditorStub = (model: any) => ({
   onDidChangeModelContent: vi.fn(),
   createContextKey: vi.fn(),
   addCommand: vi.fn(),
+  onKeyDown: vi.fn(),
   onDidFocusEditorWidget: vi.fn(),
   onDidBlurEditorWidget: vi.fn(),
   dispose: vi.fn(),

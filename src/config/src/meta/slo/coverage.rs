@@ -126,7 +126,9 @@ pub fn evaluation_is_measured(outcome: &RunOutcome) -> bool {
         RunOutcome::Firing | RunOutcome::Normal | RunOutcome::NotifyFailed => true,
         // Observed nothing: the query failed, the run was skipped, or the
         // outcome belongs to a non-condition module.
-        RunOutcome::Error | RunOutcome::Skipped | RunOutcome::Succeeded => false,
+        RunOutcome::Error | RunOutcome::Skipped | RunOutcome::Succeeded | RunOutcome::Pending => {
+            false
+        }
     }
 }
 

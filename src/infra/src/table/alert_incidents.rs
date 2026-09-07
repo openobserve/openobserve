@@ -263,9 +263,10 @@ pub async fn list(
         query = query.filter(alert_incidents::Column::Status.eq(s));
     }
 
+    let page_size = limit.max(1);
     query
-        .paginate(client, limit.max(1))
-        .fetch_page(offset / limit)
+        .paginate(client, page_size)
+        .fetch_page(offset / page_size)
         .await
         .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
 }

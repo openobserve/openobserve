@@ -397,9 +397,9 @@ pub async fn zo_config_bootstrap() -> impl IntoResponse {
     let custom_logo_dark_img = enterprise_value!(None, get_logo_dark().await);
     let custom_hide_self_logo = enterprise_value!(false, o2cfg.common.custom_hide_self_logo);
 
-    #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
+    #[cfg(feature = "cloud")]
     let build_type = "cloud";
-    #[cfg(feature = "enterprise")]
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     let build_type = "enterprise";
     #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
     let build_type = "opensource";
@@ -486,9 +486,9 @@ pub async fn zo_config(
     let synthetics_private_locations_enabled = enterprise_value!(false, cfg.synthetics.enabled);
     let synthetics_recorder_extension_url = &cfg.synthetics.recorder_extension_url;
 
-    #[cfg(all(feature = "cloud", not(feature = "enterprise")))]
+    #[cfg(feature = "cloud")]
     let build_type = "cloud";
-    #[cfg(feature = "enterprise")]
+    #[cfg(all(feature = "enterprise", not(feature = "cloud")))]
     let build_type = "enterprise";
     #[cfg(not(any(feature = "cloud", feature = "enterprise")))]
     let build_type = "opensource";

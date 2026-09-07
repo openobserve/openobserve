@@ -3,15 +3,18 @@
 <!--
   The Test-connection rail on the register/edit form.
 
-  A test connection is not a preview: it is the ONLY thing that publishes a
-  version, so this panel is the register button's other half rather than an
-  optional extra. It always shows the raw exchange, on success and on failure
-  alike, because "what did we actually send, and what came back" is the only
-  thing that helps when someone else's service says no.
+  It tests the form as it stands, through `POST /tasks/test`, which takes the
+  whole candidate — so nothing is registered, no secret is written and no version
+  is published. Publishing still requires a passing test; that check belongs to
+  the Publish button, which runs its own.
+
+  It always shows the raw exchange, on success and on failure alike, because
+  "what did we actually send, and what came back" is the only thing that helps
+  when someone else's service says no.
 -->
 <template>
   <aside
-    class="border-border-default max-[68.75rem]:border-border-default flex min-h-0 flex-col overflow-auto border-l max-[68.75rem]:border-t max-[68.75rem]:border-l-0"
+    class="border-border-default max-[68.75rem]:border-border-default flex min-h-0 flex-col overflow-auto border-s max-[68.75rem]:border-s-0 max-[68.75rem]:border-t"
     data-test="ai-remote-task-test-panel"
   >
     <div class="flex flex-col gap-4 p-5">

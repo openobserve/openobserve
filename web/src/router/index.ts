@@ -93,7 +93,13 @@ export default function (store: any) {
 
     const isAuthenticated = store.state.loggedIn;
 
-    if (!isAuthenticated && (to.path == "/cb" || to.path == "/web/cb")) {
+    if (
+      !isAuthenticated &&
+      (to.path === "/cb" ||
+        to.path === "/web/cb" ||
+        to.path === "/slack/oauth/callback" ||
+        to.path === "/web/slack/oauth/callback")
+    ) {
       next();
     } else if (!isAuthenticated) {
       const sessionUserInfo = getDecodedUserInfo();

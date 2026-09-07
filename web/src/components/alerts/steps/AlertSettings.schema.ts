@@ -22,6 +22,12 @@
 //                                                         (SCHEDULED-only, see below)
 //   - destinations               (multi-select)        — at least one required
 //   - creates_incident           (switch)              — optional boolean
+//   - _ui.pendingPeriod          (display value, in the
+//     selected unit — minutes/hours) — optional, ≥ 0. Blank = 0 (fire
+//     immediately), so unlike silence this coerces rather than distinguishing
+//     "" from 0. Rendered for scheduled AND composite alerts (AlertSettings.vue
+//     owns the field for both); the composite branch of AddAlert.schema.ts
+//     applies the same rule directly since it returns before reaching here.
 //
 // The cross-step threshold / promql / aggregation / group_by / frequency / cron
 // checks are NOT here — they belong to QueryConfig / the AddAlert orchestrator.
@@ -75,6 +81,17 @@ export const makeSilenceSchema = (t: Translator) =>
 export const makePeriodSchema = (t: Translator) =>
   z.coerce.number().min(1, t("alerts.validation.periodPositive"));
 
+/** pending period ≥ 0 (optional — blank OR ABSENT coerces to 0, which is a
+ *  valid, meaningful value: fire immediately). Unlike silence, blank does NOT
+ *  need to be told apart from 0, so this can safely `z.coerce.number()` the
+ *  raw value. `.optional()` covers the key being missing entirely — a form
+ *  built without `withFormExtras`/`buildDefaultForm` (e.g. a hand-built test
+ *  fixture) never seeds `_ui.pendingPeriod`, and `z.coerce.number()` alone
+ *  would reject `undefined` as a required field rather than treating a never
+ *  -configured pending period as 0. */
+export const makePendingPeriodSchema = (t: Translator) =>
+  z.coerce.number().min(0, t("alerts.validation.pendingPeriodNonNegative")).optional();
+
 /** destinations: at least one required. Elements are destination NAME strings
  *  (the OSelect options are `formattedDestinations` = array of names). */
 export const makeDestinationsSchema = (t: Translator) =>
@@ -95,6 +112,7 @@ export const makeAlertSettingsShape = (t: Translator) =>
       silence: makeSilenceSchema(t),
       period: makePeriodSchema(t),
     }),
+    _ui: z.object({ pendingPeriod: makePendingPeriodSchema(t) }).optional(),
     destinations: makeDestinationsSchema(t),
     creates_incident: alertSettingsCreatesIncidentSchema,
   }) as const;
@@ -122,6 +140,7 @@ export const createAlertSettingsSchema = (
       silence: makeSilenceSchema(t),
       period: isRealTime ? z.coerce.number() : makePeriodSchema(t),
     }),
+    _ui: z.object({ pendingPeriod: makePendingPeriodSchema(t) }).optional(),
     // With workflows in play the per-field `min(1)` can't express the rule (it
     // is cross-field), so it moves to the refinement below.
     destinations: allowWorkflows ? z.array(z.string()).optional() : makeDestinationsSchema(t),

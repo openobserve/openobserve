@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="{ 'bg-dropdown-item-hover-bg!': hoveredItem === 'gte' }"
       data-test="context-menu-gte"
     >
-      <OIcon name="arrow-upward" size="xs" class="mr-2" />
+      <OIcon name="arrow-upward" size="xs" class="me-2" />
       <span>{{ fieldName }} >= {{ formattedValue }}</span>
     </div>
     <div
@@ -42,7 +42,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :class="{ 'bg-dropdown-item-hover-bg!': hoveredItem === 'lte' }"
       data-test="context-menu-lte"
     >
-      <OIcon name="arrow-downward" size="xs" class="mr-2" />
+      <OIcon name="arrow-downward" size="xs" class="me-2" />
       <span>{{ fieldName }} &lt;= {{ formattedValue }}</span>
     </div>
   </div>

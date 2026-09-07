@@ -728,9 +728,14 @@ pub async fn update_stream_settings(
         )
         .await
         {
-            return Ok(MetaHttpResponse::internal_error(format!(
-                "Internal server error while updating pattern associations {e}",
-            )));
+            return Ok(match e {
+                infra::errors::Error::ErrorCode(infra::errors::ErrorCodes::InvalidParams(msg)) => {
+                    MetaHttpResponse::bad_request(msg)
+                }
+                e => MetaHttpResponse::internal_error(format!(
+                    "Internal server error while updating pattern associations {e}",
+                )),
+            });
         }
     }
 

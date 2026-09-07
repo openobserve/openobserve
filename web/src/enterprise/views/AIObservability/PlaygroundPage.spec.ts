@@ -117,7 +117,10 @@ function vm(wrapper: Awaited<ReturnType<typeof mountPage>>) {
     removeRow: (id: string) => void;
     createExperiment: (id: string) => void;
     updateVariant: (variant: import("./playgroundDraft").PlaygroundVariant) => void;
+    expectedRequired: boolean;
+    setTools: (tools: import("./playgroundDraft").PlaygroundTool[]) => void;
     scoreAll: () => Promise<void>;
+    addOutputToMessages: (variantId: string) => void;
     totalCells: number;
   };
 }
@@ -135,6 +138,7 @@ describe("PlaygroundPage", () => {
     runPlayground.mockResolvedValue({
       text: "an answer",
       toolCall: null,
+      reasoningContent: null,
       usage: { promptTokens: 5, completionTokens: 2, costUsd: 0.001, latencyMs: 100 },
     });
   });
@@ -199,6 +203,56 @@ describe("PlaygroundPage", () => {
     expect(request.messages).toEqual([{ role: "user", content: "Hello" }]);
   });
 
+  it("continues a returned tool call with a linked tool result", async () => {
+    runPlayground.mockResolvedValueOnce({
+      text: "",
+      toolCall: {
+        id: "call_1",
+        name: "lookup_order",
+        arguments: '{"order_id":"123"}',
+      },
+      reasoningContent: "I should look up this order before answering.",
+      usage: { promptTokens: 5, completionTokens: 2, costUsd: 0.001, latencyMs: 100 },
+    });
+    const wrapper = await mountPage();
+    const page = vm(wrapper);
+    const variant = page.draft.variants[0];
+    variant.messages[1].content = "Where is order 123?";
+
+    await page.runVariant(variant.id);
+    page.addOutputToMessages(variant.id);
+
+    const resultMessage = variant.messages.at(-1)!;
+    expect(resultMessage).toMatchObject({
+      role: "tool",
+      content: "",
+      toolName: "lookup_order",
+      toolCallId: "call_1",
+      toolArguments: '{"order_id":"123"}',
+      reasoningContent: "I should look up this order before answering.",
+    });
+
+    resultMessage.content = '{"status":"shipped"}';
+    await page.runVariant(variant.id);
+
+    expect(runPlayground.mock.calls[1][1].messages).toEqual([
+      { role: "user", content: "Where is order 123?" },
+      {
+        role: "assistant",
+        content: "",
+        reasoningContent: "I should look up this order before answering.",
+        toolCalls: [
+          {
+            id: "call_1",
+            name: "lookup_order",
+            arguments: '{"order_id":"123"}',
+          },
+        ],
+      },
+      { role: "tool", content: '{"status":"shipped"}', toolCallId: "call_1" },
+    ]);
+  });
+
   it("records a failed run as a retryable error rather than an empty answer", async () => {
     const { PlaygroundRunError } = await import("@/services/llm-playground.service");
     runPlayground.mockRejectedValue(new PlaygroundRunError("provider 429", true));
@@ -249,6 +303,31 @@ describe("PlaygroundPage", () => {
 
     page.removeVariant(doomed);
     expect(page.results[doomed]).toBeUndefined();
+  });
+
+  // A comparison only says something when the prompt or model is the one thing
+  // that differs, so the tool harness is shared rather than per column.
+  it("gives every bench the same tools", async () => {
+    const page = vm(await mountPage());
+    page.duplicate(page.draft.variants[0].id);
+    page.duplicate(page.draft.variants[0].id);
+
+    page.setTools([{ name: "search", description: "", parameters: "{}" }]);
+
+    expect(page.draft.variants).toHaveLength(3);
+    for (const variant of page.draft.variants) {
+      expect(variant.tools.map((tool) => tool.name)).toEqual(["search"]);
+    }
+  });
+
+  it("gives each bench its own copy, so editing one never mutates another", async () => {
+    const page = vm(await mountPage());
+    page.duplicate(page.draft.variants[0].id);
+
+    page.setTools([{ name: "search", description: "", parameters: "{}" }]);
+    page.draft.variants[0].tools[0].name = "changed";
+
+    expect(page.draft.variants[1].tools[0].name).toBe("search");
   });
 
   it("inserts a duplicate directly after its source, with an id of its own", async () => {
@@ -352,5 +431,77 @@ describe("PlaygroundPage", () => {
     await page.scoreAll();
     expect(scorePlayground).toHaveBeenCalledTimes(2);
     expect(scorePlayground.mock.calls[1][1].expectedOutput).toBe("the golden answer");
+  });
+});
+
+// The golden answer is scoring-only: the run never sends it, renderTemplate
+// refuses to bind it, and Create Experiment drops it. So the field only earns
+// its space once something actually reads it.
+describe("PlaygroundPage — expected output", () => {
+  const referenceScorer = {
+    id: "sc-ref",
+    entityId: "sc-ref",
+    name: "answer_correctness",
+    template: "Compare against {{expected_output}}",
+    referenceBased: true,
+  } as any;
+
+  const traceScorer = {
+    id: "sc-trace",
+    entityId: "sc-trace",
+    name: "span_checker",
+    template: "Read {{trace}}",
+  } as any;
+
+  const plainScorer = {
+    id: "sc-plain",
+    entityId: "sc-plain",
+    name: "tone",
+    template: "Judge the tone",
+  } as any;
+
+  beforeEach(() => {
+    localStorage.clear();
+    providersList.mockResolvedValue([PROVIDER]);
+    datasetsList.mockResolvedValue([]);
+    runPlayground.mockReset();
+    toast.mockReset();
+  });
+
+  it("asks for one only when a selected scorer reads it", async () => {
+    scorersList.mockResolvedValue([referenceScorer, plainScorer]);
+    const page = vm(await mountPage());
+    expect(page.expectedRequired).toBe(false);
+
+    page.draft.scorerIds = ["sc-plain"];
+    await flushPromises();
+    expect(page.expectedRequired).toBe(false);
+
+    page.draft.scorerIds = ["sc-plain", "sc-ref"];
+    await flushPromises();
+    expect(page.expectedRequired).toBe(true);
+  });
+
+  it("stops asking once the bench has one", async () => {
+    scorersList.mockResolvedValue([referenceScorer]);
+    const page = vm(await mountPage());
+    page.draft.scorerIds = ["sc-ref"];
+    await flushPromises();
+    expect(page.expectedRequired).toBe(true);
+
+    page.draft.expectedSingle = "the golden answer";
+    await flushPromises();
+    expect(page.expectedRequired).toBe(false);
+  });
+
+  // No expected output fixes a trace-reading scorer, so demanding one would
+  // point the user at a field that changes nothing.
+  it("never asks on behalf of a scorer that needs a trace", async () => {
+    scorersList.mockResolvedValue([traceScorer]);
+    const page = vm(await mountPage());
+    page.draft.scorerIds = ["sc-trace"];
+    await flushPromises();
+
+    expect(page.expectedRequired).toBe(false);
   });
 });

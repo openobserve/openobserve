@@ -388,7 +388,7 @@ test.describe("ConfigPanel — Drilldown Configuration", () => {
     await pm.dashboardDrilldown.waitForSameTabDashboardNavigation(sourceUrl);
     testLogger.info(`Navigated to destination dashboard (Default tab) in same tab: ${page.url()}`);
     await expect(
-      page.locator('[data-test="dashboard-tab-list"]').getByRole("tab", { selected: true })
+      pm.dashboardDrilldown.getSelectedDashboardTab()
     ).toHaveText(/Default/, { timeout: 10000 });
 
     await pm.dashboardList.menuItem("dashboards-item");
@@ -434,7 +434,7 @@ test.describe("ConfigPanel — Drilldown Configuration", () => {
     // The drilldown was configured for "Tab Two" — assert it actually opened there,
     // so a tab selection that got reset back to "Default" is a failure, not a pass.
     await expect(
-      page.locator('[data-test="dashboard-tab-list"]').getByRole("tab", { selected: true })
+      pm.dashboardDrilldown.getSelectedDashboardTab()
     ).toHaveText(/Tab Two/, { timeout: 10000 });
 
     // Now on destination dashboard — go to list and delete both

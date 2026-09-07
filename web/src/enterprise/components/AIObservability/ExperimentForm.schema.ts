@@ -26,6 +26,10 @@
 // field that is only required half the time cannot be expressed as `.min(1)`.
 
 import { z } from "zod";
+import type { ExperimentTask, LlmExperiment } from "@/services/llm-experiments.service";
+
+/** The server's own ceiling on trials per Dataset Case. */
+export const MAX_TRIAL_COUNT = 10;
 
 /** Dataset item origins — the fixed set `datasetFilter.sources` accepts. */
 export const EXPERIMENT_ROW_SOURCES = ["trace", "annotation", "manual"] as const;
@@ -69,7 +73,7 @@ export const makeExperimentSchema = (t: (_key: string) => string) =>
         .number()
         .int()
         .min(1, t("aiObservability.experiments.form.validation.trialCountRange"))
-        .max(100, t("aiObservability.experiments.form.validation.trialCountRange"))
+        .max(MAX_TRIAL_COUNT, t("aiObservability.experiments.form.validation.trialCountRange"))
         .default(1),
     })
     .superRefine((values, ctx) => {
@@ -113,6 +117,58 @@ export interface ExperimentFormPrefill {
   temperature?: string;
   systemPrompt?: string;
   userPrompt?: string;
+}
+
+/** An `sdk` task is reported by customer code and has no controls here, so a
+ *  clone of one must stay a server-side copy rather than pass through the form. */
+export function canCloneInForm(task: ExperimentTask): boolean {
+  return task.type !== "sdk";
+}
+
+/** Milliseconds are the wire unit; the form asks for seconds. */
+function secondsFrom(milliseconds: number | undefined): string {
+  return milliseconds ? String(Math.round(milliseconds / 1000)) : "";
+}
+
+/**
+ * A source run, opened as an editable draft. The dataset comes across but is
+ * not editable at the call site: a comparison is only defined between runs over
+ * the same dataset.
+ */
+export function experimentFormFromExperiment(source: LlmExperiment, name: string): ExperimentForm {
+  const common: ExperimentForm = {
+    ...experimentFormDefaults(source.datasetId),
+    name,
+    description: source.description ?? "",
+    sources: [...(source.datasetFilter?.sources ?? [])],
+    scorerIds: source.scorers.map((scorer) => scorer.id),
+    trialCount: source.trialCount,
+  };
+  const task = source.task;
+  if (task.type === "remote") {
+    return {
+      ...common,
+      taskType: "remote",
+      taskRef: task.taskRef,
+      taskTimeoutSeconds: secondsFrom(task.overrides?.timeoutMs),
+      taskMaxConcurrency:
+        task.overrides?.maxConcurrency == null ? "" : String(task.overrides.maxConcurrency),
+    };
+  }
+  if (task.type === "inline_prompt") {
+    const contentOf = (role: string) =>
+      task.messages.find((message) => message.role === role)?.content ?? "";
+    return {
+      ...common,
+      taskType: "inline_prompt",
+      providerId: task.providerId,
+      model: task.model ?? "",
+      systemPrompt: contentOf("system"),
+      userPrompt: contentOf("user"),
+      temperature: Number(task.params?.temperature) || 0,
+    };
+  }
+  return common;
 }
 
 export const experimentFormDefaults = (

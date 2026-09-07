@@ -30,12 +30,7 @@
           :disabled="option.disabled"
           :data-test="`quality-runs-filter-${option.id}`"
         >
-          <span>{{ option.label }}</span>
-          <span
-            class="bg-surface-subtle text-3xs text-text-secondary ml-1 rounded-full px-1.5 py-0.5 leading-none [font-variant-numeric:tabular-nums]"
-          >
-            {{ option.count }}
-          </span>
+          {{ option.label }}
         </OToggleGroupItem>
       </OToggleGroup>
     </header>
@@ -76,6 +71,8 @@
       :empty-message="emptyMessage"
       :enable-column-resize="true"
       :persist-columns="true"
+      :horizontal-scroll="true"
+      :row-height="56"
       table-id="quality-config-scores-v1"
       :row-class="runRowClass"
       :get-row-status-color="runStatusColor"
@@ -109,10 +106,7 @@
       </template>
 
       <template #cell-reasoning="{ row }">
-        <span
-          class="text-2xs text-text-secondary block max-w-full truncate"
-          :title="reasoningFor(row)"
-        >
+        <span class="block max-w-full truncate" :title="reasoningFor(row)">
           {{ reasoningFor(row) }}
         </span>
       </template>
@@ -133,21 +127,26 @@
 
       <template #cell-agentName="{ row }">
         <div class="flex min-w-0 flex-col items-start gap-0.5 leading-tight">
-          <span class="text-2xs text-text-heading max-w-full truncate" :title="agentLabel(row)">
+          <span class="max-w-full truncate" :title="agentLabel(row)">
             {{ agentLabel(row) }}
           </span>
-          <span
-            v-if="row.agentName && row.agentId"
-            class="text-3xs text-text-tertiary max-w-full truncate font-mono"
-            :title="row.agentId"
-          >
-            {{ shortId(row.agentId) }}
-          </span>
-          <OAgentBadges
-            :env="row.agentEnv"
-            :version="row.agentVersion"
-            data-test="quality-runs-agent-badges"
-          />
+          <!-- id + badges share the second line, matching how OAgentBadges sits
+               inline everywhere else it's used — stacking the badges as their
+               own third line was what made this cell read as cramped. -->
+          <div class="flex min-w-0 flex-wrap items-center gap-1.5">
+            <span
+              v-if="row.agentName && row.agentId"
+              class="text-3xs text-text-tertiary max-w-full truncate font-mono"
+              :title="row.agentId"
+            >
+              {{ shortId(row.agentId) }}
+            </span>
+            <OAgentBadges
+              :env="row.agentEnv"
+              :version="row.agentVersion"
+              data-test="quality-runs-agent-badges"
+            />
+          </div>
         </div>
       </template>
     </OTable>
@@ -164,7 +163,6 @@ import OToggleGroup from "@/lib/core/ToggleGroup/OToggleGroup.vue";
 import OToggleGroupItem from "@/lib/core/ToggleGroup/OToggleGroupItem.vue";
 import type { ScoreConfig } from "@/services/online-evals.service";
 import type {
-  QualityRunCounts,
   QualityRunFilter,
   QualityRunRow,
   QualityRunsPagination,
@@ -174,7 +172,6 @@ import { thresholdForConfig } from "../utils/scoreThreshold";
 const props = defineProps<{
   config: ScoreConfig;
   rows: QualityRunRow[];
-  counts: QualityRunCounts;
   activeFilter: QualityRunFilter;
   currentPage: number;
   pageSize: number;
@@ -197,13 +194,11 @@ const filterOptions = computed(() => [
   {
     id: "all" as const,
     label: t("onlineEvals.quality.runs.filters.all"),
-    count: props.counts.all,
     disabled: false,
   },
   {
     id: "unhealthy" as const,
     label: t("onlineEvals.quality.runs.filters.unhealthy"),
-    count: props.counts.unhealthy ?? 0,
     disabled: !hasThreshold.value,
   },
 ]);
