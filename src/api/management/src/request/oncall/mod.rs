@@ -4622,6 +4622,7 @@ pub async fn promote_to_incident(
         // check cannot be inherited from `add_note` further down — a stranger
         // would create the incident and only then be refused.
         if let Err(e) = o2_enterprise::enterprise::oncall::service::refuse_if_not_on_the_paged_team(
+            &org_id,
             record.team(),
             &user_email.user_id,
         )
