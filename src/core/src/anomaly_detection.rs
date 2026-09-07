@@ -18,7 +18,7 @@ use chrono::Utc;
 use config::{
     meta::{
         destinations::{DestinationType, Module},
-        folder::{DEFAULT_FOLDER, Folder, FolderType},
+        folder::{DEFAULT_FOLDER, FolderType},
         stream::StreamType,
         triggers::{ScheduledTriggerData, TriggerModule},
     },
