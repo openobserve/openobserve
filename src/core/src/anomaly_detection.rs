@@ -1517,14 +1517,26 @@ fn merged_interval_pair(
     )
 }
 
-/// Validates the merged pair only when it differs from the persisted one, in parsed seconds:
-/// the full-body PUT resends unchanged intervals, and rejecting those would strand the rows
-/// already broken on disk.
+/// Validates the merged pair only when it differs from the persisted one, byte-wise or in
+/// parsed seconds: the full-body PUT resends unchanged intervals, and rejecting those would
+/// strand the rows already broken on disk, including those whose stored value cannot parse.
 fn validated_intervals(
     req: &UpdateAnomalyConfigRequest,
     existing: &infra::table::entity::anomaly_detection_config::Model,
 ) -> Result<()> {
     let (schedule, histogram) = merged_interval_pair(req, existing);
+    // A row whose persisted interval cannot parse must still accept an edit that leaves it alone.
+    if req
+        .schedule_interval
+        .as_ref()
+        .is_none_or(|v| *v == existing.schedule_interval)
+        && req
+            .histogram_interval
+            .as_ref()
+            .is_none_or(|v| *v == existing.histogram_interval)
+    {
+        return Ok(());
+    }
     // An unparseable value never matches, so it reaches the rule instead of being skipped.
     if let (Ok(schedule_secs), Ok(histogram_secs), Ok(stored_schedule), Ok(stored_histogram)) = (
         parse_interval(&schedule),
