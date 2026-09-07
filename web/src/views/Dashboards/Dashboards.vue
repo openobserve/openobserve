@@ -95,13 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </ODropdownItem>
       </ODropdown>
       <!-- new dashboard button -->
-      <OButton
-        variant="primary"
-        size="sm"
-        icon-left="add"
-        data-test="dashboard-new"
-        @click="addDashboard"
-      >
+      <OButton variant="primary" size="sm" data-test="dashboard-new" @click="addDashboard">
         {{ t(`dashboard.add`) }}
       </OButton>
     </template>

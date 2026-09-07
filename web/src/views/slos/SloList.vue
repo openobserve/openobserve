@@ -36,13 +36,7 @@
       <!-- The provider behind the Terraform export, which is otherwise only
            discoverable once the export dialog is already open. -->
       <IacRegistryLinks data-test="slos-slolist-iac-registries" />
-      <OButton
-        variant="primary"
-        size="sm-action"
-        icon-left="add"
-        data-test="slos-slolist-new"
-        @click="goToNew"
-      >
+      <OButton variant="primary" size="sm-action" data-test="slos-slolist-new" @click="goToNew">
         {{ t("slos.new") }}
       </OButton>
     </template>
