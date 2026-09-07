@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch, defineAsyncComponent, provide, defineExpose } from "vue";
+import { ref, onMounted, watch, defineAsyncComponent, provide } from "vue";
 import { useRouter } from "vue-router";
 import { useI18nTyped } from "@/types/i18n";
 import useDashboardPanelData from "@/composables/dashboard/useDashboardPanel";
