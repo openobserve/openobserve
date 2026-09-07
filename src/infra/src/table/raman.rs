@@ -13,12 +13,27 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-//! Org teardown for the raman tables.
+//! Lookup and org teardown for the raman tables.
 
-use sea_orm::{ColumnTrait, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait};
+use sea_orm::{
+    ColumnTrait, ConnectionTrait, DatabaseConnection, EntityTrait, QueryFilter, TransactionTrait,
+};
 
 use super::entity::{raman_configs, raman_digests};
-use crate::errors::Error;
+use crate::errors::{DbError, Error};
+
+/// Scoped by org so a config id leaked from another org can never resolve here.
+pub async fn get_by_id<C: ConnectionTrait>(
+    conn: &C,
+    org: &str,
+    id: &str,
+) -> Result<Option<raman_configs::Model>, Error> {
+    raman_configs::Entity::find_by_id(id)
+        .filter(raman_configs::Column::Org.eq(org))
+        .one(conn)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))
+}
 
 /// Removes the org's raman config together with every digest it produced.
 pub async fn delete_by_org(db: &DatabaseConnection, org: &str) -> Result<(), Error> {
@@ -203,6 +218,31 @@ mod tests {
         .insert(&db)
         .await
         .expect("a leftover config row blocked the re-created org");
+    }
+
+    /// The super-cluster sync uses this as an existence check before pushing a
+    /// scheduler job, so a cross-org hit would create a job in the wrong org.
+    #[tokio::test]
+    async fn get_by_id_is_scoped_to_the_org() {
+        let db = db().await;
+        raman_configs::ActiveModel {
+            id: Set("config-1".to_string()),
+            org: Set(ORG.to_string()),
+            ..Default::default()
+        }
+        .insert(&db)
+        .await
+        .unwrap();
+
+        assert!(get_by_id(&db, ORG, "config-1").await.unwrap().is_some());
+        assert!(
+            get_by_id(&db, OTHER_ORG, "config-1")
+                .await
+                .unwrap()
+                .is_none(),
+            "another org resolved a config it does not own"
+        );
+        assert!(get_by_id(&db, ORG, "missing").await.unwrap().is_none());
     }
 
     #[tokio::test]

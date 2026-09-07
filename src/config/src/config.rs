@@ -2619,6 +2619,12 @@ pub struct Limit {
         help = "Max query-recommendation jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
     )]
     pub scheduler_query_reco_concurrency: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_RAMAN_CONCURRENCY",
+        default = 0,
+        help = "Max raman digest jobs pulled per cycle and the worker-pool size. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_CONCURRENCY."
+    )]
+    pub scheduler_raman_concurrency: i64,
     // Per-module poll cadence in seconds. 0 = inherit ZO_ALERT_SCHEDULE_INTERVAL (the alert pull
     // frequency). Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. One var per module so each
     // puller can poll at its own rate (e.g. backfill slower, synthetics faster). The alert lane
@@ -2671,6 +2677,12 @@ pub struct Limit {
         help = "Poll cadence in seconds for the query-recommendation puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
     )]
     pub scheduler_query_reco_interval: i64,
+    #[env_config(
+        name = "ZO_SCHEDULER_RAMAN_INTERVAL",
+        default = 0, // seconds
+        help = "Poll cadence in seconds for the raman digest puller. Only used when ZO_SCHEDULER_PER_MODULE_PULLERS=true. 0 inherits ZO_ALERT_SCHEDULE_INTERVAL."
+    )]
+    pub scheduler_raman_interval: i64,
     #[env_config(name = "ZO_SEARCH_JOB_WORKS", default = 1)]
     pub search_job_workers: i64,
     #[env_config(name = "ZO_SEARCH_JOB_SCHEDULE_INTERVAL", default = 10)] // seconds

@@ -54,6 +54,8 @@ pub enum TriggerModule {
     /// next rung's delay. Its own lane so a paging timer is never queued
     /// behind an alert evaluation backlog.
     OncallEscalation,
+    /// Periodic digest run over the raman rules engine, one job per org config.
+    Raman,
 }
 
 impl std::fmt::Display for TriggerModule {
@@ -69,6 +71,7 @@ impl std::fmt::Display for TriggerModule {
             Self::SloBackfill => write!(f, "slo_backfill"),
             Self::CompositeAlert => write!(f, "composite_alert"),
             Self::OncallEscalation => write!(f, "oncall_escalation"),
+            Self::Raman => write!(f, "raman"),
         }
     }
 }
@@ -236,6 +239,30 @@ mod tests {
         assert_eq!(TriggerModule::Slo.to_string(), "slo");
         assert_eq!(TriggerModule::SloBackfill.to_string(), "slo_backfill");
         assert_eq!(TriggerModule::CompositeAlert.to_string(), "composite_alert");
+        assert_eq!(TriggerModule::OncallEscalation.to_string(), "oncall_escalation");
+        assert_eq!(TriggerModule::Raman.to_string(), "raman");
+    }
+
+    /// Two variants sharing a `Display` string would make the wire/log form
+    /// ambiguous, and every module here is addressed by that string somewhere.
+    #[test]
+    fn trigger_module_display_strings_are_unique() {
+        let all = [
+            TriggerModule::Report,
+            TriggerModule::Alert,
+            TriggerModule::DerivedStream,
+            TriggerModule::QueryRecommendations,
+            TriggerModule::Backfill,
+            TriggerModule::AnomalyDetection,
+            TriggerModule::Slo,
+            TriggerModule::SloBackfill,
+            TriggerModule::CompositeAlert,
+            TriggerModule::OncallEscalation,
+            TriggerModule::Raman,
+        ];
+        let unique: std::collections::HashSet<String> =
+            all.iter().map(ToString::to_string).collect();
+        assert_eq!(unique.len(), all.len(), "duplicate TriggerModule display");
     }
 
     /// The discriminant IS the stored value. A variant inserted above an
@@ -253,19 +280,13 @@ mod tests {
         assert_eq!(TriggerModule::SloBackfill as i32, 7);
         assert_eq!(TriggerModule::CompositeAlert as i32, 8);
         assert_eq!(TriggerModule::OncallEscalation as i32, 9);
+        assert_eq!(TriggerModule::Raman as i32, 10);
     }
 
     #[test]
-    fn composite_alert_module_serde_is_append_only_and_round_trips() {
-        let encoded = serde_json::to_string(&TriggerModule::CompositeAlert).unwrap();
-        assert_eq!(encoded, r#""CompositeAlert""#);
-        assert_eq!(
-            serde_json::from_str::<TriggerModule>(&encoded).unwrap(),
-            TriggerModule::CompositeAlert
-        );
-
-        // Pin the pre-composite wire spellings as well as the numeric values:
-        // a rolling upgrade must keep reading jobs serialized by older nodes.
+    fn trigger_module_serde_is_append_only_and_round_trips() {
+        // Pin every wire spelling as well as the numeric values: a rolling
+        // upgrade must keep reading jobs serialized by older nodes.
         for (variant, wire) in [
             (TriggerModule::Report, "Report"),
             (TriggerModule::Alert, "Alert"),
@@ -275,6 +296,9 @@ mod tests {
             (TriggerModule::AnomalyDetection, "AnomalyDetection"),
             (TriggerModule::Slo, "Slo"),
             (TriggerModule::SloBackfill, "SloBackfill"),
+            (TriggerModule::CompositeAlert, "CompositeAlert"),
+            (TriggerModule::OncallEscalation, "OncallEscalation"),
+            (TriggerModule::Raman, "Raman"),
         ] {
             assert_eq!(
                 serde_json::to_string(&variant).unwrap(),

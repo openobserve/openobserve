@@ -636,6 +636,7 @@ pub async fn handle_triggers(
         db::scheduler::TriggerModule::OncallEscalation => {
             handle_oncall_escalation_triggers(trigger).await
         }
+        db::scheduler::TriggerModule::Raman => handle_raman_triggers(trace_id, trigger).await,
     }
 }
 
@@ -5898,6 +5899,23 @@ async fn handle_slo_backfill_triggers(
     trigger.next_run_at = now_micros() + second_micros(30);
     trigger.status = db::scheduler::TriggerStatus::Waiting;
     db::scheduler::update_trigger(trigger, true, "").await?;
+    Ok(())
+}
+
+#[cfg(not(feature = "enterprise"))]
+async fn handle_raman_triggers(
+    _trace_id: &str,
+    _trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
+    Ok(())
+}
+
+// STUB: digest generation lands in a later step; wired now so no raman job is silently dropped.
+#[cfg(feature = "enterprise")]
+async fn handle_raman_triggers(
+    _trace_id: &str,
+    _trigger: db::scheduler::Trigger,
+) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
