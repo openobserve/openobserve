@@ -273,10 +273,10 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.folder_id = Set(src.folder_id);
     active.owner = Set(src.owner);
     active.status = Set(src.status);
-    active.retries = Set(src.retries);
     active.last_updated = Set(src.last_updated);
     active.updated_at = Set(src.updated_at);
     // created_at is NOT patched — it is set once at insert time and never changed.
+    // retries is NOT patched: a peer's count would push this region into an unearned backoff.
     // last_failed_at is NOT patched: a replicated anchor can only corrupt the local backoff.
     // last_alert_fired_at is NOT patched either: each region alerts to its own
     // destinations, so a peer's fire time must not suppress a local alert.
@@ -295,6 +295,7 @@ fn normalize_filters(filters: Option<Json>) -> Option<Json> {
 fn into_active_model(mut m: Model) -> anomaly_detection_config::ActiveModel {
     m.filters = normalize_filters(m.filters);
     // Held local like patch_all_fields does: a new row inherits no peer's anchor.
+    m.retries = 0;
     m.last_failed_at = None;
     m.last_alert_fired_at = None;
     // For inserts the PK must be Set (it is not auto-increment).
