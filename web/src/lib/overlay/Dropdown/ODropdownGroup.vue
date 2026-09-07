@@ -17,7 +17,7 @@ defineSlots<DropdownGroupSlots>();
       ]"
     >
       <span>{{ props.label }}</span>
-      <span v-if="$slots['label-action']" class="ml-auto flex items-center">
+      <span v-if="$slots['label-action']" class="ms-auto flex items-center">
         <slot name="label-action" />
       </span>
     </DropdownMenuLabel>

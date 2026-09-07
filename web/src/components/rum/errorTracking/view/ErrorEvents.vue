@@ -16,7 +16,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 <template>
   <section class="mt-4">
-    <h4 data-test="error-events-title" class="mb-2 ml-1">
+    <h4 data-test="error-events-title" class="ms-1 mb-2">
       {{ t("rum.events") }}
     </h4>
 
@@ -28,7 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <li
         v-for="(event, index) in timelineEvents"
         :key="index"
-        class="event-timeline__item relative flex items-start gap-2 pb-3 pl-5"
+        class="event-timeline__item relative flex items-start gap-2 ps-5 pb-3"
         :class="{ 'event-timeline__item--error': isErrorEvent(event) }"
         :data-test="`error-events-timeline-item-${index}`"
       >

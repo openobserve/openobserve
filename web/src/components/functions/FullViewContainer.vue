@@ -10,7 +10,7 @@
           v-if="showExpandIcon"
           name="keyboard-arrow-up"
           @click.stop="expanded = !expanded"
-          class="text-text-secondary mr-1 cursor-pointer transition-all"
+          class="text-text-secondary me-1 cursor-pointer transition-all"
           :class="expanded ? 'rotate-180 transform' : ''"
           size="md"
         />

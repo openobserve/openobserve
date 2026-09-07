@@ -225,7 +225,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   size="icon-toolbar"
                 >
                   <OIcon name="saved-search" size="sm" />
-                  <OIcon name="arrow-drop-down" size="sm" class="-ml-0.5" />
+                  <OIcon name="arrow-drop-down" size="sm" class="-ms-0.5" />
                   <OTooltip :content="t('search.listSavedViews')" :side-offset="2" />
                 </OButton>
               </template>
@@ -314,7 +314,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <template #trigger>
             <OButton
               data-test="logs-search-bar-utilities-menu-btn"
-              class="rounded-default hover:bg-button-outline-hover-bg element-box-shadow ml-1 min-h-[1.875rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease] max-md:ml-auto"
+              class="rounded-default hover:bg-button-outline-hover-bg element-box-shadow ms-1 min-h-[1.875rem]! p-1! text-xs font-medium [border:0.0625rem_solid_var(--color-button-outline-border)]! [transition:all_0.2s_ease] max-md:ms-auto"
               icon-left="more-horiz"
               variant="outline"
               size="xs"
@@ -341,7 +341,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               {{ t("search.sqlModeLabel") }}
               <template #icon-right>
-                <span class="ml-auto flex items-center gap-1">
+                <span class="ms-auto flex items-center gap-1">
                   <OSwitch
                     :model-value="searchObj.meta.sqlMode"
                     :disabled="isSqlModeDisabled"
@@ -396,7 +396,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               {{ t("search.showHistogramLabel") }}
               <template #icon-right>
-                <span class="ml-auto flex items-center gap-1">
+                <span class="ms-auto flex items-center gap-1">
                   <OSwitch
                     v-model="searchObj.meta.showHistogram"
                     size="md"
@@ -434,7 +434,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               {{ t("search.quickModeLabel") }}
               <template #icon-right>
-                <span class="ml-auto flex items-center gap-1">
+                <span class="ms-auto flex items-center gap-1">
                   <OSwitch
                     :model-value="searchObj.meta.quickMode"
                     size="md"
@@ -473,7 +473,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </template>
               {{ t("search.functionEditorLabel") }}
               <template #icon-right>
-                <span class="ml-auto flex items-center gap-1">
+                <span class="ms-auto flex items-center gap-1">
                   <OSwitch
                     data-test="logs-search-bar-show-query-toggle-btn"
                     v-model="searchObj.meta.showTransformEditor"
@@ -548,7 +548,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <ODropdownSeparator />
 
           <!-- SYNTAX GUIDE -->
-          <div class="flex w-full items-center pr-2">
+          <div class="flex w-full items-center pe-2">
             <SyntaxGuide
               :sqlmode="searchObj.meta.sqlMode"
               :menuItem="true"
@@ -560,7 +560,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="logs-search-bar-menu-pin-syntax-guide-btn"
               variant="ghost-neutral"
               size="icon-sm"
-              class="ml-auto"
+              class="ms-auto"
               :title="
                 isPinned('syntaxGuide') ? t('search.unpinFromToolbar') : t('search.pinToToolbar')
               "
@@ -668,7 +668,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
               <div
                 v-if="showDownloadSubmenu && !isDownloadDisabled"
-                class="search-download-submenu bg-dropdown-bg rounded-default shadow-hover-shadow absolute top-0 right-full z-9999 mr-1 min-w-40 px-0 py-1 shadow-lg [border:0.063rem_solid_var(--color-card-glass-border)] max-md:static max-md:mt-1 max-md:mr-0 max-md:w-full max-md:min-w-0 max-md:basis-full max-md:shadow-none"
+                class="search-download-submenu bg-dropdown-bg rounded-default shadow-hover-shadow absolute top-0 right-full z-9999 me-1 min-w-40 px-0 py-1 shadow-lg [border:0.063rem_solid_var(--color-card-glass-border)] max-md:static max-md:me-0 max-md:mt-1 max-md:w-full max-md:min-w-0 max-md:basis-full max-md:shadow-none"
                 data-test="search-download-submenu"
               >
                 <button
@@ -848,7 +848,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="logs-search-bar-function-editor-pinned-btn"
           size="xs"
           variant="outline"
-          class="element-box-shadow order-1 mr-1 gap-1.5"
+          class="element-box-shadow order-1 me-1 gap-1.5"
           @click="searchObj.meta.showTransformEditor = !searchObj.meta.showTransformEditor"
         >
           <OSwitch
@@ -860,7 +860,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <OTooltip :content="t('search.functionEditorLabel')" />
         </OButton>
 
-        <div class="order-1 mr-1 max-md:mr-auto">
+        <div class="order-1 me-1 max-md:me-auto">
           <DateTime
             ref="dateTimeRef"
             auto-apply
@@ -884,7 +884,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="search-time order-2">
           <div class="flex">
             <OButtonGroup
-              class="element-box-shadow border-card-glass-border mr-1 border p-0"
+              class="element-box-shadow border-card-glass-border me-1 border p-0"
               v-if="
                 config.isEnterprise == 'true' &&
                 Object.keys(store.state.regionInfo).length > 0 &&
@@ -900,7 +900,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     :title="t('search.regionTitle')"
                   >
                     {{ t("search.region") }}
-                    <OIcon name="arrow-drop-down" size="sm" class="ml-1" />
+                    <OIcon name="arrow-drop-down" size="sm" class="ms-1" />
                   </OButton>
                 </template>
                 <div class="min-w-60 p-2" data-test="logs-search-bar-region-menu">
@@ -1186,7 +1186,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   "
                   name="autorenew"
                   size="xs"
-                  class="mr-1"
+                  class="me-1"
                 />
                 {{
                   isNaturalLanguageDetected && !searchObj.meta.nlpMode
@@ -1284,7 +1284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               </ODropdown>
               <!-- Compact Auto Refresh Button -->
               <AutoRefreshInterval
-                class="ml-1"
+                class="ms-1"
                 v-model="searchObj.meta.refreshInterval"
                 :trigger="true"
                 :is-compact="true"
@@ -1297,7 +1297,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
       </div>
     </div>
-    <!-- pr-1.5 mirrors the editor's ml-1.5 so the editor area sits at 10px on
+    <!-- pe-1.5 mirrors the editor's ms-1.5 so the editor area sits at 10px on
          the right (4px wrapper + 6px), aligning with the results panel below.
          data-fullscreen is a stable test hook exposing the fullscreen state
          (the styling itself is driven by the inline `isFocused` class binding).
@@ -1336,7 +1336,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <div
               class="relative flex h-full flex-col overflow-hidden"
               :class="{
-                'rounded-r-none border-r-0': searchObj.data.transformType,
+                'rounded-r-none border-e-0': searchObj.data.transformType,
                 'fn-editor-open': showFunctionEditor,
               }"
             >
@@ -1505,7 +1505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="py-2"
         />
         <div>
-          <div class="text-compact text-input-label-text pr-2 leading-tight font-medium">
+          <div class="text-compact text-input-label-text pe-2 leading-tight font-medium">
             {{ t("search.fileType") }}
           </div>
           <OButtonGroup
@@ -1645,7 +1645,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <div>
         <div class="mb-1 text-left">
           {{ t("search.noOfRecords") }}:
-          <OIcon name="info-outline" size="sm" class="ml-1 cursor-pointer" />
+          <OIcon name="info-outline" size="sm" class="ms-1 cursor-pointer" />
           <OTooltip side="right" align="center" max-width="18.75rem">
             <template #content>
               <span class="text-sm">{{ t("search.noOfRecordsTooltip") }}</span>
@@ -1663,7 +1663,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         {{ t("search.maxEventsScheduleJob") }}
       </div>
       <div class="mapping-warning-msg mt-3 text-left opacity-80">
-        <OIcon name="warning" size="sm" class="text-status-error-text mr-2" />
+        <OIcon name="warning" size="sm" class="text-status-error-text me-2" />
         <span>{{ t("search.histogramDisabledScheduleJob") }}</span>
       </div>
     </ODialog>
@@ -1724,7 +1724,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div data-test="logs-search-saved-view-list" class="flex">
           <div
             class="flex flex-col"
-            :class="localSavedViews.length > 0 ? 'border-card-glass-border border-r' : ''"
+            :class="localSavedViews.length > 0 ? 'border-card-glass-border border-e' : ''"
             :style="localSavedViews.length > 0 ? 'width: 60%' : 'width: 100%'"
           >
             <div class="flex flex-col" style="max-height: 30.375rem; min-height: 17.5rem">
@@ -1847,7 +1847,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </div>
           </div>
 
-          <div class="ml-0 flex w-[40%] flex-col pl-3" v-if="localSavedViews.length > 0">
+          <div class="ms-0 flex w-[40%] flex-col ps-3" v-if="localSavedViews.length > 0">
             <div class="flex flex-col" style="max-height: 30rem; min-height: 17.5rem">
               <OTable
                 data-test="log-search-saved-view-favorite-list-fields-table"

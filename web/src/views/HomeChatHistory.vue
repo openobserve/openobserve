@@ -92,7 +92,7 @@ function formatTime(ts: string): string {
 
 <template>
   <div
-    class="border-card-glass-border bg-card-glass-bg flex h-full w-[15em] shrink-0 flex-col overflow-hidden border-r border-r-[0.0625em] text-base"
+    class="border-card-glass-border bg-card-glass-bg flex h-full w-[15em] shrink-0 flex-col overflow-hidden border-e border-e-[0.0625em] text-base"
   >
     <!-- Header -->
     <div class="flex shrink-0 items-center justify-between px-3 pt-[0.625em] pb-[0.375em]">

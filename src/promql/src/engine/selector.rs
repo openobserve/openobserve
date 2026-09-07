@@ -16,13 +16,20 @@
 //! Vector/matrix selector evaluation and data loading. Reads `ctx`,
 //! `label_selector`, and `skip_labels`; writes `result_type`.
 
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
-use config::meta::promql::{NAME_LABEL, value::*};
-use datafusion::error::{DataFusionError, Result};
+use config::meta::{
+    promql::{NAME_LABEL, value::*},
+    search::ScanStats,
+};
+use datafusion::{
+    arrow::datatypes::Schema,
+    error::{DataFusionError, Result},
+    prelude::SessionContext,
+};
 use futures::future::try_join_all;
 use hashbrown::HashMap;
-use infra::errors::{Error, ErrorCodes};
+use infra::errors::ErrorCodes;
 use promql_parser::{
     label::{MatchOp, Matchers},
     parser::{Offset, VectorSelector},
@@ -33,7 +40,11 @@ use super::Engine;
 use crate::{
     load_series::{LoadedMetrics, PartitionedMetrics, selector_load_data_from_datafusion},
     micros,
+    promql::rewrite::remove_filter_all,
 };
+
+/// One context per selected schema with its scan stats and whether the matchers still apply.
+pub(super) type SelectorContexts = Vec<(SessionContext, Arc<Schema>, ScanStats, bool)>;
 
 impl Engine {
     /// Instant vector selector --- select a single sample at each evaluation
@@ -48,45 +59,16 @@ impl Engine {
             self.result_type = Some("vector".to_string());
         }
 
-        let mut selector = selector.clone();
-        if selector.name.is_none() {
-            let name = match selector.matchers.find_matchers(NAME_LABEL).first() {
-                Some(mat) => mat.value.clone(),
-                None => {
-                    return Err(DataFusionError::Plan(
-                        "VectorSelector: metric name is required".into(),
-                    ));
-                }
-            };
-            selector.name = Some(name);
-            // the matcher is fully consumed by stream selection; leaving it in
-            // would filter on the stored `__name__` column (which may keep the
-            // pre-`format_stream_name` case), leak into partition pruning, and
-            // make the selector's PromQL text unparseable on super-cluster peers
-            selector
-                .matchers
-                .matchers
-                .retain(|mat| mat.name != NAME_LABEL);
-        }
+        let selector = named_selector(selector.clone(), "VectorSelector")?;
 
-        let data = self.selector_load_data_owned(&selector, None).await?;
+        let data = self.selector_load_data_owned(&selector, None, None).await?;
 
         let metrics_cache = match data.get_range_values() {
             Some(v) => v,
             None => return Ok(vec![]),
         };
 
-        let mut offset_modifier = 0;
-        if let Some(offset) = selector.offset {
-            match offset {
-                Offset::Pos(offset) => {
-                    offset_modifier = micros(offset);
-                }
-                Offset::Neg(offset) => {
-                    offset_modifier = -micros(offset);
-                }
-            }
-        };
+        let offset_modifier = get_offset_modifier(selector.offset);
 
         // Get all evaluation timestamps from the context
         let eval_timestamps = self.eval_ctx.timestamps();
@@ -148,36 +130,21 @@ impl Engine {
     /// See <https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#confusion-alert-instantrange-selectors-vs-instantrange-queries>
     ///
     /// MatrixSelector is a special case of VectorSelector that returns a matrix
-    /// of samples.
+    /// of samples. `ctxs` reuses contexts already created for this selector.
     pub(super) async fn eval_matrix_selector(
         &mut self,
         selector: &VectorSelector,
         range: Duration,
+        ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
         if self.result_type.is_none() {
             self.result_type = Some("matrix".to_string());
         }
 
-        let mut selector = selector.clone();
-        if selector.name.is_none() {
-            let name = selector
-                .matchers
-                .find_matchers(NAME_LABEL)
-                .first()
-                .unwrap()
-                .value
-                .clone();
-
-            selector.name = Some(name);
-            // see eval_vector_selector: the matcher is consumed by stream selection
-            selector
-                .matchers
-                .matchers
-                .retain(|mat| mat.name != NAME_LABEL);
-        }
+        let selector = named_selector(selector.clone(), "MatrixSelector")?;
 
         let data = self
-            .selector_load_data_owned(&selector, Some(range))
+            .selector_load_data_owned(&selector, Some(range), ctxs)
             .await?;
 
         let values = match data.get_range_values() {
@@ -220,8 +187,9 @@ impl Engine {
         &mut self,
         selector: &VectorSelector,
         range: Option<Duration>,
+        ctxs: Option<SelectorContexts>,
     ) -> Result<Value> {
-        let mut metric_values = match self.selector_load_data_inner(selector, range).await {
+        let mut metric_values = match self.selector_load_data_inner(selector, range, ctxs).await {
             Ok(v) => v,
             Err(e) => {
                 log::error!(
@@ -264,6 +232,7 @@ impl Engine {
         &self,
         selector: &VectorSelector,
         range: Option<Duration>,
+        ctxs: Option<SelectorContexts>,
     ) -> Result<Vec<RangeValue>> {
         let start_time = std::time::Instant::now();
         // https://promlabs.com/blog/2020/07/02/selecting-data-in-promql/#lookback-delta
@@ -319,18 +288,25 @@ impl Engine {
             drop(super_tx);
         }
 
-        let ctxs = self
-            .ctx
-            .table_provider
-            .create_context(
-                &self.ctx.query_ctx.org_id,
-                table_name,
-                (start, end),
-                selector.matchers.clone(),
-                self.label_selector.clone(),
-                &mut filters,
-            )
-            .await?;
+        let mut label_selector = self.label_selector.clone();
+        label_selector.extend(self.ctx.label_selector.iter().cloned());
+
+        let ctxs = match ctxs {
+            Some(ctxs) => ctxs,
+            None => {
+                self.ctx
+                    .table_provider
+                    .create_context(
+                        &self.ctx.query_ctx.org_id,
+                        table_name,
+                        (start, end),
+                        selector.matchers.clone(),
+                        label_selector.clone(),
+                        &mut filters,
+                    )
+                    .await?
+            }
+        };
 
         // check if we need to load data from local cluster
         #[cfg(feature = "enterprise")]
@@ -345,9 +321,6 @@ impl Engine {
         } else {
             ctxs
         };
-
-        let mut label_selector = self.label_selector.clone();
-        label_selector.extend(self.ctx.label_selector.iter().cloned());
 
         // Calculate step and lookback for the optimization
         let start = self.eval_ctx.start - offset_modifier;
@@ -400,7 +373,7 @@ impl Engine {
         let timeout = self.ctx.query_ctx.timeout;
         let query_task = try_join_all(tasks);
         tokio::pin!(query_task);
-        let task_results = tokio::select! {
+        let task_results: Result<Vec<_>> = tokio::select! {
             ret = &mut query_task => {
                 match ret {
                     Ok(ret) => {
@@ -411,13 +384,14 @@ impl Engine {
                                 Ok(Ok(data)) => unwrapped_results.push(data),
                                 Ok(Err(_)) => {
                                     log::error!("[trace_id {trace_id}] [PromQL] grpc search load data task timeout");
-                                    return Err(DataFusionError::Plan(
-                                        Error::ErrorCode(ErrorCodes::SearchTimeout("[PromQL] grpc search load data task timeout".to_string())).to_string()
-                                    ));
+                                    return Err(ErrorCodes::SearchTimeout(
+                                        "[PromQL] grpc search load data task timeout".to_string(),
+                                    )
+                                    .into());
                                 }
                                 Err(err) => {
                                     log::error!("[trace_id {trace_id}] [PromQL] grpc search execute error: {err}");
-                                    return Err(DataFusionError::Plan(format!("task error: {err}")));
+                                    return Err(ErrorCodes::ServerInternalError(err.to_string()).into());
                                 }
                             }
                         }
@@ -425,7 +399,7 @@ impl Engine {
                     },
                     Err(err) => {
                         log::error!("[trace_id {trace_id}] [PromQL] grpc search execute error: {err}");
-                        Err(Error::Message(err.to_string()))
+                        Err(ErrorCodes::ServerInternalError(err.to_string()).into())
                     }
                 }
             },
@@ -434,7 +408,7 @@ impl Engine {
                     handle.abort();
                 }
                 log::error!("[trace_id {trace_id}] [PromQL] grpc search timeout");
-                Err(Error::ErrorCode(ErrorCodes::SearchTimeout("[PromQL] grpc search timeout".to_string())))
+                Err(ErrorCodes::SearchTimeout("[PromQL] grpc search timeout".to_string()).into())
             },
             _ = async {
                 match abort_receiver.as_mut() {
@@ -448,12 +422,11 @@ impl Engine {
                     handle.abort();
                 }
                 log::info!("[trace_id {trace_id}] [PromQL] grpc search canceled");
-                Err(Error::ErrorCode(ErrorCodes::SearchCancelQuery("[PromQL] grpc search canceled".to_string())))
+                Err(ErrorCodes::SearchCancelQuery("[PromQL] grpc search canceled".to_string()).into())
             }
         };
 
-        let task_results =
-            task_results.map_err(|e| DataFusionError::Plan(format!("task error: {e}")))?;
+        let task_results = task_results?;
 
         // check for super cluster
         #[cfg(feature = "enterprise")]
@@ -506,6 +479,47 @@ impl Engine {
     }
 }
 
+/// Strips placeholder matchers and rejects the selector forms no loader supports.
+pub(super) fn plain_selector(selector: &VectorSelector, kind: &str) -> Result<VectorSelector> {
+    let mut selector = selector.clone();
+    remove_filter_all(&mut selector);
+    if !selector.matchers.or_matchers.is_empty() {
+        return Err(DataFusionError::Plan(format!(
+            "{kind}: or_matchers is not supported"
+        )));
+    }
+    if selector.at.is_some() {
+        return Err(DataFusionError::NotImplemented(format!(
+            "{kind}: @ modifier is not supported"
+        )));
+    }
+    Ok(selector)
+}
+
+/// Lifts the `__name__` matcher into the selector name; kept as a matcher it would filter the
+/// stored column, which may hold the pre-`format_stream_name` case.
+pub(super) fn named_selector(mut selector: VectorSelector, kind: &str) -> Result<VectorSelector> {
+    if selector.name.is_some() {
+        return Ok(selector);
+    }
+    let Some(name) = selector
+        .matchers
+        .find_matchers(NAME_LABEL)
+        .first()
+        .map(|mat| mat.value.clone())
+    else {
+        return Err(DataFusionError::Plan(format!(
+            "{kind}: metric name is required"
+        )));
+    };
+    selector.name = Some(name);
+    selector
+        .matchers
+        .matchers
+        .retain(|mat| mat.name != NAME_LABEL);
+    Ok(selector)
+}
+
 /// Discard the already-partitioned series hashes without rebuilding a global
 /// hash table. This is the common path when DataFusion creates one query
 /// context for the selected schema.
@@ -536,7 +550,7 @@ fn collect_loaded_metrics(mut results: Vec<LoadedMetrics>) -> Vec<RangeValue> {
     }
 }
 
-fn equal_matcher_filters(matchers: &Matchers) -> Vec<(String, Vec<String>)> {
+pub(super) fn equal_matcher_filters(matchers: &Matchers) -> Vec<(String, Vec<String>)> {
     matchers
         .matchers
         .iter()
@@ -578,7 +592,7 @@ fn merge_loaded_metrics(results: Vec<LoadedMetrics>) -> HashMap<u64, RangeValue>
     metrics
 }
 
-fn get_offset_modifier(offset: Option<Offset>) -> i64 {
+pub(super) fn get_offset_modifier(offset: Option<Offset>) -> i64 {
     if let Some(offset) = offset {
         match offset {
             Offset::Pos(offset) => micros(offset),
@@ -824,11 +838,95 @@ mod tests {
         };
 
         let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300))
+            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
             .await;
         assert!(result.is_ok());
         let values = result.unwrap();
         assert_eq!(values.len(), 0); // Mock provider returns empty data
+    }
+
+    #[tokio::test]
+    async fn test_eval_vector_selector_without_a_metric_name_is_an_error() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
+        let mut engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx(trace_id, org_id, 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+
+        // `{env="prod"}` -- no name and no __name__ matcher to fall back on.
+        let selector = VectorSelector {
+            name: None,
+            matchers: Matchers {
+                matchers: vec![promql_parser::label::Matcher {
+                    name: "env".to_string(),
+                    op: MatchOp::Equal,
+                    value: "prod".to_string(),
+                }],
+                or_matchers: vec![],
+            },
+            offset: None,
+            at: None,
+        };
+
+        let result = engine.eval_vector_selector(&selector).await;
+
+        assert!(result.is_err(), "expected an error, not a panic");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("VectorSelector: metric name is required"),
+            "the error should name the vector selector"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_eval_matrix_selector_without_a_metric_name_is_an_error() {
+        let trace_id = "test_trace";
+        let org_id = "test_org";
+        let mut engine = Engine::new(
+            trace_id,
+            Arc::new(PromqlContext::new(
+                create_test_query_ctx(trace_id, org_id, 30),
+                SimpleMockProvider,
+                vec![],
+            )),
+            create_test_eval_ctx(),
+        );
+
+        // `{env="prod"}[5m]` -- no name and no __name__ matcher to fall back on.
+        let selector = VectorSelector {
+            name: None,
+            matchers: Matchers {
+                matchers: vec![promql_parser::label::Matcher {
+                    name: "env".to_string(),
+                    op: MatchOp::Equal,
+                    value: "prod".to_string(),
+                }],
+                or_matchers: vec![],
+            },
+            offset: None,
+            at: None,
+        };
+
+        let result = engine
+            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
+            .await;
+
+        assert!(result.is_err(), "expected an error, not a panic");
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("MatrixSelector: metric name is required"),
+            "the error should name the matrix selector"
+        );
     }
 
     #[tokio::test]
@@ -862,7 +960,7 @@ mod tests {
         };
 
         let result = engine
-            .eval_matrix_selector(&selector, Duration::from_secs(300))
+            .eval_matrix_selector(&selector, Duration::from_secs(300), None)
             .await;
         assert!(result.is_ok());
         let values = result.unwrap();

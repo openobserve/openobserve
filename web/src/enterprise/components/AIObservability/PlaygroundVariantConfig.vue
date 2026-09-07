@@ -16,6 +16,7 @@
       @remove="onMessageRemove"
       @add="onMessageAdd"
       @set-tool="onMessageToolChange"
+      @set-tool-arguments="onMessageToolArgumentsChange"
       @set-role="onMessageRoleChange"
       @move="onMessageMove"
     />
@@ -27,6 +28,7 @@ import PlaygroundMessageList from "./PlaygroundMessageList.vue";
 import {
   moveMessage,
   playgroundId,
+  toolCallId,
   withRole,
   type PlaygroundRole,
   type PlaygroundVariant,
@@ -49,7 +51,22 @@ function patch(changes: Partial<PlaygroundVariant>) {
 function onMessageToolChange(messageId: string, toolName: string) {
   patch({
     messages: props.variant.messages.map((message) =>
-      message.id === messageId ? { ...message, toolName } : message,
+      message.id === messageId
+        ? {
+            ...message,
+            toolName,
+            toolCallId: toolName ? message.toolCallId || toolCallId(message.id) : undefined,
+            toolArguments: toolName ? message.toolArguments || "{}" : undefined,
+          }
+        : message,
+    ),
+  });
+}
+
+function onMessageToolArgumentsChange(messageId: string, toolArguments: string) {
+  patch({
+    messages: props.variant.messages.map((message) =>
+      message.id === messageId ? { ...message, toolArguments } : message,
     ),
   });
 }

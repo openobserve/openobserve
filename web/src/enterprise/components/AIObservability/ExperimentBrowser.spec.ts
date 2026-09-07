@@ -308,6 +308,58 @@ describe("ExperimentBrowser", () => {
     expect(wrapper.find("button input, button button").exists()).toBe(false);
   });
 
+  it("clears the baseline when the pin is clicked again", async () => {
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("new", "dataset-a", 2), experiment("old", "dataset-a", 1)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+      },
+      global: { stubs },
+    });
+
+    const pin = () => wrapper.get('[data-test="ai-experiment-baseline-old"]');
+    await pin().trigger("click");
+    expect(JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}")).toEqual({
+      "dataset-a": "old",
+    });
+
+    // The pin renders filled once set, so it reads as a toggle — before this it
+    // could only ever re-pin the row to itself, stranding the baseline forever.
+    await pin().trigger("click");
+    expect(JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}")).toEqual({});
+
+    // The dataset key is DELETED, not blanked: an empty string left behind still
+    // reads as a configured baseline everywhere the id is looked up.
+    expect(
+      Object.prototype.hasOwnProperty.call(
+        JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}"),
+        "dataset-a",
+      ),
+    ).toBe(false);
+  });
+
+  it("leaves another dataset's baseline alone when one is cleared", async () => {
+    localStorage.setItem(
+      "o2_experiment_baselines_acme",
+      JSON.stringify({ "dataset-a": "old", "dataset-b": "other" }),
+    );
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [experiment("old", "dataset-a", 1)],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+      },
+      global: { stubs },
+    });
+
+    await wrapper.get('[data-test="ai-experiment-baseline-old"]').trigger("click");
+
+    expect(JSON.parse(localStorage.getItem("o2_experiment_baselines_acme") ?? "{}")).toEqual({
+      "dataset-b": "other",
+    });
+  });
+
   it("persists the selected baseline and orders it first", async () => {
     const wrapper = mount(ExperimentBrowser, {
       props: {

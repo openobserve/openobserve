@@ -27,18 +27,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- x axis container. < md the Breakdown/Pivot half stacks BELOW the
          X-Axis instead of sharing the row (which forced a horizontal scroll). -->
     <div
-      class="flex w-full flex-row pl-3 max-md:flex-col"
+      class="flex w-full flex-row ps-3 max-md:flex-col"
       v-if="dashboardPanelData.data.type != 'metric'"
     >
       <div class="flex-1">
         <div class="flex flex-row">
           <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
             <span
-              class="rounded-default bg-badge-indigo-ol-text mr-1.5 h-2 w-2 shrink-0"
+              class="rounded-default bg-badge-indigo-ol-text me-1.5 h-2 w-2 shrink-0"
               aria-hidden="true"
             ></span>
             {{ currentXLabel }}
-            <OIcon name="info-outline" size="sm" class="ml-1" />
+            <OIcon name="info-outline" size="sm" class="ms-1" />
             <OTooltip :content="xAxisHint" />
           </div>
           <span class="layout-separator mx-0.5 flex items-center">:</span>
@@ -65,7 +65,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-x-layout"
           >
             <div
-              class="my-0.5 mr-2 flex"
+              class="my-0.5 me-2 flex"
               v-for="(itemX, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.x"
@@ -179,23 +179,23 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         "
       >
         <div
-          class="max-md:border-border-default flex h-full flex-row pl-3 max-md:border-t max-md:pl-0"
+          class="max-md:border-border-default flex h-full flex-row ps-3 max-md:border-t max-md:ps-0"
         >
           <!-- Separator between X and Breakdown/Pivot (stacked mode draws a
                top border instead) -->
-          <OSeparator vertical class="mr-4 max-md:hidden" />
+          <OSeparator vertical class="me-4 max-md:hidden" />
           <!-- shrink-0, not min-w-0: the label is whitespace-nowrap, so letting it
                shrink below its text width overflows the box and the text lands on
                top of the drop-zone hint in a narrow builder column. -->
           <div class="layout-name flex shrink-0 items-center whitespace-nowrap">
             <span
-              class="rounded-default bg-badge-orange-ol-text mr-1.5 h-2 w-2 shrink-0"
+              class="rounded-default bg-badge-orange-ol-text me-1.5 h-2 w-2 shrink-0"
               aria-hidden="true"
             ></span>
             {{
               dashboardPanelData.data.type == "table" ? t("panel.pivotField") : t("panel.breakdown")
             }}
-            <OIcon name="info-outline" size="sm" class="ml-1" />
+            <OIcon name="info-outline" size="sm" class="ms-1" />
             <OTooltip side="top" align="center">
               <template #content>
                 <span v-if="dashboardPanelData.data.type == 'table'">{{
@@ -236,7 +236,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="dashboard-b-layout"
           >
             <div
-              class="my-0.5 mr-2 flex"
+              class="my-0.5 me-2 flex"
               v-for="(itemB, index) in dashboardPanelData.data.queries[
                 dashboardPanelData.layout.currentQueryIndex
               ].fields?.breakdown"
@@ -337,14 +337,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     </div>
     <OSeparator v-if="dashboardPanelData.data.type != 'metric'" />
     <!-- y axis container -->
-    <div class="flex flex-row pl-3">
+    <div class="flex flex-row ps-3">
       <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
         <span
-          class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+          class="rounded-default bg-badge-success-ol-text me-1.5 h-2 w-2 shrink-0"
           aria-hidden="true"
         ></span>
         {{ currentYLabel }}
-        <OIcon name="info-outline" size="sm" class="ml-1" />
+        <OIcon name="info-outline" size="sm" class="ms-1" />
         <OTooltip :content="yAxisHint" />
       </div>
       <span class="layout-separator mx-0.5 flex items-center">:</span>
@@ -371,7 +371,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         data-test="dashboard-y-layout"
       >
         <div
-          class="my-0.5 mr-2 flex"
+          class="my-0.5 me-2 flex"
           v-for="(itemY, index) in dashboardPanelData.data.queries[
             dashboardPanelData.layout.currentQueryIndex
           ].fields?.y"
@@ -471,14 +471,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- z axis container -->
     <span v-if="dashboardPanelData.data.type === 'heatmap'">
       <OSeparator />
-      <div class="flex flex-row pl-3">
+      <div class="flex flex-row ps-3">
         <div class="layout-name flex items-center whitespace-nowrap" :class="labelWidthClass">
           <span
-            class="rounded-default bg-badge-success-ol-text mr-1.5 h-2 w-2 shrink-0"
+            class="rounded-default bg-badge-success-ol-text me-1.5 h-2 w-2 shrink-0"
             aria-hidden="true"
           ></span>
           {{ dashboardPanelData.data.type == "heatmap" ? t("panel.zAxis") : "" }}
-          <OIcon name="info-outline" size="sm" class="ml-1" />
+          <OIcon name="info-outline" size="sm" class="ms-1" />
           <OTooltip :content="zAxisHint" />
         </div>
         <span class="layout-separator mx-0.5 flex items-center">:</span>
@@ -505,7 +505,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           data-test="dashboard-z-layout"
         >
           <div
-            class="my-0.5 mr-2 flex"
+            class="my-0.5 me-2 flex"
             v-for="(itemZ, index) in dashboardPanelData.data.queries[
               dashboardPanelData.layout.currentQueryIndex
             ].fields?.z"

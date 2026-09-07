@@ -208,20 +208,36 @@ pub static SQL_SECONDARY_INDEX_SEARCH_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
     fields
 });
 
+const _DEFAULT_QUICK_MODE_FIELDS: [&str; 9] = [
+    // Losing these silently degrades sourcemap translation, breadcrumbs and session replay.
+    "service",
+    "version",
+    "session_id",
+    "view_url",
+    // Losing these leaves the trace detail page without spans to build a waterfall from.
+    "service_name",
+    "operation_name",
+    "trace_id",
+    "span_id",
+    "duration",
+];
 pub static QUICK_MODEL_FIELDS: Lazy<Vec<String>> = Lazy::new(|| {
-    let mut fields = get_config()
-        .common
-        .feature_quick_mode_fields
-        .split(',')
-        .filter_map(|s| {
-            let s = s.trim();
-            if s.is_empty() {
-                None
-            } else {
-                Some(s.to_string())
-            }
-        })
-        .collect::<Vec<_>>();
+    let mut fields = chain(
+        _DEFAULT_QUICK_MODE_FIELDS.iter().map(|s| s.to_string()),
+        get_config()
+            .common
+            .feature_quick_mode_fields
+            .split(',')
+            .filter_map(|s| {
+                let s = s.trim();
+                if s.is_empty() {
+                    None
+                } else {
+                    Some(s.to_string())
+                }
+            }),
+    )
+    .collect::<Vec<_>>();
     fields.sort();
     fields.dedup();
     fields
@@ -1528,9 +1544,15 @@ pub struct Search {
     #[env_config(
         name = "ZO_FEATURE_METRICS_FUSED_AGG_ENABLED",
         default = true,
-        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output; disable to fall back to the generic evaluator"
+        help = "Fold PromQL agg(range_func(...)) queries incrementally instead of materializing the range function output"
     )]
     pub feature_metrics_fused_agg_enabled: bool,
+    #[env_config(
+        name = "ZO_FEATURE_METRICS_STREAMING_AGG_ENABLED",
+        default = true,
+        help = "Evaluate fused PromQL agg(range_func(...)) queries as a stream over hash-sorted metrics files, series by series"
+    )]
+    pub feature_metrics_streaming_agg_enabled: bool,
     #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
@@ -1737,7 +1759,11 @@ pub struct Common {
         help = "Comma-separated fields to build bloom filter on for all streams, replaces the deprecated ZO_BLOOM_FILTER_DEFAULT_FIELDS"
     )]
     pub feature_bloom_filter_extra_fields: String,
-    #[env_config(name = "ZO_FEATURE_QUICK_MODE_FIELDS", default = "")]
+    #[env_config(
+        name = "ZO_FEATURE_QUICK_MODE_FIELDS",
+        default = "",
+        help = "Comma-separated extra fields quick mode always returns when the stream has them, on top of the built-in defaults"
+    )]
     pub feature_quick_mode_fields: String,
     #[env_config(name = "ZO_FEATURE_QUERY_QUEUE_ENABLED", default = true)]
     pub feature_query_queue_enabled: bool,
@@ -2175,6 +2201,9 @@ pub struct Limit {
     pub disk_free: usize,
     #[env_config(name = "ZO_PAYLOAD_LIMIT", default = 209715200)]
     pub req_payload_limit: usize,
+    #[env_config(name = "ZO_JS_FUNCTION_MAX_EXECUTION_TIME_SECS", default = 5)]
+    // 0 falls back to default
+    pub js_function_max_execution_time_secs: u64,
     #[env_config(name = "ZO_MAX_FILE_RETENTION_TIME", default = 600)] // seconds
     pub max_file_retention_time: u64,
     // MB, per log file size limit on disk

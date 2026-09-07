@@ -20,7 +20,7 @@
       <!-- max-md:basis-full: the controls alone fill a phone row, so the title
            takes its own row rather than truncating to a couple of characters. -->
       <div
-        class="mr-3 flex min-w-0 flex-1 items-center text-xl tracking-[0.005em] max-md:mr-0 max-md:basis-full"
+        class="me-3 flex min-w-0 flex-1 items-center text-xl tracking-[0.005em] max-md:me-0 max-md:basis-full"
       >
         <!-- truncate, not wrap: a long panel name would otherwise grow the header
              to two lines and leave the controls floating beside a ragged block. -->
@@ -32,7 +32,7 @@
           {{ dashboardPanelData.data.title }}
         </span>
       </div>
-      <div class="flex shrink-0 items-center gap-2 max-md:ml-auto">
+      <div class="flex shrink-0 items-center gap-2 max-md:ms-auto">
         <!-- histogram interval for sql queries -->
         <HistogramIntervalDropDown
           v-if="!promqlMode && histogramFields.length"
@@ -111,7 +111,7 @@
               />
               <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div
-                  class="mr-2 flex shrink-0 items-center justify-end"
+                  class="me-2 flex shrink-0 items-center justify-end"
                   data-test="view-panel-last-refreshed-at"
                 >
                   <!-- Error/Warning tooltips -->

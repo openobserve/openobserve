@@ -82,58 +82,97 @@
       >
         {{ message.content }}
       </div>
-      <!-- Inline, beside the field. It shifts this row's textarea right of the
-           other rows' — accepted deliberately: the pairing of tool to response
-           reads better than a straight column of inputs. -->
-      <OSelect
-        v-if="message.role === 'tool' && !message.readonly"
-        class="mt-0.5"
-        :model-value="message.toolName ?? ''"
-        :options="toolOptions"
-        :placeholder="t('aiObservability.playground.messageToolPlaceholder')"
-        size="md"
-        width="sm"
-        searchable
-        :data-test="`ai-playground-message-tool-${message.id}`"
-        @update:model-value="(value: unknown) => emit('set-tool', message.id, String(value ?? ''))"
-      />
-
-      <div v-if="!message.readonly" class="relative min-w-0 flex-1">
-        <OTextarea
-          :model-value="message.content"
-          :placeholder="
-            t('aiObservability.playground.messagePlaceholder', { role: roleLabel(message.role) })
-          "
-          :rows="1"
-          :max-rows="5"
-          size="sm"
-          autogrow
-          :data-test="`ai-playground-message-input-${message.id}`"
-          @update:model-value="(value: string) => onInput(message.id, value)"
-          @focus="onFocus(message.id, $event)"
-          @blur="closeSuggest"
-          @keydown="onKeydown(message.id, $event)"
-        />
-
-        <!-- Typing `{{` is the moment someone is reaching for a variable, so
-             that is where the list belongs — not behind a menu they would have
-             to know exists. -->
+      <div
+        v-if="!message.readonly"
+        class="min-w-0 flex-1"
+        :class="
+          message.role === 'tool'
+            ? 'grid grid-cols-1 gap-1.5 @min-[28rem]/variant:grid-cols-[minmax(7.5rem,12.5rem)_minmax(0,1fr)]'
+            : ''
+        "
+        :data-test="
+          message.role === 'tool' ? `ai-playground-message-tool-editor-${message.id}` : undefined
+        "
+      >
+        <!-- Tool metadata shares a compact header. The result gets the full
+             content width below it instead of collapsing into a third column. -->
         <div
-          v-if="suggest?.messageId === message.id && matches.length"
-          class="bg-dropdown-bg border-dropdown-border rounded-default absolute top-full left-0 z-10 mt-1 w-56 border p-1 shadow-md"
-          :data-test="`ai-playground-var-suggest-${message.id}`"
+          v-if="message.role === 'tool'"
+          class="contents"
+          :data-test="`ai-playground-message-tool-metadata-${message.id}`"
         >
-          <button
-            v-for="(name, index) in matches"
-            :key="name"
-            type="button"
-            class="rounded-default text-dropdown-item-text flex w-full cursor-pointer items-center px-2 py-1 text-left font-mono text-xs"
-            :class="index === activeIndex ? 'bg-dropdown-item-hover-bg' : ''"
-            :data-test="`ai-playground-var-suggest-item-${name}`"
-            @mousedown.prevent="accept(message.id, name)"
+          <OSelect
+            class="min-w-0"
+            :model-value="message.toolName ?? ''"
+            :options="toolOptions"
+            :placeholder="t('aiObservability.playground.messageToolPlaceholder')"
+            size="md"
+            width="full"
+            searchable
+            :data-test="`ai-playground-message-tool-${message.id}`"
+            @update:model-value="
+              (value: unknown) => emit('set-tool', message.id, String(value ?? ''))
+            "
+          />
+
+          <OTextarea
+            class="min-w-0"
+            :model-value="message.toolArguments ?? '{}'"
+            :placeholder="t('aiObservability.playground.toolArgumentsPlaceholder')"
+            :rows="1"
+            :max-rows="5"
+            size="sm"
+            width="full"
+            autogrow
+            :data-test="`ai-playground-message-tool-arguments-${message.id}`"
+            @update:model-value="(value: string) => emit('set-tool-arguments', message.id, value)"
+          />
+        </div>
+
+        <div
+          class="relative min-w-0"
+          :class="message.role === 'tool' ? '@min-[28rem]/variant:col-span-2' : ''"
+        >
+          <OTextarea
+            :model-value="message.content"
+            :placeholder="
+              message.role === 'tool'
+                ? t('aiObservability.playground.toolResultPlaceholder')
+                : t('aiObservability.playground.messagePlaceholder', {
+                    role: roleLabel(message.role),
+                  })
+            "
+            :rows="1"
+            :max-rows="5"
+            size="sm"
+            autogrow
+            :data-test="`ai-playground-message-input-${message.id}`"
+            @update:model-value="(value: string) => onInput(message.id, value)"
+            @focus="onFocus(message.id, $event)"
+            @blur="closeSuggest"
+            @keydown="onKeydown(message.id, $event)"
+          />
+
+          <!-- Typing `{{` is the moment someone is reaching for a variable, so
+               that is where the list belongs — not behind a menu they would have
+               to know exists. -->
+          <div
+            v-if="suggest?.messageId === message.id && matches.length"
+            class="bg-dropdown-bg border-dropdown-border rounded-default absolute top-full left-0 z-10 mt-1 w-56 border p-1 shadow-md"
+            :data-test="`ai-playground-var-suggest-${message.id}`"
           >
-            {{ tokenFor(name) }}
-          </button>
+            <button
+              v-for="(name, index) in matches"
+              :key="name"
+              type="button"
+              class="rounded-default text-dropdown-item-text flex w-full cursor-pointer items-center px-2 py-1 text-left font-mono text-xs"
+              :class="index === activeIndex ? 'bg-dropdown-item-hover-bg' : ''"
+              :data-test="`ai-playground-var-suggest-item-${name}`"
+              @mousedown.prevent="accept(message.id, name)"
+            >
+              {{ tokenFor(name) }}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -228,6 +267,8 @@ const emit = defineEmits<{
   add: [role: PlaygroundRole];
   /** Which tool a `tool`-role message answers. */
   "set-tool": [messageId: string, toolName: string];
+  /** JSON arguments sent to that tool. */
+  "set-tool-arguments": [messageId: string, toolArguments: string];
   /** Retype a message in place, keeping whatever was written in it. */
   "set-role": [messageId: string, role: PlaygroundRole];
   move: [from: number, to: number];

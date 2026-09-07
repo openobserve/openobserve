@@ -1154,7 +1154,7 @@ defineExpose({
         <slot name="toolbar" />
         <!-- Grouped so that when the mobile toolbar wraps, the controls land
              right-aligned on their row instead of ragged bottom-left. -->
-        <div class="flex shrink-0 items-center gap-2 max-md:ml-auto">
+        <div class="flex shrink-0 items-center gap-2 max-md:ms-auto">
           <OTableColumnToggle
             v-if="
               props.persistColumns &&
@@ -1191,7 +1191,7 @@ defineExpose({
             :value="globalFilterLocal"
             type="text"
             :placeholder="props.globalFilterPlaceholder ?? t('common.searchEllipsis')"
-            class="text-primary placeholder-text-disabled w-full border-none bg-transparent py-1 pr-2 pl-7 text-sm outline-none"
+            class="text-primary placeholder-text-disabled w-full border-none bg-transparent py-1 ps-7 pe-2 text-sm outline-none"
             data-test="o2-table-global-filter-input"
             @input="handleGlobalFilterChange(($event.target as HTMLInputElement).value)"
           />

@@ -6,6 +6,12 @@ Automated PR review that posts a single consolidated comment on every pull reque
 The posted comment is branded **OpenObserve Code Reviewer**. Branding is *cosmetic + identity
 only* — it does not change what the reviewer finds or decides.
 
+The posted comment never names the model or provider behind the review — the heading carries no
+model label, the comment marker is provider-neutral, and `redactProviderIdentity` in
+`run-review.mjs` strips the provider/model ids out of anything on its way to the PR (a model
+naming itself, or an upstream error echoing the slug). Naming the model in this repo and in the
+Actions logs is fine; naming it in the comment is not.
+
 ## How it works (one paragraph)
 
 On each PR the workflow fetches the diff, filters noise, picks a risk tier (`trivial` / `lite` /

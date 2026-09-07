@@ -103,14 +103,14 @@ function toggle(browserId: string, deviceId: string) {
     data-test="synthetics-check-browser-devices"
   >
     <div class="border-border-default flex items-center border-b px-3 py-2.5">
-      <div class="rounded-default bg-accent mr-2 h-4 w-[0.1875rem] shrink-0" />
+      <div class="rounded-default bg-accent me-2 h-4 w-[0.1875rem] shrink-0" />
       <h3 class="text-text-heading text-base font-semibold">
         {{ t("synthetics.browserDevices.title") }}
       </h3>
     </div>
     <div class="flex flex-col gap-3 px-3 py-2">
       <!-- Device column headers -->
-      <div class="flex items-center gap-10 pb-2 pl-36">
+      <div class="flex items-center gap-10 ps-36 pb-2">
         <div
           v-for="device in activeDevices"
           :key="device.id"

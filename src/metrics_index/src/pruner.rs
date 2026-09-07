@@ -253,7 +253,7 @@ pub(super) fn residual_matchers_covered(
     matcher_labels: &[String],
 ) -> bool {
     matchers.matchers.iter().all(|matcher| {
-        !promql::utils::matcher_is_residual(table_schema, matcher)
+        promql::utils::matcher_residual_field(table_schema, matcher).is_none()
             || matcher_labels.contains(&matcher.name)
     })
 }

@@ -18,10 +18,6 @@ vi.mock("@/types/i18n", async () => {
   };
 });
 
-const OBanner = {
-  props: ["variant", "dense", "content", "icon", "inlineActions"],
-  template: '<div class="o-banner" :data-variant="variant" :data-content="content"><slot /></div>',
-};
 const OButton = {
   props: ["variant", "size", "iconLeft", "title"],
   emits: ["click"],
@@ -31,11 +27,15 @@ const OTag = {
   props: ["variant", "size", "label"],
   template: '<span class="o-tag" :data-label="label" />',
 };
+const OBanner = {
+  props: ["variant", "dense", "preserveWhitespace"],
+  template: '<div v-bind="$attrs"><slot /></div>',
+};
 
 function mountCell(cell: PlaygroundCell | undefined, props: Record<string, unknown> = {}) {
   return mount(PlaygroundOutputCell, {
     props: { cell, ...props },
-    global: { stubs: { OBanner, OButton, OTag } },
+    global: { stubs: { OButton, OTag, OBanner } },
   });
 }
 
@@ -134,16 +134,17 @@ describe("PlaygroundOutputCell", () => {
       error: { message: "provider 429", retryable: true },
     });
 
-    expect(
-      wrapper.find('[data-test="ai-playground-output-error"]').attributes("data-content"),
-    ).toBe("provider 429");
+    expect(wrapper.find('[data-test="ai-playground-output-error"]').text()).toBe("provider 429");
     await wrapper.find('[data-test="ai-playground-output-retry"]').trigger("click");
     expect(wrapper.emitted("retry")).toHaveLength(1);
   });
 
   it("renders a tool call as the output, with no answer text", () => {
     const wrapper = mountCell(
-      doneCell({ text: "", toolCall: { name: "lookup_order", arguments: '{ "id": 1 }' } }),
+      doneCell({
+        text: "",
+        toolCall: { id: "call_1", name: "lookup_order", arguments: '{ "id": 1 }' },
+      }),
     );
     const call = wrapper.find('[data-test="ai-playground-output-tool-call"]');
 

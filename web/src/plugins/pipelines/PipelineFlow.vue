@@ -20,9 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div
       data-test="pipeline-flow-unsaved-changes-warning-text"
       v-show="pipelineObj.dirtyFlag"
-      class="text-status-warning-text border-status-warning-text rounded-default mr-3 flex items-center border px-2"
+      class="text-status-warning-text border-status-warning-text rounded-default me-3 flex items-center border px-2"
     >
-      <OIcon name="info" class="mr-1" size="sm" />
+      <OIcon name="info" class="me-1" size="sm" />
       {{ t("pipeline.unsavedChangesDetected") }}
     </div>
 
@@ -31,7 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-if="showEdgeHelpNotification"
       class="edge-help-notification bg-surface-base text-text-body rounded-default border-border-default absolute top-5 left-1/2 z-1000 flex -translate-x-1/2 items-center border px-4 py-2.5 text-sm shadow-lg dark:shadow-lg"
     >
-      <OIcon name="info" class="mr-1" size="sm" />
+      <OIcon name="info" class="me-1" size="sm" />
       {{ t("pipeline.edgeDeleteHint") }}
     </div>
   </div>

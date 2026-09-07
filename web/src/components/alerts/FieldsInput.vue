@@ -48,7 +48,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex items-end justify-start gap-2 pb-2"
           :data-test="`alert-conditions-${index + 1}`"
         >
-          <div class="o2-input ml-0">
+          <div class="o2-input ms-0">
             <OFormSelect
               :name="`${namePrefix}[${index}].column`"
               :options="props.streamFields"
@@ -60,7 +60,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @create="(val: string) => setRowColumn(index, val)"
             />
           </div>
-          <div class="o2-input ml-0">
+          <div class="o2-input ms-0">
             <OFormSelect
               :name="`${namePrefix}[${index}].operator`"
               :options="triggerOperators"
@@ -69,7 +69,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-conditions-operator-select"
             />
           </div>
-          <div class="o2-input ml-0 flex items-end">
+          <div class="o2-input ms-0 flex items-end">
             <OFormInput
               :name="`${namePrefix}[${index}].value`"
               :placeholder="t('common.value')"
@@ -78,10 +78,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               data-test="alert-conditions-value-input"
             />
           </div>
-          <div class="alerts-condition-action mb-3 ml-0">
+          <div class="alerts-condition-action ms-0 mb-3">
             <OButton
               data-test="alert-conditions-delete-condition-btn"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-circle-sm"
               :title="t('alert_templates.edit')"
@@ -92,7 +92,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="alert-conditions-add-condition-btn"
               v-if="index === formRows.length - 1"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-circle-sm"
               :title="t('alert_templates.edit')"
@@ -130,7 +130,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           class="flex items-end justify-start gap-2 pb-2"
           :data-test="`alert-conditions-${index + 1}`"
         >
-          <div class="o2-input ml-0">
+          <div class="o2-input ms-0">
             <OSelect
               v-model="field.column"
               :options="props.streamFields"
@@ -156,7 +156,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             />
           </div>
-          <div class="o2-input ml-0">
+          <div class="o2-input ms-0">
             <OSelect
               v-model="field.operator"
               :options="triggerOperators"
@@ -174,7 +174,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             />
           </div>
-          <div class="o2-input ml-0 flex items-end">
+          <div class="o2-input ms-0 flex items-end">
             <OInput
               v-model="field.value"
               :placeholder="t('common.value')"
@@ -192,10 +192,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               "
             />
           </div>
-          <div class="alerts-condition-action mb-3 ml-0">
+          <div class="alerts-condition-action ms-0 mb-3">
             <OButton
               data-test="alert-conditions-delete-condition-btn"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-circle-sm"
               :title="t('alert_templates.edit')"
@@ -206,7 +206,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OButton
               data-test="alert-conditions-add-condition-btn"
               v-if="index === fields.length - 1"
-              class="ml-1"
+              class="ms-1"
               variant="ghost"
               size="icon-circle-sm"
               :title="t('alert_templates.edit')"

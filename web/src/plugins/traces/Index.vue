@@ -114,7 +114,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 class="h-full w-full"
               >
                 <template #before>
-                  <div class="border-border-default bg-surface-panel h-full border-r">
+                  <div class="border-border-default bg-surface-panel h-full border-e">
                     <!-- < md the field list moves into a drawer (see below). -->
                     <IndexList
                       v-show="searchObj.meta.showFields && !isMobile"

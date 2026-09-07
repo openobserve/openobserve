@@ -5,7 +5,7 @@ OpenObserve stream, so we can build performance/reliability dashboards on top of
 
 | Workflow | Repo | Stream | Emitting job |
 |---|---|---|---|
-| Playwright Regression (`playwright_regression.yml`) | openobserve (OSS) | `ci_regression` | `report_to_openobserve` |
+| Playwright Bug-Fix Regression (`playwright_bugfix_regression.yml`) | openobserve (OSS) | `ci_regression` | `report_to_openobserve` |
 | DocGen engine (`docgen.yml`) | o2-enterprise | `ci_docgen` | `report_metrics` |
 | E2E Council engine (`e2e-council.yml`) | o2-enterprise | `ci_council` | `report_metrics` |
 
@@ -59,7 +59,8 @@ The PAT used by the engine report jobs for cross-repo PR-URL lookups is the exis
 
 ### `ci_regression`
 `branch`, `conclusion` (success/failure), `build_result`, `ui_result`, `merge_result`,
-`build_duration_sec`, `shards_total`, `shards_passed`, `shards_failed`,
+`build_duration_sec` (null when an existing runtime is reused),
+`runtime_ready_duration_sec`, `shards_total`, `shards_passed`, `shards_failed`,
 `shards[]` (`{name, conclusion, duration_sec}` per matrix shard),
 `tests_total`, `tests_passed`, `tests_failed`, `tests_flaky`, `tests_skipped`.
 
@@ -101,7 +102,9 @@ FROM ci_regression GROUP BY day ORDER BY day;
 
 **Regression — slowest shards (avg duration)** — unnest `shards` or query the flattened field.
 ```sql
-SELECT avg(build_duration_sec) AS avg_build_sec, avg(duration_sec) AS avg_wallclock_sec,
+SELECT avg(build_duration_sec) AS avg_build_sec,
+       avg(runtime_ready_duration_sec) AS avg_runtime_ready_sec,
+       avg(duration_sec) AS avg_wallclock_sec,
        avg(runner_seconds) AS avg_runner_sec
 FROM ci_regression;
 ```

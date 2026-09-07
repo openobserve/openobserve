@@ -491,7 +491,7 @@ function onChildMouseenter(event: MouseEvent) {
       :data-test="`nav-group-inline-${groupKey}`"
       role="menu"
       :aria-label="title"
-      class="border-border-default mt-0.5 mb-1 ml-3 flex flex-col gap-0.5 border-l pl-2"
+      class="border-border-default ms-3 mt-0.5 mb-1 flex flex-col gap-0.5 border-s ps-2"
     >
       <template v-for="block in flyoutBlocks" :key="`inline-${block.key}`">
         <div

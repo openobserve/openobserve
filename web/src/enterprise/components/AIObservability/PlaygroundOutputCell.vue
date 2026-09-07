@@ -25,12 +25,9 @@
 
     <!-- error -->
     <template v-else-if="cell.status === 'error'">
-      <OBanner
-        variant="error"
-        dense
-        :content="raw(cell.error?.message)"
-        data-test="ai-playground-output-error"
-      />
+      <OBanner variant="error" dense preserve-whitespace data-test="ai-playground-output-error">
+        {{ raw(cell.error?.message) }}
+      </OBanner>
       <div>
         <OButton
           variant="outline"
@@ -74,7 +71,7 @@
         {{ cell.text
         }}<span
           v-if="cell.status === 'streaming'"
-          class="bg-accent ml-0.5 inline-block h-3 w-1.5 animate-pulse align-text-bottom"
+          class="bg-accent ms-0.5 inline-block h-3 w-1.5 animate-pulse align-text-bottom"
         />
       </div>
     </template>

@@ -183,6 +183,39 @@ export interface ExperimentRowDetail {
   scoreSummaries: ExperimentScoreSummary[];
 }
 
+export type ExperimentResultRowSort = "dataset" | "dispersion_desc";
+
+export interface ExperimentResultRow {
+  rowIndex: number;
+  rowId: string;
+  logicalId: string;
+  input: unknown;
+  expectedOutput: unknown | null;
+  trialCount: number;
+  status: ExperimentSlotStatus;
+  output: unknown | null;
+  scoreSummaries: ExperimentScoreSummary[];
+  p50LatencyMs: number | null;
+  dispersion: ExperimentRowDispersion | null;
+}
+
+export interface ExperimentResultRowPage {
+  rows: ExperimentResultRow[];
+  pagination: {
+    page: number;
+    pageSize: number;
+    totalRows: number;
+    hasMore: boolean;
+  };
+}
+
+export interface ExperimentResultRowPageOptions {
+  page?: number;
+  pageSize?: number;
+  sort?: ExperimentResultRowSort;
+  highDispersionOnly?: boolean;
+}
+
 export interface ExperimentRowDispersion {
   rowId: string;
   logicalId: string;
@@ -218,7 +251,12 @@ export interface ExperimentResultScore {
   score: Record<string, unknown> | null;
 }
 
+export type ExperimentSlotStatus =
+  "pending" | "running" | "scoring" | "completed" | "skipped" | "task_failed" | "score_failed";
+
 export interface ExperimentResultSlot extends ExperimentSlot {
+  /** Single lifecycle rollup of task and score evidence — the list-surface field. */
+  status: ExperimentSlotStatus;
   taskStatus: "pending" | "in_progress" | "ok" | "skipped" | "error";
   execution: ExperimentExecution | null;
   scores: ExperimentResultScore[];
@@ -237,6 +275,7 @@ export interface ExperimentAggregateSummary {
   incomplete: boolean;
   incompleteTaskSlots: number;
   incompleteScoreDimensions: number;
+  errorTaskSlots: number;
 }
 
 export interface ExperimentProgress {
@@ -357,6 +396,29 @@ export interface ExperimentResultQuery {
 
 const TASK_RESULT_STATUSES = ["pending", "in_progress", "ok", "skipped", "error"] as const;
 const SCORE_RESULT_STATUSES = ["pending", "in_progress", "success", "skipped", "error"] as const;
+const SLOT_STATUSES = [
+  "pending",
+  "running",
+  "scoring",
+  "completed",
+  "skipped",
+  "task_failed",
+  "score_failed",
+] as const;
+
+// Mirrors the server rollup so a response predating the field still gets one.
+function deriveSlotStatus(
+  taskStatus: ExperimentResultSlot["taskStatus"],
+  scores: ExperimentResultScore[],
+): ExperimentSlotStatus {
+  if (taskStatus === "pending") return "pending";
+  if (taskStatus === "in_progress") return "running";
+  if (taskStatus === "error") return "task_failed";
+  if (taskStatus === "skipped") return "skipped";
+  if (scores.some((s) => s.status === "pending" || s.status === "in_progress")) return "scoring";
+  if (scores.some((s) => s.status === "error")) return "score_failed";
+  return "completed";
+}
 
 function normalizeTaskResultStatus(input: unknown): ExperimentResultSlot["taskStatus"] {
   return TASK_RESULT_STATUSES.includes(input as (typeof TASK_RESULT_STATUSES)[number])
@@ -485,13 +547,9 @@ function normalizeResults(input: any): ExperimentResults {
   const aggregateSummary = value<any>(input, "aggregateSummary", "aggregate_summary", {});
   const dispersionSummary = value<any>(input, "dispersionSummary", "dispersion_summary", {});
   return {
-    rowDispersions: value<any[]>(input, "rowDispersions", "row_dispersions", []).map((row) => ({
-      rowId: String(value(row, "rowId", "row_id", "")),
-      logicalId: String(value(row, "logicalId", "logical_id", "")),
-      maxNormalized: numberOrNull(value(row, "maxNormalized", "max_normalized", null)),
-      high: Boolean(row?.high),
-      outlierTrialIndex: numberOrNull(value(row, "outlierTrialIndex", "outlier_trial_index", null)),
-    })),
+    rowDispersions: value<any[]>(input, "rowDispersions", "row_dispersions", []).map(
+      normalizeRowDispersion,
+    ),
     dispersionSummary: {
       highDispersionRowCount: Number(
         value(dispersionSummary, "highDispersionRowCount", "high_dispersion_row_count", 0),
@@ -533,6 +591,7 @@ function normalizeResults(input: any): ExperimentResults {
       incompleteScoreDimensions: Number(
         value(aggregateSummary, "incompleteScoreDimensions", "incomplete_score_dimensions", 0),
       ),
+      errorTaskSlots: Number(value(aggregateSummary, "errorTaskSlots", "error_task_slots", 0)),
     },
   };
 }
@@ -558,20 +617,26 @@ function normalizeExecution(record: any): ExperimentExecution {
 }
 
 function normalizeResultSlot(slot: any): ExperimentResultSlot {
+  const taskStatus = normalizeTaskResultStatus(value(slot, "taskStatus", "task_status", "pending"));
+  const scores: ExperimentResultScore[] = (slot.scores ?? []).map((score: any) => ({
+    scorerId: value(score, "scorerId", "scorer_id", ""),
+    scorerVersion: Number(value(score, "scorerVersion", "scorer_version", 0)),
+    status: normalizeScoreResultStatus(score.status ?? "pending"),
+    score: score.score ?? null,
+  }));
+  const status = SLOT_STATUSES.includes(slot.status)
+    ? (slot.status as ExperimentSlotStatus)
+    : deriveSlotStatus(taskStatus, scores);
   return {
     rowId: value(slot, "rowId", "row_id", ""),
     logicalId: value(slot, "logicalId", "logical_id", ""),
     trialIndex: Number(value(slot, "trialIndex", "trial_index", 0)),
     input: slot.input,
     expectedOutput: value(slot, "expectedOutput", "expected_output", null),
-    taskStatus: normalizeTaskResultStatus(value(slot, "taskStatus", "task_status", "pending")),
+    status,
+    taskStatus,
     execution: slot.execution ? normalizeExecution(slot.execution) : null,
-    scores: (slot.scores ?? []).map((score: any) => ({
-      scorerId: value(score, "scorerId", "scorer_id", ""),
-      scorerVersion: Number(value(score, "scorerVersion", "scorer_version", 0)),
-      status: normalizeScoreResultStatus(score.status ?? "pending"),
-      score: score.score ?? null,
-    })),
+    scores,
   };
 }
 
@@ -592,6 +657,43 @@ function normalizeScoreSummary(summary: any): ExperimentScoreSummary {
     noTraceCount: Number(value(summary, "noTraceCount", "no_trace_count", 0)),
     skippedCount: Number(value(summary, "skippedCount", "skipped_count", 0)),
     value: summary.value ?? null,
+  };
+}
+
+function normalizeRowDispersion(row: any): ExperimentRowDispersion {
+  return {
+    rowId: String(value(row, "rowId", "row_id", "")),
+    logicalId: String(value(row, "logicalId", "logical_id", "")),
+    maxNormalized: numberOrNull(value(row, "maxNormalized", "max_normalized", null)),
+    high: Boolean(row?.high),
+    outlierTrialIndex: numberOrNull(value(row, "outlierTrialIndex", "outlier_trial_index", null)),
+  };
+}
+
+export function normalizeExperimentResultRowPage(input: any): ExperimentResultRowPage {
+  const pagination = input?.pagination ?? {};
+  return {
+    rows: (input?.rows ?? []).map((row: any) => ({
+      rowIndex: Number(value(row, "rowIndex", "row_index", 0)),
+      rowId: String(value(row, "rowId", "row_id", "")),
+      logicalId: String(value(row, "logicalId", "logical_id", "")),
+      input: row?.input,
+      expectedOutput: value(row, "expectedOutput", "expected_output", null),
+      trialCount: Number(value(row, "trialCount", "trial_count", 0)),
+      status: row?.status as ExperimentSlotStatus,
+      output: row?.output ?? null,
+      scoreSummaries: value<any[]>(row, "scoreSummaries", "score_summaries", []).map(
+        normalizeScoreSummary,
+      ),
+      p50LatencyMs: numberOrNull(value(row, "p50LatencyMs", "p50_latency_ms", null)),
+      dispersion: row?.dispersion ? normalizeRowDispersion(row.dispersion) : null,
+    })),
+    pagination: {
+      page: Number(pagination.page ?? 1),
+      pageSize: Number(value(pagination, "pageSize", "page_size", 50)),
+      totalRows: Number(value(pagination, "totalRows", "total_rows", 0)),
+      hasMore: Boolean(value(pagination, "hasMore", "has_more", false)),
+    },
   };
 }
 
@@ -778,6 +880,17 @@ const llmExperimentsService = {
       `${base(orgId)}/${experimentId}/rows/${encodeURIComponent(rowId)}`,
     );
     return normalizeExperimentRowDetail(response.data);
+  },
+
+  async listRows(
+    orgId: string,
+    experimentId: string,
+    options: ExperimentResultRowPageOptions = {},
+  ): Promise<ExperimentResultRowPage> {
+    const response = await http().get(`${base(orgId)}/${experimentId}/rows`, {
+      params: options,
+    });
+    return normalizeExperimentResultRowPage(response.data);
   },
 
   async retry(orgId: string, experimentId: string): Promise<LlmExperiment> {

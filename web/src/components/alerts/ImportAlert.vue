@@ -77,7 +77,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- Output Section with Alert-specific Error Display -->
     <template #output-content>
       <div
-        class="border-border-default flex h-full w-full min-w-100 flex-col border-l max-md:min-w-0"
+        class="border-border-default flex h-full w-full min-w-100 flex-col border-s max-md:min-w-0"
       >
         <div
           v-if="alertErrorsToDisplay.length > 0"

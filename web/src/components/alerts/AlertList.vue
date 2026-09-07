@@ -194,7 +194,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                         <OToggleGroup
                           :model-value="searchAcrossFolders ? 'all' : 'this'"
                           type="single"
-                          class="mr-1 self-center"
+                          class="me-1 self-center"
                           @update:model-value="(v) => (searchAcrossFolders = v === 'all')"
                         >
                           <OToggleGroupItem
@@ -500,7 +500,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     data-test="alert-list-loading-alert"
                     v-if="alertStateLoadingMap[row.uuid]"
                     style="display: inline-block; width: 2.07125rem; height: auto"
-                    class="ml-1 flex items-center justify-center max-md:hidden"
+                    class="ms-1 flex items-center justify-center max-md:hidden"
                     :title="row.enabled ? t('common.turningOff') : t('common.turningOn')"
                   >
                     <OSpinner size="xs" />
@@ -509,7 +509,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                     v-else
                     :data-row-action="row.enabled ? 'pause' : 'resume'"
                     :data-test="`alert-list-${row.name}-pause-start-alert`"
-                    class="ml-1 max-md:hidden"
+                    class="ms-1 max-md:hidden"
                     :variant="row.enabled ? 'ghost-destructive' : 'ghost-success'"
                     size="icon-sm"
                     :icon-left="row.enabled ? 'pause' : 'play-arrow'"

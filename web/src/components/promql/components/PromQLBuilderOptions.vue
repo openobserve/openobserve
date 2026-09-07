@@ -4,18 +4,18 @@
 
     <!-- Options Row: Query Type Tabs + Legend + Step Value -->
     <div>
-      <div class="flex flex-row items-center pl-2">
+      <div class="flex flex-row items-center ps-2">
         <div
           data-test="promql-builder-options-label"
           class="flex min-w-24 items-center whitespace-nowrap"
         >
           <span
-            class="rounded-default bg-text-secondary mr-1.5 h-2 w-2 shrink-0"
+            class="rounded-default bg-text-secondary me-1.5 h-2 w-2 shrink-0"
             aria-hidden="true"
           ></span>
           {{ t("panel.options") }}
         </div>
-        <span class="mr-0.5 ml-0.5 flex items-center">:</span>
+        <span class="ms-0.5 me-0.5 flex items-center">:</span>
         <div
           data-test="promql-builder-options-axis-container"
           class="mx-1.25 my-0.5 flex flex-wrap items-center gap-2"
@@ -24,7 +24,7 @@
           <!-- < md the legend field takes its own full row; the input flexes. -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="ml-2.5 flex flex-row items-center gap-2 max-md:ml-0 max-md:w-full"
+            class="ms-2.5 flex flex-row items-center gap-2 max-md:ms-0 max-md:w-full"
           >
             <span
               data-test="promql-builder-options-field-label"
@@ -70,7 +70,7 @@
           <!-- Step Value -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="ml-2.5 flex flex-row items-center gap-2 max-md:ml-0"
+            class="ms-2.5 flex flex-row items-center gap-2 max-md:ms-0"
           >
             <span
               data-test="promql-builder-options-field-label"
@@ -113,7 +113,7 @@
           <!-- Query Type Select (Range/Instant) -->
           <div
             data-test="promql-builder-options-field-wrapper"
-            class="ml-2.5 flex flex-row items-center gap-2 max-md:ml-0"
+            class="ms-2.5 flex flex-row items-center gap-2 max-md:ms-0"
           >
             <span
               data-test="promql-builder-options-field-label"

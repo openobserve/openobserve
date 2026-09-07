@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 // State is a module-level reactive singleton (same pattern as pipelineObj) so
 // the editor, canvas, nodes and node-forms all share one object.
 
-import { reactive } from "vue";
+import { computed, reactive, ref } from "vue";
 import { isEqual } from "lodash-es";
 import { useVueFlow } from "@vue-flow/core";
 import { getUUID, getImageURL } from "@/utils/zincutils";
@@ -38,9 +38,10 @@ import type { IconName } from "@/lib/core/Icon/OIcon.icons";
 import { detectCycle } from "@/composables/flow/detectCycle";
 import { makeEdge } from "@/composables/flow/makeEdge";
 import { getTruncatedConditions } from "@/utils/conditionPreview";
-import { DEFAULT_TRIGGER_KIND } from "./triggers";
+import { convertV0ToV2, convertV1BEToV2, convertV1ToV2 } from "@/utils/alerts/alertDataTransforms";
+import { DEFAULT_TRIGGER_KIND, triggerTypeForKind } from "./triggers";
 import workflowService from "@/services/workflows";
-import type { I18nKey } from "@/types/i18n";
+import { raw, type I18nKey, type I18nText } from "@/types/i18n";
 import type { TranslateFn } from "@/types/i18n";
 
 export type WorkflowNodeCategory = "trigger" | "logic" | "action";
@@ -94,6 +95,16 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
     image: getImageURL("images/pipeline/transform_condition.png"),
     ioType: "default",
   },
+  // Fan-out: one input, one output handle per arm (see branchHandles).
+  branch: {
+    category: "logic",
+    kindKey: "workflow.node.kindLogic",
+    titleKey: "workflow.node.branch",
+    descKey: "workflow.node.branchDesc",
+    icon: "fork-right",
+    image: getImageURL("images/pipeline/transform_condition.png"),
+    ioType: "default",
+  },
   function: {
     category: "logic",
     kindKey: "workflow.node.kindLogic",
@@ -118,9 +129,250 @@ export const WORKFLOW_NODE_TYPES: Record<string, WorkflowNodeMeta> = {
 export const nodeMeta = (nodeType: string): WorkflowNodeMeta | undefined =>
   WORKFLOW_NODE_TYPES[nodeType];
 
+// One handle per configured case plus terminal `else`; other node types return [].
+// The STORED handle wins: deleting or reordering a path never re-indexes the
+// survivors, so deriving it from the array position would rename a live handle and
+// condemn the edge still wired to it as unroutable.
+export const branchHandles = (node: any): string[] => {
+  if (node?.data?.node_type !== "branch") return [];
+  const cases = node?.data?.cases;
+  // No legacy true/false fallback: those arms can never be declared, so every edge wired on them died at publish.
+  if (!Array.isArray(cases) || !cases.length) return [];
+  return [...cases.map((c: any, i: number) => c?.handle || `case-${i}`), "else"];
+};
+
+// Marks the "add another path" `+` on a fully wired Branch. Never persisted: it is
+// swapped for a real case handle the moment a step is picked.
+export const NEW_BRANCH_PATH_HANDLE = "__new_path__";
+
+// Mints the next free `case-N` on a Branch and returns its handle, so a canvas-added
+// path is a real arm the drawer can then configure.
+export const appendBranchCase = (node: any): string => {
+  const cases = Array.isArray(node?.data?.cases) ? node.data.cases : [];
+  const taken = new Set(cases.map((c: any) => c?.handle));
+  let i = cases.length;
+  while (taken.has(`case-${i}`)) i += 1;
+  const handle = `case-${i}`;
+  node.data = { ...node.data, cases: [...cases, { handle, conditions: null }] };
+  return handle;
+};
+
+// A Branch is born with a declared first path + else: handles minted before
+// configuration (the old true/false) could never be declared, condemning every
+// edge wired ahead of setup.
+const initialNodeData = (nodeType: string, id: string) =>
+  nodeType === "branch"
+    ? {
+        label: id,
+        node_type: nodeType,
+        cases: [{ handle: "case-0", conditions: null }],
+        else_handle: "else",
+      }
+    : { label: id, node_type: nodeType };
+
+// A single-output card's handle id is the literal "output" — not a routable Branch arm, so persisting it would invent a path the backend does not have.
+export const routableHandle = (handle?: string): string | undefined =>
+  !handle || handle === "output" || handle === "out" ? undefined : handle;
+
+// Ranks a sourceHandle so fan-out subtrees lay out in DECLARED order, not edge-array order.
+export const branchHandleRank = (handle?: string): number => {
+  if (!handle || handle === "output" || handle === "out") return -1;
+  if (handle === "true") return 0;
+  if (handle === "false") return 1;
+  // Namespaced away from true/false: legacy edges keep those handles and would tie.
+  const m = /^case-(\d+)$/.exec(handle);
+  if (m) return 1000 + Number(m[1]);
+  return handle === "else" ? Number.MAX_SAFE_INTEGER : Number.MAX_SAFE_INTEGER - 1;
+};
+
+// What an arm leaving a Branch routes, for the connector label. The stored handle
+// is the anchor, so an unlabelled path is numbered by its POSITION among the
+// survivors — a raw `case-2` says nothing, and it is the 2nd path once a middle
+// one is deleted.
+// True only when the case carries at least one real rule. Both shapes are in the wild:
+// v1 `{and:[…]}` (what the builder saves) and v2 `{version,conditions:{conditions:[…]}}`.
+export const hasBranchRule = (kase: any): boolean => {
+  // Unwrap either envelope: the v2 `{version,conditions}` and the builder's plain
+  // `{conditions}` both nest the real rule one level down.
+  const seen = new Set<any>();
+  let c = kase?.conditions;
+  while (c && typeof c === "object" && c.conditions && !seen.has(c)) {
+    seen.add(c);
+    c = c.conditions;
+  }
+  if (!c || typeof c !== "object") return false;
+  const list = c.and ?? c.or ?? (Array.isArray(c) ? c : null);
+  return Array.isArray(list) && list.length > 0;
+};
+
+export const branchEdgeLabel = (
+  node: any,
+  handle: string | undefined,
+  t: TranslateFn,
+): I18nText | "" => {
+  if (!handle || node?.data?.node_type !== "branch") return "";
+  const handles = branchHandles(node);
+  const index = handles.indexOf(handle);
+  if (index < 0) return "";
+  if (index === handles.length - 1) return t("workflow.node.branchElseTitle");
+  const kase = node?.data?.cases?.[index];
+  const authored = String(kase?.label || "").trim();
+  const name = authored || String(t("workflow.node.branchPathNumber", { index: index + 1 }));
+  // An empty rule evaluates TRUE, so first-match-wins hands this arm every record and
+  // starves the ones below it — it must never read like a configured path.
+  if (!hasBranchRule(kase)) return t("workflow.node.branchPathUnset", { name });
+  return authored ? raw(authored) : t("workflow.node.branchPathNumber", { index: index + 1 });
+};
+
+export const edgeBranchLabel = (edgeId: string, t: TranslateFn): I18nText | "" => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  const edge = (wf?.edges || []).find((e: any) => e.id === edgeId);
+  if (!edge) return "";
+  const source = (wf?.nodes || []).find((n: any) => n.id === (edge.source ?? edge.sourceNode?.id));
+  return branchEdgeLabel(source, edge.sourceHandle, t);
+};
+
+// `event_type` is the backend's WorkflowTriggerType. A dry run from the editor
+// records as "Test"; without this a rehearsal is indistinguishable in history
+// from a real fired-alert run that paged someone.
+export const isTestRun = (run: { event_type?: string } | null | undefined): boolean =>
+  run?.event_type === "Test";
+
+// Every run-history surface (the Runs table, the editor's History dropdown) must
+// make the SAME call about test runs; they drifted once and buried a published
+// workflow's real runs under two dozen rehearsals. Each caller gets its OWN
+// override ref so hiding rows on one surface cannot silently reshape the other.
+export const useTestRunVisibility = () => {
+  // Derived, not snapshotted: on a deep link the workflow hydrates AFTER the
+  // surface mounts, so a snapshot would lock in the pre-hydration default.
+  const defaultShowTestRuns = computed(() => !!workflowObj.currentSelectedWorkflow?.isDraft);
+  // Null until the user touches the control; once set it outranks the default for
+  // the session, so a refetch or a mid-session Publish cannot undo an explicit choice.
+  const choice = ref<boolean | null>(null);
+  const showTestRuns = computed({
+    get: () => choice.value ?? defaultShowTestRuns.value,
+    set: (v: boolean) => {
+      choice.value = v;
+    },
+  });
+  const testRunCount = computed(() => workflowObj.runsHistory.list.filter(isTestRun).length);
+  const visibleRuns = <T extends { event_type?: string }>(list: T[]): T[] =>
+    showTestRuns.value ? list : list.filter((r) => !isTestRun(r));
+  return { showTestRuns, testRunCount, visibleRuns };
+};
+
+// Where a canvas badge's evidence came from. `source` is stamped at every point a
+// result is created, because the run-detail endpoint carries no event_type of its own.
+export const isTestEarnedResult = (result: { source?: string } | null | undefined): boolean =>
+  result?.source === "test";
+
+// The backend names a node by its `meta.label`, but falls back to the raw id when
+// the author never renamed it — and it has no i18n, so it cannot say "Branch".
+// Only the canvas knows both, so any backend message is rewritten before display.
+// An id the graph no longer has is left alone: dropping it would leave a dangling
+// "Edge from BranchNode  to X".
+// Nodes whose WIRING cannot execute — a different class from `meta.incomplete`
+// (which is "not finished yet" and only blocks Publish). These fail on the backend
+// mid-run with a uuid-bearing message, so they are caught before a run instead.
+// Branch is the only multi-output type today; the per-type shape is checked here so
+// a future fan-out node has one place to declare its rule.
+export const structurallyBrokenNodes = (): string[] => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  const nodes = wf?.nodes || [];
+  const edges = wf?.edges || [];
+  const broken: string[] = [];
+  for (const node of nodes) {
+    if (node?.data?.node_type !== "branch") continue;
+    const out = edges.filter((e: any) => (e.source ?? e.sourceNode?.id) === node.id);
+    if (!out.length) continue; // routing nothing yet — legal
+    const declared = new Set(branchHandles(node));
+    const configured = Array.isArray(node?.data?.cases) && node.data.cases.length > 0;
+    // Unconfigured: no declared handles at all, so any outgoing edge is unroutable.
+    if (!configured) {
+      broken.push(node.id);
+      continue;
+    }
+    if (out.some((e: any) => !e.sourceHandle || !declared.has(e.sourceHandle))) {
+      broken.push(node.id);
+    }
+  }
+  return broken;
+};
+
+// The composable receives `t`; these module-level helpers run outside it, so the
+// translator is captured on first use rather than threaded through every caller.
+let translate: TranslateFn | undefined;
+export const setWorkflowTranslator = (t: TranslateFn) => {
+  translate = t;
+};
+
+const NODE_ID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+export const humanizeNodeIds = (message?: string | null, t?: TranslateFn): string => {
+  if (!message) return "";
+  const nodes = workflowObj.currentSelectedWorkflow?.nodes || [];
+  if (!nodes.length) return message;
+  return message.replace(NODE_ID_RE, (id) => {
+    const node = nodes.find((n: any) => n.id === id);
+    if (!node) return id;
+    const custom = nodeCustomName(node);
+    if (custom) return custom;
+    const key = nodeMeta(node?.data?.node_type)?.titleKey;
+    return key && t ? t(key) : id;
+  });
+};
+
+// A validation failure used to be a toast alone, leaving the author to find the
+// offending node by uuid. The ids in the message identify it, so they are written
+// into the SAME per-node error map the run badges already render — one highlight
+// mechanism, no second rendering path. A message naming no node changes nothing.
+export const markNodesFromError = (message?: string | null): void => {
+  if (!message) return;
+  const nodes = workflowObj.currentSelectedWorkflow?.nodes || [];
+  const ids = [...new Set(message.match(NODE_ID_RE) || [])].filter((id) =>
+    nodes.some((n: any) => n.id === id),
+  );
+  if (!ids.length) return;
+  const result = workflowObj.testRun.result || { inputs: {}, outputs: {}, errors: {} };
+  result.errors = result.errors || {};
+  for (const id of ids) {
+    result.errors[id] = { error_count: 1, errors: [[message]] };
+  }
+  workflowObj.testRun.result = result;
+};
+
+// Sentinel for "the test run already in memory" — its per-node inputs live in
+// sessionStorage, not the server, so it is picked without a fetch.
+export const LAST_TEST_RUN = "__last_test_run__";
+
+// The input a loaded run fed to one node. `loadWorkflowRun` already fetches the
+// WHOLE run's per-node map in one request, so re-testing slices the node it wants
+// out of that instead of fetching per step. Empty `fromNode` means the trigger —
+// the payload the workflow itself received. Null when that node isn't in the run,
+// so the caller falls back to the sample rather than seeding an empty array.
+export const runInputForNode = (fromNode: string): any[] | null => {
+  const nodes = workflowObj.currentSelectedWorkflow?.nodes || [];
+  const id = fromNode || nodes.find((n: any) => n.data?.node_type === "workflow_trigger")?.id || "";
+  return id ? nodeTestInput(id) : null;
+};
+
+// Informational ONLY — a dangling arm is a legal "drop these records" path.
+export const branchUnwiredHandles = (node: any, edges: any[]): string[] => {
+  const handles = branchHandles(node);
+  if (!handles.length) return [];
+  const wired = new Set(
+    (edges || [])
+      .filter((e: any) => (e.source ?? e.sourceNode?.id) === node.id)
+      .map((e: any) => e.sourceHandle),
+  );
+  return handles.filter((h) => !wired.has(h));
+};
+
 // Node types offered by the step picker when extending a node (everything but
 // the triggers, which can only ever be the FIRST node).
-export const ADDABLE_NODE_TYPES = ["condition", "function", "destination"];
+// "branch" sits next to "condition": both are `logic`, and a Branch is the N-way
+// generalisation of a Condition, so the picker reads condition → branch → function.
+export const ADDABLE_NODE_TYPES = ["condition", "branch", "function", "destination"];
 
 // Node types offered by the empty-canvas start node. One today; the list is the
 // seam where further trigger kinds land, and the picker already handles n of
@@ -232,10 +484,22 @@ const defaultObject = {
     // maps "" to a display sentinel locally (see WorkflowTestDialog) — the
     // sentinel never lands here or on the API payload.
     fromNode: "",
+    // Where `input` came from — a payload an author hand-edited must never keep
+    // reading as the generated sample, or Test lies about what it ran against.
+    inputSource: <"sample" | "run" | "edited">"sample",
+    // Display label of the run `input` was seeded from; empty for the other sources.
+    inputRunLabel: "",
+    // Default ON: a Test must not dispatch to real destinations (paging on-call)
+    // unless the author explicitly opts into a live run.
+    suppressDestinations: true,
     result: <any>null,
   },
   currentSelectedWorkflow: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
   workflowWithoutChange: <any>JSON.parse(JSON.stringify(defaultWorkflow)),
+  // Serialized payload of the version the SERVER holds. A save that would send an
+  // identical payload is a no-op the backend answers 200 to, so publishing it
+  // reports a change the author never made — compared here to block that.
+  storedSnapshot: "",
   nameError: false,
   nameErrorMessage: "",
   // Node ids to FLASH a "needs setup" warning ring on — set by Publish validation
@@ -472,15 +736,23 @@ export const currentTriggerKind = (): string | undefined => {
 //   edges: [{ source: "t", target: "f" }, { source: "f", target: "d" }]
 //   returns: Map { "t" => ["f"], "f" => ["d"] }   // "d" is a leaf → not a key
 export const buildChildrenMap = (edges: any[]): Map<string, string[]> => {
-  const children = new Map<string, string[]>();
+  const children = new Map<string, Array<{ tgt: string; rank: number }>>();
   for (const e of edges || []) {
     const src = e.source ?? e.sourceNode?.id;
     const tgt = e.target ?? e.targetNode?.id;
     if (!src || !tgt) continue;
     if (!children.has(src)) children.set(src, []);
-    children.get(src)!.push(tgt);
+    children.get(src)!.push({ tgt, rank: branchHandleRank(e.sourceHandle) });
   }
-  return children;
+  // Handle order decides a fan-out node's child order; the stable sort keeps edge order within a handle.
+  const ordered = new Map<string, string[]>();
+  for (const [src, kids] of children) {
+    ordered.set(
+      src,
+      [...kids].sort((a, b) => a.rank - b.rank).map((k) => k.tgt),
+    );
+  }
+  return ordered;
 };
 
 // All node ids in BFS (flow) order from `startId` (default: the trigger).
@@ -592,6 +864,70 @@ const downstreamOfErrorNodes = (errorIds: string[]): string[] => {
   return [...set];
 };
 
+// ConditionBuilder re-renders stored rules in the v2 UI schema, so reopening a
+// Branch/Condition yields a payload that is structurally unlike what was stored yet
+// identical in meaning. Compare both sides in v2 form — otherwise merely OPENING such
+// a node would void its badge. Mirrors the builder's own load-time conversion.
+const toV2Conditions = (c: any): any => {
+  if (!c || typeof c !== "object") return c;
+  try {
+    const clone = JSON.parse(JSON.stringify(c));
+    // Only levels shapes the converters actually recognize: convertV0ToV2 collapses any
+    // unrecognized object to an EMPTY group, which would hide real edits as "no change".
+    if (Array.isArray(clone)) return convertV0ToV2(clone);
+    if (clone.and || clone.or) return convertV1BEToV2(clone);
+    if (clone.label && clone.items) return convertV1ToV2(clone);
+    return clone;
+  } catch {
+    return c;
+  }
+};
+
+// Ids and the version wrapper are builder scaffolding, never meaning; `conditions`
+// payloads are levelled to v2 first so the two schemas can be compared at all.
+const semanticConfig = (data: any, key?: string): any => {
+  if (key === "conditions" && data && typeof data === "object" && !Array.isArray(data))
+    return semanticConfig(toV2Conditions(data));
+  if (Array.isArray(data)) return data.map((v) => semanticConfig(v));
+  if (!data || typeof data !== "object") return data;
+  return Object.fromEntries(
+    Object.entries(data)
+      .filter(([k]) => k !== "id" && k !== "groupId" && k !== "version")
+      .map(([k, v]) => [k, semanticConfig(v, k)]),
+  );
+};
+
+// A recorded ✓/✗ is a claim about the config the node ran with, so editing that config
+// makes it DIRTY: the node and its immediate successors (whose input was this node's
+// output). Only the first step down each arm — a re-run is what re-verifies the rest.
+const dirtyScopeFrom = (nodeId: string): string[] => {
+  const kids = buildChildrenMap(workflowObj.currentSelectedWorkflow.edges || []).get(nodeId) ?? [];
+  return [...new Set([nodeId, ...kids])];
+};
+
+// Marks rather than deletes: the recorded input/output stays inspectable in the NDV,
+// while the badge flips to the amber "needs a re-test" state instead of a stale pass.
+const markTestResultDirty = (nodeId: string) => {
+  const res = workflowObj.testRun.result;
+  if (!res || !nodeId) return;
+  const scope = dirtyScopeFrom(nodeId).filter((id) => (res.ranNodeIds || []).includes(id));
+  if (!scope.length) return;
+  const dirtyNodeIds = [...new Set([...(res.dirtyNodeIds || []), ...scope])];
+  if (dirtyNodeIds.length === (res.dirtyNodeIds || []).length && res.dirtyEditedId === nodeId)
+    return;
+  workflowObj.testRun.result = { ...res, dirtyNodeIds, dirtyEditedId: nodeId };
+  writeTestStateToNodes();
+  persistTestData();
+};
+
+// A fresh run re-verifies these nodes, so they stop being dirty (n8n: executing a node
+// again clears its dirty status).
+const clearDirtyNodes = (result: any, ranIds: string[]): any => {
+  const prev = result?.dirtyNodeIds || [];
+  if (!prev.length) return result;
+  return { ...result, dirtyNodeIds: prev.filter((id: string) => !ranIds.includes(id)) };
+};
+
 // A v2 condition group the backend reads as "pass everything through": one rule
 // with an EMPTY column. The backend short-circuits an empty column to always-true
 // (Condition::evaluate: `if self.column.is_empty() { return true }`) BEFORE it ever
@@ -668,6 +1004,17 @@ const serializeNode = (node: any) => {
   return out;
 };
 
+// VueFlow names the field `sourceHandle`; the Rust `Edge` names it `source_handle`
+// with no serde rename, so an untranslated Branch edge arrives with no handle and
+// validate_branch_node rejects the whole run. Omitted (not null) when absent, so
+// every pre-existing handle-less edge serializes exactly as it did before.
+const serializeEdge = (edge: any) => {
+  const out: any = { id: edge.id, source: edge.source, target: edge.target };
+  const handle = edge.source_handle ?? edge.sourceHandle;
+  if (handle) out.source_handle = handle;
+  return out;
+};
+
 // Build the backend `Workflow` object from the current in-memory graph. Shared by
 // the editor's create/update payload AND the Test run (which now sends the whole
 // graph so it can run WITHOUT saving). The `Workflow` struct has no serde
@@ -691,9 +1038,22 @@ export const serializeWorkflow = (opts?: { onlyNodeId?: string }) => {
     updated_at: wf.updated_at || 0,
     created_by: "",
     nodes: nodes.map(serializeNode),
-    edges: opts?.onlyNodeId ? [] : wf.edges || [],
+    edges: opts?.onlyNodeId ? [] : (wf.edges || []).map(serializeEdge),
   };
 };
+
+// Stamp the current graph as the stored version. Called on load and after every
+// successful write, so the no-op comparison always names the newest saved state.
+export const captureStoredSnapshot = () => {
+  workflowObj.storedSnapshot = JSON.stringify(serializeWorkflow());
+};
+
+// True when saving would send exactly what the server already holds. Never true
+// for an unsaved workflow — there is no stored version to be identical to.
+export const isUnchangedFromStored = (): boolean =>
+  !!workflowObj.currentSelectedWorkflow?.id &&
+  !!workflowObj.storedSnapshot &&
+  workflowObj.storedSnapshot === JSON.stringify(serializeWorkflow());
 
 // Run the workflow Test (from the Test dialog or a node's Run Step button) and
 // store the result so each WorkflowNode paints its ✓ / ✗ / ⊘ badge. Shared so
@@ -710,6 +1070,7 @@ export const executeTestRun = async (opts: {
   inputs: any[];
   fromNode?: string;
   singleNode?: boolean;
+  suppressDestinations?: boolean;
 }): Promise<{ ok: boolean; error?: string }> => {
   const wf = workflowObj.currentSelectedWorkflow;
   try {
@@ -725,6 +1086,7 @@ export const executeTestRun = async (opts: {
       inputs: opts.inputs,
       from_node: opts.fromNode || undefined,
       draft,
+      suppress_destinations: opts.suppressDestinations ?? true,
     });
     const errors = res.data?.errors || {};
     // Per-node INPUT map: node_id -> the records that node received.
@@ -759,14 +1121,30 @@ export const executeTestRun = async (opts: {
       Object.assign(mergedInputs, inputs);
       Object.assign(mergedOutputs, outputs);
       const ranNodeIds = [...new Set([...(base.ranNodeIds || []), single])];
-      workflowObj.testRun.result = {
-        ...base,
-        errors: mergedErrors,
-        inputs: mergedInputs,
-        outputs: mergedOutputs,
-        ranNodeIds,
-        blockedNodeIds: downstreamOfErrorNodes(Object.keys(mergedErrors)),
-      };
+      workflowObj.testRun.result = clearDirtyNodes(
+        {
+          ...base,
+          errors: mergedErrors,
+          inputs: mergedInputs,
+          outputs: mergedOutputs,
+          ranNodeIds,
+          blockedNodeIds: downstreamOfErrorNodes(Object.keys(mergedErrors)),
+          // A Run Step is a rehearsal even when it lands on a loaded real run, so the
+          // merged result can no longer claim the real run's provenance.
+          source: "test",
+        },
+        [single],
+      );
+      // A Run Step re-verifies one node, so the result describes a NEW run and the stamp
+      // has to move — except over a loaded history run, whose runId identifies the stored
+      // execution the rest of the view still shows and must keep pointing at.
+      if (base.mode !== "history") {
+        workflowObj.testRun.result.runId = newTestRunId();
+        workflowObj.testRun.result.ranAt = Date.now();
+      }
+      writeTestStateToNodes();
+      persistTestData();
+      await flushTestStateToServer(opts.orgId);
       return { ok: true };
     }
 
@@ -785,14 +1163,26 @@ export const executeTestRun = async (opts: {
       outputs,
       ranNodeIds,
       blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
+      dirtyNodeIds: [],
+      runId: newTestRunId(),
+      ranAt: Date.now(),
+      // This path is /workflows/test — a rehearsal, never evidence the live workflow ran.
+      source: "test",
     };
+    writeTestStateToNodes();
+    persistTestData();
+    await flushTestStateToServer(opts.orgId);
     return { ok: true };
   } catch (e: any) {
     // A failed FULL run must not leave the previous run's ✓/✗ badges on screen. A
     // single-node run that throws (network/validation) keeps the accumulated
     // results so other nodes' Run Step outputs aren't wiped by an unrelated failure.
     if (!(opts.singleNode && opts.fromNode)) workflowObj.testRun.result = null;
-    return { ok: false, error: e?.response?.data?.message };
+    {
+      const msg = e?.response?.data?.message;
+      markNodesFromError(msg);
+      return { ok: false, error: humanizeNodeIds(msg, translate) };
+    }
   }
 };
 
@@ -810,9 +1200,370 @@ export const nodeTestInput = (nodeId: string): any[] | null => {
 // ran / emitted nothing) or there's no run. Replaces deriving output from
 // downstream inputs: the backend now reports each node's output directly.
 export const nodeTestOutput = (nodeId: string): any[] | null => {
-  const outputs = workflowObj.testRun.result?.outputs;
-  const v = outputs?.[nodeId];
-  return Array.isArray(v) ? v : null;
+  const v = workflowObj.testRun.result?.outputs?.[nodeId];
+  if (Array.isArray(v)) return v;
+  // A fan-out node reports a per-handle map instead of one flat array; flatten it
+  // in handle order so the plain "what did this step emit" view still works.
+  if (v && typeof v === "object") {
+    return Object.keys(v)
+      .sort((a, b) => branchHandleRank(a) - branchHandleRank(b))
+      .flatMap((h) => (Array.isArray(v[h]) ? v[h] : []));
+  }
+  return null;
+};
+
+// Hand-edited test input per workflow id, then node id — the NDV's Input pane keeps
+// the edit when walking between steps instead of re-seeding from the sample.
+let editedInputsWorkflowId = "";
+let nodeEditedInputs: Record<string, string> = {};
+
+// Session quota is ~5MB and a recorded run's outputs are unbounded; over budget we
+// clear rather than keep a stale entry that would resurrect the superseded run.
+const TEST_DATA_MAX_BYTES = 2_000_000;
+
+const testDataKey = (workflowId: string) => `workflow-test-data:${workflowId}`;
+// The typed payload is authored work and belongs in localStorage — it must
+// survive closing the tab the way a draft does. The recorded RESULT deliberately
+// stays session-scoped: it snapshots ONE run and goes stale against an edited
+// graph, so restoring it days later would paint ✓/✗ badges for a workflow that no
+// longer matches.
+const testInputKey = (workflowId: string) => `workflow-test-input:${workflowId}`;
+
+// Scoping the map to one workflow at a time stops workflow A's edit for node "n1"
+// being served to workflow B's node "n1", and bounds it across a long session.
+const claimEditedInputs = (workflowId: string): Record<string, string> => {
+  if (editedInputsWorkflowId !== workflowId) {
+    editedInputsWorkflowId = workflowId;
+    nodeEditedInputs = {};
+  }
+  return nodeEditedInputs;
+};
+
+// Reads answer from whichever workflow the map currently HOLDS, never re-claiming: a
+// restore runs while the store id is still "" (reset, then load), so re-deriving the
+// scope on every read would wipe what was just restored.
+const readEditedInputs = (): Record<string, string> => nodeEditedInputs;
+
+const currentWorkflowId = () => workflowObj.currentSelectedWorkflow?.id || "";
+
+// Debounced: the Input pane calls this on every keystroke, and serializing a whole
+// recorded run per character is what would make typing feel heavy.
+const PERSIST_DEBOUNCE_MS = 500;
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+const persistTestDataSoon = () => {
+  if (persistTimer) clearTimeout(persistTimer);
+  persistTimer = setTimeout(() => {
+    persistTimer = null;
+    persistTestData();
+  }, PERSIST_DEBOUNCE_MS);
+};
+
+export const setNodeEditedInput = (nodeId: string, text: string) => {
+  if (nodeId) claimEditedInputs(currentWorkflowId())[nodeId] = text;
+  persistTestDataSoon();
+};
+
+export const getNodeEditedInput = (nodeId: string): string | undefined =>
+  readEditedInputs()[nodeId];
+
+export const clearNodeEditedInput = (nodeId: string) => {
+  delete readEditedInputs()[nodeId];
+  persistTestDataSoon();
+};
+
+// Per-node test state lives in `Node.meta` — it travels with the workflow DOCUMENT,
+// so the badge one author records is the badge every other user sees, and clearing a
+// browser cannot silently un-test a workflow. Strings only: `meta` is a
+// HashMap<String,String> on the backend and round-trips untouched via serializeNode.
+// A local run identity: the /test endpoint deliberately records nothing in run history,
+// so there is no server run id to borrow and the badge still has to say WHICH run it is.
+const newTestRunId = () => `test-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const TEST_META_KEYS = ["test_status", "test_run_id", "test_ran_at", "test_dirty"] as const;
+
+// Strips every test key from a node's meta, dropping `meta` entirely once empty so an
+// untested node serializes exactly as it did before this state existed.
+const stripTestMeta = (node: any): boolean => {
+  const meta = node?.meta;
+  if (!meta) return false;
+  let changed = false;
+  for (const k of TEST_META_KEYS) {
+    if (meta[k] !== undefined) {
+      delete meta[k];
+      changed = true;
+    }
+  }
+  if (changed && !Object.keys(meta).length) delete node.meta;
+  return changed;
+};
+
+// Per-node outcome, mirroring WorkflowNode.testStatus: a node is a real pass only when it
+// actually did its job, so one that ran against nothing — or was never set up — is "skipped".
+const testStatusForNode = (result: any, nodeId: string): string | null => {
+  if (!result?.ranNodeIds?.includes(nodeId)) return null;
+  if (result.errors?.[nodeId]) return "error";
+  // A never-configured step did no work, so records reaching it are not a pass.
+  const node = (workflowObj.currentSelectedWorkflow?.nodes || []).find((n: any) => n.id === nodeId);
+  if (isNodeIncomplete(node)) return "skipped";
+  if (result.inputs) return result.inputs[nodeId]?.length ? "ok" : "skipped";
+  if (result.blockedNodeIds?.includes(nodeId)) return "skipped";
+  return "ok";
+};
+
+// Pushes the recorded state to the server so ANOTHER user opening this workflow sees
+// the same badges — the point of holding test state in the document. Skipped when the
+// graph has unsaved edits or was never saved: writing then would silently persist the
+// author's in-progress edits as a side effect of pressing Run.
+const flushTestStateToServer = async (orgId: string) => {
+  const wf = workflowObj.currentSelectedWorkflow;
+  if (!wf?.id || workflowObj.dirtyFlag || workflowObj.readOnly) return;
+  try {
+    await workflowService.updateWorkflow({
+      org_identifier: orgId,
+      id: wf.id,
+      data: {
+        workflow: serializeWorkflow(),
+        trigger_type: triggerTypeForKind(currentTriggerKind()),
+      },
+      draft: !!wf.isDraft,
+    });
+  } catch {
+    // A failed flush must not lose the run: the badges still render from memory, and
+    // the state rides along on the author's next explicit save.
+  }
+};
+
+// Projects the in-memory run onto the graph so the next save carries it to the server.
+// Writes meta DIRECTLY rather than via setNodeMeta: recording an outcome is not an edit
+// to the workflow, and marking it dirty would trip the unsaved-changes guard.
+export const writeTestStateToNodes = () => {
+  const result = workflowObj.testRun.result;
+  const nodes = workflowObj.currentSelectedWorkflow?.nodes || [];
+  // A history run is someone else's recorded execution being previewed, not this
+  // workflow's own test state — projecting it would overwrite the real badges.
+  if (result?.mode === "history") return;
+  const runId = result?.runId || "";
+  const ranAt = result?.ranAt ? String(result.ranAt) : "";
+  const editedId = result?.dirtyEditedId;
+  for (const node of nodes) {
+    const status = result ? testStatusForNode(result, node.id) : null;
+    stripTestMeta(node);
+    if (!status) continue;
+    const meta = { ...(node.meta || {}) };
+    meta.test_status = status;
+    if (runId) meta.test_run_id = runId;
+    if (ranAt) meta.test_ran_at = ranAt;
+    if (result.dirtyNodeIds?.includes(node.id))
+      meta.test_dirty = node.id === editedId ? "self" : "upstream";
+    node.meta = meta;
+  }
+};
+
+// Rebuilds the badge state from what the DOCUMENT carries, so a fresh browser (or a
+// different user) sees the same ✓/✗/⊘ without any local storage. Only the per-node
+// SUMMARY survives a reload this way — the recorded input/output records are not in the
+// document, so a synthetic one-record marker stands in to keep `ok` reading as a pass.
+const restoreTestStateFromNodes = (): boolean => {
+  const nodes = workflowObj.currentSelectedWorkflow?.nodes || [];
+  const tested = nodes.filter((n: any) => n.meta?.test_status);
+  if (!tested.length) return false;
+  const errors: Record<string, any> = {};
+  const inputs: Record<string, any[]> = {};
+  const ranNodeIds: string[] = [];
+  const dirtyNodeIds: string[] = [];
+  let dirtyEditedId = "";
+  let runId = "";
+  let ranAt = 0;
+  for (const node of tested) {
+    const meta = node.meta;
+    ranNodeIds.push(node.id);
+    // `translate` is bound by useWorkflowCanvas(t); hydrate can run before that, and the
+    // message is replaced by the real one as soon as the records are re-fetched.
+    if (meta.test_status === "error")
+      errors[node.id] = {
+        error_count: 1,
+        errors: [[translate ? translate("workflow.test.recordedFailure") : "Recorded failure"]],
+      };
+    // "skipped" is the absence of records, so only a pass/failure seeds the marker.
+    if (meta.test_status !== "skipped") inputs[node.id] = [{}];
+    if (meta.test_dirty) {
+      dirtyNodeIds.push(node.id);
+      if (meta.test_dirty === "self") dirtyEditedId = node.id;
+    }
+    if (!runId && meta.test_run_id) runId = meta.test_run_id;
+    const at = Number(meta.test_ran_at);
+    if (Number.isFinite(at) && at > ranAt) ranAt = at;
+  }
+  workflowObj.testRun.result = {
+    errors,
+    inputs,
+    outputs: {},
+    ranNodeIds,
+    blockedNodeIds: downstreamOfErrorNodes(Object.keys(errors)),
+    dirtyNodeIds,
+    dirtyEditedId,
+    runId,
+    ranAt,
+    // The records themselves were never persisted; the NDV uses this to say so
+    // instead of rendering an empty Input/Output pane as if the run produced nothing.
+    recordsUnavailable: true,
+    // Only writeTestStateToNodes persists badges here and it refuses history runs,
+    // so anything the document carries was necessarily earned by a test run.
+    source: "test",
+  };
+  return true;
+};
+
+export const clearTestData = (workflowId: string) => {
+  if (!workflowId) return;
+  for (const node of workflowObj.currentSelectedWorkflow?.nodes || []) stripTestMeta(node);
+  try {
+    sessionStorage.removeItem(testDataKey(workflowId));
+    localStorage.removeItem(testInputKey(workflowId));
+  } catch {
+    // nothing to clear if storage is unavailable
+  }
+};
+
+// The stored payload carries its provenance so a reload cannot relabel a
+// hand-edited payload as the generated sample.
+const serializeStoredInput = (input: string): string =>
+  JSON.stringify({
+    input,
+    source: workflowObj.testRun.inputSource || "sample",
+    runLabel: workflowObj.testRun.inputRunLabel || "",
+  });
+
+// Entries written before provenance existed are bare payload strings, not blobs;
+// they restore as the generated sample rather than being dropped as unparseable.
+const applyStoredInput = (stored: string) => {
+  let blob: any = null;
+  try {
+    blob = JSON.parse(stored);
+  } catch {
+    blob = null;
+  }
+  if (!blob || typeof blob.input !== "string") {
+    workflowObj.testRun.input = stored;
+    workflowObj.testRun.inputSource = "sample";
+    workflowObj.testRun.inputRunLabel = "";
+    return;
+  }
+  workflowObj.testRun.input = blob.input;
+  workflowObj.testRun.inputSource =
+    blob.source === "run" || blob.source === "edited" ? blob.source : "sample";
+  workflowObj.testRun.inputRunLabel = typeof blob.runLabel === "string" ? blob.runLabel : "";
+};
+
+// SESSION scope, never localStorage: recorded inputs/outputs carry real log lines.
+export const persistTestData = (): { ok: boolean; reason?: string } => {
+  const id = workflowObj.currentSelectedWorkflow?.id;
+  if (!id) return { ok: false, reason: "no-workflow" };
+  const payload = JSON.stringify({
+    result: workflowObj.testRun.result ?? null,
+    // The Test dialog's payload — the thing an author re-runs while tuning a
+    // condition. Without it a reload silently reverts to the generic sample.
+    input: workflowObj.testRun.input || "",
+    inputSource: workflowObj.testRun.inputSource || "sample",
+    inputRunLabel: workflowObj.testRun.inputRunLabel || "",
+    editedInputs: editedInputsWorkflowId === id ? nodeEditedInputs : {},
+  });
+  if (payload.length > TEST_DATA_MAX_BYTES) {
+    clearTestData(id);
+    return { ok: false, reason: "too-large" };
+  }
+  try {
+    sessionStorage.setItem(testDataKey(id), payload);
+    const input = workflowObj.testRun.input || "";
+    if (input) localStorage.setItem(testInputKey(id), serializeStoredInput(input));
+    else localStorage.removeItem(testInputKey(id));
+  } catch {
+    return { ok: false, reason: "unavailable" };
+  }
+  return { ok: true };
+};
+
+export const restoreTestData = (workflowId: string, opts?: { keepDocumentState?: boolean }) => {
+  if (!workflowId) return;
+  const edits = claimEditedInputs(workflowId);
+  // Survives the tab, so it is read before (and independently of) the session blob.
+  try {
+    const savedInput = localStorage.getItem(testInputKey(workflowId));
+    if (savedInput) applyStoredInput(savedInput);
+  } catch {
+    /* storage unavailable — fall through to the sample */
+  }
+  let saved: any = null;
+  try {
+    const raw = sessionStorage.getItem(testDataKey(workflowId));
+    saved = raw ? JSON.parse(raw) : null;
+  } catch {
+    return;
+  }
+  if (!saved) return;
+  // Re-attaching the records is only correct when the session blob describes the very
+  // run the document recorded; a stale one would resurrect a superseded run's badges.
+  const sameRun =
+    !opts?.keepDocumentState ||
+    (!!saved.result?.runId && saved.result.runId === workflowObj.testRun.result?.runId);
+  // A history overlay is opt-in from the Runs list, so it must not come back on its
+  // own: restoring it would open the editor wearing a past run's badges and chip.
+  if (saved.result?.mode === "history") delete saved.result;
+  if (saved.result && sameRun) workflowObj.testRun.result = saved.result;
+  if (typeof saved.input === "string" && saved.input) {
+    workflowObj.testRun.input = saved.input;
+    if (saved.inputSource) workflowObj.testRun.inputSource = saved.inputSource;
+    workflowObj.testRun.inputRunLabel = saved.inputRunLabel || "";
+  }
+  for (const [id, text] of Object.entries(saved.editedInputs || {})) {
+    if (typeof text === "string") edits[id] = text;
+  }
+};
+
+// Only execute_workflow (the real trigger path) calls save_workflow_errors;
+// test_workflow and retry_run just record the run — so a Test and a failed Retry
+// both LOOK retryable in history but answer 400 "Errored run info not found".
+// Why a run cannot be retried, "" when it can — lets a disabled control say which.
+export const retryBlockedReason = (
+  run: { event_type?: string; error?: string } | null | undefined,
+): "" | "test" | "retry" | "succeeded" => {
+  if (!run) return "succeeded";
+  if (run.event_type === "Test") return "test";
+  if (run.event_type === "Retry") return "retry";
+  if (!run.error) return "succeeded";
+  return "";
+};
+
+export const isRetryableRun = (
+  run: { event_type?: string; error?: string } | null | undefined,
+): boolean => retryBlockedReason(run) === "";
+
+// Replay a failed run server-side. The backend re-runs from the stored input map,
+// so this creates a NEW run (event_type "Retry") rather than mutating the original —
+// callers must refresh the history list afterwards. `run` is optional but, when
+// given, blocks the call locally for a run the endpoint would refuse anyway.
+export const retryWorkflowRun = async (opts: {
+  orgId: string;
+  workflowId: string;
+  runId: string;
+  fromNode?: string;
+  run?: { event_type?: string; error?: string } | null;
+}): Promise<{ ok: boolean; error?: string }> => {
+  if (opts.run !== undefined && !isRetryableRun(opts.run)) {
+    return { ok: false, error: "" };
+  }
+  try {
+    await workflowService.retryWorkflow({
+      org_identifier: opts.orgId,
+      id: opts.workflowId,
+      run_id: opts.runId,
+      from_node: opts.fromNode,
+    });
+    return { ok: true };
+  } catch (e: any) {
+    const msg = e?.response?.data?.message;
+    return { ok: false, error: humanizeNodeIds(msg, translate) };
+  }
 };
 
 // Fetch the runs list into SHARED state (workflowObj.runsHistory), so the Runs page
@@ -913,11 +1664,73 @@ export const loadWorkflowRun = async (opts: {
       mode: "history",
       runId: opts.runId,
       ghostNodeIds,
+      // The run-detail endpoint carries no event_type, so provenance is resolved
+      // against the shared history list rather than the response itself.
+      source: isTestRun(workflowObj.runsHistory.list.find((r: any) => r.run_id === opts.runId))
+        ? "test"
+        : "run",
     };
     return { ok: true };
   } catch (e: any) {
-    return { ok: false, error: e?.response?.data?.message };
+    {
+      const msg = e?.response?.data?.message;
+      markNodesFromError(msg);
+      return { ok: false, error: humanizeNodeIds(msg, translate) };
+    }
   }
+};
+
+// Remap one orphan branch edge to a declared arm: legacy `false` means "everything
+// else", `true` means "the matching case"; anything else takes the first free arm.
+// A fresh case is minted only when no free arm remains, so a healed arm is never
+// double-routed and declared handles stay unique.
+const healOrphanEdge = (node: any, edge: any, wired: Set<string>): void => {
+  const caseHandles = (node.data.cases as any[]).map(
+    (c: any, i: number) => c?.handle || `case-${i}`,
+  );
+  const firstFree = (handles: string[]) => handles.find((h) => !wired.has(h));
+  let target: string | undefined;
+  if (edge.sourceHandle === "false") target = wired.has("else") ? firstFree(caseHandles) : "else";
+  else if (edge.sourceHandle === "true") target = firstFree(caseHandles);
+  else target = firstFree([...caseHandles, "else"]);
+  if (!target) target = appendBranchCase(node);
+  wired.add(target);
+  edge.sourceHandle = target;
+  // serializeEdge prefers snake_case, so a stale copy would resurrect the dead handle on save.
+  delete edge.source_handle;
+};
+
+// Drafts skip save-time validation, so a branch edge wired before its paths
+// existed (legacy true/false arms, a deleted case, a missing handle) loads
+// pointing at a handle the node does not declare — unpublishable, with no way to
+// finish short of rebuilding the subtree. Heal on load instead. Returns whether
+// anything changed, so the caller can keep the fix saveable (not a stored no-op).
+const healBranchEdges = (nodes: any[], edges: any[]): boolean => {
+  let changed = false;
+  for (const node of nodes) {
+    if (node?.data?.node_type !== "branch") continue;
+    if (!Array.isArray(node.data.cases) || !node.data.cases.length) {
+      node.data = { ...node.data, cases: [{ handle: "case-0", conditions: null }] };
+      changed = true;
+    }
+    // The UI offers the else arm on every configured Branch; undeclared it fails publish.
+    if (!node.data.else_handle) {
+      node.data = { ...node.data, else_handle: "else" };
+      changed = true;
+    }
+    const out = edges.filter((e: any) => (e.source ?? e.sourceNode?.id) === node.id);
+    if (!out.length) continue;
+    const declared = new Set(branchHandles(node));
+    const wired = new Set<string>(
+      out.map((e: any) => e.sourceHandle).filter((h: string) => declared.has(h)),
+    );
+    for (const edge of out) {
+      if (edge.sourceHandle && declared.has(edge.sourceHandle)) continue;
+      healOrphanEdge(node, edge, wired);
+      changed = true;
+    }
+  }
+  return changed;
 };
 
 // Load a workflow (a list row or API result) into the shared editor state,
@@ -949,9 +1762,13 @@ export const hydrateWorkflow = (wf: any) => {
   const edges = (wf.edges || []).map((e: any) => {
     const src = e.source ?? e.sourceNode?.id;
     const tgt = e.target ?? e.targetNode?.id;
-    const styled = makeEdge(src, tgt, e.sourceHandle);
+    // The backend `Edge` has no serde rename, so a saved Branch edge comes back as
+    // `source_handle`; without this the arm is lost on load and the workflow that
+    // saved cleanly reloads as unroutable.
+    const styled = makeEdge(src, tgt, e.source_handle ?? e.sourceHandle);
     return { ...e, ...styled, id: e.id || styled.id };
   });
+  const healed = healBranchEdges(nodes, edges);
   // List rows carry `is_draft`; normalize it onto the store's `isDraft` so the
   // editor knows to save via the draft endpoints and to offer Publish.
   workflowObj.currentSelectedWorkflow = { ...wf, nodes, edges, isDraft: !!wf.is_draft };
@@ -960,13 +1777,27 @@ export const hydrateWorkflow = (wf: any) => {
   workflowObj.workflowWithoutChange = JSON.parse(
     JSON.stringify(workflowObj.currentSelectedWorkflow),
   );
+  // A healed graph differs from the server copy; a snapshot of it would make the very save that persists the fix read as a no-op.
+  if (healed) workflowObj.storedSnapshot = "";
+  else captureStoredSnapshot();
   workflowObj.isEditWorkflow = true;
   // A freshly-loaded workflow is clean and carries no prior local edit history.
   workflowObj.dirtyFlag = false;
   resetWorkflowHistory();
+  // Claim the edit map for the workflow being loaded BEFORE restoring, so the previous
+  // workflow's edits are dropped even when this one has nothing stored.
+  const loadedId = workflowObj.currentSelectedWorkflow.id || "";
+  claimEditedInputs(loadedId);
+  // The DOCUMENT is the source of truth for which nodes are tested, so it wins over
+  // this browser's session copy; the session blob only re-attaches the recorded
+  // input/output records, which are too large to live in the workflow itself.
+  workflowObj.testRun.result = null;
+  const fromDoc = restoreTestStateFromNodes();
+  restoreTestData(loadedId, { keepDocumentState: fromDoc });
 };
 
 export default function useWorkflowCanvas(t: TranslateFn) {
+  translate = t;
   const { screenToFlowCoordinate, onNodesInitialized, updateNode } = useVueFlow();
 
   // --- edge helpers ----------------------------------------------------------
@@ -1033,7 +1864,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     pushWorkflowHistory();
     workflowObj.currentSelectedWorkflow.edges = [
       ...edges,
-      newEdge(connection.source, connection.target, connection.sourceHandle),
+      newEdge(connection.source, connection.target, routableHandle(connection.sourceHandle)),
     ];
     markWorkflowDirty();
   }
@@ -1248,7 +2079,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       id,
       type: meta.ioType,
       position,
-      data: { label: id, node_type: nodeType },
+      data: initialNodeData(nodeType, id),
       meta: { incomplete: "true" },
     };
     // No auto-wire on drag-drop — the node is placed where dropped and stays
@@ -1335,7 +2166,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       id,
       type: meta.ioType,
       position: position ?? { x: 320, y: 240 },
-      data: { label: id, node_type: nodeType },
+      data: initialNodeData(nodeType, id),
       meta: { incomplete: "true" },
     };
     // Unconnected — no trigger to wire from yet; the trigger add links it later.
@@ -1357,14 +2188,20 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     const meta = nodeMeta(nodeType);
     if (!src || !meta) return;
 
+    // The `+` on a fully wired Branch adds a PATH, so mint the case first — wiring to
+    // the sentinel itself would leave the edge pointing at a handle that never exists.
+    if (handle === NEW_BRANCH_PATH_HANDLE) handle = appendBranchCase(src);
+
     const id = getUUID();
     const sourceHandle = handle === "out" ? undefined : handle;
     // Offset siblings on the same output so they don't overlap (fan-out).
     const siblings = wf.edges.filter(
       (e: any) => e.source === sourceId && (e.sourceHandle || undefined) === sourceHandle,
     ).length;
+    // Each arm needs its own column: without the handle index every arm's first child stacks up.
+    const armIndex = Math.max(0, branchHandles(src).indexOf(handle));
     const position = {
-      x: (src.position?.x ?? 0) + siblings * (NODE_W + 40),
+      x: (src.position?.x ?? 0) + (siblings + armIndex) * (NODE_W + 40),
       y: (src.position?.y ?? 0) + 160,
     };
 
@@ -1373,7 +2210,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       // VueFlow render template (UI only) — derived from node_type, not stored.
       type: meta.ioType,
       position,
-      data: { label: id, node_type: nodeType },
+      data: initialNodeData(nodeType, id),
       // A freshly-added config node is an unconfigured placeholder until the panel
       // is closed with its payload; flag it so it shows the "Set up later" badge and
       // Publish stays blocked.
@@ -1418,7 +2255,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       id,
       type: meta.ioType,
       position,
-      data: { label: id, node_type: nodeType },
+      data: initialNodeData(nodeType, id),
       meta: { incomplete: "true" },
     };
     workflowObj.pendingEdge = null;
@@ -1494,13 +2331,16 @@ export default function useWorkflowCanvas(t: TranslateFn) {
     const node = workflowObj.currentSelectedNodeData;
     if (!node) return;
     const merged = { ...node.data, ...payload };
-    if (isEqual(merged, node.data)) return;
+    const previous = node.data;
+    // Semantic: the builder re-emits stored v1 rules as v2, so a raw compare called a look an edit.
+    if (isEqual(semanticConfig(merged), semanticConfig(previous))) return;
     pushWorkflowHistory();
     node.data = merged;
     const idx = wf.nodes.findIndex((n: any) => n.id === node.id);
     if (idx !== -1) wf.nodes[idx] = node;
-    // The Test log PERSISTS across edits — editing a node keeps the dock and existing
-    // badges in place; the node keeps its last-run badge until re-tested.
+    // The Test log itself PERSISTS across edits (the dock stays open); the edited node
+    // and its next steps just go amber until re-tested.
+    markTestResultDirty(node.id);
     markWorkflowDirty();
   }
 
@@ -1537,6 +2377,7 @@ export default function useWorkflowCanvas(t: TranslateFn) {
   function resetWorkflowData() {
     workflowObj.currentSelectedWorkflow = JSON.parse(JSON.stringify(defaultWorkflow));
     workflowObj.workflowWithoutChange = JSON.parse(JSON.stringify(defaultWorkflow));
+    workflowObj.storedSnapshot = "";
     workflowObj.currentSelectedNodeData = null;
     workflowObj.currentSelectedNodeID = "";
     workflowObj.dialog = { ...defaultDialog };
@@ -1578,8 +2419,15 @@ export default function useWorkflowCanvas(t: TranslateFn) {
       show: false,
       input: "",
       fromNode: "",
+      inputSource: "sample",
+      inputRunLabel: "",
+      // Must carry EVERY key the default declares: dropping this one left it
+      // undefined, one refactor away from a Test dispatching to real destinations.
+      suppressDestinations: true,
       result: null,
     };
+    editedInputsWorkflowId = "";
+    nodeEditedInputs = {};
   }
 
   return {

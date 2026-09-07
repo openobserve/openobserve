@@ -126,7 +126,7 @@
             v-if="selectedIds.length > 0"
             variant="outline"
             size="sm"
-            class="ml-3"
+            class="ms-3"
             icon-left="download"
             data-test="score-config-bulk-export-btn"
             @click="handleBulkExport"

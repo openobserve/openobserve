@@ -992,5 +992,6 @@ onMounted(() => {
 // the user pays for work they don't see.
 onUnmounted(() => {
   cancelAll();
+  versionCompare.cancel();
 });
 </script>

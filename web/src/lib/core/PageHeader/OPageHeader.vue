@@ -191,7 +191,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            instead of wrapping within its own row. -->
       <div
         v-if="hasActions || hasActionsOverflow"
-        class="ml-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
+        class="ms-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
       >
         <slot name="actions" />
 

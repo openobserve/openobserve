@@ -136,7 +136,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Main Panel -->
         <main
           data-test="main-content"
-          class="bg-surface-chrome-deeper flex min-h-0 flex-col pr-2 pb-2 max-md:pr-0"
+          class="bg-surface-chrome-deeper flex min-h-0 flex-col pe-2 pb-2 max-md:pe-0"
           :style="{
             width:
               !store.state.isAiChatEnabled || isMobile
@@ -174,11 +174,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             // The chat is a floating card in both modes — match the main content
             // card's right/bottom gap (+ rounded-surface corners) so they read as
             // the same card. Expanding only widens it; it never overlays the header.
-            'pr-2 pb-2',
+            'pe-2 pb-2',
             // < md there is no room beside the content: the chat becomes a
             // full-width overlay under the header instead of a side panel.
             isMobile
-              ? 'fixed inset-x-0 bottom-0 z-50 pl-2'
+              ? 'fixed inset-x-0 bottom-0 z-50 ps-2'
               : 'sticky top-[var(--navbar-height,2.25rem)] self-start',
           ]"
           :style="[
@@ -1316,6 +1316,8 @@ export default defineComponent({
     };
 
     const toggleAIChat = () => {
+      // ai_enabled arrives with the async /config response, so it can't gate registration.
+      if (!store.state.zoConfig.ai_enabled) return;
       // On the home page, switch to the AI tab instead of opening the side panel
       if (router.currentRoute.value.name === "home") {
         window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
@@ -1428,7 +1430,10 @@ export default defineComponent({
     };
 
     // ── Global shortcuts: AI Chat ─────────────────────────────────────────
-    useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
+    // O2 AI is enterprise-only: on OSS the Ctrl+B binding must not exist at all.
+    if (config.isEnterprise == "true") {
+      useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
+    }
 
     return {
       isDark,

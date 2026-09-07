@@ -27,6 +27,7 @@ import LogsVisualise from "./dashboardPages/visualise";
 import { DashboardPage } from "./dashboardPages/dashboardPage.js";
 import { ScheduledReportsDrawerPage } from "./dashboardPages/scheduledReportsDrawer.js";
 import { AlertsPage } from "./alertsPages/alertsPage.js";
+import { AlertLibraryPage } from "./alertsPages/alertLibraryPage.js";
 import { AlertHistoryPage } from "./alertsPages/alertHistoryPage.js";
 import { AlertDetailPage } from "./alertsPages/alertDetailPage.js";
 import { CompositeAlertsPage } from "./alertsPages/compositeAlertsPage.js";
@@ -109,6 +110,7 @@ import UnflattenedPage from "./logsPages/unflattened.js";
 import { SDRPatternsPage } from "./sdrPages/sdrPatternsPage.js";
 import { SDRVerificationPage } from "./sdrPages/sdrVerificationPage.js";
 import { SDRTracesIngestionPage } from "./sdrPages/sdrTracesIngestionPage.js";
+import { GenAiTracesIngestionPage } from "./tracesPages/genAiTracesIngestionPage.js";
 import { StreamAssociationPage } from "./streamsPages/streamAssociationPage.js";
 import { StreamsFormValidationPage } from "./streamsPages/streamsFormValidationPage.js";
 
@@ -158,6 +160,7 @@ class PageManager {
 
     // ===== EXISTING ALERTS PAGE OBJECT =====
     this.alertsPage = new AlertsPage(page);
+    this.alertLibraryPage = new AlertLibraryPage(page);
     this.alertHistoryPage = new AlertHistoryPage(page);
     this.alertDetailPage = new AlertDetailPage(page);
     this.compositeAlertsPage = new CompositeAlertsPage(page);
@@ -236,6 +239,7 @@ class PageManager {
     this.sdrPatternsPage = new SDRPatternsPage(page);
     this.sdrVerificationPage = new SDRVerificationPage(page);
     this.sdrTracesPage = new SDRTracesIngestionPage(page);
+    this.genAiTracesIngestionPage = new GenAiTracesIngestionPage(page);
     this.streamAssociationPage = new StreamAssociationPage(page);
     this.streamsFormValidation = new StreamsFormValidationPage(page);
 

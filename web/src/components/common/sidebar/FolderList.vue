@@ -19,12 +19,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div
     class="bg-surface-panel flex flex-col"
-    :class="mobileRail ? '' : 'border-border-default h-full border-r pb-1'"
+    :class="mobileRail ? '' : 'border-border-default h-full border-e pb-1'"
   >
     <!-- < md the rail moves into a left drawer: a folder panel stacked above
          the list it filters pushed the list itself off a phone screen. This
          trigger row names the active folder so the scope stays visible. -->
-    <div v-if="mobileRail" class="flex items-center justify-between gap-1 py-1 pr-1.5 pl-1.5">
+    <div v-if="mobileRail" class="flex items-center justify-between gap-1 py-1 ps-1.5 pe-1.5">
       <OButton
         variant="ghost"
         size="sm"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <div class="folder-header bg-transparent">
           <div
             v-if="!mobileRail"
-            class="text-text-heading pl-page-edge flex items-center justify-between gap-2 py-1.5 pr-1.5 text-sm font-semibold"
+            class="text-text-heading ps-page-edge flex items-center justify-between gap-2 py-1.5 pe-1.5 text-sm font-semibold"
           >
             <span class="truncate">{{ t("dashboard.folders") }}</span>
             <OButton

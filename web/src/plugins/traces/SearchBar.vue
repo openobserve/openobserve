@@ -95,7 +95,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             <OSwitch
               data-test="traces-search-bar-show-metrics-toggle-btn"
               v-model="searchObj.meta.showHistogram"
-              class="o2-toggle-button-xs flex items-center justify-center pr-1"
+              class="o2-toggle-button-xs flex items-center justify-center pe-1"
               size="lg"
             />
             <OIcon name="bar-chart" size="sm" class="shrink-0" />
@@ -113,7 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               variant="outline"
               size="xs"
               icon-left="more-horiz"
-              class="max-md:ml-auto"
+              class="max-md:ms-auto"
             >
               {{ t("search.menuMore") }}
             </OButton>
@@ -151,7 +151,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             data-test="logs-search-bar-date-time-dropdown"
             :queryRangeRestrictionInHour="searchObj.data.datetime.queryRangeRestrictionInHour"
             :queryRangeRestrictionMsg="searchObj.data.datetime.queryRangeRestrictionMsg"
-            class="h-8 max-md:mr-auto"
+            class="h-8 max-md:me-auto"
             @on:date-change="updateDateTime"
             @on:timezone-change="updateTimezone"
           />
@@ -258,7 +258,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         <!-- Service Graph right toolbar: DateTime, Refresh, Tree/Graph tabs, Layout.
              < md the tab labels drop to icons and the select narrows so the
              whole cluster fits one row. -->
-        <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ml-auto max-md:ml-0">
+        <div v-if="searchObj.meta.searchMode === 'service-graph'" class="ms-auto max-md:ms-0">
           <div class="flex items-center gap-2 max-md:w-full max-md:justify-end max-md:gap-1.5">
             <DateTime
               ref="dateTimeRef"
@@ -310,7 +310,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </div>
 
         <!-- Services Catalog right toolbar: DateTime, Refresh -->
-        <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ml-auto">
+        <div v-if="searchObj.meta.searchMode === 'services-catalog'" class="ms-auto">
           <div class="flex items-center gap-2">
             <DateTime
               ref="dateTimeRef"
@@ -323,7 +323,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }"
               :default-relative-time="searchObj.data.datetime.relativeTimePeriod"
               data-test="services-catalog-date-time-picker"
-              class="mr-1.5 h-8!"
+              class="me-1.5 h-8!"
               @on:date-change="updateDateTime"
             />
           </div>

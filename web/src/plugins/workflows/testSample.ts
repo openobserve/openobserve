@@ -79,3 +79,8 @@ export const buildFlatTestSample = (): unknown[] => {
   for (const k of Object.keys(meta)) metaFlat[`meta_${k}`] = meta[k];
   return data.map((row) => ({ ...metaFlat, ...row }));
 };
+
+// The DISPLAY payload: the single event `row` is bound to inside a workflow
+// function, not the wire batch array. The inner data[] stays — those are real
+// query rows the function iterates, unlike the incident sample's empty placeholder.
+export const buildTestDisplaySample = (): unknown => buildTestSample()[0];

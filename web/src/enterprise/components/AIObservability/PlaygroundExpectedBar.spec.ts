@@ -88,6 +88,29 @@ describe("PlaygroundExpectedBar", () => {
     vi.useRealTimers();
   });
 
+  // Sampling can land while the user is typing anywhere on the page — a
+  // passive visual cue is welcome, but yanking keyboard focus away mid-type
+  // is not. This is why flash() and focus() are two separate seams.
+  it("flashes without moving keyboard focus", async () => {
+    vi.useFakeTimers();
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    input.focus();
+
+    const wrapper = mountBar({ required: true });
+    const field = () => wrapper.get('[data-test="ai-playground-expected-field"]');
+
+    (wrapper.vm as unknown as { flash: () => void }).flash();
+    await wrapper.vm.$nextTick();
+
+    expect(field().attributes("data-flashing")).toBe("true");
+    expect(document.activeElement).toBe(input);
+
+    wrapper.unmount();
+    input.remove();
+    vi.useRealTimers();
+  });
+
   // Asking twice must re-arm the flash rather than let the first timer end it
   // half a second into the second one.
   it("restarts the flash when asked again", async () => {

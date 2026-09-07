@@ -17,7 +17,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 <template>
   <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
     <!-- LEFT SIDE: Logo -->
-    <div class="flex shrink-0 items-center justify-start gap-1 pl-3 max-md:pl-1.5">
+    <div class="flex shrink-0 items-center justify-start gap-1 ps-3 max-md:ps-1.5">
       <!-- MOBILE NAV TOGGLE: opens the nav rail as a drawer (< md only) -->
       <OButton
         variant="ghost"
@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           "
           :href="homeUrl"
           @click.prevent="goToHome"
-          class="mr-2 flex cursor-pointer items-center p-0 text-xl font-bold font-semibold text-inherit no-underline"
+          class="me-2 flex cursor-pointer items-center p-0 text-xl font-bold font-semibold text-inherit no-underline"
           >{{ store.state.zoConfig.custom_logo_text }}</a
         >
 
@@ -144,10 +144,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="min-w-0 flex-1" />
 
     <!-- RIGHT SIDE: Controls -->
-    <div class="flex shrink-0 items-center justify-end gap-1 pr-3">
+    <div class="flex shrink-0 items-center justify-end gap-1 pe-3">
       <!-- QUOTA WARNING SECTION: Shows warning when quota threshold is reached -->
       <div
-        class="mr-4 flex items-center gap-1 max-md:hidden"
+        class="me-4 flex items-center gap-1 max-md:hidden"
         v-if="store.state.organizationData.quotaThresholdMsg"
       >
         <div type="warning" icon="cloud" class="bg-status-warning-bg rounded-default inline p-1.25">
@@ -381,7 +381,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                      room on either side, so it expands inline below the row. -->
                 <div
                   v-if="showLanguageSubmenu"
-                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute top-0 right-full z-9999 mr-1 min-w-50 border py-1 shadow-lg max-md:static max-md:mt-1 max-md:mr-0 max-md:w-full max-md:min-w-0 max-md:basis-full max-md:shadow-none dark:shadow-lg"
+                  class="rounded-default bg-dropdown-bg border-dropdown-border absolute top-0 right-full z-9999 me-1 min-w-50 border py-1 shadow-lg max-md:static max-md:me-0 max-md:mt-1 max-md:w-full max-md:min-w-0 max-md:basis-full max-md:shadow-none dark:shadow-lg"
                   data-test="language-dropdown-item"
                   @click.stop
                 >

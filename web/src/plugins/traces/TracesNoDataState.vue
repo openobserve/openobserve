@@ -53,7 +53,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <template #extra>
       <div class="flex flex-wrap items-center justify-center gap-2">
-        <span class="text-text-secondary mr-1 text-sm font-semibold">
+        <span class="text-text-secondary me-1 text-sm font-semibold">
           {{ t("traces.noData.or") }}
         </span>
         <EmptyStateIngestionChip
