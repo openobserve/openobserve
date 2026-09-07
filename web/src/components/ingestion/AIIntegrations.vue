@@ -54,55 +54,54 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       seamless
       data-test="ai-integrations-list-mobile-drawer"
     >
-              <div class="flex h-full flex-col">
-                <div class="ps-2 pe-4 pt-2">
-                  <OSearchInput
-                    data-test="ai-integrations-search-input"
-                    v-model="integrationFilter"
-                    clearable
-                    class="indexlist-search-input w-full"
-                    :placeholder="t('common.search')"
-                  />
-                </div>
-                <div class="min-h-0 flex-1 overflow-y-auto">
-                  <OTabs
-                    v-model="selectedIntegration"
-                    orientation="vertical"
-                    dense
-                    class="px-1"
-                    @update:model-value="onIntegrationPicked"
-                  >
-                    <OTab
-                      v-for="integration in filteredIntegrations"
-                      :key="integration.slug"
-                      :name="integration.routeName"
-                      :label="raw(integration.name)"
-                      :data-test="`ai-integrations-item-${integration.slug}`"
-                    >
-                      <template #icon>
-                        <img
-                          v-if="
-                            (integration.logo || integration.logoDark) &&
-                            !failedLogos.has(integration.slug)
-                          "
-                          :src="(isDark && integration.logoDark) || integration.logo"
-                          :alt="t('common.itemLogo', { name: integration.name })"
-                          class="rounded-default h-4.5 w-4.5 flex-none object-contain"
-                          loading="lazy"
-                          referrerpolicy="no-referrer"
-                          @error="onLogoError(integration.slug)"
-                        />
-                        <span
-                          v-else
-                          class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-bold"
-                          aria-hidden="true"
-                          >{{ integration.name.charAt(0) }}</span
-                        >
-                      </template>
-                    </OTab>
-                  </OTabs>
-                </div>
-              </div>
+      <div class="flex h-full flex-col">
+        <div class="ps-2 pe-4 pt-2">
+          <OSearchInput
+            data-test="ai-integrations-search-input"
+            v-model="integrationFilter"
+            clearable
+            class="indexlist-search-input w-full"
+            :placeholder="t('common.search')"
+          />
+        </div>
+        <div class="min-h-0 flex-1 overflow-y-auto">
+          <OTabs
+            v-model="selectedIntegration"
+            orientation="vertical"
+            dense
+            class="px-1"
+            @update:model-value="onIntegrationPicked"
+          >
+            <OTab
+              v-for="integration in filteredIntegrations"
+              :key="integration.slug"
+              :name="integration.routeName"
+              :label="raw(integration.name)"
+              :data-test="`ai-integrations-item-${integration.slug}`"
+            >
+              <template #icon>
+                <img
+                  v-if="
+                    (integration.logo || integration.logoDark) && !failedLogos.has(integration.slug)
+                  "
+                  :src="(isDark && integration.logoDark) || integration.logo"
+                  :alt="t('common.itemLogo', { name: integration.name })"
+                  class="rounded-default h-4.5 w-4.5 flex-none object-contain"
+                  loading="lazy"
+                  referrerpolicy="no-referrer"
+                  @error="onLogoError(integration.slug)"
+                />
+                <span
+                  v-else
+                  class="rounded-default bg-theme-accent text-text-inverse text-3xs grid h-4.5 w-4.5 flex-none place-items-center leading-none font-bold"
+                  aria-hidden="true"
+                  >{{ integration.name.charAt(0) }}</span
+                >
+              </template>
+            </OTab>
+          </OTabs>
+        </div>
+      </div>
     </ODrawer>
   </div>
 

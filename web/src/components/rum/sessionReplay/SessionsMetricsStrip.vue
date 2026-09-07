@@ -34,7 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       @click="card.selectable && emit('select', card.key)"
     >
       <span
-        class="text-text-label text-xs font-medium tracking-wide uppercase max-lg:w-full max-lg:truncate max-lg:text-3xs"
+        class="text-text-label max-lg:text-3xs text-xs font-medium tracking-wide uppercase max-lg:w-full max-lg:truncate"
         >{{ card.label }}</span
       >
       <span class="flex items-baseline gap-1.5">

@@ -29,7 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :data-test="`rum-errors-kpi-${card.key}-card`"
     >
       <span
-        class="text-text-label flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase max-md:block max-md:w-full max-md:truncate max-md:text-3xs"
+        class="text-text-label max-md:text-3xs flex items-center gap-1.5 text-xs font-medium tracking-wide uppercase max-md:block max-md:w-full max-md:truncate"
       >
         {{ card.label }}
         <OTag
@@ -51,9 +51,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         >{{ card.value }}</span
       >
 
-      <small v-if="!loading" class="max-md:hidden" :data-test="`rum-errors-kpi-${card.key}-caption`">{{
-        card.caption
-      }}</small>
+      <small
+        v-if="!loading"
+        class="max-md:hidden"
+        :data-test="`rum-errors-kpi-${card.key}-caption`"
+        >{{ card.caption }}</small
+      >
     </article>
   </section>
 </template>

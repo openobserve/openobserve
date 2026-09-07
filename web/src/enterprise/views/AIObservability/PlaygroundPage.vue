@@ -59,7 +59,11 @@
       >
         {{ t("aiObservability.playground.reset") }}
       </OButton>
-      <span v-if="!isMobile" class="text-text-secondary text-xs" data-test="ai-playground-window-count">
+      <span
+        v-if="!isMobile"
+        class="text-text-secondary text-xs"
+        data-test="ai-playground-window-count"
+      >
         {{
           t("aiObservability.playground.windowCount", {
             count: draft.variants.length,
@@ -91,7 +95,11 @@
     </template>
 
     <template #actions>
-      <span v-if="isMobile" class="text-text-secondary text-xs" data-test="ai-playground-window-count">
+      <span
+        v-if="isMobile"
+        class="text-text-secondary text-xs"
+        data-test="ai-playground-window-count"
+      >
         {{
           t("aiObservability.playground.windowCount", {
             count: draft.variants.length,

@@ -89,8 +89,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div class="flex flex-col gap-1 max-md:min-w-0 max-md:max-w-full max-md:items-center">
-                <div class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm">
+              <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
+                <div
+                  class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm"
+                >
                   {{ hasNoData ? raw("NA") : (profileData?.data_records || 0).toLocaleString() }}
                 </div>
                 <div class="text-3xs text-text-secondary max-md:hidden">
@@ -123,8 +125,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div class="flex flex-col gap-1 max-md:min-w-0 max-md:max-w-full max-md:items-center">
-                <div class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm">
+              <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
+                <div
+                  class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm"
+                >
                   {{ hasNoData ? raw("NA") : (profileData?.scan_records || 0).toLocaleString() }}
                 </div>
                 <div class="text-3xs text-text-secondary max-md:hidden">
@@ -163,8 +167,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </svg>
                 </div>
               </div>
-              <div class="flex flex-col gap-1 max-md:min-w-0 max-md:max-w-full max-md:items-center">
-                <div class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm">
+              <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
+                <div
+                  class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm"
+                >
                   {{
                     hasNoData
                       ? raw("NA")
@@ -231,7 +237,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </svg>
                 </div>
               </div>
-              <div class="flex flex-col gap-1 max-md:min-w-0 max-md:max-w-full max-md:items-center">
+              <div class="flex flex-col gap-1 max-md:max-w-full max-md:min-w-0 max-md:items-center">
                 <div
                   class="truncate overflow-hidden font-mono text-sm leading-tight font-semibold max-md:max-w-full max-md:text-xs"
                   :class="hasNoData ? 'text-text-secondary' : 'text-text-link'"
