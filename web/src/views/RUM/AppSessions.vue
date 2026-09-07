@@ -18,7 +18,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
   <div class="sessions_page flex min-h-0 flex-1 flex-col overflow-hidden">
     <template v-if="isSessionReplayEnabled">
       <div>
-        <div class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5">
+        <div
+          class="bg-card-glass-bg border-border-default px-page-edge border-b py-1.5"
+          data-drawer-anchor="rum-sessions-toolbar"
+        >
           <!-- < md the editor takes its own row and the controls wrap below. -->
           <div class="flex items-start gap-1 max-md:flex-wrap">
             <!-- Query editor (flex-grow to fill available space) -->
@@ -136,6 +139,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :width="80"
         bleed
         :title="t('search.showFields')"
+        anchor='[data-drawer-anchor="rum-sessions-toolbar"]'
         data-test="rum-sessions-mobile-fields-drawer"
       >
         <SearchFieldList

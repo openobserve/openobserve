@@ -284,6 +284,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="sm"
       bleed
       seamless
+      anchor="#tracesThirdLevel"
       data-test="traces-mobile-fields-drawer"
     >
       <div class="flex h-full flex-col overflow-hidden pt-2.5">

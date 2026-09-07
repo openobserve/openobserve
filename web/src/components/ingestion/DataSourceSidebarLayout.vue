@@ -65,7 +65,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         </slot>
       </OTabs>
     </div>
-    <div v-else class="border-border-default flex shrink-0 items-center border-b px-2 py-1">
+    <div
+      v-else
+      class="border-border-default flex shrink-0 items-center border-b px-2 py-1"
+      data-drawer-anchor="data-source-sidebar"
+    >
       <OButton
         variant="ghost"
         size="sm"
@@ -86,6 +90,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="sm"
       bleed
       seamless
+      anchor='[data-drawer-anchor="data-source-sidebar"]'
       data-test="data-source-sidebar-mobile-drawer"
     >
       <div

@@ -94,7 +94,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- ── Body (mobile): sidebar collapses into an off-canvas drawer ── -->
     <template v-if="!!slots.sidebar && isMobile">
-      <div class="border-border-default px-page-edge flex shrink-0 items-center border-b py-1">
+      <div
+        class="border-border-default px-page-edge flex shrink-0 items-center border-b py-1"
+        data-drawer-anchor="page-layout-sidebar"
+      >
         <OButton
           variant="ghost"
           size="sm"
@@ -118,6 +121,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         size="sm"
         bleed
         seamless
+        anchor='[data-drawer-anchor="page-layout-sidebar"]'
         data-test="o-page-layout-mobile-sidebar-drawer"
       >
         <div class="flex h-full flex-col overflow-hidden">

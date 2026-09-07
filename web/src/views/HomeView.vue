@@ -90,7 +90,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <HomeChatHistory class="max-md:hidden" @load-chat="onLoadChat" @new-chat="onNewChat" />
           <!-- In-flow toggle bar (not a floating overlay — it would sit over the
                message list once the chat scrolls). -->
-          <div v-if="isMobile" class="flex shrink-0 items-center pb-1">
+          <div
+            v-if="isMobile"
+            class="flex shrink-0 items-center pb-1"
+            data-drawer-anchor="home-chats"
+          >
             <OButton
               variant="outline"
               size="sm"
@@ -109,6 +113,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             size="sm"
             bleed
             seamless
+            anchor='[data-drawer-anchor="home-chats"]'
             data-test="home-mobile-chats-drawer"
           >
             <HomeChatHistory

@@ -83,6 +83,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :width="80"
           bleed
           :title="t('common.filters')"
+          anchor='[data-test="alert-library-toolbar"]'
           data-test="alert-library-mobile-filters-drawer"
         >
           <LibraryRail

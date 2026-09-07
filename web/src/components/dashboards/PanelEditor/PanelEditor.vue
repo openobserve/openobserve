@@ -99,6 +99,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   <div
                     v-if="isMobile"
                     class="border-border-default flex items-center border-b px-2 py-1.5"
+                    data-drawer-anchor="panel-editor-fields"
                   >
                     <OButton
                       variant="outline"
@@ -485,6 +486,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                 <div
                   v-if="isMobile"
                   class="border-border-default flex items-center border-b px-2 py-1.5"
+                  data-drawer-anchor="panel-editor-fields"
                 >
                   <OButton
                     variant="outline"
@@ -650,6 +652,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="sm"
       bleed
       :title="t('panel.fields')"
+      anchor='[data-drawer-anchor="panel-editor-fields"]'
       data-test="panel-editor-mobile-fields-drawer"
     >
       <div class="flex h-full min-h-0 flex-col">

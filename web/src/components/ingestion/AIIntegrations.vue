@@ -29,7 +29,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         />
       </OTabs>
     </div>
-    <div class="border-border-default flex shrink-0 items-center border-b px-2 py-1">
+    <div
+      class="border-border-default flex shrink-0 items-center border-b px-2 py-1"
+      data-drawer-anchor="ai-integrations-list"
+    >
       <OButton
         variant="ghost"
         size="sm"
@@ -52,6 +55,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       size="sm"
       bleed
       seamless
+      anchor='[data-drawer-anchor="ai-integrations-list"]'
       data-test="ai-integrations-list-mobile-drawer"
     >
       <div class="flex h-full flex-col">

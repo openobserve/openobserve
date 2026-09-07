@@ -149,6 +149,14 @@ export interface DrawerProps {
    */
   portalTarget?: string | HTMLElement | null;
 
+  /**
+   * Element (or CSS selector) whose top edge becomes the drawer's top. The
+   * overlay and panel start there, so the app chrome above a mobile side panel
+   * stays visible; the panel opens "from its own row". Measured on open/resize.
+   * @default undefined  (full viewport height)
+   */
+  anchor?: string | HTMLElement | null;
+
   /** Render the portal in place for a contained drawer surface. Default: false. */
   inline?: boolean;
 }

@@ -57,6 +57,7 @@ const props = withDefaults(defineProps<DrawerProps>(), {
   neutralButtonLoading: false,
   lazy: true,
   portalTarget: undefined,
+  anchor: undefined,
 });
 
 const emit = defineEmits<DrawerEmits>();
@@ -199,9 +200,36 @@ const isContained = computed(() => !!props.portalTarget);
 // on a phone), so it clamps to 88% — near-full for content, while the visible
 // overlay strip keeps it reading as a drawer rather than a page swap.
 const { isMobile } = useBreakpoint();
+
+// ── Anchored top edge ────────────────────────────────────────────────────────
+// Measured (not CSS) because the anchor row lives in the page while the drawer
+// is portaled to <body>; re-measured on resize so rotation keeps it aligned.
+const anchorTop = ref(0);
+function measureAnchor() {
+  const a = props.anchor;
+  const el = typeof a === "string" ? document.querySelector<HTMLElement>(a) : a;
+  anchorTop.value = el ? Math.max(0, Math.round(el.getBoundingClientRect().top)) : 0;
+}
+watchEffect((cleanup) => {
+  if (!internalOpen.value || !props.anchor) {
+    anchorTop.value = 0;
+    return;
+  }
+  measureAnchor();
+  window.addEventListener("resize", measureAnchor);
+  cleanup(() => window.removeEventListener("resize", measureAnchor));
+});
+const anchorStyle = computed(() =>
+  anchorTop.value > 0
+    ? { top: `${anchorTop.value}px`, height: `calc(100% - ${anchorTop.value}px)` }
+    : {},
+);
+const overlayStyle = computed(() => ({ zIndex: overlayZIndex.value, ...anchorStyle.value }));
+
 const contentStyle = computed(() => {
   const style: Record<string, string | number> = {
     zIndex: contentZIndex.value,
+    ...anchorStyle.value,
   };
   if (props.width != null) {
     const w = isMobile.value ? Math.min(100, Math.max(88, props.width)) : props.width;
@@ -330,7 +358,7 @@ watch(internalOpen, (open) => {
           'data-[state=closed]:animate-out data-[state=closed]:fade-out-0',
           'data-[state=closed]:duration-120 data-[state=open]:duration-120',
         ]"
-        :style="{ zIndex: overlayZIndex }"
+        :style="overlayStyle"
       />
 
       <!-- Drawer panel -->

@@ -24,7 +24,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- < md the rail moves into a left drawer: a folder panel stacked above
          the list it filters pushed the list itself off a phone screen. This
          trigger row names the active folder so the scope stays visible. -->
-    <div v-if="mobileRail" class="flex items-center justify-between gap-1 py-1 ps-1.5 pe-1.5">
+    <div
+      v-if="mobileRail"
+      class="flex items-center justify-between gap-1 py-1 ps-1.5 pe-1.5"
+      data-drawer-anchor="folder-list"
+    >
       <OButton
         variant="ghost"
         size="sm"
@@ -250,6 +254,7 @@ export default defineComponent({
             size: "sm",
             bleed: true,
             title: t("dashboard.folders"),
+            anchor: '[data-drawer-anchor="folder-list"]',
             "onUpdate:open": (v: boolean) => (mobileDrawerOpen.value = v),
           }
         : {},
