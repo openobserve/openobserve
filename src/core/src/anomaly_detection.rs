@@ -461,6 +461,7 @@ pub async fn create_config(
         status: 0i32, // 0 = waiting
         retries: 0,
         last_failed_at: None,
+        last_alert_fired_at: None,
         last_updated: now_us,
         // Seasonality is auto-determined at training time from training_window_days;
         // initialise to "none" as a placeholder until the first training run.
@@ -1007,6 +1008,7 @@ pub async fn clone_config(
         status: 0i32,
         retries: 0,
         last_failed_at: None,
+        last_alert_fired_at: None,
         last_updated: now_us,
         created_at: now_us,
         updated_at: now_us,
@@ -1436,8 +1438,30 @@ fn validate_config_request(req: &CreateAnomalyConfigRequest) -> Result<()> {
     }
 
     // Validate interval strings
-    parse_interval(&req.histogram_interval)?;
-    parse_interval(&req.schedule_interval)?;
+    let histogram_secs = parse_interval(&req.histogram_interval)?;
+    let schedule_secs = parse_interval(&req.schedule_interval)?;
+
+    // The two intervals must match. Both mismatches are live production faults:
+    // `default/ingester_health` runs a 1m schedule against 5m buckets, so every run
+    // scores a fifth of a bucket against a full-bucket baseline -- an apparent 80%
+    // drop, forever, at a ceiling of 1440 alerts/day. `default/ingester_offline`
+    // is the inverse, 5m against 1m buckets, which silently skips buckets.
+    if schedule_secs < histogram_secs {
+        anyhow::bail!(
+            "schedule_interval ({}) must not be shorter than histogram_interval ({}): each run \
+             would score a partial bucket against a full-bucket baseline",
+            req.schedule_interval,
+            req.histogram_interval
+        );
+    }
+    if schedule_secs % histogram_secs != 0 {
+        anyhow::bail!(
+            "schedule_interval ({}) must be a whole multiple of histogram_interval ({}): \
+             otherwise runs straddle bucket boundaries and rescore partial data",
+            req.schedule_interval,
+            req.histogram_interval
+        );
+    }
 
     Ok(())
 }
@@ -2433,6 +2457,42 @@ mod tests {
             merge_trigger_run_state(&mut obj, "{not json");
 
             assert!(obj.is_empty());
+        }
+    }
+
+    /// Both directions of interval mismatch are live production faults, so both
+    /// must be rejected at creation rather than producing silently wrong scores.
+    #[test]
+    fn test_validate_rejects_schedule_shorter_than_histogram() {
+        // default/ingester_health: 1m schedule, 5m buckets -> scores 0.2 of a bucket.
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "1m".to_string();
+        req.histogram_interval = "5m".to_string();
+        let err = validate_config_request(&req).unwrap_err().to_string();
+        assert!(err.contains("must not be shorter"), "got: {err}");
+    }
+
+    #[test]
+    fn test_validate_rejects_schedule_not_a_multiple_of_histogram() {
+        // default/ingester_offline: 5m schedule, 1m buckets is a clean multiple and
+        // allowed; 7m against 5m straddles boundaries and is not.
+        let mut req = make_valid_filters_req();
+        req.schedule_interval = "7m".to_string();
+        req.histogram_interval = "5m".to_string();
+        let err = validate_config_request(&req).unwrap_err().to_string();
+        assert!(err.contains("whole multiple"), "got: {err}");
+    }
+
+    #[test]
+    fn test_validate_accepts_matching_and_multiple_intervals() {
+        for (sched, hist) in [("5m", "5m"), ("1h", "5m"), ("10m", "5m"), ("5m", "1m")] {
+            let mut req = make_valid_filters_req();
+            req.schedule_interval = sched.to_string();
+            req.histogram_interval = hist.to_string();
+            assert!(
+                validate_config_request(&req).is_ok(),
+                "{sched} against {hist} must be accepted"
+            );
         }
     }
 }

@@ -96,6 +96,7 @@ const ANOMALY_EXPORT_STRIPPED_KEYS: [&str; 9] = [
     "last_error",
     "retries",
     "last_failed_at",
+    "last_alert_fired_at",
 ];
 
 /// CreateAlert

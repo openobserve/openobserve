@@ -50,6 +50,7 @@ pub struct Model {
     pub retries: i32,
     /// When the last training attempt FAILED, in microseconds — the retry backoff's anchor.
     pub last_failed_at: Option<i64>,
+    pub last_alert_fired_at: Option<i64>,
     pub last_updated: i64,
     pub created_at: i64,
     pub updated_at: i64,
@@ -112,6 +113,7 @@ mod tests {
             status: 0,
             retries: 0,
             last_failed_at: None,
+            last_alert_fired_at: None,
             last_updated: 0,
             created_at: 1000,
             updated_at: 1000,

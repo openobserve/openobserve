@@ -278,6 +278,8 @@ fn patch_all_fields(active: &mut anomaly_detection_config::ActiveModel, src: Mod
     active.updated_at = Set(src.updated_at);
     // created_at is NOT patched — it is set once at insert time and never changed.
     // last_failed_at is NOT patched: a replicated anchor can only corrupt the local backoff.
+    // last_alert_fired_at is NOT patched either: each region alerts to its own
+    // destinations, so a peer's fire time must not suppress a local alert.
 }
 
 /// Collapses the `filters` shapes that mean "no filters" to NULL, on every model-based write.
@@ -294,6 +296,7 @@ fn into_active_model(mut m: Model) -> anomaly_detection_config::ActiveModel {
     m.filters = normalize_filters(m.filters);
     // Held local like patch_all_fields does: a new row inherits no peer's anchor.
     m.last_failed_at = None;
+    m.last_alert_fired_at = None;
     // For inserts the PK must be Set (it is not auto-increment).
     // `into_active_model()` sets every field including PK as Set, which is
     // correct for INSERT — only UPDATE requires the PK to be Unchanged.
@@ -344,6 +347,7 @@ mod tests {
             status: 0,
             retries: 0,
             last_failed_at: None,
+            last_alert_fired_at: None,
             last_updated: 0,
             created_at: 1_000_000,
             updated_at: 1_000_000,
