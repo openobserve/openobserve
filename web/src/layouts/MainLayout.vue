@@ -1256,6 +1256,8 @@ export default defineComponent({
     };
 
     const toggleAIChat = () => {
+      // ai_enabled arrives with the async /config response, so it can't gate registration.
+      if (!store.state.zoConfig.ai_enabled) return;
       // On the home page, switch to the AI tab instead of opening the side panel
       if (router.currentRoute.value.name === "home") {
         window.dispatchEvent(new CustomEvent("o2:home-switch-tab", { detail: "ai" }));
@@ -1368,7 +1370,10 @@ export default defineComponent({
     };
 
     // ── Global shortcuts: AI Chat ─────────────────────────────────────────
-    useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
+    // O2 AI is enterprise-only: on OSS the Ctrl+B binding must not exist at all.
+    if (config.isEnterprise == "true") {
+      useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
+    }
 
     return {
       isDark,
