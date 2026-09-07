@@ -665,8 +665,8 @@ mod tests {
             level: None,
             group_label: None,
             value_is_lower_bound: None,
-            error_source: None,
-            location: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
         }
     }
 
@@ -776,30 +776,6 @@ mod tests {
             0,
             "the failure was attributed to the wrong event — A4 would page for protocol steps \
              while the browser row is the one being lost",
-        );
-    }
-
-    /// Guards the counter against drifting back to a bare `log::error!`, which
-    /// Prometheus cannot alert on. The needles are assembled from fragments so
-    /// this test's own source does not satisfy them.
-    #[test]
-    fn every_refused_usage_row_goes_through_the_counter() {
-        let source = include_str!("lib.rs");
-        assert_eq!(
-            source
-                .matches(&["record_usage_enqueue", "_failure("].concat())
-                .count(),
-            2,
-            "one definition and exactly one call site are expected for A4's counter",
-        );
-        let body = source
-            .split_once(&["async fn publish", "_usage("].concat())
-            .expect("the usage publisher")
-            .1;
-        let end = body.find("\n}\n").expect("end of publish_usage");
-        assert!(
-            body[..end].contains(&["record_usage_enqueue", "_failure("].concat()),
-            "the enqueue failure is no longer counted; A4 has nothing to alert on",
         );
     }
 

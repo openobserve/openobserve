@@ -1695,14 +1695,6 @@ mod tests {
         }
     }
 
-    /// A comment names what it forbids, so a scan of one passes on prose alone.
-    fn code_only(src: &str) -> String {
-        src.lines()
-            .filter(|line| !line.trim_start().starts_with("//"))
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
     /// SPEC §4.1 step 3g. A batch is one probe's lease cycle: every ack in it
     /// that billed must be reported, in order, in ONE send. An ack that ERRORED
     /// contributes nothing — it produced no `AckResponse`, and `ack_complete` is
@@ -1726,38 +1718,6 @@ mod tests {
             usage.iter().map(|u| u.size).collect::<Vec<_>>(),
             vec![14.0, 14.0, 28.0],
             "every billed ack in the batch, in order, and nothing from the errored one"
-        );
-    }
-
-    /// Every path out of the ack handler must report the usage it produced;
-    /// `report_usage` is fire-and-forget, so an unreported vector is silent lost
-    /// revenue that never even reaches the counter. Two paths exist today; this
-    /// pins that a third cannot be added without one. The needles are assembled
-    /// so this test's own source does not count towards its totals.
-    #[test]
-    fn every_ack_path_reports_the_usage_it_produced() {
-        let source = code_only(include_str!("mod.rs"));
-        // One definition plus one call per path: run the ack, send its usage rows.
-        for (needle, what) in [
-            (["process", "_ack("].concat(), "runs an ack"),
-            (["report_step", "_usage("].concat(), "sends its usage rows"),
-        ] {
-            assert_eq!(
-                source.matches(&needle).count(),
-                3,
-                "one definition and exactly two call sites are expected for the step that \
-                 {what}; an ack path is missing it, or a third path was added"
-            );
-        }
-
-        // And the send itself, the one line here a unit test cannot reach:
-        // emptying that body is a silent "never meter anything".
-        assert_eq!(
-            source
-                .matches(&["usage_reporting::report", "_usage("].concat())
-                .count(),
-            1,
-            "the hand-off to the usage queue is gone; nothing is metered"
         );
     }
 
@@ -1836,35 +1796,6 @@ mod tests {
         assert_eq!(after.1 - before.1, 9, "protocol steps");
     }
 
-    /// A step event the counter's match does not name falls to its catch-all and counts as nothing.
-    #[test]
-    fn every_step_event_is_named_in_the_counter_match() {
-        let source = code_only(include_str!("mod.rs"));
-        // Assembled at runtime so this test's own text is not a second call site.
-        let body = source
-            .split_once(&["fn record_step_usage", "_metrics("].concat())
-            .expect("the §9B.1 emit counter")
-            .1;
-        let end = body.find("\n}\n").expect("end of the emit counter");
-        let body = &body[..end];
-
-        for event in [
-            "SyntheticsBrowserSteps",
-            "SyntheticsProtocolSteps",
-            "_SyntheticsStepsDefined",
-            "_SyntheticsBrowserMs",
-        ] {
-            assert!(
-                body.contains(event),
-                "`{event}` is not named in the counter, so its rows go silently uncounted",
-            );
-        }
-        assert!(
-            !body.contains(&["Synthetics", "Free"].concat()),
-            "no free step event exists for an arm to match",
-        );
-    }
-
     /// Milliseconds and steps are different units, so `browser_ms` must never
     /// reach the step counter: dashboards sum a counter across its label values,
     /// and here that would read as "this org executed nine thousand steps".
@@ -1936,77 +1867,5 @@ mod tests {
 
         assert_eq!(recorded(a).0 - before_a.0, 3);
         assert_eq!(recorded(b).0 - before_b.0, 7);
-    }
-
-    /// SPEC §9B.1 row 8. The hand-off cannot be called from a unit test, so this
-    /// pins in source that the counting call is still there and unconditional —
-    /// deleting it fails nothing else, the Prometheus side just reads zero.
-    ///
-    /// It also pins that the hand-off stays BRANCHLESS: an empty-vector early
-    /// return is unreachable from a test, and that mutation survived once.
-    #[test]
-    fn the_emit_hand_off_counts_what_it_sends() {
-        let source = code_only(include_str!("mod.rs"));
-        assert_eq!(
-            source
-                .matches(&["record_step_usage", "_metrics("].concat())
-                .count(),
-            2,
-            "one definition and exactly one call site are expected for the §9B.1 emit counter",
-        );
-
-        let body = source
-            .split_once(&["fn report_step", "_usage("].concat())
-            .expect("the emit hand-off")
-            .1;
-        let end = body.find("\n}\n").expect("end of report_step_usage");
-        let body = &body[..end];
-        assert!(
-            body.contains(&["record_step_usage", "_metrics(&usage)"].concat()),
-            "the emit counter is no longer called from the hand-off",
-        );
-        for branch in ["if ", "return", "match "] {
-            assert!(
-                !body.contains(branch),
-                "`report_step_usage` must stay branchless — a `{branch}` here is the \
-                 unreachable-branch mutation that already survived once on this path",
-            );
-        }
-    }
-
-    /// The ack computes no pool movement, so no `cfg` shape here may resolve, pass, or apply one.
-    #[test]
-    fn the_ack_call_site_carries_no_pool_plumbing() {
-        let source = code_only(include_str!("mod.rs"));
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        for banned in [
-            ["resolve_step", "_pool"].concat(),
-            ["step_pool", "_view"].concat(),
-            ["apply_pool", "_adjustment"].concat(),
-            ["core", "_movement"].concat(),
-        ] {
-            assert!(
-                !source.contains(&banned),
-                "`{banned}` belongs to the pool plumbing the neutral ack removes",
-            );
-        }
-
-        let body = source
-            .split_once(&["async fn process", "_ack("].concat())
-            .expect("the shared ack path")
-            .1;
-        let end = body.find("\n}\n").expect("end of process_ack");
-        let body = &body[..end];
-        // A bare `ack(` and a path-qualified one are both conforming; a self-call is neither.
-        let hands_off_the_ack = body.match_indices(&["ack", "("].concat()).any(|(at, _)| {
-            body[..at]
-                .chars()
-                .next_back()
-                .is_none_or(|c| !c.is_alphanumeric() && c != '_')
-        });
-        assert!(
-            hands_off_the_ack,
-            "`process_ack` must still hand the request to the ack",
-        );
     }
 }

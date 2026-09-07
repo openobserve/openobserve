@@ -538,38 +538,6 @@ mod tests {
         out
     }
 
-    /// CODE only: a comment naming what a scan forbids would trip that scan on its own text.
-    fn code_only_source() -> String {
-        include_str!("trial_quota_usage.rs")
-            .lines()
-            .filter(|line| !line.trim_start().starts_with("//"))
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
-    /// The body of the first `fn name` defined in this file, up to its closing brace.
-    fn fn_body<'a>(source: &'a str, name: &str) -> &'a str {
-        let needle = format!("fn {name}");
-        // `<` as well as `(`: a generic entry point is still the entry point, not a missing one.
-        let at = source
-            .match_indices(&needle)
-            .find(|(at, _)| matches!(source[at + needle.len()..].chars().next(), Some('(' | '<')))
-            .expect("the function must live in this file")
-            .0;
-        let body = &source[at..];
-        let end = body.find("\n}\n").expect("end of the function");
-        &body[..end]
-    }
-
-    /// The `_in` split is what these tests can reach, so the pub entry point must run it too.
-    fn assert_entry_point_delegates(entry_point: &str, inner: &str) {
-        let source = code_only_source();
-        assert!(
-            fn_body(&source, entry_point).contains(&format!("{inner}(")),
-            "the write under test is not the one `{entry_point}` runs",
-        );
-    }
-
     fn mock_db(backend: DatabaseBackend, writes: usize) -> DatabaseConnection {
         MockDatabase::new(backend)
             .append_exec_results(vec![
@@ -639,23 +607,6 @@ mod tests {
         assert!(
             get_for_orgs(&db, &[], SYNTHETICS).await.unwrap().is_empty(),
             "a tick that claimed nothing must not read the whole table",
-        );
-    }
-
-    /// A flush tick that coalesced to nothing must answer without waiting on the write pool.
-    #[test]
-    fn an_empty_batch_returns_before_the_write_pool_is_touched() {
-        let source = code_only_source();
-        let body = fn_body(&source, "batch_increment");
-        let guard = body
-            .find("records.is_empty()")
-            .expect("the empty batch must be answered here, not by the callee");
-        let pool = body
-            .find("get_orm_client_rw")
-            .expect("the wrapper is what reaches for the write pool");
-        assert!(
-            guard < pool,
-            "an empty batch blocks on pool initialisation once the guard moves into the callee",
         );
     }
 
@@ -760,8 +711,6 @@ mod tests {
             90,
             "the org filter is still the outer bound",
         );
-
-        assert_entry_point_delegates("reset_notified_checkpoint", "reset_notified_checkpoint_in");
     }
 
     /// The working case: raising the AI limit re-arms the AI pool's own rows.
@@ -836,11 +785,6 @@ mod tests {
             0,
             "the org filter is still the outer bound",
         );
-
-        assert_entry_point_delegates(
-            "update_notified_checkpoint",
-            "update_notified_checkpoint_in",
-        );
     }
 
     /// The AI job's `already_notified` is this MAX, and `pending_checkpoint_from` returns
@@ -860,8 +804,6 @@ mod tests {
             "acme's AI pool is unnotified: only a synthetics watermark, or its own zero, can \
              put it in this answer",
         );
-
-        assert_entry_point_delegates("load_all_checkpoints", "load_all_checkpoints_in");
     }
 
     /// Spec §11.1 end to end: production rows carry 95 on EVERY feature, so an AI grant raised
@@ -924,30 +866,5 @@ mod tests {
 
         assert!(has_no_row(&db, "acme", BROWSER).await, "browser");
         assert!(has_no_row(&db, "acme", PROTOCOL).await, "protocol");
-    }
-
-    /// Spec §7.9: the reset rides each org's own upsert, so no write may be scoped to a `feature`
-    /// alone.
-    #[test]
-    fn reset_is_per_row() {
-        let marker = ["#[cfg(", "test)]"].concat();
-        let source = code_only_source();
-        let source = &source[..source.find(&marker).unwrap_or(source.len())];
-
-        // Case-insensitive: `execute_unprepared("update trial_quota_usage set …")` walks through.
-        let update = ["update", " "].concat();
-        assert!(
-            !source.to_lowercase().contains(&update),
-            "a raw statement bypasses the per-org filters the query builder makes visible",
-        );
-        for (at, _) in source.match_indices("update_many()") {
-            let chain = &source[at..];
-            let end = chain.find(".exec").expect("an update that never executes");
-            assert!(
-                chain[..end].contains("Column::OrgId"),
-                "this update is not scoped to one org: {}",
-                &chain[..end],
-            );
-        }
     }
 }

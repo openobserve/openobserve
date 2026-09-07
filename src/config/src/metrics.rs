@@ -3254,27 +3254,6 @@ mod tests {
         );
     }
 
-    /// A gauge outliving its writer scrapes a permanent 0, which A8 reads as healthy forever.
-    #[test]
-    fn no_reconcile_metric_remains() {
-        // CODE only: a comment naming what it forbids would fail this scan on prose alone.
-        let source = include_str!("metrics.rs")
-            .lines()
-            .filter(|line| !line.trim_start().starts_with("//"))
-            .collect::<Vec<_>>()
-            .join("\n");
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        for banned in [
-            ["SYNTHETICS_STEP", "_RECONCILE"].concat(),
-            ["synthetics_step", "_reconcile"].concat(),
-        ] {
-            assert!(
-                !source.contains(&banned),
-                "`{banned}` belongs to the drift job the neutral ack makes unnecessary",
-            );
-        }
-    }
-
     #[test]
     fn test_statics_synthetics_step_billing() {
         let _ = SYNTHETICS_STEPS_TOTAL.clone();

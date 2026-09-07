@@ -351,10 +351,10 @@ pub struct TriggerData {
     /// Which failure produced this row. The three synthetics failure paths share
     /// one stream and one `status`, so only this separates them for an alert rule.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub error_source: Option<String>,
-    /// The venue the failed slot was scheduled for.
+    pub synthetics_error_source: Option<String>,
+    /// The venue the failed synthetics slot was scheduled for.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub location: Option<String>,
+    pub synthetics_location: Option<String>,
 }
 
 impl Default for TriggerData {
@@ -392,8 +392,8 @@ impl Default for TriggerData {
             level: None,
             group_label: None,
             value_is_lower_bound: None,
-            error_source: None,
-            location: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
         }
     }
 }
@@ -442,8 +442,8 @@ impl TriggerData {
             level: Some(0),
             group_label: Some(String::new()),
             value_is_lower_bound: Some(false),
-            error_source: Some(String::new()),
-            location: Some(String::new()),
+            synthetics_error_source: Some(String::new()),
+            synthetics_location: Some(String::new()),
         }
     }
 
@@ -1759,8 +1759,8 @@ mod tests {
             level: None,
             group_label: None,
             value_is_lower_bound: None,
-            error_source: None,
-            location: None,
+            synthetics_error_source: None,
+            synthetics_location: None,
         };
 
         let json = serde_json::to_string(&trigger_data).unwrap();
@@ -2675,23 +2675,23 @@ mod tests {
 
     /// Every `TriggerData` writer shares one inferred schema, so an unset field must stay ABSENT.
     #[test]
-    fn trigger_data_error_source_and_location_round_trip_and_omit_when_none() {
+    fn trigger_data_synthetics_fields_round_trip_and_omit_when_none() {
         let bare = TriggerData::default();
-        assert_eq!(bare.error_source, None);
-        assert_eq!(bare.location, None);
+        assert_eq!(bare.synthetics_error_source, None);
+        assert_eq!(bare.synthetics_location, None);
 
         let json = serde_json::to_value(&bare).expect("TriggerData must serialize");
-        assert!(json.get("error_source").is_none());
-        assert!(json.get("location").is_none());
+        assert!(json.get("synthetics_error_source").is_none());
+        assert!(json.get("synthetics_location").is_none());
 
         let tagged = TriggerData {
-            error_source: Some("quota".to_string()),
-            location: Some("aws-us-east-1".to_string()),
+            synthetics_error_source: Some("quota".to_string()),
+            synthetics_location: Some("aws-us-east-1".to_string()),
             ..TriggerData::default()
         };
         let json = serde_json::to_value(&tagged).expect("TriggerData must serialize");
-        assert_eq!(json["error_source"], "quota");
-        assert_eq!(json["location"], "aws-us-east-1");
+        assert_eq!(json["synthetics_error_source"], "quota");
+        assert_eq!(json["synthetics_location"], "aws-us-east-1");
 
         let back: TriggerData =
             serde_json::from_value(json).expect("a tagged row must read back unchanged");
@@ -2701,11 +2701,11 @@ mod tests {
             serde_json::to_value(&bare).expect("TriggerData must serialize"),
         )
         .expect("a row written before these fields existed must still deserialize");
-        assert_eq!(untagged.error_source, None);
-        assert_eq!(untagged.location, None);
+        assert_eq!(untagged.synthetics_error_source, None);
+        assert_eq!(untagged.synthetics_location, None);
 
         let names = TriggerData::get_field_names();
-        for field in ["error_source", "location"] {
+        for field in ["synthetics_error_source", "synthetics_location"] {
             assert!(
                 names.contains(&field.to_string()),
                 "`skip_serializing_if` keeps `{field}` out of the reflection sample unless \

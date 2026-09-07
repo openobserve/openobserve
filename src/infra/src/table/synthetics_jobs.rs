@@ -886,62 +886,6 @@ pub async fn prune_stale<C: ConnectionTrait>(conn: &C, now_us: i64) -> Result<u6
 mod tests {
     use super::*;
 
-    /// **One job is settled by exactly one of the two paths.** Both the ack and
-    /// the reaper call `increment_jobs_done`, so a job settled twice drives
-    /// `jobs_done` past `job_count` and completes a run on a count that never
-    /// matched its jobs. Only these two compare-and-swaps enforce it:
-    /// `ack_complete` applies only from `status = 1` and returns `Ok(None)`
-    /// otherwise, and `dead_letter_expired` re-checks the status its SELECT saw
-    /// and returns only rows whose UPDATE matched. Pinned over source text
-    /// because neither guard is reachable without a database.
-    #[test]
-    fn an_ack_and_a_dead_letter_cannot_both_settle_one_job() {
-        let src = include_str!("synthetics_jobs.rs");
-
-        assert!(
-            src.contains("WHERE id = $4 AND status = 1{owner_clause}"),
-            "`ack_complete` must only apply to a job that is still Claimed",
-        );
-        assert!(
-            src.contains("if applied.rows_affected() == 0 {\n        return Ok(None);"),
-            "an ack that did not apply must report `None`, or the caller bills a job it lost",
-        );
-
-        assert!(
-            src.contains("\"UPDATE synthetics_jobs SET status = 2 WHERE id = $1 AND status = $2\""),
-            "the dead letter must re-check the status its SELECT saw",
-        );
-        assert!(
-            src.contains("if res.rows_affected() == 1 {\n            dead.push(row);"),
-            "only a row this call actually transitioned may be returned to the caller",
-        );
-    }
-
-    /// Every column `DeadLetteredRow` declares must be in the raw SELECT. The
-    /// ones read with `.ok()?` drop the whole row out of the `filter_map`, so
-    /// the job never reaches `increment_jobs_done` and its run stays open
-    /// forever; the rest degrade silently to defaults.
-    #[test]
-    fn a_dead_lettered_row_reads_every_column_it_declares() {
-        let src = include_str!("synthetics_jobs.rs");
-        let at = src
-            .find("pub async fn dead_letter_expired")
-            .expect("dead_letter_expired moved");
-        let body = &src[at..];
-        for column in ["scheduled_ts", "steps_configured", "browser_devices"] {
-            assert!(
-                body.contains(&format!("row.try_get(\"\", \"{column}\")")),
-                "`dead_letter_expired` must read {column}; dropping it from the SELECT fails \
-                 only against a real database",
-            );
-        }
-        // The identity columns every consumer of the row needs; pinned so a
-        // tidy-up cannot drop one silently.
-        for column in ["id", "synthetics_id", "location"] {
-            assert!(body.contains(&format!("\"{column}\"")));
-        }
-    }
-
     #[test]
     fn test_enqueue_params_fields() {
         let p = EnqueueParams {

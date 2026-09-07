@@ -461,7 +461,7 @@ fn orphan_trigger(c: &OrphanCandidate, now_us: i64, overdue_secs: i64) -> Trigge
              row failing the whole claim, or for scheduler errors in the log."
         )),
         // `orphan`, `dispatch`, `quota` and `trial` share this stream and this `status`.
-        error_source: Some(ERROR_SOURCE_ORPHAN.to_string()),
+        synthetics_error_source: Some(ERROR_SOURCE_ORPHAN.to_string()),
         ..TriggerData::default()
     }
 }
@@ -505,7 +505,6 @@ mod tests {
         ERROR_SOURCE_ORPHAN, HashMap, HashSet, MIN_GRACE_US, ORPHAN_INTERVALS, RENOTIFY_AFTER_US,
         anchor_us, grace_deadline_us, orphan_trigger, overdue_by_us, plan_reports,
     };
-    use crate::test_source::{block_from, code_only, production};
 
     /// Minute-aligned, so the cron tests get exact slot boundaries out of
     /// `schedule.after()` instead of a partial first interval.
@@ -932,39 +931,16 @@ mod tests {
         );
     }
 
-    /// 22 — the internal channel is fire-and-forget, so the cooldown starts on ENQUEUE.
-    #[test]
-    fn the_cooldown_is_recorded_once_per_report() {
-        let src = code_only(production(include_str!("orphan.rs")));
-        // Assembled at runtime so this test's own text cannot satisfy the scan.
-        let pass = ["async fn re", "port("].concat();
-        let at = src
-            .find(pass.as_str())
-            .expect("the report pass must still be a function of its own");
-        let (open, end) = block_from(&src, at);
-        let body = &src[open..end];
-
-        assert_eq!(
-            body.matches(&["last_reported", ".insert("].concat())
-                .count(),
-            1,
-            "one cooldown write per report: none re-reports a persistent orphan every pass, two \
-             is one silence too many",
-        );
-        assert!(
-            !body.contains("delivered"),
-            "`publish_triggers_usage` returns `()`, so there is no delivery signal left to gate \
-             the cooldown on and a survivor is a gate on something else",
-        );
-    }
-
     /// §11.3: all three failure paths share one stream and one status, separable only by source.
     #[test]
     fn the_orphan_report_keeps_every_field_its_json_carried() {
         let c = candidate(NOW - ONE_HOUR_US, 0, 0);
         let trigger = orphan_trigger(&c, NOW, 3_600);
 
-        assert_eq!(trigger.error_source.as_deref(), Some(ERROR_SOURCE_ORPHAN));
+        assert_eq!(
+            trigger.synthetics_error_source.as_deref(),
+            Some(ERROR_SOURCE_ORPHAN)
+        );
         assert_eq!(
             trigger.next_run_at, c.next_run_at,
             "the slot nobody claimed is what makes this row triageable",

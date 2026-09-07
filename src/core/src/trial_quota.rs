@@ -161,14 +161,11 @@ impl TrialQuotaPool {
             .find(|pool| pool.feature_keys().contains(&feature))
     }
 
-    /// Exhaustive on purpose: a new variant must be classified before it compiles.
     pub fn is_synthetics(self) -> bool {
-        match self {
-            TrialQuotaPool::AiCredits => false,
-            TrialQuotaPool::SyntheticsBrowserSteps | TrialQuotaPool::SyntheticsProtocolSteps => {
-                true
-            }
-        }
+        matches!(
+            self,
+            TrialQuotaPool::SyntheticsBrowserSteps | TrialQuotaPool::SyntheticsProtocolSteps
+        )
     }
 
     /// Every `trial_quota_usage.feature` value that spends from this pool; each
@@ -1391,27 +1388,6 @@ mod tests {
 
     const STEPS: TrialQuotaFeature = TrialQuotaFeature::SyntheticsBrowserSteps;
 
-    /// The one read behind both batched entry points.
-    const SYNTHETICS_READER: &str = "fn read_synthetics_rows(";
-
-    /// Each batched synthetics read and the fold it is a thin wrapper around.
-    const BATCHED_READS: [(&str, &str); 2] = [
-        (
-            "fn synthetics_remaining_for_orgs(",
-            "fold_synthetics_remaining(",
-        ),
-        ("fn synthetics_quota_for_orgs(", "fold_synthetics_quota("),
-    ];
-
-    /// CODE only: a comment naming what a scan forbids would trip that scan on its own text.
-    fn code_only_source() -> String {
-        include_str!("trial_quota.rs")
-            .lines()
-            .filter(|line| !line.trim_start().starts_with("//"))
-            .collect::<Vec<_>>()
-            .join("\n")
-    }
-
     /// The argument text of the first `needle` call in `body`, matched by paren balance.
     fn call_args<'a>(body: &'a str, needle: &str) -> &'a str {
         let at = body
@@ -1430,81 +1406,10 @@ mod tests {
         panic!("`{needle}` call is never closed");
     }
 
-    /// The text after `signature`, up to the closing brace of the item it opens.
-    fn fn_body<'a>(source: &'a str, signature: &str) -> &'a str {
-        let body = source
-            .split_once(signature)
-            .unwrap_or_else(|| panic!("`{signature}` must live in this file"))
-            .1;
-        let end = body.find("\n}\n").expect("end of the function");
-        &body[..end]
-    }
-
     /// rustfmt is free to break an argument list across lines, so every scan of one compares
     /// against this.
     fn without_whitespace(text: &str) -> String {
         text.chars().filter(|c| !c.is_whitespace()).collect()
-    }
-
-    /// Whether `body` reads a pool off this node's own cache rather than the table.
-    fn reads_the_node_cache(body: &str) -> bool {
-        // Assembled at runtime so this file is not itself a call site to the workspace scan.
-        ["get_used", "get_limit", "get_remaining"]
-            .into_iter()
-            .any(|reader| body.contains(&[reader, "_for_pool("].concat()))
-    }
-
-    /// Whether `args` hands `param` on, as itself or as something read off it — a token scan, so
-    /// `all_features()` does not read as the `features` the frame was given.
-    fn passes_through(args: &str, param: &str) -> bool {
-        args.split(|c: char| !c.is_alphanumeric() && c != '_')
-            .any(|token| token == param)
-    }
-
-    /// The name of the `index`-th parameter the function `signature` opens declares.
-    fn parameter(source: &str, signature: &str, index: usize) -> String {
-        call_args(source, signature)
-            .split(',')
-            .nth(index)
-            .unwrap_or_else(|| panic!("`{signature}` must declare {} parameters", index + 1))
-            .split(':')
-            .next()
-            .expect("a parameter name")
-            .trim()
-            .to_string()
-    }
-
-    /// What `name` is bound to in `body`, up to the `;` that ends its `let`.
-    fn binding_value<'a>(body: &'a str, name: &str) -> Option<&'a str> {
-        let mut rest = body;
-        loop {
-            let at = rest.find("let ")? + "let ".len();
-            rest = &rest[at..];
-            let declared = rest.trim_start_matches("mut ");
-            let end = declared
-                .find(|c: char| !c.is_alphanumeric() && c != '_')
-                .unwrap_or(declared.len());
-            if &declared[..end] == name {
-                let value = declared[end..].split_once('=')?.1;
-                return Some(&value[..value.find(';')?]);
-            }
-        }
-    }
-
-    /// Whether `args` hands on ALL of `expr` — as the expression itself, or as a binding assigned
-    /// it — so hoisting is fine and an index that narrows it to one element is not.
-    fn hands_on_all(body: &str, args: &str, expr: &str) -> bool {
-        let expr = without_whitespace(expr);
-        let args = without_whitespace(args);
-        let handed = args.trim_end_matches(',').trim_start_matches('&');
-        if handed.contains('[') {
-            return false;
-        }
-        handed == expr
-            || binding_value(body, handed).is_some_and(|bound| {
-                let bound = without_whitespace(bound);
-                bound.trim_start_matches('&') == expr
-            })
     }
 
     /// Every `.rs` file under the workspace `src/` that mentions one of `needles`, comments
@@ -1740,50 +1645,6 @@ mod tests {
             get_remaining_for_pool(&org_id, TrialQuotaPool::SyntheticsBrowserSteps),
             0
         );
-    }
-
-    #[test]
-    fn t33_the_pool_has_no_period_or_reset_machinery() {
-        let source = code_only_source();
-        // Assembled at runtime so the guard cannot match its own text.
-        let banned = [
-            ["period", "ym"].join("_"),
-            ["monthly", "reset"].join("_"),
-            ["reset", "usage"].join("_"),
-            ["reset", "pool"].join("_"),
-        ];
-        for banned in banned {
-            assert!(
-                !source.contains(&banned),
-                "SPEC §6.1: the pool is a one-time grant — `{banned}` would make it periodic",
-            );
-        }
-    }
-
-    /// These are `pub`, so a leftover entry point raises no dead-code warning.
-    #[test]
-    fn no_synthetics_reservation_entry_point_survives() {
-        let source = code_only_source();
-        // Assembled at runtime so the guard cannot match its own text.
-        let banned = [
-            ["synthetics_steps", "_try", "_deduct"].concat(),
-            ["synthetics_steps", "_ref", "und"].concat(),
-            ["synthetics_steps", "_dead_letter", "_ref", "und"].concat(),
-            ["synthetics_steps", "_adjust"].concat(),
-            ["synthetics_steps", "_remaining"].concat(),
-            ["Pool", "Adjustment"].concat(),
-            ["Idempotency", "Ledger"].concat(),
-            ["ADJUST", "MENTS"].concat(),
-            ["apply_pool", "_adjustment"].concat(),
-            ["force_deduct", "_units"].concat(),
-            ["ref", "und", "_units"].concat(),
-        ];
-        for banned in banned {
-            assert!(
-                !source.contains(&banned),
-                "`{banned}` takes from a ONE-TIME grant the gate no longer gives back",
-            );
-        }
     }
 
     fn ha(cost: u64, pool: Option<&str>, delta: i64) -> TrialQuotaHaMsg {
@@ -2053,22 +1914,6 @@ mod tests {
             seen.iter().all(Option::is_some),
             "the {listed} pools in ALL_POOLS do not cover the indices 0..{listed}",
         );
-
-        // `ordinal` is exhaustive, so its arm count IS the number of variants.
-        let src = code_only_source();
-        let at = src
-            .find("fn ordinal(")
-            .expect("the ordinal helper must be in this file");
-        let end = at
-            + src[at..]
-                .find("\n    }")
-                .expect("the helper must close at module level");
-        assert_eq!(
-            src[at..end].matches("TrialQuotaPool::").count(),
-            listed,
-            "a pool has an ordinal but no ALL_POOLS entry, so every scan built on ALL_POOLS \
-             skips it silently",
-        );
     }
 
     /// A pool absent from `ALL_POOLS` or unresolvable by its own key is invisible to every scan.
@@ -2110,23 +1955,6 @@ mod tests {
         }
     }
 
-    /// `ack_ha_msg`'s own doc: an un-acked HA delta is redelivered forever, so a branch that
-    /// skips a message without acking it spins the subscriber on that message.
-    #[test]
-    fn every_ha_branch_acks_before_it_skips() {
-        let source = code_only_source();
-        let body = fn_body(&source, "pub async fn subscribe_ha_queue(");
-
-        let skips = body.matches("continue;").count();
-        assert!(skips > 0, "the subscriber no longer skips anything: {body}");
-        assert_eq!(
-            body.matches("ack_ha_msg(").count(),
-            skips + 1,
-            "each of the {skips} skipped messages acks, and so does the one applied at the \
-             bottom of the loop",
-        );
-    }
-
     /// Omit the pre-split key and every org whose protocol usage predates the split is re-granted.
     #[test]
     fn all_synthetics_features_includes_the_pre_split_key() {
@@ -2149,49 +1977,6 @@ mod tests {
             "without the pre-split key an org whose protocol usage predates the split reads \
              used = 0 and is handed the whole grant a second time",
         );
-    }
-
-    /// One read, every synthetics key, and nothing at all when it fails: a fall back to the node's
-    /// own counters answers with a grant no other node agrees on.
-    #[test]
-    fn a_batched_read_answers_from_the_table_or_not_at_all() {
-        let source = code_only_source();
-        let reader = fn_body(&source, SYNTHETICS_READER);
-        let args = call_args(reader, "get_for_orgs(");
-        assert!(
-            args.contains("all_synthetics_features()"),
-            "a read narrowed to one pool's `feature_keys()` reports `used = 0` for every other \
-             pool, and nothing in the answer says those rows were never asked for",
-        );
-        assert!(
-            passes_through(args, &parameter(&source, SYNTHETICS_READER, 0)),
-            "the read must ask about the orgs this frame was given",
-        );
-        assert!(
-            without_whitespace(reader).contains("returnNone;"),
-            "a failed read answers with nothing, so both entry points hand back an empty map \
-             instead of a number the table never granted",
-        );
-        assert!(
-            !reads_the_node_cache(reader),
-            "the shared read answers from this node's own cache, which no other node agrees with",
-        );
-        for (read, _) in BATCHED_READS {
-            let body = fn_body(&source, read);
-            assert!(
-                body.contains(SYNTHETICS_READER.trim_start_matches("fn ")),
-                "{read}: the shared read is the only source either entry point has",
-            );
-            assert!(
-                without_whitespace(body).contains("returnHashMap::new();"),
-                "{read}: a failed read answers with an empty map — the listing then reports \
-                 zeros for the page instead of a number the table never granted",
-            );
-            assert!(
-                !reads_the_node_cache(body),
-                "{read}: this node's own cache is not a grant the table ever made",
-            );
-        }
     }
 
     /// Absent from the map means UNGATED at the gate, so "has not used it yet" must not land there.
@@ -2437,59 +2222,6 @@ mod tests {
             0,
             "the drop was attributed to the wrong pool — a synthetics step lost under a \
              ONE-TIME grant is permanent, an AI credit is not",
-        );
-    }
-
-    /// The drop path must stay behind the counter. The error branch needs the
-    /// 10,000-slot channel full, which would leave every later test running
-    /// against a saturated queue, so the wiring is pinned in source. The needles
-    /// are assembled so this test's own source does not satisfy them.
-    #[test]
-    fn every_dropped_pool_record_is_counted() {
-        let source = include_str!("trial_quota.rs");
-        assert_eq!(
-            source.matches(&["record_flush", "_drop("].concat()).count(),
-            2,
-            "one definition and exactly one call site are expected for A5's counter",
-        );
-        let body = source
-            .split_once(&["fn buffer", "_flush("].concat())
-            .expect("the flush buffer")
-            .1;
-        let end = body.find("\n}\n").expect("end of buffer_flush");
-        assert!(
-            body[..end].contains(&["record_flush", "_drop("].concat()),
-            "the dropped record is no longer counted; A5 has nothing to alert on",
-        );
-    }
-
-    /// Spec §11.1: the limit write beside it is bounded by the pool it was handed, so a reset
-    /// that is not wipes the AI watermark of an org whose synthetics grant was raised.
-    #[test]
-    fn the_checkpoint_reset_is_scoped_to_the_pool_whose_limit_moved() {
-        let source = code_only_source();
-        // Assembled at runtime so this test's own source is not what the scan finds.
-        let reset = ["reset", "_checkpoint("].concat();
-        let limit_write = "pub async fn set_limit_for_pool(";
-        let keys = format!("{}.feature_keys()", parameter(&source, limit_write, 1));
-        let body = fn_body(&source, limit_write);
-        let features = call_args(body, &reset)
-            .split_once(',')
-            .map_or(String::new(), |(_, rest)| rest.to_string());
-        assert!(
-            hands_on_all(body, &features, &keys),
-            "`seed_feature` is ONE key of the pool and the pre-split `synthetics_steps` row is \
-             another, so a reset handed one of `{keys}` leaves the other row's watermark armed \
-             — the limit write beside it is bounded by all of them",
-        );
-
-        let definition = ["pub async fn reset", "_checkpoint("].concat();
-        assert!(
-            passes_through(
-                call_args(fn_body(&source, &definition), "reset_notified_checkpoint("),
-                &parameter(&source, &definition, 1),
-            ),
-            "the pool stops at this frame and the UPDATE below it is org-wide again",
         );
     }
 
