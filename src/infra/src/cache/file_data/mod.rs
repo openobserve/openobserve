@@ -393,6 +393,10 @@ pub async fn get_opts(
     })
 }
 
+pub async fn exist(file: &str) -> bool {
+    memory::exist(file).await || disk::exist(file).await
+}
+
 pub async fn get_size(account: &str, file: &str) -> object_store::Result<usize> {
     get_size_opts(account, file, true).await
 }
