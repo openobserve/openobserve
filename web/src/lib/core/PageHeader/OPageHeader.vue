@@ -80,8 +80,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
            the title truncates BESIDE the back tile instead of under it. -->
       <!-- md:min-w-60: flex-1 makes the block basis-0, so without a desktop
            floor a wide toolbar never wraps — it overlaps the title instead. -->
+      <!-- md–lg the floor drops to 10rem: a rail-hosted page leaves ~28rem for the
+           header, and the full floor pushed a lone primary button under the title. -->
       <div
-        class="flex h-full min-w-0 flex-1 items-center gap-3.25 md:min-w-60"
+        class="flex h-full min-w-0 flex-1 items-center gap-3.25 md:max-lg:min-w-40 lg:min-w-60"
         :class="[
           hasBack ? 'max-md:min-w-40' : 'max-md:min-w-24',
           hasTabs && !tabsBelow ? 'max-md:flex-wrap' : 'max-md:flex-nowrap',
@@ -193,14 +195,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         v-if="hasActions || hasActionsOverflow"
         class="ms-auto flex shrink-0 items-center gap-2 max-md:max-w-full max-md:shrink max-md:flex-wrap max-md:justify-end"
       >
+        <!-- overflowFirst: the secondary group precedes the primary CTA on desktop. -->
+        <slot v-if="hasActionsOverflow && !isMobile && overflowFirst" name="actions-overflow" />
         <slot name="actions" />
 
         <!-- Secondary actions. Inline on desktop; < md they collapse behind one
              "More" button so a long toolbar keeps the primary actions on a
              single row instead of wrapping into a block of icons. -->
         <template v-if="hasActionsOverflow">
-          <slot v-if="!isMobile" name="actions-overflow" />
-          <ODropdown v-else side="bottom" align="end">
+          <slot v-if="!isMobile && !overflowFirst" name="actions-overflow" />
+          <ODropdown v-else-if="isMobile" side="bottom" align="end">
             <template #trigger>
               <OButton
                 variant="outline"
@@ -271,11 +275,14 @@ const props = withDefaults(
      * owns its own overflow (an inline-edited page name does exactly this).
      */
     titleOverflow?: "truncate" | "visible";
+    /** Render #actions-overflow BEFORE #actions on desktop, so a trailing primary CTA stays last. */
+    overflowFirst?: boolean;
   }>(),
   {
     title: raw(""),
     subtitle: raw(""),
     titleOverflow: "truncate",
+    overflowFirst: false,
   },
 );
 

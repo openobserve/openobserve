@@ -68,6 +68,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :title-data-test="titleDataTest"
           :tabs-below="tabsBelow"
           :title-overflow="titleOverflow"
+          :overflow-first="overflowFirst"
         >
           <template v-if="!!slots.title" #title><slot name="title" /></template>
           <template v-if="!!slots['title-prefix']" #title-prefix
@@ -225,6 +226,8 @@ const props = withDefaults(
      * control (an inline-edited page name) so the <h1> stops clipping it.
      */
     titleOverflow?: "truncate" | "visible";
+    /** Forwarded to OPageHeader: desktop renders #actions-overflow before #actions. */
+    overflowFirst?: boolean;
     // Body
     bleed?: boolean;
     padY?: boolean;
@@ -243,6 +246,7 @@ const props = withDefaults(
   }>(),
   {
     tabsBelow: false,
+    overflowFirst: false,
     bleed: false,
     padY: false,
     scroll: false,
