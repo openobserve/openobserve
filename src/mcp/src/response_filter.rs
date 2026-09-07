@@ -18,19 +18,12 @@
 //! Reduces token usage by filtering tool responses based on the requested
 //! `DetailLevel`. Supports two mechanisms:
 //!
-//! 1. **Custom transformers** for complex tools (SearchSQL, testFunction)
+//! 1. **Custom transformers** for complex tools (SearchSQL, SearchAround)
 //! 2. **Declarative `summary_fields`** config from `x-o2-mcp` extensions
 
 use serde_json::{Map, Value, json};
 
 use super::{tools::get_summary_config, types::*};
-
-/// Maximum number of hits to include in SearchSQL summary responses
-const SEARCH_SQL_MAX_HITS: usize = 100;
-/// The row cap is blind to row width: eight `select *` rows can outweigh 100 ordinary ones.
-const SEARCH_SQL_MAX_PAYLOAD_BYTES: usize = 32 * 1024;
-/// Maximum number of results to include in testFunction summary responses
-const TEST_FUNCTION_MAX_RESULTS: usize = 5;
 
 /// Dropping `data`/`format`/`advisory` would empty every `output_format` response.
 const SEARCH_SQL_KEEP_FIELDS: &[&str] = &[
@@ -47,13 +40,6 @@ const SEARCH_SQL_KEEP_FIELDS: &[&str] = &[
     "advisory",
 ];
 
-struct CappedData {
-    data: String,
-    original_rows: usize,
-    shown_rows: usize,
-    reason: &'static str,
-}
-
 /// Filter a tool's response body based on the requested detail level.
 ///
 /// Returns the (possibly filtered) response body as a string.
@@ -61,7 +47,7 @@ struct CappedData {
 /// For tools with `summary_fields` config, the response is always normalized to
 /// `{ "total": N, "items": [...] }` regardless of detail level. The difference:
 /// - `DetailLevel::Full`: normalize only (all fields per item, standard wrapper)
-/// - `DetailLevel::Summary`: normalize + extract declared fields + cap at 50 items
+/// - `DetailLevel::Summary`: normalize + extract declared fields
 ///
 /// For tools without config, `Full` returns unchanged; `Summary` tries custom transformers.
 pub fn filter_response(tool_name: &str, response_body: &str, detail: &DetailLevel) -> String {
@@ -114,181 +100,29 @@ pub fn filter_response(tool_name: &str, response_body: &str, detail: &DetailLeve
 /// Apply a custom transformer for tools with complex response shapes.
 fn apply_custom_transformer(tool_name: &str, response_body: &str) -> Option<String> {
     match tool_name {
-        "SearchSQL" => Some(filter_search_sql(response_body)),
-        "SearchAround" => Some(filter_search_around(response_body)),
-        "testFunction" => Some(filter_test_function(response_body)),
+        "SearchSQL" | "SearchAround" => Some(filter_search_response(response_body)),
         _ => None,
     }
 }
 
-/// Project a search response onto `SEARCH_SQL_KEEP_FIELDS`; `None` if it is not a JSON object.
-fn keep_search_fields(response_body: &str) -> Option<Map<String, Value>> {
-    let parsed: Value = serde_json::from_str(response_body).ok()?;
-    let obj = parsed.as_object()?;
+/// Keep only `SEARCH_SQL_KEEP_FIELDS`: noisy metadata is dropped, result rows never are.
+fn filter_search_response(response_body: &str) -> String {
+    let parsed: Value = match serde_json::from_str(response_body) {
+        Ok(v) => v,
+        Err(_) => return response_body.to_string(),
+    };
+    let Some(obj) = parsed.as_object() else {
+        return response_body.to_string();
+    };
+
     let mut result = Map::new();
     for &field in SEARCH_SQL_KEEP_FIELDS {
         if let Some(val) = obj.get(field) {
             result.insert(field.to_string(), val.clone());
         }
     }
-    Some(result)
-}
-
-/// Keep only `SEARCH_SQL_KEEP_FIELDS`, capped by row count and by byte budget.
-fn filter_search_sql(response_body: &str) -> String {
-    let Some(mut result) = keep_search_fields(response_body) else {
-        return response_body.to_string();
-    };
-
-    // Cap `hits`: row count first, then the byte budget.
-    if let Some(hits) = result.get_mut("hits")
-        && let Some(arr) = hits.as_array_mut()
-    {
-        let original_len = arr.len();
-        let mut reason = None;
-        if arr.len() > SEARCH_SQL_MAX_HITS {
-            arr.truncate(SEARCH_SQL_MAX_HITS);
-            reason = Some("row cap");
-        }
-        if let Some(fits) = rows_within_budget(arr.iter(), SEARCH_SQL_MAX_PAYLOAD_BYTES) {
-            arr.truncate(fits);
-            reason = Some("byte budget");
-        }
-        if let Some(reason) = reason {
-            let shown = arr.len();
-            result.insert(
-                "_hits_capped".to_string(),
-                json!({ "original": original_len, "shown": shown, "reason": reason }),
-            );
-        }
-    }
-
-    // Cap a formatted `data` block against the same two limits as `hits`.
-    if let Some(data) = result.get("data").and_then(Value::as_str) {
-        let format = result.get("format").and_then(Value::as_str);
-        if let Some(capped) = cap_data_block(
-            data,
-            format,
-            SEARCH_SQL_MAX_HITS,
-            SEARCH_SQL_MAX_PAYLOAD_BYTES,
-        ) {
-            let marker = json!({
-                "original": capped.original_rows,
-                "shown": capped.shown_rows,
-                "reason": capped.reason,
-            });
-            result.insert("data".to_string(), Value::String(capped.data));
-            result.insert("_data_capped".to_string(), marker);
-        }
-    }
 
     serde_json::to_string(&Value::Object(result)).unwrap_or_else(|_| response_body.to_string())
-}
-
-/// Metadata only: around hits are a window (`[before] ++ [after]`), so a tail trim drops "after".
-fn filter_search_around(response_body: &str) -> String {
-    let Some(result) = keep_search_fields(response_body) else {
-        return response_body.to_string();
-    };
-    serde_json::to_string(&Value::Object(result)).unwrap_or_else(|_| response_body.to_string())
-}
-
-/// Whole rows only, never fewer than one: a truncated payload beats one that reads as "no results".
-fn rows_within_budget<'a>(rows: impl Iterator<Item = &'a Value>, budget: usize) -> Option<usize> {
-    let mut used = 0usize;
-    let mut kept = 0usize;
-    let mut total = 0usize;
-    for row in rows {
-        total += 1;
-        if used <= budget {
-            // `+ 1` for the separating comma in the serialized array.
-            used += serde_json::to_string(row).map(|s| s.len() + 1).unwrap_or(0);
-            if used <= budget || kept == 0 {
-                kept += 1;
-            }
-        }
-    }
-    (kept < total).then_some(kept)
-}
-
-/// csv has one header line, md_table two, ndjson none; the header is kept so the block parses.
-fn cap_data_block(
-    data: &str,
-    format: Option<&str>,
-    max_rows: usize,
-    budget: usize,
-) -> Option<CappedData> {
-    let header_lines = match format {
-        Some("md_table") => 2,
-        Some("csv") => 1,
-        _ => 0,
-    };
-    let lines: Vec<&str> = data.lines().collect();
-    if lines.len() <= header_lines {
-        return None;
-    }
-    let original_rows = lines.len() - header_lines;
-
-    let mut reason = None;
-    let mut kept_rows = original_rows;
-    if kept_rows > max_rows {
-        kept_rows = max_rows;
-        reason = Some("row cap");
-    }
-
-    let mut used: usize = lines.iter().take(header_lines).map(|l| l.len() + 1).sum();
-    let mut shown_rows = 0usize;
-    for line in lines.iter().skip(header_lines).take(kept_rows.max(1)) {
-        let next = used + line.len() + 1;
-        if next > budget && shown_rows > 0 {
-            break;
-        }
-        used = next;
-        shown_rows += 1;
-    }
-    if shown_rows < kept_rows {
-        reason = Some("byte budget");
-    }
-
-    let reason = reason?;
-    Some(CappedData {
-        data: lines[..header_lines + shown_rows].join("\n"),
-        original_rows,
-        shown_rows,
-        reason,
-    })
-}
-
-/// Filter testFunction responses: limit results count.
-fn filter_test_function(response_body: &str) -> String {
-    let mut parsed: Value = match serde_json::from_str(response_body) {
-        Ok(v) => v,
-        Err(_) => return response_body.to_string(),
-    };
-
-    let obj = match parsed.as_object_mut() {
-        Some(o) => o,
-        None => return response_body.to_string(),
-    };
-
-    // Truncate results array
-    if let Some(results) = obj.get_mut("results")
-        && let Some(arr) = results.as_array_mut()
-    {
-        let original_len = arr.len();
-        arr.truncate(TEST_FUNCTION_MAX_RESULTS);
-        if original_len > TEST_FUNCTION_MAX_RESULTS {
-            obj.insert(
-                "_truncated".to_string(),
-                json!({
-                    "original_results": original_len,
-                    "shown_results": TEST_FUNCTION_MAX_RESULTS
-                }),
-            );
-        }
-    }
-
-    serde_json::to_string(&parsed).unwrap_or_else(|_| response_body.to_string())
 }
 
 /// Normalize a list response to `{ "total": N, "items": [...] }`.
@@ -432,7 +266,7 @@ mod tests {
     // -- Custom transformer tests --
 
     #[test]
-    fn test_search_sql_caps_hits_at_100() {
+    fn test_search_sql_returns_every_hit() {
         let hits: Vec<Value> = (0..150)
             .map(|i| json!({"_timestamp": i, "log": format!("line {}", i)}))
             .collect();
@@ -450,13 +284,10 @@ mod tests {
         let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
         let parsed: Value = serde_json::from_str(&result).unwrap();
 
-        assert_eq!(
-            parsed["hits"].as_array().unwrap().len(),
-            SEARCH_SQL_MAX_HITS
-        );
+        assert_eq!(parsed["hits"].as_array().unwrap().len(), 150);
+        assert!(parsed.get("_hits_capped").is_none());
         assert_eq!(parsed["total"], 150);
         assert_eq!(parsed["took"], 42);
-        assert_eq!(parsed["_hits_capped"]["original"], 150);
     }
 
     #[test]
@@ -507,104 +338,8 @@ mod tests {
         assert!(parsed["advisory"].as_str().unwrap().contains("sparse"));
     }
 
-    /// A row wide enough that a handful blow the budget (the `select *`
-    /// -with-stacktrace shape that motivated the byte cap).
-    fn fat_csv(rows: usize) -> String {
-        let mut out = String::from("_timestamp,service_name,stacktrace");
-        for i in 0..rows {
-            out.push_str(&format!("\n{i},svc,{}", "x".repeat(9000)));
-        }
-        out
-    }
-
     #[test]
-    fn test_data_block_capped_by_byte_budget() {
-        let body = serde_json::to_string(&json!({
-            "hits": [],
-            "total": 8,
-            "format": "csv",
-            "data": fat_csv(8),
-        }))
-        .unwrap();
-        assert!(body.len() > SEARCH_SQL_MAX_PAYLOAD_BYTES);
-
-        let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
-        let parsed: Value = serde_json::from_str(&result).unwrap();
-
-        let data = parsed["data"].as_str().unwrap();
-        assert!(data.len() <= SEARCH_SQL_MAX_PAYLOAD_BYTES);
-        // header preserved, so the block is still parseable csv
-        assert!(data.starts_with("_timestamp,service_name,stacktrace\n"));
-        assert_eq!(parsed["_data_capped"]["original"], 8);
-        assert_eq!(parsed["_data_capped"]["reason"], "byte budget");
-        let shown = parsed["_data_capped"]["shown"].as_u64().unwrap();
-        assert!((1..8).contains(&shown), "shown was {shown}");
-        // rows are whole: no value was cut mid-field
-        assert_eq!(data.lines().count() as u64, shown + 1);
-    }
-
-    #[test]
-    fn test_md_table_cap_keeps_header_and_separator() {
-        let mut data = String::from("| a | b |\n| --- | --- |");
-        for i in 0..8 {
-            data.push_str(&format!("\n| {i} | {} |", "x".repeat(9000)));
-        }
-        let body = serde_json::to_string(&json!({
-            "hits": [], "total": 8, "format": "md_table", "data": data,
-        }))
-        .unwrap();
-
-        let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
-        let parsed: Value = serde_json::from_str(&result).unwrap();
-
-        let out = parsed["data"].as_str().unwrap();
-        assert!(out.starts_with("| a | b |\n| --- | --- |\n"));
-        assert_eq!(parsed["_data_capped"]["original"], 8);
-    }
-
-    #[test]
-    fn test_data_cap_keeps_one_row_when_the_first_row_exceeds_budget() {
-        // Never return a misleadingly empty payload. When even one row busts
-        // the budget it is surfaced whole -- oversizing the response on
-        // purpose -- and the marker says the rest were dropped.
-        let mut data = String::from("_timestamp,stacktrace");
-        for i in 0..3 {
-            data.push_str(&format!(
-                "\n{i},{}",
-                "x".repeat(SEARCH_SQL_MAX_PAYLOAD_BYTES + 1)
-            ));
-        }
-        let body =
-            serde_json::to_string(&json!({"hits": [], "total": 3, "format": "csv", "data": data}))
-                .unwrap();
-
-        let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
-        let parsed: Value = serde_json::from_str(&result).unwrap();
-
-        let out = parsed["data"].as_str().unwrap();
-        assert_eq!(out.lines().count(), 2, "header + exactly one row");
-        assert!(out.len() > SEARCH_SQL_MAX_PAYLOAD_BYTES, "row kept whole");
-        assert_eq!(parsed["_data_capped"]["shown"], 1);
-        assert_eq!(parsed["_data_capped"]["original"], 3);
-    }
-
-    #[test]
-    fn test_lone_oversized_row_passes_through_unmarked() {
-        // One row, nothing to drop: return it and do not claim a truncation.
-        let data = format!("a\n{}", "x".repeat(SEARCH_SQL_MAX_PAYLOAD_BYTES + 1));
-        let body =
-            serde_json::to_string(&json!({"hits": [], "total": 1, "format": "csv", "data": data}))
-                .unwrap();
-
-        let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
-        let parsed: Value = serde_json::from_str(&result).unwrap();
-
-        assert_eq!(parsed["data"].as_str().unwrap().lines().count(), 2);
-        assert!(parsed.get("_data_capped").is_none());
-    }
-
-    #[test]
-    fn test_small_data_block_not_capped() {
+    fn test_data_block_passes_through_verbatim() {
         let body = serde_json::to_string(&json!({
             "hits": [], "total": 2, "format": "csv",
             "data": "a,b\n1,2\n3,4",
@@ -615,6 +350,7 @@ mod tests {
 
         assert_eq!(parsed["data"], "a,b\n1,2\n3,4");
         assert!(parsed.get("_data_capped").is_none());
+        assert_eq!(parsed["format"], "csv");
     }
 
     #[test]
@@ -678,55 +414,6 @@ mod tests {
         let parsed: Value = serde_json::from_str(&result).unwrap();
 
         assert_eq!(parsed["trace_id"], "abc-123");
-    }
-
-    #[test]
-    fn test_data_block_capped_by_row_count_under_the_byte_budget() {
-        let mut data = String::from("_timestamp,msg");
-        for i in 0..150 {
-            data.push_str(&format!("\n{i},ok"));
-        }
-        let body = serde_json::to_string(&json!({
-            "hits": [],
-            "total": 150,
-            "format": "csv",
-            "data": data,
-        }))
-        .unwrap();
-
-        let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
-        let parsed: Value = serde_json::from_str(&result).unwrap();
-
-        let capped = parsed["data"].as_str().unwrap();
-        assert!(
-            capped.len() < SEARCH_SQL_MAX_PAYLOAD_BYTES,
-            "byte budget must not be the limit"
-        );
-        assert_eq!(
-            capped.lines().count(),
-            SEARCH_SQL_MAX_HITS + 1,
-            "header plus capped rows"
-        );
-        assert_eq!(parsed["_data_capped"]["original"], 150);
-        assert_eq!(parsed["_data_capped"]["shown"], SEARCH_SQL_MAX_HITS);
-        assert_eq!(parsed["_data_capped"]["reason"], "row cap");
-    }
-
-    #[test]
-    fn test_hits_capped_by_bytes_under_the_row_cap() {
-        // Eight fat rows: far below SEARCH_SQL_MAX_HITS, far over the budget.
-        let hits: Vec<Value> = (0..8)
-            .map(|i| json!({"i": i, "stacktrace": "x".repeat(9000)}))
-            .collect();
-        let body = serde_json::to_string(&json!({"hits": hits, "total": 8})).unwrap();
-
-        let result = filter_response("SearchSQL", &body, &DetailLevel::Summary);
-        let parsed: Value = serde_json::from_str(&result).unwrap();
-
-        let kept = parsed["hits"].as_array().unwrap().len();
-        assert!((1..8).contains(&kept), "kept {kept}");
-        assert_eq!(parsed["_hits_capped"]["original"], 8);
-        assert_eq!(parsed["_hits_capped"]["reason"], "byte budget");
     }
 
     #[test]
@@ -822,7 +509,7 @@ mod tests {
     }
 
     #[test]
-    fn test_test_function_truncates_results() {
+    fn test_test_function_returns_every_result() {
         let results: Vec<Value> = (0..20)
             .map(|i| json!({"output": format!("r{}", i)}))
             .collect();
@@ -831,11 +518,8 @@ mod tests {
         let result = filter_response("testFunction", &body, &DetailLevel::Summary);
         let parsed: Value = serde_json::from_str(&result).unwrap();
 
-        assert_eq!(
-            parsed["results"].as_array().unwrap().len(),
-            TEST_FUNCTION_MAX_RESULTS
-        );
-        assert_eq!(parsed["_truncated"]["original_results"], 20);
+        assert_eq!(parsed["results"].as_array().unwrap().len(), 20);
+        assert!(parsed.get("_truncated").is_none());
     }
 
     // -- Declarative summary_fields tests --
