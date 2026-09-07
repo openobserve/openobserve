@@ -381,13 +381,14 @@ const isMultiTrial = computed(() => (detail.value?.experiment.trialCount ?? 1) >
  *  two score columns exactly like the dataset grouping on the list page. */
 const scorerIds = computed(() => (detail.value?.preview.pinnedScorers ?? []).map((s) => s.id));
 
-// Fetched once per org, not re-fetched on every refresh() — Score Configs
-// change far less often than an Experiment's results.
+// Session-cached per org (see `scoreConfigs.listCached`) rather than a plain
+// `list()` — this page mounts fresh every time a different experiment is
+// opened, and Score Configs change far less often than that.
 const scoreConfigs = ref<ScoreConfig[]>([]);
 async function loadScoreConfigs() {
   if (!orgId.value) return;
   try {
-    scoreConfigs.value = await onlineEvalsService.scoreConfigs.list(orgId.value);
+    scoreConfigs.value = await onlineEvalsService.scoreConfigs.listCached(orgId.value);
   } catch {
     // Non-fatal: without configs, boolean cells just render unhighlighted —
     // same as before this feature existed.
