@@ -670,7 +670,7 @@ async fn set_pool_limit(
     security(("Authorization" = [])),
     params(
         ("org_id" = String, Path, description = "Must be _meta"),
-        ("pool" = String, Path, description = "ai_credits | synthetics_browser_steps | synthetics_protocol_steps"),
+        ("pool" = String, Path, description = "ai_credits | synthetics_browser_steps | synthetics_protocol_steps (the pre-split key `synthetics_steps` is accepted as an alias for the protocol pool)"),
     ),
     request_body(content = inline(SetQuotaUsageLimitRequest), content_type = "application/json"),
     responses(

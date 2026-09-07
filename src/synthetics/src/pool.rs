@@ -32,7 +32,7 @@ use std::{collections::HashMap, future::Future, pin::Pin, sync::OnceLock};
 /// Set once, by [`crate::init`], before any worker is spawned.
 static HOOKS: OnceLock<StepPoolHooks> = OnceLock::new();
 
-/// Steps left in one org's three synthetics grants — SPEC §6.1, §6.6.
+/// Steps left in one org's two synthetics grants — SPEC §6.1, §6.6.
 ///
 /// Deliberately NOT `Default`: a zeroed value for an org missing from the batch
 /// read means "grant spent" and blacks that org's monitoring out, where absent

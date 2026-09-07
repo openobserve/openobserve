@@ -185,7 +185,7 @@ pub struct AllOrgListDetails {
     #[cfg(feature = "cloud")]
     pub credits_limit: u64,
     /// Separate allowances from the AI pool, in a different unit: browser and protocol hold
-    /// independent one-time grants, and the status pool alone refills every month.
+    /// independent one-time grants.
     #[cfg(feature = "cloud")]
     pub browser_steps_used: u64,
     #[cfg(feature = "cloud")]
