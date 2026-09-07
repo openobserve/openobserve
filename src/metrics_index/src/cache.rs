@@ -24,8 +24,11 @@ use hashlink::LruCache;
 pub(super) static METRICS_INDEX_SELECTION_CACHE: LazyLock<Mutex<MetricsIndexSelectionCache>> =
     LazyLock::new(|| Mutex::new(MetricsIndexSelectionCache::default()));
 
+/// Selected physical row ranges of one sidecar plus the parquet row-group size they map onto.
+pub(super) type CachedSelection = (Arc<Vec<Range<usize>>>, u32);
+
 pub(super) struct MetricsIndexSelectionCache {
-    entries: LruCache<String, Arc<Vec<Range<usize>>>>,
+    entries: LruCache<String, CachedSelection>,
     memory_size: usize,
 }
 
@@ -43,20 +46,20 @@ impl MetricsIndexSelectionCache {
         key.len() + std::mem::size_of::<Vec<Range<usize>>>() + std::mem::size_of_val(ranges)
     }
 
-    pub(super) fn get(&mut self, key: &str) -> Option<Arc<Vec<Range<usize>>>> {
+    pub(super) fn get(&mut self, key: &str) -> Option<CachedSelection> {
         self.entries.get(key).cloned()
     }
 
-    pub(super) fn insert(&mut self, key: String, ranges: Arc<Vec<Range<usize>>>) {
+    pub(super) fn insert(&mut self, key: String, selection: CachedSelection) {
         let max_bytes = get_config().search.metrics_index_selection_cache_max_size * 1024 * 1024;
-        let size = Self::entry_size(&key, &ranges);
+        let size = Self::entry_size(&key, &selection.0);
         if size > max_bytes {
             return;
         }
-        if let Some(previous) = self.entries.insert(key.clone(), ranges) {
+        if let Some(previous) = self.entries.insert(key.clone(), selection) {
             self.memory_size = self
                 .memory_size
-                .saturating_sub(Self::entry_size(&key, &previous));
+                .saturating_sub(Self::entry_size(&key, &previous.0));
         }
         self.memory_size += size;
         while self.memory_size > max_bytes {
@@ -65,7 +68,7 @@ impl MetricsIndexSelectionCache {
             };
             self.memory_size = self
                 .memory_size
-                .saturating_sub(Self::entry_size(&key, &evicted));
+                .saturating_sub(Self::entry_size(&key, &evicted.0));
         }
     }
 }

@@ -27,6 +27,12 @@ use config::{
 };
 
 pub const METRICS_INDEX_ROW_COUNT: &str = "__oo_midx_row_count";
+/// Format version a writer stamps into the `.midx` schema; readers reject newer ones.
+pub const METRICS_INDEX_VERSION: u32 = 1;
+pub const METRICS_INDEX_VERSION_KEY: &str = "o2:midx_version";
+pub const METRICS_INDEX_PARENT_RECORDS_KEY: &str = "o2:parent_records";
+pub const METRICS_INDEX_ROW_GROUP_SIZE_KEY: &str = "o2:row_group_size";
+pub const METRICS_INDEX_EXCLUDED_LABELS_KEY: &str = "o2:excluded_labels";
 
 /// [`metrics_index_enabled`] narrowed to one stream: the layout also
 /// needs a `__hash__` column of type `UInt64` (remote-write / OTLP metrics).
@@ -41,10 +47,7 @@ pub fn metrics_index_stream(stream_type: StreamType, schema: &Schema) -> bool {
 /// (`ZO_METRICS_INDEX_ENABLED`): metrics files ordered by
 /// `(__hash__, _timestamp)`, so readers must not assume a `_timestamp` order.
 pub fn metrics_index_enabled(stream_type: StreamType) -> bool {
-    if stream_type != StreamType::Metrics {
-        return false;
-    }
-    get_config().compact.metrics_index_enabled
+    stream_type == StreamType::Metrics && get_config().compact.metrics_index_enabled
 }
 
 /// Metrics-specific physical layout encoded in a file-name prefix so readers

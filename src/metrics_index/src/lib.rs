@@ -44,7 +44,7 @@ mod tests {
     use promql_parser::label::{MatchOp, Matcher, Matchers};
 
     use super::{
-        METRICS_INDEX_ROW_COUNT,
+        METRICS_INDEX_ROW_COUNT, MetricsIndexWriter, layout,
         pruner::{
             create_physical_filter, metrics_index_labels, residual_matchers_covered,
             selection_cache_key, sidecar_covers_labels,
@@ -121,6 +121,8 @@ mod tests {
         let data = MetricsIndexData {
             schema: Arc::clone(&schema),
             batches: vec![batch],
+            parent_records: None,
+            row_group_size: None,
         };
         let matchers = Matchers::new(vec![Matcher::new(MatchOp::Equal, "path", "a")]);
         let filter = create_physical_filter(&schema, &matchers).unwrap();
@@ -148,6 +150,60 @@ mod tests {
             evaluate_metrics_index(&data, filter.as_deref(), 8).unwrap(),
             vec![Range { start: 2, end: 4 }]
         );
+    }
+
+    #[test]
+    fn reader_enforces_the_recorded_parent_and_version() {
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("__hash__", DataType::UInt64, false),
+            Field::new(TIMESTAMP_COL_NAME, DataType::Int64, false),
+            Field::new("path", DataType::Utf8View, true),
+        ]));
+        let batch = RecordBatch::try_new(
+            Arc::clone(&schema),
+            vec![
+                Arc::new(arrow::array::UInt64Array::from(vec![1, 1, 2])),
+                Arc::new(arrow::array::Int64Array::from(vec![10, 20, 10])),
+                Arc::new(StringViewArray::from(vec!["a", "a", "b"])),
+            ],
+        )
+        .unwrap();
+        let mut writer = MetricsIndexWriter::try_new(&schema).unwrap();
+        writer.write(&batch).unwrap();
+        let bytes = writer.finish(3, Some(2)).unwrap();
+
+        let data =
+            decode_metrics_index("parent", Bytes::from(bytes), &["path".to_string()]).unwrap();
+        assert_eq!(data.parent_records, Some(3));
+        assert_eq!(data.row_group_size, Some(2));
+        assert_eq!(
+            evaluate_metrics_index(&data, None, 3).unwrap(),
+            vec![Range { start: 0, end: 3 }]
+        );
+        // file_list says 4 rows: the index was written for another file
+        let mismatch = evaluate_metrics_index(&data, None, 4).unwrap_err();
+        assert!(mismatch.to_string().contains("written for 3 rows"));
+
+        // a newer format version is refused before anything is decoded
+        let newer_schema = Arc::new(Schema::new_with_metadata(
+            vec![Field::new(METRICS_INDEX_ROW_COUNT, DataType::UInt32, false)],
+            std::collections::HashMap::from([(
+                layout::METRICS_INDEX_VERSION_KEY.to_string(),
+                (layout::METRICS_INDEX_VERSION + 1).to_string(),
+            )]),
+        ));
+        let newer = RecordBatch::try_new(
+            Arc::clone(&newer_schema),
+            vec![Arc::new(UInt32Array::from(vec![3]))],
+        )
+        .unwrap();
+        let mut ipc = ArrowFileWriter::try_new(Vec::new(), &newer_schema).unwrap();
+        ipc.write(&newer).unwrap();
+        let newer_bytes = Bytes::from(ipc.into_inner().unwrap());
+        let Err(error) = decode_metrics_index("newer", newer_bytes, &[]) else {
+            panic!("a newer metrics index version was decoded");
+        };
+        assert!(error.to_string().contains("this build reads up to 1"));
     }
 
     #[test]
