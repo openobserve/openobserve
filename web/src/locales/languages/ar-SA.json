@@ -848,7 +848,9 @@
     },
     "condition": {
       "loading": "ظروف التحميل...",
-      "loadError": "لم يكن بالإمكان قراءة الحالة المحفوظة وتم إعادة ضبطها. الحفظ الآن سيكتب فوقه."
+      "loadError": "لم يكن بالإمكان قراءة الحالة المحفوظة وتم إعادة ضبطها. الحفظ الآن سيكتب فوقه.",
+      "unknownColumn": "العمود \"{column}\" غير موجود في حمولة هذا المشغّل، لذا قد لا يتحقق هذا الشرط أبداً.",
+      "unknownColumnSuggestion": "هل تقصد \"{suggestion}\"؟"
     },
     "destination": {
       "createNew": "إنشاء وجهة جديدة",
@@ -2560,7 +2562,9 @@
       "title": "تشغيل سير العمل",
       "edit": "تحرير سير العمل",
       "debugInEditor": "محرر تصحيح الأخطاء",
-      "staleGraphWarning": "تم تعديل هذا السير منذ هذا التشغيل — {count} خطوة تم تنفيذها لم تعد موجودة، لذا حالتها غير معروضة هنا. | تم تعديل هذا السير منذ هذا التشغيل — {count} الخطوات التي نفذها لم تعد موجودة، لذا لم تظهر حالتها هنا."
+      "staleGraphWarning": "تم تعديل هذا السير منذ هذا التشغيل — {count} خطوة تم تنفيذها لم تعد موجودة، لذا حالتها غير معروضة هنا. | تم تعديل هذا السير منذ هذا التشغيل — {count} الخطوات التي نفذها لم تعد موجودة، لذا لم تظهر حالتها هنا.",
+      "hideList": "إخفاء قائمة التشغيلات",
+      "showList": "إظهار قائمة التشغيلات"
     },
     "history": {
       "button": "السلاسل",
@@ -2576,10 +2580,21 @@
       "error": "خطأ",
       "success": "النجاح",
       "failed": "فشل",
+      "testRun": "تشغيل تجريبي",
+      "runType": "النوع",
+      "testRunTooltip": "بدأ من المحرر. خطوات الوجهة ترسل البيانات فعلياً.",
+      "showTestRuns": "إظهار {count} من التشغيلات التجريبية",
+      "hideTestRuns": "إخفاء التشغيلات التجريبية",
       "open": "التاريخ",
       "openFullView": "عرض الجولة الكاملة المفتوحة",
       "loadError": "خطأ أثناء تحميل التنفيذات",
-      "loadRunError": "خطأ أثناء تحميل هذه الجولة"
+      "loadRunError": "خطأ أثناء تحميل هذه الجولة",
+      "retry": "إعادة المحاولة",
+      "retryTooltip": "إعادة هذا التشغيل الفاشل باستخدام مدخلاته المسجّلة",
+      "retryTitle": "إعادة محاولة هذا التشغيل؟",
+      "retryMessage": "ينشئ هذا تشغيلاً جديداً باستخدام المدخلات التي سجّلها التشغيل الفاشل. خطوات الوجهة ترسل البيانات فعلياً.",
+      "retryStarted": "بدأت إعادة المحاولة — ستظهر في القائمة كتشغيل جديد.",
+      "retryError": "تعذّرت إعادة محاولة هذا التشغيل"
     },
     "edit": "تعديل",
     "view": "منظر",
@@ -2596,7 +2611,9 @@
     "triggerRequired": "هناك زناد مطلوب",
     "addStepRequired": "أضف على الأقل خطوة واحدة بعد المحفز",
     "connectAllNodes": "ربط جميع العقد قبل الحفظ",
+    "branchPathsRequired": "اربط كل مسار تفرّع بخطوة | توجد خطوة تفرّع واحدة لا تتطابق اتصالاتها مع مساراتها. افتحها وحدّد المسارات ثم أعد ربطها. | توجد {count} من خطوات التفرّع لا تتطابق اتصالاتها مع مساراتها.",
     "finishStepsBeforePublish": "{count} خطوة تحتاج إلى إعداد قبل النشر — يتم تمييزها على القماش. | {count} الخطوات تحتاج إلى إعداد قبل النشر — يتم تمييزها على القماش.",
+    "noChangesToPublish": "لا توجد تغييرات للنشر — سير العمل هذا يطابق النسخة المنشورة بالفعل.",
     "draft": "المسودة",
     "saveDraft": "حفظ كمسودة",
     "publish": "النشر",
@@ -2656,11 +2673,29 @@
       "runFromBeginning": "البداية (الزناد)",
       "runFromNote": "فقط خطوات من هنا إلى الأسفل ستجري.",
       "inputLabel": "مدخل العينة",
+      "source": {
+        "sample": "عينة مولّدة",
+        "run": "من التشغيل: {run}",
+        "edited": "عدّلتها بنفسك"
+      },
+      "revertInput": "تراجع",
+      "useRunInput": "استخدام مدخلات من تشغيل…",
+      "lastTestRun": "آخر تشغيل تجريبي (علامة التبويب هذه)",
+      "runHasNoInput": "لا توجد مدخلات محفوظة لهذه الخطوة في ذلك التشغيل.",
       "invalidJson": "أدخل مجموعة JSON صالحة من السجلات.",
       "resultHint": "بعد التشغيل، تظهر كل خطوة رمز فحص أو خطأ على القماش.",
+      "rehearsalOnly": "نجحت في تشغيل تجريبي فقط — تجربة بحمولة نموذجية، وليست دليلاً على أن سير العمل المنشور يعمل.",
       "notVerified": "لم تصل أي سجلات إلى هذه الخطوة — فقد قام أحد بتصفية حالة في التيار الرئيسي، أو أن خطوة سابقة تعرضت للخطأ في الوضع.",
+      "notConfigured": "هذه الخطوة غير مُعدّة، لذا لم تنفّذ شيئاً في هذا التشغيل. قم بإعدادها ثم أعد اختبارها.",
+      "recordedFailure": "فشلت هذه الخطوة في آخر تشغيل مسجّل.",
+      "recordsUnavailable": "سُجّلت في تشغيل سابق — أعد الاختبار لفحص السجلات.",
+      "dirtySelf": "تغيّر الإعداد منذ آخر تشغيل لهذه الخطوة. أعد اختبار الخطوة.",
+      "dirtyUpstream": "تغيّرت خطوة سابقة منذ تشغيل هذه الخطوة. أعد اختبار الخطوة.",
       "run": "تشغيل الاختبار",
       "runError": "غير قادر على إجراء الاختبار.",
+      "suppressDestinations": "عدم الإرسال الفعلي إلى الوجهات",
+      "suppressDestinationsHint": "تحدّد خطوات الوجهة مسارات التوجيه، لكن لا يتم تسليم أي شيء.",
+      "dispatchWarning": "الاختبار فعلي: سيُرسل هذا التشغيل البيانات بالفعل إلى {destinations}.",
       "stepResult": {
         "viewHint": "انقر لعرض المدخلات / الإخراج",
         "input": "المدخلات",
@@ -2686,8 +2721,10 @@
         "status": {
           "ok": "تم النجاح",
           "error": "خطأ",
-          "skipped": "لا سجلات"
-        }
+          "skipped": "لا سجلات",
+          "noMatch": "لا يوجد تطابق"
+        },
+        "suppressed": "تم منع الإرسال — لم يُرسل إلى الوجهة الفعلية"
       }
     },
     "linkAlerts": {
@@ -2720,6 +2757,7 @@
       "kindLogic": "المنطق",
       "kindAction": "الحدث",
       "condition": "الحالة",
+      "branch": "تفرّع",
       "function": "الوظيفة",
       "sendToDestination": "الوجهة",
       "configComingSoon": "{node} التكوين قادم في خطوة لاحقة",
@@ -2728,11 +2766,40 @@
       "stepSearchPlaceholder": "خطوات البحث...",
       "stepNoMatch": "لا توجد خطوات تتوافق مع بحثك.",
       "conditionDesc": "المتابعة فقط عند تطابق قاعدة",
+      "branchDesc": "توجيه كل سجل عبر أول مسار مطابق",
+      "branchCaseLabel": "اسم المسار (اختياري)",
+      "branchCaseLabelPlaceholder": "مثلاً: خطورة عالية",
+      "branchAddCase": "إضافة مسار",
+      "branchRemoveCase": "إزالة المسار",
+      "branchMoveUp": "نقل المسار إلى الأعلى",
+      "branchMoveDown": "نقل المسار إلى الأسفل",
+      "branchPathNumber": "المسار {index}",
+      "branchElseTitle": "كل ما عدا ذلك",
+      "branchElseHint": "تخرج من هنا السجلات التي لا تطابق أي مسار أعلاه.",
+      "branchNoteTitle": "إرشادات التفرّع",
+      "branchNoteFirstMatch": "تُفحص المسارات من الأعلى إلى الأسفل، ويُختار أول تطابق، لذلك يخرج كل سجل عبر مسار واحد فقط.",
+      "branchNoteUnwired": "أي مسار غير متصل بشيء يتخلّص من سجلاته ببساطة.",
       "functionDesc": "إعادة تشكيل الحمولة باستخدام دالة",
       "destinationDesc": "أرسل إلى وجهة",
       "triggerBody": "يعمل عندما يطلق تنبيه مرتبط",
       "triggerDataExampleNote": "مثال فقط — الأعمدة الفعلية تأتي من استعلام تنبيهك.",
       "incidentEventTypeLabel": "نوع الحدث",
+      "incidentEventType": {
+        "created": "تم إنشاء الحادث",
+        "alert": "تم إطلاق التنبيه",
+        "severity_upgrade": "تم رفع مستوى الخطورة",
+        "severity_override": "تم تجاوز مستوى الخطورة",
+        "acknowledged": "تم الاستلام",
+        "resolved": "تم الحل",
+        "reopened": "أُعيد فتح الحادث",
+        "dimension_upgraded": "تمت ترقية البُعد",
+        "title_changed": "تم تغيير العنوان",
+        "assignment_changed": "تم تغيير الإسناد",
+        "comment": "تمت إضافة تعليق",
+        "ai_analysis_begin": "بدأ تحليل الذكاء الاصطناعي",
+        "ai_analysis_complete": "اكتمل تحليل الذكاء الاصطناعي",
+        "ai_analysis_failed": "فشل تحليل الذكاء الاصطناعي"
+      },
       "incidentCommonTitle": "الحقول المشتركة (كل فعالية)",
       "incidentSpecificTitle": "الحقول الخاصة بالحدث",
       "incidentNoExtraFields": "هذا الحدث لا يضيف أي حقول تتجاوز الحقول الشائعة.",
@@ -2759,11 +2826,14 @@
       "enable": "تمكين الخطوة",
       "disabledBadge": "معاق",
       "incompleteBadge": "الإعداد لاحقا",
+      "unwiredBadge": "مسار غير متصل",
       "unsavedFnTitle": "تغييرات الدوال غير المحفوظة",
       "unsavedFnMessage": "هذه الخطوة تحتوي على كود وظيفي غير محفوظ في مكتبتك. احفظها، احذف التغييرات، أو استمر في التعديل.",
       "unsavedFnSave": "وظيفة الحفظ",
       "unsavedFnDiscard": "تغييرات التخلص منها",
-      "unsavedFnKeep": "استمر في التحرير"
+      "unsavedFnKeep": "استمر في التحرير",
+      "destination": "الوجهة",
+      "branchPathUnset": "{name} · لم تُحدّد قاعدة"
     },
     "commonFieldsAbove": "الحقول المشتركة أعلاه",
     "canvas": {
@@ -2787,11 +2857,15 @@
       "openStep": "{name} مفتوح",
       "runToView": "قم بإجراء اختبار لعرض هذه البيانات.",
       "noBranchItems": "لا توجد عناصر في هذا الفرع.",
+      "forwardedCount": "تم تمرير {out} من {total} سجل | تم تمرير {out} من {total} سجلات",
+      "noMatchForwarded": "لا يوجد تطابق — تم تمرير 0 من {total} سجل | لا يوجد تطابق — تم تمرير 0 من {total} سجلات",
+      "branchDropped": "لم يطابق {count} سجل أي مسار — تم إسقاطه | لم تطابق {count} سجلات أي مسار — تم إسقاطها",
       "noUpstream": "لا توجد درجات صعودية.",
       "noRunYet": "لم أبدأ بالجري بعد.",
       "runLabel": "اركض",
       "switchRun": "سويتش ران",
       "notInRun": "هذه الخطوة غير مشمولة في هذه الجولة.",
+      "noRunData": "لم يحفظ هذا التشغيل بيانات الخطوات.",
       "runTest": "تشغيل الاختبار",
       "noItems": "لا عناصر",
       "itemsCount": "{count} العناصر | {count} العناصر",
@@ -2801,8 +2875,14 @@
       "executeStep": "تشغيل الخطوة",
       "sample": "عينة",
       "editStep": "تعديل الخطوة",
+      "readOnlyRun": "أنت تعرض تشغيلاً سابقاً، لذا لا يمكن تغيير إعداد هذه الخطوة هنا.",
+      "readOnlyRunEdit": "تعديل في سير العمل",
       "testInputHint": "إدخال الاختبار — تعديل، ثم تشغيل الخطوة.",
-      "noRunsList": "لا محاولات حتى الآن."
+      "noRunsList": "لا محاولات حتى الآن.",
+      "resetInput": "إعادة التعيين إلى العينة",
+      "eventPager": "{n} من {total}",
+      "nextEvent": "الحدث التالي",
+      "prevEvent": "الحدث السابق"
     },
     "runOverlay": {
       "banner": "عرض بيانات الخطوات من جولة سابقة ({run}). يمكنك التعديل بحرية — هذه الجولة لا تتغير أبدا.",
@@ -2829,6 +2909,8 @@
       "noConfig": "لا يوجد تكوين",
       "functionLabel": "الوظيفة",
       "destinationLabel": "الوجهة",
+      "branchPathsLabel": "المسارات",
+      "branchNoRule": "لم تُحدّد قاعدة",
       "destinationUnsupported": "النوع غير المدعوم",
       "destinationMissing": "هذه الوجهة لم تعد موجودة أو لا يمكن قراءتها.",
       "headersLabel": "الرؤوس",
@@ -5235,7 +5317,13 @@
       "enterString": "هنا يأتي دور الوتر",
       "enterNumber": "أدخل الرقم",
       "add": "إضافة",
-      "parameter": "{n} المعلمات"
+      "parameter": "{n} المعلمات",
+      "castSuggestion": {
+        "error": "تتطلب {fn} قيمة عددية، لكن {field} نص من النوع ({type}). سيفشل هذا الاستعلام.",
+        "castTo": "تحويل إلى {type}",
+        "dismiss": "تجاهل"
+      },
+      "selectCastType": "النوع"
     },
     "customChartRenderer": {
       "errorExecutingCodeWithMessage": "خطأ أثناء تنفيذ الشيفرة: {message}",
@@ -6410,6 +6498,7 @@
       "firing": "الفصل",
       "ok": "حسنا",
       "error": "خطأ",
+      "pending": "قيد الانتظار",
       "skipped": "تم تخطيها",
       "unknown": "غير معروف",
       "flapping": "الرفرفة",
@@ -6436,6 +6525,7 @@
       "templateRequired": "النموذج مطلوب!",
       "validEmails": "أضف رسائل بريد إلكتروني صالحة!",
       "silenceNonNegative": "يجب أن يكون إشعار الصمت أكبر من أو يساوي 0",
+      "pendingPeriodNonNegative": "يجب أن تكون مدة الانتظار أكبر من أو تساوي 0",
       "periodPositive": "يجب أن يكون الفاصل الزمني أكبر من 0",
       "destinationRequired": "هناك وجهة واحدة على الأقل مطلوبة.",
       "thresholdPositive": "يجب أن تكون العتبة أكبر من 0",
@@ -6446,6 +6536,7 @@
       "timestampAliasBanned": "لا يمكن استخدام {column} كاسم مستعار للعمود. استخدم time_bucket بدلا من ذلك.",
       "credentialFieldRequired": "{field} مطلوب",
       "minimumFrequency": "الحد الأدنى للتردد يجب أن يكون {minutes} دقيقة",
+      "pendingPeriodNotMultiple": "ليست مضاعفاً لفاصل التحقق ({minutes} دقيقة) — قد ينتظر التنبيه حتى فاصل إضافي واحد قبل إطلاقه.",
       "nameMandatoryString": "الاسم إلزامي ويجب أن يكون سلسلة نصية صالحة",
       "orgIdMismatch": "يجب أن يكون معرف المنظمة مساويا {orgId}",
       "streamTypeMandatory": "نوع التدفق إلزامي ويجب أن يكون واحدًا من: سجلات، مقاييس، تتبعات",
@@ -6521,6 +6612,7 @@
     "metricsValueFieldTooltip": "تخزن تدفقات المقاييس قياسها في حقل \"القيمة\" بشكل افتراضي",
     "howOftenCheckTooltip": "كم مرة يجب فحص حالة التنبيه هذه",
     "alertIfNoOfEvents": "تنبيه إذا لا. من الأحداث",
+    "alertIfColumn": "أطلق التنبيه إذا",
     "alertIfValueIs": "تنبيه إذا كانت القيمة هي",
     "havingSeries": "السلسلة",
     "clearMultiWindowsTitle": "تنظيف النوافذ المتعددة؟",
@@ -6650,6 +6742,9 @@
       "cooldown": "فترة الانتظار",
       "betweenAlerts": "بين التنبيهات",
       "noCooldown": "لا يوجد فترة تهدئة",
+      "pendingPeriod": "انتظار لمدة",
+      "beforeFiring": "{duration} قبل إطلاق التنبيه",
+      "firesImmediately": "يُطلق فوراً",
       "minuteCount": "{n} دقيقة | {n} دقيقة",
       "hourCount": "{n} ساعة | {n} ساعة",
       "timeRangeCount": "{n} النطاق الزمني ({ranges}) | {n} المدى الزمني ({ranges})",
@@ -6666,6 +6761,7 @@
         "conditionOther": "{threshold} الأحداث ({operator})",
         "alertMeWhenMinutes": "أبلغني عندما يحدث {condition} خلال فترة {count} دقيقة",
         "alertMeWhenHours": "أبلغني عندما يحدث {condition} خلال فترة {count} ساعة",
+        "pendingPeriodClause": "، بعد الانتظار لمدة {duration}",
         "cooldownClause": "، ولكن ليس أكثر من مرة كل {cooldown}",
         "defaultConditions": "أبلغني عندما تتحقق الشروط المهيأة"
       }
@@ -7130,6 +7226,8 @@
       "writeQueryHint": "اكتب استعلاما للبدء",
       "sqlEditorHint": "استخدم المحرر الكامل المفتوح لتشغيل والتحقق",
       "checkEvery": "تحقق من كل",
+      "pendingPeriod": "انتظار لمدة",
+      "pendingPeriodTooltip": "انتظر هذه المدة قبل إطلاق التنبيه، حتى يستمر تحقق الشرط بدلاً من إطلاقه بسبب فترة واحدة غير سليمة.",
       "cronExpressionPlaceholder": "0 */10 * * * *",
       "timezonePlaceholder": "المنطقة الزمنية",
       "onThese": "على هذه",
@@ -7139,6 +7237,7 @@
       "showVrlEditor": "محرر العرض VRL",
       "hideVrlEditor": "إخفاء VRL المحرر",
       "alertIfValueIsTooltip": "تنبه عندما يقيس التعبير PromQL لهذا الشرط لسلسلة زمنية. مثال: >= 100 يفعل عندما تكون النتيجة 100 أو أكثر.",
+      "sqlHavingClauseWarning": "سيُطبّق شرط HAVING في الاستعلام قبل مرشحات شرط إطلاق التنبيه",
       "havingSeriesTooltip": "الحد الأدنى لعدد السلاسل الزمنية التي يجب أن تحقق الشرط أعلاه لتفعيل التنبيه.",
       "clearMultiWindowsMessage": "تم تكوين النوافذ المتعددة. لتفعيل وضع {mode}، نحتاج إلى تنظيفها. هل تريد المتابعة؟",
       "cron": "كرون",
@@ -8010,6 +8109,7 @@
     "delete": "حذف",
     "method": "الطريقة",
     "url": "الرابط",
+    "urlOrRecipients": "عنوان URL / المستلمون",
     "api_header": "الرأس",
     "api_header_value": "القيمة",
     "skip_tls_verify": "تخطي التحقق من TLS",
@@ -8033,6 +8133,48 @@
     "createEmailTemplate": "إنشاء قالب بريد إلكتروني",
     "headers": "الرؤوس",
     "previewError": "فشل في توليد المعاينة",
+    "slackOAuth": {
+      "setupMethodLabel": "كيف تريد ربط Slack؟",
+      "oauthMethodTitle": "ربط Slack",
+      "oauthMethodDescription": "اختر مساحة عمل وقناة في Slack. لا حاجة إلى نسخ عنوان webhook.",
+      "manifestMethodTitle": "إنشاء باستخدام ملف تعريف تطبيق Slack",
+      "manifestMethodDescription": "أنشئ تطبيق Slack تابعاً لمساحة العمل باستخدام ملف تعريف جاهز.",
+      "recommended": "موصى به",
+      "webhookMethodTitle": "استخدام webhook موجود",
+      "webhookMethodDescription": "اربط webhook وارداً سبق أن أنشأته في Slack.",
+      "permissionNote": "يطلب {product} فقط صلاحية إرسال الإشعارات إلى القناة التي تختارها. ولا يمكنه قراءة رسائل مساحة العمل.",
+      "connectSlack": "ربط Slack",
+      "reconnectSlack": "إعادة ربط Slack",
+      "connected": "متصل بـ {workspace} · {channel}",
+      "connectionRequired": "اربط Slack قبل حفظ هذه الوجهة.",
+      "popupBlocked": "حظر متصفحك نافذة Slack. اسمح بالنوافذ المنبثقة لـ {product} ثم أعد المحاولة.",
+      "popupClosed": "أُغلقت نافذة ربط Slack قبل اكتمال الإعداد.",
+      "startFailed": "تعذّر بدء ربط Slack. اطلب من مسؤول التحقق من إعداد Slack OAuth.",
+      "exchangeFailed": "تعذّر إكمال تفويض Slack. يرجى إعادة المحاولة.",
+      "authorizationDenied": "لم يُمنح إذن الوصول إلى Slack. اختر ربط Slack لإعادة المحاولة.",
+      "manifestStepApp": "تسمية التطبيق",
+      "manifestStepReview": "مراجعة ملف التعريف",
+      "manifestStepWebhook": "ربط القناة",
+      "manifestAppName": "اسم تطبيق Slack",
+      "manifestAppNameHelp": "يعرّف هذا الاسم التطبيق داخل مساحة عملك في Slack.",
+      "manifestAppNameRequired": "أدخل اسماً لتطبيق Slack.",
+      "manifestAppNameTooLong": "يمكن أن تحتوي أسماء تطبيقات Slack على {max} حرفاً كحد أقصى.",
+      "manifestContinue": "تابع",
+      "manifestBack": "العودة",
+      "manifestPermissionNote": "يطلب هذا التطبيق صلاحية incoming-webhook فقط. ولا يمكنه قراءة رسائل مساحة العمل.",
+      "manifestReviewHelp": "راجع ملف التعريف هذا أو انسخه، ثم افتح Slack لإنشاء التطبيق وتثبيته في مساحة عملك.",
+      "manifestOpenSlack": "فتح إعداد Slack",
+      "manifestWhereToFind": "بعد تثبيت التطبيق واختيار قناة، افتح Incoming Webhooks في إعدادات تطبيق Slack وانسخ عنوان Webhook URL.",
+      "webhookSecretNote": "تعامل مع عنوان webhook هذا كمعلومة سرية. يستطيع أي شخص يملكه النشر في قناة Slack المرتبطة به.",
+      "revealWebhook": "إظهار عنوان webhook الخاص بـ Slack",
+      "hideWebhook": "إخفاء عنوان webhook الخاص بـ Slack",
+      "slackAppFallback": "تطبيق Slack",
+      "previewDisclaimer": "يوفّر Slack أيقونة التطبيق الفعلية وقناة الوجهة بعد التثبيت.",
+      "successResponseBody": "استجابة Slack",
+      "callbackTitle": "جارٍ ربط Slack",
+      "callbackWorking": "جارٍ الرجوع إلى {product}…",
+      "callbackError": "لا يمكن إكمال ربط Slack هذا. أغلق هذه النافذة ثم أعد المحاولة."
+    },
     "prebuilt": {
       "slackDescription": "إرسال إشعارات إلى قنوات Slack",
       "discordDescription": "إرسال الإشعارات إلى قنوات ديسكورد",
@@ -10506,6 +10648,7 @@
       "evalJobs": "شغل وراقب مهام التقييم عبر جلساتك",
       "scorers": "أنشئ وأدر أدوات التقييم التي تقيّم مخرجات LLM",
       "scoreConfigs": "قم بتكوين معايير التقييم التي تستخدمها تقييماتك",
+      "playground": "جرّب التوجيهات والنماذج جنباً إلى جنب قبل اعتماد تجربة",
       "remoteTasks": "HTTP يمكن لتجارب الخدمات الاتصال بها — منشورة مرة واحدة، تم إصدارها، وإعادة استخدامها"
     },
     "annotate": {
@@ -10563,6 +10706,10 @@
         "success": "تمت إضافتها إلى مجموعة البيانات",
         "loadError": "فشل في تحميل مجموعات البيانات",
         "error": "فشل في إضافة هذا العنصر إلى مجموعة البيانات"
+      },
+      "playground": {
+        "button": "فتح في ساحة التجربة",
+        "hint": "حمّل رسائل هذا الاستدعاء في ساحة التجربة لتعديلها وإعادة تشغيله"
       }
     },
     "discovery": {
@@ -10803,6 +10950,7 @@
       "retrySuccess": "تم انتظار الفتحات الفاشلة لإعادة المحاولة",
       "retryError": "فشل في إعادة التجربة",
       "cloneSuccess": "استنساخ التجربة",
+      "cloneLoadError": "فشل تحميل التجربة المراد استنساخها",
       "cloneError": "فشل في استنساخ تجربة",
       "datasetFilter": "مجموعة البيانات",
       "nameSearch": "تجارب البحث",
@@ -10844,6 +10992,10 @@
         "modelPlaceholder": "افتراضي المزود",
         "modelHelp": "اترك النموذج فارغا لاستخدام النموذج الافتراضي للمزود.",
         "trialsHelp": "1–100 محاولة لكل صف. يضاعف التكلفة.",
+        "cloneTitle": "استنساخ التجربة",
+        "cloneSubmit": "إنشاء نسخة",
+        "cloneNameSuffix": "{name} (نسخة)",
+        "cloneDatasetLocked": "موروثة من التشغيل الأصلي — لا تُجرى المقارنة إلا على مجموعة البيانات نفسها.",
         "systemPromptLabel": "رسالة النظام",
         "systemPromptPlaceholder": "تعليمات اختيارية ترسل قبل كل صف.",
         "userPromptLabel": "رسالة المستخدم",
@@ -10925,7 +11077,10 @@
         "columns": {
           "input": "المدخلات",
           "output": "الإنتاج",
-          "latency": "زمن الاستجابة"
+          "trials": "المحاولات",
+          "dispersion": "التشتّت",
+          "latency": "زمن الاستجابة",
+          "p50Latency": "زمن استجابة P50"
         },
         "retryFailed": "إعادة محاولة فشل الفتحات",
         "loadError": "فشل في تحميل التجربة",
@@ -10963,8 +11118,12 @@
         },
         "slotStatus": "الحالة",
         "searchPlaceholder": "مدخلات أو مخرجات البحث",
+        "searchInputPlaceholder": "البحث في المدخلات",
         "statusFilter": "الحالة",
-        "statusFilterAll": "جميع الحالات"
+        "statusFilterAll": "جميع الحالات",
+        "sortByDispersion": "الترتيب حسب التشتّت",
+        "highDispersionBadge": "عالي",
+        "trialNumber": "المحاولة {n}"
       },
       "rowDetail": {
         "fallbackTitle": "صف التجارب",
@@ -11017,6 +11176,7 @@
           "bucketInconclusive": "غير حاسم",
           "bucketNew": "الجديد",
           "bucketMissing": "مفقود",
+          "input": "المدخلات",
           "outcome": "النتيجة",
           "oneSidedCoverage": "{baseline} فقط على خط الأساس · {candidate} للمرشحين فقط",
           "oneSided": "من جانب واحد",
@@ -11029,8 +11189,18 @@
           "ofScoreDimensions": "بأبعاد النقاط الإجمالية {total}",
           "noScoreDimensionMoved": "لم يتم تغيير بعد النوتة",
           "unknownScoreDimension": "بعد النتيجة غير المعروفة",
+          "typeNumeric": "رقمي",
+          "typeCategorical": "تصنيفي",
+          "typeBoolean": "منطقي",
           "threshold": "العتبة",
-          "measurePerRow": "متوسط لكل صف، فوق التجارب"
+          "measurePerRow": "متوسط لكل صف، فوق التجارب",
+          "dimensionImproved": "تحسّن {count} صف | تحسّنت {count} صفوف",
+          "dimensionUnchanged": "لم يتغيّر {count} صف | لم تتغيّر {count} صفوف",
+          "dimensionRegressed": "تراجع {count} صف | تراجعت {count} صفوف",
+          "dimensionNotCounted": "غير محتسب",
+          "dimensionNotCountedHint": "لا توجد سياسة مقارنة لهذا المُقيّم ضمن إعداد الدرجات، لذا تُعرض قيمه دون الحكم بتحسّنها أو تراجعها، ولا تؤثر في النتيجة. حدّد له اتجاهاً وعتبة ليتم احتسابه.",
+          "dimensionNoneCompared": "لم تُقارن أي بيانات",
+          "dimensionNoneComparedHint": "لم يُقَس أي صف على الجانبين. الصف الذي نُفّذ في تجربة واحدة فقط لا يملك قيمة للمقارنة، لذا لا يُحتسب في أي اتجاه."
         },
         "rowDrawer": {
           "fallbackTitle": "صف المقارنة",
@@ -11040,13 +11210,17 @@
           "outputHeading": "المخرجات · خط الأساس مقابل المرشح",
           "scores": "التسجيلات",
           "dimension": "البعد",
+          "change": "التغيّر",
           "trial": "{index} المحاكمة",
           "noContent": "لم يتم توفيرها",
           "noOutput": "لا يوجد مخرج",
-          "absentSide": "غير موجود في هذه الجولة"
+          "absentSide": "غير موجود في هذه الجولة",
+          "enterFullscreen": "الدخول إلى وضع ملء الشاشة",
+          "exitFullscreen": "الخروج من وضع ملء الشاشة"
         }
       },
-      "selectionCount": "{count} من اثنين تم اختيارهم"
+      "selectionCount": "{count} من اثنين تم اختيارهم",
+      "clearBaseline": "مسح خط الأساس"
     },
     "datasets": {
       "listTitle": "مجموعات البيانات",
@@ -11394,6 +11568,7 @@
         "republishedSuccess": "تم تحديث الوصف. الإصدار {version} لم يتغير.",
         "draftSuccess": "تم حفظ المسودة. اختبر الاتصال لنشره.",
         "draftError": "لم أتمكن من حفظ المسودة",
+        "testFailed": "فشل اختبار الاتصال",
         "publishFailed": "فشل الاتصال التجريبي، لذلك لم يتم نشر أي شيء. تم حفظ مسودتك.",
         "createError": "لم أتمكن من نشر المهمة البعيدة",
         "validation": {
@@ -11601,20 +11776,27 @@
       "fromExperiment": "تم استنساخها من تجربة {name}",
       "variables": "المتغيرات",
       "noVariables": "لا يوجد {token} في الرسائل — أضف واحدا لتمثيل المدخل.",
+      "unusedSampledValue": "لم تتم الإشارة بعد إلى {tokens} في رسالة. اكتبها في رسالة لاستخدامها.",
       "variablePlaceholder": "القيمة مقابل {name}",
       "addExpected": "+ الإنتاج المتوقع",
       "expectedLabel": "متوقع",
       "expectedPlaceholder": "الإجابة الذهبية — تمكين تسجيل النقاط المعتمدة على المرجع لاحقا",
+      "expectedHint": "يقارن المُقيّمون كل إجابة بهذه القيمة",
+      "expectedMissing": "يقارن {scorers} النتائج بمخرج متوقّع. وفي غيابه يتم تخطّيهم.",
+      "expectedMissingAction": "إضافة",
+      "scoreSkippedNoReference": "تم التخطي — لا يوجد مخرج متوقّع",
       "removeExpected": "إزالة الإنتاج المتوقع",
       "expectedLeakWarning": "{token} لا تتوفر أبدا في محفزات المهام — إجابات ذهبية فقط في مسجلات المهام.",
       "chipInsert": "انقر للإدراج عند المؤشر",
       "variant": "النسخة المتغيرة {label}",
       "variantLimit": "المقعد يحتوي على {max} نسخ كحد أقصى.",
       "duplicateVariant": "النسخة المكررة",
+      "resetVariant": "إعادة تعيين منصة التجربة",
       "removeVariant": "إزالة النسخة",
       "runVariant": "تشغيل",
       "createExperiment": "إنشاء تجربة",
       "modelPlaceholder": "اختر أو اكتب نموذجا",
+      "providerUnknown": "موفّر غير معروف",
       "temperature": "درجة الحرارة",
       "roleSystem": "النظام",
       "roleUser": "المستخدم",
@@ -11637,6 +11819,13 @@
       "toolsEmpty": "لا توجد أدوات محددة.",
       "toolCall": "نداء الأدوات",
       "toolCallNote": "يتوقف اللعب هنا — الملعب لا ينفذ الأدوات.",
+      "toolCallAddToMessages": "إضافة إلى الرسائل",
+      "toolCallContinueTooltip": "يضيف هذا الاستدعاء إلى المحادثة ويفتح حقل نتيجته.",
+      "toolCallAddedToMessages": "تمت إضافة استدعاء الأداة — أدخل نتيجة الأداة وأعد التشغيل.",
+      "toolArgumentsPlaceholder": "وسائط الأداة (JSON)",
+      "toolResultPlaceholder": "أدخل نتيجة الأداة…",
+      "toolResultRequired": "أدخل نتيجة الأداة أعلاه للمتابعة.",
+      "toolSetupRequired": "اختر أداة وحدّد وسائطها للمتابعة.",
       "toolInvalidJson": "يجب أن تكون المعايير صالحة JSON.",
       "schema": "المخطط",
       "schemaOn": "المخطط · على",
@@ -11644,6 +11833,8 @@
       "schemaToggle": "تقييد الإخراج على مخطط JSON",
       "schemaHelp": "يتم عرض الإخراج بتنسيق JSON عند تعيين المخطط.",
       "schemaInvalidJson": "يجب أن يكون المخطط صالحا JSON.",
+      "schemaIgnored": "المخطط · يتجاهله هذا الموفّر",
+      "schemaUnsupported": "لا يوفّر هذا الموفّر حقلاً للمخرجات المنظّمة. يُحتفظ بالمخطط في هذا العمود، لكنه لا يُرسل ويجيب النموذج بنص عادي.",
       "outputPlaceholder": "يظهر المخرجات هنا — اضغط على تشغيل.",
       "outputNotRun": "لا يركض",
       "retry": "إعادة المحاولة",
@@ -11661,6 +11852,7 @@
       "sampleDatasetPlaceholder": "اختر مجموعة بيانات",
       "sampleSubmit": "عينة",
       "sampleLoadError": "لم أتمكن من تحميل الصفوف من تلك المجموعة.",
+      "sampleApplied": "تم تحميل العينة {index} من {total} — أشر إليها باستخدام {token} في رسالة.",
       "sampleEmpty": "هذه المجموعة لا تحتوي على أي عناصر حتى الآن.",
       "noProviderTitle": "تحتاج ساحة التجربة إلى مزود LLM",
       "noProviderBody": "وصل مزود لتشغيل التنبيهات. يستغرق الأمر حوالي دقيقة.",
@@ -11673,6 +11865,8 @@
       "reset": "إعادة التعيين",
       "resetTitle": "إعادة تعيين ملعب",
       "resetMessage": "هل أقوم بمسح كل نسخة وصف ومخرج وبدء من جديد؟ لا يمكن التراجع عن هذا.",
+      "resetVariantTitle": "إعادة تعيين منصة التجربة",
+      "resetVariantMessage": "هل تريد مسح توجيه منصة التجربة هذه ومخرجاتها؟ لا يمكن التراجع عن ذلك.",
       "scrollLeft": "انزل إلى اليسار",
       "scrollRight": "انزل إلى اليمين",
       "addMessage": "الرسالة",
@@ -11688,6 +11882,7 @@
       "variantSettings": "إعدادات النماذج",
       "messageToolPlaceholder": "اختر الأداة",
       "variablesCount": "المتغيرات · {count}",
+      "newValueTag": "جديد",
       "variableUsed": "مشار إليه بهذا النوع",
       "variableUnused": "غير مشار إليه في هذا النسخة — هنا يعرض فارغا",
       "addVariable": "إضافة متغير",
@@ -11736,7 +11931,9 @@
       "sampleFullView": "العرض الكامل",
       "sampleBack": "العودة إلى القائمة",
       "sampleInput": "المدخلات",
-      "sampleExpected": "الإنتاج المتوقع"
+      "sampleExpected": "الإنتاج المتوقع",
+      "fromTrace": "من مقطع التتبّع {id}",
+      "openInPlaygroundFailed": "تعذّر فتح هذا المقطع في ساحة التجربة"
     }
   },
   "onlineEvals": {
@@ -11769,12 +11966,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "إعدادات نتائج البحث...",
-      "scoreConfigsLabel": "{count} إعدادات النقاط | {count} إعدادات النقاط"
+      "scoreConfigsLabel": "{count} إعدادات النقاط | {count} إعدادات النقاط",
+      "selectedOfTotal": "تم اختيار {selected} من {total}"
     },
     "scorerLibrary": {
       "noProvidersMessage": "أنشئ مزودا أولا قبل استيراد ملاحظي تقييم LLM Judge.",
       "searchPlaceholder": "منقدو البحث...",
-      "scorerCountSuffix": "{count} مسجلة | {count} مسجلة"
+      "scorerCountSuffix": "{count} مسجلة | {count} مسجلة",
+      "selectedOfTotal": "تم اختيار {selected} من {total}"
     },
     "title": "التقييمات",
     "loadError": "فشل في تحميل التقييمات عبر الإنترنت",
@@ -11891,6 +12090,8 @@
         "legendFalseCount": "false ({count})",
         "kpis": {
           "average": "المتوسط",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "غير صحي",
           "healthy": "سليم",
           "trueRate": "المعدل الحقيقي",
@@ -14129,6 +14330,29 @@
     "queryFailed": "فشل الاستعلام",
     "relationNotContaining": "لا يحتوي على"
   },
+  "statusPages": {
+    "columns": {},
+    "health": {},
+    "visibility": {},
+    "sections": {},
+    "fields": {},
+    "components": {},
+    "postUpdate": {
+      "validation": {}
+    },
+    "notices": {
+      "state": {}
+    },
+    "domains": {
+      "state": {},
+      "failureReason": {}
+    },
+    "preview": {},
+    "empty": {},
+    "dialog": {},
+    "validation": {},
+    "toast": {}
+  },
   "shortcuts": {
     "then": "ثم",
     "escKey": "Esc",
@@ -14592,12 +14816,13 @@
       },
       "alertStatus": {
         "active": "نشط",
+        "disabled": "معاق",
+        "failed": "فشل",
+        "paused": "توقف",
         "ready": "جاهز",
         "running": "تشغيل",
         "training": "التدريب",
-        "failed": "فشل",
-        "disabled": "معاق",
-        "paused": "توقف"
+        "waiting": "الانتظار"
       },
       "anomalyStatus": {
         "active": "نشط",
@@ -15490,6 +15715,7 @@
   },
   "routeTitles": {
     "loginCallback": "إعادة الاتصال بتسجيل الدخول",
+    "slackOAuthCallback": "جارٍ ربط Slack",
     "emptyStateDemo": "عرض الحالة الفارغة",
     "searchScheduler": "جدولة البحث",
     "traceDetails": "تفاصيل الأثر",
