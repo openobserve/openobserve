@@ -1475,6 +1475,9 @@ fn initial_training_allowed(enabled: bool, globally_disabled: bool) -> bool {
 /// P0.4 TDD stub — implementation surface, not behaviour. The pure interval rule both
 /// create and update must share; today create inlines it and update has no check at all.
 fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> Result<()> {
+    // Anchors `parse_interval` as this fn's collaborator without evaluating it: the real
+    // rule parses both, guards positivity/overflow, then compares. Nothing here runs.
+    let _: Option<fn(&str) -> Result<i64>> = Some(parse_interval);
     let _ = (schedule_interval, histogram_interval);
     unimplemented!("P0.4: pure interval-pair rule not implemented yet")
 }
@@ -1493,12 +1496,14 @@ fn merged_interval_pair(
 /// persisted one. Keyed on change rather than presence because the alerts v2 PUT replays
 /// the full body, resending both intervals unchanged on an unrelated edit like a rename;
 /// a presence guard would reject that and make the live broken rows uneditable.
+/// Difference is compared in PARSED SECONDS: a UI re-spelling ("1h" -> "60m") is not a
+/// change, and an unparseable value can never compare equal, so it falls through to the
+/// rule rather than being grandfathered.
 fn validated_intervals(
     req: &UpdateAnomalyConfigRequest,
     existing: &infra::table::entity::anomaly_detection_config::Model,
 ) -> Result<()> {
     let (schedule, histogram) = merged_interval_pair(req, existing);
-    let _ = parse_interval(&schedule);
     validate_interval_pair(&schedule, &histogram)
 }
 
@@ -2590,14 +2595,27 @@ mod tests {
             assert!(validate_interval_pair("5m", "-5m").is_err());
         }
 
-        /// `hours * 3600` is unguarded: i64::MAX hours panics in debug and wraps NEGATIVE
-        /// in release, where it would then sail past `schedule >= histogram` like `-5m`.
-        /// Delegation makes this reachable from the update path, so `checked_mul` is required.
+        /// `hours * 3600` is unguarded. A NEGATIVE wrap is already caught by the positivity
+        /// guard, so the real threat is a POSITIVE wrap: 384307168202282400h lands on exactly
+        /// 268800s (74h), which clears `schedule >= histogram` AND divides 300 evenly, so a
+        /// wrapping multiply accepts it as a plausible schedule. Only `checked_mul` rejects it.
         #[test]
         fn rejects_intervals_that_overflow_the_seconds_conversion() {
+            // Pins the debug-build panic; in release this one wraps negative.
             assert!(validate_interval_pair("9223372036854775807h", "5m").is_err());
-            assert!(validate_interval_pair("5m", "9223372036854775807h").is_err());
-            assert!(validate_interval_pair("9223372036854775807m", "5m").is_err());
+
+            for (schedule, histogram) in
+                [("384307168202282400h", "5m"), ("5m", "384307168202282400h")]
+            {
+                let err = validate_interval_pair(schedule, histogram)
+                    .unwrap_err()
+                    .to_string();
+                assert!(
+                    err.contains("out of range"),
+                    "{schedule}/{histogram} must be refused as overflow, not merely as \
+                     non-positive -- the two are indistinguishable otherwise: {err}"
+                );
+            }
         }
     }
 
@@ -2869,6 +2887,43 @@ mod tests {
                 ..Default::default()
             };
             assert!(validated_intervals(&req, &broken).is_ok());
+        }
+
+        /// Compared in parsed seconds, not strings: the UI re-spelling an interval is not an
+        /// edit. A string compare would re-validate here and make the broken row uneditable
+        /// again -- precisely what grandfathering exists to prevent.
+        #[test]
+        fn a_respelled_interval_of_equal_length_is_not_a_change() {
+            let mut stored = broken_legacy_config();
+            stored.schedule_interval = "1h".to_string();
+            stored.histogram_interval = "5m".to_string();
+            // 1h and 60m are the same duration, so this row is untouched, not repaired.
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("60m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&req, &stored).is_ok());
+
+            let broken = broken_legacy_config();
+            let zero_padded = UpdateAnomalyConfigRequest {
+                schedule_interval: Some("01m".to_string()),
+                ..Default::default()
+            };
+            assert!(validated_intervals(&zero_padded, &broken).is_ok());
+        }
+
+        /// An empty interval must reach the rule and be refused, not be mistaken for
+        /// "unchanged" by an implementation that filters blanks before comparing.
+        #[test]
+        fn an_empty_interval_string_is_refused_not_grandfathered() {
+            let req = UpdateAnomalyConfigRequest {
+                schedule_interval: Some(String::new()),
+                ..Default::default()
+            };
+            let err = validated_intervals(&req, &broken_legacy_config())
+                .unwrap_err()
+                .to_string();
+            assert!(err.contains("Invalid interval format"), "got: {err}");
         }
 
         /// Grandfathering does not extend to a genuine edit: changing one interval on a
