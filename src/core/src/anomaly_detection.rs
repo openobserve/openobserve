@@ -1093,6 +1093,9 @@ async fn force_retrain_for_threshold(org_id: &str, anomaly_id: &str) -> Result<(
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
 
+    // Precedes the queue-reset writes below: a disabled config must not be left mid-transition.
+    ensure_trainable(&config)?;
+
     // Don't clobber an in-flight (re)train: a training run already bakes the latest
     // `config.threshold`, so the new percentile will land in the model it produces. Resetting
     // status/is_trained here would interrupt it for no benefit.
@@ -1153,10 +1156,12 @@ pub async fn cancel_training(org_id: &str, anomaly_id: &str) -> Result<()> {
 pub async fn train_model(org_id: &str, anomaly_id: &str) -> Result<serde_json::Value> {
     // Verify the config exists and belongs to this org before delegating.
     let db = get_orm_client_ro().await;
-    anomaly_config_table::get_by_id(db, org_id, anomaly_id)
+    let config = anomaly_config_table::get_by_id(db, org_id, anomaly_id)
         .await
         .map_err(|e| anyhow::anyhow!(e.to_string()))?
         .ok_or_else(|| anyhow::anyhow!("Config not found"))?;
+
+    ensure_trainable(&config)?;
 
     #[cfg(feature = "enterprise")]
     {
@@ -1452,10 +1457,14 @@ fn validation_error(e: anyhow::Error) -> anyhow::Error {
     anyhow::anyhow!("validation error: {e}")
 }
 
-/// P0.6 TDD stub: only `enabled` gates training, never `alert_enabled` or `status`.
-#[allow(dead_code)]
-fn ensure_trainable(_config: &infra::table::entity::anomaly_detection_config::Model) -> Result<()> {
-    unimplemented!("P0.6: manual-training enabled guard not implemented yet")
+/// Only `enabled` gates training: `alert_enabled` gates dispatch and `status` gates nothing.
+fn ensure_trainable(config: &infra::table::entity::anomaly_detection_config::Model) -> Result<()> {
+    if !config.enabled {
+        return Err(validation_error(anyhow::anyhow!(
+            "config is disabled: enable it before training"
+        )));
+    }
+    Ok(())
 }
 
 /// The one place `alert_enabled` is allowed to decide anything: dispatch, never training.
