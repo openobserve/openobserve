@@ -71,6 +71,7 @@ pub async fn search(
     // Keep the complete matcher set in the key. A short hash collision could
     // otherwise reuse physical row ranges selected by a different query.
     let filter_key = format!("{matchers:?}");
+    let selection_cache_enabled = get_config().search.metrics_index_selection_cache_enabled;
     let mut index_files = BTreeMap::new();
     for file in files.iter() {
         // only indexed metrics files own a sidecar; other layouts stay as they are
@@ -92,13 +93,17 @@ pub async fn search(
             );
             continue;
         };
-        let cache_key = selection_cache_key(
-            &file.account,
-            &sidecar_path,
-            expected_rows,
-            &matcher_labels,
-            &filter_key,
-        );
+        let cache_key = if selection_cache_enabled {
+            selection_cache_key(
+                &file.account,
+                &sidecar_path,
+                expected_rows,
+                &matcher_labels,
+                &filter_key,
+            )
+        } else {
+            String::new()
+        };
         index_files.entry(file.key.clone()).or_insert((
             file.account.clone(),
             sidecar_path,
@@ -112,7 +117,6 @@ pub async fn search(
     let other_files = files.len() - index_files.len();
 
     let start = std::time::Instant::now();
-    let selection_cache_enabled = get_config().search.metrics_index_selection_cache_enabled;
     let mut evaluated = Vec::with_capacity(index_files.len());
     let mut misses = Vec::new();
     if selection_cache_enabled {

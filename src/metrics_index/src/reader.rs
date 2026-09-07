@@ -78,6 +78,12 @@ pub(super) fn decode_metrics_index(
     }
     let parent_records = parse_metadata(metadata, METRICS_INDEX_PARENT_RECORDS_KEY, path)?;
     let row_group_size = parse_metadata(metadata, METRICS_INDEX_ROW_GROUP_SIZE_KEY, path)?;
+    // the access plan divides by it; a corrupt 0 must fail here, not panic there
+    if row_group_size == Some(0) {
+        return Err(DataFusionError::Execution(format!(
+            "metrics index {path} has a row group size of 0"
+        )));
+    }
     let mut projection = vec![file_schema.index_of(METRICS_INDEX_ROW_COUNT)?];
     for label in labels {
         match file_schema.index_of(label) {

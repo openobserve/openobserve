@@ -204,6 +204,15 @@ mod tests {
             panic!("a newer metrics index version was decoded");
         };
         assert!(error.to_string().contains("this build reads up to 1"));
+
+        // a zero row group size would make the parquet access plan divide by zero
+        let mut writer = MetricsIndexWriter::try_new(&schema).unwrap();
+        writer.write(&batch).unwrap();
+        let zero_bytes = Bytes::from(writer.finish(3, Some(0)).unwrap());
+        let Err(error) = decode_metrics_index("zero", zero_bytes, &[]) else {
+            panic!("a zero row group size was decoded");
+        };
+        assert!(error.to_string().contains("row group size of 0"));
     }
 
     #[test]

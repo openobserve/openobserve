@@ -30,8 +30,11 @@ pub const METRICS_INDEX_ROW_COUNT: &str = "__oo_midx_row_count";
 /// Format version a writer stamps into the `.midx` schema; readers reject newer ones.
 pub const METRICS_INDEX_VERSION: u32 = 1;
 pub const METRICS_INDEX_VERSION_KEY: &str = "o2:midx_version";
+/// Row count of the data file the sidecar was written for; readers refuse a mismatch.
 pub const METRICS_INDEX_PARENT_RECORDS_KEY: &str = "o2:parent_records";
+/// Parquet only; absent for Vortex data files, whose access plan needs no row groups.
 pub const METRICS_INDEX_ROW_GROUP_SIZE_KEY: &str = "o2:row_group_size";
+/// Comma-joined `METRICS_HASH_EXCLUDED_LABELS` at write time; informational, readers ignore it.
 pub const METRICS_INDEX_EXCLUDED_LABELS_KEY: &str = "o2:excluded_labels";
 
 /// [`metrics_index_enabled`] narrowed to one stream: the layout also
