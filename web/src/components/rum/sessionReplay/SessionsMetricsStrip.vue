@@ -15,8 +15,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
+  <!-- < lg the five cards keep ONE row: label + value only, caption in the title. -->
   <section
-    class="grid grid-cols-2 gap-2 p-2 lg:grid-cols-5"
+    class="grid grid-cols-5 gap-2 p-2 max-lg:gap-1.5 max-lg:p-1.5"
     data-test="rum-sessions-metrics-strip"
     :aria-label="t('rum.sessionMetricsAria')"
   >
@@ -24,28 +25,32 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       v-for="card in cards"
       :key="card.key"
       type="button"
-      class="metric-card rounded-default bg-card-glass-bg enabled:hover:border-accent flex flex-col items-start gap-0.5 border p-3 text-left transition-colors enabled:cursor-pointer disabled:cursor-default"
+      class="metric-card rounded-default bg-card-glass-bg enabled:hover:border-accent flex min-w-0 flex-col items-start gap-0.5 border p-3 text-left transition-colors enabled:cursor-pointer disabled:cursor-default max-lg:p-1.5"
+      :title="card.caption"
       :class="card.key === activeCard ? 'border-accent' : 'border-border-default'"
       :aria-pressed="card.key === activeCard"
       :disabled="!card.selectable"
       :data-test="`rum-sessions-metric-${card.key}-card`"
       @click="card.selectable && emit('select', card.key)"
     >
-      <span class="text-text-label text-xs font-medium tracking-wide uppercase">{{
-        card.label
-      }}</span>
+      <span
+        class="text-text-label text-xs font-medium tracking-wide uppercase max-lg:w-full max-lg:truncate max-lg:text-3xs"
+        >{{ card.label }}</span
+      >
       <span class="flex items-baseline gap-1.5">
         <span
-          class="text-2xl font-semibold tabular-nums"
+          class="text-2xl font-semibold tabular-nums max-lg:text-base"
           :class="card.valueClass"
           :data-test="`rum-sessions-metric-${card.key}-value`"
           >{{ card.value }}</span
         >
-        <span v-if="card.rate" class="text-text-secondary text-sm tabular-nums"
+        <span v-if="card.rate" class="text-text-secondary text-sm tabular-nums max-lg:hidden"
           >· {{ card.rate }}</span
         >
       </span>
-      <small :class="card.captionClass || 'text-text-secondary'">{{ card.caption }}</small>
+      <small class="max-lg:hidden" :class="card.captionClass || 'text-text-secondary'">{{
+        card.caption
+      }}</small>
     </button>
   </section>
 </template>

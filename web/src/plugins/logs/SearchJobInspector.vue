@@ -62,21 +62,21 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <div class="flex min-h-0 w-full flex-1 flex-col overflow-hidden pt-2.5">
       <!-- Summary Stats Card -->
       <div v-if="!loading" class="mx-2.5 mb-2.5 shrink-0">
-        <!-- < md the five stat tiles stack (the fixed 5-column template overflows). -->
+        <!-- < md the five tiles keep one row as icon + value; labels move to the title. -->
         <div
-          class="grid gap-3 max-md:grid-cols-1! md:[grid-template-columns:1fr_1fr_1fr_1.6fr_0.9fr]"
+          class="grid gap-3 max-md:grid-cols-5 max-md:gap-1.5 md:[grid-template-columns:1fr_1fr_1fr_1.6fr_0.9fr]"
         >
           <!-- Results Returned -->
           <div class="stat-tile">
             <div
-              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base">
+                <div class="font-small text-text-label text-base max-md:hidden">
                   {{ t("logs.searchJobInspector.results") }}
                 </div>
                 <div
-                  class="rounded-default flex h-10 w-10 items-center justify-center border"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border max-md:h-7 max-md:w-7"
                   style="
                     background: rgba(57, 126, 246, 0.2);
                     border-color: rgba(57, 126, 246, 0.35);
@@ -89,11 +89,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div class="flex flex-col gap-1">
-                <div class="text-text-body text-2xl font-bold">
+              <div class="flex flex-col gap-1 max-md:min-w-0 max-md:max-w-full max-md:items-center">
+                <div class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm">
                   {{ hasNoData ? raw("NA") : (profileData?.data_records || 0).toLocaleString() }}
                 </div>
-                <div class="text-3xs text-text-secondary">
+                <div class="text-3xs text-text-secondary max-md:hidden">
                   {{ t("logs.searchJobInspector.returnedFromQuery") }}
                 </div>
               </div>
@@ -103,14 +103,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Events Scanned -->
           <div class="stat-tile">
             <div
-              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base">
+                <div class="font-small text-text-label text-base max-md:hidden">
                   {{ t("logs.searchJobInspector.scannedEvents") }}
                 </div>
                 <div
-                  class="rounded-default flex h-10 w-10 items-center justify-center border"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border max-md:h-7 max-md:w-7"
                   style="
                     background: rgba(57, 126, 246, 0.2);
                     border-color: rgba(57, 126, 246, 0.35);
@@ -123,11 +123,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   />
                 </div>
               </div>
-              <div class="flex flex-col gap-1">
-                <div class="text-text-body text-2xl font-bold">
+              <div class="flex flex-col gap-1 max-md:min-w-0 max-md:max-w-full max-md:items-center">
+                <div class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm">
                   {{ hasNoData ? raw("NA") : (profileData?.scan_records || 0).toLocaleString() }}
                 </div>
-                <div class="text-3xs text-text-secondary">
+                <div class="text-3xs text-text-secondary max-md:hidden">
                   {{ t("logs.searchJobInspector.scannedEventsForQuery") }}
                 </div>
               </div>
@@ -137,14 +137,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Time Taken -->
           <div class="stat-tile">
             <div
-              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base">
+                <div class="font-small text-text-label text-base max-md:hidden">
                   {{ t("logs.searchJobInspector.timeTaken") }}
                 </div>
                 <div
-                  class="rounded-default flex h-10 w-10 items-center justify-center border"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border max-md:h-7 max-md:w-7"
                   style="background: rgba(34, 197, 94, 0.2); border-color: rgba(34, 197, 94, 0.35)"
                 >
                   <svg
@@ -163,8 +163,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </svg>
                 </div>
               </div>
-              <div class="flex flex-col gap-1">
-                <div class="text-text-body text-2xl font-bold">
+              <div class="flex flex-col gap-1 max-md:min-w-0 max-md:max-w-full max-md:items-center">
+                <div class="text-text-body text-2xl font-bold max-md:max-w-full max-md:truncate max-md:text-sm">
                   {{
                     hasNoData
                       ? raw("NA")
@@ -172,7 +172,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   }}
                 </div>
                 <div
-                  class="text-3xs"
+                  class="text-3xs max-md:hidden"
                   :class="
                     hasNoData
                       ? 'text-text-secondary'
@@ -194,14 +194,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- Trace ID -->
           <div class="stat-tile">
             <div
-              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col justify-between border p-3 max-md:h-auto max-md:items-center max-md:gap-1 max-md:p-1.5"
             >
               <div class="flex items-start justify-between">
-                <div class="font-small text-text-label text-base">
+                <div class="font-small text-text-label text-base max-md:hidden">
                   {{ t("logs.searchJobInspector.traceId") }}
                 </div>
                 <div
-                  class="rounded-default flex h-10 w-10 items-center justify-center border"
+                  class="rounded-default flex h-10 w-10 items-center justify-center border max-md:h-7 max-md:w-7"
                   style="
                     background: rgba(242, 220, 245, 0.25);
                     border-color: rgba(242, 220, 245, 0.45);
@@ -231,9 +231,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
                   </svg>
                 </div>
               </div>
-              <div class="flex flex-col gap-1">
+              <div class="flex flex-col gap-1 max-md:min-w-0 max-md:max-w-full max-md:items-center">
                 <div
-                  class="truncate overflow-hidden font-mono text-sm leading-tight font-semibold"
+                  class="truncate overflow-hidden font-mono text-sm leading-tight font-semibold max-md:max-w-full max-md:text-xs"
                   :class="hasNoData ? 'text-text-secondary' : 'text-text-link'"
                 >
                   {{ hasNoData ? raw("NA") : traceId }}
@@ -246,7 +246,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           <!-- View Query -->
           <div class="stat-tile">
             <div
-              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col items-center justify-center border p-3 transition-all"
+              class="rounded-default bg-surface-base border-border-default flex h-28 flex-col items-center justify-center border p-3 transition-all max-md:h-full max-md:p-1.5"
               :class="
                 hasNoData
                   ? 'cursor-not-allowed opacity-50'
@@ -255,7 +255,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               @click="!hasNoData && (showSqlDialog = true)"
             >
               <div
-                class="rounded-default mb-2 flex h-12 w-12 items-center justify-center border"
+                class="rounded-default mb-2 flex h-12 w-12 items-center justify-center border max-md:mb-0 max-md:h-7 max-md:w-7"
                 style="
                   background: rgba(245, 235, 147, 0.25);
                   border-color: rgba(245, 235, 147, 0.45);
