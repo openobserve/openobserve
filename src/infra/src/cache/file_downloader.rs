@@ -335,7 +335,7 @@ async fn download_file(
     ret
 }
 
-// downloads one file for a waiting search, or waits for the task that is already downloading it
+// downloads one file whose in-flight mark the caller already holds, then clears the mark
 async fn download_file_sync(
     trace_id: &str,
     file_id: i64,
@@ -344,9 +344,6 @@ async fn download_file_sync(
     file_size: usize,
     cache_type: file_data::CacheType,
 ) -> bool {
-    if !processing_files::add(file_name) {
-        return wait_for_download(trace_id, file_name).await;
-    }
     let ret = download_file(
         0, trace_id, file_id, account, file_name, file_size, cache_type,
     )
@@ -638,16 +635,17 @@ pub async fn download_sync(
         if exceeds_cache_max_age(ts, cache_type) {
             continue;
         }
-        // files another task is already fetching are awaited later without holding a permit
-        if processing_files::is_processing(&file) {
-            in_flight.push(file);
-            continue;
-        }
         let permit = semaphore
             .clone()
             .acquire_owned()
             .await
             .expect("sync download semaphore is never closed");
+        // ownership is claimed under the permit; a file another task owns is awaited without one
+        if !processing_files::add(&file) {
+            drop(permit);
+            in_flight.push(file);
+            continue;
+        }
         let trace_id = trace_id.to_string();
         // spawned so a cancelled search still finishes the download and clears the in-flight mark
         tasks.push(tokio::spawn(async move {
@@ -731,6 +729,35 @@ mod tests {
             .await
             .expect("waiter should finish once the download is removed")
             .unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_download_sync_waits_for_file_owned_by_another_task() {
+        let name = "test_download_sync_wait_file_333.parquet";
+        assert!(processing_files::add(name));
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            processing_files::remove(name);
+        });
+        let files = vec![(1, "default".to_string(), name.to_string(), 1024, 0)];
+        let cached = tokio::time::timeout(
+            Duration::from_secs(5),
+            super::download_sync("trace", files, file_data::CacheType::None, 1),
+        )
+        .await
+        .expect("download_sync should return once the other download finishes");
+        assert_eq!(cached, 0);
+        assert!(!processing_files::is_processing(name));
+    }
+
+    #[tokio::test]
+    async fn test_download_sync_clears_in_flight_mark() {
+        let name = "test_download_sync_owned_file_444.parquet";
+        let files = vec![(1, "default".to_string(), name.to_string(), 1024, 0)];
+        // CacheType::None makes download_file a no-op success, so no storage is touched
+        let cached = super::download_sync("trace", files, file_data::CacheType::None, 1).await;
+        assert_eq!(cached, 1);
+        assert!(!processing_files::is_processing(name));
     }
 
     #[test]
