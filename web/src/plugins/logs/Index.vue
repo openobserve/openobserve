@@ -593,7 +593,7 @@ export default defineComponent({
     // On a phone the field list can't be a side-by-side splitter pane — it
     // would crush the results. Below md we collapse the inner splitter to 0 and
     // surface the same IndexList inside a left drawer, toggled by a button.
-    const { isMobile } = useBreakpoint();
+    const { isMobile, isTablet } = useBreakpoint();
     const mobileFieldsOpen = ref(false);
     // Lock the inner field-list splitter shut on mobile (results take 100%);
     // restore the default width when returning to a larger viewport.
@@ -604,6 +604,16 @@ export default defineComponent({
           searchObj.config.splitterModel = 0;
         } else if (searchObj.config.splitterModel === 0 && searchObj.meta.showFields) {
           searchObj.config.splitterModel = searchObj.config.lastSplitterPosition || 20;
+        }
+      },
+      { immediate: true },
+    );
+    // md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
+    watch(
+      isTablet,
+      (tablet) => {
+        if (tablet && searchObj.config.splitterModel > 0 && searchObj.config.splitterModel < 30) {
+          searchObj.config.splitterModel = 30;
         }
       },
       { immediate: true },

@@ -111,27 +111,27 @@ describe("OEmptyState", () => {
       expect(flexNowrapEl.exists()).toBe(false);
     });
 
-    it("should keep a single row on md+ but wrap below md when columns is false", () => {
+    it("should keep a single row on lg+ but wrap below lg when columns is false", () => {
       // Arrange & Act
       wrapper = buildWrapper({ columns: false });
 
-      // Assert — nowrap is md+ only; below md the row wraps instead of overflowing.
+      // Assert — nowrap is lg+ only; below lg the row wraps instead of overflowing.
       const flexWrapEl = wrapper.find(".flex-wrap");
-      const flexNowrapEl = wrapper.find(".md\\:flex-nowrap");
+      const flexNowrapEl = wrapper.find(".lg\\:flex-nowrap");
 
       expect(flexWrapEl.exists()).toBe(false);
       expect(flexNowrapEl.exists()).toBe(true);
-      expect(flexNowrapEl.classes()).toContain("max-md:flex-wrap");
+      expect(flexNowrapEl.classes()).toContain("max-lg:flex-wrap");
     });
 
-    it("should keep a single row on md+ but wrap below md when columns is omitted (default)", () => {
+    it("should keep a single row on lg+ but wrap below lg when columns is omitted (default)", () => {
       // Arrange & Act — no columns prop at all
       wrapper = buildWrapper();
 
-      // Assert — default is false, so the md+ nowrap variant should be present
+      // Assert — default is false, so the lg+ nowrap variant should be present
       // and unconditional flex-wrap should not.
       const flexWrapEl = wrapper.find(".flex-wrap");
-      const flexNowrapEl = wrapper.find(".md\\:flex-nowrap");
+      const flexNowrapEl = wrapper.find(".lg\\:flex-nowrap");
 
       expect(flexWrapEl.exists()).toBe(false);
       expect(flexNowrapEl.exists()).toBe(true);

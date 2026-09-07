@@ -102,8 +102,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :class="[
           props.columns
             ? 'flex flex-wrap justify-center'
-            : // < md the single-row card strip wraps instead of overflowing.
-              'flex items-stretch justify-center max-md:flex-wrap md:flex-nowrap',
+            : // < lg the single-row card strip wraps instead of overflowing.
+              'flex items-stretch justify-center max-lg:flex-wrap lg:flex-nowrap',
           sizeClass.actions,
         ]"
       >

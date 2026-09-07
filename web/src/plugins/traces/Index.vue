@@ -439,7 +439,7 @@ const fieldValues = ref({});
 
 // ── Mobile (< md) field-list handling — same recipe as the Logs page: the
 // side pane is locked shut and the same IndexList opens as a left drawer.
-const { isMobile } = useBreakpoint();
+const { isMobile, isTablet } = useBreakpoint();
 const mobileFieldsOpen = ref(false);
 watch(
   isMobile,
@@ -452,6 +452,16 @@ watch(
     // < md the toolbar wraps to two rows, so the fixed 90px top pane clips the
     // query editor; give it room and restore the desktop height on the way out.
     splitterModel.value = mobile ? 150 : 90;
+  },
+  { immediate: true },
+);
+// md–lg: the desktop 20% pane is ~140px, too narrow for the stream picker.
+watch(
+  isTablet,
+  (tablet) => {
+    if (tablet && searchObj.config.splitterModel > 0 && searchObj.config.splitterModel < 30) {
+      searchObj.config.splitterModel = 30;
+    }
   },
   { immediate: true },
 );
