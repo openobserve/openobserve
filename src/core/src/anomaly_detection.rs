@@ -1472,38 +1472,73 @@ fn initial_training_allowed(enabled: bool, globally_disabled: bool) -> bool {
     enabled && !globally_disabled
 }
 
-/// P0.4 TDD stub — implementation surface, not behaviour. The pure interval rule both
-/// create and update must share; today create inlines it and update has no check at all.
+/// The pure interval rule create and update share, so the two cannot drift apart.
 fn validate_interval_pair(schedule_interval: &str, histogram_interval: &str) -> Result<()> {
-    // Anchors `parse_interval` as this fn's collaborator without evaluating it: the real
-    // rule parses both, guards positivity/overflow, then compares. Nothing here runs.
-    let _: Option<fn(&str) -> Result<i64>> = Some(parse_interval);
-    let _ = (schedule_interval, histogram_interval);
-    unimplemented!("P0.4: pure interval-pair rule not implemented yet")
+    let schedule_secs = parse_interval(schedule_interval)?;
+    let histogram_secs = parse_interval(histogram_interval)?;
+
+    // Must precede the `%` below, which panics on a zero divisor.
+    if schedule_secs <= 0 || histogram_secs <= 0 {
+        anyhow::bail!(
+            "schedule_interval ({}) and histogram_interval ({}) must both be positive",
+            schedule_interval,
+            histogram_interval
+        );
+    }
+
+    // A short schedule scores a partial bucket against a full-bucket baseline, forever.
+    if schedule_secs < histogram_secs {
+        anyhow::bail!(
+            "schedule_interval ({}) must not be shorter than histogram_interval ({}): each run \
+             would score a partial bucket against a full-bucket baseline",
+            schedule_interval,
+            histogram_interval
+        );
+    }
+    if schedule_secs % histogram_secs != 0 {
+        anyhow::bail!(
+            "schedule_interval ({}) must be a whole multiple of histogram_interval ({}): \
+             otherwise runs straddle bucket boundaries and rescore partial data",
+            schedule_interval,
+            histogram_interval
+        );
+    }
+    Ok(())
 }
 
-/// P0.4 TDD stub — implementation surface, not behaviour. A partial update must be
-/// validated against the merged final row, since either field alone can break the pair.
+/// The pair a partial update lands on: a submitted field wins, an absent one keeps the row's.
 fn merged_interval_pair(
-    _req: &UpdateAnomalyConfigRequest,
-    _existing: &infra::table::entity::anomaly_detection_config::Model,
+    req: &UpdateAnomalyConfigRequest,
+    existing: &infra::table::entity::anomaly_detection_config::Model,
 ) -> (String, String) {
-    unimplemented!("P0.4: merged interval resolution not implemented yet")
+    (
+        req.schedule_interval
+            .clone()
+            .unwrap_or_else(|| existing.schedule_interval.clone()),
+        req.histogram_interval
+            .clone()
+            .unwrap_or_else(|| existing.histogram_interval.clone()),
+    )
 }
 
-/// P0.4 TDD stub — implementation surface, not behaviour. The single line `update_config`
-/// calls: merge, then the rule, but ONLY when the merged pair actually DIFFERS from the
-/// persisted one. Keyed on change rather than presence because the alerts v2 PUT replays
-/// the full body, resending both intervals unchanged on an unrelated edit like a rename;
-/// a presence guard would reject that and make the live broken rows uneditable.
-/// Difference is compared in PARSED SECONDS: a UI re-spelling ("1h" -> "60m") is not a
-/// change, and an unparseable value can never compare equal, so it falls through to the
-/// rule rather than being grandfathered.
+/// Validates the merged pair only when it differs from the persisted one, in parsed seconds:
+/// the full-body PUT resends unchanged intervals, and rejecting those would strand the rows
+/// already broken on disk.
 fn validated_intervals(
     req: &UpdateAnomalyConfigRequest,
     existing: &infra::table::entity::anomaly_detection_config::Model,
 ) -> Result<()> {
     let (schedule, histogram) = merged_interval_pair(req, existing);
+    // An unparseable value never matches, so it reaches the rule instead of being skipped.
+    if let (Ok(schedule_secs), Ok(histogram_secs), Ok(stored_schedule), Ok(stored_histogram)) = (
+        parse_interval(&schedule),
+        parse_interval(&histogram),
+        parse_interval(&existing.schedule_interval),
+        parse_interval(&existing.histogram_interval),
+    ) && (schedule_secs, histogram_secs) == (stored_schedule, stored_histogram)
+    {
+        return Ok(());
+    }
     validate_interval_pair(&schedule, &histogram)
 }
 
@@ -1559,10 +1594,15 @@ fn combine_detection_fn(function: &str, field: Option<&str>) -> String {
 fn parse_interval(interval: &str) -> Result<i64> {
     if let Some(stripped) = interval.strip_suffix('h') {
         let hours: i64 = stripped.parse()?;
-        Ok(hours * 3600)
+        // A positive wrap lands on a plausible schedule that clears every downstream guard.
+        hours
+            .checked_mul(3600)
+            .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
     } else if let Some(stripped) = interval.strip_suffix('m') {
         let minutes: i64 = stripped.parse()?;
-        Ok(minutes * 60)
+        minutes
+            .checked_mul(60)
+            .ok_or_else(|| anyhow::anyhow!("interval '{interval}' is out of range"))
     } else {
         anyhow::bail!("Invalid interval format. Use '1h' or '30m'");
     }
