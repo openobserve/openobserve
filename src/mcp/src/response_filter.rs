@@ -114,31 +114,31 @@ pub fn filter_response(tool_name: &str, response_body: &str, detail: &DetailLeve
 /// Apply a custom transformer for tools with complex response shapes.
 fn apply_custom_transformer(tool_name: &str, response_body: &str) -> Option<String> {
     match tool_name {
-        "SearchSQL" | "SearchAround" => Some(filter_search_sql(response_body)),
+        "SearchSQL" => Some(filter_search_sql(response_body)),
+        "SearchAround" => Some(filter_search_around(response_body)),
         "testFunction" => Some(filter_test_function(response_body)),
         _ => None,
     }
 }
 
-/// Keep only `SEARCH_SQL_KEEP_FIELDS`, capped by row count and by byte budget.
-fn filter_search_sql(response_body: &str) -> String {
-    let parsed: Value = match serde_json::from_str(response_body) {
-        Ok(v) => v,
-        Err(_) => return response_body.to_string(),
-    };
-
-    let obj = match parsed.as_object() {
-        Some(o) => o,
-        None => return response_body.to_string(),
-    };
-
-    // Build a new object with only the fields we want
-    let mut result = serde_json::Map::new();
+/// Project a search response onto `SEARCH_SQL_KEEP_FIELDS`; `None` if it is not a JSON object.
+fn keep_search_fields(response_body: &str) -> Option<Map<String, Value>> {
+    let parsed: Value = serde_json::from_str(response_body).ok()?;
+    let obj = parsed.as_object()?;
+    let mut result = Map::new();
     for &field in SEARCH_SQL_KEEP_FIELDS {
         if let Some(val) = obj.get(field) {
             result.insert(field.to_string(), val.clone());
         }
     }
+    Some(result)
+}
+
+/// Keep only `SEARCH_SQL_KEEP_FIELDS`, capped by row count and by byte budget.
+fn filter_search_sql(response_body: &str) -> String {
+    let Some(mut result) = keep_search_fields(response_body) else {
+        return response_body.to_string();
+    };
 
     // Cap `hits`: row count first, then the byte budget.
     if let Some(hits) = result.get_mut("hits")
@@ -182,6 +182,14 @@ fn filter_search_sql(response_body: &str) -> String {
         }
     }
 
+    serde_json::to_string(&Value::Object(result)).unwrap_or_else(|_| response_body.to_string())
+}
+
+/// Metadata only: around hits are a window (`[before] ++ [after]`), so a tail trim drops "after".
+fn filter_search_around(response_body: &str) -> String {
+    let Some(result) = keep_search_fields(response_body) else {
+        return response_body.to_string();
+    };
     serde_json::to_string(&Value::Object(result)).unwrap_or_else(|_| response_body.to_string())
 }
 
@@ -610,7 +618,7 @@ mod tests {
     }
 
     #[test]
-    fn test_search_around_is_filtered_like_search_sql() {
+    fn test_search_around_strips_metadata_without_capping() {
         let hits: Vec<Value> = (0..150)
             .map(|i| json!({ "_timestamp": i, "log": "x" }))
             .collect();
@@ -629,15 +637,32 @@ mod tests {
         let result = filter_response("SearchAround", &body, &DetailLevel::Summary);
         let parsed: Value = serde_json::from_str(&result).unwrap();
 
-        assert_eq!(
-            parsed["hits"].as_array().unwrap().len(),
-            SEARCH_SQL_MAX_HITS
-        );
-        assert_eq!(parsed["_hits_capped"]["original"], 150);
-        assert_eq!(parsed["_hits_capped"]["reason"], "row cap");
+        assert_eq!(parsed["hits"].as_array().unwrap().len(), 150);
+        assert!(parsed.get("_hits_capped").is_none());
         assert_eq!(parsed["total"], 150);
         assert!(parsed.get("trace_id").is_none());
         assert!(parsed.get("took_detail").is_none());
+    }
+
+    #[test]
+    fn test_search_around_keeps_the_records_after_the_key() {
+        // around returns [before ... key ... after]: a tail trim answers "nothing happened after".
+        let mut hits: Vec<Value> = Vec::new();
+        for side in ["before", "after"] {
+            for i in 0..5 {
+                hits.push(json!({ "side": side, "i": i, "stacktrace": "x".repeat(9000) }));
+            }
+        }
+        let body =
+            serde_json::to_string(&json!({ "hits": hits, "total": 10, "size": 10 })).unwrap();
+
+        let result = filter_response("SearchAround", &body, &DetailLevel::Summary);
+        let parsed: Value = serde_json::from_str(&result).unwrap();
+
+        let kept = parsed["hits"].as_array().unwrap();
+        assert_eq!(kept.len(), 10);
+        assert_eq!(kept.iter().filter(|h| h["side"] == "after").count(), 5);
+        assert!(parsed.get("_hits_capped").is_none());
     }
 
     #[test]
