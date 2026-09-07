@@ -20,7 +20,7 @@ use std::{
 
 use arrow::datatypes::Schema;
 use config::{
-    PARQUET_MAX_ROW_GROUP_SIZE,
+    PARQUET_MAX_ROW_GROUP_SIZE, get_config,
     meta::{
         promql::is_metrics_hash_excluded_label,
         stream::{FileKey, FileSelection},
@@ -111,9 +111,10 @@ pub async fn search(
     let other_files = files.len() - index_files.len();
 
     let start = std::time::Instant::now();
+    let selection_cache_enabled = get_config().search.metrics_index_selection_cache_enabled;
     let mut evaluated = Vec::with_capacity(index_files.len());
     let mut misses = Vec::new();
-    {
+    if selection_cache_enabled {
         let mut cache = METRICS_INDEX_SELECTION_CACHE
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
@@ -125,6 +126,12 @@ pub async fn search(
                 misses.push((data_path, account, sidecar_path, cache_key, expected_rows));
             }
         }
+    } else {
+        misses.extend(index_files.into_iter().map(
+            |(data_path, (account, sidecar_path, cache_key, expected_rows))| {
+                (data_path, account, sidecar_path, cache_key, expected_rows)
+            },
+        ));
     }
     let cache_hits = evaluated.len();
     let concurrency = target_partitions.max(1).saturating_mul(2).min(64);
@@ -162,7 +169,7 @@ pub async fn search(
     while let Some((data_path, result)) = evaluations.next().await {
         match result {
             Ok((cache_key, ranges, complete)) => {
-                if complete {
+                if complete && selection_cache_enabled {
                     METRICS_INDEX_SELECTION_CACHE
                         .lock()
                         .unwrap_or_else(|poisoned| poisoned.into_inner())

@@ -18,10 +18,8 @@ use std::{
     sync::{Arc, LazyLock, Mutex},
 };
 
+use config::get_config;
 use hashlink::LruCache;
-
-/// Process-wide upper bound for cached physical row-range selections.
-const METRICS_INDEX_SELECTION_CACHE_MAX_BYTES: usize = 256 * 1024 * 1024;
 
 pub(super) static METRICS_INDEX_SELECTION_CACHE: LazyLock<Mutex<MetricsIndexSelectionCache>> =
     LazyLock::new(|| Mutex::new(MetricsIndexSelectionCache::default()));
@@ -50,8 +48,9 @@ impl MetricsIndexSelectionCache {
     }
 
     pub(super) fn insert(&mut self, key: String, ranges: Arc<Vec<Range<usize>>>) {
+        let max_bytes = get_config().search.metrics_index_selection_cache_max_size * 1024 * 1024;
         let size = Self::entry_size(&key, &ranges);
-        if size > METRICS_INDEX_SELECTION_CACHE_MAX_BYTES {
+        if size > max_bytes {
             return;
         }
         if let Some(previous) = self.entries.insert(key.clone(), ranges) {
@@ -60,7 +59,7 @@ impl MetricsIndexSelectionCache {
                 .saturating_sub(Self::entry_size(&key, &previous));
         }
         self.memory_size += size;
-        while self.memory_size > METRICS_INDEX_SELECTION_CACHE_MAX_BYTES {
+        while self.memory_size > max_bytes {
             let Some((key, evicted)) = self.entries.remove_lru() else {
                 break;
             };

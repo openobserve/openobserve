@@ -1554,6 +1554,18 @@ pub struct Search {
     )]
     pub feature_metrics_streaming_agg_enabled: bool,
     #[env_config(
+        name = "ZO_METRICS_INDEX_SELECTION_CACHE_ENABLED",
+        default = false,
+        help = "Cache the row ranges a PromQL query selected from each `.midx` metrics index, keyed by file and matchers, so a repeated query skips decoding and evaluating the index."
+    )]
+    pub metrics_index_selection_cache_enabled: bool,
+    #[env_config(
+        name = "ZO_METRICS_INDEX_SELECTION_CACHE_MAX_SIZE",
+        default = 256,
+        help = "Maximum memory size in MB of the metrics index selection cache."
+    )]
+    pub metrics_index_selection_cache_max_size: usize,
+    #[env_config(
         name = "ZO_FEATURE_DYNAMIC_PUSHDOWN_FILTER_ENABLED",
         default = true,
         help = "Enable dynamic pushdown filter"
