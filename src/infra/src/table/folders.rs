@@ -275,7 +275,7 @@ pub(crate) async fn get_model_by_name<C: ConnectionTrait>(
         .await
 }
 
-/// Lists all folder ORM models with the specified type.
+/// Parses the primary-key `id` column as a Ksuid.
 fn model_ksuid(model: &Model) -> Result<Ksuid, errors::Error> {
     Ksuid::from_base62(&model.id).map_err(|_| {
         FromStrError {
@@ -286,6 +286,7 @@ fn model_ksuid(model: &Model) -> Result<Ksuid, errors::Error> {
     })
 }
 
+/// Lists all folder ORM models with the specified type.
 async fn list_models(
     db: &DatabaseConnection,
     org_id: &str,

@@ -182,8 +182,7 @@ pub async fn ensure_default_folder(
             &folder.name,
             Some(folder.description.as_str()).filter(|d| !d.is_empty()),
         )
-        .await
-        .map_err(|e| FolderError::InfraError(infra::errors::Error::Message(e.to_string())));
+        .await;
     }
 
     Ok(folder)
