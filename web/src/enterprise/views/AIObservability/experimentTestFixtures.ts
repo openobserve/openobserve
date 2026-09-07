@@ -32,6 +32,7 @@ export function makeExperiment(overrides: Partial<LlmExperiment> = {}): LlmExper
     completedAt: 1_800_000_000_100,
     lifecycleVersion: 1,
     retryCount: 0,
+    isBaseline: false,
     createdBy: "test",
     createdAt: 1_800_000_000_000,
     ...overrides,

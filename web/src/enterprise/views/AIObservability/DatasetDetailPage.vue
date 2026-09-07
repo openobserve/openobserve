@@ -209,7 +209,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               :org-id="orgId"
               :experiments="experiments"
               :datasets="[dataset]"
-              :details="experimentDetails"
               :fixed-dataset-id="datasetId"
               :loading="loading"
               compact
@@ -381,11 +380,7 @@ import llmDatasetsService, {
   type LlmDatasetItem,
   type LlmDatasetItemSource,
 } from "@/services/llm-datasets.service";
-import llmExperimentsService, {
-  type ExperimentDetail,
-  type LlmExperiment,
-} from "@/services/llm-experiments.service";
-import { fetchExperimentDetails } from "./experimentDiscovery";
+import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
 import { aiExperimentCreateRoute, aiExperimentsRoute } from "./experimentRoutes";
 
 defineOptions({ name: "AIDatasetDetailPage" });
@@ -402,7 +397,6 @@ const datasetId = computed<string>(() => String(route.params.id ?? ""));
 const dataset = ref<LlmDataset | null>(null);
 const items = ref<LlmDatasetItem[]>([]);
 const experiments = ref<LlmExperiment[]>([]);
-const experimentDetails = ref<Record<string, ExperimentDetail>>({});
 const loading = ref(false);
 const search = ref("");
 const activeTab = ref<"items" | "experiments">("items");
@@ -533,15 +527,11 @@ function onBaselineChanged(experiment: LlmExperiment, previousBaselineId: string
 
 async function refreshExperiments() {
   try {
-    experiments.value = (await llmExperimentsService.list(orgId.value)).filter(
-      (experiment) => experiment.datasetId === datasetId.value,
-    );
-    experimentDetails.value = await fetchExperimentDetails(experiments.value, (experimentId) =>
-      llmExperimentsService.get(orgId.value, experimentId),
-    );
+    experiments.value = (
+      await llmExperimentsService.list(orgId.value, { includeSummary: true })
+    ).filter((experiment) => experiment.datasetId === datasetId.value);
   } catch {
     experiments.value = [];
-    experimentDetails.value = {};
   }
 }
 

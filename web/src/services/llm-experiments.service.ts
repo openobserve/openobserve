@@ -142,6 +142,16 @@ export interface LlmExperiment extends ExperimentCreatePayload {
   isBaseline: boolean;
   createdBy: string;
   createdAt: number;
+  /**
+   * Present only when fetched with `includeSummary` (list) or via `get()`
+   * (always summarized). Lets the browse table read cost/progress/scores
+   * straight off the row instead of a per-experiment detail fetch.
+   */
+  scoringStatus?: string | null;
+  executionProgress?: ExperimentProgress | null;
+  scoringProgress?: ExperimentProgress | null;
+  scoreSummaries?: ExperimentScoreSummary[];
+  aggregateSummary?: ExperimentAggregateSummary | null;
 }
 
 export interface ExperimentDetail {
@@ -533,28 +543,94 @@ function normalizeExperiment(input: any): LlmExperiment {
     trialCount: Number(value(input, "trialCount", "trial_count", 0)),
     metadata: input.metadata ?? null,
     idempotencyKey: value(input, "idempotencyKey", "idempotency_key", null),
-    status: input.status,
-    statusReason: value(input, "statusReason", "status_reason", null),
+    // The server renamed the stored field to executionStatus/etc so it can
+    // report a richer, derived `status` alongside it (e.g. "scoring"); the
+    // old names are kept as a fallback for a response predating the rename.
+    status: value(input, "executionStatus", "execution_status", input.status),
+    statusReason: value(
+      input,
+      "executionStatusReason",
+      "execution_status_reason",
+      value(input, "statusReason", "status_reason", null),
+    ),
     deadlineAt: Number(value(input, "deadlineAt", "deadline_at", 0)),
-    completedAt: value(input, "completedAt", "completed_at", null),
+    completedAt: value(
+      input,
+      "executionCompletedAt",
+      "execution_completed_at",
+      value(input, "completedAt", "completed_at", null),
+    ),
     lifecycleVersion: Number(value(input, "lifecycleVersion", "lifecycle_version", 0)),
     retryCount: Number(value(input, "retryCount", "retry_count", 0)),
-    isBaseline: value(input, "isBaseline", "is_baseline", false) === true,
+    isBaseline: value<boolean>(input, "isBaseline", "is_baseline", false) === true,
     createdBy: value(input, "createdBy", "created_by", ""),
     createdAt: Number(value(input, "createdAt", "created_at", 0)),
+    scoringStatus: value(input, "scoringStatus", "scoring_status", undefined),
+    executionProgress: hasSummaryField(input, "executionProgress", "execution_progress")
+      ? normalizeProgress(value<any>(input, "executionProgress", "execution_progress", {}))
+      : undefined,
+    scoringProgress: hasSummaryField(input, "scoringProgress", "scoring_progress")
+      ? normalizeProgress(value<any>(input, "scoringProgress", "scoring_progress", {}))
+      : undefined,
+    scoreSummaries: hasSummaryField(input, "scoreSummaries", "score_summaries")
+      ? value<any[]>(input, "scoreSummaries", "score_summaries", []).map(normalizeScoreSummary)
+      : undefined,
+    aggregateSummary: hasSummaryField(input, "aggregateSummary", "aggregate_summary")
+      ? normalizeAggregateSummary(value<any>(input, "aggregateSummary", "aggregate_summary", {}))
+      : undefined,
   };
+}
+
+function hasSummaryField(input: any, camel: string, snake: string): boolean {
+  return input?.[camel] !== undefined || input?.[snake] !== undefined;
 }
 
 function numberOrNull(input: unknown): number | null {
   return input === null || input === undefined || input === "" ? null : Number(input);
 }
 
-function normalizeResults(input: any): ExperimentResults {
-  const taskProgress = value<any>(input, "taskProgress", "task_progress", {});
-  const scoringProgress = value<any>(input, "scoringProgress", "scoring_progress", {});
+function normalizeAggregateSummary(aggregateSummary: any): ExperimentAggregateSummary {
+  return {
+    p50LatencyMs: value(aggregateSummary, "p50LatencyMs", "p50_latency_ms", null),
+    totalCost: Number(value(aggregateSummary, "totalCost", "total_cost", 0)),
+    taskCost: numberOrNull(value(aggregateSummary, "taskCost", "task_cost", null)),
+    scoringCost: numberOrNull(value(aggregateSummary, "scoringCost", "scoring_cost", null)),
+    costIncomplete: Boolean(value(aggregateSummary, "costIncomplete", "cost_incomplete", false)),
+    incomplete: Boolean(aggregateSummary?.incomplete ?? false),
+    incompleteTaskSlots: Number(
+      value(aggregateSummary, "incompleteTaskSlots", "incomplete_task_slots", 0),
+    ),
+    incompleteScoreDimensions: Number(
+      value(aggregateSummary, "incompleteScoreDimensions", "incomplete_score_dimensions", 0),
+    ),
+    errorTaskSlots: Number(value(aggregateSummary, "errorTaskSlots", "error_task_slots", 0)),
+  };
+}
+
+// The server moved these four fields out of the results object and onto the
+// (now always-summarized) experiment, so `experimentSummary` — when passed —
+// takes priority; `input` stays as a fallback for a response predating the move.
+function normalizeResults(input: any, experimentSummary: any = {}): ExperimentResults {
+  const taskProgress = value<any>(
+    experimentSummary,
+    "executionProgress",
+    "execution_progress",
+    value<any>(input, "taskProgress", "task_progress", {}),
+  );
+  const scoringProgress = value<any>(
+    experimentSummary,
+    "scoringProgress",
+    "scoring_progress",
+    value<any>(input, "scoringProgress", "scoring_progress", {}),
+  );
   const skipSummary = value<any>(input, "skipSummary", "skip_summary", {});
   const pagination = value<any>(input, "pagination", "pagination", {});
-  const aggregateSummary = value<any>(input, "aggregateSummary", "aggregate_summary", {});
+  const aggregateSummary = value<any>(
+    experimentSummary,
+    "aggregateSummary",
+    "aggregate_summary",
+    value<any>(input, "aggregateSummary", "aggregate_summary", {}),
+  );
   const dispersionSummary = value<any>(input, "dispersionSummary", "dispersion_summary", {});
   return {
     rowDispersions: value<any[]>(input, "rowDispersions", "row_dispersions", []).map(
@@ -588,24 +664,13 @@ function normalizeResults(input: any): ExperimentResults {
       ),
       noTraceDimensions: Number(value(skipSummary, "noTraceDimensions", "no_trace_dimensions", 0)),
     },
-    scoreSummaries: value<any[]>(input, "scoreSummaries", "score_summaries", []).map(
-      normalizeScoreSummary,
-    ),
-    aggregateSummary: {
-      p50LatencyMs: value(aggregateSummary, "p50LatencyMs", "p50_latency_ms", null),
-      totalCost: Number(value(aggregateSummary, "totalCost", "total_cost", 0)),
-      taskCost: numberOrNull(value(aggregateSummary, "taskCost", "task_cost", null)),
-      scoringCost: numberOrNull(value(aggregateSummary, "scoringCost", "scoring_cost", null)),
-      costIncomplete: Boolean(value(aggregateSummary, "costIncomplete", "cost_incomplete", false)),
-      incomplete: Boolean(aggregateSummary.incomplete ?? false),
-      incompleteTaskSlots: Number(
-        value(aggregateSummary, "incompleteTaskSlots", "incomplete_task_slots", 0),
-      ),
-      incompleteScoreDimensions: Number(
-        value(aggregateSummary, "incompleteScoreDimensions", "incomplete_score_dimensions", 0),
-      ),
-      errorTaskSlots: Number(value(aggregateSummary, "errorTaskSlots", "error_task_slots", 0)),
-    },
+    scoreSummaries: value<any[]>(
+      experimentSummary,
+      "scoreSummaries",
+      "score_summaries",
+      value<any[]>(input, "scoreSummaries", "score_summaries", []),
+    ).map(normalizeScoreSummary),
+    aggregateSummary: normalizeAggregateSummary(aggregateSummary),
   };
 }
 
@@ -826,8 +891,15 @@ function normalizeProgress(input: any): ExperimentProgress {
 }
 
 const llmExperimentsService = {
-  async list(orgId: string): Promise<LlmExperiment[]> {
-    const response = await http().get(base(orgId));
+  /**
+   * `includeSummary` folds each row's status/progress/scores/cost into the
+   * same call — the alternative is a detail fetch per experiment, which is
+   * an N+1 fan-out for a page that just needs a few summary numbers per row.
+   */
+  async list(orgId: string, options: { includeSummary?: boolean } = {}): Promise<LlmExperiment[]> {
+    const response = await http().get(base(orgId), {
+      params: options.includeSummary ? { includeSummary: true } : undefined,
+    });
     const rows = Array.isArray(response.data) ? response.data : (response.data?.list ?? []);
     return rows.map(normalizeExperiment);
   },
@@ -872,7 +944,7 @@ const llmExperimentsService = {
     return {
       experiment: normalizeExperiment(response.data?.experiment),
       preview: normalizePreview(response.data?.preview),
-      results: normalizeResults(response.data?.results),
+      results: normalizeResults(response.data?.results, response.data?.experiment),
     };
   },
 

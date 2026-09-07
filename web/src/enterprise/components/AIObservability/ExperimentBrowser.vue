@@ -267,10 +267,7 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { LlmDataset } from "@/services/llm-datasets.service";
-import llmExperimentsService, {
-  type ExperimentDetail,
-  type LlmExperiment,
-} from "@/services/llm-experiments.service";
+import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
 import {
   comparisonEligibility,
   experimentEvidence,
@@ -289,14 +286,13 @@ const props = withDefaults(
     orgId: string;
     experiments: LlmExperiment[];
     datasets: LlmDataset[];
-    details?: Record<string, ExperimentDetail>;
     fixedDatasetId?: string;
     compact?: boolean;
     syncUrl?: boolean;
     /** Spins the refresh icon while the page re-fetches. */
     loading?: boolean;
   }>(),
-  { details: () => ({}), fixedDatasetId: "", compact: false, syncUrl: false, loading: false },
+  { fixedDatasetId: "", compact: false, syncUrl: false, loading: false },
 );
 
 const emit = defineEmits<{
@@ -490,11 +486,11 @@ watch([datasetFilter, nameSearch], () => {
 });
 
 function evidence(experiment: LlmExperiment) {
-  return experimentEvidence(props.details[experiment.id]);
+  return experimentEvidence(experiment);
 }
 
 function progress(experiment: LlmExperiment) {
-  const task = props.details[experiment.id]?.results.taskProgress;
+  const task = experiment.executionProgress;
   if (task?.total) return { done: task.completed, total: task.total };
   const value = evidence(experiment);
   return { done: value.completedSlots, total: value.totalSlots };

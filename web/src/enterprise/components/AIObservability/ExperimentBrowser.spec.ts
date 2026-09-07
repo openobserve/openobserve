@@ -19,10 +19,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { flushPromises, mount } from "@vue/test-utils";
 import { nextTick, reactive } from "vue";
 import ExperimentBrowser from "./ExperimentBrowser.vue";
-import {
-  makeExperiment,
-  makeExperimentDetail,
-} from "@/enterprise/views/AIObservability/experimentTestFixtures";
+import { makeExperiment } from "@/enterprise/views/AIObservability/experimentTestFixtures";
+import type { ExperimentScoreSummary } from "@/services/llm-experiments.service";
 
 const replace = vi.fn();
 const push = vi.fn();
@@ -51,6 +49,25 @@ vi.mock("vue-i18n", () => ({
 
 const experiment = (id: string, datasetId: string, createdAt: number) =>
   makeExperiment({ id, name: id, datasetId, createdAt });
+
+const makeScoreSummary = (
+  overrides: Partial<ExperimentScoreSummary> = {},
+): ExperimentScoreSummary => ({
+  scorerId: "scorer-1",
+  scorerVersion: 1,
+  name: "score",
+  scoreConfigId: null,
+  scoreConfigName: null,
+  scoreConfigVersion: null,
+  sampleCount: 1,
+  errorCount: 0,
+  pendingCount: 0,
+  noReferenceCount: 0,
+  noTraceCount: 0,
+  skippedCount: 0,
+  value: null,
+  ...overrides,
+});
 
 const stubs = {
   OSelect: {
@@ -136,22 +153,13 @@ describe("ExperimentBrowser", () => {
       datasetId: "dataset-a",
       createdAt: 1,
       status: "running",
+      executionProgress: { completed: 4, total: 10, skipped: 0 },
     });
     const wrapper = mount(ExperimentBrowser, {
       props: {
         orgId: "acme",
         experiments: [running, experiment("done", "dataset-a", 2)],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
-        details: {
-          run: makeExperimentDetail(running, {
-            results: {
-              executions: [],
-              scores: [],
-              slots: [],
-              taskProgress: { completed: 4, total: 10, skipped: 0 },
-            },
-          } as any),
-        },
       },
       global: { stubs },
     });
@@ -434,22 +442,18 @@ describe("ExperimentBrowser", () => {
 
   it("gives each scorer its own column instead of one joined score label", () => {
     const row = experiment("scored", "dataset-a", 1);
+    row.scoreSummaries = [
+      makeScoreSummary({ name: "approved", value: { kind: "boolean", trueCount: 1, falseCount: 0 } }),
+      makeScoreSummary({
+        name: "label",
+        value: { kind: "categorical", counts: { good: 1 } },
+      }),
+    ];
     const wrapper = mount(ExperimentBrowser, {
       props: {
         orgId: "acme",
         experiments: [row],
         datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
-        details: {
-          scored: makeExperimentDetail(row, {
-            results: {
-              executions: [],
-              scores: [
-                { name: "approved", value_boolean: true },
-                { name: "label", value_categorical: "good" },
-              ],
-            },
-          }),
-        },
       },
       global: { stubs },
     });
@@ -460,7 +464,11 @@ describe("ExperimentBrowser", () => {
 
   it("keeps score columns scoped to their dataset group", () => {
     const first = experiment("first", "dataset-a", 1);
+    first.scoreSummaries = [makeScoreSummary({ name: "quality", value: { kind: "numeric", mean: 0.8 } })];
     const second = experiment("second", "dataset-b", 2);
+    second.scoreSummaries = [
+      makeScoreSummary({ name: "safety", value: { kind: "boolean", trueCount: 1, falseCount: 0 } }),
+    ];
     const wrapper = mount(ExperimentBrowser, {
       props: {
         orgId: "acme",
@@ -469,14 +477,6 @@ describe("ExperimentBrowser", () => {
           { id: "dataset-a", name: "Dataset A" },
           { id: "dataset-b", name: "Dataset B" },
         ] as any,
-        details: {
-          first: makeExperimentDetail(first, {
-            results: { executions: [], scores: [{ name: "quality", value_numeric: 0.8 }] },
-          }),
-          second: makeExperimentDetail(second, {
-            results: { executions: [], scores: [{ name: "safety", value_boolean: true }] },
-          }),
-        },
       },
       global: { stubs },
     });
