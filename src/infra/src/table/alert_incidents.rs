@@ -19,8 +19,8 @@
 
 use sea_orm::{
     ActiveModelTrait, ColumnTrait, EntityTrait, PaginatorTrait, QueryFilter, QueryOrder,
-    QuerySelect, Set, TransactionTrait,
-    sea_query::{Expr, LockType},
+    QuerySelect, RelationTrait, Set, TransactionTrait,
+    sea_query::{Expr, JoinType, LockType},
 };
 use svix_ksuid::KsuidLike;
 
@@ -512,6 +512,58 @@ pub async fn get_alert_counts(
         .collect())
 }
 
+/// Built apart from the call so its shape is testable without a database.
+fn linked_firings_query(
+    org_id: &str,
+    start_micros: i64,
+    end_micros: i64,
+) -> sea_orm::Select<alert_incident_alerts::Entity> {
+    // The junction carries no org, so scoping has to come through the incident row.
+    alert_incident_alerts::Entity::find()
+        .join(
+            JoinType::InnerJoin,
+            alert_incident_alerts::Relation::Incident.def(),
+        )
+        .filter(alert_incidents::Column::OrgId.eq(org_id))
+        .filter(alert_incident_alerts::Column::AlertFiredAt.gte(start_micros))
+        .filter(alert_incident_alerts::Column::AlertFiredAt.lt(end_micros))
+        .select_only()
+        .column(alert_incident_alerts::Column::AlertId)
+        .column_as(alert_incident_alerts::Column::AlertId.count(), "count")
+        .group_by(alert_incident_alerts::Column::AlertId)
+}
+
+/// Firings that joined an incident, per alert, over a half-open window.
+///
+/// This junction is the system of record for alert-to-incident linkage; deriving it
+/// from anywhere else would disagree with what the correlator actually did.
+pub async fn count_linked_firings_by_alert(
+    org_id: &str,
+    start_micros: i64,
+    end_micros: i64,
+) -> Result<std::collections::HashMap<String, u64>, errors::Error> {
+    use sea_orm::FromQueryResult;
+
+    let client = get_orm_client_ro().await;
+
+    #[derive(Debug, FromQueryResult)]
+    struct LinkedCount {
+        alert_id: String,
+        count: i64,
+    }
+
+    let results = linked_firings_query(org_id, start_micros, end_micros)
+        .into_model::<LinkedCount>()
+        .all(client)
+        .await
+        .map_err(|e| Error::DbError(DbError::SeaORMError(e.to_string())))?;
+
+    Ok(results
+        .into_iter()
+        .map(|r| (r.alert_id, r.count.max(0) as u64))
+        .collect())
+}
+
 /// Count open incidents for an org
 pub async fn count_open(org_id: &str) -> Result<u64, errors::Error> {
     let client = get_orm_client_ro().await;
@@ -818,6 +870,34 @@ pub async fn delete_by_org(org_id: &str) -> Result<(), errors::Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The join, the org scope and the half-open bounds are the whole correctness of
+    /// this query, and there is no database harness here to exercise them.
+    #[test]
+    fn linked_firings_query_scopes_by_org_through_the_incident_join() {
+        use sea_orm::{DbBackend, QueryTrait};
+
+        let sql = linked_firings_query("acme", 100, 200)
+            .build(DbBackend::Postgres)
+            .to_string();
+
+        assert!(
+            sql.contains("INNER JOIN \"alert_incidents\""),
+            "must reach the incident row to find an org: {sql}"
+        );
+        assert!(
+            sql.contains("\"alert_incidents\".\"org_id\" = 'acme'"),
+            "must scope to the org: {sql}"
+        );
+        assert!(
+            sql.contains("\"alert_fired_at\" >= 100") && sql.contains("\"alert_fired_at\" < 200"),
+            "window must be half-open, or a firing on a boundary is counted twice: {sql}"
+        );
+        assert!(
+            sql.contains("GROUP BY \"alert_incident_alerts\".\"alert_id\""),
+            "must aggregate per alert, not per incident: {sql}"
+        );
+    }
 
     #[test]
     fn test_ksuid_generation() {

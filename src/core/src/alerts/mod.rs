@@ -57,6 +57,7 @@ pub mod notifications;
 #[cfg(feature = "enterprise")]
 pub mod org_config;
 pub mod prebuilt;
+pub mod raman_rules;
 pub mod scheduler;
 pub mod templates;
 
