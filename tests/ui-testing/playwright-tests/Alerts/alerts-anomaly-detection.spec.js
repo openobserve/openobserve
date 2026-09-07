@@ -592,11 +592,17 @@ test.describe('Anomaly Detection', () => {
 
         // A freshly created anomaly has not trained, so each panel is either a
         // rendered chart or the explicit unavailable state — never neither.
+        // Poll rather than count once: the panels mount asynchronously, and a
+        // bare count() races the render instead of waiting for it.
         for (const key of ['metric', 'score', 'deviation']) {
           const body = pm.anomalyDetectionPage.getChartBodyLocator(key);
           const empty = pm.anomalyDetectionPage.getChartEmptyLocator(key);
-          const rendered = (await body.count()) > 0 || (await empty.count()) > 0;
-          expect(rendered, `panel ${key} should render a chart or its empty state`).toBe(true);
+          await expect
+            .poll(async () => (await body.count()) + (await empty.count()), {
+              timeout: 30000,
+              message: `panel ${key} rendered neither a chart nor its empty state`,
+            })
+            .toBeGreaterThan(0);
         }
       });
     });
@@ -625,7 +631,8 @@ test.describe('Anomaly Detection', () => {
       // 2 days of 5m buckets at a flat baseline, with a 120-count spike in the
       // most recent buckets so it lands inside the 1h detection window.
       const seed = await seedAnomalyStream(page, seededStream, {
-        days: 2,
+        hours: 4,
+        bucketSeconds: 60,
         baseline: 10,
         spikeValue: 120,
         spikeBuckets: 4,
@@ -644,10 +651,12 @@ test.describe('Anomaly Detection', () => {
 
       await pm.anomalyDetectionPage.openConfigTab();
       await pm.anomalyDetectionPage.selectDetectionFunction('count');
-      await pm.anomalyDetectionPage.setHistogramInterval(5, 'm');
+      // Resolution matches the seeded bucket width — at 5m the 1m buckets
+      // collapse and the model sees a fifth of the points.
+      await pm.anomalyDetectionPage.setHistogramInterval(1, 'm');
       await pm.anomalyDetectionPage.setScheduleInterval(10, 'm');
       await pm.anomalyDetectionPage.setDetectionWindow(1, 'h');
-      await pm.anomalyDetectionPage.setTrainingWindow(2);
+      await pm.anomalyDetectionPage.setTrainingWindow(1);
       await pm.anomalyDetectionPage.selectSensitivityTier(95);
 
       await pm.anomalyDetectionPage.openAlertingTab();

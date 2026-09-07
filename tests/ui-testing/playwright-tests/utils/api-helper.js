@@ -119,7 +119,7 @@ async function destinationExists(page, name) {
 }
 
 /**
- * Seed a stream with a flat baseline plus a spike, backdated across `days`.
+ * Seed a stream with a flat baseline plus a spike, backdated across `hours`.
  *
  * Anomaly training needs history: a model cannot be built from rows all stamped
  * "now", which is why the shared e2e_automate stream is unusable for this. The
@@ -127,24 +127,33 @@ async function destinationExists(page, name) {
  */
 async function seedAnomalyStream(page, streamName, opts = {}) {
   const {
-    days = 2,
-    bucketSeconds = 300,
+    // Stay inside ZO_INGEST_ALLOWED_UPTO (5 hours in CI) — rows backdated
+    // further are silently dropped, and a 2-day seed at 5m buckets lands only
+    // ~59 points, under the 100 the model needs to train.
+    hours = 4,
+    // 1-minute buckets so 4 hours still yields ~240 points.
+    bucketSeconds = 60,
     baseline = 10,
     spikeValue = 120,
-    spikeBuckets = 4,
+    // Wide enough that the model cannot dismiss it, and held back from the
+    // newest buckets: the test spends ~30s in the wizard before detecting, so
+    // a spike hard against the window edge drifts and can fall outside it.
+    spikeBuckets = 15,
+    spikeOffset = 10,
   } = opts;
   const org = getOrgName();
   const now = Math.floor(Date.now() / 1000);
-  const total = Math.floor((days * 86400) / bucketSeconds);
+  const total = Math.floor((hours * 3600) / bucketSeconds);
   const rows = [];
   for (let i = total; i > 0; i--) {
     const ts = (now - i * bucketSeconds) * 1_000_000;
-    const count = i <= spikeBuckets + 1 && i > 1 ? spikeValue : baseline;
+    const inSpike = i > spikeOffset && i <= spikeOffset + spikeBuckets;
+    const count = inSpike ? spikeValue : baseline;
     for (let n = 0; n < count; n++) {
       rows.push({ _timestamp: ts, level: 'info', job: 'anomaly_e2e', log: 'seeded event' });
     }
   }
-  testLogger.info('Seeding anomaly stream', { streamName, rows: rows.length, days });
+  testLogger.info('Seeding anomaly stream', { streamName, rows: rows.length, hours, buckets: total });
   const base = process.env.INGESTION_URL || process.env.ZO_BASE_URL;
   return apiCall(page, 'POST', `/api/${org}/${streamName}/_json`, rows, base);
 }
