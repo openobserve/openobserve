@@ -62,14 +62,8 @@ const EXPAND_WINDOW: i64 = DAY_MICROS;
 const SESSION_EXPAND_WINDOW: i64 = 7 * DAY_MICROS;
 const MAX_LOOKUP_KEYS: usize = 100;
 const LOOKUP_CONCURRENCY: usize = 8;
-/// How many remembered streams the first lookup stage scans; a stale guess
-/// costs one extra stage, so a short list beats a broad first pass.
 const AFFINITY_STREAMS: usize = 2;
 
-/// Per `(org, kind)` memory of the streams that last answered a lookup, so the
-/// common case — a batch of ids that all live in one stream — settles in the
-/// first stage instead of fanning out over every trace stream. Entries are
-/// hints, never answers, and are bounded by the org count times the two kinds.
 static STREAM_AFFINITY: Lazy<RwHashMap<String, Vec<String>>> = Lazy::new(Default::default);
 
 /// What the lookup key identifies. The timer algorithm is shared; the kind
@@ -242,8 +236,6 @@ struct LookupOutcome {
     timed_out: bool,
 }
 
-/// One stream's slot in the request's fan-out: everything else the scan needs
-/// is built once and read through `run`.
 struct ScanParams<'a> {
     run: &'a LookupRun<'a>,
     stream_index: usize,
@@ -255,8 +247,7 @@ impl ScanParams<'_> {
     }
 }
 
-/// Shared state for one request's fan-out: the key-derived tables are built
-/// once, and `resolved` carries the cross-stream pruning across stages.
+/// `resolved` carries the cross-stream pruning across stages.
 struct LookupRun<'a> {
     org_id: &'a str,
     streams: &'a [String],
@@ -300,16 +291,13 @@ impl<'a> LookupRun<'a> {
         }
     }
 
-    /// True once every key has been seen by some stream, which is what lets a
-    /// later stage be skipped entirely.
     fn all_resolved(&self) -> bool {
         self.resolved
             .iter()
             .all(|flag| flag.load(Ordering::Relaxed))
     }
 
-    /// Scans one slice of the candidate streams concurrently. The bool reports
-    /// whether any of them lacked index coverage.
+    /// The bool reports whether any scanned stream lacked index coverage.
     async fn scan(&self, stage: Range<usize>) -> Result<(Vec<LookupOutcome>, bool)> {
         let scans = futures::stream::iter(stage.map(move |stream_index| async move {
             scan_stream(&ScanParams {
@@ -770,12 +758,7 @@ async fn query_inner(
     Ok(Some(SessionTimeIndexResult { range, traces }))
 }
 
-/// Two-stage fan-out under one shared deadline: the remembered streams first,
-/// the rest only when a key is still unseen. A trace or session id lives in
-/// exactly one stream, so a key seen by one stream's scan is skipped by the
-/// others. Skipping the second stage is safe because it only happens when
-/// every key was found, leaving no `not_found` for the unscanned streams to
-/// qualify. The bool reports whether any scanned stream lacked index coverage.
+/// Skipping the second stage is safe: it only happens when every key was found.
 async fn run_staged_lookups(
     run: &LookupRun<'_>,
     stage_one: usize,
@@ -789,10 +772,7 @@ async fn run_staged_lookups(
     Ok((outcomes, coverage_missing))
 }
 
-/// The org fan-out end to end: order the candidates by affinity, scan them in
-/// stages, then drop what the caller may not see. The steps are ordered — the
-/// affinity must not learn a stream the caller was denied — so they stay
-/// together rather than in the handler.
+/// Step order matters: the affinity must not learn a stream the caller was denied.
 async fn run_org_lookups(
     org_id: &str,
     user_id: &str,
@@ -817,7 +797,6 @@ async fn run_org_lookups(
     ))
 }
 
-/// The distinct streams that answered for at least one key.
 fn answering_streams(outcomes: &[LookupOutcome]) -> Vec<usize> {
     let mut answered = Vec::new();
     for outcome in outcomes {
@@ -828,8 +807,7 @@ fn answering_streams(outcomes: &[LookupOutcome]) -> Vec<usize> {
     answered
 }
 
-/// Moves the streams that last answered for this org to the front and returns
-/// how many of them the first stage should scan.
+/// Returns how many of the reordered prefix the first stage should scan.
 fn order_by_affinity(org_id: &str, kind: TimeIndexKind, streams: &mut [String]) -> usize {
     let Some(remembered) = STREAM_AFFINITY.get(&affinity_key(org_id, kind)) else {
         return 0;
@@ -844,8 +822,6 @@ fn order_by_affinity(org_id: &str, kind: TimeIndexKind, streams: &mut [String]) 
     front
 }
 
-/// Records the streams that answered, most recent first, so the next lookup
-/// for this org starts with them.
 fn remember_streams(
     org_id: &str,
     kind: TimeIndexKind,
@@ -872,10 +848,7 @@ fn affinity_key(org_id: &str, kind: TimeIndexKind) -> String {
     format!("{org_id}/{}", kind.label())
 }
 
-/// Permission is checked only on the streams that answered — one check in the
-/// common case instead of one per org trace stream. A denied stream's outcomes
-/// are dropped and reported as missing coverage, so the response neither
-/// returns its range nor names it.
+/// A denied stream is reported as missing coverage, never named or ranged.
 async fn drop_unpermitted(
     org_id: &str,
     user_id: &str,
@@ -1296,11 +1269,7 @@ async fn index_stream_exists(org_id: &str, stream_name: &str) -> bool {
     .await
 }
 
-/// Trace streams of the org that carry a time index, optionally narrowed to
-/// `filter`. The bool reports whether any candidate stream had to be skipped
-/// (partial coverage). Both listings are served by the schema cache, so this
-/// costs no per-stream round trip; permission is checked later, on the streams
-/// that answer.
+/// The bool reports whether any candidate was skipped for lacking an index.
 async fn resolve_org_streams(org_id: &str, filter: &[String]) -> Result<(Vec<String>, bool)> {
     if !get_config().common.trace_time_index_enabled {
         return Ok((Vec::new(), true));
