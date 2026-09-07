@@ -350,28 +350,4 @@ mod job_cluster_gate_tests {
 }
 
 #[cfg(test)]
-mod tests {
-    /// Every publish helper on the synthetics queue: checks and the two config
-    /// tables. Assembled at runtime so the search cannot match its own text.
-    fn any_publish_prefix() -> String {
-        ["queue", "synthetics_"].join("::")
-    }
-
-    /// The check publish helpers share this prefix.
-    fn publish_prefix() -> String {
-        ["queue", "synthetics_check"].join("::")
-    }
-
-    /// Source with every whitespace character removed, so a guard counts the
-    /// same whether rustfmt kept it on one line or wrapped it.
-    ///
-    /// The enterprise idiom fits on one line; the OSS one is
-    /// `o2_enterprise::enterprise::common::config::get_config().super_cluster
-    /// .enabled` and does not. Matching the formatted text would make this test
-    /// a lint on line length, and it would go quiet — reading zero guards as
-    /// "no publishes to guard" — exactly when a publish moved into a file where
-    /// the call is longer.
-    fn squeezed(source: &str) -> String {
-        source.chars().filter(|c| !c.is_whitespace()).collect()
-    }
-}
+mod tests {}

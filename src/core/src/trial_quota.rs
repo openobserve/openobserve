@@ -1388,18 +1388,6 @@ mod tests {
 
     const STEPS: TrialQuotaFeature = TrialQuotaFeature::SyntheticsBrowserSteps;
 
-    /// The one read behind both batched entry points.
-    const SYNTHETICS_READER: &str = "fn read_synthetics_rows(";
-
-    /// Each batched synthetics read and the fold it is a thin wrapper around.
-    const BATCHED_READS: [(&str, &str); 2] = [
-        (
-            "fn synthetics_remaining_for_orgs(",
-            "fold_synthetics_remaining(",
-        ),
-        ("fn synthetics_quota_for_orgs(", "fold_synthetics_quota("),
-    ];
-
     /// The argument text of the first `needle` call in `body`, matched by paren balance.
     fn call_args<'a>(body: &'a str, needle: &str) -> &'a str {
         let at = body
@@ -1418,81 +1406,10 @@ mod tests {
         panic!("`{needle}` call is never closed");
     }
 
-    /// The text after `signature`, up to the closing brace of the item it opens.
-    fn fn_body<'a>(source: &'a str, signature: &str) -> &'a str {
-        let body = source
-            .split_once(signature)
-            .unwrap_or_else(|| panic!("`{signature}` must live in this file"))
-            .1;
-        let end = body.find("\n}\n").expect("end of the function");
-        &body[..end]
-    }
-
     /// rustfmt is free to break an argument list across lines, so every scan of one compares
     /// against this.
     fn without_whitespace(text: &str) -> String {
         text.chars().filter(|c| !c.is_whitespace()).collect()
-    }
-
-    /// Whether `body` reads a pool off this node's own cache rather than the table.
-    fn reads_the_node_cache(body: &str) -> bool {
-        // Assembled at runtime so this file is not itself a call site to the workspace scan.
-        ["get_used", "get_limit", "get_remaining"]
-            .into_iter()
-            .any(|reader| body.contains(&[reader, "_for_pool("].concat()))
-    }
-
-    /// Whether `args` hands `param` on, as itself or as something read off it — a token scan, so
-    /// `all_features()` does not read as the `features` the frame was given.
-    fn passes_through(args: &str, param: &str) -> bool {
-        args.split(|c: char| !c.is_alphanumeric() && c != '_')
-            .any(|token| token == param)
-    }
-
-    /// The name of the `index`-th parameter the function `signature` opens declares.
-    fn parameter(source: &str, signature: &str, index: usize) -> String {
-        call_args(source, signature)
-            .split(',')
-            .nth(index)
-            .unwrap_or_else(|| panic!("`{signature}` must declare {} parameters", index + 1))
-            .split(':')
-            .next()
-            .expect("a parameter name")
-            .trim()
-            .to_string()
-    }
-
-    /// What `name` is bound to in `body`, up to the `;` that ends its `let`.
-    fn binding_value<'a>(body: &'a str, name: &str) -> Option<&'a str> {
-        let mut rest = body;
-        loop {
-            let at = rest.find("let ")? + "let ".len();
-            rest = &rest[at..];
-            let declared = rest.trim_start_matches("mut ");
-            let end = declared
-                .find(|c: char| !c.is_alphanumeric() && c != '_')
-                .unwrap_or(declared.len());
-            if &declared[..end] == name {
-                let value = declared[end..].split_once('=')?.1;
-                return Some(&value[..value.find(';')?]);
-            }
-        }
-    }
-
-    /// Whether `args` hands on ALL of `expr` — as the expression itself, or as a binding assigned
-    /// it — so hoisting is fine and an index that narrows it to one element is not.
-    fn hands_on_all(body: &str, args: &str, expr: &str) -> bool {
-        let expr = without_whitespace(expr);
-        let args = without_whitespace(args);
-        let handed = args.trim_end_matches(',').trim_start_matches('&');
-        if handed.contains('[') {
-            return false;
-        }
-        handed == expr
-            || binding_value(body, handed).is_some_and(|bound| {
-                let bound = without_whitespace(bound);
-                bound.trim_start_matches('&') == expr
-            })
     }
 
     /// Every `.rs` file under the workspace `src/` that mentions one of `needles`, comments

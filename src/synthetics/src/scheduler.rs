@@ -2142,8 +2142,8 @@ mod pool_gate_tests {
     use infra::table::synthetics_checks::DueCheck;
 
     use super::{
-        ERROR_SOURCE_QUOTA, ERROR_SOURCE_TRIAL, GateContext, PoolExhaustionPolicy, PoolGate,
-        distinct_org_ids, gate_decision, quota_result_record, quota_trigger_record, slot_verdict,
+        ERROR_SOURCE_QUOTA, GateContext, PoolExhaustionPolicy, PoolGate, gate_decision,
+        quota_result_record, quota_trigger_record, slot_verdict,
     };
     use crate::pool::StepRemaining;
 
@@ -2178,14 +2178,6 @@ mod pool_gate_tests {
         }
     }
 
-    fn check_for_org(id: &str, org_id: &str) -> DueCheck {
-        DueCheck {
-            id: id.to_string(),
-            org_id: org_id.to_string(),
-            ..due_check()
-        }
-    }
-
     fn protocol_check() -> DueCheck {
         DueCheck {
             check_type: SyntheticType::Http,
@@ -2208,22 +2200,6 @@ mod pool_gate_tests {
                 .map(|(org, policy)| ((*org).to_string(), *policy))
                 .collect(),
         }
-    }
-
-    /// Byte offset of the per-check fan-out loop in `run`.
-    fn fan_out_loop_at(src: &str) -> usize {
-        src.find(&["for synthetic in ", "synthetics {"].concat())
-            .expect("the per-check fan-out loop must still exist in scheduler::run")
-    }
-
-    /// Every brace inside `run` is indented, so the first column-zero `}` closes the function.
-    fn fan_out_body(src: &str) -> &str {
-        let at = fan_out_loop_at(src);
-        let end = at
-            + src[at..]
-                .find("\n}\n")
-                .expect("scheduler::run must still be a function");
-        &src[at..end]
     }
 
     // ── §6.6, evaluated at the gate ─────────────────────────────────────────
@@ -2406,27 +2382,6 @@ mod pool_gate_tests {
     // ── one batched read per tick ───────────────────────────────────────────
 
     // ── the dead letter, one shape for both gates ───────────────────────────
-
-    /// Spec §2.4: a trial-expired org must never be told its steps ran out.
-    fn assert_says_trial(text: &str) {
-        assert!(
-            text.contains("free trial has ended"),
-            "a trial skip must name the trial, not something else: {text}",
-        );
-        assert!(
-            !text.contains("step"),
-            "a trial does not re-open on a raised step limit, so its text must not offer one: \
-             {text}",
-        );
-    }
-
-    /// Spec §2.4: an org with steps left in no pool must be told exactly that.
-    fn assert_says_quota(text: &str) {
-        assert!(
-            text.contains("step") && text.contains("exhausted"),
-            "a quota skip must name the exhausted steps: {text}",
-        );
-    }
 
     // ── 2.4 — a denied slot is recorded, never enqueued ─────────────────────
 

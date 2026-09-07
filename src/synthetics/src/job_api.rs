@@ -2629,14 +2629,6 @@ mod tests {
         // threads, so an exact-delta test would pass alone and fail in the suite.
         // The needles are split so this test's own source does not match them.
 
-        fn clamp_counter_needle() -> String {
-            ["SYNTHETICS_STEP_CLAMP", "_TOTAL.inc()"].concat()
-        }
-
-        fn zero_fallback_counter_needle() -> String {
-            ["SYNTHETICS_STEP_ZERO_FALLBACK", "_TOTAL.inc()"].concat()
-        }
-
         /// The runtime half: the counters really are wired to the globals the
         /// alerts query. Monotone, because other tests share them.
         #[test]
