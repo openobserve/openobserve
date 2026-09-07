@@ -56,6 +56,15 @@ export class ReportFoldersPage {
     return this.page.locator(`${this.folderTabsContainer} [role="tab"]`).filter({ hasText: folderName });
   }
 
+  // Several dialogs can sit in the DOM at once, so a bare .q-dialog__backdrop locator
+  // matches more than one element and waitFor throws a strict-mode violation. Count the
+  // visible ones instead: a leftover backdrop swallows every click on the page beneath.
+  async waitForNoDialogBackdrop(timeout = 10000) {
+    await expect(
+      this.page.locator('.q-dialog__backdrop').locator('visible=true')
+    ).toHaveCount(0, { timeout });
+  }
+
   async navigateToReports() {
     await this.page.goto(
       `${process.env["ZO_BASE_URL"]}/web/reports?org_identifier=${process.env["ORGNAME"]}`,
@@ -96,8 +105,7 @@ export class ReportFoldersPage {
     await this.clickSaveFolder();
     // Wait for the dialog to close after save
     await this.page.locator(this.folderDialog).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    // Also wait for the Quasar backdrop to fade — otherwise it can intercept the next click.
-    await this.page.locator('.q-dialog__backdrop').waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
+    await this.waitForNoDialogBackdrop();
   }
 
   async expectFolderTabVisible(folderName) {
@@ -109,6 +117,7 @@ export class ReportFoldersPage {
   }
 
   async clickFolderTab(folderName) {
+    await this.waitForNoDialogBackdrop();
     await this.getTabByName(folderName).click();
     await this.page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
   }
@@ -185,14 +194,13 @@ export class ReportFoldersPage {
   async clickMove() {
     await this.page.locator(this.moveSubmitBtn).click();
     await this.page.locator(this.moveDialogHeader).waitFor({ state: 'hidden', timeout: 10000 }).catch(() => {});
-    // Wait for Quasar dialog backdrop close animation before interacting with the page
-    await this.page.locator('.q-dialog__backdrop').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    await this.waitForNoDialogBackdrop();
   }
 
   async cancelMove() {
     await this.page.locator(this.moveCancelBtn).first().click();
     await this.page.locator(this.moveDialogHeader).waitFor({ state: 'hidden', timeout: 5000 }).catch(() => {});
-    await this.page.locator('.q-dialog__backdrop').waitFor({ state: 'hidden', timeout: 3000 }).catch(() => {});
+    await this.waitForNoDialogBackdrop();
   }
 
   async expectDefaultFolderExists() {
@@ -226,10 +234,11 @@ export class ReportFoldersPage {
     await this.page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => {});
   }
 
-  async expectReportVisibleInTable(reportName) {
+  async expectReportVisibleInTable(reportName, timeout = 20000) {
+    await this.page.locator(this.reportTable).waitFor({ state: 'visible', timeout }).catch(() => {});
     await expect(
       this.page.locator(`[data-test="report-list-${reportName}-pause-start-report"]`)
-    ).toBeVisible({ timeout: 10000 });
+    ).toBeVisible({ timeout });
   }
 
   async expectReportNotVisibleInTable(reportName) {
