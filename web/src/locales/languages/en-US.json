@@ -13382,13 +13382,14 @@
       "overridesGlobal": "overrides global",
       "notInMany": "Not in {count} environments",
       "overriddenByCheck": "Overridden by local variable",
-      "title": "Inherited",
+      "title": "Shared",
       "filterAll": "All",
       "filterLabel": "Filter by source",
-      "emptyIn": "No inherited variables in {env}.",
+      "emptyIn": "No shared variables in {env}.",
+      "titleTooltip": "Values shared with every check, managed on the Environments & Variables tab: this check's environments plus globals. Local variables above win over these.",
       "valueSet": "Set",
       "valueNotSet": "Not set",
-      "emptyNone": "No inherited variables."
+      "emptyNone": "No shared variables."
     },
     "promote": {
       "done": "Variable is now global",
@@ -13508,7 +13509,7 @@
       "countOfCap": "{count} of {cap}",
       "local": "Local",
       "resolutionOrder": "Resolution order: check, then environment, then global.",
-      "overridesInherited": "Overrides an inherited variable — this value wins.",
+      "overridesInherited": "Overrides a shared variable — this value wins.",
       "valueTooltipEmpty": "{name}: no value yet"
     },
     "browserDevices": {

@@ -73,6 +73,14 @@ describe("SyntheticsInheritedVariables", () => {
     wrapper?.unmount();
   });
 
+  it("explains what Shared means on the header's info icon", () => {
+    wrapper = mountInherited({ rows: [row()] });
+    const hint = wrapper.find('[data-test="synthetics-inherited-hint-icon"]');
+    expect(hint.exists()).toBe(true);
+    // The tooltip is the bridge to where these values are managed.
+    expect(wrapper.find('[data-tip*="Environments & Variables"]').exists()).toBe(true);
+  });
+
   it("renders one row per distinct name with the rail's scope icons", () => {
     wrapper = mountInherited({
       rows: [
@@ -200,7 +208,7 @@ describe("SyntheticsInheritedVariables", () => {
     expect(globalRows[0].text().startsWith("ORG")).toBe(true);
     await filter.setValue("qa");
     expect(wrapper.find('[data-test="synthetics-inherited-empty"]').text()).toBe(
-      "No inherited variables in qa.",
+      "No shared variables in qa.",
     );
   });
 });

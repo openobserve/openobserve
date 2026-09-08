@@ -14,7 +14,7 @@ GNU Affero General Public License for more details.
 You should have received a copy of the GNU Affero General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-The Inherited group of the 4b names-only panel: the union of every selected
+The Shared group of the 4b names-only panel: the union of every selected
 environment plus globals, one row per distinct name, filterable by source.
 Purely presentational — the panel owns the grouped fetch.
 -->
@@ -26,6 +26,14 @@ Purely presentational — the panel owns the grouped fetch.
         {{ t("synthetics.inherited.title") }}
       </h4>
       <OBadge variant="default" size="sm">{{ rows.length }}</OBadge>
+      <OTooltip :content="t('synthetics.inherited.titleTooltip')" side="bottom">
+        <OIcon
+          name="info"
+          size="sm"
+          class="text-text-secondary cursor-help"
+          data-test="synthetics-inherited-hint-icon"
+        />
+      </OTooltip>
       <!-- Resets per visit by design: local state, never persisted. -->
       <div v-if="filterOptions.length > 2" class="ml-auto">
         <OSelect
