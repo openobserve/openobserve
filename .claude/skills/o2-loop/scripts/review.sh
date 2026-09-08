@@ -14,12 +14,14 @@ MAX_BUDGET_USD=""
 CANDIDATES=1
 DRY_RUN=0
 UNSANDBOXED=0
+ALSO_REPOS=()
 
 usage() {
   cat <<'USAGE'
 Usage: review.sh --round N [--ledger DIR] [--base BRANCH] [--backend auto|codex|claude]
                        [--effort low|medium|high] [--model MODEL] [--timeout SECS]
                        [--max-budget-usd N] [--no-candidates] [--unsandboxed] [--dry-run]
+                       [--also PATH ...]
 
 Each round first records the working tree as a local WIP commit ("wip(o2-loop): round N"),
 so the reviewer sees an immutable snapshot and the caller can prove nothing changed afterwards by
@@ -29,6 +31,11 @@ Claude's responses and reviews the delta between round N-1's commit and round N'
 
 DIR defaults to ~/.claude/o2-loop/<repo name>/<branch with / replaced by ->. It must be outside
 the checkout, otherwise it would be swept into the WIP commit.
+
+--also PATH (repeatable) adds a paired repository checkout to the same round: it gets its own WIP
+commit, disposable worktree, patch, and prompt section, so one reviewer sees every side of a
+cross-repo change. Its artifacts live in DIR/round-N/also/<repo name>/ (commit, path, diff.patch,
+delta.patch, and the coder's evidence.md and coder-response.json). BASE must exist in every repo.
 
 Backends:
   codex   `codex exec` in its read-only sandbox. --effort sets model_reasoning_effort (default high).
@@ -52,6 +59,7 @@ A flag that does not apply to the selected backend is rejected.
 Inputs the caller must prepare before running:
   DIR/spec.md                          the confirmed plan (optional, embedded in the prompt when present)
   DIR/round-N/evidence.md              build, clippy, and test results for this round
+  DIR/round-N/also/<name>/evidence.md  the same for each --also repository (optional)
   DIR/round-(N-1)/verdict.json         previous reviewer result (round > 1, written by this script)
   DIR/round-(N-1)/coder-response.json  the coder's per-finding response (round > 1)
 
@@ -74,6 +82,10 @@ USAGE
 
 log() { echo "$*" >&2; }
 
+realpath_of() { python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
+
+repo_name_of() { basename "$(dirname "$(git -C "$1" rev-parse --path-format=absolute --git-common-dir)")"; }
+
 # Appending the error line (never truncating) is what lets a watcher on progress.log end, even on a refused rerun.
 die() {
   log "$*"
@@ -94,6 +106,7 @@ parse_args() {
       --max-budget-usd) MAX_BUDGET_USD="$2"; shift 2 ;;
       --no-candidates) CANDIDATES=0; shift ;;
       --unsandboxed) UNSANDBOXED=1; shift ;;
+      --also) ALSO_REPOS+=("$(realpath_of "$2")"); shift 2 ;;
       --dry-run) DRY_RUN=1; shift ;;
       -h|--help) usage; exit 0 ;;
       *) usage >&2; die "unknown argument: $1" ;;
@@ -161,12 +174,18 @@ resolve_paths() {
   cd "$REPO"
   git rev-parse --verify --quiet "$BASE" >/dev/null || die "base branch not found: $BASE"
   # --git-common-dir resolves to the main checkout even inside a worktree, so all worktrees share one repo name.
+  REPO_NAME="$(repo_name_of "$REPO")"
   if [ -z "$LEDGER" ]; then
-    local repo_name branch_slug
-    repo_name="$(basename "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+    local branch_slug
     branch_slug="$(git rev-parse --abbrev-ref HEAD | tr '/' '-')"
-    LEDGER="$HOME/.claude/o2-loop/$repo_name/$branch_slug"
+    LEDGER="$HOME/.claude/o2-loop/$REPO_NAME/$branch_slug"
   fi
+  local also
+  for also in "${ALSO_REPOS[@]}"; do
+    git -C "$also" rev-parse --show-toplevel >/dev/null 2>&1 || die "--also $also is not a git checkout"
+    git -C "$also" rev-parse --verify --quiet "$BASE" >/dev/null || die "base branch $BASE not found in $also"
+    [ "$(repo_name_of "$also")" != "$REPO_NAME" ] || die "--also $also has the same repository name as the primary checkout"
+  done
   LEDGER="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$LEDGER")"
   case "$LEDGER/" in
     "$REPO"/*) die "ledger $LEDGER is inside the checkout; it would be swept into the WIP commit. Use a path outside the repo." ;;
@@ -190,6 +209,10 @@ check_inputs() {
     done
     check_json "$LEDGER/round-$r/verdict.json" "verdict,findings,prior_findings"
     check_json "$LEDGER/round-$r/coder-response.json" "round,responses"
+    local also
+    for also in "${ALSO_REPOS[@]}"; do
+      [ -s "$LEDGER/round-$r/also/$(repo_name_of "$also")/commit" ] || die "missing $LEDGER/round-$r/also/$(repo_name_of "$also")/commit, required for round $ROUND"
+    done
   done
 }
 
@@ -211,18 +234,51 @@ snapshot() {
     git diff "$PREV_COMMIT" "$COMMIT" > "$ROUND_DIR/delta.patch"
     [ "$PREV_COMMIT" != "$COMMIT" ] || log "warning: round $ROUND reviews the same commit as round $((ROUND - 1)); only responses changed"
   fi
+  local also
+  for also in "${ALSO_REPOS[@]}"; do
+    snapshot_also "$also"
+  done
+}
+
+# Same freeze for a paired repository; its artifacts go under round-N/also/<name>/.
+snapshot_also() {
+  local repo="$1" name dir mb commit prev
+  name="$(repo_name_of "$repo")"
+  dir="$ROUND_DIR/also/$name"
+  mkdir -p "$dir"
+  echo "$repo" > "$dir/path"
+  if [ -n "$(git -C "$repo" status --porcelain)" ]; then
+    git -C "$repo" add -A
+    git -C "$repo" commit --quiet --no-verify -m "wip(o2-loop): round $ROUND"
+  fi
+  commit="$(git -C "$repo" rev-parse HEAD)"
+  echo "$commit" > "$dir/commit"
+  mb="$(git -C "$repo" merge-base "$BASE" HEAD)"
+  echo "$mb" > "$dir/merge-base"
+  git -C "$repo" diff "$mb" "$commit" > "$dir/diff.patch"
+  if [ "$ROUND" -gt 1 ]; then
+    prev="$(cat "$PREV_DIR/also/$name/commit")"
+    git -C "$repo" diff "$prev" "$commit" > "$dir/delta.patch"
+  fi
 }
 
 # The reviewer works in a throwaway checkout of the commit, so nothing it does can touch the real checkout.
-realpath_of() { python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1"; }
-
 make_review_worktree() {
   REVIEW_DIR="$(mktemp -d "${TMPDIR:-/tmp}/o2-loop-review.XXXXXX")"
   rmdir "$REVIEW_DIR"
   git worktree add --quiet --detach "$REVIEW_DIR" "$COMMIT"
   # Seatbelt matches canonical paths, so symlinked or doubled-slash paths would silently miss the rules.
   REVIEW_DIR="$(realpath_of "$REVIEW_DIR")"
+  ALSO_REVIEW_DIRS=()
   trap remove_review_worktree EXIT
+  local also name wt
+  for also in "${ALSO_REPOS[@]}"; do
+    name="$(repo_name_of "$also")"
+    wt="$(mktemp -d "${TMPDIR:-/tmp}/o2-loop-review-$name.XXXXXX")"
+    rmdir "$wt"
+    git -C "$also" worktree add --quiet --detach "$wt" "$(cat "$ROUND_DIR/also/$name/commit")"
+    ALSO_REVIEW_DIRS+=("$(realpath_of "$wt")")
+  done
 }
 
 # The reviewed tree must still equal COMMIT after each reviewer process; drift means something wrote into it.
@@ -248,7 +304,15 @@ sandbox_profile() {
   # Denied last so they win even under the temp dirs; the worktree's gitdir sits under the main repo's .git, hence the final re-allow.
   printf '(deny file-write* (subpath "%s"))' "$REVIEW_DIR" "$LEDGER" "$(realpath_of "$REPO")" \
     "$(realpath_of "$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")")"
+  local i
+  for i in "${!ALSO_REVIEW_DIRS[@]}"; do
+    printf '(deny file-write* (subpath "%s"))' "${ALSO_REVIEW_DIRS[$i]}" "${ALSO_REPOS[$i]}" \
+      "$(realpath_of "$(dirname "$(git -C "${ALSO_REPOS[$i]}" rev-parse --path-format=absolute --git-common-dir)")")"
+  done
   printf '(allow file-write* (subpath "%s"))' "$review_gitdir"
+  for i in "${!ALSO_REVIEW_DIRS[@]}"; do
+    printf '(allow file-write* (subpath "%s"))' "$(realpath_of "$(git -C "${ALSO_REVIEW_DIRS[$i]}" rev-parse --path-format=absolute --git-dir)")"
+  done
 }
 
 # No die() here: this runs as a pipeline stage, where an exit would only end the subshell. select_backend gates it.
@@ -266,6 +330,23 @@ remove_review_worktree() {
   [ -n "${REVIEW_DIR:-}" ] || return 0
   git -C "$REPO" worktree remove --force "$REVIEW_DIR" 2>/dev/null || true
   git -C "$REPO" worktree prune 2>/dev/null || true
+  local i
+  for i in "${!ALSO_REVIEW_DIRS[@]}"; do
+    git -C "${ALSO_REPOS[$i]}" worktree remove --force "${ALSO_REVIEW_DIRS[$i]}" 2>/dev/null || true
+    git -C "${ALSO_REPOS[$i]}" worktree prune 2>/dev/null || true
+  done
+}
+
+# Every reviewed tree must still equal its commit after each reviewer process.
+check_review_worktrees() {
+  local who="$1" i
+  check_review_worktree "$who"
+  for i in "${!ALSO_REVIEW_DIRS[@]}"; do
+    if [ "$(git -C "${ALSO_REVIEW_DIRS[$i]}" rev-parse HEAD)" != "$(cat "$ROUND_DIR/also/$(repo_name_of "${ALSO_REPOS[$i]}")/commit")" ] \
+      || [ -n "$(git -C "${ALSO_REVIEW_DIRS[$i]}" status --porcelain --ignored)" ]; then
+      die "the reviewed tree of $(repo_name_of "${ALSO_REPOS[$i]}") changed during the $who; verdict discarded"
+    fi
+  done
 }
 
 run_with_timeout() {
@@ -282,6 +363,7 @@ run_with_timeout() {
 claude_common_args() {
   printf '%s\n' --restricted --strict-mcp-config --mcp-config '{"mcpServers":{}}' --model "$MODEL" \
     --max-budget-usd "$1" --add-dir "$ROUND_DIR" \
+    "${ALSO_REVIEW_DIRS[@]/#/--add-dir=}" \
     --disallowedTools "Write" "Edit" "NotebookEdit" "WebFetch" "WebSearch" \
     --allowedTools "Bash(git diff:*)" "Bash(git log:*)" "Bash(git show:*)" "Bash(git status:*)" "Bash(git rev-parse:*)" "Bash(git merge-base:*)" \
       "Bash(head:*)" "Bash(tail:*)" "Bash(cat:*)" "Bash(ls:*)" "Bash(wc:*)" "Bash(nl:*)"
@@ -319,7 +401,7 @@ gather_candidates() {
   )
   local status=$?
   set -e
-  check_review_worktree "pre-run"
+  check_review_worktrees "pre-run"
   REVIEWER_TIMEOUT=$((TIMEOUT_SECS - (SECONDS - started)))
   [ "$REVIEWER_TIMEOUT" -ge 60 ] || die "round timeout ${TIMEOUT_SECS}s exhausted by the pre-run; raise --timeout or use --no-candidates"
   local cost
@@ -346,12 +428,35 @@ write_prompt() {
     cat "$SKILL_DIR/prompts/backend-$BACKEND.md"
     echo
     echo "## Change set"
+    echo "- Repository name: $REPO_NAME (use it as the \`repo\` of every finding in this checkout)"
     echo "- Your working directory is a disposable checkout of the commit under review; the real checkout is elsewhere and not yours to touch."
     echo "- Base branch: $BASE (merge-base $MERGE_BASE)"
     echo "- Commit under review: $COMMIT (this is HEAD; the working tree is clean and identical to it)"
     echo "- Full patch: \`$ROUND_DIR/diff.patch\` (absolute path, outside your checkout), or run \`git diff $MERGE_BASE $COMMIT\`"
     echo "- Changed files:"
     echo "$CHANGED_FILES" | sed 's/^/  - /'
+    local i name dir
+    for i in "${!ALSO_REPOS[@]}"; do
+      name="$(repo_name_of "${ALSO_REPOS[$i]}")"
+      dir="$ROUND_DIR/also/$name"
+      echo
+      echo "## Paired repository: $name"
+      echo "- This change spans repositories; review them together and report contract mismatches between them."
+      echo "- Repository name: $name (use it as the \`repo\` of findings in this checkout)"
+      echo "- Disposable checkout (read-only): ${ALSO_REVIEW_DIRS[$i]}"
+      echo "- Commit under review: $(cat "$dir/commit") (merge-base $(cat "$dir/merge-base"))"
+      echo "- Full patch: \`$dir/diff.patch\`, or run \`git -C ${ALSO_REVIEW_DIRS[$i]} diff $(cat "$dir/merge-base") $(cat "$dir/commit")\`"
+      echo "- Changed files:"
+      git -C "${ALSO_REPOS[$i]}" diff --name-only "$(cat "$dir/merge-base")" "$(cat "$dir/commit")" | sed 's/^/  - /'
+      if [ -s "$dir/evidence.md" ]; then
+        echo
+        echo "### Evidence from the $name coder (round $ROUND)"
+        cat "$dir/evidence.md"
+      fi
+      if [ "$ROUND" -gt 1 ] && [ -s "$dir/delta.patch" ]; then
+        echo "- Delta since the previous round: \`$dir/delta.patch\` ($(wc -l < "$dir/delta.patch" | tr -d ' ') lines)"
+      fi
+    done
     if [ -s "$LEDGER/spec.md" ]; then
       echo
       echo "## Spec the change must satisfy"
@@ -379,6 +484,15 @@ write_prompt() {
         cat "$LEDGER/round-$r/coder-response.json"
         echo
         echo '```'
+        for name in "$LEDGER/round-$r"/also/*/; do
+          [ -s "$name/coder-response.json" ] || continue
+          echo
+          echo "## Round $r coder response ($(basename "$name"))"
+          echo '```json'
+          cat "$name/coder-response.json"
+          echo
+          echo '```'
+        done
       done
       echo
       echo "## Delta since the previous round"
@@ -418,7 +532,7 @@ run_reviewer() {
   [ "$BACKEND" = "codex" ] || settings="model $MODEL, reviewer budget \$$REVIEWER_BUDGET of \$$MAX_BUDGET_USD"
   log "backend: $BACKEND${CODEX:+ (codex at $CODEX)}"
   log "round $ROUND, $settings, base $BASE, commit $COMMIT"
-  log "review checkout $REVIEW_DIR (removed on exit)"
+  log "review checkout $REVIEW_DIR (removed on exit)${ALSO_REVIEW_DIRS[*]:+; paired: ${ALSO_REVIEW_DIRS[*]}}"
   log "ledger $ROUND_DIR (tail -f progress.log to watch)"
   if [ "$DRY_RUN" -eq 1 ]; then
     log "dry run: prompt written to $PROMPT, $BACKEND not invoked"
@@ -440,10 +554,25 @@ run_reviewer() {
     mv "$ROUND_DIR/verdict.json" "$ROUND_DIR/verdict.json.discarded"
     die "checkout changed while $BACKEND was reviewing (HEAD or working tree differs from $COMMIT); verdict discarded"
   fi
+  local i
+  for i in "${!ALSO_REPOS[@]}"; do
+    if [ "$(git -C "${ALSO_REPOS[$i]}" rev-parse HEAD)" != "$(cat "$ROUND_DIR/also/$(repo_name_of "${ALSO_REPOS[$i]}")/commit")" ] \
+      || [ -n "$(git -C "${ALSO_REPOS[$i]}" status --porcelain)" ]; then
+      mv "$ROUND_DIR/verdict.json" "$ROUND_DIR/verdict.json.discarded"
+      die "paired checkout ${ALSO_REPOS[$i]} changed while $BACKEND was reviewing; verdict discarded"
+    fi
+  done
   if [ "$(git -C "$REVIEW_DIR" rev-parse HEAD)" != "$COMMIT" ] || [ -n "$(git -C "$REVIEW_DIR" status --porcelain --ignored)" ]; then
     mv "$ROUND_DIR/verdict.json" "$ROUND_DIR/verdict.json.discarded"
     die "the reviewed tree changed during the review; verdict discarded"
   fi
+  for i in "${!ALSO_REVIEW_DIRS[@]}"; do
+    if [ "$(git -C "${ALSO_REVIEW_DIRS[$i]}" rev-parse HEAD)" != "$(cat "$ROUND_DIR/also/$(repo_name_of "${ALSO_REPOS[$i]}")/commit")" ] \
+      || [ -n "$(git -C "${ALSO_REVIEW_DIRS[$i]}" status --porcelain --ignored)" ]; then
+      mv "$ROUND_DIR/verdict.json" "$ROUND_DIR/verdict.json.discarded"
+      die "the reviewed tree of $(repo_name_of "${ALSO_REPOS[$i]}") changed during the review; verdict discarded"
+    fi
+  done
 }
 
 summarize() {
@@ -464,7 +593,7 @@ print(f"new findings: {len(r['findings'])} {sev}")
 if prior:
     print(f"prior findings: {prior}")
 for x in r["findings"]:
-    print(f"  [{x['severity']}] {x['id']} {x['file']}:{x['line']} {x['title']}")
+    print(f"  [{x['severity']}] {x['id']} {x.get('repo', '')}:{x['file']}:{x['line']} {x['title']}")
 for x in r["prior_findings"]:
     print(f"  prior {x['id']} -> {x['status']}: {x['note'][:120]}")
 no_line = [x["id"] for x in r["findings"] if x["line"] is None and x["severity"] != "low"]

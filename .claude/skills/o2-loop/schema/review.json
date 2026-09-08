@@ -10,9 +10,10 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "severity", "category", "file", "line", "title", "detail", "suggestion"],
+        "required": ["id", "severity", "category", "repo", "file", "line", "title", "detail", "suggestion"],
         "properties": {
           "id": { "type": "string" },
+          "repo": { "type": "string" },
           "severity": { "type": "string", "enum": ["critical", "high", "medium", "low"] },
           "category": { "type": "string", "enum": ["correctness", "concurrency", "security", "performance", "error-handling", "api-contract", "convention", "test-coverage", "other"] },
           "file": { "type": "string" },

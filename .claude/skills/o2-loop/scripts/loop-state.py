@@ -36,6 +36,38 @@ def read(path):
         return None
 
 
+def nonempty(path):
+    return os.path.exists(path) and os.path.getsize(path) > 0
+
+
+def merged_response(d):
+    """The primary coder's response plus every paired repository's, as one response document."""
+    primary = load(os.path.join(d, "coder-response.json"))
+    parts = [primary] if primary else []
+    also_dir = os.path.join(d, "also")
+    if os.path.isdir(also_dir):
+        for name in sorted(os.listdir(also_dir)):
+            r = load(os.path.join(also_dir, name, "coder-response.json"))
+            if r:
+                parts.append(r)
+    if not parts:
+        return None
+    return {
+        "responses": [a for p in parts for a in p.get("responses", [])],
+        "open_items": [i for p in parts for i in (p.get("open_items") or [])],
+    }
+
+
+def paired(d):
+    """(name, checkout path, reviewed commit) for each paired repository frozen in this round."""
+    out = []
+    also_dir = os.path.join(d, "also")
+    if os.path.isdir(also_dir):
+        for name in sorted(os.listdir(also_dir)):
+            out.append((name, read(os.path.join(also_dir, name, "path")), read(os.path.join(also_dir, name, "commit"))))
+    return out
+
+
 def collect(ledger):
     rounds = []
     n = 1
@@ -44,11 +76,12 @@ def collect(ledger):
         rounds.append({
             "n": n,
             "dir": d,
-            "evidence": os.path.getsize(os.path.join(d, "evidence.md")) > 0 if os.path.exists(os.path.join(d, "evidence.md")) else False,
+            "evidence": nonempty(os.path.join(d, "evidence.md")),
             "commit": read(os.path.join(d, "commit")),
             "backend": read(os.path.join(d, "backend")),
             "verdict": load(os.path.join(d, "verdict.json")),
-            "response": load(os.path.join(d, "coder-response.json")),
+            "response": merged_response(d),
+            "paired": paired(d),
         })
         n += 1
     return rounds
@@ -62,7 +95,7 @@ def finding_registry(rounds):
         if not v:
             continue
         for f in v.get("findings", []):
-            reg[f["id"]] = {"severity": f["severity"], "status": "open", "round": r["n"], "title": f.get("title", "")}
+            reg[f["id"]] = {"severity": f["severity"], "status": "open", "round": r["n"], "title": f.get("title", ""), "repo": f.get("repo", "")}
         for p in v.get("prior_findings", []):
             if p["id"] in reg:
                 reg[p["id"]]["status"] = p["status"]
@@ -95,6 +128,9 @@ def decide(rounds, reg, cap, head, clean):
     open_items = last["response"].get("open_items") or []
     verdict = last["verdict"]["verdict"]
     drift = head != last["commit"] or not clean
+    for name, path, commit in last["paired"]:
+        if not path or sh("git", "-C", path, "rev-parse", "HEAD") != commit or sh("git", "-C", path, "status", "--porcelain") != "":
+            drift = True
     if verdict == "approve" and not blocking and not low_not_deferred and not open_items and not drift:
         return "agreed", f"agreed after {n} rounds; deferred lows: {[i for i in open_ids if reg[i].get('action') == 'defer']}"
     reasons = []
@@ -145,8 +181,10 @@ def main():
     print(f"open findings: {open_ids or 'none'}")
     for i in open_ids:
         f = reg[i]
-        print(f"  {i} [{f['severity']}] round {f['round']} {f['status']} action={f.get('action', '-')}: {f['title']}")
+        print(f"  {i} [{f['severity']}] {f.get('repo') or '-'} round {f['round']} {f['status']} action={f.get('action', '-')}: {f['title']}")
     print(f"HEAD {head[:10]} clean={clean}")
+    for name, path, commit in (rounds[-1]["paired"] if rounds else []):
+        print(f"paired {name}: {path} reviewed {(commit or '-')[:10]} HEAD {sh('git', '-C', path, 'rev-parse', 'HEAD')[:10] if path else '-'}")
     print(f"ACTION: {action}")
     print(f"WHY: {why}")
 

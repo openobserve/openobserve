@@ -18,5 +18,5 @@ The delta between the previous round's commit and this round's commit is listed 
 
 ## Output rules
 - `verdict` is `approve` only if no prior finding is `still_open` with an original severity of critical, high, or medium, and no new finding is critical, high, or medium.
-- Every new finding cites a real `file` and `line` in the working tree; `line` may be null only for a file-level finding of low severity.
+- Every new finding names its `repo` and cites a real `file` and `line` in that checkout; `line` may be null only for a file-level finding of low severity.
 - `summary` states whether the change is now mergeable and, if not, the single most important remaining issue.

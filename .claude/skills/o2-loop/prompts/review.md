@@ -20,7 +20,7 @@ Look for, in priority order:
 Do not report: formatting, naming taste, anything `cargo fmt` or `cargo clippy` already enforces, or speculative issues you cannot point to a concrete line for.
 
 ## Output rules
-- Every finding must cite a real `file` and `line` in the working tree, with a `detail` that states the failing input or state and the wrong outcome. `line` may be null only for a file-level finding such as a missing test file, and never for a finding above low severity.
+- Every finding names its `repo` (the repository name given in the change-set or paired-repository section) and cites a real `file` and `line` in that checkout, with a `detail` that states the failing input or state and the wrong outcome. `line` may be null only for a file-level finding such as a missing test file, and never for a finding above low severity.
 - Give each finding a stable id `F<n>` starting at F1. Later rounds refer to these ids.
 - `verdict` is `request_changes` if any finding is critical, high, or medium. If only low findings remain, `verdict` is `approve` and the findings stay listed as optional.
 - `prior_findings` must be an empty array in this first round.
