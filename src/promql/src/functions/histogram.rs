@@ -23,6 +23,8 @@ use config::{
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashMap;
 
+use crate::fused::columnar::{ColumnarMatrix, ColumnarSeries, is_missing};
+
 // https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L33
 #[derive(Debug, Clone, PartialEq)]
 struct Bucket {
@@ -141,6 +143,87 @@ pub(crate) fn histogram_quantile(phi: f64, data: Value, eval_ctx: &EvalContext) 
 }
 
 // cf. https://github.com/prometheus/prometheus/blob/cf1bea344a3c390a90c35ea8764c4a468b345d5e/promql/quantile.go#L76
+/// `histogram_quantile` over columns: buckets gather per step from contiguous slices, and a bucket
+/// without a value at a step contributes its first value, as the row path does.
+pub(crate) fn histogram_quantile_columnar(
+    phi: f64,
+    matrix: ColumnarMatrix,
+    eval_ctx: &EvalContext,
+) -> Result<Value> {
+    let start = std::time::Instant::now();
+    let trace_id = &eval_ctx.trace_id;
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] histogram_quantile({phi}) started with {} columnar series and {} time points",
+        matrix.series.len(),
+        matrix.timestamps.len()
+    );
+
+    let mut metrics_by_sig: HashMap<u64, Vec<(f64, ColumnarSeries)>> = HashMap::default();
+    for series in matrix.series {
+        let Ok(upper_bound) = series.labels.get_value(BUCKET_LABEL).parse::<f64>() else {
+            continue;
+        };
+        let sig = signature_without_labels(&series.labels, &[HASH_LABEL, NAME_LABEL, BUCKET_LABEL]);
+        metrics_by_sig
+            .entry(sig)
+            .or_default()
+            .push((upper_bound, series));
+    }
+
+    let group_count = metrics_by_sig.len();
+    let mut range_values = Vec::with_capacity(group_count);
+    for (_sig, mut bucket_series) in metrics_by_sig {
+        bucket_series.sort_by(|a, b| sort_float(&a.0, &b.0));
+        let mut base_labels = bucket_series[0].1.labels.clone();
+        base_labels
+            .retain(|l| l.name != HASH_LABEL && l.name != NAME_LABEL && l.name != BUCKET_LABEL);
+        let first_values: Vec<Option<f64>> = bucket_series
+            .iter()
+            .map(|(_, series)| {
+                series
+                    .values
+                    .iter()
+                    .copied()
+                    .find(|value| !is_missing(*value))
+            })
+            .collect();
+
+        let mut samples = Vec::with_capacity(matrix.timestamps.len());
+        for (slot, &eval_ts) in matrix.timestamps.iter().enumerate() {
+            let mut buckets = Vec::with_capacity(bucket_series.len());
+            for ((upper_bound, series), first) in bucket_series.iter().zip(&first_values) {
+                let value = series.values[slot];
+                let value = if is_missing(value) {
+                    *first
+                } else {
+                    Some(value)
+                };
+                if let Some(value) = value {
+                    buckets.push(Bucket::new(*upper_bound, value));
+                }
+            }
+            if !buckets.is_empty() {
+                samples.push(Sample::new(eval_ts, bucket_quantile_sorted(phi, buckets)));
+            }
+        }
+        if !samples.is_empty() {
+            range_values.push(RangeValue {
+                labels: base_labels,
+                samples,
+                exemplars: None,
+                time_window: None,
+            });
+        }
+    }
+
+    log::info!(
+        "[trace_id: {trace_id}] [PromQL Timing] histogram_quantile({phi}) completed in {:?}, folded {group_count} groups into {} series",
+        start.elapsed(),
+        range_values.len()
+    );
+    Ok(Value::Matrix(range_values))
+}
+
 /// Compute a classic histogram quantile from buckets already sorted by upper bound.
 fn bucket_quantile_sorted(phi: f64, buckets: Vec<Bucket>) -> f64 {
     if phi.is_nan() || buckets.is_empty() {
@@ -279,6 +362,82 @@ mod tests {
                 .collect::<Vec<_>>(),
             vec![(1, 1.0), (2, 1.0), (3, 1.0)],
         );
+    }
+
+    #[test]
+    fn test_histogram_quantile_columnar_matches_rows() {
+        let eval_ctx = EvalContext::new(1, 4, 1, "test".to_string());
+        let labels = |path: &str, le: &str| -> config::meta::promql::value::Labels {
+            vec![
+                Arc::new(Label::new("path", path)),
+                Arc::new(Label::new("le", le)),
+            ]
+        };
+        // (path, le, value per step; None = the function produced nothing there)
+        let data: Vec<(&str, &str, [Option<f64>; 4])> = vec![
+            (
+                "/a",
+                "+Inf",
+                [Some(10.0), Some(20.0), Some(30.0), Some(40.0)],
+            ),
+            ("/a", "1", [Some(5.0), None, Some(15.0), Some(f64::NAN)]),
+            ("/a", "0.5", [None, None, Some(2.0), Some(3.0)]),
+            ("/b", "+Inf", [Some(1.0), Some(2.0), Some(3.0), Some(4.0)]),
+            ("/b", "bad", [Some(1.0), Some(1.0), Some(1.0), Some(1.0)]),
+        ];
+        let rows = Value::Matrix(
+            data.iter()
+                .map(|(path, le, values)| RangeValue {
+                    labels: labels(path, le),
+                    samples: values
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, value)| value.map(|v| Sample::new(i as i64 + 1, v)))
+                        .collect(),
+                    exemplars: None,
+                    time_window: None,
+                })
+                .collect(),
+        );
+        let columns = ColumnarMatrix {
+            timestamps: Arc::from([1i64, 2, 3, 4]),
+            series: data
+                .iter()
+                .map(|(path, le, values)| ColumnarSeries {
+                    labels: labels(path, le),
+                    values: values
+                        .iter()
+                        .map(|value| value.unwrap_or(crate::fused::columnar::MISSING))
+                        .collect(),
+                })
+                .collect(),
+        };
+        let flatten = |value: Value| -> Vec<(String, Vec<(i64, u64)>)> {
+            let Value::Matrix(mut series) = value else {
+                panic!("expected matrix");
+            };
+            series.sort_by_key(|rv| rv.labels.get_value("path"));
+            series
+                .into_iter()
+                .map(|rv| {
+                    (
+                        rv.labels
+                            .iter()
+                            .map(|l| format!("{}={}", l.name, l.value))
+                            .collect::<Vec<_>>()
+                            .join(","),
+                        rv.samples
+                            .iter()
+                            .map(|s| (s.timestamp, s.value.to_bits()))
+                            .collect(),
+                    )
+                })
+                .collect()
+        };
+        let expected = flatten(histogram_quantile(0.9, rows, &eval_ctx).unwrap());
+        let actual = flatten(histogram_quantile_columnar(0.9, columns, &eval_ctx).unwrap());
+        assert_eq!(expected.len(), 2);
+        assert_eq!(actual, expected);
     }
 
     #[test]

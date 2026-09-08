@@ -57,7 +57,7 @@ mod vector;
 pub(crate) use absent::absent;
 pub(crate) use absent_over_time::absent_over_time;
 pub(crate) use clamp::clamp;
-pub(crate) use histogram::histogram_quantile;
+pub(crate) use histogram::{histogram_quantile, histogram_quantile_columnar};
 pub(crate) use holt_winters::holt_winters;
 pub(crate) use label_join::label_join;
 pub(crate) use label_replace::label_replace;

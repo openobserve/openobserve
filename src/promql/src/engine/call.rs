@@ -21,7 +21,7 @@ use std::{str::FromStr, sync::Arc};
 use config::meta::promql::value::*;
 use datafusion::error::{DataFusionError, Result};
 use hashbrown::HashSet;
-use promql_parser::parser::{Expr as PromExpr, Function, FunctionArgs, MatrixSelector};
+use promql_parser::parser::{Call, Expr as PromExpr, Function, FunctionArgs, MatrixSelector};
 
 use super::Engine;
 use crate::functions::{self, Func};
@@ -44,6 +44,24 @@ impl Engine {
             && let PromExpr::MatrixSelector(MatrixSelector { vs, range }) = arg.as_ref()
             && let Some(value) = self
                 .try_streaming_range_func(vs, *range, range_func.clone())
+                .await?
+        {
+            return Ok(value);
+        }
+
+        // histogram_quantile over a streamed range function consumes its columns directly
+        if matches!(func_name, Func::HistogramQuantile)
+            && let [phi, arg] = args.args.as_slice()
+            && let PromExpr::NumberLiteral(phi) = phi.as_ref()
+            && let PromExpr::Call(Call {
+                func: inner,
+                args: inner_args,
+            }) = arg.as_ref()
+            && let Some(inner_func) = Func::from_str(inner.name).ok().and_then(Func::range_func)
+            && let [inner_arg] = inner_args.args.as_slice()
+            && let PromExpr::MatrixSelector(MatrixSelector { vs, range }) = inner_arg.as_ref()
+            && let Some(value) = self
+                .try_streaming_histogram_quantile(phi.val, vs, *range, Arc::from(inner_func))
                 .await?
         {
             return Ok(value);

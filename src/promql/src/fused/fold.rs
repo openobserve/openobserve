@@ -26,7 +26,11 @@ use datafusion::error::{DataFusionError, Result};
 use hashbrown::{HashMap, hash_map::Entry};
 use tokio::task::JoinSet;
 
-use super::{accumulator::FusedAccumulator, op::FusedAggOp};
+use super::{
+    accumulator::FusedAccumulator,
+    columnar::{ColumnarMatrix, ColumnarSeries, MISSING},
+    op::FusedAggOp,
+};
 use crate::{
     functions::{RangeFunc, advance_sample_window},
     micros,
@@ -159,6 +163,29 @@ where
     Ok((series, series_count))
 }
 
+/// Emits every partition's series as value columns on the shared timestamp axis.
+pub(super) async fn emit_sources_columnar<F, S>(
+    sources: Vec<F>,
+    eval: Arc<SeriesEval>,
+) -> Result<(ColumnarMatrix, usize)>
+where
+    F: Future<Output = Result<S>> + Send + 'static,
+    S: SeriesStream + 'static,
+{
+    let parts = sources
+        .into_iter()
+        .map(|source| {
+            let eval = eval.clone();
+            async move { emit_partition_columnar(source.await?, eval).await }
+        })
+        .collect();
+    let parts = run_partitions(parts).await?;
+    let series_count = parts.iter().map(|(_, series)| series).sum();
+    let series = parts.into_iter().flat_map(|(series, _)| series).collect();
+    let timestamps = Arc::from(eval.timestamps.as_slice());
+    Ok((ColumnarMatrix { timestamps, series }, series_count))
+}
+
 /// Emits one partition's series; like the generic evaluator, a series with no value is dropped.
 async fn emit_partition<S: SeriesStream>(
     mut source: S,
@@ -180,6 +207,32 @@ async fn emit_partition<S: SeriesStream>(
                 exemplars: None,
                 time_window: Some(TimeWindow::new(eval.range)),
             });
+        }
+        series_count += 1;
+        tokio::task::consume_budget().await;
+    }
+    Ok((series, series_count))
+}
+
+/// Emits one partition's series as columns; a series with no value is dropped.
+async fn emit_partition_columnar<S: SeriesStream>(
+    mut source: S,
+    eval: Arc<SeriesEval>,
+) -> Result<(Vec<ColumnarSeries>, usize)> {
+    let slots = eval.timestamps.len();
+    let mut series = Vec::new();
+    let mut series_count = 0;
+    while source.advance().await?.is_some() {
+        let labels = source.labels();
+        let samples = source.consume().await?;
+        let mut values = vec![MISSING; slots];
+        let mut any = false;
+        eval.eval_series(samples, |slot, value| {
+            values[slot] = value;
+            any = true;
+        });
+        if any {
+            series.push(ColumnarSeries { labels, values });
         }
         series_count += 1;
         tokio::task::consume_budget().await;

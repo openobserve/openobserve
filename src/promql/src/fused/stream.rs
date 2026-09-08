@@ -34,10 +34,14 @@ use datafusion::{
     execution::SendableRecordBatchStream,
     prelude::SessionContext,
 };
+use futures::{FutureExt, future::BoxFuture};
 use hashbrown::HashSet;
 use promql_parser::{label::Matchers, parser::LabelModifier};
 
-use super::fold::{FoldParams, SeriesEval, emit_sources, fold_sources};
+use super::{
+    columnar::ColumnarMatrix,
+    fold::{FoldParams, SeriesEval, emit_sources, emit_sources_columnar, fold_sources},
+};
 use crate::{
     functions::{KEEP_METRIC_NAME_FUNC, RangeFunc},
     fused::FusedAggOp,
@@ -138,39 +142,24 @@ pub(crate) async fn range_series(
     eval_ctx: &EvalContext,
 ) -> Result<Option<Value>> {
     let start_time = std::time::Instant::now();
-    let trace_id = eval_ctx.trace_id.clone();
-
-    if schema
-        .field_with_name(HASH_LABEL)
-        .is_ok_and(|field| field.data_type() != &DataType::UInt64)
-    {
-        return Ok(None);
-    }
-    let label_cols = series_label_columns(schema, &labels, func.name());
-    let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
-    columns.extend(label_cols.iter().map(String::as_str));
-
-    let Some(shard_inputs) =
-        shard_inputs(ctx, &selector, micros(range), &columns, eval_ctx).await?
+    let Some((sources, eval)) = range_sources(
+        ctx,
+        schema,
+        &selector,
+        func.clone(),
+        range,
+        &labels,
+        eval_ctx,
+    )
+    .await?
     else {
         return Ok(None);
     };
-    let shards = shard_inputs.len();
-
-    log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming {}() started with {shards} shards",
-        func.name(),
-    );
-    let eval = Arc::new(SeriesEval::new(func.clone(), range, eval_ctx));
-    let label_cols = Arc::new(label_cols);
-    let sources = shard_inputs
-        .into_iter()
-        .map(|streams| MergeSeriesStream::start(streams, label_cols.clone(), selector.offset))
-        .collect();
     let (series, series_count) = emit_sources(sources, eval).await?;
 
     log::info!(
-        "[trace_id: {trace_id}] [PromQL Timing] streaming {}() execution took: {:?}, emitted {} of {series_count} series",
+        "[trace_id: {}] [PromQL Timing] streaming {}() execution took: {:?}, emitted {} of {series_count} series",
+        eval_ctx.trace_id,
         func.name(),
         start_time.elapsed(),
         series.len(),
@@ -181,6 +170,89 @@ pub(crate) async fn range_series(
     } else {
         Value::Matrix(series)
     }))
+}
+
+/// Like `range_series`, but the series come back as columns on the shared timestamp axis, with
+/// the number of series scanned; `None` when the layout cannot stream.
+pub(crate) async fn range_series_columnar(
+    ctx: &SessionContext,
+    schema: &Schema,
+    selector: StreamingSelector<'_>,
+    func: Arc<dyn RangeFunc>,
+    range: Duration,
+    labels: SeriesLabels<'_>,
+    eval_ctx: &EvalContext,
+) -> Result<Option<(ColumnarMatrix, usize)>> {
+    let start_time = std::time::Instant::now();
+    let Some((sources, eval)) = range_sources(
+        ctx,
+        schema,
+        &selector,
+        func.clone(),
+        range,
+        &labels,
+        eval_ctx,
+    )
+    .await?
+    else {
+        return Ok(None);
+    };
+    let (matrix, series_count) = emit_sources_columnar(sources, eval).await?;
+
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] streaming {}() execution took: {:?}, emitted {} of {series_count} series as columns",
+        eval_ctx.trace_id,
+        func.name(),
+        start_time.elapsed(),
+        matrix.series.len(),
+    );
+    Ok(Some((matrix, series_count)))
+}
+
+/// The per-shard sources carrying the series labels, and the evaluator of `func`; `None` when
+/// the layout cannot stream.
+async fn range_sources(
+    ctx: &SessionContext,
+    schema: &Schema,
+    selector: &StreamingSelector<'_>,
+    func: Arc<dyn RangeFunc>,
+    range: Duration,
+    labels: &SeriesLabels<'_>,
+    eval_ctx: &EvalContext,
+) -> Result<
+    Option<(
+        Vec<BoxFuture<'static, Result<MergeSeriesStream>>>,
+        Arc<SeriesEval>,
+    )>,
+> {
+    if schema
+        .field_with_name(HASH_LABEL)
+        .is_ok_and(|field| field.data_type() != &DataType::UInt64)
+    {
+        return Ok(None);
+    }
+    let label_cols = series_label_columns(schema, labels, func.name());
+    let mut columns = vec![TIMESTAMP_COL_NAME, HASH_LABEL, VALUE_LABEL];
+    columns.extend(label_cols.iter().map(String::as_str));
+
+    let Some(shard_inputs) = shard_inputs(ctx, selector, micros(range), &columns, eval_ctx).await?
+    else {
+        return Ok(None);
+    };
+    log::info!(
+        "[trace_id: {}] [PromQL Timing] streaming {}() started with {} shards",
+        eval_ctx.trace_id,
+        func.name(),
+        shard_inputs.len(),
+    );
+    let eval = Arc::new(SeriesEval::new(func, range, eval_ctx));
+    let label_cols = Arc::new(label_cols);
+    let offset = selector.offset;
+    let sources = shard_inputs
+        .into_iter()
+        .map(|streams| MergeSeriesStream::start(streams, label_cols.clone(), offset).boxed())
+        .collect();
+    Ok(Some((sources, eval)))
 }
 
 /// The per-shard ordered streams of the selector's hash-sorted table projected to `columns`;

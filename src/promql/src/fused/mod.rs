@@ -18,6 +18,7 @@
 //! evaluator's intermediate per-series materialization.
 
 mod accumulator;
+pub(crate) mod columnar;
 mod fold;
 pub(crate) mod matrix;
 mod op;
