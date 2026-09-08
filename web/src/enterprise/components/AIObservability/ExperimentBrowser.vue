@@ -159,7 +159,9 @@
             class="flex min-w-0 items-center gap-2"
             :data-test="`ai-experiment-row-${experiment.id}`"
           >
-            <span class="text-text-heading truncate font-medium">{{ experiment.name }}</span>
+            <span class="text-text-heading min-w-0 truncate font-medium">{{
+              experiment.name
+            }}</span>
             <OTag v-if="isBaseline(experiment)" size="sm" variant="blue-soft">
               {{ t("aiObservability.experiments.baseline") }}
             </OTag>
@@ -190,8 +192,8 @@
               >
                 {{ statusVariant(row.status, "eval").label }}
               </OTag>
-              <span v-if="row.statusReason" class="text-text-secondary truncate text-xs">
-                {{ raw(row.statusReason) }}
+              <span v-if="visibleStatusReason(row)" class="text-text-secondary truncate text-xs">
+                {{ raw(visibleStatusReason(row)) }}
               </span>
             </template>
           </div>
@@ -209,23 +211,29 @@
           <!-- No gap: icon-sm buttons are square hit targets that already carry
                their own whitespace, the same as the Alerts row actions. -->
           <div class="flex items-center">
-            <OButton
-              size="icon-sm"
-              variant="ghost"
-              :icon-left="isBaseline(row) ? 'keep' : 'keep-outline'"
-              :title="
-                isBaseline(row)
-                  ? t('aiObservability.experiments.clearBaseline')
-                  : t('aiObservability.experiments.setBaseline')
-              "
-              :aria-label="
-                isBaseline(row)
-                  ? t('aiObservability.experiments.clearBaseline')
-                  : t('aiObservability.experiments.setBaseline')
-              "
-              :data-test="`ai-experiment-baseline-${row.id}`"
-              @click.stop="toggleBaseline(row)"
-            />
+            <OTooltip
+              :content="t('aiObservability.experiments.baselineRequiresCompleted')"
+              :disabled="canSetBaseline(row)"
+            >
+              <OButton
+                size="icon-sm"
+                variant="ghost"
+                :icon-left="isBaseline(row) ? 'keep' : 'keep-outline'"
+                :title="
+                  isBaseline(row)
+                    ? t('aiObservability.experiments.clearBaseline')
+                    : t('aiObservability.experiments.setBaseline')
+                "
+                :aria-label="
+                  isBaseline(row)
+                    ? t('aiObservability.experiments.clearBaseline')
+                    : t('aiObservability.experiments.setBaseline')
+                "
+                :disabled="baselineChangingId === row.id || !canSetBaseline(row)"
+                :data-test="`ai-experiment-baseline-${row.id}`"
+                @click.stop="toggleBaseline(row)"
+              />
+            </OTooltip>
             <OButton
               size="icon-sm"
               variant="ghost"
@@ -261,17 +269,12 @@ import OProgressBar from "@/lib/data/ProgressBar/OProgressBar.vue";
 import { statusVariant } from "@/lib/core/Table/cells/statusVariant";
 import { COL, type OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import type { LlmDataset } from "@/services/llm-datasets.service";
-import llmExperimentsService, {
-  type ExperimentDetail,
-  type LlmExperiment,
-} from "@/services/llm-experiments.service";
+import llmExperimentsService, { type LlmExperiment } from "@/services/llm-experiments.service";
 import {
   comparisonEligibility,
   experimentEvidence,
   groupExperiments,
-  readExperimentBaselines,
   type ComparisonIneligibilityReason,
-  writeExperimentBaselines,
 } from "@/enterprise/views/AIObservability/experimentDiscovery";
 import {
   aiExperimentCompareRoute,
@@ -285,21 +288,23 @@ const props = withDefaults(
     orgId: string;
     experiments: LlmExperiment[];
     datasets: LlmDataset[];
-    details?: Record<string, ExperimentDetail>;
     fixedDatasetId?: string;
     compact?: boolean;
     syncUrl?: boolean;
     /** Spins the refresh icon while the page re-fetches. */
     loading?: boolean;
   }>(),
-  { details: () => ({}), fixedDatasetId: "", compact: false, syncUrl: false, loading: false },
+  { fixedDatasetId: "", compact: false, syncUrl: false, loading: false },
 );
 
-defineEmits<{
+const emit = defineEmits<{
   select: [experimentId: string];
   new: [datasetId: string];
   "open-filtered": [datasetId: string];
   refresh: [];
+  /** The full row refetch a `refresh` triggers is overkill for a single flag
+   *  flip, so the parent patches its own list in place from this instead. */
+  "baseline-changed": [experiment: LlmExperiment, previousBaselineId: string | null];
 }>();
 
 const { t } = useI18nTyped();
@@ -310,7 +315,7 @@ const initialDataset =
 const datasetFilter = ref(initialDataset);
 const cloningId = ref("");
 const nameSearch = ref(props.syncUrl ? String(route.query.experiment ?? "") : "");
-const baselineByDataset = ref(readExperimentBaselines(props.orgId));
+const baselineChangingId = ref("");
 const selectedIds = ref<string[]>([]);
 const collapsedGroups = ref<string[]>([]);
 
@@ -337,7 +342,7 @@ function buildColumns(experiments: LlmExperiment[]): OTableColumnDef[] {
       sortable: true,
       size: COL.name,
       minSize: 160,
-      meta: { align: "left" as const, flex: true, isName: true },
+      meta: { align: "left" as const, isName: true },
     },
     {
       id: "status",
@@ -363,6 +368,21 @@ function buildColumns(experiments: LlmExperiment[]): OTableColumnDef[] {
       sortable: true,
       size: 140,
       meta: { align: "left" as const },
+    },
+    // Invisible filler — absorbs the leftover width so every real column
+    // (Name included) keeps its exact declared size regardless of how many
+    // scorer columns THIS dataset group happens to add. Without a flex column
+    // here, OTable falls back to plain `table-fixed; width:100%`, which
+    // proportionally stretches every declared width to fill the container —
+    // exactly what made Name a different width in each group's table.
+    {
+      id: "fill",
+      header: raw(""),
+      sortable: false,
+      hideable: false,
+      size: 0,
+      minSize: 0,
+      meta: { flex: true },
     },
     {
       id: "actions",
@@ -421,7 +441,6 @@ const groups = computed(() =>
   groupExperiments(
     props.experiments,
     datasetNames.value,
-    baselineByDataset.value,
     props.fixedDatasetId || datasetFilter.value,
     nameSearch.value,
   ),
@@ -435,13 +454,6 @@ const comparisonReason = computed(() => {
   const reason = comparison.value.reason;
   return reason ? translateComparisonReason(reason) : raw("");
 });
-
-watch(
-  () => props.orgId,
-  (orgId) => {
-    baselineByDataset.value = readExperimentBaselines(orgId);
-  },
-);
 
 watch(
   () => [route.query.dataset, route.query.experiment, route.query.baseline, route.query.candidate],
@@ -476,11 +488,11 @@ watch([datasetFilter, nameSearch], () => {
 });
 
 function evidence(experiment: LlmExperiment) {
-  return experimentEvidence(props.details[experiment.id]);
+  return experimentEvidence(experiment);
 }
 
 function progress(experiment: LlmExperiment) {
-  const task = props.details[experiment.id]?.results.taskProgress;
+  const task = experiment.executionProgress;
   if (task?.total) return { done: task.completed, total: task.total };
   const value = evidence(experiment);
   return { done: value.completedSlots, total: value.totalSlots };
@@ -496,6 +508,15 @@ function progressLabel(experiment: LlmExperiment) {
   return total
     ? t("aiObservability.experiments.progress", { done, total })
     : statusVariant(experiment.status, "eval").label;
+}
+
+// executionStatusReason describes the execution lifecycle only. Do not place
+// it beside a derived scoring state, where it would explain the wrong phase.
+function visibleStatusReason(experiment: LlmExperiment) {
+  return experiment.status === experiment.executionStatus ||
+    experiment.status === "execution_failed"
+    ? experiment.executionStatusReason
+    : null;
 }
 
 // One column per scorer in the group: the scores array already carries each
@@ -536,7 +557,15 @@ function costLabel(experiment: LlmExperiment) {
 }
 
 function isBaseline(experiment: LlmExperiment) {
-  return baselineByDataset.value[experiment.datasetId] === experiment.id;
+  return experiment.isBaseline;
+}
+
+// A baseline is the fixed reference every later run gets compared against, so
+// it must point at a run with final results — pending/running/failed/cancelled
+// runs have nothing stable to pin. Already-baseline experiments can still be
+// cleared regardless of status: unpinning is always safe.
+function canSetBaseline(experiment: LlmExperiment) {
+  return experiment.isBaseline || experiment.status === "completed";
 }
 
 // Cloning opens the create form seeded from the source rather than starting a
@@ -562,22 +591,32 @@ async function cloneExperiment(experiment: LlmExperiment) {
   }
 }
 
-function toggleBaseline(experiment: LlmExperiment) {
-  const next = { ...baselineByDataset.value };
-  if (next[experiment.datasetId] === experiment.id) {
-    // One baseline per dataset, so clearing is a delete rather than a write of
-    // some empty value — a "" left behind would still match a stale id lookup.
-    delete next[experiment.datasetId];
-    baselineByDataset.value = next;
-    writeExperimentBaselines(props.orgId, next);
-    return;
+async function toggleBaseline(experiment: LlmExperiment) {
+  baselineChangingId.value = experiment.id;
+  try {
+    if (experiment.isBaseline) {
+      const updated = await llmExperimentsService.clearBaseline(props.orgId, experiment.id);
+      emit("baseline-changed", updated, null);
+    } else {
+      const { experiment: updated, previousBaselineId } = await llmExperimentsService.setBaseline(
+        props.orgId,
+        experiment.id,
+      );
+      emit("baseline-changed", updated, previousBaselineId);
+      // Pinning starts a comparison from the new baseline. Clearing does not
+      // touch the selection: dropping the pin is not a statement about what
+      // to compare.
+      selectedIds.value = [experiment.id];
+    }
+  } catch (error: any) {
+    toast({
+      variant: "error",
+      message:
+        raw(error?.response?.data?.message) || t("aiObservability.experiments.baselineError"),
+    });
+  } finally {
+    baselineChangingId.value = "";
   }
-  next[experiment.datasetId] = experiment.id;
-  baselineByDataset.value = next;
-  writeExperimentBaselines(props.orgId, next);
-  // Pinning starts a comparison from the new baseline. Clearing does not touch
-  // the selection: dropping the pin is not a statement about what to compare.
-  selectedIds.value = [experiment.id];
 }
 
 function comparisonDisabled(experiment: LlmExperiment) {
@@ -623,13 +662,12 @@ function toggleComparison(experiment: LlmExperiment) {
     rejectComparison("select_only_two");
     return;
   } else {
-    const baselineId = baselineByDataset.value[experiment.datasetId];
-    const baselineCanSeed =
-      baselineId &&
-      baselineId !== experiment.id &&
-      props.experiments.some(({ id }) => id === baselineId);
+    const baseline = props.experiments.find(
+      (row) => row.datasetId === experiment.datasetId && row.isBaseline,
+    );
+    const baselineCanSeed = baseline && baseline.id !== experiment.id;
     selectedIds.value = baselineCanSeed
-      ? [baselineId, experiment.id]
+      ? [baseline.id, experiment.id]
       : [...selectedIds.value, experiment.id];
   }
 }
@@ -637,7 +675,9 @@ function toggleComparison(experiment: LlmExperiment) {
 function openComparison() {
   if (!comparison.value.eligible) return;
   const datasetId = selectedExperiments.value[0].datasetId;
-  const configuredBaseline = baselineByDataset.value[datasetId];
+  const configuredBaseline = props.experiments.find(
+    (row) => row.datasetId === datasetId && row.isBaseline,
+  )?.id;
   const baseline =
     selectedExperiments.value.find(({ id }) => id === configuredBaseline) ??
     selectedExperiments.value[0];

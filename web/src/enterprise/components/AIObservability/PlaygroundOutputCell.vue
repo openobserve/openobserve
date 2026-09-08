@@ -41,6 +41,16 @@
       </div>
     </template>
 
+    <!-- waiting — connected, nothing streamed back yet -->
+    <div
+      v-else-if="cell.status === 'streaming' && !cell.text"
+      class="text-text-secondary flex items-center gap-2.5 py-1 text-xs italic"
+      data-test="ai-playground-output-analyzing"
+    >
+      <OSpinner variant="dots" size="xs" />
+      <span>{{ analyzingMessage }}</span>
+    </div>
+
     <!-- tool call — terminal -->
     <div
       v-else-if="cell.toolCall"
@@ -131,11 +141,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, watch } from "vue";
 import { raw, useI18nTyped } from "@/types/i18n";
 import OBanner from "@/lib/feedback/Banner/OBanner.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OSpinner from "@/lib/feedback/Spinner/OSpinner.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import useAnalyzingMessage from "@/composables/useAnalyzingMessage";
 import type {
   PlaygroundCell,
   PlaygroundScore,
@@ -160,6 +172,43 @@ const emit = defineEmits<{
 }>();
 
 const { t } = useI18nTyped();
+
+// Reuses O2AIChat's analyzing copy: it's generic "AI is working" phrasing,
+// not chat-specific, so a second copy of the same 20 strings would just be
+// duplication.
+const ANALYZING_MESSAGES = [
+  t("aiAssistant.aiChat.analyzingMessages.analyzing"),
+  t("aiAssistant.aiChat.analyzingMessages.thinking"),
+  t("aiAssistant.aiChat.analyzingMessages.processing"),
+  t("aiAssistant.aiChat.analyzingMessages.examiningData"),
+  t("aiAssistant.aiChat.analyzingMessages.reviewingContext"),
+  t("aiAssistant.aiChat.analyzingMessages.formulatingResponse"),
+  t("aiAssistant.aiChat.analyzingMessages.checkingDetails"),
+  t("aiAssistant.aiChat.analyzingMessages.gatheringInsights"),
+  t("aiAssistant.aiChat.analyzingMessages.evaluatingOptions"),
+  t("aiAssistant.aiChat.analyzingMessages.synthesizingInformation"),
+  t("aiAssistant.aiChat.analyzingMessages.workingOnIt"),
+  t("aiAssistant.aiChat.analyzingMessages.almostThere"),
+  t("aiAssistant.aiChat.analyzingMessages.divingDeeper"),
+  t("aiAssistant.aiChat.analyzingMessages.connectingTheDots"),
+  t("aiAssistant.aiChat.analyzingMessages.crunchingNumbers"),
+  t("aiAssistant.aiChat.analyzingMessages.exploringPossibilities"),
+  t("aiAssistant.aiChat.analyzingMessages.refiningAnswer"),
+  t("aiAssistant.aiChat.analyzingMessages.stillThinking"),
+  t("aiAssistant.aiChat.analyzingMessages.makingProgress"),
+  t("aiAssistant.aiChat.analyzingMessages.piecingTogether"),
+];
+const {
+  current: analyzingMessage,
+  start: startAnalyzing,
+  stop: stopAnalyzing,
+} = useAnalyzingMessage(ANALYZING_MESSAGES);
+
+watch(
+  () => props.cell?.status === "streaming" && !props.cell.text,
+  (waiting) => (waiting ? startAnalyzing() : stopAnalyzing()),
+  { immediate: true },
+);
 
 /** Name and value in one chip: with four columns side by side, the scorer and
  *  its verdict have to be readable as a single token. */

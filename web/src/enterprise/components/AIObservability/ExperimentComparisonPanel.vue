@@ -6,6 +6,7 @@
       <OTable
         :data="visibleRows"
         :columns="comparisonColumns"
+        :loading="loading"
         row-key="logicalId"
         pagination="client"
         :page-size="20"
@@ -21,7 +22,7 @@
              control that acts on it are the same strip rather than two rows. -->
         <template #subheader>
           <div
-            class="px-page-edge border-table-row-divider flex flex-wrap items-center gap-3 border-b py-1.5"
+            class="px-page-edge border-table-row-divider flex flex-wrap items-end gap-3 border-b py-1.5"
             data-test="ai-experiment-counts"
           >
             <div class="min-w-0 flex-1">
@@ -33,21 +34,55 @@
                 @select="selectBucket"
               />
             </div>
-            <!-- Label sits outside so the control stays a single line, the same
-                 shape as the Baseline / Candidate pickers in the page header. -->
-            <div class="flex shrink-0 items-center gap-2">
-              <span class="text-text-tertiary text-xs">
-                {{ t("aiObservability.experiments.comparePage.panel.threshold") }}
-              </span>
-              <OSelect
-                :model-value="comparison.threshold"
-                :options="thresholdOptions"
-                :searchable="false"
-                size="md"
-                width="xs"
-                data-test="ai-experiment-comparison-threshold"
-                @update:model-value="selectThreshold"
-              />
+            <!-- Label sits ABOVE its control (not beside it) so the pair reads
+                 as one compact field instead of eating horizontal room the
+                 bucket stats need — same idea as a labeled form field. -->
+            <div class="flex shrink-0 items-end gap-3">
+              <div class="flex flex-col gap-0.5">
+                <span class="text-text-tertiary text-xs">
+                  {{ t("aiObservability.experiments.comparePage.panel.outcomeDimensions") }}
+                </span>
+                <!-- The tooltip sits on the select itself, not the label, so it
+                     describes what the CURRENT selection does rather than a
+                     generic hint disconnected from the visible value. -->
+                <OTooltip :content="outcomeTooltip">
+                  <OSelect
+                    :model-value="selectedDimensions"
+                    :options="outcomeOptions"
+                    :aria-label="
+                      t('aiObservability.experiments.comparePage.panel.outcomeDimensions')
+                    "
+                    :disabled="loading"
+                    :searchable="true"
+                    multiple
+                    select-all
+                    option-tooltip
+                    size="md"
+                    width="sm"
+                    data-test="ai-experiment-comparison-outcome-dimensions"
+                    @update:model-value="selectOutcomeDimensions"
+                  >
+                    <template #trigger>{{ selectionLabel }}</template>
+                  </OSelect>
+                </OTooltip>
+              </div>
+              <div class="flex flex-col gap-0.5">
+                <span class="text-text-tertiary text-xs">
+                  {{ t("aiObservability.experiments.comparePage.panel.threshold") }}
+                </span>
+                <OTooltip :content="thresholdTooltip">
+                  <OSelect
+                    :model-value="comparison.threshold"
+                    :options="thresholdOptions"
+                    :searchable="false"
+                    :disabled="loading"
+                    size="md"
+                    width="xs"
+                    data-test="ai-experiment-comparison-threshold"
+                    @update:model-value="selectThreshold"
+                  />
+                </OTooltip>
+              </div>
             </div>
           </div>
         </template>
@@ -74,7 +109,7 @@
           <div class="flex items-center gap-1.5">
             <span class="text-text-body text-xs">{{ rowDimensionValue(row, dimension) }}</span>
             <OTag
-              v-if="rowDimension(row, dimension)?.delta != null"
+              v-if="hasDeltaTag(row, dimension)"
               size="sm"
               icon=""
               :variant="deltaVariant(rowDimension(row, dimension)!)"
@@ -91,6 +126,7 @@
 import { computed, h, ref } from "vue";
 import { raw, useI18nTyped, type I18nText } from "@/types/i18n";
 import OTag from "@/lib/core/Badge/OTag.vue";
+import OTooltip from "@/lib/overlay/Tooltip/OTooltip.vue";
 import OSelect from "@/lib/forms/Select/OSelect.vue";
 import type { SelectModelValue } from "@/lib/forms/Select/OSelect.types";
 import OStatStrip from "@/lib/data/StatStrip/OStatStrip.vue";
@@ -102,6 +138,7 @@ import type { OTableColumnDef } from "@/lib/core/Table/OTable.types";
 import ExperimentDimensionHeader from "./ExperimentDimensionHeader.vue";
 import {
   dimensionIdentity,
+  dimensionLabel,
   dimensionMovementCounts,
   dimensionSideValue,
 } from "./experimentRowContent";
@@ -112,13 +149,47 @@ import type {
   ExperimentComparisonRow,
 } from "@/services/llm-experiments.service";
 
-const props = defineProps<{ comparison: ExperimentComparison }>();
+const props = defineProps<{
+  /** `null` while the first comparison is still loading — the table then
+   *  shows nothing but its own `loading` skeleton, same shape either way. */
+  comparison: ExperimentComparison | null;
+  outcomeDimensions?: string[];
+  loading?: boolean;
+}>();
 const emit = defineEmits<{
   inspect: [row: ExperimentComparisonRow, siblings: ExperimentComparisonRow[]];
   "apply-threshold": [threshold: number];
+  "select-outcome-dimensions": [dimensions: string[]];
 }>();
 
 const { t } = useI18nTyped();
+
+const EMPTY_COMPARISON: ExperimentComparison = {
+  baselineId: "",
+  candidateId: "",
+  datasetId: "",
+  threshold: 0.05,
+  outcomeDimensions: [],
+  assignmentRule: "",
+  counts: {
+    baselineRows: 0,
+    candidateRows: 0,
+    commonRows: 0,
+    regressed: 0,
+    improved: 0,
+    unchanged: 0,
+    inconclusive: 0,
+    new: 0,
+    missing: 0,
+  },
+  dimensions: [],
+  rows: [],
+};
+
+/** Every other computed reads through here, never `props.comparison`
+ *  directly, so the whole panel — including the real `<OTable>` and its real
+ *  columns — renders correctly (just empty) before the first response. */
+const comparison = computed(() => props.comparison ?? EMPTY_COMPARISON);
 
 // The summary tile, matching the Alerts strip: it clears rather than filters.
 const TOTAL = "total";
@@ -190,26 +261,96 @@ const bucketFilter = ref<string | null>(null);
 // silently reclassifies the whole run.
 const THRESHOLD_STEPS = [0.02, 0.05, 0.1, 0.15];
 
+// The server (and the wire format everywhere else) speaks in the raw fraction
+// (0.05) — only the label a person reads is a percentage. Rounding to 2
+// decimal places before trimming avoids float noise (0.1 * 100 !== 10 exactly).
+function thresholdPercentLabel(step: number): string {
+  return `${Number((step * 100).toFixed(2))}%`;
+}
+
 /** Whatever the server is using stays selectable even if it is off the ladder. */
 const thresholdOptions = computed(() => {
-  const steps = THRESHOLD_STEPS.includes(props.comparison.threshold)
+  const steps = THRESHOLD_STEPS.includes(comparison.value.threshold)
     ? THRESHOLD_STEPS
-    : [...THRESHOLD_STEPS, props.comparison.threshold].sort((a, b) => a - b);
-  return steps.map((step) => ({ label: raw(step.toFixed(2)), value: step }));
+    : [...THRESHOLD_STEPS, comparison.value.threshold].sort((a, b) => a - b);
+  return steps.map((step) => ({ label: raw(thresholdPercentLabel(step)), value: step }));
 });
 
 function selectThreshold(next: SelectModelValue) {
-  if (typeof next === "number" && next !== props.comparison.threshold) {
+  if (typeof next === "number" && next !== comparison.value.threshold) {
     emit("apply-threshold", next);
   }
 }
 
+const thresholdTooltip = computed(() =>
+  t("aiObservability.experiments.comparePage.panel.thresholdTooltip", {
+    percent: thresholdPercentLabel(comparison.value.threshold),
+  }),
+);
+
+const selectedDimensions = computed(
+  () => props.outcomeDimensions ?? comparison.value.outcomeDimensions,
+);
+
+const outcomeOptions = computed(() =>
+  comparison.value.dimensions.map((dimension) => {
+    const label =
+      dimension.kind === "cost"
+        ? t("aiObservability.experiments.comparePage.panel.tileCost")
+        : dimension.kind === "latency"
+          ? t("aiObservability.experiments.comparePage.panel.tileLatency")
+          : dimensionLabel(dimension);
+    return {
+      value: dimension.id,
+      label: dimension.canAffectOutcome
+        ? label
+        : t("aiObservability.experiments.comparePage.panel.outcomeDimensionUnavailable", {
+            name: label,
+          }),
+      disabled: !dimension.canAffectOutcome,
+    };
+  }),
+);
+
+const selectionLabel = computed(() => {
+  const count = selectedDimensions.value.length;
+  if (count === 0) return t("aiObservability.experiments.comparePage.panel.noOutcomeDimensions");
+  if (count === outcomeOptions.value.filter((option) => !option.disabled).length) {
+    return t("aiObservability.experiments.comparePage.panel.allOutcomeDimensions");
+  }
+  return t("aiObservability.experiments.comparePage.panel.selectedOutcomeDimensions", { count });
+});
+
+function selectOutcomeDimensions(next: SelectModelValue) {
+  if (Array.isArray(next) && next.every((id): id is string => typeof id === "string")) {
+    emit("select-outcome-dimensions", next);
+  }
+}
+
+/** What the current selection actually does, read on hover over the select
+ *  itself rather than a generic hint disconnected from the visible value. */
+const outcomeTooltip = computed(() => {
+  const selected = new Set(selectedDimensions.value);
+  const eligible = outcomeOptions.value.filter((option) => !option.disabled);
+  if (selected.size === 0) {
+    return t("aiObservability.experiments.comparePage.panel.outcomeTooltipNone");
+  }
+  if (selected.size === eligible.length) {
+    return t("aiObservability.experiments.comparePage.panel.outcomeTooltipAll");
+  }
+  const names = eligible
+    .filter((option) => selected.has(String(option.value)))
+    .map((option) => option.label)
+    .join(", ");
+  return t("aiObservability.experiments.comparePage.panel.outcomeTooltipPartial", { names });
+});
+
 /** Rows in either run — what "All" counts. */
 const totalRows = computed(
   () =>
-    props.comparison.counts.commonRows +
-    props.comparison.counts.new +
-    props.comparison.counts.missing,
+    comparison.value.counts.commonRows +
+    comparison.value.counts.new +
+    comparison.value.counts.missing,
 );
 
 // Outcomes first, All last — the same shape as the Alerts / Eval Jobs strips,
@@ -218,7 +359,7 @@ const bucketStats = computed<StatItem[]>(() => [
   ...FILTER_GROUPS.map((group) => ({
     key: group.key,
     label: FILTER_LABELS[group.key],
-    value: group.buckets.reduce((sum, bucket) => sum + props.comparison.counts[bucket], 0),
+    value: group.buckets.reduce((sum, bucket) => sum + comparison.value.counts[bucket], 0),
     icon: FILTER_ICONS[group.key],
     tone: FILTER_TONES[group.key],
     max: totalRows.value || undefined,
@@ -238,9 +379,9 @@ const bucketStats = computed<StatItem[]>(() => [
 
 const visibleRows = computed(() => {
   const group = FILTER_GROUPS.find(({ key }) => key === bucketFilter.value);
-  if (!group) return props.comparison.rows;
+  if (!group) return comparison.value.rows;
   const buckets = group.buckets as readonly ExperimentComparisonBucket[];
-  return props.comparison.rows.filter((row) => buckets.includes(row.bucket));
+  return comparison.value.rows.filter((row) => buckets.includes(row.bucket));
 });
 
 // All clears; any other tile toggles, so re-clicking the active one also gets
@@ -270,12 +411,12 @@ const comparisonColumns = computed<OTableColumnDef<ExperimentComparisonRow>[]>((
   // A component header, not a label: the movement counts describe THIS column.
   // `header` already accepts a component, so none of this asks the shared table
   // to change.
-  ...props.comparison.dimensions.map((dimension) => ({
+  ...comparison.value.dimensions.map((dimension) => ({
     id: dimensionColumnId(dimension),
     header: () =>
       h(ExperimentDimensionHeader, {
         dimension,
-        counts: dimensionMovementCounts(props.comparison.rows, dimension),
+        counts: dimensionMovementCounts(comparison.value.rows, dimension),
       }),
     accessorKey: dimensionColumnId(dimension),
   })),
@@ -302,6 +443,15 @@ function dimensionSlot(dimension: ExperimentComparisonDimension) {
 function rowDimension(row: ExperimentComparisonRow, dimension: ExperimentComparisonDimension) {
   const identity = dimensionIdentity(dimension);
   return row.dimensions.find((candidate) => dimensionIdentity(candidate) === identity);
+}
+
+// A raw numeric delta is only meaningful for a numeric score (or cost/latency,
+// which have no dataType at all): "true → true" or a category swap is already
+// fully explained by the value itself, and a "+0"/"-1" chip beside it reads as
+// a measurement that doesn't actually exist.
+function hasDeltaTag(row: ExperimentComparisonRow, dimension: ExperimentComparisonDimension) {
+  if (dimension.dataType === "boolean" || dimension.dataType === "categorical") return false;
+  return rowDimension(row, dimension)?.delta != null;
 }
 
 /** Trailing zeros carry no information — `34.0000` is just `34`. */

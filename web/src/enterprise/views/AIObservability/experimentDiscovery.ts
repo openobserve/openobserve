@@ -13,7 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { ExperimentDetail, LlmExperiment } from "@/services/llm-experiments.service";
+import type { LlmExperiment } from "@/services/llm-experiments.service";
 
 export type ExperimentScoreSummary =
   | { name: string; kind: "numeric"; value: number; sampleCount: number }
@@ -44,91 +44,54 @@ export interface ExperimentDatasetGroup {
   experiments: LlmExperiment[];
 }
 
-export type ExperimentDetailFetcher = (experimentId: string) => Promise<ExperimentDetail>;
-
-export async function fetchExperimentDetails(
-  experiments: LlmExperiment[],
-  fetchDetail: ExperimentDetailFetcher,
-): Promise<Record<string, ExperimentDetail>> {
-  const settled = await Promise.allSettled(
-    experiments.map((experiment) => fetchDetail(experiment.id)),
-  );
-  return Object.fromEntries(
-    settled.flatMap((result) =>
-      result.status === "fulfilled" ? [[result.value.experiment.id, result.value] as const] : [],
-    ),
-  );
-}
-
-export function experimentEvidence(detail?: ExperimentDetail): ExperimentEvidence {
-  if (!detail) return { completedSlots: 0, totalSlots: 0, cost: null, scores: [] };
-
-  const executions = detail.results.executions;
-  const costs = executions
-    .map((execution) => execution.cost)
-    .filter((cost): cost is number => typeof cost === "number" && Number.isFinite(cost));
-  const numericScores = new Map<string, number[]>();
-  const booleanScores = new Map<string, boolean[]>();
-  const categoricalScores = new Map<string, string[]>();
-  for (const score of detail.results.scores) {
-    const name = String(
-      score.name ?? score.scorer_name ?? score.scorerId ?? score.scorer_id ?? "score",
-    );
-    if (score.value_numeric !== null && score.value_numeric !== undefined) {
-      const value = Number(score.value_numeric);
-      if (Number.isFinite(value)) {
-        numericScores.set(name, [...(numericScores.get(name) ?? []), value]);
-      }
-    }
-    if (typeof score.value_boolean === "boolean") {
-      booleanScores.set(name, [...(booleanScores.get(name) ?? []), score.value_boolean]);
-    }
-    if (typeof score.value_categorical === "string") {
-      categoricalScores.set(name, [
-        ...(categoricalScores.get(name) ?? []),
-        score.value_categorical,
-      ]);
+/**
+ * The row's own `includeSummary` fields already carry the type-aware
+ * aggregate per scorer, so this only reshapes it for the browse table's
+ * per-scorer column — it never needs raw execution/score records.
+ */
+export function experimentEvidence(experiment: LlmExperiment): ExperimentEvidence {
+  const scores: ExperimentScoreSummary[] = [];
+  for (const summary of experiment.scoreSummaries ?? []) {
+    const aggregate = summary.value as Record<string, unknown> | null;
+    if (!aggregate) continue;
+    const name = summary.scoreConfigName || summary.name;
+    if (aggregate.kind === "numeric") {
+      scores.push({
+        name,
+        kind: "numeric",
+        value: Number(aggregate.mean ?? 0),
+        sampleCount: summary.sampleCount,
+      });
+    } else if (aggregate.kind === "boolean") {
+      scores.push({
+        name,
+        kind: "boolean",
+        trueCount: Number(aggregate.trueCount ?? aggregate.true_count ?? 0),
+        falseCount: Number(aggregate.falseCount ?? aggregate.false_count ?? 0),
+        sampleCount: summary.sampleCount,
+      });
+    } else if (aggregate.kind === "categorical") {
+      const counts = (aggregate.counts ?? {}) as Record<string, number>;
+      scores.push({
+        name,
+        kind: "categorical",
+        values: Object.entries(counts).map(([value, count]) => ({ value, count: Number(count) })),
+        sampleCount: summary.sampleCount,
+      });
     }
   }
 
   return {
-    completedSlots: new Set(
-      executions.map((execution) => `${execution.rowId}:${execution.trialIndex}`),
-    ).size,
-    totalSlots: detail.preview.slotCount,
-    cost: costs.length ? costs.reduce((total, cost) => total + cost, 0) : null,
-    scores: [
-      ...[...numericScores].map(([name, values]): ExperimentScoreSummary => ({
-        name,
-        kind: "numeric",
-        value: values.reduce((total, value) => total + value, 0) / values.length,
-        sampleCount: values.length,
-      })),
-      ...[...booleanScores].map(([name, values]): ExperimentScoreSummary => ({
-        name,
-        kind: "boolean",
-        trueCount: values.filter(Boolean).length,
-        falseCount: values.filter((value) => !value).length,
-        sampleCount: values.length,
-      })),
-      ...[...categoricalScores].map(([name, values]): ExperimentScoreSummary => {
-        const counts = new Map<string, number>();
-        for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
-        return {
-          name,
-          kind: "categorical",
-          values: [...counts].map(([value, count]) => ({ value, count })),
-          sampleCount: values.length,
-        };
-      }),
-    ],
+    completedSlots: experiment.executionProgress?.completed ?? 0,
+    totalSlots: experiment.executionProgress?.total ?? 0,
+    cost: experiment.aggregateSummary?.totalCost ?? null,
+    scores,
   };
 }
 
 export function groupExperiments(
   experiments: LlmExperiment[],
   datasetNames: Map<string, string>,
-  baselineByDataset: Record<string, string>,
   datasetFilter: string,
   nameSearch: string,
 ): ExperimentDatasetGroup[] {
@@ -144,9 +107,8 @@ export function groupExperiments(
     datasetId,
     datasetName: datasetNames.get(datasetId) ?? datasetId,
     experiments: rows.sort((left, right) => {
-      const baselineId = baselineByDataset[datasetId];
-      if (left.id === baselineId) return -1;
-      if (right.id === baselineId) return 1;
+      if (left.isBaseline) return -1;
+      if (right.isBaseline) return 1;
       return right.createdAt - left.createdAt || left.id.localeCompare(right.id);
     }),
   }));
@@ -168,23 +130,4 @@ export function comparisonEligibility(experiments: LlmExperiment[]): {
     return { eligible: false, reason: "different_dataset" };
   }
   return { eligible: true, reason: null };
-}
-
-export function readExperimentBaselines(orgId: string): Record<string, string> {
-  if (!orgId) return {};
-  try {
-    const parsed = JSON.parse(localStorage.getItem(`o2_experiment_baselines_${orgId}`) ?? "{}");
-    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-  } catch {
-    return {};
-  }
-}
-
-export function writeExperimentBaselines(orgId: string, baselines: Record<string, string>) {
-  if (!orgId) return;
-  try {
-    localStorage.setItem(`o2_experiment_baselines_${orgId}`, JSON.stringify(baselines));
-  } catch {
-    // The selection remains available for the current page if storage is unavailable.
-  }
 }
