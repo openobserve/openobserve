@@ -13,10 +13,13 @@ const logData = require('../../../fixtures/log.json');
 test.describe('Regression: Search History re-apply retains the query (#14283)', () => {
   test.describe.configure({ mode: 'serial' });
 
-  const EARLIER_QUERY = `SELECT * FROM "e2e_automate" WHERE code = '200'`;
-  const LATEST_QUERY = `SELECT * FROM "e2e_automate" WHERE code = '404'`;
-  const EARLIER_MARKER = `'200'`;
-  const LATEST_MARKER = `'404'`;
+  // The predicates are always true on purpose: the two searches only need to be
+  // textually distinct and both return rows. A filter that matches nothing leaves the
+  // results grid unrendered, and waitForResultsLoaded() never sees its pagination.
+  const EARLIER_QUERY = `SELECT * FROM "e2e_automate" WHERE 200 = 200`;
+  const LATEST_QUERY = `SELECT * FROM "e2e_automate" WHERE 404 = 404`;
+  const EARLIER_MARKER = '200';
+  const LATEST_MARKER = '404';
 
   let pm;
 
@@ -49,6 +52,7 @@ test.describe('Regression: Search History re-apply retains the query (#14283)', 
 
     // Match on the literal alone: the SQL recorded in usage may differ in spacing
     // from what was typed, but 200 vs 404 is what discriminates the two queries.
+    // Both markers are compared against editor/URL text only, never against log rows.
     const reAppliedSql = await pm.searchHistoryPage.reApplyQuery(EARLIER_MARKER);
     expect(reAppliedSql).toContain(EARLIER_MARKER);
 
