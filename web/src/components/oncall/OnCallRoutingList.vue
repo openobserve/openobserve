@@ -55,7 +55,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       <template v-else>
         <!-- The rules scroll inside the card rather than growing it: the two
              rows below must never be scrolled off to find. -->
-        <div class="max-h-96 overflow-y-auto" data-test="oncall-routing-rules-scroll">
+        <div
+          v-if="rows.length"
+          class="max-h-96 overflow-y-auto"
+          data-test="oncall-routing-rules-scroll"
+        >
           <div
             v-for="(row, index) in rows"
             :key="row.rule.rule_id"
@@ -159,6 +163,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
             </OButton>
           </div>
         </div>
+
+        <!-- No rule pages this team yet — the fact a reader must not have to
+             infer from an empty list plus a catch-all row about someone else. -->
+        <OEmptyState
+          v-else
+          size="block"
+          preset="no-team-routing"
+          :description="emptyRoutingDescription"
+          data-test="oncall-routing-empty-state"
+          @action="() => setEditor('new')"
+        />
 
         <!-- Tier 4: the explicitly nominated catch-all, as the row it behaves
              like. Nothing is auto-created, so the unset state is the warning. -->
@@ -371,10 +386,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </div>
     </div>
 
-    <OText v-if="!loading && !rows.length" variant="meta" data-test="oncall-routing-no-rules">
-      {{ t("oncall.routingNoRules") }}
-    </OText>
-
     <!-- One dialog for add, edit and claim: a rule is conditions plus the team
          they page, whichever of the three opened it. Removal lives in there
          too, so the row keeps a single button. -->
@@ -414,6 +425,7 @@ import type { RuleDraft } from "@/components/oncall/OnCallRuleEditor.vue";
 import ODimensionChip from "@/lib/core/Badge/ODimensionChip.vue";
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OTimeCell from "@/lib/core/Table/cells/OTimeCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";
 import OInnerLoading from "@/lib/feedback/InnerLoading/OInnerLoading.vue";
@@ -555,6 +567,14 @@ const rows = computed(() =>
     headline: headlineOf(rule),
     overlap: overlapNoteFor(rule),
   })),
+);
+
+/// Names the team so the empty state reads as a fact about this screen, not a
+/// generic placeholder shared with the org-wide table.
+const emptyRoutingDescription = computed<I18nText>(() =>
+  props.teamName
+    ? t("oncall.routingEmptyBodyNamed", { team: props.teamName })
+    : t("emptyState.noTeamRouting.description"),
 );
 
 const volumeNote = computed<I18nText>(() =>

@@ -49,6 +49,7 @@ function render(props: Record<string, unknown> = {}) {
       hasTeam: false,
       hasStaffedRotation: false,
       hasRouting: false,
+      hasDestinations: false,
       ...props,
     },
     global: { plugins: [i18n, store], stubs },
@@ -62,7 +63,7 @@ describe("OnCallSetupChecklist", () => {
   it("marks each step done from live data", () => {
     const wrapper = render({ hasTeam: true, hasStaffedRotation: true, hasRouting: false });
 
-    expect(states(wrapper)).toEqual(["done", "done", "active"]);
+    expect(states(wrapper)).toEqual(["done", "done", "active", "locked"]);
   });
 
   /// The steps genuinely depend on each other: a rotation needs a team, and
@@ -70,7 +71,7 @@ describe("OnCallSetupChecklist", () => {
   it("locks every step after the first undone one", () => {
     const wrapper = render();
 
-    expect(states(wrapper)).toEqual(["active", "locked", "locked"]);
+    expect(states(wrapper)).toEqual(["active", "locked", "locked", "locked"]);
     expect(wrapper.find('[data-test="oncall-setup-cta-team"]').exists()).toBe(true);
     expect(wrapper.find('[data-test="oncall-setup-cta-rotation"]').exists()).toBe(false);
     expect(wrapper.find('[data-test="oncall-setup-locked-rotation"]').text()).toContain("team");
@@ -156,6 +157,18 @@ describe("OnCallSetupChecklist", () => {
     await wrapper.find('[data-test="oncall-setup-cta-routing"]').trigger("click");
 
     expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "onCallRouting" }));
+  });
+
+  /// A team, a rotation and a routing rule can all be finished and a page
+  /// still lands nowhere without a destination — this is the step that
+  /// actually makes paging possible.
+  it("sends the destinations step to Notification Destinations", async () => {
+    const wrapper = render({ hasTeam: true, hasStaffedRotation: true, hasRouting: true });
+
+    expect(states(wrapper)).toEqual(["done", "done", "done", "active"]);
+    await wrapper.find('[data-test="oncall-setup-cta-destinations"]').trigger("click");
+
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ name: "alertDestinations" }));
   });
 
   /// Every step is an `oncall` write. Offering the button to somebody who

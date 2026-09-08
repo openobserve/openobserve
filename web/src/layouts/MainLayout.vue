@@ -1213,7 +1213,11 @@ export default defineComponent({
           }
         })
         .catch((error) => {
-          console.error("Failed to load the full configuration:", error);
+          if (error?.response?.status === 404) {
+            console.warn("Full configuration not found for this org (404):", error);
+          } else {
+            console.error("Failed to load the full configuration:", error);
+          }
           // Fail open: reveal the base menu even if the config never resolves.
           menuReady.value = true;
           // Session replay must not be lost to a failed config fetch — the rum

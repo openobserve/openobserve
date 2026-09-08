@@ -204,7 +204,7 @@
              load are columns of the roster now, not panels beside it: one row per
              person answers can we reach them, what have they carried, when are
              they on next. -->
-        <OTabPanel name="members">
+        <OTabPanel name="members" stretch>
           <OnCallMembers
             :team-id="teamId"
             :members="members"

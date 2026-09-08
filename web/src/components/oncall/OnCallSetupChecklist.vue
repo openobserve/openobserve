@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  Three things must exist before an alert can wake somebody, and each one is
+  Four things must exist before an alert can wake somebody, and each one is
   answered from live data rather than from a static list.
 
   It is NOT gated on "no teams at all": an org with a team, no rotation and no
@@ -204,6 +204,8 @@ const props = withDefaults(
     hasStaffedRotation: boolean;
     /** Step 3 — an ownership rule, or an alert bound to a team. */
     hasRouting: boolean;
+    /** Step 4 — a channel a page could actually go out on. */
+    hasDestinations: boolean;
     /**
      * The org already has pages, so this is not the only thing on the screen.
      *
@@ -279,6 +281,10 @@ function openRouting() {
   router.push({ name: "onCallRouting", query: orgQuery.value });
 }
 
+function openDestinations() {
+  router.push({ name: "alertDestinations", query: orgQuery.value });
+}
+
 const steps = computed<ChecklistStep[]>(() => {
   const defs = [
     {
@@ -310,6 +316,16 @@ const steps = computed<ChecklistStep[]>(() => {
       done: props.hasRouting,
       act: openRouting,
       review: openRouting,
+    },
+    {
+      key: "destinations",
+      title: t("oncall.setupStep4Title"),
+      body: t("oncall.setupStep4Body"),
+      cta: t("oncall.setupStep4Cta"),
+      lockedLabel: t("oncall.setupNeedsRouting"),
+      done: props.hasDestinations,
+      act: openDestinations,
+      review: openDestinations,
     },
   ];
 

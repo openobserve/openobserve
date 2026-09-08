@@ -140,14 +140,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
          that starts with a blank rotation form. -->
     <OEmptyState
       v-else-if="!tracks.length"
-      size="inline"
-      preset="no-data"
-      :description="t('oncall.calendarEmpty')"
-      :action-label="t('oncall.addRotation')"
-      :secondary-action-label="t('oncall.presetsTitle')"
+      size="block"
+      preset="no-oncall-schedule"
       data-test="oncall-timeline-empty"
-      @action="emit('add')"
-      @secondary-action="emit('presets')"
+      @action="(id) => (id === 'presets' ? emit('presets') : emit('add'))"
     />
 
     <OScheduleTimeline

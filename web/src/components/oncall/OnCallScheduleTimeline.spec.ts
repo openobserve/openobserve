@@ -52,8 +52,8 @@ const stubs = {
   OTooltip: { name: "OTooltip", template: "<span />" },
   OEmptyState: {
     name: "OEmptyState",
-    props: ["actionLabel", "secondaryActionLabel"],
-    emits: ["action", "secondaryAction"],
+    props: ["preset"],
+    emits: ["action"],
     template: "<div />",
   },
   OToggleGroup: { name: "OToggleGroup", template: "<div><slot /></div>" },
@@ -523,12 +523,15 @@ describe("OnCallScheduleTimeline", () => {
       const empty = wrapper.findComponent({ name: "OEmptyState" });
 
       expect(empty.exists()).toBe(true);
-      expect(String(empty.props("actionLabel"))).toBe("Add rotation");
-      expect(String(empty.props("secondaryActionLabel"))).toBe("Start from a preset");
+      expect(empty.props("preset")).toBe("no-oncall-schedule");
 
-      empty.vm.$emit("secondaryAction");
+      empty.vm.$emit("action", "presets");
       await nextTick();
       expect(wrapper.emitted("presets")).toHaveLength(1);
+
+      empty.vm.$emit("action", "add");
+      await nextTick();
+      expect(wrapper.emitted("add")).toHaveLength(1);
     });
   });
 

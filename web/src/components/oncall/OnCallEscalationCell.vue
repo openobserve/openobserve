@@ -58,6 +58,14 @@ const props = defineProps<{
   /** Absent while the ladder position is still loading, or beyond the fetch cap. */
   progress?: EscalationProgress | null;
   /**
+   * False until the list's first escalation-progress fetch has completed.
+   * An absent `progress` is ambiguous on its own — "haven't asked yet" and
+   * "asked, and nothing has fired" both look like `null` — so this is what
+   * tells the two apart and keeps the headline blank rather than flashing
+   * "Not paged yet" before the real status arrives.
+   */
+  progressLoaded?: boolean;
+  /**
    * Rungs the team's policy defines for this priority. Absent when the policy
    * could not be read — the cell then says "Level 2" rather than inventing a
    * total, because "Level 2 of 3" with a guessed 3 is worse than no denominator.
@@ -107,6 +115,10 @@ const headline = computed<I18nText>(() => {
   // "Not paged yet" implies a page is coming; a priority with no rungs never
   // pages at all, which is a policy fact, not a pending one.
   if (props.totalRungs === 0) return t("oncall.escalationPagesNobody");
+  // Still waiting on the first fetch: an absent `progress` here means "don't
+  // know yet", not "confirmed nothing fired" — say nothing rather than flash
+  // "Not paged yet" and then correct it a moment later.
+  if (!props.progress && !props.progressLoaded) return raw("");
   if (firedCount.value === 0) return t("oncall.escalationNotStarted");
   // Who is being woken RIGHT NOW, not just how far up the ladder we are — that
   // is the name a responder checks against their own.

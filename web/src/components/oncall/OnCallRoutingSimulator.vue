@@ -111,6 +111,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       </OButton>
     </span>
 
+    <!-- Nothing tried yet — the title above already explains the CONCEPT,
+         this explains the FIRST ACTION, the same inline empty state
+         PriorCauses uses so "nothing here yet" reads the same way across
+         on-call. -->
+    <OEmptyState
+      v-if="!preview"
+      size="inline"
+      :title="t('oncall.simulatorEmptyTitle')"
+      :description="t('oncall.simulatorEmptyDescription')"
+      hide-action
+      data-test="oncall-simulator-empty"
+    />
+
     <!-- A closed vocabulary: a typo here would produce a confident "nothing
          matches" for a dimension nothing ever emits. -->
     <span v-if="adding" class="flex flex-wrap items-end gap-2" data-test="oncall-simulator-adder">
@@ -243,6 +256,7 @@ import { computed, ref } from "vue";
 
 import OTag from "@/lib/core/Badge/OTag.vue";
 import OButton from "@/lib/core/Button/OButton.vue";
+import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import OIcon from "@/lib/core/Icon/OIcon.vue";
 import OUserCell from "@/lib/core/Table/cells/OUserCell.vue";
 import OText from "@/lib/core/Typography/OText.vue";

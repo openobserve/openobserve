@@ -43,6 +43,11 @@ const stubs = {
     emits: ["update:modelValue"],
     template: `<select :value="modelValue" />`,
   },
+  OEmptyState: {
+    name: "OEmptyState",
+    props: ["title", "description"],
+    template: `<div><span>{{ title }}</span></div>`,
+  },
 };
 
 function preview(over: Partial<RoutingPreview> = {}): RoutingPreview {
@@ -107,6 +112,19 @@ async function pickPriority(wrapper: Wrapper, priority = "P1") {
 }
 
 describe("OnCallRoutingSimulator", () => {
+  /// The title above already explains the concept; a bare form with no
+  /// example of what a run produces left first-time users guessing at what
+  /// to do next.
+  it("guides a first-time user before anything has been tried", () => {
+    const wrapper = render();
+    expect(wrapper.find('[data-test="oncall-simulator-empty"]').exists()).toBe(true);
+  });
+
+  it("drops the guidance once a run has produced a result", () => {
+    const wrapper = render({ preview: preview() });
+    expect(wrapper.find('[data-test="oncall-simulator-empty"]').exists()).toBe(false);
+  });
+
   /// A pre-filled P1 makes the tester answer a question nobody asked, and the
   /// answer changes with the priority — so it starts empty.
   it("assumes no priority until one is chosen", async () => {

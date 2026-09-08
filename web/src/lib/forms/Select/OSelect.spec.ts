@@ -267,6 +267,36 @@ describe("OSelect", () => {
       expect(document.body.querySelector('input[placeholder="Search..."]')).toBeNull();
     });
 
+    // A caller driving the trigger programmatically (an empty state's "add"
+    // action landing the cursor in the field) wants more than a focus ring —
+    // it wants the picker actually open, the same as a click would.
+    it("opens the dropdown when focus() is called programmatically", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          searchable: true,
+          options: [{ label: "sample", value: "s1" }],
+        },
+      });
+      (wrapper.vm as unknown as { focus: () => void }).focus();
+      await flushPromises();
+      expect(document.body.querySelector('input[placeholder="Search..."]')).not.toBeNull();
+    });
+
+    it("does not open a disabled select", async () => {
+      wrapper = mount(OSelect, {
+        attachTo: document.body,
+        props: {
+          searchable: true,
+          disabled: true,
+          options: [{ label: "sample", value: "s1" }],
+        },
+      });
+      (wrapper.vm as unknown as { focus: () => void }).focus();
+      await flushPromises();
+      expect(document.body.querySelector('input[placeholder="Search..."]')).toBeNull();
+    });
+
     it("should stop propagation of printable keys so page-level shortcuts never fire", async () => {
       wrapper = mount(OSelect, {
         attachTo: document.body,

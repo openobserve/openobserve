@@ -76,6 +76,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       :has-team="setup.hasTeam"
       :has-staffed-rotation="setup.hasStaffedRotation"
       :has-routing="setup.hasRouting"
+      :has-destinations="setup.hasDestinations"
       :compact="hasPages"
       :can-configure="canConfigure"
       :first-team-id="teams[0]?.id ?? null"
@@ -435,6 +436,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
           :response-id="row.latest.id"
           :state="row.latest.state"
           :progress="progressById[row.latest.id] ?? null"
+          :progress-loaded="progressLoaded"
           :total-rungs="totalRungsFor(row.latest)"
           :acked-in-micros="ackedInMicros(row.latest)"
         />
@@ -770,6 +772,7 @@ import { COL } from "@/lib/core/Table/OTable.types";
 import type { OTableColumnDef, RowRailTone, RowTone } from "@/lib/core/Table/OTable.types";
 import { toast } from "@/lib/feedback/Toast/useToast";
 import { useShortcuts } from "@/lib/vue-shortcut-manager";
+import destinationService from "@/services/alert_destination";
 import incidentsService from "@/services/incidents";
 import oncallService, { RESPONSE_PAGE_LIMIT } from "@/services/oncall";
 import type {
@@ -852,6 +855,11 @@ const policyByTeam = ref<Record<string, OnCallPolicy>>({});
 const scheduleByTeam = ref<Record<string, OnCallSchedule>>({});
 const positionsByTeam = ref<Record<string, OnCallPosition[]>>({});
 const progressById = ref<Record<string, EscalationProgress>>({});
+// False until the first escalation-progress fetch completes. Before then, an
+// absent `progressById` entry means "we haven't asked yet", not "confirmed
+// nothing has fired" — OnCallEscalationCell needs to tell those apart so a
+// climbing ladder doesn't flash "Not paged yet" on every list load.
+const progressLoaded = ref(false);
 const escalationCapped = ref(false);
 const expandedIds = ref<string[]>([]);
 const expandedEvents = ref<OnCallResponseEvent[]>([]);
@@ -909,7 +917,12 @@ const confirmBulkResolve = ref(false);
 
 // Only after the first fetch, so the checklist never flashes while loading.
 const loaded = ref(false);
-const setup = ref({ hasTeam: false, hasStaffedRotation: false, hasRouting: false });
+const setup = ref({
+  hasTeam: false,
+  hasStaffedRotation: false,
+  hasRouting: false,
+  hasDestinations: false,
+});
 /// The list and the checklist are answered by two different fetches, and these
 /// defaults are all-false. Drawing the checklist off them the moment the LIST
 /// arrived told every configured org to create a team — and, with no pages yet,
@@ -968,7 +981,12 @@ const showChecklist = computed(
     // it is the default we started from, and the first step would be a lie.
     teamsAvailable.value &&
     !loadError.value &&
-    !(setup.value.hasTeam && setup.value.hasStaffedRotation && setup.value.hasRouting),
+    !(
+      setup.value.hasTeam &&
+      setup.value.hasStaffedRotation &&
+      setup.value.hasRouting &&
+      setup.value.hasDestinations
+    ),
 );
 
 /// Whether this org has ever paged anybody — read from what was FETCHED, not
@@ -1624,10 +1642,18 @@ async function fetchIncidentTitles() {
 /// Teams, coverage and ownership answer the checklist, not the list. A failure
 /// on any one of them degrades a single control rather than the page.
 async function fetchContext() {
-  const [teamRes, gapRes, ruleRes] = await Promise.allSettled([
+  const [teamRes, gapRes, ruleRes, destRes] = await Promise.allSettled([
     oncallService.listTeams({ org_identifier: orgId.value }),
     oncallService.coverageGaps({ org_identifier: orgId.value }),
     oncallService.listOwnershipRules({ org_identifier: orgId.value }),
+    destinationService.list({
+      org_identifier: orgId.value,
+      page_num: 1,
+      page_size: 1,
+      sort_by: "name",
+      desc: false,
+      module: "alert",
+    }),
   ]);
 
   teamsAvailable.value = teamRes.status === "fulfilled";
@@ -1640,6 +1666,7 @@ async function fetchContext() {
     hasStaffedRotation: await someTeamWouldPage(gapRes),
     // An alert bound straight to a team counts: it is routing without a rule.
     hasRouting: rules.length > 0 || responses.value.some((r) => !!r.team_id),
+    hasDestinations: destRes.status === "fulfilled" && (destRes.value.data ?? []).length > 0,
   };
   // Set even when a call failed: the screen has to stop waiting either way.
   // Whether the answer is trustworthy is `teamsAvailable`, checked separately.
@@ -1728,6 +1755,7 @@ async function fetchEscalationProgress() {
   // Replaced wholesale so a record that resolved since the last poll drops its
   // stale ladder instead of keeping a countdown that will never fire.
   progressById.value = next;
+  progressLoaded.value = true;
 }
 
 /// The expanded row's timeline.

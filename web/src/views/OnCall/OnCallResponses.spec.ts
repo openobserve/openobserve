@@ -17,6 +17,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import i18n from "@/locales";
+import destinationService from "@/services/alert_destination";
 import oncallService from "@/services/oncall";
 import store from "@/test/unit/helpers/store";
 import OnCallResponses from "@/views/OnCall/OnCallResponses.vue";
@@ -45,6 +46,10 @@ vi.mock("@/services/users", () => ({
   default: { orgUsers: vi.fn().mockResolvedValue({ data: { data: [] } }) },
 }));
 
+vi.mock("@/services/alert_destination", () => ({
+  default: { list: vi.fn() },
+}));
+
 const push = vi.fn();
 const routeQuery: Record<string, string> = {};
 vi.mock("vue-router", () => ({
@@ -53,6 +58,7 @@ vi.mock("vue-router", () => ({
 }));
 
 const service = vi.mocked(oncallService);
+const destinations = vi.mocked(destinationService);
 
 const stubs = {
   OPageLayout: { name: "OPageLayout", template: "<div><slot name='actions' /><slot /></div>" },
@@ -109,6 +115,7 @@ const stubs = {
       "hasTeam",
       "hasStaffedRotation",
       "hasRouting",
+      "hasDestinations",
       "compact",
       "canConfigure",
       "firstTeamId",
@@ -198,6 +205,7 @@ describe("OnCallResponses", () => {
     service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
     service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
     service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
+    destinations.list.mockResolvedValue({ data: [{ name: "dest_1" }] } as any);
     // The ladder, the policy behind its denominator, and the expanded row's
     // events. Every one of them degrades a single cell rather than the page,
     // so the default is "answered, with nothing in it".
@@ -573,6 +581,23 @@ describe("OnCallResponses", () => {
       expect(checklist.exists()).toBe(true);
       expect(checklist.props("hasTeam")).toBe(true);
       expect(checklist.props("hasStaffedRotation")).toBe(false);
+    });
+
+    /// A team, a staffed rotation and a routing rule can all exist while the
+    /// org has configured zero notification destinations — paging is still
+    /// structurally impossible, so the checklist must stay up rather than
+    /// declare setup finished.
+    it("still shows when everything but a destination is configured", async () => {
+      service.listTeams.mockResolvedValue({ data: [team] } as any);
+      destinations.list.mockResolvedValue({ data: [] } as any);
+      const wrapper = render();
+      await flushPromises();
+
+      const checklist = wrapper.findComponent({ name: "OnCallSetupChecklist" });
+      expect(checklist.exists()).toBe(true);
+      expect(checklist.props("hasTeam")).toBe(true);
+      expect(checklist.props("hasRouting")).toBe(true);
+      expect(checklist.props("hasDestinations")).toBe(false);
     });
 
     /// A server without the coverage-gap endpoint used to read as "zero gaps",
@@ -1180,6 +1205,7 @@ describe("OnCallResponses — the rows' own fields", () => {
     service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
     service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
     service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
+    destinations.list.mockResolvedValue({ data: [{ name: "dest_1" }] } as any);
     service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
     service.getSchedule.mockResolvedValue({ data: null } as any);
     service.escalationProgress.mockResolvedValue({
@@ -1291,6 +1317,7 @@ describe("OnCallResponses — filtering by cause", () => {
     service.coverageGaps.mockResolvedValue({ data: { at: 0, total: 0, teams: [] } } as any);
     service.whoIsOnCall.mockResolvedValue({ data: [] } as any);
     service.listOwnershipRules.mockResolvedValue({ data: [{ id: "rule_1" }] } as any);
+    destinations.list.mockResolvedValue({ data: [{ name: "dest_1" }] } as any);
     service.getPolicy.mockResolvedValue({ data: { rungs: [] } } as any);
     service.getSchedule.mockResolvedValue({ data: null } as any);
     service.escalationProgress.mockResolvedValue({

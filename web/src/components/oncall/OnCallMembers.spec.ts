@@ -45,6 +45,11 @@ const ORG_USERS = [
   { email: "cara@o2.ai" },
 ];
 
+// Referenced directly rather than through `wrapper.vm.focus` — Vue's public
+// instance proxy rebinds methods, so a stub method read back off `vm` no
+// longer satisfies `toHaveBeenCalled()` against the same mock.
+const memberPickerFocus = vi.fn();
+
 const stubs = {
   // Renders the real cell slots, so the tests exercise what the page draws.
   OTable: {
@@ -58,7 +63,12 @@ const stubs = {
       <slot name='empty' />
     </div>`,
   },
-  OEmptyState: { name: "OEmptyState", props: ["description"], template: "<div />" },
+  OEmptyState: {
+    name: "OEmptyState",
+    props: ["description"],
+    emits: ["action"],
+    template: "<button @click=\"$emit('action')\" />",
+  },
   // `open`, not `modelValue` — ODialog has no `modelValue`, and a stub that
   // invents one lets a dialog that can never open test green.
   ODialog: {
@@ -94,6 +104,10 @@ const stubs = {
       pick(e: any) {
         return Array.from(e.target.selectedOptions).map((o: any) => o.value);
       },
+      // The real OSelect exposes `focus()` (and opens its dropdown); the
+      // empty state's action calls it via a template ref, so the stub needs
+      // it or that call throws.
+      focus: memberPickerFocus,
     },
   },
 };
@@ -133,6 +147,19 @@ describe("OnCallMembers", () => {
     oncall.resolvedSchedule.mockResolvedValue({ data: [] } as any);
     users.orgUsers.mockResolvedValue({ data: { data: ORG_USERS } } as any);
     oncall.addMembers.mockResolvedValue({ data: [] } as any);
+  });
+
+  // An empty roster with no way back to the picker reads as a dead end — the
+  // action has to actually land the reader in the field, not just describe it.
+  it("lands the cursor in the member picker from the empty state's action", async () => {
+    Element.prototype.scrollIntoView = vi.fn();
+    const wrapper = render([]);
+    await flushPromises();
+
+    await wrapper.findComponent({ name: "OEmptyState" }).vm.$emit("action");
+
+    expect(memberPickerFocus).toHaveBeenCalled();
+    expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
   });
 
   // Typing an email means a typo silently creates a member nobody can log in
