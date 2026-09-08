@@ -76,6 +76,9 @@ pub enum ReportError {
     #[error("Report already exists")]
     CreateReportNameAlreadyUsed,
 
+    #[error("Report organization does not match the organization in the request path")]
+    OrgMismatch,
+
     #[error("Report not found")]
     ReportNotFound,
 
@@ -117,8 +120,7 @@ pub async fn save(
     mut report: Report,
     create: bool,
 ) -> Result<(), ReportError> {
-    // Persistence, relations and the trigger all read the org off the report, never the path.
-    report.org_id = org_id.to_string();
+    bind_to_path_org(&mut report, org_id)?;
 
     let conn = get_orm_client_rw().await;
     let cfg = get_config();
@@ -401,8 +403,7 @@ pub async fn update_by_id(
     new_folder_id: Option<&str>,
     mut report: Report,
 ) -> Result<(), ReportError> {
-    // Persistence, relations and the trigger all read the org off the report, never the path.
-    report.org_id = org_id.to_string();
+    bind_to_path_org(&mut report, org_id)?;
 
     let conn = get_orm_client_rw().await;
     let cfg = get_config();
@@ -989,6 +990,16 @@ fn sanitize_filename(filename: &str) -> String {
         .collect()
 }
 
+/// Anchors a report to the org it was addressed to, rejecting a body that names a different one.
+fn bind_to_path_org(report: &mut Report, org_id: &str) -> Result<(), ReportError> {
+    if !report.org_id.is_empty() && report.org_id != org_id {
+        return Err(ReportError::OrgMismatch);
+    }
+    // Persistence, relations and the trigger all read the org off the report, never the path.
+    report.org_id = org_id.to_string();
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1128,5 +1139,34 @@ mod tests {
     fn test_report_error_db_error() {
         let err = ReportError::DbError(anyhow::anyhow!("connection refused"));
         assert!(err.to_string().contains("connection refused"));
+    }
+
+    #[test]
+    fn bind_to_path_org_rejects_a_foreign_org_in_the_body() {
+        let mut report = Report {
+            org_id: "org_b".to_string(),
+            ..Default::default()
+        };
+        assert!(matches!(
+            bind_to_path_org(&mut report, "org_a"),
+            Err(ReportError::OrgMismatch)
+        ));
+    }
+
+    #[test]
+    fn bind_to_path_org_fills_in_an_omitted_org() {
+        let mut report = Report::default();
+        assert!(bind_to_path_org(&mut report, "org_a").is_ok());
+        assert_eq!(report.org_id, "org_a");
+    }
+
+    #[test]
+    fn bind_to_path_org_accepts_a_matching_org() {
+        let mut report = Report {
+            org_id: "org_a".to_string(),
+            ..Default::default()
+        };
+        assert!(bind_to_path_org(&mut report, "org_a").is_ok());
+        assert_eq!(report.org_id, "org_a");
     }
 }
