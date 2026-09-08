@@ -475,7 +475,9 @@ inline_patch() {
   limit=$((INLINE_REMAINING < 200000 ? INLINE_REMAINING : 200000))
   echo "### $title"
   echo '```diff'
-  if [ "$size" -gt "$limit" ]; then
+  if [ "$limit" -le 0 ]; then
+    echo "[omitted: the inline budget for this prompt is spent; $size bytes not shown]"
+  elif [ "$size" -gt "$limit" ]; then
     head -c "$limit" "$file"
     echo
     echo "[truncated: $((size - limit)) of $size bytes omitted; run the loop on a host with sandbox-exec to review the rest]"
