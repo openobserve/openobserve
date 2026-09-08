@@ -14623,6 +14623,7 @@
     },
     "actions": {
       "openCheatsheet": "Open keyboard shortcuts cheatsheet",
+      "commandPalette": "Open the command palette (search & jump)",
       "closeDialog": "Close any dialog, drawer, or modal",
       "focusSearch": "Focus search bar",
       "focusQuery": "Focus query editor",

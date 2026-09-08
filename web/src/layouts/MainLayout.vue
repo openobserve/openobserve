@@ -1367,12 +1367,24 @@ export default defineComponent({
       useShortcuts([{ id: "aiChatToggle", handler: () => toggleAIChat() }]);
     }
 
+    // Command palette (⌘K / Ctrl+K) is available on every build; the dialog lands in Phase 1.
+    const showPalette = ref(false);
+    useShortcuts([
+      {
+        id: "commandPalette",
+        handler: () => {
+          showPalette.value = !showPalette.value;
+        },
+      },
+    ]);
+
     return {
       isDark,
       t,
       router,
       store,
       config,
+      showPalette,
       announcementBarRef,
       langList,
       selectedLanguage,
