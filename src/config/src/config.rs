@@ -3838,6 +3838,9 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check meta store
     check_meta_store_config(cfg)?;
 
+    // check cluster coordinator
+    check_cluster_coordinator_config(cfg)?;
+
     // check meta partition mode
     if cfg.common.meta_partition_mode != "manual" {
         cfg.common.meta_partition_mode = "auto".to_string();
@@ -3960,11 +3963,12 @@ fn check_meta_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             cfg.common.meta_store = "nats".to_string();
         }
     }
-    cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
+    // parse before lowercasing so the error quotes what the operator typed
     cfg.common
         .meta_store
         .parse::<crate::meta::meta_store::MetaStore>()
-        .map_err(|e| anyhow::anyhow!("{e}"))?;
+        .map_err(|e| anyhow::anyhow!("ZO_META_STORE: {e}"))?;
+    cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
     if !cfg.common.local_mode && !cfg.common.meta_store.starts_with("postgres") {
         return Err(anyhow::anyhow!(
             "Meta store only supports postgres in cluster mode."
@@ -3995,6 +3999,26 @@ fn check_meta_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
             urlencoding::encode(&c.meta_postgres_dbname),
         );
         cfg.common.meta_postgres_dsn = dsn;
+    }
+    Ok(())
+}
+
+fn check_cluster_coordinator_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    if cfg.common.cluster_coordinator.is_empty() {
+        cfg.common.cluster_coordinator = "nats".to_string();
+    }
+    // parse before lowercasing so the error quotes what the operator typed
+    let coordinator = cfg
+        .common
+        .cluster_coordinator
+        .parse::<crate::meta::meta_store::MetaStore>()
+        .map_err(|e| anyhow::anyhow!("ZO_CLUSTER_COORDINATOR: {e}"))?;
+    cfg.common.cluster_coordinator = cfg.common.cluster_coordinator.to_lowercase();
+    // NATS is the only coordinator backend; any other value silently skips node registration
+    if !cfg.common.local_mode && coordinator != crate::meta::meta_store::MetaStore::Nats {
+        return Err(anyhow::anyhow!(
+            "ZO_CLUSTER_COORDINATOR only supports nats in cluster mode (ZO_LOCAL_MODE=false)."
+        ));
     }
     Ok(())
 }
@@ -5671,7 +5695,7 @@ mod tests {
             cfg.common.meta_store = value.to_string();
             let err = check_meta_store_config(&mut cfg).unwrap_err().to_string();
             assert!(
-                err.contains("mysql"),
+                err.to_lowercase().contains("mysql"),
                 "error must name the offending scheme {value}: {err}"
             );
             assert!(
@@ -5687,7 +5711,7 @@ mod tests {
 
     #[test]
     fn test_check_meta_store_config_rejects_unknown_values() {
-        for value in ["mongodb", "sqllite", "postgre", "etcd"] {
+        for value in ["mongodb", "sqllite", "postgre"] {
             let mut cfg = Config::default();
             cfg.common.local_mode = true;
             cfg.common.meta_store = value.to_string();
@@ -5696,7 +5720,126 @@ mod tests {
                 err.contains(value),
                 "error must name the offending value {value}: {err}"
             );
+            assert!(
+                !err.contains("no longer supported"),
+                "a plain unknown value must not claim a removed backend: {err}"
+            );
         }
+    }
+
+    #[test]
+    fn test_check_meta_store_config_rejects_mysql_in_cluster_mode() {
+        let mut cfg = Config::default();
+        cfg.common.local_mode = false;
+        cfg.common.meta_store = "mysql".to_string();
+        let err = check_meta_store_config(&mut cfg).unwrap_err().to_string();
+        assert!(
+            err.contains("no longer supported"),
+            "the removal notice must win over the cluster-mode guard: {err}"
+        );
+    }
+
+    #[test]
+    fn test_check_meta_store_config_error_quotes_the_value_as_typed() {
+        let mut cfg = Config::default();
+        cfg.common.local_mode = true;
+        cfg.common.meta_store = "MongoDB".to_string();
+        let err = check_meta_store_config(&mut cfg).unwrap_err().to_string();
+        assert!(
+            err.contains("MongoDB"),
+            "error must quote what the operator typed: {err}"
+        );
+        assert!(
+            err.contains("ZO_META_STORE"),
+            "error must name the offending variable: {err}"
+        );
+    }
+
+    #[test]
+    fn test_check_cluster_coordinator_config_accepts_nats() {
+        for value in ["nats", "NATS", ""] {
+            let mut cfg = Config::default();
+            cfg.common.local_mode = false;
+            cfg.common.cluster_coordinator = value.to_string();
+            check_cluster_coordinator_config(&mut cfg).unwrap();
+            assert_eq!(cfg.common.cluster_coordinator, "nats");
+        }
+    }
+
+    #[test]
+    fn test_check_cluster_coordinator_config_rejects_unknown_values() {
+        for value in ["mongodb", "natss", "NatsX"] {
+            let mut cfg = Config::default();
+            cfg.common.local_mode = true;
+            cfg.common.cluster_coordinator = value.to_string();
+            let err = check_cluster_coordinator_config(&mut cfg)
+                .unwrap_err()
+                .to_string();
+            assert!(
+                err.contains(value),
+                "error must name the offending value {value}: {err}"
+            );
+            assert!(
+                err.contains("ZO_CLUSTER_COORDINATOR"),
+                "error must name the offending variable: {err}"
+            );
+            assert!(
+                !err.contains("no longer supported"),
+                "a plain unknown value must not claim a removed backend: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_check_cluster_coordinator_config_rejects_etcd() {
+        for value in ["etcd", "ETCD"] {
+            let mut cfg = Config::default();
+            cfg.common.local_mode = true;
+            cfg.common.cluster_coordinator = value.to_string();
+            let err = check_cluster_coordinator_config(&mut cfg)
+                .unwrap_err()
+                .to_string();
+            assert!(
+                err.to_lowercase().contains("etcd"),
+                "error must name the offending value {value}: {err}"
+            );
+            assert!(
+                err.contains("no longer supported"),
+                "etcd was this variable's default until it was removed: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_check_cluster_coordinator_config_requires_nats_in_cluster_mode() {
+        for value in ["sqlite", "postgres"] {
+            let mut cfg = Config::default();
+            cfg.common.local_mode = false;
+            cfg.common.cluster_coordinator = value.to_string();
+            let err = check_cluster_coordinator_config(&mut cfg)
+                .unwrap_err()
+                .to_string();
+            assert!(
+                err.contains("nats"),
+                "error must point at the only supported coordinator: {err}"
+            );
+
+            let mut cfg = Config::default();
+            cfg.common.local_mode = true;
+            cfg.common.cluster_coordinator = value.to_string();
+            check_cluster_coordinator_config(&mut cfg).unwrap();
+        }
+    }
+
+    #[test]
+    fn test_check_common_config_validates_cluster_coordinator() {
+        let mut cfg = Config::init().unwrap();
+        cfg.common.cluster_coordinator = "mongodb".to_string();
+        let err = check_common_config(&mut cfg).unwrap_err().to_string();
+        assert!(
+            err.contains("ZO_CLUSTER_COORDINATOR"),
+            "check_common_config must validate the coordinator: {err}"
+        );
     }
 
     #[test]

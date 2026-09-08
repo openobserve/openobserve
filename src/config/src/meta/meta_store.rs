@@ -29,27 +29,26 @@ impl FromStr for MetaStore {
     type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let s = s.to_lowercase();
-        match s.as_str() {
+        let lowered = s.to_lowercase();
+        match lowered.as_str() {
             "sqlite" => Ok(Self::Sqlite),
             "nats" => Ok(Self::Nats),
             "postgres" | "postgresql" => Ok(Self::PostgreSQL),
-            // MySQL shipped once, so its operators need migration advice, not a typo hint
-            _ if s.starts_with("mysql") => Err(format!(
-                "invalid meta store: {}, MySQL is no longer supported as a metadata store; set \
-                 ZO_META_STORE to one of: sqlite, nats, postgres, postgresql",
-                redacted(&s)
+            // backends this enum shipped and dropped: their operators need migration advice
+            _ if lowered.starts_with("mysql") || lowered.starts_with("etcd") => Err(format!(
+                "invalid value: {}, this backend is no longer supported; valid values are: \
+                 sqlite, nats, postgres, postgresql",
+                redacted(s)
             )),
             _ => Err(format!(
-                "invalid meta store: {}, set ZO_META_STORE to one of: sqlite, nats, postgres, \
-                 postgresql",
-                redacted(&s)
+                "invalid value: {}, valid values are: sqlite, nats, postgres, postgresql",
+                redacted(s)
             )),
         }
     }
 }
 
-// Infallible for callers reading an already-validated config; startup rejects bad values
+// both env vars parsed into this are rejected at startup, so callers never hit the fallback
 impl From<&str> for MetaStore {
     fn from(s: &str) -> Self {
         s.parse().unwrap_or(Self::Sqlite)
@@ -145,7 +144,7 @@ mod tests {
         ] {
             let err = value.parse::<MetaStore>().unwrap_err();
             assert!(
-                err.contains("mysql"),
+                err.to_lowercase().contains("mysql"),
                 "error must name the offending scheme {value}: {err}"
             );
             assert!(
@@ -160,8 +159,23 @@ mod tests {
     }
 
     #[test]
+    fn test_metastore_parse_rejects_etcd_with_removal_notice() {
+        for value in ["etcd", "ETCD", "etcd://localhost:2379"] {
+            let err = value.parse::<MetaStore>().unwrap_err();
+            assert!(
+                err.to_lowercase().contains("etcd"),
+                "error must name the offending scheme {value}: {err}"
+            );
+            assert!(
+                err.contains("no longer supported"),
+                "error must state etcd is no longer supported: {err}"
+            );
+        }
+    }
+
+    #[test]
     fn test_metastore_parse_rejects_unknown_values() {
-        for value in ["mongodb", "sqllite", "postgre", "etcd", ""] {
+        for value in ["mongodb", "sqllite", "postgre"] {
             let err = value.parse::<MetaStore>().unwrap_err();
             assert!(
                 err.contains(value),
@@ -170,6 +184,30 @@ mod tests {
             assert!(
                 !err.contains("no longer supported"),
                 "a plain unknown value must not claim a removed backend: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_metastore_parse_rejects_empty_value() {
+        let err = "".parse::<MetaStore>().unwrap_err();
+        assert!(
+            err.contains("sqlite, nats, postgres, postgresql"),
+            "an empty value must still list the supported stores: {err}"
+        );
+        assert!(
+            !err.contains("no longer supported"),
+            "an empty value must not claim a removed backend: {err}"
+        );
+    }
+
+    #[test]
+    fn test_metastore_parse_error_quotes_the_value_as_typed() {
+        for value in ["MongoDB", "SqlLite", "MySQL", "ETCD"] {
+            let err = value.parse::<MetaStore>().unwrap_err();
+            assert!(
+                err.contains(value),
+                "error must quote what the operator typed, not a lowercased copy: {err}"
             );
         }
     }
