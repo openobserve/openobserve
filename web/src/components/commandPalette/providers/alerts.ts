@@ -37,7 +37,12 @@ export function alertToItem(row: AlertRow): PaletteItem {
     label: row.name,
     subtitle: [row.folder_name || folder, state].filter(Boolean).join(" · "),
     icon: "shield-alert-outline",
-    keywords: [row.folder_name ?? "", row.alert_type ?? "", row.description ?? ""].filter(Boolean),
+    keywords: [
+      row.alert_id,
+      row.folder_name ?? "",
+      row.alert_type ?? "",
+      row.description ?? "",
+    ].filter(Boolean),
     route: { name: "alertDetail", params: { alert_id: row.alert_id }, query: { folder } },
   };
 }

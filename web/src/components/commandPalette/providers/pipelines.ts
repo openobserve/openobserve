@@ -37,7 +37,12 @@ export function pipelineToItem(row: PipelineRow): PaletteItem {
     label: row.name,
     subtitle: parts.filter(Boolean).join(" · "),
     icon: "lan",
-    keywords: [row.source?.stream_name ?? "", row.source?.source_type ?? "", "etl"].filter(Boolean),
+    keywords: [
+      row.pipeline_id,
+      row.source?.stream_name ?? "",
+      row.source?.source_type ?? "",
+      "etl",
+    ].filter(Boolean),
     route: { name: "pipelineEditor", query: { id: row.pipeline_id, name: row.name } },
   };
 }

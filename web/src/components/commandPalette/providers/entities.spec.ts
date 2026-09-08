@@ -63,6 +63,7 @@ describe("entity mappers", () => {
       subtitle: "SRE",
       route: { path: "/dashboards/view", query: { dashboard: "d1", folder: "f1" } },
     });
+    expect(dashboardToItem({ dashboard_id: "d1", title: "Payments" }).keywords).toContain("d1");
     expect(dashboardToItem({ dashboard_id: "d2", title: "X" }).route).toEqual({
       path: "/dashboards/view",
       query: { dashboard: "d2", folder: "default" },
@@ -77,6 +78,7 @@ describe("entity mappers", () => {
       folder_name: "SRE",
       enabled: false,
     });
+    expect(item.keywords).toContain("a1");
     expect(item).toMatchObject({
       id: "alert:a1",
       subtitle: "SRE · paused",

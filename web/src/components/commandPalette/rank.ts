@@ -53,6 +53,8 @@ function matchScore(item: PaletteItem, q: string, aliasHits: Set<string>): numbe
   if (aliasHits.has(item.id)) return 100;
   const label = fold(item.label);
   if (label === q) return 80;
+  // A pasted entity id is an exact keyword; it must beat every label substring.
+  if ((item.keywords ?? []).some((k) => fold(k) === q)) return 70;
   if (label.startsWith(q)) return 60;
   if (wordStart(label, q)) return 40;
   if (label.includes(q)) return 20;

@@ -71,6 +71,19 @@ describe("scoreItem", () => {
     expect(scoreItem(item("page:logs", "Logs"), "sql")).toBeGreaterThan(exact);
   });
 
+  it("ranks an exact id keyword above every label substring", () => {
+    const dash = item("dashboard:default/7Ab", "Payments", {
+      type: "dashboard",
+      keywords: ["7Ab9xQ"],
+    });
+    const decoy = item("page:x", "7ab9xq report");
+    expect(rankItems([decoy, dash], "7Ab9xQ").map((i) => i.id)).toEqual([
+      "dashboard:default/7Ab",
+      "page:x",
+    ]);
+    expect(rankItems([dash], "7ab9").map((i) => i.id)).toEqual(["dashboard:default/7Ab"]);
+  });
+
   it("returns 0 for a non-match and caps the frecency boost", () => {
     expect(scoreItem(item("x", "Logs"), "zzz")).toBe(0);
     const frecency = new Map([["x", 40]]);

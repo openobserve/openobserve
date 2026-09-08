@@ -30,6 +30,7 @@ export function savedViewToItem(row: SavedViewRow, subtitle: string): PaletteIte
     label: row.view_name,
     subtitle,
     icon: "bookmark",
+    keywords: [row.view_id],
     route: { name: "logs", query: { view_id: row.view_id } },
   };
 }

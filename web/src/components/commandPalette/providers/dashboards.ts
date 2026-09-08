@@ -34,7 +34,7 @@ export function dashboardToItem(row: DashboardRow): PaletteItem {
     label: row.title,
     subtitle: row.folder_name || folder,
     icon: "dashboard",
-    keywords: [row.folder_name ?? "", row.description ?? ""].filter(Boolean),
+    keywords: [row.dashboard_id, row.folder_name ?? "", row.description ?? ""].filter(Boolean),
     route: { path: "/dashboards/view", query: { dashboard: row.dashboard_id, folder } },
   };
 }
