@@ -56,7 +56,12 @@ test.describe('Regression: Search History re-apply retains the query (#14283)', 
     const reAppliedSql = await pm.searchHistoryPage.reApplyQuery(EARLIER_MARKER);
     expect(reAppliedSql).toContain(EARLIER_MARKER);
 
-    const editorText = await pm.logsPage.getQueryEditorTextWhenReady(EARLIER_MARKER, 30000);
+    // Fall back to a plain read so a miss reports the query the editor actually held
+    // (the stale one) rather than an opaque poll timeout.
+    const editorText = await pm.logsPage
+      .getQueryEditorTextWhenReady(EARLIER_MARKER, 30000)
+      .catch(() => pm.logsPage.getQueryEditorText());
+    testLogger.info('Editor content after re-apply', { editorText });
 
     expect(editorText).toContain(EARLIER_MARKER);
     // The stale cached query must not win over the one carried in the URL.
