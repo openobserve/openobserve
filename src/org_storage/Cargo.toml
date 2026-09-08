@@ -29,3 +29,5 @@ log.workspace = true
 object_store.workspace = true
 serde_json.workspace = true
 tokio.workspace = true
+serde.workspace = true
+reqwest.workspace = true

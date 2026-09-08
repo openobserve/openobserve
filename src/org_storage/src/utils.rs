@@ -85,27 +85,6 @@ pub fn get_azure(
     builder.build()
 }
 
-pub fn get_gcp(
-    config: GcpCredentials,
-) -> object_store::Result<object_store::gcp::GoogleCloudStorage> {
-    let cfg = get_config();
-    let mut builder = object_store::gcp::GoogleCloudStorageBuilder::from_env()
-        .with_client_options(
-            object_store::ClientOptions::default()
-                .with_connect_timeout(std::time::Duration::from_secs(cfg.s3.connect_timeout))
-                .with_timeout(std::time::Duration::from_secs(cfg.s3.request_timeout))
-                .with_allow_invalid_certificates(cfg.s3.allow_invalid_certificates),
-        )
-        .with_bucket_name(&config.bucket_name)
-        .with_service_account_path(&config.access_key);
-
-    if !config.server_url.is_empty() {
-        builder = builder.with_url(&config.server_url);
-    }
-
-    builder.build()
-}
-
 pub async fn test_provider(provider: &dyn ObjectStore) -> Result<(), anyhow::Error> {
     // Test upload
     let path = object_store::path::Path::parse(TEST_FILE)?;
@@ -147,8 +126,8 @@ pub fn _merge_aws_credentials(existing: &str, new: &str) -> Result<String, anyho
 pub fn _merge_gcp_credentials(existing: &str, new: &str) -> Result<String, anyhow::Error> {
     let mut existing: GcpCredentials = serde_json::from_str(existing)?;
     let new: GcpCredentials = serde_json::from_str(new)?;
-    if !new.access_key.is_empty() {
-        existing.access_key = new.access_key;
+    if !new.service_account_name.is_empty() {
+        existing.service_account_name = new.service_account_name;
     }
     Ok(serde_json::to_string(&existing)?)
 }

@@ -68,8 +68,10 @@ pub fn enforce_checks(
             Ok(serde_json::to_string(&creds)?)
         }
         ProviderType::GcpCredentials => {
-            let mut creds: GcpCredentials = serde_json::from_str(&data)?;
-            creds.server_url = policy.server_url.to_string();
+            let creds: GcpCredentials = serde_json::from_str(&data)?;
+            // for gcp we do not allow specifying the server url or region
+            // so nothing to enforce here, we simply do a parse check to
+            // make sure the shape is ok
             Ok(serde_json::to_string(&creds)?)
         }
         ProviderType::AzureCredentials => {

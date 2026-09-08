@@ -61,8 +61,8 @@ pub struct AwsCredentials {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct GcpCredentials {
     pub bucket_name: String,
-    pub server_url: String,
-    pub access_key: String,
+    pub project_name: String,
+    pub service_account_name: String,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
