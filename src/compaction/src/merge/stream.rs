@@ -217,7 +217,7 @@ pub async fn merge_by_stream(
             let mut check_guard = HashSet::with_capacity(batch_groups.len());
             let mut orphan_blooms = Vec::new();
             for ret in worker_results {
-                let (batch_id, new_files, merged_inputs) = match ret {
+                let (batch_id, new_files) = match ret {
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("[COMPACTOR] merge files failed: {e}");
@@ -234,9 +234,8 @@ pub async fn merge_by_stream(
                 }
                 check_guard.insert(batch_id);
 
-                // retire exactly the inputs the merge consumed: a merge may take fewer files
-                // than the planned batch, and the rest must stay live
-                let delete_file_list = merged_inputs.as_slice();
+                // delete small files keys & write big files keys, use transaction
+                let delete_file_list = batch_groups.get(batch_id).unwrap().files.as_slice();
                 let mut events = Vec::with_capacity(new_files.len() + delete_file_list.len());
                 for new_file in new_files {
                     if !new_file.key.is_empty() {
