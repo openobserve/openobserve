@@ -848,7 +848,9 @@
     },
     "condition": {
       "loading": "Carregando condições...",
-      "loadError": "A condição salva não pôde ser lida e foi redefinida. Salvar agora a substituirá."
+      "loadError": "A condição salva não pôde ser lida e foi redefinida. Salvar agora a substituirá.",
+      "unknownColumn": "\"{column}\" não está no payload deste gatilho, portanto esta condição pode nunca corresponder.",
+      "unknownColumnSuggestion": "Você quis dizer \"{suggestion}\"?"
     },
     "destination": {
       "createNew": "Criar novo destino",
@@ -2560,7 +2562,9 @@
       "title": "Execuções do Fluxo de Trabalho",
       "edit": "Editar Fluxo de Trabalho",
       "debugInEditor": "Depurar no editor",
-      "staleGraphWarning": "Este workflow foi editado desde esta execução — {count} passo que ele executou não existe mais, portanto seu status não é mostrado aqui. | Este workflow foi editado desde esta execução — {count} passos que ele executou não existem mais, portanto seus status não são mostrados aqui."
+      "staleGraphWarning": "Este workflow foi editado desde esta execução — {count} passo que ele executou não existe mais, portanto seu status não é mostrado aqui. | Este workflow foi editado desde esta execução — {count} passos que ele executou não existem mais, portanto seus status não são mostrados aqui.",
+      "hideList": "Ocultar lista de execuções",
+      "showList": "Mostrar lista de execuções"
     },
     "history": {
       "button": "Execuções",
@@ -2576,10 +2580,21 @@
       "error": "Erro",
       "success": "Sucesso",
       "failed": "Falhou",
+      "testRun": "Execução de teste",
+      "runType": "Tipo",
+      "testRunTooltip": "Iniciada a partir do editor. As etapas de destino disparam para valer.",
+      "showTestRuns": "Mostrar {count} execução(ões) de teste",
+      "hideTestRuns": "Ocultar execuções de teste",
       "open": "Histórico",
       "openFullView": "Abrir visão completa de execuções",
       "loadError": "Erro ao Carregar Execuções",
-      "loadRunError": "Erro ao Carregar Esta Execução"
+      "loadRunError": "Erro ao Carregar Esta Execução",
+      "retry": "Tentar novamente",
+      "retryTooltip": "Repetir esta execução com falha a partir da entrada registrada",
+      "retryTitle": "Repetir esta execução?",
+      "retryMessage": "Isso cria uma nova execução a partir da entrada que a execução com falha registrou. As etapas de destino disparam para valer.",
+      "retryStarted": "Nova tentativa iniciada — ela aparece na lista como uma nova execução.",
+      "retryError": "Não foi possível repetir esta execução"
     },
     "edit": "Editar",
     "view": "Visualizar",
@@ -2596,7 +2611,9 @@
     "triggerRequired": "Um Acionador é Obrigatório",
     "addStepRequired": "Adicione pelo Menos Uma Etapa Após o Acionador",
     "connectAllNodes": "Conecte Todos os Nós Antes de Salvar",
+    "branchPathsRequired": "Conecte cada caminho de ramificação a uma etapa | 1 etapa de ramificação tem conexões que não correspondem aos seus caminhos. Abra-a, defina os caminhos e reconecte-os. | {count} etapas de ramificação têm conexões que não correspondem aos seus caminhos.",
     "finishStepsBeforePublish": "{count} passo precisa de configuração antes de publicar — destacado no canvas. | {count} passos precisam de configuração antes de publicar — destacados no canvas.",
+    "noChangesToPublish": "Nenhuma alteração para publicar — este fluxo de trabalho já corresponde à versão publicada.",
     "draft": "Rascunho",
     "saveDraft": "Salvar como rascunho",
     "publish": "Publicar",
@@ -2643,7 +2660,7 @@
     "loadError": "Não foi possível carregar o Workflow",
     "deleteNode": "Excluir Nó",
     "deleteNodeTitle": "Excluir Etapa",
-    "deleteNodeConfirm": "Tem certeza de que deseja excluir esta etapa? Isso não pode ser desfeito.",
+    "deleteNodeConfirm": "Tem certeza de que deseja excluir esta etapa? Você pode desfazer esta ação.",
     "namePlaceholder": "Workflow sem título",
     "renameHint": "Clique para renomear este workflow",
     "editMode": "Editar workflow",
@@ -2656,11 +2673,29 @@
       "runFromBeginning": "Início (Gatilho)",
       "runFromNote": "Apenas as etapas a partir daqui serão executadas.",
       "inputLabel": "Entrada de Exemplo",
+      "source": {
+        "sample": "Amostra gerada",
+        "run": "Da execução: {run}",
+        "edited": "Editado por você"
+      },
+      "revertInput": "Reverter",
+      "useRunInput": "Usar entrada da execução…",
+      "lastTestRun": "Última execução de teste (nesta aba)",
+      "runHasNoInput": "Essa execução não tem entrada armazenada para esta etapa.",
       "invalidJson": "Insira um array JSON válido de registros.",
       "resultHint": "Após a execução, cada etapa mostra um ícone de verificação ou erro no canvas.",
+      "rehearsalOnly": "Passou apenas em uma execução de teste — um ensaio com um payload de amostra, não evidência de que o fluxo de trabalho publicado funciona.",
       "notVerified": "Nenhum registro alcançou este passo — uma condição a montante os filtrou, ou um passo anterior falhou.",
+      "notConfigured": "Esta etapa não está configurada, portanto não fez nada nesta execução. Configure-a e teste novamente.",
+      "recordedFailure": "Esta etapa falhou na última execução registrada.",
+      "recordsUnavailable": "Registrado em uma execução anterior — execute novamente o teste para inspecionar os registros.",
+      "dirtySelf": "A configuração mudou desde a última execução desta etapa. Teste a etapa novamente.",
+      "dirtyUpstream": "Uma etapa anterior mudou desde a execução desta etapa. Teste a etapa novamente.",
       "run": "Executar Teste",
       "runError": "Não foi possível executar o teste.",
+      "suppressDestinations": "Não enviar de fato para os destinos",
+      "suppressDestinationsHint": "As etapas de destino resolvem seu roteamento, mas nada é entregue.",
+      "dispatchWarning": "O teste é real: esta execução realmente entregará para {destinations}.",
       "stepResult": {
         "viewHint": "Clique para ver entrada / saída",
         "input": "Entrada",
@@ -2686,8 +2721,10 @@
         "status": {
           "ok": "Aprovado",
           "error": "Com erro",
-          "skipped": "Sem registros"
-        }
+          "skipped": "Sem registros",
+          "noMatch": "Sem correspondência"
+        },
+        "suppressed": "Suprimido — não enviado ao destino real"
       }
     },
     "linkAlerts": {
@@ -2720,6 +2757,7 @@
       "kindLogic": "Lógica",
       "kindAction": "Ação",
       "condition": "Condição",
+      "branch": "Ramificação",
       "function": "Função",
       "sendToDestination": "Destino",
       "configComingSoon": "A configuração de {node} virá em uma etapa posterior",
@@ -2727,7 +2765,20 @@
       "sectionDestination": "Destino",
       "stepSearchPlaceholder": "Pesquisar etapas...",
       "stepNoMatch": "Nenhuma etapa corresponde à sua pesquisa.",
-      "conditionDesc": "Ramificar em uma regra",
+      "conditionDesc": "Continuar apenas quando uma regra corresponder",
+      "branchDesc": "Encaminhe cada registro pelo primeiro caminho correspondente",
+      "branchCaseLabel": "Nome do caminho (opcional)",
+      "branchCaseLabelPlaceholder": "ex.: Alta severidade",
+      "branchAddCase": "Adicionar caminho",
+      "branchRemoveCase": "Remover caminho",
+      "branchMoveUp": "Mover caminho para cima",
+      "branchMoveDown": "Mover caminho para baixo",
+      "branchPathNumber": "Caminho {index}",
+      "branchElseTitle": "Todo o resto",
+      "branchElseHint": "Registros que não correspondem a nenhum caminho acima saem por aqui.",
+      "branchNoteTitle": "Diretrizes de ramificação",
+      "branchNoteFirstMatch": "Os caminhos são verificados de cima para baixo e a PRIMEIRA correspondência vence, portanto cada registro sai por exatamente um caminho.",
+      "branchNoteUnwired": "Um caminho sem nada conectado simplesmente descarta seus registros.",
       "functionDesc": "Remodelar o payload com uma função",
       "destinationDesc": "Enviar para um destino",
       "triggerBody": "Executa quando um alerta associado dispara",
@@ -2775,11 +2826,14 @@
       "enable": "Ativar etapa",
       "disabledBadge": "Desativado",
       "incompleteBadge": "Configurar depois",
+      "unwiredBadge": "Caminho sem conexão",
       "unsavedFnTitle": "Alterações não salvas na função",
       "unsavedFnMessage": "Esta etapa tem código de função que não está salvo na sua biblioteca. Salve-o, descarte as alterações ou continue editando.",
       "unsavedFnSave": "Salvar função",
       "unsavedFnDiscard": "Descartar alterações",
-      "unsavedFnKeep": "Continuar editando"
+      "unsavedFnKeep": "Continuar editando",
+      "destination": "Destino",
+      "branchPathUnset": "{name} · sem regra definida"
     },
     "commonFieldsAbove": "campos comuns acima",
     "canvas": {
@@ -2803,11 +2857,15 @@
       "openStep": "Abrir {name}",
       "runToView": "Execute um teste para visualizar estes dados.",
       "noBranchItems": "Nenhum item neste ramo.",
+      "forwardedCount": "{out} de {total} registro encaminhado | {out} de {total} registros encaminhados",
+      "noMatchForwarded": "Sem correspondência — 0 de {total} registro encaminhado | Sem correspondência — 0 de {total} registros encaminhados",
+      "branchDropped": "{count} registro não correspondeu a nenhum caminho — descartado | {count} registros não corresponderam a nenhum caminho — descartados",
       "noUpstream": "Nenhuma etapa anterior.",
       "noRunYet": "Nenhuma execução ainda.",
       "runLabel": "Executar",
       "switchRun": "Alternar execução",
       "notInRun": "Esta etapa não está incluída nesta execução.",
+      "noRunData": "Esta execução não armazenou dados da etapa.",
       "runTest": "Executar teste",
       "noItems": "Nenhum item",
       "itemsCount": "{count} Item | {count} Itens",
@@ -2817,8 +2875,14 @@
       "executeStep": "Executar etapa",
       "sample": "Amostra",
       "editStep": "Editar etapa",
+      "readOnlyRun": "Você está vendo uma execução passada, portanto a configuração desta etapa não pode ser alterada aqui.",
+      "readOnlyRunEdit": "Editar no fluxo de trabalho",
       "testInputHint": "Entrada de teste — Edite e depois execute a etapa.",
-      "noRunsList": "Nenhuma execução ainda."
+      "noRunsList": "Nenhuma execução ainda.",
+      "resetInput": "Redefinir para amostra",
+      "eventPager": "{n} de {total}",
+      "nextEvent": "Próximo evento",
+      "prevEvent": "Evento anterior"
     },
     "runOverlay": {
       "banner": "Mostrando dados da etapa de uma execução passada ({run}). Você pode editar livremente — esta execução nunca é alterada.",
@@ -2845,6 +2909,8 @@
       "noConfig": "Sem Configuração",
       "functionLabel": "Função",
       "destinationLabel": "Destino",
+      "branchPathsLabel": "Caminhos",
+      "branchNoRule": "Sem regra definida",
       "destinationUnsupported": "Tipo Não Suportado",
       "destinationMissing": "Este destino não existe mais ou não pode ser lido.",
       "headersLabel": "Cabeçalhos",
@@ -3603,29 +3669,30 @@
       "crossLinkBody": "{brand} expõe um endpoint {product} (MCP) para que clientes de IA como {client1}, {client2} e {client3} possam consultar e agir nesta organização. A configuração e as credenciais ficam no IAM.",
       "crossLinkCta": "Abrir configuração do MCP",
       "tagline": "Conecte {client1}, {client2}, {client3} e outros clientes de IA a esta organização através do {product} (MCP).",
-      "endpointLabel": "Endpoint MCP",
-      "authLabel": "1. Autenticação",
-      "clientLabel": "2. Escolha seu cliente",
-      "configLabel": "3. Adicione a configuração",
+      "connectLabel": "Endpoint e autenticação",
+      "connectHint": "Aponte seu cliente MCP para esta URL e escolha como ele se autentica.",
+      "configLabel": "Adicione a configuração",
+      "configHint": "Escolha seu cliente e cole a configuração onde ela deve ficar.",
       "auth": {
         "oauth": "OAuth — faça login (recomendado)",
         "token": "Token de acesso",
         "oauthNote": "Nenhuma credencial para gerenciar: seu cliente MCP abre um navegador para fazer login e o acesso é limitado pelas suas permissões existentes. Use sempre que seu cliente suportar OAuth."
       },
       "credential": {
-        "quickStartTitle": "Início rápido — sua conta",
-        "quickStartBody": "Os snippets usam suas próprias credenciais, que carregam todas as suas permissões. Para produção, gere uma credencial somente leitura dedicada.",
-        "generate": "Gerar credencial somente leitura",
-        "created": "Credencial somente leitura criada",
+        "quickStartTitle": "Ainda sem token",
+        "quickStartBody": "Os trechos abaixo contêm um cabeçalho de espaço reservado. Gere um token dedicado para este cliente MCP ou cole um token de conta de serviço existente no lugar do cabeçalho.",
+        "generate": "Gerar token dedicado",
+        "created": "Token dedicado criado",
         "shownOnce": "Para {email}. Copie agora — o token é mostrado apenas uma vez e os snippets abaixo agora o utilizam.",
         "download": "Baixar",
         "manage": "Gerenciar / revogar",
-        "readonlyWarn": "A conta foi criada, mas a função somente leitura não pôde ser aplicada automaticamente — revise suas permissões em Contas de Serviço.",
+        "readonlyWarn": "A conta foi criada, mas não pôde ser adicionada à função {role} — ela não tem permissões até que você atribua uma no IAM.",
+        "readonlyNote": "Acesso limitado a somente leitura pela função {role} — revise ou estenda em IAM › Funções.",
+        "rbacNote": "O RBAC está desativado nesta implantação, portanto este token não pode ser limitado a somente leitura — ele tem o mesmo acesso que qualquer outra credencial desta organização.",
         "error": "Não foi possível criar a credencial. Tente novamente ou crie uma conta de serviço manualmente no IAM."
       },
       "securityTitle": "Use uma credencial dedicada com privilégios mínimos",
-      "securityBody": "O token usa por padrão as credenciais da sua conta. Para produção, gere uma credencial somente leitura acima (ou crie uma conta de serviço com escopo) e nunca envie tokens para o controle de versão.",
-      "docsCta": "Leia a documentação completa do MCP",
+      "securityBody": "Forneça ao cliente MCP uma conta de serviço com escopo somente leitura, em vez de suas próprias credenciais de conta, e nunca faça commit do token dessa conta no controle de versão.",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3734,7 +3801,7 @@
       "dynamodbPipelineTitle": "Transmita DynamoDB → Firehose",
       "dynamodbTagline": "Transmita as alterações de itens do DynamoDB para o OpenObserve via Kinesis Firehose.",
       "ec2IamNote": "Requer uma função IAM na instância com ec2:DescribeTags e ec2:DescribeInstances, para que o agente possa ler a tag Name e usá-la como identificador do host.",
-      "enableSessionReplayDesc": "O Replay de Sessão é configurado **separadamente** do RUM e **não** herda `rumConfiguration.customEndpoint`. Ele também não anexa um caminho, então precisa da URL completa `/replay` abaixo. Errar isso é o motivo usual de eventos RUM chegarem, mas replays nunca chegarem.",
+      "enableSessionReplayDesc": "Session Replay é configurado **separadamente** do Monitoramento de usuários reais e **não** herda `rumConfiguration.customEndpoint`. Dê a ele sua própria URL base abaixo — com o mesmo formato da URL do Monitoramento de usuários reais/Registros. O bridge acrescenta `/replay` por conta própria, portanto **não** adicione você mesmo: um `/replay` adicionado manualmente adiciona o caminho duas vezes e todo upload é rejeitado com 401, que é o motivo usual de os eventos do Monitoramento de usuários reais chegarem, mas os replays nunca chegarem.",
       "enableSessionReplayTitle": "Ativar Replay de Sessão",
       "endpointLabel": "Endpoint",
       "externalEndpointVariant": "Endpoint Externo",
@@ -3936,18 +4003,16 @@
       "rnInitNote": "Inicialize o mais cedo possível — o provider deve montar antes das telas que você quer medir.",
       "rnInstallNote": "Os pacotes de session-replay e navegação são opcionais — remova qualquer uma das linhas se você não precisar de gravação de tela ou rastreamento automático de visualização.",
       "rnNavigationNote": "Sem isso, você ainda pode gravar visualizações manualmente com `O2Rum.startView()` / `O2Rum.stopView()`.",
-      "rnSessionReplayNote": "O Session Replay em React Native é atualmente verificado no Android. No iOS, o SDK anexa seu próprio caminho a esta URL, então os uploads de replay ainda não chegam ao OpenObserve — RUM, logs e crashes não são afetados.",
-      "rnTrouble401A": "O `clientToken` é o **token RUM** desta organização, não a senha de ingestão. Se ele foi rotacionado, gere novamente a partir do cabeçalho desta página e recompile o aplicativo.",
+      "rnSessionReplayNote": "O Session Replay é verificado no iOS e no Android a partir do SDK 0.1.2. Os segmentos são agrupados em lote antes do upload, então espere um pequeno atraso antes que eles apareçam.",
+      "rnTrouble401A": "Duas causas comuns. Primeiro, o `clientToken` — ele deve ser o **token do Monitoramento de usuários reais** desta organização, não o código de acesso de ingestão; se ele tiver sido rotacionado, gere-o novamente no cabeçalho desta página e recompile o aplicativo. Segundo, especificamente para o Session Replay: acrescentar `/replay` a `customEndpoint` manualmente adiciona o caminho duas vezes (o bridge já o adiciona), o que o backend também rejeita com 401 — passe a URL base simples.",
       "rnTrouble401Q": "As requisições retornam 401 ou 403",
       "rnTroubleCleartextA": "O Android bloqueia tráfego em texto claro por padrão. Para um endpoint `http://`, defina `additionalConfiguration: {config}` na configuração do SDK e permita texto claro para o seu host na configuração de segurança de rede do aplicativo. Prefira HTTPS fora do desenvolvimento local.",
       "rnTroubleCleartextQ": "O build de release/debug do Android não envia nada via HTTP sem criptografia",
       "rnTroubleIosBuildA": "Execute `npx pod-install` (ou `cd ios && pod install`) após adicionar os pacotes e recompile pelo Xcode ou `npx react-native run-ios`. Um recarregamento apenas pelo Metro não detectará novos módulos nativos.",
       "rnTroubleIosBuildQ": "O build do iOS falha ou o módulo nativo está ausente",
-      "rnTroubleIosReplayA": "Limitação conhecida do SDK atual do React Native: no iOS, ele anexa seu próprio caminho ao `customEndpoint` do session-replay, então os uploads não atingem a rota `/replay` do OpenObserve. O Android usa a URL exatamente como está e funciona. Eventos RUM, logs e relatórios de crash não são afetados em ambas as plataformas.",
-      "rnTroubleIosReplayQ": "O session replay funciona no Android, mas não no iOS",
       "rnTroubleMaskedA": "Esse é o padrão. `textAndInputPrivacyLevel`, `imagePrivacyLevel` e `touchPrivacyLevel` usam por padrão a configuração mais restritiva (`MASK_ALL`). Afrouxe-os apenas até onde sua política de privacidade permitir — `MASK_SENSITIVE_INPUTS` mantém senhas e campos de cartão ocultos enquanto mostra o restante.",
       "rnTroubleMaskedQ": "Os replays são renderizados, mas tudo está mascarado",
-      "rnTroubleNoReplayA": "Quase sempre é o endpoint. O Session Replay é configurado separadamente e **não** herda `rumConfiguration.customEndpoint`; se não for definido, o padrão é uma string vazia e os uploads não vão para lugar nenhum que você possa ver. Passe a URL completa explicitamente: `customEndpoint: '{replayUrl}'` — observe o `/replay` no final, que a URL base do SDK principal não tem.",
+      "rnTroubleNoReplayA": "Quase sempre o endpoint. O Session Replay é configurado separadamente e **não** herda `rumConfiguration.customEndpoint`; se não for definido, o padrão é uma string vazia e os uploads não vão para lugar nenhum que você consiga ver. Passe a URL base explicitamente: `customEndpoint: '{replayUrl}'` — o bridge acrescenta `/replay` por conta própria (desde o SDK 0.1.2), portanto não adicione esse sufixo você mesmo, ou os uploads serão rejeitados com 401.",
       "rnTroubleNoReplayQ": "Os eventos RUM chegam, mas não há session replay",
       "rnTroubleNothingArrivesA": "Verifique o host primeiro — veja a caixa de correção acima. `localhost` resolve para o dispositivo, não para sua máquina: use `10.0.2.2` no emulador Android, `localhost` no simulador iOS e o IP da LAN da sua máquina em um dispositivo físico.",
       "rnTroubleNothingArrivesQ": "Nada chega de um emulador ou dispositivo",
@@ -6434,6 +6499,7 @@
       "firing": "Disparado",
       "ok": "Ok",
       "error": "Erro",
+      "pending": "Pendente",
       "skipped": "Ignorado",
       "unknown": "Desconhecido",
       "flapping": "Flapping",
@@ -6460,6 +6526,7 @@
       "templateRequired": "O modelo é obrigatório!",
       "validEmails": "Adicione e-mails válidos!",
       "silenceNonNegative": "O silenciamento de notificações deve ser maior ou igual a 0",
+      "pendingPeriodNonNegative": "O período de espera deve ser maior ou igual a 0",
       "periodPositive": "O período deve ser maior que 0",
       "destinationRequired": "Pelo menos um destino é obrigatório.",
       "thresholdPositive": "O limite deve ser maior que 0",
@@ -6470,6 +6537,7 @@
       "timestampAliasBanned": "{column} não pode ser usado como alias de coluna. Use time_bucket em vez disso.",
       "credentialFieldRequired": "{field} é obrigatório",
       "minimumFrequency": "Frequência mínima deve ser de {minutes} minutos",
+      "pendingPeriodNotMultiple": "Não é um múltiplo da frequência de verificação ({minutes} min) — o alerta pode esperar até um intervalo extra antes de disparar.",
       "nameMandatoryString": "Nome é obrigatório e deve ser uma string válida",
       "orgIdMismatch": "O ID da organização deve ser igual a {orgId}",
       "streamTypeMandatory": "O Tipo de Stream é obrigatório e deve ser um dos: logs, metrics, traces",
@@ -6675,6 +6743,9 @@
       "cooldown": "Tempo de recarga",
       "betweenAlerts": "entre alertas",
       "noCooldown": "Sem tempo de recarga",
+      "pendingPeriod": "Aguardar por",
+      "beforeFiring": "{duration} antes de disparar",
+      "firesImmediately": "Dispara imediatamente",
       "minuteCount": "{n} minuto | {n} minutos",
       "hourCount": "{n} hora | {n} horas",
       "timeRangeCount": "{n} intervalo de tempo ({ranges}) | {n} intervalos de tempo ({ranges})",
@@ -6691,6 +6762,7 @@
         "conditionOther": "{threshold} eventos ({operator})",
         "alertMeWhenMinutes": "Alerta-me quando {condition} ocorrer em qualquer período de {count} minutos",
         "alertMeWhenHours": "Alerta-me quando {condition} ocorrer em qualquer período de {count} horas",
+        "pendingPeriodClause": ", após aguardar por {duration}",
         "cooldownClause": ", mas não mais do que uma vez a cada {cooldown}",
         "defaultConditions": "Alerte-me quando as condições configuradas forem atendidas"
       }
@@ -7155,6 +7227,8 @@
       "writeQueryHint": "Escreva uma consulta para começar",
       "sqlEditorHint": "Use o editor aberto e completo para executar e validar",
       "checkEvery": "Verificar a cada",
+      "pendingPeriod": "Aguardar por",
+      "pendingPeriodTooltip": "Aguarde esse período antes de disparar, para que a condição se mantenha em vez de ser acionada por um único intervalo ruim.",
       "cronExpressionPlaceholder": "0 */10 * * * *",
       "timezonePlaceholder": "fuso horário",
       "onThese": "nestes",
@@ -10633,6 +10707,10 @@
         "success": "Adicionado ao dataset",
         "loadError": "Falha ao carregar datasets",
         "error": "Falha ao adicionar este item ao dataset"
+      },
+      "playground": {
+        "button": "Abrir no Playground",
+        "hint": "Carregue as mensagens desta chamada no Playground para editá-la e executá-la novamente"
       }
     },
     "discovery": {
@@ -11000,7 +11078,10 @@
         "columns": {
           "input": "Entrada",
           "output": "Saída",
-          "latency": "Latência"
+          "trials": "Tentativas",
+          "dispersion": "Dispersão",
+          "latency": "Latência",
+          "p50Latency": "Latência P50"
         },
         "retryFailed": "Repetir Slots com Falha",
         "loadError": "Falha ao carregar o experimento",
@@ -11038,8 +11119,12 @@
         },
         "slotStatus": "Status",
         "searchPlaceholder": "Pesquisar entrada ou saída",
+        "searchInputPlaceholder": "Buscar entrada",
         "statusFilter": "Status",
-        "statusFilterAll": "Todos os Status"
+        "statusFilterAll": "Todos os Status",
+        "sortByDispersion": "Ordenar por dispersão",
+        "highDispersionBadge": "Alta",
+        "trialNumber": "Tentativa {n}"
       },
       "rowDetail": {
         "fallbackTitle": "Linha do experimento",
@@ -11130,10 +11215,13 @@
           "trial": "Tentativa {index}",
           "noContent": "Não fornecido",
           "noOutput": "Nenhuma saída",
-          "absentSide": "Não presente nesta execução"
+          "absentSide": "Não presente nesta execução",
+          "enterFullscreen": "Entrar em tela cheia",
+          "exitFullscreen": "Sair da tela cheia"
         }
       },
-      "selectionCount": "{count} de 2 selecionados"
+      "selectionCount": "{count} de 2 selecionados",
+      "clearBaseline": "Limpar referência"
     },
     "datasets": {
       "listTitle": "Datasets",
@@ -11202,7 +11290,7 @@
           "expectedOutput": "Saída Esperada",
           "source": "Fonte",
           "tags": "Tags",
-          "version": "Versão",
+          "version": "Versão do conjunto de dados",
           "actions": "Ações"
         },
         "deleteItemTitle": "Excluir item",
@@ -11681,8 +11769,6 @@
       "title": "Playground",
       "runAll": "Executar tudo",
       "runAllTooltip": "Executar cada variante",
-      "running": "Executando… ({done}/{total})",
-      "stop": "Parar",
       "recentDrafts": "Rascunhos recentes",
       "recentDraftsSection": "Neste navegador · últimos 10",
       "draftVersus": "vs",
@@ -11691,6 +11777,7 @@
       "fromExperiment": "Clonado do experimento {name}",
       "variables": "Variáveis",
       "noVariables": "Nenhum {token} nas mensagens — adicione um para parametrizar a entrada.",
+      "unusedSampledValue": "Ainda não referenciados em uma mensagem: {tokens}. Digite um deles em uma mensagem para usá-lo.",
       "variablePlaceholder": "Valor para {name}",
       "addExpected": "+ Saída esperada",
       "expectedLabel": "Esperado",
@@ -11705,8 +11792,9 @@
       "variant": "Variante {label}",
       "variantLimit": "A bancada comporta no máximo {max} variantes.",
       "duplicateVariant": "Duplicar variante",
+      "resetVariant": "Limpar bancada",
       "removeVariant": "Remover variante",
-      "runVariant": "Executar esta variante",
+      "runVariant": "Executar",
       "createExperiment": "Criar experimento",
       "modelPlaceholder": "Selecione ou digite um modelo",
       "providerUnknown": "Provedor desconhecido",
@@ -11732,6 +11820,13 @@
       "toolsEmpty": "Nenhuma ferramenta definida.",
       "toolCall": "Chamada de ferramenta",
       "toolCallNote": "A execução para aqui — o Playground não executa ferramentas.",
+      "toolCallAddToMessages": "Adicionar às mensagens",
+      "toolCallContinueTooltip": "Adiciona esta chamada à conversa e abre o campo de resultado.",
+      "toolCallAddedToMessages": "Chamada de ferramenta adicionada — insira o resultado da ferramenta e execute novamente.",
+      "toolArgumentsPlaceholder": "Argumentos da ferramenta (JSON)",
+      "toolResultPlaceholder": "Insira o resultado da ferramenta…",
+      "toolResultRequired": "Insira o resultado da ferramenta acima para continuar.",
+      "toolSetupRequired": "Selecione uma ferramenta e forneça seus argumentos para continuar.",
       "toolInvalidJson": "Os parâmetros devem ser JSON válido.",
       "schema": "Esquema",
       "schemaOn": "Esquema · Ativado",
@@ -11758,6 +11853,7 @@
       "sampleDatasetPlaceholder": "Selecione um dataset",
       "sampleSubmit": "Amostrar",
       "sampleLoadError": "Não foi possível carregar linhas desse dataset.",
+      "sampleApplied": "Amostra {index} de {total} carregada — referencie-a com {token} em uma mensagem.",
       "sampleEmpty": "Este dataset ainda não tem itens.",
       "noProviderTitle": "O Playground precisa de um provedor de LLM",
       "noProviderBody": "Conecte um provedor para executar prompts. Leva cerca de um minuto.",
@@ -11770,6 +11866,8 @@
       "reset": "Redefinir",
       "resetTitle": "Redefinir Playground",
       "resetMessage": "Limpar todas as variantes, linhas e saída e começar de novo? Isso não pode ser desfeito.",
+      "resetVariantTitle": "Limpar bancada",
+      "resetVariantMessage": "Limpar o prompt e a saída desta bancada? Isso não pode ser desfeito.",
       "scrollLeft": "Rolar para a esquerda",
       "scrollRight": "Rolar para a direita",
       "addMessage": "Mensagem",
@@ -11785,6 +11883,7 @@
       "variantSettings": "Configurações do Modelo",
       "messageToolPlaceholder": "Selecione uma Ferramenta",
       "variablesCount": "Variáveis · {count}",
+      "newValueTag": "Novo",
       "variableUsed": "Referenciada por esta variante",
       "variableUnused": "Não referenciada por esta variante — é exibida vazia aqui",
       "addVariable": "Adicionar Variável",
@@ -11833,7 +11932,9 @@
       "sampleFullView": "Visualização Completa",
       "sampleBack": "Voltar à Lista",
       "sampleInput": "Entrada",
-      "sampleExpected": "Saída Esperada"
+      "sampleExpected": "Saída Esperada",
+      "fromTrace": "Do span de rastro {id}",
+      "openInPlaygroundFailed": "Não foi possível abrir este span no Playground"
     }
   },
   "onlineEvals": {
@@ -11866,12 +11967,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "Pesquisar Configurações de Pontuação...",
-      "scoreConfigsLabel": "{count} configuração de pontuação | {count} configurações de pontuação"
+      "scoreConfigsLabel": "{count} configuração de pontuação | {count} configurações de pontuação",
+      "selectedOfTotal": "{selected} de {total} selecionados"
     },
     "scorerLibrary": {
       "noProvidersMessage": "Crie um Provedor primeiro antes de importar avaliadores de LLM Judge.",
       "searchPlaceholder": "Pesquisar Avaliadores...",
-      "scorerCountSuffix": "{count} avaliador | {count} avaliadores"
+      "scorerCountSuffix": "{count} avaliador | {count} avaliadores",
+      "selectedOfTotal": "{selected} de {total} selecionados"
     },
     "title": "Avaliações",
     "loadError": "Falha ao carregar avaliações on-line",
@@ -11988,7 +12091,8 @@
         "legendFalseCount": "falso ({count})",
         "kpis": {
           "average": "Média",
-          "p50p95": "P50/P95",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "Insalubre",
           "healthy": "Saudável",
           "trueRate": "Taxa verdadeira",
@@ -12097,8 +12201,6 @@
       "remoteCta": "Configurar Endpoint"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "Voltar para Provedores",
       "createTitle": "Criar provedor LLM",
       "editTitle": "Editar provedor LLM",
@@ -12107,7 +12209,7 @@
       "nameLabel": "Nome",
       "typeLabel": "Tipo de provedor",
       "endpointLabel": "Ponto final",
-      "endpointPlaceholder": "Endpoint personalizado opcional",
+      "endpointPlaceholder": "URL completa de completions, por exemplo, https://your-host/v1/chat/completions",
       "defaultModelLabel": "Modelo padrão",
       "availableModelsLabel": "Modelos disponíveis",
       "apiKeyLabel": "Chave de API",

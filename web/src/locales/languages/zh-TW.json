@@ -848,7 +848,9 @@
     },
     "condition": {
       "loading": "正在載入條件...",
-      "loadError": "無法讀取已儲存的條件，已重設。立即儲存將會覆寫。"
+      "loadError": "無法讀取已儲存的條件，已重設。立即儲存將會覆寫。",
+      "unknownColumn": "「{column}」不在此觸發器的 payload 中，因此此條件可能永遠不會符合。",
+      "unknownColumnSuggestion": "您是指「{suggestion}」嗎？"
     },
     "destination": {
       "createNew": "建立新目標",
@@ -2560,7 +2562,9 @@
       "title": "工作流程執行記錄",
       "edit": "編輯工作流程",
       "debugInEditor": "在編輯器中除錯",
-      "staleGraphWarning": "此工作流程自本次執行後已遭編輯 — 其執行的 {count} 個步驟已不再存在，因此此處未顯示其狀態。 | 此工作流程自本次執行後已遭編輯 — 其執行的 {count} 個步驟已不再存在，因此此處未顯示其狀態。"
+      "staleGraphWarning": "此工作流程自本次執行後已遭編輯 — 其執行的 {count} 個步驟已不再存在，因此此處未顯示其狀態。 | 此工作流程自本次執行後已遭編輯 — 其執行的 {count} 個步驟已不再存在，因此此處未顯示其狀態。",
+      "hideList": "隱藏執行清單",
+      "showList": "顯示執行清單"
     },
     "history": {
       "button": "執行記錄",
@@ -2576,10 +2580,21 @@
       "error": "錯誤",
       "success": "成功",
       "failed": "失敗",
+      "testRun": "測試執行",
+      "runType": "類型",
+      "testRunTooltip": "從編輯器啟動。目標步驟會實際派送。",
+      "showTestRuns": "顯示 {count} 次測試執行",
+      "hideTestRuns": "隱藏測試執行",
       "open": "歷史",
       "openFullView": "開啟完整執行檢視",
       "loadError": "載入執行記錄時發生錯誤",
-      "loadRunError": "載入此次執行時發生錯誤"
+      "loadRunError": "載入此次執行時發生錯誤",
+      "retry": "重試",
+      "retryTooltip": "以記錄的輸入重新執行此失敗的執行",
+      "retryTitle": "要重試此執行嗎？",
+      "retryMessage": "這會以失敗執行所記錄的輸入建立新的執行。目標步驟會實際派送。",
+      "retryStarted": "重試已開始，會以新執行的形式出現在清單中。",
+      "retryError": "無法重試此執行"
     },
     "edit": "編輯",
     "view": "檢視",
@@ -2596,7 +2611,9 @@
     "triggerRequired": "需要觸發器",
     "addStepRequired": "在觸發器之後至少新增一個步驟",
     "connectAllNodes": "儲存前連接所有節點",
+    "branchPathsRequired": "將每個分支路徑連接至一個步驟 | 1 個分支步驟的連線不符合其路徑。請開啟該步驟、定義路徑，然後重新連接。 | {count} 個分支步驟的連線不符合其路徑",
     "finishStepsBeforePublish": "{count} 個步驟需要在發布前設定 — 已在畫布上標示。 | {count} 個步驟需要在發布前設定 — 已在畫布上標示。",
+    "noChangesToPublish": "沒有可發佈的變更，此工作流程已與已發佈版本一致。",
     "draft": "草稿",
     "saveDraft": "儲存為草稿",
     "publish": "發布",
@@ -2643,7 +2660,7 @@
     "loadError": "無法載入工作流程",
     "deleteNode": "刪除節點",
     "deleteNodeTitle": "刪除步驟",
-    "deleteNodeConfirm": "您確定要刪除此步驟嗎？此動作無法復原。",
+    "deleteNodeConfirm": "您確定要刪除此步驟嗎？您可以復原此操作。",
     "namePlaceholder": "未命名的工作流程",
     "renameHint": "按一下以重新命名此工作流程",
     "editMode": "編輯工作流程",
@@ -2656,11 +2673,29 @@
       "runFromBeginning": "開頭（觸發）",
       "runFromNote": "只有從此處往下的步驟會執行。",
       "inputLabel": "範例輸入",
+      "source": {
+        "sample": "產生的範例",
+        "run": "來自執行：{run}",
+        "edited": "由您編輯"
+      },
+      "revertInput": "還原",
+      "useRunInput": "使用來自執行的輸入…",
+      "lastTestRun": "上次測試執行（此分頁）",
+      "runHasNoInput": "該執行沒有為此步驟儲存任何輸入。",
       "invalidJson": "輸入有效的記錄 JSON 陣列。",
       "resultHint": "執行後，每個步驟會在畫布上顯示勾號或錯誤圖示。",
+      "rehearsalOnly": "僅在測試執行中通過 — 是針對範例 payload 的預演，並非已發佈工作流程正常運作的證明。",
       "notVerified": "沒有記錄到達此步驟 — 上游條件將它們過濾掉，或較早的步驟發生錯誤。",
+      "notConfigured": "此步驟尚未設定，因此在此次執行中沒有執行任何動作。請設定後再重新測試。",
+      "recordedFailure": "此步驟在上一次記錄的執行中失敗。",
+      "recordsUnavailable": "記錄於先前的執行中 — 重新執行測試以檢視記錄。",
+      "dirtySelf": "自此步驟上次執行後，設定已變更。請重新測試步驟。",
+      "dirtyUpstream": "此步驟執行後，先前步驟已變更。請重新測試步驟。",
       "run": "執行測試",
       "runError": "無法執行測試。",
+      "suppressDestinations": "不要實際傳送至目標",
+      "suppressDestinationsHint": "目標步驟會解析路由，但不會傳送任何內容。",
+      "dispatchWarning": "此測試為實際執行：此執行會真的傳送至 {destinations}。",
       "stepResult": {
         "viewHint": "按一下以檢視輸入／輸出",
         "input": "輸入",
@@ -2686,8 +2721,10 @@
         "status": {
           "ok": "通過",
           "error": "錯誤",
-          "skipped": "沒有記錄"
-        }
+          "skipped": "沒有記錄",
+          "noMatch": "不符合"
+        },
+        "suppressed": "已抑制 — 未傳送至真實目標"
       }
     },
     "linkAlerts": {
@@ -2720,6 +2757,7 @@
       "kindLogic": "邏輯",
       "kindAction": "動作",
       "condition": "條件",
+      "branch": "分支",
       "function": "函數",
       "sendToDestination": "目標",
       "configComingSoon": "{node} 設定將在後續步驟中出現",
@@ -2727,7 +2765,20 @@
       "sectionDestination": "目標",
       "stepSearchPlaceholder": "搜尋步驟...",
       "stepNoMatch": "沒有符合搜尋條件的步驟。",
-      "conditionDesc": "依規則分支",
+      "conditionDesc": "僅在規則相符時繼續",
+      "branchDesc": "將每筆記錄路由至第一個相符的路徑",
+      "branchCaseLabel": "路徑名稱（選填）",
+      "branchCaseLabelPlaceholder": "例如：高嚴重性",
+      "branchAddCase": "新增路徑",
+      "branchRemoveCase": "移除路徑",
+      "branchMoveUp": "上移路徑",
+      "branchMoveDown": "下移路徑",
+      "branchPathNumber": "路徑 {index}",
+      "branchElseTitle": "其他所有",
+      "branchElseHint": "不符合上述任何路徑的記錄會從此處離開。",
+      "branchNoteTitle": "分支指南",
+      "branchNoteFirstMatch": "路徑會由上而下依序檢查，第一個符合者優先，因此每筆記錄只會經由恰好一條路徑離開。",
+      "branchNoteUnwired": "未連接任何節點的路徑會直接丟棄其記錄。",
       "functionDesc": "使用函數重新調整負載",
       "destinationDesc": "傳送至目標",
       "triggerBody": "當關聯警示觸發時執行",
@@ -2775,11 +2826,14 @@
       "enable": "啟用步驟",
       "disabledBadge": "已停用",
       "incompleteBadge": "稍後設定",
+      "unwiredBadge": "未連接的路徑",
       "unsavedFnTitle": "未儲存的函式變更",
       "unsavedFnMessage": "此步驟包含尚未儲存至您的函式庫的函式程式碼。您可以儲存、捨棄變更，或繼續編輯。",
       "unsavedFnSave": "儲存函式",
       "unsavedFnDiscard": "捨棄變更",
-      "unsavedFnKeep": "繼續編輯"
+      "unsavedFnKeep": "繼續編輯",
+      "destination": "目標",
+      "branchPathUnset": "{name} · 未設定規則"
     },
     "commonFieldsAbove": "上方的通用欄位",
     "canvas": {
@@ -2803,11 +2857,15 @@
       "openStep": "開啟 {name}",
       "runToView": "執行測試以檢視此資料。",
       "noBranchItems": "此分支上沒有項目。",
+      "forwardedCount": "已轉發 {out} / {total} 筆記錄 | 已轉發 {out} / {total} 筆記錄",
+      "noMatchForwarded": "無符合項目 — 已轉發 0 / {total} 筆記錄 | 無符合項目 — 已轉發 0 / {total} 筆記錄",
+      "branchDropped": "{count} 筆記錄未符合任何路徑 — 已丟棄 | {count} 筆記錄未符合任何路徑 — 已丟棄",
       "noUpstream": "沒有上游步驟。",
       "noRunYet": "尚未執行。",
       "runLabel": "執行",
       "switchRun": "切換執行",
       "notInRun": "此步驟未包含在此次執行中。",
+      "noRunData": "此次執行未儲存步驟資料。",
       "runTest": "執行測試",
       "noItems": "沒有項目",
       "itemsCount": "{count} 個項目 | {count} 個項目",
@@ -2817,8 +2875,14 @@
       "executeStep": "執行步驟",
       "sample": "樣本",
       "editStep": "編輯步驟",
+      "readOnlyRun": "您正在檢視先前的執行，因此無法在此變更此步驟的設定。",
+      "readOnlyRunEdit": "在工作流程中編輯",
       "testInputHint": "測試輸入 — 編輯後執行步驟。",
-      "noRunsList": "尚無執行記錄。"
+      "noRunsList": "尚無執行記錄。",
+      "resetInput": "重設為範例",
+      "eventPager": "{n} / {total}",
+      "nextEvent": "下一個事件",
+      "prevEvent": "上一個事件"
     },
     "runOverlay": {
       "banner": "顯示過去某次執行 ({run}) 的步驟資料。您可以自由編輯 — 此執行永遠不會被變更。",
@@ -2845,6 +2909,8 @@
       "noConfig": "無配置",
       "functionLabel": "函式",
       "destinationLabel": "目標",
+      "branchPathsLabel": "路徑",
+      "branchNoRule": "未設定規則",
       "destinationUnsupported": "不支援的類型",
       "destinationMissing": "此目標已不存在或無法讀取。",
       "headersLabel": "標頭",
@@ -3603,29 +3669,30 @@
       "crossLinkBody": "{brand} 公開 {product} (MCP) 端點，以便像 {client1}、{client2} 和 {client3} 這樣的 AI 用戶端可以查詢並對此組織採取動作。設定和憑證位於 IAM 中。",
       "crossLinkCta": "開啟 MCP 設定",
       "tagline": "透過 {product} (MCP) 將 {client1}、{client2}、{client3} 及其他 AI 用戶端連線至此組織。",
-      "endpointLabel": "MCP 端點",
-      "authLabel": "1. 驗證",
-      "clientLabel": "2. 選擇用戶端",
-      "configLabel": "3. 新增設定",
+      "connectLabel": "端點與驗證",
+      "connectHint": "將您的 MCP 用戶端指向此 URL，然後選擇其登入方式。",
+      "configLabel": "新增設定",
+      "configHint": "選擇您的用戶端，然後將設定複製到對應位置。",
       "auth": {
         "oauth": "OAuth — 登入（建議使用）",
         "token": "存取權杖",
         "oauthNote": "無需管理憑證：您的 MCP 用戶端會開啟瀏覽器進行登入，存取範圍受限於您現有的權限。只要您的用戶端支援 OAuth，即可使用此方式。"
       },
       "credential": {
-        "quickStartTitle": "快速開始 — 您的帳戶",
-        "quickStartBody": "程式碼片段使用您自己的憑證，這會帶有您的完整權限。針對生產環境，請改為產生專用的唯讀憑證。",
-        "generate": "產生唯讀憑證",
-        "created": "已建立唯讀憑證",
+        "quickStartTitle": "尚無 Token",
+        "quickStartBody": "下方的程式碼片段帶有預留位置的標頭。請為此 MCP 用戶端產生專用 Token，或將現有的服務帳戶 Token 貼到該處。",
+        "generate": "產生專用 Token",
+        "created": "已建立專用 Token",
         "shownOnce": "適用於 {email}。請立即複製 — 權杖僅顯示一次，下方的程式碼片段現在會使用它。",
         "download": "下載",
         "manage": "管理 / 撤銷",
-        "readonlyWarn": "帳戶已建立，但無法自動套用唯讀角色 — 請在服務帳戶中檢視其權限。",
+        "readonlyWarn": "帳戶已建立，但無法加入 {role} 角色 — 在 IAM 中指派角色前，它沒有任何權限。",
+        "readonlyNote": "透過 {role} 角色限定為唯讀 — 請在 IAM › 角色 中檢視或擴充。",
+        "rbacNote": "此部署中已停用 RBAC，因此此 Token 無法限定為唯讀 — 它與此組織的任何其他憑證擁有一樣的存取權限。",
         "error": "無法建立憑證。請重試，或在 IAM 中手動建立服務帳戶。"
       },
       "securityTitle": "使用專用、最小權限的憑證",
-      "securityBody": "權杖預設為您自己的帳戶憑證。針對生產環境，請在上方產生唯讀憑證（或建立限定的服務帳戶），切勿將權杖提交至原始碼控制。",
-      "docsCta": "閱讀完整的 MCP 文件",
+      "securityBody": "請給予 MCP 用戶端一個限定範圍的唯讀服務帳戶，而不是您自己的帳戶憑證，而且絕不要將其 Token 提交至版本控制。",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3734,7 +3801,7 @@
       "dynamodbPipelineTitle": "將 DynamoDB 串流至 Firehose",
       "dynamodbTagline": "透過 Kinesis Firehose 將 DynamoDB 項目變更串流到 OpenObserve。",
       "ec2IamNote": "需要在執行個體上具備包含 ec2:DescribeTags 和 ec2:DescribeInstances 的 IAM 角色，代理程式才能讀取 Name 標籤並將其用作主機識別碼。",
-      "enableSessionReplayDesc": "Session Replay 是**獨立**於 RUM 設定的，且**不會**繼承 `rumConfiguration.customEndpoint`。它也不會附加路徑，因此需要下方的完整 `/replay` URL。設定錯誤通常是 RUM 事件有收到但 replay 卻沒收到的主要原因。",
+      "enableSessionReplayDesc": "工作階段重播與 RUM **分開**設定，且 **不會** 繼承 `rumConfiguration.customEndpoint`。請在下方為它提供自己的基本 URL，格式與 RUM/Logs 的相同。橋接器會自行附加 `/replay`，因此您 **不要** 自行新增：手動附加 `/replay` 會導致路徑重複附加，每次上傳都會被 401 拒絕，這通常是 RUM 事件有送達但重播卻從未出現的原因。",
       "enableSessionReplayTitle": "啟用 Session Replay",
       "endpointLabel": "端點",
       "externalEndpointVariant": "外部端點",
@@ -3936,18 +4003,16 @@
       "rnInitNote": "盡早初始化——提供者必須在您要測量的畫面掛載之前完成掛載。",
       "rnInstallNote": "session-replay 和 navigation 套件為選用——如果您不需要畫面錄製或自動檢視追蹤，請移除其中一行。",
       "rnNavigationNote": "沒有這個，您仍然可以手動記錄檢視，使用 `O2Rum.startView()` / `O2Rum.stopView()`。",
-      "rnSessionReplayNote": "React Native 上的 Session Replay 目前已在 Android 上驗證。在 iOS 上，SDK 會將自己的路徑附加到這個 URL，因此 replay 上傳尚無法送達 OpenObserve——RUM、日誌和當機不受影響。",
-      "rnTrouble401A": "`clientToken` 是此組織的 **RUM token**，而不是擷取密碼。如果它已輪換，請從此頁面的頁首重新產生，然後重建應用程式。",
+      "rnSessionReplayNote": "工作階段重播自 SDK 0.1.2 起已在 iOS 與 Android 上通過驗證。片段會在上傳前先批次處理，因此請預期會有短暫延遲後才顯示。",
+      "rnTrouble401A": "有兩個常見原因。首先，`clientToken` — 它必須是此組織的 **RUM Token**，而非擷取通行碼；若已輪替，請從此頁面的標頭重新產生並重建應用程式。其次，特別針對工作階段重播：自行將 `/replay` 附加到 `customEndpoint` 會重複附加路徑（橋接器已經加上），後端也會以 401 拒絕 — 請改傳不含 `/replay` 的基本 URL。",
       "rnTrouble401Q": "請求回傳 401 或 403",
       "rnTroubleCleartextA": "Android 預設封鎖明文流量。對於 `http://` 端點，請在 SDK 設定中設定 `additionalConfiguration: {config}`，並在應用程式的網路安全性設定中為您的主機允許明文流量。在本地開發之外，請優先使用 HTTPS。",
       "rnTroubleCleartextQ": "Android release/debug 建置不會透過純 HTTP 傳送任何內容",
       "rnTroubleIosBuildA": "新增套件後，執行 `npx pod-install`（或 `cd ios && pod install`），然後從 Xcode 或 `npx react-native run-ios` 重新建置。僅重新載入 Metro 將無法取得新的原生模組。",
       "rnTroubleIosBuildQ": "iOS 建置失敗或缺少原生模組",
-      "rnTroubleIosReplayA": "目前 React Native SDK 的已知限制：在 iOS 上，它會將自己的路徑附加到 session-replay 的 `customEndpoint`，因此上傳會錯過 OpenObserve 的 `/replay` 路由。Android 會直接使用 URL 並且正常運作。RUM 事件、日誌和當機回報在兩個平台上均不受影響。",
-      "rnTroubleIosReplayQ": "Session replay 在 Android 上可運作，但在 iOS 上無法運作",
       "rnTroubleMaskedA": "那是預設值。`textAndInputPrivacyLevel`、`imagePrivacyLevel` 和 `touchPrivacyLevel` 全部預設為最嚴格的設定（`MASK_ALL`）。只在您的隱私權政策允許的範圍內放寬它們——`MASK_SENSITIVE_INPUTS` 會隱藏密碼和卡片欄位，同時顯示其餘內容。",
       "rnTroubleMaskedQ": "Replay 會呈現，但所有內容都被遮罩",
-      "rnTroubleNoReplayA": "幾乎總是端點的問題。Session Replay 是單獨設定的，**不會**繼承 `rumConfiguration.customEndpoint`；如果未設定，它會預設為空字串，上傳不會送到任何您可以看到的地方。請明確傳遞完整 URL：`customEndpoint: '{replayUrl}'`——請注意結尾的 `/replay`，這是核心 SDK 的基礎 URL 所沒有的。",
+      "rnTroubleNoReplayA": "幾乎都是端點的問題。工作階段重播是分開設定的，且 **不會** 繼承 `rumConfiguration.customEndpoint`；若未設定，它預設為空字串，上傳內容不會送到任何您能看到的地方。請明確傳入基本 URL：`customEndpoint: '{replayUrl}'` — 橋接器會自行加上 `/replay`（自 SDK 0.1.2 起），所以請勿自行新增該後綴，否則上傳會改為被 401 拒絕。",
       "rnTroubleNoReplayQ": "RUM 事件會送達，但沒有 session replay",
       "rnTroubleNothingArrivesA": "請先檢查主機——請參閱上面的修正方塊。`localhost` 解析為裝置本身，而不是您的機器：在 Android 模擬器上使用 `10.0.2.2`，在 iOS 模擬器上使用 `localhost`，在實體裝置上使用您機器的 LAN IP。",
       "rnTroubleNothingArrivesQ": "從模擬器或裝置上完全沒有任何內容送達",
@@ -6429,6 +6494,7 @@
       "firing": "觸發中",
       "ok": "正常",
       "error": "錯誤",
+      "pending": "等待中",
       "skipped": "已跳過",
       "unknown": "未知",
       "flapping": "抖動",
@@ -6455,6 +6521,7 @@
       "templateRequired": "範本為必填項！",
       "validEmails": "請新增有效的電子郵件！",
       "silenceNonNegative": "通知靜音應大於或等於 0",
+      "pendingPeriodNonNegative": "等待期間應大於或等於 0",
       "periodPositive": "週期應大於 0",
       "destinationRequired": "至少需要一個目標。",
       "thresholdPositive": "閾值應大於 0",
@@ -6465,6 +6532,7 @@
       "timestampAliasBanned": "{column} 不能用作資料行別名。請改用 time_bucket。",
       "credentialFieldRequired": "{field} 為必填項",
       "minimumFrequency": "最低頻率應為 {minutes} 分鐘",
+      "pendingPeriodNotMultiple": "不是檢查頻率 ({minutes} 分鐘) 的倍數 — 警示最多可能多等一個間隔才觸發。",
       "nameMandatoryString": "名稱為必填，且應為有效的字串",
       "orgIdMismatch": "組織 ID 應等於 {orgId}",
       "streamTypeMandatory": "串流類型為必填，且應為下列之一：logs、metrics、traces",
@@ -6670,6 +6738,9 @@
       "cooldown": "冷卻",
       "betweenAlerts": "警示之間",
       "noCooldown": "無冷卻",
+      "pendingPeriod": "等待",
+      "beforeFiring": "{duration} 後觸發",
+      "firesImmediately": "立即觸發",
       "minuteCount": "{n} 分鐘 | {n} 分鐘",
       "hourCount": "{n} 小時 | {n} 小時",
       "timeRangeCount": "{n} 個時間範圍 ({ranges}) | {n} 個時間範圍 ({ranges})",
@@ -6686,6 +6757,7 @@
         "conditionOther": "{threshold} 個事件（{operator}）",
         "alertMeWhenMinutes": "當 {condition} 在任意 {count} 分鐘內發生時提醒我",
         "alertMeWhenHours": "當 {condition} 在任意 {count} 小時內發生時提醒我",
+        "pendingPeriodClause": ", 在等待 {duration} 後",
         "cooldownClause": "，但每 {cooldown} 不超過一次",
         "defaultConditions": "當設定的條件被滿足時發出警示"
       }
@@ -7150,6 +7222,8 @@
       "writeQueryHint": "撰寫查詢以開始",
       "sqlEditorHint": "使用「開啟完整編輯器」來執行和驗證",
       "checkEvery": "檢查間隔",
+      "pendingPeriod": "等待",
+      "pendingPeriodTooltip": "在觸發前等待這段時間，好讓條件必須持續成立，而不是因單一不良間隔而觸發。",
       "cronExpressionPlaceholder": "0 */10 * * * *",
       "timezonePlaceholder": "時區",
       "onThese": "在這些",
@@ -10628,6 +10702,10 @@
         "success": "已加入資料集",
         "loadError": "無法載入資料集",
         "error": "無法將此項目加入資料集"
+      },
+      "playground": {
+        "button": "在 Playground 中開啟",
+        "hint": "將此呼叫的訊息載入 Playground，以編輯並重新執行"
       }
     },
     "discovery": {
@@ -10995,7 +11073,10 @@
         "columns": {
           "input": "輸入",
           "output": "輸出",
-          "latency": "延遲"
+          "trials": "試驗",
+          "dispersion": "離散度",
+          "latency": "延遲",
+          "p50Latency": "P50 延遲"
         },
         "retryFailed": "重試失敗的槽位",
         "loadError": "無法載入實驗",
@@ -11033,8 +11114,12 @@
         },
         "slotStatus": "狀態",
         "searchPlaceholder": "搜尋輸入或輸出",
+        "searchInputPlaceholder": "搜尋輸入內容",
         "statusFilter": "狀態",
-        "statusFilterAll": "所有狀態"
+        "statusFilterAll": "所有狀態",
+        "sortByDispersion": "依離散度排序",
+        "highDispersionBadge": "高",
+        "trialNumber": "試驗 {n}"
       },
       "rowDetail": {
         "fallbackTitle": "實驗列",
@@ -11125,10 +11210,13 @@
           "trial": "試驗 {index}",
           "noContent": "未提供",
           "noOutput": "無輸出",
-          "absentSide": "此次執行中不存在"
+          "absentSide": "此次執行中不存在",
+          "enterFullscreen": "進入全螢幕",
+          "exitFullscreen": "退出全螢幕"
         }
       },
-      "selectionCount": "已選取 {count}/2"
+      "selectionCount": "已選取 {count}/2",
+      "clearBaseline": "清除基準線"
     },
     "datasets": {
       "listTitle": "資料集",
@@ -11197,7 +11285,7 @@
           "expectedOutput": "預期輸出",
           "source": "來源",
           "tags": "標籤",
-          "version": "版本",
+          "version": "資料集版本",
           "actions": "操作"
         },
         "deleteItemTitle": "刪除項目",
@@ -11211,7 +11299,7 @@
             "item": "項目",
             "versions": "版本"
           },
-          "versionPill": "{count} 版本 | {count} 版本",
+          "versionPill": "{count} 個版本 | {count} 個版本",
           "sourceSection": "來源",
           "sourceTrace": "追蹤",
           "sourceSpan": "Span",
@@ -11676,8 +11764,6 @@
       "title": "遊樂場",
       "runAll": "全部執行",
       "runAllTooltip": "執行每個變體",
-      "running": "執行中… ({done}/{total})",
-      "stop": "停止",
       "recentDrafts": "近期草稿",
       "recentDraftsSection": "此瀏覽器 · 最近 10 個",
       "draftVersus": "對比",
@@ -11686,6 +11772,7 @@
       "fromExperiment": "複製自實驗 {name}",
       "variables": "變數",
       "noVariables": "訊息中沒有 {token} — 新增一個以參數化輸入。",
+      "unusedSampledValue": "尚未在訊息中引用：{tokens}。請在訊息中輸入它來使用。",
       "variablePlaceholder": "給 {name} 的值",
       "addExpected": "+ 預期輸出",
       "expectedLabel": "預期",
@@ -11700,8 +11787,9 @@
       "variant": "變體 {label}",
       "variantLimit": "測試台最多容納 {max} 個變體。",
       "duplicateVariant": "複製變體",
+      "resetVariant": "重設測試台",
       "removeVariant": "移除變體",
-      "runVariant": "執行此變體",
+      "runVariant": "執行",
       "createExperiment": "建立實驗",
       "modelPlaceholder": "選擇或輸入模型",
       "providerUnknown": "未知提供者",
@@ -11727,6 +11815,13 @@
       "toolsEmpty": "未定義任何工具。",
       "toolCall": "工具呼叫",
       "toolCallNote": "執行到此停止 — 遊樂場不會執行工具。",
+      "toolCallAddToMessages": "新增至訊息",
+      "toolCallContinueTooltip": "將此呼叫新增至對話，並開啟其結果欄位。",
+      "toolCallAddedToMessages": "工具呼叫已新增 — 輸入工具結果並重新執行。",
+      "toolArgumentsPlaceholder": "工具引數 (JSON)",
+      "toolResultPlaceholder": "輸入工具結果…",
+      "toolResultRequired": "請在上方輸入工具結果以繼續。",
+      "toolSetupRequired": "請選取工具並提供其引數以繼續。",
       "toolInvalidJson": "參數必須是有效的 JSON。",
       "schema": "結構描述",
       "schemaOn": "結構描述 · 開啟",
@@ -11753,6 +11848,7 @@
       "sampleDatasetPlaceholder": "選擇資料集",
       "sampleSubmit": "取樣",
       "sampleLoadError": "無法從該資料集載入資料列。",
+      "sampleApplied": "已載入第 {index} 個樣本（共 {total} 個）— 在訊息中使用 {token} 引用它。",
       "sampleEmpty": "此資料集尚無任何項目。",
       "noProviderTitle": "Playground 需要 LLM 提供者",
       "noProviderBody": "連線提供者以執行提示。大約需要一分鐘。",
@@ -11765,6 +11861,8 @@
       "reset": "重設",
       "resetTitle": "重設 Playground",
       "resetMessage": "清除所有變體、資料列和輸出並重新開始？此操作無法復原。",
+      "resetVariantTitle": "重設測試台",
+      "resetVariantMessage": "清除此測試台的提示和輸出？此操作無法復原。",
       "scrollLeft": "向左捲動",
       "scrollRight": "向右捲動",
       "addMessage": "訊息",
@@ -11780,6 +11878,7 @@
       "variantSettings": "模型設定",
       "messageToolPlaceholder": "選擇工具",
       "variablesCount": "變數 · {count}",
+      "newValueTag": "新",
       "variableUsed": "由此變體引用",
       "variableUnused": "未被此變體引用 — 在此呈現為空白",
       "addVariable": "新增變數",
@@ -11828,7 +11927,9 @@
       "sampleFullView": "完整檢視",
       "sampleBack": "返回清單",
       "sampleInput": "輸入",
-      "sampleExpected": "預期輸出"
+      "sampleExpected": "預期輸出",
+      "fromTrace": "來自追蹤 Span {id}",
+      "openInPlaygroundFailed": "無法在 Playground 中開啟此 Span"
     }
   },
   "onlineEvals": {
@@ -11861,12 +11962,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "搜尋評分設定...",
-      "scoreConfigsLabel": "{count} 個評分設定 | {count} 個評分設定"
+      "scoreConfigsLabel": "{count} 個評分設定 | {count} 個評分設定",
+      "selectedOfTotal": "已選取 {total} 個中的 {selected} 個"
     },
     "scorerLibrary": {
       "noProvidersMessage": "匯入 LLM Judge 評分器前，請先建立提供者。",
       "searchPlaceholder": "搜尋評分器...",
-      "scorerCountSuffix": "{count} 個評分器 | {count} 個評分器"
+      "scorerCountSuffix": "{count} 個評分器 | {count} 個評分器",
+      "selectedOfTotal": "已選取 {total} 個中的 {selected} 個"
     },
     "title": "評估",
     "loadError": "載入線上評估失敗",
@@ -11983,7 +12086,8 @@
         "legendFalseCount": "假 ({count})",
         "kpis": {
           "average": "平均值",
-          "p50p95": "P50 / P95",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "不健康",
           "healthy": "健康",
           "trueRate": "真實率",
@@ -12092,8 +12196,6 @@
       "remoteCta": "設定端點"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "返回供應商",
       "createTitle": "建立 LLM 供應商",
       "editTitle": "編輯 LLM 供應商",
@@ -12102,7 +12204,7 @@
       "nameLabel": "名稱",
       "typeLabel": "供應商類型",
       "endpointLabel": "端點",
-      "endpointPlaceholder": "選用的自訂端點",
+      "endpointPlaceholder": "完整的 completions URL，例如 https://your-host/v1/chat/completions",
       "defaultModelLabel": "預設模型",
       "availableModelsLabel": "可用模型",
       "apiKeyLabel": "API 金鑰",

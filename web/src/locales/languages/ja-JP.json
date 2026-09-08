@@ -848,7 +848,9 @@
     },
     "condition": {
       "loading": "条件を読み込み中...",
-      "loadError": "保存された条件を読み取れなかったため、リセットされました。今保存すると上書きされます。"
+      "loadError": "保存された条件を読み取れなかったため、リセットされました。今保存すると上書きされます。",
+      "unknownColumn": "「{column}」はこのトリガーのペイロードに含まれていないため、この条件が一致しない可能性があります。",
+      "unknownColumnSuggestion": "もしかして「{suggestion}」ですか？"
     },
     "destination": {
       "createNew": "新しい宛先を作成",
@@ -2560,7 +2562,9 @@
       "title": "ワークフロー実行",
       "edit": "ワークフローを編集",
       "debugInEditor": "エディタでデバッグ",
-      "staleGraphWarning": "このワークフローはこの実行後に編集されました — 実行した{count}個のステップはもう存在しないため、ここではステータスが表示されません。 | このワークフローはこの実行後に編集されました — 実行した{count}個のステップはもう存在しないため、ここではステータスが表示されません。"
+      "staleGraphWarning": "このワークフローはこの実行後に編集されました — 実行した{count}個のステップはもう存在しないため、ここではステータスが表示されません。 | このワークフローはこの実行後に編集されました — 実行した{count}個のステップはもう存在しないため、ここではステータスが表示されません。",
+      "hideList": "実行リストを非表示",
+      "showList": "実行リストを表示"
     },
     "history": {
       "button": "実行",
@@ -2576,10 +2580,21 @@
       "error": "エラー",
       "success": "成功",
       "failed": "失敗",
+      "testRun": "テスト実行",
+      "runType": "種別",
+      "testRunTooltip": "エディターから開始されました。宛先ステップは実際に配信されます。",
+      "showTestRuns": "{count} 件のテスト実行を表示",
+      "hideTestRuns": "テスト実行を非表示",
       "open": "履歴",
       "openFullView": "すべての実行ビューを開く",
       "loadError": "実行の読み込み中にエラーが発生しました",
-      "loadRunError": "この実行の読み込み中にエラーが発生しました"
+      "loadRunError": "この実行の読み込み中にエラーが発生しました",
+      "retry": "再試行",
+      "retryTooltip": "記録された入力から、この失敗した実行を再実行します",
+      "retryTitle": "この実行を再試行しますか？",
+      "retryMessage": "これにより、失敗した実行が記録した入力から新しい実行が作成されます。宛先ステップは実際に配信されます。",
+      "retryStarted": "再試行を開始しました。新しい実行としてリストに表示されます。",
+      "retryError": "この実行を再試行できませんでした。"
     },
     "edit": "編集",
     "view": "表示",
@@ -2596,7 +2611,9 @@
     "triggerRequired": "トリガーが必要です",
     "addStepRequired": "トリガーの後に少なくとも1つのステップを追加してください",
     "connectAllNodes": "保存する前にすべてのノードを接続してください",
+    "branchPathsRequired": "各分岐パスをステップに接続してください | 1 つの分岐ステップで、接続がパスと一致していません。そのステップを開いてパスを定義し、接続し直してください。 | {count} 個の分岐ステップで、接続がパスと一致していません。",
     "finishStepsBeforePublish": "{count} ステップは公開前にセットアップが必要です — キャンバス上でハイライトされています。 | {count} ステップは公開前にセットアップが必要です — キャンバス上でハイライトされています。",
+    "noChangesToPublish": "公開する変更はありません — このワークフローは公開済みバージョンと一致しています。",
     "draft": "下書き",
     "saveDraft": "下書きとして保存",
     "publish": "公開",
@@ -2643,7 +2660,7 @@
     "loadError": "ワークフローを読み込めません",
     "deleteNode": "ノードを削除",
     "deleteNodeTitle": "ステップを削除",
-    "deleteNodeConfirm": "このステップを削除してもよろしいですか？この操作は元に戻せません。",
+    "deleteNodeConfirm": "このステップを削除してもよろしいですか？元に戻せます。",
     "namePlaceholder": "無題のワークフロー",
     "renameHint": "クリックしてこのワークフローを名前変更",
     "editMode": "ワークフローを編集",
@@ -2656,11 +2673,29 @@
       "runFromBeginning": "開始（トリガー）",
       "runFromNote": "ここから下のステップのみ実行されます。",
       "inputLabel": "サンプル入力",
+      "source": {
+        "sample": "生成されたサンプル",
+        "run": "実行 {run} から",
+        "edited": "あなたによる編集"
+      },
+      "revertInput": "元に戻す",
+      "useRunInput": "実行からの入力を使用…",
+      "lastTestRun": "最後のテスト実行（このタブ）",
+      "runHasNoInput": "その実行には、このステップの入力が保存されていません。",
       "invalidJson": "有効なJSON配列のレコードを入力してください。",
       "resultHint": "実行後、各ステップにチェックまたはエラーアイコンがキャンバスに表示されます。",
+      "rehearsalOnly": "テスト実行のみで成功しました — サンプルペイロードによるリハーサルであり、公開済みワークフローが動作する証拠にはなりません。",
       "notVerified": "このステップにレコードが到達しませんでした — 上流の条件で除外されたか、以前のステップでエラーが発生しました。",
+      "notConfigured": "このステップは設定されていないため、この実行では何も行いませんでした。設定してから再テストしてください。",
+      "recordedFailure": "このステップは、最後に記録された実行で失敗しました。",
+      "recordsUnavailable": "以前の実行で記録されました。記録を確認するには、テストを再実行してください。",
+      "dirtySelf": "このステップが最後に実行されてから設定が変更されています。再テストしてください。",
+      "dirtyUpstream": "上流のステップがこのステップの実行後に変更されました。再テストしてください。",
       "run": "テスト実行",
       "runError": "テストを実行できません。",
+      "suppressDestinations": "実際には宛先に送信しない",
+      "suppressDestinationsHint": "宛先ステップはルーティングを解決しますが、何も配信されません。",
+      "dispatchWarning": "ライブテストです：この実行は {destinations} に実際に配信されます。",
       "stepResult": {
         "viewHint": "クリックして入力/出力を表示",
         "input": "入力",
@@ -2686,8 +2721,10 @@
         "status": {
           "ok": "成功",
           "error": "エラー",
-          "skipped": "レコードなし"
-        }
+          "skipped": "レコードなし",
+          "noMatch": "一致なし"
+        },
+        "suppressed": "抑制済み — 実際の宛先には送信されませんでした"
       }
     },
     "linkAlerts": {
@@ -2720,6 +2757,7 @@
       "kindLogic": "ロジック",
       "kindAction": "アクション",
       "condition": "条件",
+      "branch": "分岐",
       "function": "関数",
       "sendToDestination": "宛先",
       "configComingSoon": "{node} の設定は後続のステップで行います",
@@ -2727,7 +2765,20 @@
       "sectionDestination": "宛先",
       "stepSearchPlaceholder": "ステップを検索...",
       "stepNoMatch": "検索に一致するステップがありません。",
-      "conditionDesc": "ルールで分岐",
+      "conditionDesc": "ルールが一致した場合のみ続行します",
+      "branchDesc": "各レコードを、最初に一致するパスに振り分けます",
+      "branchCaseLabel": "パス名（オプション）",
+      "branchCaseLabelPlaceholder": "例: 重大度高",
+      "branchAddCase": "パスを追加",
+      "branchRemoveCase": "パスを削除",
+      "branchMoveUp": "パスを上へ移動",
+      "branchMoveDown": "パスを下へ移動",
+      "branchPathNumber": "パス {index}",
+      "branchElseTitle": "それ以外",
+      "branchElseHint": "上記のどのパスにも一致しないレコードは、ここから出力されます。",
+      "branchNoteTitle": "分岐のガイドライン",
+      "branchNoteFirstMatch": "パスは上から下の順にチェックされ、最初に一致したパスが優先されます。そのため、各レコードは必ず1つのパスだけを通って出力されます。",
+      "branchNoteUnwired": "何も接続されていないパスは、そのレコードを単に破棄します。",
       "functionDesc": "関数でペイロードを再整形",
       "destinationDesc": "宛先に送信",
       "triggerBody": "関連付けられたアラートが発生したときに実行",
@@ -2775,11 +2826,14 @@
       "enable": "ステップを有効にする",
       "disabledBadge": "無効",
       "incompleteBadge": "後で設定",
+      "unwiredBadge": "未接続のパス",
       "unsavedFnTitle": "未保存の関数変更",
       "unsavedFnMessage": "このステップにはライブラリに保存されていない関数コードがあります。保存するか、変更を破棄するか、編集を続けてください。",
       "unsavedFnSave": "関数を保存",
       "unsavedFnDiscard": "変更を破棄",
-      "unsavedFnKeep": "編集を続ける"
+      "unsavedFnKeep": "編集を続ける",
+      "destination": "宛先",
+      "branchPathUnset": "{name} · ルール未設定"
     },
     "commonFieldsAbove": "上記の共通フィールド",
     "canvas": {
@@ -2803,11 +2857,15 @@
       "openStep": "{name} を開く",
       "runToView": "このデータを表示するにはテストを実行してください。",
       "noBranchItems": "このブランチにはアイテムがありません。",
+      "forwardedCount": "{out} / {total} 件のレコードを転送済み | {out} / {total} 件のレコードを転送済み",
+      "noMatchForwarded": "一致なし — 0 / {total} 件のレコードを転送済み | 一致なし — 0 / {total} 件のレコードを転送済み",
+      "branchDropped": "どのパスにも一致しなかった {count} 件のレコードは破棄されました | どのパスにも一致しなかった {count} 件のレコードは破棄されました",
       "noUpstream": "上流のステップがありません。",
       "noRunYet": "まだ実行されていません。",
       "runLabel": "実行",
       "switchRun": "実行を切り替え",
       "notInRun": "このステップはこの実行に含まれていません。",
+      "noRunData": "この実行ではステップデータは保存されませんでした。",
       "runTest": "テストを実行",
       "noItems": "アイテムがありません",
       "itemsCount": "{count} アイテム | {count} アイテム",
@@ -2817,8 +2875,14 @@
       "executeStep": "ステップを実行",
       "sample": "サンプル",
       "editStep": "ステップを編集",
+      "readOnlyRun": "過去の実行を表示しているため、このステップの設定をここで変更することはできません。",
+      "readOnlyRunEdit": "ワークフローで編集",
       "testInputHint": "テスト入力 — 編集してからステップを実行してください。",
-      "noRunsList": "実行はまだありません。"
+      "noRunsList": "実行はまだありません。",
+      "resetInput": "サンプルにリセット",
+      "eventPager": "{n} / {total}",
+      "nextEvent": "次のイベント",
+      "prevEvent": "前のイベント"
     },
     "runOverlay": {
       "banner": "過去の実行（{run}）のステップデータを表示しています。自由に編集できます — この実行が変更されることはありません。",
@@ -2845,6 +2909,8 @@
       "noConfig": "設定なし",
       "functionLabel": "関数",
       "destinationLabel": "宛先",
+      "branchPathsLabel": "パス",
+      "branchNoRule": "ルール未設定",
       "destinationUnsupported": "未対応のタイプ",
       "destinationMissing": "この宛先は存在しないか、読み取ることができません。",
       "headersLabel": "ヘッダー",
@@ -3603,29 +3669,30 @@
       "crossLinkBody": "{brand} は {product}（MCP）エンドポイントを公開しており、{client1}、{client2}、{client3} などの AI クライアントがこの組織に対してクエリを実行し操作できます。セットアップと認証情報は IAM にあります。",
       "crossLinkCta": "MCPセットアップを開く",
       "tagline": "{product}（MCP）を介して {client1}、{client2}、{client3} およびその他の AI クライアントをこの組織に接続します。",
-      "endpointLabel": "MCPエンドポイント",
-      "authLabel": "1. 認証",
-      "clientLabel": "2. クライアントを選択",
-      "configLabel": "3. 設定を追加",
+      "connectLabel": "エンドポイントと認証",
+      "connectHint": "MCPクライアントにこのURLを指定し、サインイン方法を選択してください。",
+      "configLabel": "設定を追加",
+      "configHint": "クライアントを選択し、設定を指定の場所にコピーしてください。",
       "auth": {
         "oauth": "OAuth — サインイン（推奨）",
         "token": "アクセストークン",
         "oauthNote": "管理する資格情報はありません。MCPクライアントがブラウザを開いてサインインし、アクセスは既存の権限に基づいてスコープされます。クライアントがOAuthをサポートしている場合はこれを使用してください。"
       },
       "credential": {
-        "quickStartTitle": "クイックスタート — あなたのアカウント",
-        "quickStartBody": "スニペットはあなた自身の資格情報を使用し、完全な権限を持ちます。本番環境では、代わりに専用の読み取り専用資格情報を生成してください。",
-        "generate": "読み取り専用資格情報を生成",
-        "created": "読み取り専用資格情報を作成しました",
+        "quickStartTitle": "トークンがまだありません",
+        "quickStartBody": "以下のスニペットにはプレースホルダーのヘッダーが含まれています。このMCPクライアント専用のトークンを生成するか、既存のサービスアカウントトークンをそこに貼り付けてください。",
+        "generate": "専用トークンを生成",
+        "created": "専用トークンを作成しました",
         "shownOnce": "{email}用です。今すぐコピーしてください。トークンは一度だけ表示され、以下のスニペットで使用されます。",
         "download": "ダウンロード",
         "manage": "管理/取り消し",
-        "readonlyWarn": "アカウントは作成されましたが、読み取り専用ロールを自動的に適用できませんでした。サービスアカウントで権限を確認してください。",
+        "readonlyWarn": "アカウントは作成されましたが、{role} ロールに追加できませんでした。IAMでロールを割り当てるまで権限はありません。",
+        "readonlyNote": "{role} ロールを通じて読み取り専用にスコープされています。IAM › ロール で確認または拡張してください。",
+        "rbacNote": "この環境ではRBACが無効になっているため、このトークンを読み取り専用にスコープできません。この組織の他の認証情報と同じアクセス権を持ちます。",
         "error": "資格情報を作成できませんでした。もう一度試すか、IAMで手動でサービスアカウントを作成してください。"
       },
       "securityTitle": "専用の最小権限資格情報を使用する",
-      "securityBody": "トークンはデフォルトで自分のアカウント資格情報になります。本番環境では、上記で読み取り専用資格情報を生成するか（またはスコープされたサービスアカウントを作成し）、トークンをソース管理にコミットしないでください。",
-      "docsCta": "MCPの完全なドキュメントを読む",
+      "securityBody": "MCPクライアントには、自分のアカウントの認証情報ではなく、スコープされた読み取り専用のサービスアカウントを付与し、そのトークンをソース管理にコミットしないでください。",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3734,7 +3801,7 @@
       "dynamodbPipelineTitle": "DynamoDB → Firehose をストリーミング",
       "dynamodbTagline": "Kinesis Firehose を介して DynamoDB アイテムの変更を OpenObserve にストリーミングします。",
       "ec2IamNote": "インスタンスにec2:DescribeTagsおよびec2:DescribeInstancesを含むIAMロールが必要です。エージェントがNameタグを読み取り、ホスト識別子として使用できるようにするためです。",
-      "enableSessionReplayDesc": "セッションリプレイは RUM とは**別に**設定され、`rumConfiguration.customEndpoint` を**継承しません**。またパスを追加しないため、以下の完全な `/replay` URL が必要です。この設定を間違えると、RUM イベントは届くがリプレイが届かないという一般的な原因になります。",
+      "enableSessionReplayDesc": "Session Replay は RUM とは**別に**設定され、`rumConfiguration.customEndpoint` は**継承されません**。以下で RUM/ログと同じ形式の専用ベースURLを指定してください。ブリッジが `/replay` を自動的に追加するため、自分で**追加しないでください**。手動で `/replay` を追加するとパスが二重になり、すべてのアップロードが401で拒否されます。これは、RUMイベントは届くのにリプレイが届かない場合のよくある原因です。",
       "enableSessionReplayTitle": "セッションリプレイを有効にする",
       "endpointLabel": "エンドポイント",
       "externalEndpointVariant": "外部エンドポイント",
@@ -3936,18 +4003,16 @@
       "rnInitNote": "できるだけ早く初期化してください。プロバイダーは測定対象の画面より先にマウントされている必要があります。",
       "rnInstallNote": "session-replay パッケージと navigation パッケージはオプションです。画面録画や自動ビュー追跡が不要な場合は、いずれかの行を削除してください。",
       "rnNavigationNote": "これがなくても、`O2Rum.startView()` / `O2Rum.stopView()` を使用して手動でビューを記録できます。",
-      "rnSessionReplayNote": "React Native でのセッションリプレイは現在 Android で検証されています。iOS では SDK がこの URL に独自のパスを追加するため、リプレイのアップロードはまだ OpenObserve に到達しません。RUM、ログ、クラッシュレポートには影響ありません。",
-      "rnTrouble401A": "`clientToken` はこの組織の **RUM トークン**であり、取り込み用パスコードではありません。ローテーションされた場合は、このページのヘッダーから再生成し、アプリを再ビルドしてください。",
+      "rnSessionReplayNote": "Session Replay はSDK 0.1.2時点でiOSとAndroidの両方で動作確認済みです。セグメントはアップロード前にバッチ処理されるため、表示されるまで少し遅延が生じます。",
+      "rnTrouble401A": "よくある原因は2つあります。1つ目は `clientToken` です。これはこの組織の**RUMトークン**である必要があり、取り込み用パスコードではありません。ローテーションされた場合は、このページのヘッダーから再生成してアプリを再ビルドしてください。2つ目は Session Replay に固有の問題です。`customEndpoint` に自分で `/replay` を追加すると、パスが二重になります（ブリッジが既に追加します）。バックエンドもこれを401で拒否するため、ベースURLのみを渡してください。",
       "rnTrouble401Q": "リクエストが 401 または 403 を返す",
       "rnTroubleCleartextA": "Android はデフォルトで平文トラフィックをブロックします。`http://` エンドポイントの場合は、SDK 設定で `additionalConfiguration: {config}` を設定し、アプリのネットワークセキュリティ設定でホストに対して平文通信を許可してください。ローカル開発以外では HTTPS を推奨します。",
       "rnTroubleCleartextQ": "Android のリリース/デバッグビルドは平文 HTTP では何も送信しない",
       "rnTroubleIosBuildA": "パッケージ追加後、`npx pod-install` (または `cd ios && pod install`) を実行し、Xcode または `npx react-native run-ios` から再ビルドしてください。Metro のみのリロードでは新しいネイティブモジュールは反映されません。",
       "rnTroubleIosBuildQ": "iOS ビルドが失敗する、またはネイティブモジュールが見つからない",
-      "rnTroubleIosReplayA": "現在の React Native SDK の既知の制限: iOS ではセッションリプレイの `customEndpoint` に独自のパスを追加するため、アップロードが OpenObserve の `/replay` ルートに到達しません。Android は URL をそのまま使用して動作します。RUM イベント、ログ、クラッシュレポートは両プラットフォームで影響を受けません。",
-      "rnTroubleIosReplayQ": "セッションリプレイは Android では動作するが iOS では動作しない",
       "rnTroubleMaskedA": "それがデフォルトです。`textAndInputPrivacyLevel`、`imagePrivacyLevel`、`touchPrivacyLevel` はすべて最も厳しい設定 (`MASK_ALL`) がデフォルトです。プライバシーポリシーで許可される範囲でのみ緩めてください。`MASK_SENSITIVE_INPUTS` はパスワードとカードフィールドを非表示にしつつ、それ以外を表示します。",
       "rnTroubleMaskedQ": "リプレイは描画されるがすべてマスクされている",
-      "rnTroubleNoReplayA": "ほとんどの場合エンドポイントが原因です。セッションリプレイは個別に設定され、`rumConfiguration.customEndpoint` を**継承しません**。未設定のままにすると空文字列がデフォルトとなり、アップロードはどこにも表示されません。完全な URL を明示的に渡してください: `customEndpoint: '{replayUrl}'` — 末尾の `/replay` に注意してください。これはコア SDK のベース URL には含まれていません。",
+      "rnTroubleNoReplayA": "ほとんどの場合、エンドポイントが原因です。Session Replay は個別に設定され、`rumConfiguration.customEndpoint` を**継承しません**。未設定のままにすると空文字列になり、アップロードはどこにも到達しません。ベースURLを明示的に渡してください: `customEndpoint: '{replayUrl}'` — SDK 0.1.2時点ではブリッジが `/replay` を自動的に追加するため、自分でその接尾辞を追加しないでください。追加するとアップロードが401で拒否されます。",
       "rnTroubleNoReplayQ": "RUM イベントは届くがセッションリプレイがない",
       "rnTroubleNothingArrivesA": "まずホストを確認してください — 上記の修正ボックスを参照。`localhost` はあなたのマシンではなくデバイスに解決されます。Android エミュレータでは `10.0.2.2`、iOS シミュレータでは `localhost`、実機ではあなたのマシンの LAN IP を使用してください。",
       "rnTroubleNothingArrivesQ": "エミュレータまたはデバイスから何も届かない",
@@ -6434,6 +6499,7 @@
       "firing": "発火中",
       "ok": "OK",
       "error": "エラー",
+      "pending": "保留中",
       "skipped": "スキップ",
       "unknown": "不明",
       "flapping": "フラッピング",
@@ -6460,6 +6526,7 @@
       "templateRequired": "テンプレートは必須です！",
       "validEmails": "有効なメールアドレスを追加してください！",
       "silenceNonNegative": "通知のサイレンスは0以上である必要があります",
+      "pendingPeriodNonNegative": "保留期間は0以上である必要があります",
       "periodPositive": "期間は0より大きい必要があります",
       "destinationRequired": "宛先が少なくとも1つ必要です。",
       "thresholdPositive": "しきい値は0より大きい必要があります",
@@ -6470,6 +6537,7 @@
       "timestampAliasBanned": "{column} は列のエイリアスとして使用できません。代わりに time_bucket を使用してください。",
       "credentialFieldRequired": "{field} は必須です",
       "minimumFrequency": "最小頻度は {minutes} 分にする必要があります",
+      "pendingPeriodNotMultiple": "チェック頻度 ({minutes} 分) の倍数ではありません。アラートは発火までに最大1回分のチェック間隔を余計に待つことがあります。",
       "nameMandatoryString": "名前は必須で、有効な文字列である必要があります",
       "orgIdMismatch": "組織IDは {orgId} と等しい必要があります",
       "streamTypeMandatory": "ストリームタイプは必須で、logs、metrics、traces のいずれかである必要があります",
@@ -6675,6 +6743,9 @@
       "cooldown": "クールダウン",
       "betweenAlerts": "アラート間",
       "noCooldown": "クールダウンなし",
+      "pendingPeriod": "保留期間",
+      "beforeFiring": "発火まで {duration}",
+      "firesImmediately": "即座に発火",
       "minuteCount": "{n} 分 | {n} 分",
       "hourCount": "{n} 時間 | {n} 時間",
       "timeRangeCount": "{n} 時間範囲 ({ranges}) | {n} 時間範囲 ({ranges})",
@@ -6691,6 +6762,7 @@
         "conditionOther": "{threshold} 件のイベント（{operator}）",
         "alertMeWhenMinutes": "任意の {count} 分間に {condition} が発生した場合にアラート",
         "alertMeWhenHours": "任意の {count} 時間に {condition} が発生した場合にアラート",
+        "pendingPeriodClause": ", {duration} の保留後",
         "cooldownClause": "、ただし {cooldown} ごとに最大1回",
         "defaultConditions": "設定した条件が満たされたら通知を受け取る"
       }
@@ -7155,6 +7227,8 @@
       "writeQueryHint": "クエリを書いて始めましょう",
       "sqlEditorHint": "フルエディターを開いて実行して検証する",
       "checkEvery": "チェック間隔",
+      "pendingPeriod": "保留期間",
+      "pendingPeriodTooltip": "発火するまでの待機時間です。1回の異常なインターバルで反応するのではなく、条件が継続していることを確認できます。",
       "cronExpressionPlaceholder": "0 */10 * * * *",
       "timezonePlaceholder": "タイムゾーン",
       "onThese": "これらの",
@@ -10633,6 +10707,10 @@
         "success": "データセットに追加しました",
         "loadError": "データセットの読み込みに失敗しました",
         "error": "このアイテムをデータセットに追加できませんでした"
+      },
+      "playground": {
+        "button": "Playground で開く",
+        "hint": "この呼び出しのメッセージを Playground に読み込み、編集して再実行できます"
       }
     },
     "discovery": {
@@ -11000,7 +11078,10 @@
         "columns": {
           "input": "入力",
           "output": "出力",
-          "latency": "レイテンシ"
+          "trials": "試行",
+          "dispersion": "ばらつき",
+          "latency": "レイテンシ",
+          "p50Latency": "P50 レイテンシー"
         },
         "retryFailed": "失敗したスロットを再試行",
         "loadError": "実験の読み込みに失敗しました",
@@ -11038,8 +11119,12 @@
         },
         "slotStatus": "ステータス",
         "searchPlaceholder": "入力または出力を検索",
+        "searchInputPlaceholder": "入力を検索",
         "statusFilter": "ステータス",
-        "statusFilterAll": "すべてのステータス"
+        "statusFilterAll": "すべてのステータス",
+        "sortByDispersion": "ばらつき順に並べ替え",
+        "highDispersionBadge": "高",
+        "trialNumber": "試行 {n}"
       },
       "rowDetail": {
         "fallbackTitle": "実験行",
@@ -11130,10 +11215,13 @@
           "trial": "試行 {index}",
           "noContent": "提供されていません",
           "noOutput": "出力なし",
-          "absentSide": "この実行には存在しません"
+          "absentSide": "この実行には存在しません",
+          "enterFullscreen": "全画面表示",
+          "exitFullscreen": "全画面表示を終了"
         }
       },
-      "selectionCount": "{count} 件（2件中）選択中"
+      "selectionCount": "{count} 件（2件中）選択中",
+      "clearBaseline": "ベースラインをクリア"
     },
     "datasets": {
       "listTitle": "データセット",
@@ -11202,7 +11290,7 @@
           "expectedOutput": "期待される出力",
           "source": "ソース",
           "tags": "タグ",
-          "version": "バージョン",
+          "version": "データセットバージョン",
           "actions": "操作"
         },
         "deleteItemTitle": "アイテムを削除",
@@ -11681,8 +11769,6 @@
       "title": "プレイグラウンド",
       "runAll": "すべて実行",
       "runAllTooltip": "すべてのバリアントを実行",
-      "running": "実行中… ({done}/{total})",
-      "stop": "停止",
       "recentDrafts": "最近のドラフト",
       "recentDraftsSection": "このブラウザ · 最新10件",
       "draftVersus": "vs",
@@ -11691,6 +11777,7 @@
       "fromExperiment": "実験 {name} からクローン",
       "variables": "変数",
       "noVariables": "メッセージに {token} がありません — 入力をパラメータ化するには追加してください。",
+      "unusedSampledValue": "まだメッセージで参照されていません: {tokens}。使用するには、メッセージに入力してください。",
       "variablePlaceholder": "{name} の値",
       "addExpected": "+ 期待される出力",
       "expectedLabel": "期待出力",
@@ -11705,8 +11792,9 @@
       "variant": "バリアント {label}",
       "variantLimit": "ベンチは最大 {max} 個のバリアントを保持できます。",
       "duplicateVariant": "バリアントを複製",
+      "resetVariant": "ベンチをリセット",
       "removeVariant": "バリアントを削除",
-      "runVariant": "このバリアントを実行",
+      "runVariant": "実行",
       "createExperiment": "実験を作成",
       "modelPlaceholder": "モデルを選択または入力",
       "providerUnknown": "不明なプロバイダー",
@@ -11732,6 +11820,13 @@
       "toolsEmpty": "ツールが定義されていません。",
       "toolCall": "ツール呼び出し",
       "toolCallNote": "実行はここで停止します — プレイグラウンドはツールを実行しません。",
+      "toolCallAddToMessages": "メッセージに追加",
+      "toolCallContinueTooltip": "この呼び出しを会話に追加し、その結果フィールドを開きます。",
+      "toolCallAddedToMessages": "ツール呼び出しが追加されました — ツールの結果を入力して再実行してください。",
+      "toolArgumentsPlaceholder": "ツールの引数 (JSON)",
+      "toolResultPlaceholder": "ツールの結果を入力…",
+      "toolResultRequired": "続行するには、上のツールの結果を入力してください。",
+      "toolSetupRequired": "続行するには、ツールを選択して引数を指定してください。",
       "toolInvalidJson": "パラメータは有効なJSONである必要があります。",
       "schema": "スキーマ",
       "schemaOn": "スキーマ · オン",
@@ -11758,6 +11853,7 @@
       "sampleDatasetPlaceholder": "データセットを選択",
       "sampleSubmit": "サンプル",
       "sampleLoadError": "そのデータセットから行を読み込めませんでした。",
+      "sampleApplied": "サンプル {index} / {total} を読み込みました — メッセージ内で {token} を使って参照してください。",
       "sampleEmpty": "このデータセットにはまだ項目がありません。",
       "noProviderTitle": "プレイグラウンドにはLLMプロバイダーが必要です",
       "noProviderBody": "プロンプトを実行するにはプロバイダーを接続してください。約1分かかります。",
@@ -11770,6 +11866,8 @@
       "reset": "リセット",
       "resetTitle": "プレイグラウンドをリセット",
       "resetMessage": "すべてのバリアント、行、出力をクリアして最初からやり直しますか？この操作は元に戻せません。",
+      "resetVariantTitle": "ベンチをリセット",
+      "resetVariantMessage": "このベンチのプロンプトと出力をクリアしますか？この操作は元に戻せません。",
       "scrollLeft": "左にスクロール",
       "scrollRight": "右にスクロール",
       "addMessage": "メッセージ",
@@ -11785,6 +11883,7 @@
       "variantSettings": "モデル設定",
       "messageToolPlaceholder": "ツールを選択",
       "variablesCount": "変数 · {count}",
+      "newValueTag": "新規",
       "variableUsed": "このバリアントから参照されています",
       "variableUnused": "このバリアントでは参照されません — ここでは空で表示されます",
       "addVariable": "変数を追加",
@@ -11833,7 +11932,9 @@
       "sampleFullView": "全体表示",
       "sampleBack": "リストに戻る",
       "sampleInput": "入力",
-      "sampleExpected": "期待出力"
+      "sampleExpected": "期待出力",
+      "fromTrace": "トレーススパン {id} から",
+      "openInPlaygroundFailed": "このスパンをプレイグラウンドで開けませんでした。"
     }
   },
   "onlineEvals": {
@@ -11866,12 +11967,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "スコア設定を検索...",
-      "scoreConfigsLabel": "{count} スコア設定 | {count} スコア設定"
+      "scoreConfigsLabel": "{count} スコア設定 | {count} スコア設定",
+      "selectedOfTotal": "{total} 件中 {selected} 件を選択中"
     },
     "scorerLibrary": {
       "noProvidersMessage": "LLM Judge スコアラーをインポートする前に、まずプロバイダを作成してください。",
       "searchPlaceholder": "スコアラーを検索...",
-      "scorerCountSuffix": "{count} スコアラー | {count} スコアラー"
+      "scorerCountSuffix": "{count} スコアラー | {count} スコアラー",
+      "selectedOfTotal": "{total} 件中 {selected} 件を選択中"
     },
     "title": "評価",
     "loadError": "オンライン評価を読み込めませんでした",
@@ -11988,7 +12091,8 @@
         "legendFalseCount": "偽 ({count})",
         "kpis": {
           "average": "アベレージ",
-          "p50p95": "P50/P95",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "不健康",
           "healthy": "ヘルシー",
           "trueRate": "真率",
@@ -12097,8 +12201,6 @@
       "remoteCta": "エンドポイントを設定"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "プロバイダーに戻る",
       "createTitle": "LLM プロバイダーの作成",
       "editTitle": "LLM プロバイダーの編集",
@@ -12107,7 +12209,7 @@
       "nameLabel": "[名前]",
       "typeLabel": "プロバイダーの種類",
       "endpointLabel": "終点",
-      "endpointPlaceholder": "オプションのカスタムエンドポイント",
+      "endpointPlaceholder": "完全な completions URL（例: https://your-host/v1/chat/completions）",
       "defaultModelLabel": "デフォルトモデル",
       "availableModelsLabel": "ご利用可能なモデル",
       "apiKeyLabel": "APIキー",

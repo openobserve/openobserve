@@ -730,7 +730,7 @@
     },
     "copied": "Kopyalandı",
     "copiedExclaim": "Kopyalandı!",
-    "clearAll": "Tümünü temizle",
+    "clearAll": "Tümünü Temizle",
     "unknown": "Bilinmiyor",
     "totalFields": "Toplam Alanlar: {count}",
     "providerLogo": "{name} logosu",
@@ -848,7 +848,9 @@
     },
     "condition": {
       "loading": "Koşullar yükleniyor...",
-      "loadError": "Kaydedilen koşul okunamadı ve sıfırlandı. Şimdi kaydetmek onun üzerine yazacaktır."
+      "loadError": "Kaydedilen koşul okunamadı ve sıfırlandı. Şimdi kaydetmek onun üzerine yazacaktır.",
+      "unknownColumn": "\"{column}\" bu tetikleyicinin veri yükünde yok, bu nedenle bu koşul hiç eşleşmeyebilir.",
+      "unknownColumnSuggestion": "\"{suggestion}\" mu demek istediniz?"
     },
     "destination": {
       "createNew": "Yeni Hedef Oluştur",
@@ -2560,7 +2562,9 @@
       "title": "İş Akışı Çalıştırmaları",
       "edit": "İş Akışını Düzenle",
       "debugInEditor": "Düzenleyicide Hata Ayıkla",
-      "staleGraphWarning": "Bu iş akışı bu çalıştırmadan bu yana düzenlendi — yürüttüğü {count} adım artık mevcut değil, bu yüzden durumu burada gösterilmiyor. | Bu iş akışı bu çalıştırmadan bu yana düzenlendi — yürüttüğü {count} adım artık mevcut değil, bu yüzden durumu burada gösterilmiyor."
+      "staleGraphWarning": "Bu iş akışı bu çalıştırmadan bu yana düzenlendi — yürüttüğü {count} adım artık mevcut değil, bu yüzden durumu burada gösterilmiyor. | Bu iş akışı bu çalıştırmadan bu yana düzenlendi — yürüttüğü {count} adım artık mevcut değil, bu yüzden durumu burada gösterilmiyor.",
+      "hideList": "Çalıştırma listesini gizle",
+      "showList": "Çalıştırma listesini göster"
     },
     "history": {
       "button": "Çalıştırmalar",
@@ -2576,10 +2580,21 @@
       "error": "Hata",
       "success": "Başarılı",
       "failed": "Başarısız",
+      "testRun": "Test çalıştırması",
+      "runType": "Tür",
+      "testRunTooltip": "Düzenleyiciden başlatıldı. Hedef adımları gerçekten gönderim yapar.",
+      "showTestRuns": "{count} test çalıştırmasını göster",
+      "hideTestRuns": "Test çalıştırmalarını gizle",
       "open": "Geçmiş",
       "openFullView": "Çalıştırmaların Tam Görünümünü Aç",
       "loadError": "Yürütmeler Yüklenirken Hata",
-      "loadRunError": "Bu Çalıştırma Yüklenirken Hata"
+      "loadRunError": "Bu Çalıştırma Yüklenirken Hata",
+      "retry": "Yeniden Dene",
+      "retryTooltip": "Bu başarısız çalıştırmayı kaydedilmiş girdisiyle yeniden çalıştır.",
+      "retryTitle": "Bu çalıştırma yeniden denensin mi?",
+      "retryMessage": "Bu, başarısız çalıştırmanın kaydettiği girdiden yeni bir çalıştırma oluşturur. Hedef adımları gerçekten gönderim yapar.",
+      "retryStarted": "Yeniden deneme başlatıldı — listede yeni bir çalıştırma olarak görünür.",
+      "retryError": "Bu çalıştırma yeniden denenemedi."
     },
     "edit": "Düzenle",
     "view": "Görüntüle",
@@ -2596,7 +2611,9 @@
     "triggerRequired": "Bir Tetikleyici Gerekli",
     "addStepRequired": "Tetikleyiciden Sonra En Az Bir Adım Ekleyin",
     "connectAllNodes": "Kaydetmeden Önce Tüm Düğümleri Bağlayın",
+    "branchPathsRequired": "Her dal yolunu bir adıma bağlayın | 1 dal adımının yollarıyla eşleşmeyen bağlantıları var. Adımı açın, yolları tanımlayın ve ardından yeniden bağlayın. | {count} dal adımının yollarıyla eşleşmeyen bağlantıları var.",
     "finishStepsBeforePublish": "{count} adım yayınlamadan önce kurulum gerektiriyor — tuval üzerinde vurgulanır. | {count} adım yayınlamadan önce kurulum gerektiriyor — tuval üzerinde vurgulanır.",
+    "noChangesToPublish": "Yayınlanacak değişiklik yok — bu iş akışı zaten yayınlanmış sürümle eşleşiyor.",
     "draft": "Taslak",
     "saveDraft": "Taslak Olarak Kaydet",
     "publish": "Yayınla",
@@ -2643,7 +2660,7 @@
     "loadError": "İş Akışı Yüklenemiyor",
     "deleteNode": "Düğümü Sil",
     "deleteNodeTitle": "Adımı Sil",
-    "deleteNodeConfirm": "Bu adımı silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.",
+    "deleteNodeConfirm": "Bu adımı silmek istediğinizden emin misiniz? Bu işlemi geri alabilirsiniz.",
     "namePlaceholder": "Başlıksız İş Akışı",
     "renameHint": "Bu iş akışını yeniden adlandırmak için tıklayın",
     "editMode": "İş akışını düzenle",
@@ -2656,11 +2673,29 @@
       "runFromBeginning": "Başlangıç (Tetikleyici)",
       "runFromNote": "Yalnızca buradan aşağıdaki adımlar çalışacak.",
       "inputLabel": "Örnek Giriş",
+      "source": {
+        "sample": "Oluşturulan örnek",
+        "run": "Çalıştırmadan: {run}",
+        "edited": "Sizin tarafınızdan düzenlendi"
+      },
+      "revertInput": "Geri Al",
+      "useRunInput": "Çalıştırmadan girdi kullan…",
+      "lastTestRun": "Son test çalıştırması (bu sekme)",
+      "runHasNoInput": "Bu çalıştırmanın bu adım için kayıtlı girdisi yok.",
       "invalidJson": "Geçerli bir JSON kayıt dizisi girin.",
       "resultHint": "Çalıştırmadan sonra, her adım tuvalde bir onay veya hata simgesi gösterir.",
+      "rehearsalOnly": "Yalnızca bir test çalıştırmasında geçti — örnek bir veri yüküne karşı bir prova, yayınlanmış iş akışının çalıştığının kanıtı değil.",
       "notVerified": "Bu adıma hiç kayıt ulaşmadı — yukarı akış koşulu bunları filtreledi veya daha önceki bir adım hata verdi.",
+      "notConfigured": "Bu adım yapılandırılmadığı için bu çalıştırmada hiçbir şey yapmadı. Yapılandırıp yeniden test edin.",
+      "recordedFailure": "Bu adım, son kaydedilen çalıştırmada başarısız oldu.",
+      "recordsUnavailable": "Önceki bir çalıştırmada kaydedildi — kayıtları incelemek için testi yeniden çalıştırın.",
+      "dirtySelf": "Bu adımın yapılandırması, en son çalıştığından beri değişti. Adımı yeniden test edin.",
+      "dirtyUpstream": "Bu adım çalıştığından beri kendisinden önceki bir adım değişti. Adımı yeniden test edin.",
       "run": "Testi Çalıştır",
       "runError": "Test çalıştırılamıyor.",
+      "suppressDestinations": "Hedeflere gerçekten gönderme",
+      "suppressDestinationsHint": "Hedef adımları yönlendirme kararlarını verir ancak hiçbir şey iletilmez.",
+      "dispatchWarning": "Test canlıdır: bu çalıştırma {destinations} hedeflerine gerçekten gönderim yapacaktır.",
       "stepResult": {
         "viewHint": "Girdi / çıktıyı görüntülemek için tıklayın",
         "input": "Giriş",
@@ -2686,8 +2721,10 @@
         "status": {
           "ok": "Başarılı",
           "error": "Hatalı",
-          "skipped": "Kayıt yok"
-        }
+          "skipped": "Kayıt yok",
+          "noMatch": "Eşleşme Yok"
+        },
+        "suppressed": "Engellendi — gerçek hedefe gönderilmedi."
       }
     },
     "linkAlerts": {
@@ -2720,6 +2757,7 @@
       "kindLogic": "Mantık",
       "kindAction": "Eylem",
       "condition": "Koşul",
+      "branch": "Dal",
       "function": "Fonksiyon",
       "sendToDestination": "Hedef",
       "configComingSoon": "{node} Yapılandırması Daha Sonraki Bir Adımda Gelecek",
@@ -2727,7 +2765,20 @@
       "sectionDestination": "Hedef",
       "stepSearchPlaceholder": "Adımları Ara...",
       "stepNoMatch": "Aramanızla Eşleşen Adım Yok.",
-      "conditionDesc": "Bir kurala göre dal",
+      "conditionDesc": "Yalnızca bir kural eşleştiğinde devam et",
+      "branchDesc": "Her kaydı eşleşen ilk yola yönlendir",
+      "branchCaseLabel": "Yol Adı (İsteğe Bağlı)",
+      "branchCaseLabelPlaceholder": "ör. Yüksek Önem Derecesi",
+      "branchAddCase": "Yol Ekle",
+      "branchRemoveCase": "Yolu Kaldır",
+      "branchMoveUp": "Yolu Yukarı Taşı",
+      "branchMoveDown": "Yolu Aşağı Taşı",
+      "branchPathNumber": "Yol {index}",
+      "branchElseTitle": "Diğer Her Şey",
+      "branchElseHint": "Yukarıdaki hiçbir yolla eşleşmeyen kayıtlar buradan ayrılır.",
+      "branchNoteTitle": "Dal Rehberi",
+      "branchNoteFirstMatch": "Yollar yukarıdan aşağıya doğru kontrol edilir ve İLK eşleşme kazanır; böylece her kayıt tam olarak tek bir yoldan çıkar.",
+      "branchNoteUnwired": "Kendisine bağlı hiçbir şey olmayan bir yol, kayıtlarını atar.",
       "functionDesc": "Bir fonksiyonla yükü yeniden şekillendir",
       "destinationDesc": "Bir hedefe gönder",
       "triggerBody": "İlişkili Bir Uyarı Tetiklendiğinde Çalışır",
@@ -2775,11 +2826,14 @@
       "enable": "Adımı Etkinleştir",
       "disabledBadge": "Devre Dışı",
       "incompleteBadge": "Daha Sonra Kur",
+      "unwiredBadge": "Bağlantısız yol",
       "unsavedFnTitle": "Kaydedilmemiş Fonksiyon Değişiklikleri",
       "unsavedFnMessage": "Bu adım, kitaplığınıza kaydedilmemiş fonksiyon kodu içeriyor. Kaydedin, değişiklikleri atın veya düzenlemeye devam edin.",
       "unsavedFnSave": "Fonksiyonu Kaydet",
       "unsavedFnDiscard": "Değişiklikleri At",
-      "unsavedFnKeep": "Düzenlemeye Devam Et"
+      "unsavedFnKeep": "Düzenlemeye Devam Et",
+      "destination": "Hedef",
+      "branchPathUnset": "{name} · kural ayarlanmamış"
     },
     "commonFieldsAbove": "yukarıdaki ortak alanlar",
     "canvas": {
@@ -2803,11 +2857,15 @@
       "openStep": "Aç {name}",
       "runToView": "Bu Veriyi Görüntülemek İçin Bir Test Çalıştırın.",
       "noBranchItems": "Bu Daldaki Öğe Yok.",
+      "forwardedCount": "{out} / {total} kayıt iletildi | {out} / {total} kayıt iletildi",
+      "noMatchForwarded": "Eşleşme yok — 0 / {total} kayıt iletildi | Eşleşme yok — 0 / {total} kayıt iletildi",
+      "branchDropped": "{count} kayıt hiçbir yolla eşleşmedi — atıldı | {count} kayıt hiçbir yolla eşleşmedi — atıldı",
       "noUpstream": "Yukarı Akış Adımı Yok.",
       "noRunYet": "Henüz Çalıştırma Yok.",
       "runLabel": "Çalıştır",
       "switchRun": "Çalıştırmayı Değiştir",
       "notInRun": "Bu Adım Bu Çalıştırmaya Dahil Değil.",
+      "noRunData": "Bu çalıştırma adım verilerini kaydetmedi.",
       "runTest": "Testi Çalıştır",
       "noItems": "Öğe Yok",
       "itemsCount": "{count} Öğe | {count} Öğe",
@@ -2817,8 +2875,14 @@
       "executeStep": "Adımı Çalıştır",
       "sample": "Örnek",
       "editStep": "Adımı Düzenle",
+      "readOnlyRun": "Geçmiş bir çalıştırmayı görüntülüyorsunuz, bu nedenle bu adımın yapılandırması burada değiştirilemez.",
+      "readOnlyRunEdit": "İş Akışında Düzenle",
       "testInputHint": "Test Girdisi — Düzenleyin, Sonra Adımı Çalıştırın.",
-      "noRunsList": "Henüz Çalıştırma Yok."
+      "noRunsList": "Henüz Çalıştırma Yok.",
+      "resetInput": "Örneğe Sıfırla",
+      "eventPager": "{n} / {total}",
+      "nextEvent": "Sonraki Olay",
+      "prevEvent": "Önceki Olay"
     },
     "runOverlay": {
       "banner": "Geçmiş bir çalıştırmadaki ({run}) adım verileri gösteriliyor. Serbestçe düzenleyebilirsiniz — bu çalıştırma asla değiştirilmez.",
@@ -2845,6 +2909,8 @@
       "noConfig": "Yapılandırma Yok",
       "functionLabel": "İşlev",
       "destinationLabel": "Hedef",
+      "branchPathsLabel": "Yollar",
+      "branchNoRule": "Kural ayarlanmamış",
       "destinationUnsupported": "Desteklenmeyen Tür",
       "destinationMissing": "Bu hedef artık mevcut değil veya okunamıyor.",
       "headersLabel": "Başlıklar",
@@ -3603,29 +3669,30 @@
       "crossLinkBody": "{brand}, {client1}, {client2} ve {client3} gibi AI istemcilerinin bu kuruluşu sorgulayabilmesi ve işlem yapabilmesi için bir {product} (MCP) uç noktası sunar. Kurulum ve kimlik bilgileri IAM'de bulunur.",
       "crossLinkCta": "MCP kurulumunu aç",
       "tagline": "{client1}, {client2}, {client3} ve diğer AI istemcilerini {product} (MCP) üzerinden bu kuruluşa bağlayın.",
-      "endpointLabel": "MCP uç noktası",
-      "authLabel": "1. Kimlik Doğrulama",
-      "clientLabel": "2. İstemcinizi Seçin",
-      "configLabel": "3. Yapılandırmayı Ekleyin",
+      "connectLabel": "Endpoint ve kimlik doğrulama",
+      "connectHint": "MCP istemcinizi bu URL'ye yönlendirin ve nasıl oturum açacağını seçin.",
+      "configLabel": "Yapılandırmayı ekleyin",
+      "configHint": "İstemcinizi seçin, ardından yapılandırmayı yerine kopyalayın.",
       "auth": {
         "oauth": "OAuth — oturum aç (önerilir)",
         "token": "Erişim belirteci",
         "oauthNote": "Yönetilecek kimlik bilgisi yok: MCP istemciniz oturum açmak için bir tarayıcı açar ve erişim mevcut izinlerinizle sınırlanır. İstemciniz OAuth'u desteklediğinde kullanın."
       },
       "credential": {
-        "quickStartTitle": "Hızlı başlangıç — hesabınız",
-        "quickStartBody": "Parçacıklar, tam izinlerinizi taşıyan kendi kimlik bilgilerinizi kullanır. Üretim için bunun yerine özel bir salt okunur kimlik bilgisi oluşturun.",
-        "generate": "Salt okunur kimlik bilgisi oluştur",
-        "created": "Salt okunur kimlik bilgisi oluşturuldu",
+        "quickStartTitle": "Henüz token yok",
+        "quickStartBody": "Aşağıdaki kod parçacıkları yer tutucu bir başlık içerir. Bu MCP istemcisi için özel bir token oluşturun veya yerine mevcut bir hizmet hesabı token'ını yapıştırın.",
+        "generate": "Özel token oluştur",
+        "created": "Özel token oluşturuldu",
         "shownOnce": "{email} için. Şimdi kopyalayın — belirteç yalnızca bir kez gösterilir ve aşağıdaki parçacıklar artık onu kullanır.",
         "download": "İndir",
         "manage": "Yönet / iptal et",
-        "readonlyWarn": "Hesap oluşturuldu ancak salt okunur rol otomatik olarak uygulanamadı — izinlerini Servis Hesapları'nda gözden geçirin.",
+        "readonlyWarn": "Hesap oluşturuldu ancak {role} rolüne eklenemedi — IAM'de bir rol atayıncaya kadar hiçbir izni yoktur.",
+        "readonlyNote": "{role} rolüyle salt okunur olarak sınırlandırıldı — IAM › Roller bölümünde inceleyin veya genişletin.",
+        "rbacNote": "Bu dağıtımda RBAC kapalı olduğundan, bu token salt okunur olarak sınırlandırılamaz — bu kuruluştaki diğer herhangi bir kimlik bilgisiyle aynı erişime sahiptir.",
         "error": "Kimlik bilgisi oluşturulamadı. Tekrar deneyin veya IAM'de manuel olarak bir servis hesabı oluşturun."
       },
       "securityTitle": "Özel, en az ayrıcalıklı bir kimlik bilgisi kullanın",
-      "securityBody": "Belirteç varsayılan olarak kendi hesap kimlik bilgilerinizi kullanır. Üretim için yukarıda bir salt okunur kimlik bilgisi oluşturun (veya kapsamlı bir servis hesabı oluşturun) ve belirteçleri asla kaynak kontrolüne göndermeyin.",
-      "docsCta": "Tam MCP belgelerini okuyun",
+      "securityBody": "MCP istemcisine kendi hesap kimlik bilgileriniz yerine kapsamı salt okunur olarak sınırlandırılmış bir hizmet hesabı verin ve token'ını asla sürüm kontrolüne işlemeyin.",
       "clients": {
         "claudeCode": "Claude Code",
         "cursor": "Cursor",
@@ -3734,7 +3801,7 @@
       "dynamodbPipelineTitle": "DynamoDB → Firehose Aktarımı",
       "dynamodbTagline": "DynamoDB öğe değişikliklerini Kinesis Firehose aracılığıyla OpenObserve'e aktarın.",
       "ec2IamNote": "Örneğin üzerinde ec2:DescribeTags ve ec2:DescribeInstances izinlerine sahip bir IAM rolü gerektirir; böylece aracı Name etiketini okuyup bunu ana bilgisayar tanımlayıcısı olarak kullanabilir.",
-      "enableSessionReplayDesc": "Oturum Tekrar Oynatma, RUM'dan **ayrı** olarak yapılandırılır ve `rumConfiguration.customEndpoint`'i **devralmaz**. Ayrıca bir yol eklemez, bu nedenle aşağıdaki tam `/replay` URL'sine ihtiyaç duyar. Bunu yanlış yapmak, RUM olaylarının gelmesinin ancak tekrar oynatmaların hiç gelmemesinin olağan nedenidir.",
+      "enableSessionReplayDesc": "Session Replay, Gerçek Kullanıcı İzleme'den **ayrı** yapılandırılır ve `rumConfiguration.customEndpoint` öğesini **devralmaz**. Aşağıda kendine ait bir temel URL verin — Gerçek Kullanıcı İzleme/Günlükler ile aynı biçimde. Bridge, `/replay` sonekini kendisi ekler; bu yüzden siz **eklemeyin**: elle eklenen `/replay` yolu çift ekler ve her yükleme 401 ile reddedilir. Bu, Gerçek Kullanıcı İzleme olaylarının gelmesine rağmen session replay kayıtlarının hiç gelmemesinin olağan nedenidir.",
       "enableSessionReplayTitle": "Oturum Tekrar Oynatmayı Etkinleştir",
       "endpointLabel": "Uç Nokta",
       "externalEndpointVariant": "Harici Uç Nokta",
@@ -3936,18 +4003,16 @@
       "rnInitNote": "Mümkün olduğunca erken başlatın — sağlayıcı, ölçmek istediğiniz ekranlardan önce bağlanmalıdır.",
       "rnInstallNote": "Oturum oynatma ve gezinme paketleri isteğe bağlıdır — ekran kaydı veya otomatik görünüm izleme gerekmiyorsa bu satırlardan birini kaldırın.",
       "rnNavigationNote": "Bu olmadan, görünümleri `O2Rum.startView()` / `O2Rum.stopView()` ile manuel olarak kaydedebilirsiniz.",
-      "rnSessionReplayNote": "React Native'de Oturum Oynatma şu anda Android'de doğrulanmıştır. iOS'ta SDK bu URL'ye kendi yolunu ekler, bu nedenle oynatma yüklemeleri henüz OpenObserve'e ulaşmaz — RUM, günlükler ve çökmeler etkilenmez.",
-      "rnTrouble401A": "`clientToken` bu kuruluşun **RUM belirtecidir**, veri alım parolası değil. Değiştirildiyse, bu sayfanın başlığından yeniden oluşturun ve uygulamayı yeniden derleyin.",
+      "rnSessionReplayNote": "Session Replay, SDK 0.1.2 sürümünden itibaren hem iOS hem de Android'de doğrulanmıştır. Segmentler yüklemeden önce toplu hale getirilir, bu nedenle görünmeden önce kısa bir gecikme bekleyin.",
+      "rnTrouble401A": "İki yaygın neden vardır. Birincisi, `clientToken` — bu kuruluşun **Gerçek Kullanıcı İzleme token'ı** olmalıdır, Veri Alımı parolası değil. Token değiştirildiyse, bu sayfadaki başlıktan yeniden oluşturun ve uygulamayı yeniden derleyin. İkinci olarak, özellikle Session Replay için: `customEndpoint` öğesine kendiniz `/replay` eklerseniz, yol çift eklenir (bridge zaten ekler) ve arka uç da bunu 401 ile reddeder — bunun yerine yalın temel URL'yi iletin.",
       "rnTrouble401Q": "İstekler 401 veya 403 döndürüyor.",
       "rnTroubleCleartextA": "Android varsayılan olarak düz metin trafiğini engeller. Bir `http://` uç noktası için SDK yapılandırmasında `additionalConfiguration: {config}` ayarlayın ve uygulamanın ağ güvenliği yapılandırmasında ana bilgisayarınız için düz metne izin verin. Yerel geliştirme dışında HTTPS tercih edin.",
       "rnTroubleCleartextQ": "Android release/debug sürümü düz HTTP üzerinden hiçbir şey göndermiyor.",
       "rnTroubleIosBuildA": "Paketleri ekledikten sonra `npx pod-install` (veya `cd ios && pod install`) çalıştırın, ardından Xcode'dan veya `npx react-native run-ios` ile yeniden derleyin. Yalnızca Metro yeniden yüklemesi yeni yerel modülleri algılamaz.",
       "rnTroubleIosBuildQ": "iOS derlemesi başarısız oluyor veya yerel modül eksik.",
-      "rnTroubleIosReplayA": "Mevcut React Native SDK'nın bilinen bir sınırlaması: iOS'ta oturum oynatma `customEndpoint` değerine kendi yolunu ekler, bu nedenle yüklemeler OpenObserve'in `/replay` rotasını kaçırır. Android URL'yi aynen kullanır ve çalışır. RUM olayları, günlükler ve çökme raporlaması her iki platformda da etkilenmez.",
-      "rnTroubleIosReplayQ": "Oturum oynatma Android'de çalışıyor ancak iOS'ta çalışmıyor.",
       "rnTroubleMaskedA": "Bu varsayılandır. `textAndInputPrivacyLevel`, `imagePrivacyLevel` ve `touchPrivacyLevel` tümü en sıkı ayarlarına (`MASK_ALL`) varsayılan olarak ayarlıdır. Bunları yalnızca gizlilik politikanızın izin verdiği ölçüde gevşetin — `MASK_SENSITIVE_INPUTS` şifreleri ve kart alanlarını gizli tutarken geri kalanını gösterir.",
       "rnTroubleMaskedQ": "Oynatmalar işleniyor ancak her şey maskelenmiş.",
-      "rnTroubleNoReplayA": "Neredeyse her zaman uç noktasıdır. Oturum Oynatma ayrı olarak yapılandırılır ve `rumConfiguration.customEndpoint` değerini **devralmaz**; ayarlanmadığında boş bir dizeye varsayılan olarak ayarlanır ve yüklemeler görebileceğiniz hiçbir yere gitmez. Tam URL'yi açıkça iletin: `customEndpoint: '{replayUrl}'` — çekirdek SDK'nın temel URL'sinde olmayan sonda `/replay` ekinin olduğunu unutmayın.",
+      "rnTroubleNoReplayA": "Neredeyse her zaman sorun endpoint'tir. Session Replay ayrıca yapılandırılır ve `rumConfiguration.customEndpoint` öğesini **devralmaz**; ayarlanmadığında boş bir dize olarak varsayılan değeri alır ve yüklemeler hiçbir yere gitmez. Temel URL'yi açıkça iletin: `customEndpoint: '{replayUrl}'` — Bridge, `/replay` sonekini kendisi ekler (SDK 0.1.2 itibarıyla), bu yüzden bu soneki kendiniz eklemeyin; aksi takdirde yüklemeler 401 ile reddedilir.",
       "rnTroubleNoReplayQ": "RUM olayları geliyor ancak oturum oynatma yok.",
       "rnTroubleNothingArrivesA": "Önce ana bilgisayarı kontrol edin — yukarıdaki düzeltme kutusuna bakın. `localhost` cihaza çözümlenir, makinenize değil: Android emülatöründe `10.0.2.2`, iOS simülatöründe `localhost` ve fiziksel bir cihazda makinenizin LAN IP'sini kullanın.",
       "rnTroubleNothingArrivesQ": "Bir emülatörden veya cihazdan hiçbir şey gelmiyor.",
@@ -6434,6 +6499,7 @@
       "firing": "Tetiklenen",
       "ok": "Tamam",
       "error": "Hata",
+      "pending": "Beklemede",
       "skipped": "Atlanan",
       "unknown": "Bilinmeyen",
       "flapping": "Dalgalanan",
@@ -6460,6 +6526,7 @@
       "templateRequired": "Şablon gereklidir!",
       "validEmails": "Geçerli e-postalar ekleyin!",
       "silenceNonNegative": "Bildirim susturması 0'a eşit veya 0'dan büyük olmalıdır",
+      "pendingPeriodNonNegative": "Bekleme süresi 0'a eşit veya daha büyük olmalıdır.",
       "periodPositive": "Süre 0'dan büyük olmalıdır",
       "destinationRequired": "En az bir hedef gereklidir.",
       "thresholdPositive": "Eşik 0'dan büyük olmalıdır",
@@ -6470,6 +6537,7 @@
       "timestampAliasBanned": "{column} sütun takma adı olarak kullanılamaz. Bunun yerine time_bucket kullanın.",
       "credentialFieldRequired": "{field} gereklidir",
       "minimumFrequency": "Minimum sıklık {minutes} dakika olmalıdır",
+      "pendingPeriodNotMultiple": "Kontrol sıklığının ({minutes} dk) bir katı değil — uyarı, tetiklenmeden önce en fazla bir ek aralık bekleyebilir.",
       "nameMandatoryString": "Ad zorunludur ve geçerli bir dize olmalıdır",
       "orgIdMismatch": "Kuruluş Kimliği {orgId} ile eşit olmalıdır",
       "streamTypeMandatory": "Akış Türü zorunludur ve şunlardan biri olmalıdır: logs, metrics, traces",
@@ -6675,6 +6743,9 @@
       "cooldown": "Bekleme Süresi",
       "betweenAlerts": "uyarılar arasında",
       "noCooldown": "Bekleme süresi yok",
+      "pendingPeriod": "Bekleme süresi",
+      "beforeFiring": "Tetiklenmeden {duration} önce",
+      "firesImmediately": "Anında tetiklenir",
       "minuteCount": "{n} dakika | {n} dakika",
       "hourCount": "{n} saat | {n} saat",
       "timeRangeCount": "{n} zaman aralığı ({ranges}) | {n} zaman aralığı ({ranges})",
@@ -6691,6 +6762,7 @@
         "conditionOther": "{threshold} olay ({operator})",
         "alertMeWhenMinutes": "{condition} herhangi bir {count} dakikalık periyotta gerçekleştiğinde beni uyar",
         "alertMeWhenHours": "{condition} herhangi bir {count} saatlik periyotta gerçekleştiğinde beni uyar",
+        "pendingPeriodClause": ", {duration} bekledikten sonra",
         "cooldownClause": ", ancak her {cooldown} sürede en fazla bir kez",
         "defaultConditions": "Yapılandırılan koşullar yerine getirildiğinde beni uyarın"
       }
@@ -7155,6 +7227,8 @@
       "writeQueryHint": "Başlamak için bir sorgu yazın",
       "sqlEditorHint": "Çalıştırmak ve doğrulamak için açık tam düzenleyiciyi kullanın",
       "checkEvery": "Her",
+      "pendingPeriod": "Bekleme süresi",
+      "pendingPeriodTooltip": "Tetiklenmeden önce bu kadar bekleyin; böylece bir koşul, tek bir hatalı aralıkta tetiklenmek yerine sürekli sağlanmalıdır.",
       "cronExpressionPlaceholder": "0 */10 * * * *",
       "timezonePlaceholder": "saat dilimi",
       "onThese": "bunlarda",
@@ -10633,6 +10707,10 @@
         "success": "Veri kümesine eklendi",
         "loadError": "Veri kümeleri yüklenemedi",
         "error": "Bu öğe veri kümesine eklenemedi"
+      },
+      "playground": {
+        "button": "Playground'da Aç",
+        "hint": "Bu çağrının mesajlarını Playground'a yükleyerek düzenleyin ve yeniden çalıştırın."
       }
     },
     "discovery": {
@@ -11000,7 +11078,10 @@
         "columns": {
           "input": "Girdi",
           "output": "Çıktı",
-          "latency": "Gecikme"
+          "trials": "Denemeler",
+          "dispersion": "Yayılım",
+          "latency": "Gecikme",
+          "p50Latency": "P50 Gecikme"
         },
         "retryFailed": "Başarısız Slotları Yeniden Dene",
         "loadError": "Deney yüklenemedi",
@@ -11038,8 +11119,12 @@
         },
         "slotStatus": "Durum",
         "searchPlaceholder": "Girdi veya çıktı ara",
+        "searchInputPlaceholder": "Arama girişi",
         "statusFilter": "Durum",
-        "statusFilterAll": "Tüm Durumlar"
+        "statusFilterAll": "Tüm Durumlar",
+        "sortByDispersion": "Yayılıma göre sırala",
+        "highDispersionBadge": "Yüksek",
+        "trialNumber": "Deneme {n}"
       },
       "rowDetail": {
         "fallbackTitle": "Deney Satırı",
@@ -11130,10 +11215,13 @@
           "trial": "Deneme {index}",
           "noContent": "Sağlanmadı",
           "noOutput": "Çıktı yok",
-          "absentSide": "Bu çalıştırmada mevcut değil"
+          "absentSide": "Bu çalıştırmada mevcut değil",
+          "enterFullscreen": "Tam ekrana geç",
+          "exitFullscreen": "Tam ekrandan çık"
         }
       },
-      "selectionCount": "{count} / 2 seçildi"
+      "selectionCount": "{count} / 2 seçildi",
+      "clearBaseline": "Temel çizgiyi temizle"
     },
     "datasets": {
       "listTitle": "Veri Setleri",
@@ -11202,7 +11290,7 @@
           "expectedOutput": "Beklenen Çıktı",
           "source": "Kaynak",
           "tags": "Etiketler",
-          "version": "Sürüm",
+          "version": "Veri Kümesi Sürümü",
           "actions": "Eylemler"
         },
         "deleteItemTitle": "Öğeyi Sil",
@@ -11681,8 +11769,6 @@
       "title": "Playground",
       "runAll": "Tümünü Çalıştır",
       "runAllTooltip": "Tüm varyantları çalıştır",
-      "running": "Çalışıyor… ({done}/{total})",
-      "stop": "Durdur",
       "recentDrafts": "Son Taslaklar",
       "recentDraftsSection": "Bu tarayıcı · son 10",
       "draftVersus": "vs",
@@ -11691,6 +11777,7 @@
       "fromExperiment": "{name} deneyinden kopyalandı",
       "variables": "Değişkenler",
       "noVariables": "Mesajlarda {token} yok — girişi parametrelendirmek için bir tane ekleyin.",
+      "unusedSampledValue": "Henüz bir mesajda referans verilmedi: {tokens}. Kullanmak için bunları bir mesaja yazın.",
       "variablePlaceholder": "{name} için değer",
       "addExpected": "+ Beklenen Çıktı",
       "expectedLabel": "Beklenen",
@@ -11705,8 +11792,9 @@
       "variant": "Varyant {label}",
       "variantLimit": "Kıyaslama alanı en fazla {max} varyant alabilir.",
       "duplicateVariant": "Varyantı Çoğalt",
+      "resetVariant": "Çalışma Alanını Sıfırla",
       "removeVariant": "Varyantı Kaldır",
-      "runVariant": "Bu Varyantı Çalıştır",
+      "runVariant": "Çalıştır",
       "createExperiment": "Deney Oluştur",
       "modelPlaceholder": "Bir model seçin veya yazın",
       "providerUnknown": "Bilinmeyen Sağlayıcı",
@@ -11732,6 +11820,13 @@
       "toolsEmpty": "Tanımlı araç yok.",
       "toolCall": "Araç Çağrısı",
       "toolCallNote": "Çalıştırma burada durur — Playground araçları çalıştırmaz.",
+      "toolCallAddToMessages": "Mesajlara Ekle",
+      "toolCallContinueTooltip": "Bu çağrıyı konuşmaya ekler ve sonuç alanını açar.",
+      "toolCallAddedToMessages": "Araç çağrısı eklendi — araç sonucunu girin ve yeniden çalıştırın.",
+      "toolArgumentsPlaceholder": "Araç argümanları (JSON)",
+      "toolResultPlaceholder": "Araç sonucunu girin…",
+      "toolResultRequired": "Devam etmek için araç sonucunu yukarıda girin.",
+      "toolSetupRequired": "Devam etmek için bir araç seçin ve argümanlarını girin.",
       "toolInvalidJson": "Parametreler geçerli JSON olmalıdır.",
       "schema": "Şema",
       "schemaOn": "Şema · Açık",
@@ -11758,6 +11853,7 @@
       "sampleDatasetPlaceholder": "Bir veri kümesi seçin",
       "sampleSubmit": "Örnek Al",
       "sampleLoadError": "Bu veri kümesinden satırlar yüklenemedi.",
+      "sampleApplied": "Toplam {total} örnekten {index}. örnek yüklendi — bir mesajda {token} ile bu örneğe referans verin.",
       "sampleEmpty": "Bu veri kümesinde henüz öğe yok.",
       "noProviderTitle": "Playground bir LLM sağlayıcısı gerektirir.",
       "noProviderBody": "İstemleri çalıştırmak için bir sağlayıcı bağlayın. Yaklaşık bir dakika sürer.",
@@ -11770,6 +11866,8 @@
       "reset": "Sıfırla",
       "resetTitle": "Playground'ı Sıfırla",
       "resetMessage": "Tüm varyantları, satırları ve çıktıları temizleyip yeniden başlamak istiyor musunuz? Bu işlem geri alınamaz.",
+      "resetVariantTitle": "Çalışma Alanını Sıfırla",
+      "resetVariantMessage": "Bu çalışma alanının istemini ve çıktısını temizle? Bu geri alınamaz.",
       "scrollLeft": "Sola Kaydır",
       "scrollRight": "Sağa Kaydır",
       "addMessage": "Mesaj",
@@ -11785,6 +11883,7 @@
       "variantSettings": "Model Ayarları",
       "messageToolPlaceholder": "Araç Seç",
       "variablesCount": "Değişkenler · {count}",
+      "newValueTag": "Yeni",
       "variableUsed": "Bu varyantta kullanılıyor",
       "variableUnused": "Bu varyantta kullanılmıyor — burada boş görünür",
       "addVariable": "Değişken Ekle",
@@ -11833,7 +11932,9 @@
       "sampleFullView": "Tam Görünüm",
       "sampleBack": "Listeye Geri Dön",
       "sampleInput": "Giriş",
-      "sampleExpected": "Beklenen Çıktı"
+      "sampleExpected": "Beklenen Çıktı",
+      "fromTrace": "{id} nolu iz spanından",
+      "openInPlaygroundFailed": "Bu span Deneme Alanı'nda açılamadı"
     }
   },
   "onlineEvals": {
@@ -11866,12 +11967,14 @@
     },
     "scoreConfigLibrary": {
       "searchPlaceholder": "Puan Yapılandırmalarını Ara...",
-      "scoreConfigsLabel": "{count} puan yapılandırması | {count} puan yapılandırması"
+      "scoreConfigsLabel": "{count} puan yapılandırması | {count} puan yapılandırması",
+      "selectedOfTotal": "{total} üzerinden {selected} seçildi"
     },
     "scorerLibrary": {
       "noProvidersMessage": "LLM Judge puanlayıcılarını içe aktarmadan önce bir Sağlayıcı oluşturun.",
       "searchPlaceholder": "Puanlayıcıları Ara...",
-      "scorerCountSuffix": "{count} puanlayıcı | {count} puanlayıcı"
+      "scorerCountSuffix": "{count} puanlayıcı | {count} puanlayıcı",
+      "selectedOfTotal": "{total} üzerinden {selected} seçildi"
     },
     "title": "Değerlendirmeler",
     "loadError": "Çevrimiçi değerlendirmeler yüklenemedi",
@@ -11988,7 +12091,8 @@
         "legendFalseCount": "yanlış ({count})",
         "kpis": {
           "average": "Ortalama",
-          "p50p95": "P50/P95",
+          "p50": "P50",
+          "p95": "P95",
           "unhealthy": "Sağlıksız",
           "healthy": "Sağlıklı",
           "trueRate": "Doğru oranı",
@@ -12097,8 +12201,6 @@
       "remoteCta": "Uç Noktayı Yapılandır"
     },
     "provider": {
-      "sectionStep1": "01",
-      "sectionStep2": "02",
       "backTo": "Sağlayıcılara Geri Dön",
       "createTitle": "LLM Sağlayıcısı Oluştur",
       "editTitle": "LLM Sağlayıcısını Düzenle",
@@ -12107,7 +12209,7 @@
       "nameLabel": "İsim",
       "typeLabel": "Sağlayıcı tipi",
       "endpointLabel": "Bitiş noktası",
-      "endpointPlaceholder": "İsteğe bağlı özel uç nokta",
+      "endpointPlaceholder": "Tamamlamalar için tam URL, örn. https://your-host/v1/chat/completions",
       "defaultModelLabel": "Varsayılan model",
       "availableModelsLabel": "Mevcut modeller",
       "apiKeyLabel": "API Anahtarı",
