@@ -778,6 +778,13 @@ pub struct StepAssertion {
     pub attribute: Option<String>,
 }
 
+/// The browser check whose steps replace a `subtest` step at expansion.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SubtestRef {
+    pub id: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct BrowserStepV2 {
@@ -821,6 +828,9 @@ pub struct BrowserStepV2 {
     /// is a deliberate author choice, validated into 100..=60000.
     #[serde(default)]
     pub timeout_ms: Option<u32>,
+    /// Present only on a `subtest` step; never reaches a browser (expansion removes it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subtest: Option<SubtestRef>,
 }
 
 /// A (browser, device) pair for browser check fan-out.
@@ -1160,6 +1170,25 @@ pub fn device_viewport(device_id: &str) -> Option<(u32, u32)> {
         .map(|d| (d.width, d.height))
 }
 
+pub fn is_composition_action(action: &str) -> bool {
+    V2_COMPOSITION_ACTIONS.contains(&action)
+}
+
+/// Runs the per-step rules over an already-expanded journey (no `subtest` may remain).
+pub fn validate_expanded_steps(steps: &[serde_json::Value]) -> Result<(), String> {
+    validate_v2_steps(steps)?;
+    if let Some(i) = steps.iter().position(|s| {
+        s.get("action")
+            .and_then(|a| a.as_str())
+            .is_some_and(is_composition_action)
+    }) {
+        return Err(format!(
+            "config.steps[{i}]: a composition action survived expansion"
+        ));
+    }
+    Ok(())
+}
+
 /// Worst-case wall clock for one leased job, in milliseconds.
 ///
 /// Retries happen INSIDE the leased job, so the lease has to cover the whole
@@ -1268,8 +1297,8 @@ fn validate_net_retry_budget(
 /// model and made it reachable from the action picker. It is executed by
 /// `Locator.hover` in the probe and `Frame.hover` in the extension player.
 ///
-/// Because this set is drawn from Playwright's own model, every stored v2 step
-/// is executable by both the probe and the extension player by construction.
+/// Every step the probe RECEIVES is executable by construction: expansion strips
+/// `V2_COMPOSITION_ACTIONS` first.
 const V2_STEP_ACTIONS: &[&str] = &[
     "navigate", "click", "hover", "fill", "press", "select", "check", "uncheck", "upload", "assert",
 ];
@@ -1278,6 +1307,13 @@ const V2_STEP_ACTIONS: &[&str] = &[
 const V2_ELEMENT_ACTIONS: &[&str] = &[
     "click", "hover", "fill", "press", "select", "check", "uncheck", "upload", "assert",
 ];
+
+/// Actions that exist only in the stored vocabulary: expansion replaces them before any browser
+/// sees a journey.
+pub const V2_COMPOSITION_ACTIONS: &[&str] = &["subtest"];
+
+/// The evidence panel's "no step" sentinel; a step may not claim it.
+const STEP_ID_RESERVED: &str = "__unattributed__";
 
 /// The closed set of assertion kinds (spec P5.1).
 ///
@@ -1299,7 +1335,7 @@ const V2_VISIBILITY_ASSERTION_KINDS: &[&str] = &["element_visible", "element_not
 /// Kinds that describe the page rather than an element, and so need no locator.
 const V2_PAGE_LEVEL_ASSERTION_KINDS: &[&str] = &["url_matches", "page_title"];
 
-const MAX_STEPS: usize = 50;
+pub const MAX_STEPS: usize = 50;
 /// A step carries up to 5 locator candidates and 5 settle patterns. A maximal
 /// 50-step journey lands near 60KB; the cap is set well clear of that. The
 /// `config` column is already JSON (jsonb on PostgreSQL), and steps travel over
@@ -1913,9 +1949,7 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
         let step: BrowserStepV2 =
             serde_json::from_value(raw.clone()).map_err(|e| format!("config.steps[{i}]: {e}"))?;
 
-        if step.id.is_empty() {
-            return Err(format!("config.steps[{i}]: 'id' must not be empty"));
-        }
+        validate_step_id(i, &step.id)?;
         if !seen_ids.insert(step.id.clone()) {
             return Err(format!(
                 "config.steps[{i}]: duplicate step id '{}'",
@@ -1923,13 +1957,25 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
             ));
         }
 
-        if !V2_STEP_ACTIONS.contains(&step.action.as_str()) {
+        if !V2_STEP_ACTIONS.contains(&step.action.as_str()) && !is_composition_action(&step.action)
+        {
             return Err(format!(
                 "config.steps[{i}]: action '{}' is not valid (valid: {}). scroll, wait and \
                  screenshot have no equivalent in the recorder's action model and cannot be \
                  replayed; type and keydown are aliases of fill and press.",
                 step.action,
                 V2_STEP_ACTIONS.join(", ")
+            ));
+        }
+
+        if is_composition_action(&step.action) {
+            validate_subtest_step(i, &step)?;
+            continue;
+        }
+        if step.subtest.is_some() {
+            return Err(format!(
+                "config.steps[{i}]: 'subtest' is only valid on a 'subtest' step, not on '{}'",
+                step.action
             ));
         }
 
@@ -2050,6 +2096,56 @@ fn validate_v2_steps(steps: &[serde_json::Value]) -> Result<(), String> {
         }
     }
 
+    Ok(())
+}
+
+fn validate_step_id(i: usize, id: &str) -> Result<(), String> {
+    if id.is_empty() {
+        return Err(format!("config.steps[{i}]: 'id' must not be empty"));
+    }
+    if !id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
+        return Err(format!(
+            "config.steps[{i}]: step id '{id}' may only contain letters, digits, '-' and '_'"
+        ));
+    }
+    if id == STEP_ID_RESERVED {
+        return Err(format!("config.steps[{i}]: step id '{id}' is reserved"));
+    }
+    Ok(())
+}
+
+fn validate_subtest_step(i: usize, step: &BrowserStepV2) -> Result<(), String> {
+    let target = step.subtest.as_ref().filter(|s| !s.id.trim().is_empty());
+    if target.is_none() {
+        return Err(format!(
+            "config.steps[{i}]: a 'subtest' step requires 'subtest.id'"
+        ));
+    }
+    if step.optional || step.always_run {
+        return Err(format!(
+            "config.steps[{i}]: 'optional' and 'always_run' are not valid on a 'subtest' step \
+             — a subtest failure always fails the parent"
+        ));
+    }
+    // Every optional field of `BrowserStepV2` except `name`: a reference is the reference.
+    let carries_more = step.url.is_some()
+        || step.locator.is_some()
+        || step.value.is_some()
+        || step.key.is_some()
+        || step.files.is_some()
+        || step.assertion.is_some()
+        || step.settle.is_some()
+        || step.button.is_some()
+        || step.click_count.is_some()
+        || step.timeout_ms.is_some();
+    if carries_more {
+        return Err(format!(
+            "config.steps[{i}]: a 'subtest' step carries only 'subtest' (and 'name')"
+        ));
+    }
     Ok(())
 }
 
@@ -3621,6 +3717,136 @@ mod tests {
         let s = v2_synthetic(serde_json::json!([v2_click_step()]));
         let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
         assert!(err.contains("navigate"), "{err}");
+    }
+
+    fn subtest_journey() -> serde_json::Value {
+        serde_json::json!({
+            "steps": [
+                { "id": "s1", "action": "navigate", "url": "https://example.com" },
+                { "id": "s2", "action": "subtest", "name": "Log in (shared)",
+                  "subtest": { "id": "login-test" } },
+                { "id": "s3", "action": "click", "name": "Logs",
+                  "locator": { "candidates": [ { "kind": "css", "value": "#logs" } ] } }
+            ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        })
+    }
+
+    #[test]
+    fn a_subtest_step_is_accepted_by_the_stored_vocabulary() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = subtest_journey();
+        s.validate(&locs, &brs, &devs, true).unwrap();
+    }
+
+    #[test]
+    fn a_subtest_step_may_open_the_journey() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": [ { "id": "s1", "action": "subtest", "subtest": { "id": "login-test" } } ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        });
+        s.validate(&locs, &brs, &devs, true).unwrap();
+    }
+
+    #[test]
+    fn a_subtest_step_must_name_a_check() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": [
+                { "id": "s1", "action": "navigate", "url": "https://example.com" },
+                { "id": "s2", "action": "subtest" }
+            ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        });
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("requires 'subtest.id'"), "{err}");
+    }
+
+    #[test]
+    fn optional_and_always_run_are_rejected_on_a_subtest_step() {
+        let (locs, brs, devs) = allowed();
+        for flag in ["optional", "always_run"] {
+            let mut s = valid_browser_synthetic();
+            let mut cfg = subtest_journey();
+            cfg["steps"][1][flag] = serde_json::json!(true);
+            s.config = cfg;
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains(flag), "{flag}: {err}");
+        }
+    }
+
+    #[test]
+    fn a_subtest_step_carries_nothing_but_the_reference() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        let mut cfg = subtest_journey();
+        cfg["steps"][1]["url"] = serde_json::json!("https://example.com");
+        s.config = cfg;
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("carries only"), "{err}");
+    }
+
+    #[test]
+    fn a_subtest_step_rejects_every_execution_field() {
+        let (locs, brs, devs) = allowed();
+        for (field, value) in [
+            ("timeout_ms", serde_json::json!(5000)),
+            ("button", serde_json::json!("right")),
+            ("click_count", serde_json::json!(2)),
+            ("value", serde_json::json!("x")),
+            ("key", serde_json::json!("Tab")),
+        ] {
+            let mut s = valid_browser_synthetic();
+            let mut cfg = subtest_journey();
+            cfg["steps"][1][field] = value;
+            s.config = cfg;
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains("carries only"), "{field}: {err}");
+        }
+    }
+
+    #[test]
+    fn the_subtest_field_is_rejected_on_an_ordinary_step() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        let mut cfg = subtest_journey();
+        cfg["steps"][2]["subtest"] = serde_json::json!({ "id": "login-test" });
+        s.config = cfg;
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("only valid on a 'subtest' step"), "{err}");
+    }
+
+    #[test]
+    fn step_ids_are_restricted_to_the_composed_id_alphabet() {
+        let (locs, brs, devs) = allowed();
+        for bad in ["s/1", "s,1", "s 1", "__unattributed__"] {
+            let mut s = valid_browser_synthetic();
+            s.config = serde_json::json!({
+                "steps": [ { "id": bad, "action": "navigate", "url": "https://example.com" } ],
+                "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+            });
+            let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+            assert!(err.contains("step id"), "{bad}: {err}");
+        }
+    }
+
+    #[test]
+    fn duplicate_step_ids_are_rejected() {
+        let (locs, brs, devs) = allowed();
+        let mut s = valid_browser_synthetic();
+        s.config = serde_json::json!({
+            "steps": [
+                { "id": "s1", "action": "navigate", "url": "https://example.com" },
+                { "id": "s1", "action": "navigate", "url": "https://example.com/2" }
+            ],
+            "browser_devices": [ { "browser": "chromium", "device": "desktop" } ]
+        });
+        let err = s.validate(&locs, &brs, &devs, true).unwrap_err();
+        assert!(err.contains("duplicate step id 's1'"), "{err}");
     }
 
     #[test]
