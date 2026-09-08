@@ -33,6 +33,16 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
       >
       </span>
 
+      <!-- Tab List -->
+      <TabList
+        v-if="showTabs && selectedTabId !== null"
+        class="mt-2"
+        :dashboardData="dashboardData"
+        :viewOnly="viewOnly"
+        @refresh="refreshDashboard"
+      />
+
+      <!-- Below the tabs: these scope the ACTIVE tab, and above them the strip both read as page chrome and shifted the tab bar as its height changed per tab. -->
       <VariablesValueSelector
         v-if="globalVariables.length > 0 || dashboardData?.variables?.showDynamicFilters"
         :scope="'global'"
@@ -43,15 +53,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
         :initialVariableValues="initialVariableValues"
         class="global-variables-selector"
         data-test="global-variables-selector"
-      />
-
-      <!-- Tab List -->
-      <TabList
-        v-if="showTabs && selectedTabId !== null"
-        class="mt-2"
-        :dashboardData="dashboardData"
-        :viewOnly="viewOnly"
-        @refresh="refreshDashboard"
       />
 
       <!-- Tab-scoped Variables (for active tab, if using manager) -->

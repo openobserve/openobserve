@@ -24,6 +24,342 @@ const NS = "${f:k8s-namespace}";
 const POD = "${f:k8s-pod-name}";
 const CONTAINER = "${f:k8s-container-name}";
 
+/** The fleet quadrant's bubble click, carrying `detail.cluster`; CuratedPageView routes it so the SPA is never torn down. */
+export const FLEET_DRILLDOWN_EVENT = "o2-curated-cluster-drilldown";
+
+/** The tab a fleet-quadrant bubble drills into. */
+export const FLEET_DRILLDOWN_TAB = "health";
+
+// Author JS for the fleet quadrant: the ${theme:} tokens are resolved by translateTitles (useCuratedPage.ts) because the sandbox CSP blocks every stylesheet.
+/* eslint-disable local/no-hardcoded-px -- the tooltip CSS below is serialised by ECharts into its own container, where no CSS cascade resolves rem */
+const FLEET_QUADRANT_JS = `
+var byCluster = {};
+var row = function (name) {
+  if (!byCluster[name]) {
+    byCluster[name] = { name: name, allocCpu: 0, allocMem: 0, reqCpu: 0, reqMem: 0, running: 0, pending: 0, failed: 0, other: 0, restarts: 0 };
+  }
+  return byCluster[name];
+};
+// The cluster field is resolved from \${f:k8s-cluster} at query time, so its spelling is unknown here: prefer a cluster-ish key, else the one label the query did not name.
+var NAMED_LABELS = { __name__: 1, resource: 1, phase: 1, le: 1, quantile: 1 };
+var clusterOf = function (metric) {
+  var keys = Object.keys(metric || {});
+  var fallback = "";
+  for (var k = 0; k < keys.length; k++) {
+    var key = keys[k];
+    if (NAMED_LABELS[key]) continue;
+    if (key.toLowerCase().indexOf("cluster") >= 0) return String(metric[key]);
+    if (!fallback) fallback = String(metric[key]);
+  }
+  return fallback;
+};
+var lastValue = function (series) {
+  var values = series.values || [];
+  if (values.length) return Number(values[values.length - 1][1]) || 0;
+  if (series.value) return Number(series.value[1]) || 0;
+  return 0;
+};
+var eachSeries = function (frame, visit) {
+  var results = (frame && frame.result) || [];
+  for (var i = 0; i < results.length; i++) visit(results[i].metric || {}, lastValue(results[i]));
+};
+
+eachSeries(data[0], function (metric, value) {
+  var entry = row(clusterOf(metric));
+  if (metric.resource === "cpu") entry.allocCpu += value;
+  if (metric.resource === "memory") entry.allocMem += value;
+});
+eachSeries(data[1], function (metric, value) {
+  var entry = row(clusterOf(metric));
+  if (metric.resource === "cpu") entry.reqCpu += value;
+  if (metric.resource === "memory") entry.reqMem += value;
+});
+eachSeries(data[2], function (metric, value) {
+  var entry = row(clusterOf(metric));
+  if (metric.phase === "Running") entry.running += value;
+  if (metric.phase === "Pending") entry.pending += value;
+  if (metric.phase === "Failed") entry.failed += value;
+});
+eachSeries(data[3], function (metric, value) {
+  row(clusterOf(metric)).other += value;
+});
+eachSeries(data[4], function (metric, value) {
+  row(clusterOf(metric)).restarts += value;
+});
+
+var pct = function (used, total) {
+  return total > 0 ? Math.round((used / total) * 1000) / 10 : 0;
+};
+var maxCores = 1;
+var points = [];
+var names = Object.keys(byCluster);
+for (var n = 0; n < names.length; n++) {
+  var c = byCluster[names[n]];
+  if (!c.name) continue;
+  if (c.allocCpu > maxCores) maxCores = c.allocCpu;
+  points.push({
+    name: c.name,
+    cpuPct: pct(c.reqCpu, c.allocCpu),
+    memPct: pct(c.reqMem, c.allocMem),
+    cores: c.allocCpu,
+    pods: c.running + c.pending + c.failed + c.other,
+    pending: c.pending,
+    failed: c.failed,
+    restarts: Math.round(c.restarts * 10) / 10,
+  });
+}
+
+var CRITICAL = "\${theme:chart-critical}";
+var WARNING = "\${theme:chart-warning}";
+var HEALTHY = "\${theme:chart-healthy}";
+var COST = "\${theme:chart-cost}";
+var AXIS = "\${theme:chart-axis}";
+var LABEL = "\${theme:chart-label}";
+var ZONE_LABEL = "\${theme:chart-zone-label}";
+var GUIDE = "\${theme:chart-guide}";
+var GRID = "\${theme:chart-grid}";
+var SURFACE = "\${theme:chart-surface}";
+var ZONE_HOT = "\${theme:zone-hot}";
+var ZONE_CPU = "\${theme:zone-cpu}";
+var ZONE_MEM = "\${theme:zone-mem}";
+var ZONE_COLD = "\${theme:zone-cold}";
+var ZONE_HOT_INK = "\${theme:zone-hot-ink}";
+var ZONE_COLD_INK = "\${theme:zone-cold-ink}";
+var ZONE_CPU_INK = "\${theme:zone-cpu-ink}";
+var ZONE_MEM_INK = "\${theme:zone-mem-ink}";
+var TIP_BG = "\${theme:tooltip-bg}";
+var TIP_TEXT = "\${theme:tooltip-text}";
+var TIP_BORDER = "\${theme:tooltip-border}";
+
+var HOT = 80;
+var COLD = 40;
+var FULL = 100;
+// Keeps the x:y pixel ratio near 2 at the widest desktop and under 1 on a narrow one, so the diagonal stays readable without leaving dead gutters.
+var PLOT_SIDE_MARGIN = "18%";
+
+// ECharts drops any point outside a fixed axis range, so a hard max:100 would silently ERASE the over-committed cluster this chart exists to surface.
+var axisMax = FULL;
+for (var m = 0; m < points.length; m++) {
+  var worst = Math.max(points[m].cpuPct, points[m].memPct);
+  // +10 of headroom: a bubble centred exactly on the axis max is drawn half outside the grid and loses its label.
+  if (worst > axisMax) axisMax = Math.ceil(worst / 10) * 10 + 10;
+}
+
+var guides = [{ xAxis: HOT }, { yAxis: HOT }];
+// Drawn only once something is past it: at exactly 100 the axis edge already IS the line, so a second one there is noise.
+if (axisMax > FULL) {
+  guides.push({ xAxis: FULL, lineStyle: { color: CRITICAL, type: "dashed", width: 1 } });
+  guides.push({ yAxis: FULL, lineStyle: { color: CRITICAL, type: "dashed", width: 1 } });
+}
+
+// Health is judged ONLY from fault fields: position already encodes commitment, so counting it twice would paint a busy-but-sound cluster as sick.
+var state = function (p) {
+  var faults = (p.pending > 1 ? 1 : 0) + (p.restarts > 0 ? 1 : 0) + (p.failed > 0 ? 1 : 0);
+  // One fault is an incident; two co-occurring kinds is a pattern, and only a pattern earns the ring.
+  if (faults >= 2) return "crit";
+  if (p.pending > 0 || p.restarts > 0 || p.failed > 0) return "warn";
+  // Requesting MORE than the nodes can allocate is a measured capacity fact, not an inference, so it outranks a clean fault sheet.
+  if (p.cpuPct > FULL || p.memPct > FULL) return "warn";
+  // Slack on BOTH axes is a cost finding, not a health one, so it is not folded into "healthy".
+  if (p.cpuPct < COLD && p.memPct < COLD) return "cost";
+  return "ok";
+};
+var STATE_COLOR = { ok: HEALTHY, warn: WARNING, crit: CRITICAL, cost: COST };
+var STATE_LABEL = { ok: "Healthy", warn: "Isolated fault", crit: "Fault pattern", cost: "Over-provisioned" };
+
+// Sizes are baked into each data item, never a symbolSize callback: a function crossing the sandbox is serialized and loses this closure.
+// sqrt so AREA, not radius, tracks allocatable cores — a radius-linear bubble overstates a big cluster fourfold.
+var radius = function (cores) {
+  return 9 + 25 * Math.sqrt((cores > 0 ? cores : 0) / maxCores);
+};
+
+// Sorted by x so the alternating left/right assignment below makes NEIGHBOURS lean apart, which fanning by input order does not.
+points.sort(function (a, b) {
+  return a.cpuPct - b.cpuPct;
+});
+
+var zone = function (x0, x1, y0, y1, fill, text, pos, labelColor) {
+  return [
+    {
+      coord: [x0, y0],
+      itemStyle: { color: fill },
+      label: { show: true, formatter: text, position: pos, color: labelColor || ZONE_LABEL, fontSize: 11, fontWeight: 700, padding: [8, 10] },
+    },
+    { coord: [x1, y1] },
+  ];
+};
+
+
+var critical = [];
+var bubbles = [];
+for (var q = 0; q < points.length; q++) {
+  var pt = points[q];
+  var st = state(pt);
+  var isCrit = st === "crit";
+  if (isCrit) {
+    critical.push({
+      name: pt.name,
+      value: [pt.cpuPct, pt.memPct, pt.cores],
+      symbolSize: radius(pt.cores) * 2 + 15,
+    });
+  }
+  bubbles.push({
+    name: pt.name,
+    value: [pt.cpuPct, pt.memPct, pt.cores],
+    symbolSize: radius(pt.cores) * 2,
+    meta: pt,
+    stateLabel: STATE_LABEL[st],
+    stateColor: STATE_COLOR[st],
+    z: isCrit ? 12 : 5,
+    itemStyle: {
+      color: STATE_COLOR[st],
+      opacity: isCrit ? 1 : 0.88,
+      borderColor: SURFACE,
+      borderWidth: 2,
+    },
+    label: {
+      show: true,
+      position: q % 2 ? "right" : "left",
+      distance: isCrit ? 15 : 8,
+      formatter: "{b}",
+      color: isCrit ? CRITICAL : LABEL,
+      fontSize: 11,
+      fontWeight: isCrit ? 700 : 500,
+      // Surface-coloured halo keeps a name legible wherever it crosses a bubble.
+      textBorderColor: SURFACE,
+      textBorderWidth: 3,
+    },
+  });
+}
+
+option = {
+  backgroundColor: "transparent",
+  // Off deliberately: the renderer re-runs setOption on every data identity change, and a re-entry animation reads as a flicker.
+  animation: false,
+  tooltip: {
+    // "item", not the house "axis": a scatter has no shared category, so per-point is the only correct trigger.
+    trigger: "item",
+    confine: true,
+    appendToBody: false,
+    transitionDuration: 0,
+    enterable: false,
+    className: "o2-echarts-tooltip",
+    backgroundColor: TIP_BG,
+    borderColor: TIP_BORDER,
+    borderWidth: 1,
+    padding: [8, 12],
+    textStyle: { color: TIP_TEXT, fontSize: 12 },
+    extraCssText: "max-width: 500px; user-select: text; border-radius: 8px !important;",
+    // No \`&&\` and no HTML entities in this body: DOMPurify.sanitize runs over the serialized function text and would escape them into a syntax error.
+    formatter: function (p) {
+      if (!p.data) return "";
+      var d = p.data.meta;
+      if (!d) return "";
+      var faults = [];
+      if (d.pending) faults.push(d.pending + " pending");
+      if (d.failed) faults.push(d.failed + " failed");
+      if (d.restarts) faults.push(d.restarts + " restarts/hr");
+      return (
+        "<b>" + d.name + "</b>" +
+        "<br/>" + p.data.stateLabel +
+        "<br/>CPU committed " + d.cpuPct + "%" +
+        "<br/>Memory committed " + d.memPct + "%" +
+        "<br/>Allocatable CPU " + Math.round(d.cores * 10) / 10 + " cores" +
+        "<br/>Pods " + d.pods +
+        "<br/>" + (faults.length ? faults.join(", ") : "No faults")
+      );
+    },
+  },
+  // Proportional side margins: full-bleed stretches 1% of CPU to 3.1x the pixels of 1% of memory at 1920, while a fixed-width box pillarboxes the panel with dead gutters.
+  grid: { left: PLOT_SIDE_MARGIN, right: PLOT_SIDE_MARGIN, top: 24, bottom: 52, containLabel: true },
+  xAxis: {
+    name: "CPU committed %",
+    nameLocation: "middle",
+    nameGap: 33,
+    type: "value",
+    min: 0,
+    max: axisMax,
+    interval: 20,
+    boundaryGap: false,
+    axisLine: { lineStyle: { color: AXIS } },
+    axisTick: { show: false },
+    axisLabel: { color: LABEL, formatter: "{value}%" },
+    splitLine: { lineStyle: { color: GRID, type: "dashed", width: 1 } },
+  },
+  yAxis: {
+    name: "Memory committed %",
+    nameLocation: "middle",
+    nameGap: 44,
+    type: "value",
+    min: 0,
+    max: axisMax,
+    interval: 20,
+    axisLine: { show: false },
+    axisTick: { show: false },
+    axisLabel: { color: LABEL, formatter: "{value}%" },
+    splitLine: { lineStyle: { color: GRID, type: "dashed", width: 1 } },
+  },
+  series: [
+    {
+      // A detached halo, not a thicker border: state survives greyscale and red/green CVD because it is encoded in FORM too.
+      type: "scatter",
+      symbol: "circle",
+      silent: true,
+      animation: false,
+      z: 10,
+      itemStyle: { color: "transparent", borderColor: CRITICAL, borderWidth: 1.6 },
+      data: critical,
+    },
+    {
+      type: "scatter",
+      symbol: "circle",
+      cursor: "pointer",
+      data: bubbles,
+      // shiftY moves a colliding label instead of dropping it, so every cluster stays named; hideOverlap only culls what still cannot fit.
+      labelLayout: { moveOverlap: "shiftY", hideOverlap: true },
+      // Pinned rather than left to the default: an unbounded emphasis re-scale is what reads as a hover flicker.
+      emphasis: { scale: 1.06, focus: "none" },
+      // The quadrants, not the grid, are what make the hot corner legible against the slack one.
+      markArea: {
+        silent: true,
+        z: -10,
+        data: [
+          zone(0, COLD, 0, COLD, ZONE_COLD, "Over-provisioned", "insideBottomLeft", ZONE_COLD_INK),
+          zone(HOT, axisMax, HOT, axisMax, ZONE_HOT, "No headroom", "insideTopRight", ZONE_HOT_INK),
+          zone(HOT, axisMax, 0, HOT, ZONE_CPU, "CPU-bound", "insideBottomRight", ZONE_CPU_INK),
+          zone(0, HOT, HOT, axisMax, ZONE_MEM, "Memory-bound", "insideTopLeft", ZONE_MEM_INK),
+        ],
+      },
+      markLine: {
+        silent: true,
+        symbol: "none",
+        label: { show: false },
+        // GUIDE, not GRID: the quadrant boundary must read above the faint dashed grid without competing with the bubbles.
+        lineStyle: { color: GUIDE, type: "solid", width: 1 },
+        data: guides,
+      },
+    },
+  ],
+  // Serialized across the sandbox and rebuilt by CustomChartRenderer in the PARENT, which is the only reason this can reach the page at all.
+  o2_events: {
+    // Announces the pick and lets CuratedPageView route it: location.assign here would tear down and reload the whole SPA.
+    // Reaches the document off the chart's own DOM node: every global here would be a free identifier the sandbox never passes in.
+    // No "<" and no "&" ANYWHERE in this body: DOMPurify.sanitize runs over the serialized function text, escaping "&" and TRUNCATING the function at "<".
+    click: function (params, chart) {
+      if (!params.data) return;
+      var meta = params.data.meta;
+      if (!meta) return;
+      var doc = chart.getDom().ownerDocument;
+      // Bubbles because the listener sits on the document, not on this chart's container.
+      doc.dispatchEvent(
+        new CustomEvent("${FLEET_DRILLDOWN_EVENT}", { detail: { cluster: String(meta.name) }, bubbles: true }),
+      );
+    },
+  },
+};
+`;
+/* eslint-enable local/no-hardcoded-px */
+
 /** One-variant panels share this shape; the drilldown always carries variant 1. */
 const panel = (
   def: Omit<CuratedPanelDef, "drilldown">,
@@ -134,6 +470,69 @@ export const kubernetesPage: CuratedPageManifest = {
 
   sections: [
     {
+      id: "summary",
+      titleKey: "infra.k8s.section.summary",
+      // Deliberately unscoped: the over-provisioned corner is only legible NEXT TO
+      // the tight one, and filtering to one cluster degenerates the chart to a dot.
+      panels: [
+        panel(
+          {
+            id: "k8s_sm_fleet_quadrant",
+            titleKey: "infra.k8s.panel.fleetQuadrant",
+            type: "custom_chart",
+            unit: "percent",
+            groupId: "kube-state",
+            // 17px gridstack cells: h:39 is the tallest that still fits a 1440x900 viewport unscrolled, and it seats the square plot plus its axis chrome.
+            layout: { w: 192, h: 39 },
+            customChartContent: FLEET_QUADRANT_JS,
+            variants: [
+              {
+                requiresStreams: [
+                  "kube_node_status_allocatable",
+                  "kube_pod_container_resource_requests",
+                  "kube_pod_status_phase",
+                  "kube_pod_container_status_restarts_total",
+                ],
+                queryType: "promql",
+                // Each ratio divides two SEPARATE queries, so a range window let the JS take numerator and denominator from different instants (measured 3.6x wrong while autoscaling); staleness at the instant also drops decommissioned clusters.
+                queryMode: "instant",
+                queries: [
+                  // Index 0 must be the allocatable query: convertPanelData.ts:231 gates the
+                  // whole chart on data[0].result.length, and a fault query is empty on a
+                  // healthy fleet — the panel would blank exactly when nothing is wrong.
+                  {
+                    query: `sum by (${CLUSTER}, resource) (kube_node_status_allocatable{resource=~"cpu|memory|pods"})`,
+                    legend: "",
+                  },
+                  {
+                    query: `sum by (${CLUSTER}, resource) (kube_pod_container_resource_requests{resource=~"cpu|memory"})`,
+                    legend: "",
+                  },
+                  {
+                    query: `sum by (${CLUSTER}, phase) (kube_pod_status_phase{phase=~"Running|Pending|Failed"})`,
+                    legend: "",
+                  },
+                  // Running|Pending|Failed are three of five phases, so the fault counts
+                  // need the other two to have an honest pod denominator.
+                  {
+                    query: `sum by (${CLUSTER}, phase) (kube_pod_status_phase{phase=~"Succeeded|Unknown"})`,
+                    legend: "",
+                  },
+                  // A counter read raw ranks a long-lived healthy cluster above one crash-looping now.
+                  {
+                    query: `sum by (${CLUSTER}) (increase(kube_pod_container_status_restarts_total[1h]))`,
+                    legend: "",
+                  },
+                ],
+              },
+            ],
+          },
+          "kube_node_status_allocatable",
+        ),
+      ],
+    },
+
+    {
       id: "overview",
       titleKey: "infra.k8s.section.overview",
       scopedBy: ["cluster"],
@@ -142,38 +541,32 @@ export const kubernetesPage: CuratedPageManifest = {
       // tile it consumed the bar and truncated the very titles it qualified.
       noteKey: "infra.k8s.section.overviewNote",
       panels: [
+        // Counted from kube-state, the SAME collector as the ready tile beside it: a
+        // NotReady node stops emitting kubeletstats entirely, so a kubeletstats
+        // denominator shrinks toward the numerator and reads 30/30 exactly when a
+        // node has failed — the total must come from the source that still sees it.
         panel(
           {
             id: "k8s_ov_nodes",
             titleKey: "infra.k8s.panel.nodes",
             type: "metric",
             unit: "numbers",
-            groupId: "kubelet-node",
+            groupId: "kube-state",
             layout: { w: 32, h: 6 },
             variants: [
               {
-                requiresStreams: ["k8s_node_cpu_utilization"],
+                requiresStreams: ["kube_node_status_allocatable"],
                 queryType: "promql",
                 queries: [
                   {
-                    query: `count(count by (${NODE}) (k8s_node_cpu_utilization\${scope:cluster}))`,
-                    legend: "",
-                  },
-                ],
-              },
-              {
-                requiresStreams: ["k8s_node_cpu_usage"],
-                queryType: "promql",
-                queries: [
-                  {
-                    query: `count(count by (${NODE}) (k8s_node_cpu_usage\${scope:cluster}))`,
+                    query: `count(count by (${NODE}) (kube_node_status_allocatable{\${scope:cluster}}))`,
                     legend: "",
                   },
                 ],
               },
             ],
           },
-          "k8s_node_cpu_utilization",
+          "kube_node_status_allocatable",
         ),
 
         // `status="true"` selects series; the assertion lives in the series VALUE, so counting READY nodes needs `== 1`.

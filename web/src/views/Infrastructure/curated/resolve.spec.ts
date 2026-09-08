@@ -50,6 +50,8 @@ const RANGE = { start: NOW_US - 3 * HOUR_US, end: NOW_US };
 interface StreamFixture {
   name: string;
   docTimeMax?: number;
+  docNum?: number;
+  createdAt?: number;
   schema?: string[];
 }
 
@@ -57,10 +59,10 @@ interface StreamFixture {
 const streamEntry = (f: StreamFixture) => ({
   name: f.name,
   stats: {
-    created_at: 0,
+    created_at: f.createdAt ?? 0,
     doc_time_min: 0,
     doc_time_max: f.docTimeMax ?? NOW_US - 60 * 1_000_000,
-    doc_num: 1,
+    doc_num: f.docNum ?? 1,
     file_num: 1,
     storage_size: 1,
     compressed_size: 1,
@@ -674,7 +676,7 @@ describe("§5.2 variant satisfiability — presence AND liveness", () => {
     ]);
     const resolution = resolve({ streams });
 
-    for (const id of ["k8s_ov_nodes", "k8s_ov_cpu_used", "k8s_ov_node_cpu_top", "k8s_nd_cpu"]) {
+    for (const id of ["k8s_ov_cpu_used", "k8s_ov_node_cpu_top", "k8s_nd_cpu"]) {
       const panel = panelById(resolution, id);
       expect(panel.hidden, id).toBe(false);
       expect(panel.selectedVariant.requiresStreams, id).toEqual(["k8s_node_cpu_usage"]);
@@ -913,6 +915,84 @@ describe("§5.3 staleness — min(range.start, now − STALE_GRACE_US)", () => {
       .flatMap((t: any) => t.panels)
       .find((p: any) => p.config.curated_badge);
     expect(badged.config.curated_badge.key).toBe("infra.curated.staleNoDataBadge");
+  });
+
+  it("a never-ingested variant 1 (0 docs, created 9 months ago) LOSES to the live variant 2", () => {
+    // Measured: k8s_node_cpu_utilization carries doc_num 0 since 2024 while
+    // k8s_node_cpu_usage holds 148M docs. All-zero stats made the dead spelling
+    // satisfy requiresStreams, so it WON selection and rendered "No Data" over a
+    // working fallback defined right beneath it.
+    const streams = streamLists([
+      {
+        name: "k8s_node_cpu_utilization",
+        docTimeMax: 0,
+        docNum: 0,
+        createdAt: NOW_US - 270 * DAY_US,
+        schema: KUBELET_NODE_SCHEMA,
+      },
+      { name: "k8s_node_cpu_usage", schema: KUBELET_NODE_SCHEMA },
+      { name: "k8s_node_memory_usage", schema: KUBELET_NODE_SCHEMA },
+    ]);
+    const resolution = resolve({ streams });
+
+    for (const id of ["k8s_ov_node_cpu_top", "k8s_nd_cpu"]) {
+      const panel = panelById(resolution, id);
+      expect(panel.hidden, id).toBe(false);
+      expect(panel.selectedVariant.requiresStreams, id).toEqual(["k8s_node_cpu_usage"]);
+    }
+    // The live sibling keeps the group alive, so nothing badges over a healthy collector.
+    expect(hiddenFor(resolution, "kubelet-node")).toBeUndefined();
+    expect(resolution.staleGroups.some((s: any) => s.group.id === "kubelet-node")).toBe(false);
+  });
+
+  it("a BRAND-NEW zero-doc stream is still live — 'not yet' survives the never-ingested gate", () => {
+    // The carve-out above must not become a blanket zero-doc kill: a stream created
+    // minutes ago has not failed, it has not started.
+    const streams = streamLists([
+      {
+        name: "k8s_node_cpu_utilization",
+        docTimeMax: 0,
+        docNum: 0,
+        createdAt: NOW_US - 5 * 60 * 1_000_000,
+        schema: KUBELET_NODE_SCHEMA,
+      },
+      { name: "k8s_node_cpu_usage", schema: KUBELET_NODE_SCHEMA },
+      { name: "k8s_node_memory_usage", schema: KUBELET_NODE_SCHEMA },
+    ]);
+    const resolution = resolve({ streams });
+    expect(panelById(resolution, "k8s_nd_cpu").selectedVariant.requiresStreams).toEqual([
+      "k8s_node_cpu_utilization",
+    ]);
+  });
+
+  it("a zero-doc stream with NO created_at stays live — an unknown age never hides a panel", () => {
+    const streams = streamLists([
+      { name: "k8s_node_cpu_utilization", docTimeMax: 0, docNum: 0, schema: KUBELET_NODE_SCHEMA },
+      { name: "k8s_node_cpu_usage", schema: KUBELET_NODE_SCHEMA },
+      { name: "k8s_node_memory_usage", schema: KUBELET_NODE_SCHEMA },
+    ]);
+    expect(panelById(resolve({ streams }), "k8s_nd_cpu").selectedVariant.requiresStreams).toEqual([
+      "k8s_node_cpu_utilization",
+    ]);
+  });
+
+  it("an OLD stream that HAS docs but a zero doc_time_max stays live — the gate reads doc_num", () => {
+    // doc_num is what separates "never ingested" from "stats not serialized yet";
+    // an age test alone would kill a long-lived stream whose max simply did not land.
+    const streams = streamLists([
+      {
+        name: "k8s_node_cpu_utilization",
+        docTimeMax: 0,
+        docNum: 5_000,
+        createdAt: NOW_US - 270 * DAY_US,
+        schema: KUBELET_NODE_SCHEMA,
+      },
+      { name: "k8s_node_cpu_usage", schema: KUBELET_NODE_SCHEMA },
+      { name: "k8s_node_memory_usage", schema: KUBELET_NODE_SCHEMA },
+    ]);
+    expect(panelById(resolve({ streams }), "k8s_nd_cpu").selectedVariant.requiresStreams).toEqual([
+      "k8s_node_cpu_utilization",
+    ]);
   });
 
   it("opts.lastSeenUs (a dead host in a live fleet) beats the fleet-wide stream max", () => {
@@ -1216,6 +1296,7 @@ describe("§5.5 buildDashboard", () => {
     const dashboard = build(resolve({}));
     expect(dashboard.version).toBe(8);
     expect(dashboard.tabs.map((t: any) => t.tabId)).toEqual([
+      "summary",
       "overview",
       "health",
       "utilization",
@@ -1428,9 +1509,23 @@ describe("§5.5 buildDashboard", () => {
     expect(decoded).not.toContain("k8s_node_cpu_usage");
   });
 
+  it("the Nodes tile substitutes kube-state's `node`, not the kubeletstats spelling", () => {
+    // The tile moved collectors, so its node token must resolve through kube-state's
+    // override — the kubeletstats spelling would group by a label that is not there.
+    const dashboard = build(resolve({}));
+    const overviewTab = dashboard.tabs.find((t: any) => t.tabId === "overview");
+    const [query] = overviewTab.panels
+      .find((p: any) => p.id === "k8s_ov_nodes")
+      .queries.map((q: any) => q.query);
+    expect(query).toContain("count by (node)");
+    expect(query).toContain("kube_node_status_allocatable");
+    expect(query).not.toContain("k8s_node_name");
+  });
+
   it("carries the per-panel drilldown from the def", () => {
     const dashboard = build(resolve({}));
-    const panel = dashboard.tabs[0].panels.find((p: any) => p.id === "k8s_ov_nodes");
+    const overviewTab = dashboard.tabs.find((t: any) => t.tabId === "overview");
+    const panel = overviewTab.panels.find((p: any) => p.id === "k8s_ov_nodes");
     expect(Array.isArray(panel.config.drilldown)).toBe(true);
     expect(panel.config.drilldown.length).toBeGreaterThan(0);
   });
@@ -1496,6 +1591,19 @@ describe("strip model", () => {
     const noKubeletPod = fullK8sStreams();
     noKubeletPod.metrics = noKubeletPod.metrics.filter((s: any) => !s.name.startsWith("k8s_pod_"));
     expect(resolve({ streams: noKubeletPod }).stripAutoExpand).toBe(false);
+  });
+
+  it("targets the overview section by ID, not whichever section happens to be first", () => {
+    // kubelet-node owns three Overview panels and NONE in the leading Summary
+    // section, so a positional sections[0] lookup would read false here.
+    const noKubeletNode = fullK8sStreams();
+    noKubeletNode.metrics = noKubeletNode.metrics.filter(
+      (s: any) => !s.name.startsWith("k8s_node_"),
+    );
+    expect(kubernetesPage.sections[0].id, "precondition: overview is not first").not.toBe(
+      "overview",
+    );
+    expect(resolve({ streams: noKubeletNode }).stripAutoExpand).toBe(true);
   });
 
   it("a variant-miss panel folds into its PRESENT group's row with the drift spelling listed", () => {
@@ -2370,5 +2478,125 @@ describe("inventory tables can say 'nothing is wrong' rather than staying blank"
       const emitted = panels.find((p: any) => p.id === id);
       expect(emitted.config.curated_no_data_eligible, `${id} no-data eligibility`).toBe(true);
     }
+  });
+});
+
+describe("schemasPending — the tier-2 gap must never read as absence", () => {
+  /** The live pre-tier-2 shape: getStreams forces schema=false and the API serializes `schema: []`. */
+  const schemaless = () => {
+    const streams = fullK8sStreams();
+    for (const entry of streams.metrics) (entry as any).schema = [];
+    return streams;
+  };
+
+  const pendingResolve = (streams: any) =>
+    resolveManifest({
+      manifest: kubernetesPage,
+      streams,
+      semanticGroups: K8S_FULL_DICT,
+      range: RANGE,
+      now: NOW_US,
+      probeVerdicts: {},
+      schemasPending: true,
+    });
+
+  it("resolves rung-1 overrides and withholds the rest", () => {
+    const resolution = pendingResolve(schemaless());
+    // kube-state overrides all four concepts, so its panels resolve with no schema at all.
+    expect(resolution.presentGroupIds).toContain("kube-state");
+    const nonRunning = panelById(resolution, "k8s_wl_nonrunning_by_ns");
+    expect(nonRunning.hidden).toBe(false);
+    expect(nonRunning.resolvedFields[GROUP.namespace]).toBe("namespace");
+  });
+
+  it("reports NO hidden group and NO schema/field warning while the tier is in flight", () => {
+    const resolution = pendingResolve(schemaless());
+    expect(resolution.hiddenGroups).toEqual([]);
+    expect(resolution.warnings.filter((w: any) => w.kind === "schema")).toEqual([]);
+    expect(resolution.warnings.filter((w: any) => w.kind === "field-unresolved")).toEqual([]);
+  });
+
+  it("never GUESSES a spelling — the unfetched fallback is suppressed, not applied", () => {
+    const resolution = pendingResolve(schemaless());
+    // Without the flag this same input resolves k8s-node to the dictionary's first spelling.
+    const nodeCpu = panelById(resolution, "k8s_nd_cpu");
+    expect(nodeCpu.pending).toBe(true);
+    expect(nodeCpu.resolvedFields[GROUP.node]).toBeUndefined();
+  });
+
+  it("a group with NO rung-1 panel is neither present nor hidden — the absent-face guard", () => {
+    // Today's packs always keep one overridden panel visible, so the all-pending
+    // shape is built explicitly: one group, one panel, one dictionary-only concept.
+    const manifest: any = {
+      ...kubernetesPage,
+      groups: [{ ...kubernetesPage.groups[0], id: "solo", fieldOverrides: undefined }],
+      scopePickers: [],
+      sections: [
+        {
+          id: "overview",
+          titleKey: "infra.k8s.section.overview",
+          panels: [
+            {
+              id: "solo_p",
+              groupId: "solo",
+              titleKey: "infra.k8s.section.overview",
+              type: "line",
+              unit: "default",
+              variants: [
+                {
+                  requiresStreams: ["k8s_node_cpu_usage"],
+                  queries: [{ query: `sum by (\${f:${GROUP.node}}) (k8s_node_cpu_usage)` }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const resolution = resolveManifest({
+      manifest,
+      streams: schemaless(),
+      semanticGroups: K8S_FULL_DICT,
+      range: RANGE,
+      now: NOW_US,
+      probeVerdicts: {},
+      schemasPending: true,
+    });
+    expect(resolution.panels.every((p: any) => p.pending)).toBe(true);
+    expect(resolution.presentGroupIds).toEqual([]);
+    // The whole point: zero rendering panels must NOT be reported as a missing collector.
+    expect(resolution.hiddenGroups).toEqual([]);
+  });
+
+  it("a pending panel contributes NOTHING to a sibling group's strip row", () => {
+    // A group with one rendering panel and one pending panel: the pending half
+    // must not add a `field-unresolved` row beside the half that works.
+    const resolution = pendingResolve(schemaless());
+
+    const podStrip = resolution.hiddenGroups.find((h: any) => h.group.id === "kubelet-pod");
+    expect(podStrip).toBeUndefined();
+    // And the panels really are in that mixed shape, or the assertion above proves nothing.
+    const podPanels = resolution.panels.filter((p: any) => p.groupId === "kubelet-pod");
+    expect(podPanels.some((p: any) => !p.hidden)).toBe(true);
+    expect(podPanels.some((p: any) => p.pending)).toBe(true);
+    expect(podPanels.every((p: any) => p.unresolvedConcepts.length === 0)).toBe(true);
+  });
+
+  it("without the flag the SAME input reports ABSENCE — the flag is what withholds it", () => {
+    const resolution = resolveManifest({
+      manifest: kubernetesPage,
+      streams: schemaless(),
+      semanticGroups: K8S_FULL_DICT,
+      range: RANGE,
+      now: NOW_US,
+      probeVerdicts: {},
+    });
+    // `schema: []` reads as a stream that genuinely carries no such column, so the
+    // strip names every kubeletstats group as unavailable — correct once tier 2 has
+    // answered, and a lie while it is still in flight.
+    expect(resolution.hiddenGroups.map((h: any) => h.group.id)).toContain("kubelet-node");
+    const nodeCpu = panelById(resolution, "k8s_nd_cpu");
+    expect(nodeCpu.hidden).toBe(true);
+    expect(nodeCpu.pending).toBeUndefined();
   });
 });

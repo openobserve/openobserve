@@ -81,8 +81,7 @@ describe("health — shape", () => {
     // Triage first: a reader who opened the page because something is wrong should
     // reach "what is broken" before "what is wasteful".
     const ids = kubernetesPage.sections.map((s: any) => s.id);
-    expect(ids[0]).toBe("overview");
-    expect(ids[1]).toBe(SECTION_ID);
+    expect(ids.indexOf(SECTION_ID)).toBe(ids.indexOf("overview") + 1);
     expect(ids.indexOf(SECTION_ID)).toBeLessThan(ids.indexOf("utilization"));
   });
 

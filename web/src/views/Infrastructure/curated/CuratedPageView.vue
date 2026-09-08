@@ -37,6 +37,7 @@ import { timestampToTimezoneDate } from "@/utils/timezone";
 import { getConsumableRelativeTime } from "@/utils/date";
 import type { WorkloadId } from "@/composables/useWorkloadDetection";
 import { curatedPacks } from "./packs";
+import { FLEET_DRILLDOWN_EVENT, FLEET_DRILLDOWN_TAB } from "./packs/kubernetes.page";
 import { useCuratedPage } from "./useCuratedPage";
 import type { HiddenGroupInfo, StaleGroupInfo } from "./resolve";
 
@@ -158,7 +159,10 @@ watch(
       return;
     }
     if (!tabs.some((tab) => tab.tabId === selectedTabId.value)) {
-      selectedTabId.value = tabs[0].tabId;
+      // A cross-tab drilldown lands with ?tab=, which must outrank the tabs[0] default.
+      const requested = route.query.tab;
+      const landing = tabs.some((tab) => tab.tabId === requested) ? (requested as string) : null;
+      selectedTabId.value = landing ?? tabs[0].tabId;
     }
   },
   { immediate: true },
@@ -306,6 +310,66 @@ const onVariablesManagerReady = (manager: VariablesManager) => {
 };
 
 onBeforeUnmount(() => stopCommitWatch?.());
+
+// ── Fleet-quadrant drilldown ────────────────────────────────────────────────
+
+/**
+ * The sandboxed chart JS cannot see the router, so it announces the pick as a
+ * DOM event and the routing happens here — `location.assign` in the sandbox
+ * reloaded the whole SPA, losing every panel's data and in-memory state.
+ */
+const onClusterDrilldown = (event: Event) => {
+  const cluster = (event as CustomEvent<{ cluster?: string }>).detail?.cluster;
+  if (!cluster) return;
+  const query: Record<string, any> = { ...route.query };
+  // Stale scope from the tab being left: a cluster-scoped drilldown must not inherit the previous one.
+  for (const key of Object.keys(query)) {
+    if (key === "var-cluster" || key.startsWith("var-cluster.")) delete query[key];
+  }
+  query["var-cluster"] = cluster;
+  query.tab = FLEET_DRILLDOWN_TAB;
+  void router.push({ query });
+};
+
+onMounted(() => document.addEventListener(FLEET_DRILLDOWN_EVENT, onClusterDrilldown));
+onBeforeUnmount(() => document.removeEventListener(FLEET_DRILLDOWN_EVENT, onClusterDrilldown));
+
+/**
+ * The reload used to re-seed the tab and the pickers off the URL; a mounted view
+ * is re-entered instead, so the drilldown's own two params are applied here.
+ * Covers Back and Forward too, which restore a query and nothing else.
+ *
+ * Keyed on those two ALONE: a manual tab click never writes ?tab=, so reacting
+ * to the whole query would snap the tab back on unrelated param churn.
+ */
+watch(
+  () => [route.query.tab, route.query["var-cluster"]] as const,
+  () => {
+    const query = route.query;
+    const tabs = visibleTabs.value;
+    if (tabs.length > 0) {
+      // Falls back exactly as the seeding watcher does, so a Back to a tab-less URL lands on the default rather than sticking.
+      const requested = query.tab;
+      const landing = tabs.some((tab) => tab.tabId === requested) ? (requested as string) : null;
+      selectedTabId.value = landing ?? tabs[0].tabId;
+    }
+    const manager = variablesManager.value;
+    if (!manager) return;
+    // loadFromUrl only APPLIES the keys it finds, so a Back that drops var-cluster would strand the drilled-in value.
+    const cluster = manager.getVariable("cluster", "global");
+    if (cluster && query["var-cluster"] === undefined) {
+      manager.updateVariableValue(
+        "cluster",
+        "global",
+        undefined,
+        undefined,
+        cluster.multiSelect ? [] : (cluster.options?.[0]?.value ?? null),
+      );
+    }
+    manager.loadFromUrl({ query });
+    manager.commitAll();
+  },
+);
 
 /** A single-cluster org loses its picker, so the name renders as static text. */
 const singleClusterName = computed(() => {

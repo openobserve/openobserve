@@ -20,6 +20,7 @@ import {
   ref,
   shallowRef,
   toValue,
+  watch,
   type ComputedRef,
   type MaybeRefOrGetter,
   type Ref,
@@ -31,6 +32,8 @@ import searchService from "@/services/search";
 import { loadSemanticGroups, clearSemanticGroupsCacheForOrg } from "@/utils/semanticGroupsCache";
 import { workloadStateFromNames, type WorkloadState } from "@/composables/useWorkloadDetection";
 import { gt, raw } from "@/types/i18n";
+import { chartColor } from "@/utils/chartTheme";
+import { colorToRgba } from "@/utils/dashboard/colorPalette";
 import {
   buildDashboard,
   resolveManifest,
@@ -54,6 +57,66 @@ import {
 export const PROBE_TIMEOUT_MS = 4000;
 
 const BUCKET_US = 5 * 60 * 1_000_000;
+
+/** Matches the probe cache's bucket so both warm tiers expire together; `force` bypasses it. */
+const SCHEMA_TTL_MS = 5 * 60 * 1000;
+
+// MODULE scope so a revisit reuses the reads instead of re-firing them; keyed by ORG+TYPE+NAME so no org is served another's schema.
+const schemaReads = new Map<string, { at: number; read: Promise<StreamListEntry | undefined> }>();
+
+const schemaKey = (orgId: string, type: string, name: string) => `${orgId}:${type}:${name}`;
+
+/** Held as a PROMISE so concurrent walks share one in-flight read. */
+const cachedSchemaRead = (key: string): Promise<StreamListEntry | undefined> | undefined => {
+  const hit = schemaReads.get(key);
+  if (!hit) return undefined;
+  if (Date.now() - hit.at > SCHEMA_TTL_MS) {
+    schemaReads.delete(key);
+    return undefined;
+  }
+  return hit.read;
+};
+
+/** Drop one org's reads only — another org's cache is unrelated state. */
+const clearSchemaReadsForOrg = (orgId: string) => {
+  for (const key of [...schemaReads.keys()]) {
+    if (key.startsWith(`${orgId}:`)) schemaReads.delete(key);
+  }
+};
+
+/** The cache outlives every mount, so a test that counts schema reads must start from empty. */
+export const __resetSchemaReadsForTest = () => schemaReads.clear();
+
+/** `${theme:NAME}` → an EXISTING design token (+ optional alpha), the sandbox's only route to a themed colour. */
+const CHART_THEME_TOKENS: Record<string, { token: `--${string}`; alpha?: number }> = {
+  // The four status ramps are theme-independent by design, so one value reads on both surfaces.
+  "chart-healthy": { token: "--color-success-500" },
+  "chart-warning": { token: "--color-warning-500" },
+  "chart-critical": { token: "--color-error-500" },
+  // Over-provisioning is a COST story, not a health one, so it gets the purple ramp rather than a fourth health hue.
+  "chart-cost": { token: "--color-purple-500" },
+  "chart-axis": { token: "--color-border-default" },
+  "chart-label": { token: "--color-text-secondary" },
+  "chart-zone-label": { token: "--color-text-muted" },
+  "chart-guide": { token: "--color-border-subtle" },
+  "chart-grid": { token: "--color-chart-gridline" },
+  "chart-surface": { token: "--color-surface-base" },
+  // The house tooltip styling every dashboard panel uses (convertPromQLData.ts:377-392).
+  "tooltip-bg": { token: "--color-tooltip-bg" },
+  "tooltip-text": { token: "--color-tooltip-text" },
+  "tooltip-border": { token: "--color-tooltip-border" },
+  // Alpha, NOT the -50 tints: those are near-white and theme-independent, so they paint an opaque block on a dark surface.
+  "zone-hot": { token: "--color-error-500", alpha: 0.22 },
+  // CPU- and Memory-bound are the SAME severity on different resources, so they share an alpha and separate by hue instead.
+  "zone-cpu": { token: "--color-warning-500", alpha: 0.2 },
+  "zone-mem": { token: "--color-info", alpha: 0.2 },
+  "zone-cold": { token: "--color-purple-500", alpha: 0.18 },
+  // ECharts ignores markArea decals, so the corner LABEL carries the second cue and is inked in its own zone hue.
+  "zone-hot-ink": { token: "--color-error-500", alpha: 0.95 },
+  "zone-cold-ink": { token: "--color-purple-500", alpha: 0.95 },
+  "zone-cpu-ink": { token: "--color-warning-500", alpha: 0.95 },
+  "zone-mem-ink": { token: "--color-info", alpha: 0.95 },
+};
 
 export interface UseCuratedPageResult {
   face: ComputedRef<"unknown" | "undetected" | "dormant" | "ready">;
@@ -113,14 +176,13 @@ export function useCuratedPage(
   // Responses tagged with a superseded value are dropped on arrival (none of these calls take an AbortSignal).
   let generation = 0;
   let resolutionKey = "";
+  // Kept so a theme swap can rebuild from the SAME resolution: the palette lives in the built panels, not the resolver.
+  let lastResolution: CuratedResolution | null = null;
   const probeCache = new Map<string, ProbeVerdict>();
   // Session state: presence and concept passes never re-run without `force` (§5.6 warm-path budget).
   let cachedLists: Record<string, StreamListEntry[]> | null = null;
   let cachedGroups: FieldAlias[] | null = null;
   let dictionaryUnavailable = false;
-  // Held as PROMISES so concurrent walks share one in-flight read; keyed by ORG+TYPE+NAME so no org is served another's schema.
-  const schemaReads = new Map<string, Promise<StreamListEntry | undefined>>();
-  const schemaKey = (orgId: string, type: string, name: string) => `${orgId}:${type}:${name}`;
   // The shared cache writes on success ONLY, so without this every refresh re-fires the doomed 403.
   const forbiddenOrgs = new Set<string>();
   let cachedOrgId = "";
@@ -134,6 +196,7 @@ export function useCuratedPage(
     listsLoaded.value = false;
     dashboard.value = null;
     resolutionKey = "";
+    lastResolution = null;
     hiddenGroups.value = [];
     partialGroups.value = [];
     staleGroups.value = [];
@@ -179,7 +242,7 @@ export function useCuratedPage(
     dictionaryUnavailable = false;
     const force = args.force === true;
     if (force) {
-      schemaReads.clear();
+      clearSchemaReadsForOrg(args.orgId);
       forbiddenOrgs.delete(args.orgId);
       cachedLists = null;
       cachedGroups = null;
@@ -189,7 +252,7 @@ export function useCuratedPage(
       cachedOrgId = args.orgId;
       cachedLists = null;
       cachedGroups = null;
-      schemaReads.clear();
+      // schemaReads is NOT cleared: it is keyed by org, so no org can be served another's schema and a switch back stays warm.
       probeCache.clear();
       // Without this the previous org's dashboard stays mounted, firing its queries against the NEW org id.
       resetResolution();
@@ -253,20 +316,37 @@ export function useCuratedPage(
 
     // Probe-candidate schemas are NOT fetched here: the walk stops at its first viable candidate.
     let groups = cachedGroups;
-    await Promise.all([
-      (async () => {
-        if (groups) return;
-        groups = await loadDictionary(
-          args.orgId,
-          force,
-          dryRun.needsSemanticGroups,
-          gen,
-          () => generation,
-        );
-        if (groups.length > 0) cachedGroups = groups;
-      })(),
-      loadSchemas(dryRun.schemasNeeded, lists, force, args.orgId, gen),
-    ]);
+    const dictionaryReady = (async () => {
+      if (groups) return;
+      groups = await loadDictionary(
+        args.orgId,
+        force,
+        dryRun.needsSemanticGroups,
+        gen,
+        () => generation,
+      );
+      if (groups.length > 0) cachedGroups = groups;
+    })();
+    const schemasReady = loadSchemas(dryRun.schemasNeeded, lists, force, args.orgId, gen);
+
+    // Rung-1 panels need no schema, so they resolve and start querying while the schema tier is still in flight.
+    await dictionaryReady;
+    if (gen !== generation) return;
+    const early = resolveManifest({
+      manifest,
+      streams: lists,
+      semanticGroups: groups ?? [],
+      range: { start: args.start, end: args.end },
+      now: args.end,
+      pins: readPins(),
+      lastSeenUs: readLastSeenUs(),
+      probeVerdicts: {},
+      dictionaryUnavailable,
+      schemasPending: true,
+    });
+    if (early.presentGroupIds.length > 0) applyResolution(early);
+
+    await schemasReady;
     if (gen !== generation) return;
     const dictionary: FieldAlias[] = groups ?? [];
 
@@ -359,11 +439,11 @@ export function useCuratedPage(
           )?.[0] ?? "metrics";
         try {
           const key = schemaKey(orgId, type, name);
-          let read = schemaReads.get(key);
+          let read = cachedSchemaRead(key);
           if (!read) {
             read = getStream(name, type, true, force) as Promise<StreamListEntry | undefined>;
             // A superseded generation must not repopulate the map the org change just cleared.
-            if (gen === generation) schemaReads.set(key, read);
+            if (gen === generation) schemaReads.set(key, { at: Date.now(), read });
           }
           const fetched = await read;
           if (!fetched?.schema?.length) return;
@@ -509,6 +589,7 @@ export function useCuratedPage(
   };
 
   const applyResolution = (resolution: CuratedResolution) => {
+    lastResolution = resolution;
     hiddenGroups.value = resolution.hiddenGroups;
     partialGroups.value = resolution.partialGroups;
     staleGroups.value = resolution.staleGroups;
@@ -521,7 +602,7 @@ export function useCuratedPage(
     warnings.value = merged;
 
     // Swapped only when resolution output changed (the renderer re-inits on ANY new object); pins are hashed because they substitute INTO the queries.
-    const key = resolutionHash(resolution, readPins());
+    const key = resolutionHash(resolution, readPins(), store.state.theme);
     if (key !== resolutionKey || dashboard.value === null) {
       resolutionKey = key;
       const built = buildDashboard(manifest, resolution, readPins(), {
@@ -530,10 +611,19 @@ export function useCuratedPage(
         drilldownRange: readDrilldownRange(),
         pickerOptions,
       });
-      // buildDashboard emits KEYS, so titles are resolved here — outside the pure layer, once per build.
+      // buildDashboard emits KEYS and raw ${theme:} tokens, so both are resolved here — outside the pure layer, once per build.
       dashboard.value = translateTitles(built, manifest);
     }
   };
+
+  // `post` flush: App.vue's theme watcher must have dropped chartTheme's cache first, or this re-resolves the OLD palette.
+  watch(
+    () => store.state.theme,
+    () => {
+      if (lastResolution) applyResolution(lastResolution);
+    },
+    { flush: "post" },
+  );
 
   const loadDictionary = async (
     orgId: string,
@@ -611,12 +701,12 @@ export function useCuratedPage(
       let schema: StreamListEntry["schema"];
       try {
         const key = schemaKey(orgId, group.streamType, name);
-        let read = schemaReads.get(key);
+        let read = cachedSchemaRead(key);
         if (!read) {
           read = getStream(name, group.streamType, true, force) as Promise<
             StreamListEntry | undefined
           >;
-          if (gen === generation) schemaReads.set(key, read);
+          if (gen === generation) schemaReads.set(key, { at: Date.now(), read });
         }
         const fetched = await read;
         schema = fetched?.schema ?? null;
@@ -652,7 +742,7 @@ export function useCuratedPage(
   };
 }
 
-/** Resolve the titleKeys buildDashboard emitted into copy the renderer prints. */
+/** Resolve the titleKeys buildDashboard emitted into copy the renderer prints, plus the author-JS theme tokens. */
 function translateTitles(
   built: Record<string, unknown>,
   manifest: CuratedPageManifest,
@@ -667,10 +757,33 @@ function translateTitles(
       return {
         ...tab,
         name: key ? gt(key) : tab.name,
-        panels: (tab.panels ?? []).map((panel: any) => ({ ...panel, title: gt(panel.title) })),
+        panels: (tab.panels ?? []).map((panel: any) => ({
+          ...panel,
+          title: gt(panel.title),
+          ...(typeof panel.customChartContent === "string"
+            ? { customChartContent: substituteThemeTokens(panel.customChartContent) }
+            : {}),
+        })),
       };
     }),
   };
+}
+
+/**
+ * Resolve `${theme:NAME}` in author JS to a concrete colour.
+ *
+ * The custom-chart sandbox runs under `default-src 'none'; style-src 'none'`, so no
+ * stylesheet reaches it and it can never resolve a `--color-*` token itself. Deliberately
+ * NOT substituteQuery: that ends in tidyMatchers, PromQL brace surgery that turns
+ * `option = {}` into `option = ;`.
+ */
+function substituteThemeTokens(code: string): string {
+  return code.replace(/\$\{theme:([a-z0-9-]+)\}/gi, (whole, name: string) => {
+    const entry = CHART_THEME_TOKENS[name.toLowerCase()];
+    if (!entry) return whole;
+    const resolved = chartColor(entry.token);
+    return entry.alpha === undefined ? resolved : colorToRgba(resolved, entry.alpha);
+  });
 }
 
 function listNames(lists: Record<string, StreamListEntry[]>) {
@@ -695,10 +808,16 @@ function unknownFieldFrom(error: any): string | null {
   return match ? (match[1] ?? match[2]) : null;
 }
 
-/** Selected variants + resolved fields + surviving pickers/sections + badges + pins. */
-function resolutionHash(resolution: CuratedResolution, pins: CuratedPagePins): string {
+/** Selected variants + resolved fields + surviving pickers/sections + badges + pins + theme. */
+function resolutionHash(
+  resolution: CuratedResolution,
+  pins: CuratedPagePins,
+  theme: unknown,
+): string {
   return JSON.stringify({
     pins,
+    // Author-JS colours are baked in at build time, so a theme swap must invalidate the built dashboard.
+    theme: theme ?? null,
     panels: resolution.panels
       .filter((panel) => !panel.hidden)
       // subtitleKey and noDataYet both branch what buildPanel emits, so both must move the hash.

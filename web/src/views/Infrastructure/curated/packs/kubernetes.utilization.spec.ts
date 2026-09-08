@@ -73,7 +73,6 @@ describe("utilization — shape", () => {
     // tranche 1B inserts `health` between overview and utilization, and this pin
     // must not fail on a correct 1A just because 1B has not landed.
     const ids = kubernetesPage.sections.map((s: any) => s.id);
-    expect(ids[0]).toBe("overview");
     expect(ids).toContain(SECTION_ID);
     expect(ids.indexOf(SECTION_ID)).toBeLessThan(ids.indexOf("nodes"));
     expect(ids.indexOf(SECTION_ID)).toBeGreaterThan(ids.indexOf("overview"));

@@ -72,7 +72,7 @@ export interface PanelVariant {
 export interface CuratedPanelDef {
   id: string;
   titleKey: I18nKey;
-  type: "line" | "area-stacked" | "bar" | "metric" | "gauge" | "table";
+  type: "line" | "area-stacked" | "bar" | "metric" | "gauge" | "table" | "custom_chart";
   unit: string;
   /**
    * Suffix for `unit: "custom"`. A percentage hides magnitude — 46% of 92 cores and
@@ -81,6 +81,12 @@ export interface CuratedPanelDef {
    */
   unitCustom?: string;
   groupId: string;
+  /**
+   * Author JS for `type: "custom_chart"`, emitted as a TOP-LEVEL v8 field because
+   * convertPanelData.ts:226 reads `panelSchema.customChartContent` — a string
+   * parked under `config` renders an empty chart with no error anywhere.
+   */
+  customChartContent?: string;
   variants: PanelVariant[];
   /** 192-col grid cell; x/y flow-computed per section (§5.5). */
   layout: { w: number; h: number };
