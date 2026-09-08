@@ -22,6 +22,7 @@ vi.mock("@/services/saved_views", () => ({ default: { get: vi.fn() } }));
 vi.mock("@/services/jstransform", () => ({ default: { list: vi.fn() } }));
 vi.mock("@/services/pipelines", () => ({ default: { getPipelines: vi.fn() } }));
 vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
+vi.mock("@/services/synthetics", () => ({ default: { listByFolderId: vi.fn() } }));
 vi.mock("@/services/service_accounts", () => ({ default: { list: vi.fn() } }));
 const searchStreams = vi.fn();
 
@@ -34,6 +35,8 @@ import { alertToItem } from "./alerts";
 import { streamToItem } from "./streams";
 import { pipelineToItem } from "./pipelines";
 import { serviceAccountToItem, userToItem } from "./users";
+import { syntheticToItem } from "./synthetics";
+import syntheticsService from "@/services/synthetics";
 import usersService from "@/services/users";
 
 const ctx = (over: Partial<{ routes: string[]; state: any }> = {}) => ({
@@ -123,6 +126,7 @@ describe("createEntityProviders", () => {
       ["savedViews", true],
       ["functions", false],
       ["pipelines", false],
+      ["synthetics", false],
       ["users", false],
       ["serviceAccounts", false],
     ]);
@@ -222,5 +226,34 @@ describe("createEntityProviders", () => {
     });
     const items = await admin.find((p) => p.id === "users")!.list!(new AbortController().signal);
     expect(items.map((i) => i.id)).toEqual(["user:a@x.io"]);
+  });
+
+  it("maps synthetic checks to their results page and gates on the results route", async () => {
+    const item = syntheticToItem(
+      {
+        id: 42,
+        name: "Home page",
+        type: "browser",
+        target: "https://x.io",
+        folder_id: "f1",
+        enabled: false,
+      },
+      "org1",
+    );
+    expect(item).toMatchObject({ id: "synthetic:42", subtitle: "BROWSER · https://x.io · paused" });
+    expect(item.keywords).toContain("42");
+    expect(item.route).toMatchObject({ name: "synthetic-monitor-results", params: { id: "42" } });
+    const off = createEntityProviders(ctx()).find((p) => p.id === "synthetics")!;
+    expect(off.enabled()).toBe(false);
+    const on = createEntityProviders(ctx({ routes: ["synthetic-monitor-results"] })).find(
+      (p) => p.id === "synthetics",
+    )!;
+    (syntheticsService.listByFolderId as any).mockResolvedValue({
+      data: { checks: [{ id: 1, name: "API" }] },
+    });
+    expect((await on.list!(new AbortController().signal)).map((i) => i.id)).toEqual([
+      "synthetic:1",
+    ]);
+    expect(syntheticsService.listByFolderId).toHaveBeenCalledWith("org1", "all");
   });
 });

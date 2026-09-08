@@ -29,6 +29,7 @@ export type PaletteItemType =
   | "user"
   | "serviceAccount"
   | "org"
+  | "synthetic"
   | "ai";
 
 /** A chip the user can narrow the list to; each maps to one or more item types. */
@@ -44,6 +45,7 @@ export const SCOPE_ORDER: PaletteScope[] = [
   "pipeline",
   "function",
   "savedView",
+  "synthetic",
   "user",
   "actions",
 ];

@@ -17169,7 +17169,8 @@
       "savedView": "Saved views",
       "function": "Functions",
       "pipeline": "Pipelines",
-      "user": "Users"
+      "user": "Users",
+      "synthetic": "Synthetics"
     },
     "roles": {
       "admin": "Admin",
