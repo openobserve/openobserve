@@ -281,10 +281,11 @@ pub static SYNTHETICS_UNREADABLE_CHECKS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
 // `SUM(size)` over the `usage` stream: `report_usage` is fire-and-forget, so
 // stream-below-counter is the only way to see rows that were computed and lost.
 
-/// Executed / defined / free steps handed to the usage queue, per org, by
-/// event (SPEC §9B.1 rows 1-4). Incremented by `size`, not by 1: `size` IS the
-/// step count. One counter with an `event` label rather than three, so §4.3's
-/// `executed / defined` ratio is one PromQL division over one metric.
+/// Executed browser, executed protocol and defined steps handed to the usage
+/// queue, per org, by event (SPEC §9B.1). Incremented by `size`, not by 1:
+/// `size` IS the step count. One counter with an `event` label rather than
+/// three, so §4.3's `executed / defined` ratio is one PromQL division over one
+/// metric.
 pub static SYNTHETICS_STEPS_TOTAL: Lazy<IntCounterVec> = Lazy::new(|| {
     IntCounterVec::new(
         Opts::new(
@@ -346,6 +347,25 @@ pub static SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL: Lazy<IntCounter> = Lazy::new(|| 
             "synthetics_step_zero_fallback_total",
             "Synthetics acks that reported zero executed steps and fell back to the definition."
                 .to_owned()
+                + HELP_SUFFIX,
+        )
+        .namespace(NAMESPACE)
+        .const_labels(create_const_labels()),
+    )
+    .expect("Metric created")
+});
+
+/// Free-step counters the metering pass could not write back.
+///
+/// The window is already posted to the provider and the offset already
+/// advanced, so the draw cannot be retried: a persistent failure re-grants the
+/// same free steps every window and bills nothing for them. Silent under-billing
+/// otherwise — the error log at the call site carries the org.
+pub static SYNTHETICS_GRANT_WRITEBACK_FAILURES_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
+    IntCounter::with_opts(
+        Opts::new(
+            "synthetics_grant_writeback_failures_total",
+            "Settled synthetics windows whose free-step counters failed to persist.".to_owned()
                 + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
@@ -450,75 +470,6 @@ pub static METERING_CYCLES_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
         Opts::new(
             "metering_cycles_total",
             "Completed metering passes over the billing rows.".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-    )
-    .expect("Metric created")
-});
-
-/// SPEC §9B.3's reconciliation, published as three gauges — **A8**'s input.
-/// `SUM(size)` over all four synthetics step events in the usage
-/// stream, per org. See `openobserve-jobs`' `synthetics_step_reconcile` for why
-/// this side is read REGION-LOCAL even though metering reads it federated.
-pub static SYNTHETICS_STEP_RECONCILE_STREAM_STEPS: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "synthetics_step_reconcile_stream_steps",
-            "Synthetics steps recorded in the usage stream, per organization.".to_owned()
-                + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization"],
-    )
-    .expect("Metric created")
-});
-
-/// The other side of §9B.3: `trial_quota_usage.usage_count` for the synthetics
-/// pool, per org.
-pub static SYNTHETICS_STEP_RECONCILE_POOL_STEPS: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "synthetics_step_reconcile_pool_steps",
-            "Synthetics steps recorded by the free-pool counter, per organization.".to_owned()
-                + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization"],
-    )
-    .expect("Metric created")
-});
-
-/// `stream - pool`, signed — the number **A8** alerts on. Its own gauge rather
-/// than PromQL subtraction: an org present in one side and absent from the
-/// other must contribute a difference, not vanish from the join.
-///
-/// POSITIVE: the stream recorded steps the pool never charged — §11 **F8**'s
-/// dropped flush, permanent under a one-time grant. NEGATIVE: the pool charged
-/// steps the stream never recorded, i.e. the emit side failing.
-pub static SYNTHETICS_STEP_RECONCILE_DIVERGENCE_STEPS: Lazy<IntGaugeVec> = Lazy::new(|| {
-    IntGaugeVec::new(
-        Opts::new(
-            "synthetics_step_reconcile_divergence_steps",
-            "Usage-stream steps minus free-pool steps, per organization.".to_owned() + HELP_SUFFIX,
-        )
-        .namespace(NAMESPACE)
-        .const_labels(create_const_labels()),
-        &["organization"],
-    )
-    .expect("Metric created")
-});
-
-/// Completed §9B.3 reconciliation passes — a dead-man's switch like
-/// [`METERING_CYCLES_TOTAL`]: the three gauges above are sticky, so a stopped
-/// job leaves A8 reading a stale zero divergence forever.
-pub static SYNTHETICS_STEP_RECONCILE_SCANS_TOTAL: Lazy<IntCounter> = Lazy::new(|| {
-    IntCounter::with_opts(
-        Opts::new(
-            "synthetics_step_reconcile_scans_total",
-            "Completed synthetics step reconciliation passes.".to_owned() + HELP_SUFFIX,
         )
         .namespace(NAMESPACE)
         .const_labels(create_const_labels()),
@@ -2605,6 +2556,9 @@ fn register_metrics(registry: &Registry) {
         .register(Box::new(SYNTHETICS_STEP_ZERO_FALLBACK_TOTAL.clone()))
         .expect("Metric registered");
     registry
+        .register(Box::new(SYNTHETICS_GRANT_WRITEBACK_FAILURES_TOTAL.clone()))
+        .expect("Metric registered");
+    registry
         .register(Box::new(USAGE_ENQUEUE_FAILURES_TOTAL.clone()))
         .expect("Metric registered");
     registry
@@ -2618,18 +2572,6 @@ fn register_metrics(registry: &Registry) {
         .expect("Metric registered");
     registry
         .register(Box::new(METERING_CYCLES_TOTAL.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(SYNTHETICS_STEP_RECONCILE_STREAM_STEPS.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(SYNTHETICS_STEP_RECONCILE_POOL_STEPS.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(SYNTHETICS_STEP_RECONCILE_DIVERGENCE_STEPS.clone()))
-        .expect("Metric registered");
-    registry
-        .register(Box::new(SYNTHETICS_STEP_RECONCILE_SCANS_TOTAL.clone()))
         .expect("Metric registered");
     registry
         .register(Box::new(INGEST_PACK_FILES.clone()))
@@ -3309,22 +3251,6 @@ mod tests {
                 "METERING_CYCLES_TOTAL",
                 Box::new(METERING_CYCLES_TOTAL.clone()),
             ),
-            (
-                "SYNTHETICS_STEP_RECONCILE_STREAM_STEPS",
-                Box::new(SYNTHETICS_STEP_RECONCILE_STREAM_STEPS.clone()),
-            ),
-            (
-                "SYNTHETICS_STEP_RECONCILE_POOL_STEPS",
-                Box::new(SYNTHETICS_STEP_RECONCILE_POOL_STEPS.clone()),
-            ),
-            (
-                "SYNTHETICS_STEP_RECONCILE_DIVERGENCE_STEPS",
-                Box::new(SYNTHETICS_STEP_RECONCILE_DIVERGENCE_STEPS.clone()),
-            ),
-            (
-                "SYNTHETICS_STEP_RECONCILE_SCANS_TOTAL",
-                Box::new(SYNTHETICS_STEP_RECONCILE_SCANS_TOTAL.clone()),
-            ),
         ];
 
         for (name, collector) in declared {
@@ -3341,7 +3267,7 @@ mod tests {
 
     /// The names are the alert contract. §9B.2's queries are written against
     /// these strings, and they live outside this repository, so a rename here
-    /// silently breaks A1-A8 with nothing failing on either side.
+    /// silently breaks A1-A7 with nothing failing on either side.
     #[test]
     fn the_step_billing_metric_names_are_the_ones_the_alerts_query() {
         use prometheus::core::Collector;
@@ -3385,30 +3311,6 @@ mod tests {
                 METERING_CYCLES_TOTAL.desc()[0].fq_name.as_str(),
                 "zo_metering_cycles_total",
             ),
-            (
-                SYNTHETICS_STEP_RECONCILE_STREAM_STEPS.desc()[0]
-                    .fq_name
-                    .as_str(),
-                "zo_synthetics_step_reconcile_stream_steps",
-            ),
-            (
-                SYNTHETICS_STEP_RECONCILE_POOL_STEPS.desc()[0]
-                    .fq_name
-                    .as_str(),
-                "zo_synthetics_step_reconcile_pool_steps",
-            ),
-            (
-                SYNTHETICS_STEP_RECONCILE_DIVERGENCE_STEPS.desc()[0]
-                    .fq_name
-                    .as_str(),
-                "zo_synthetics_step_reconcile_divergence_steps",
-            ),
-            (
-                SYNTHETICS_STEP_RECONCILE_SCANS_TOTAL.desc()[0]
-                    .fq_name
-                    .as_str(),
-                "zo_synthetics_step_reconcile_scans_total",
-            ),
         ] {
             assert_eq!(metric, expected);
         }
@@ -3432,10 +3334,6 @@ mod tests {
         let _ = METERING_OFFSET_AGE_SECONDS.clone();
         let _ = METERING_BILLING_ROWS.clone();
         let _ = METERING_CYCLES_TOTAL.clone();
-        let _ = SYNTHETICS_STEP_RECONCILE_STREAM_STEPS.clone();
-        let _ = SYNTHETICS_STEP_RECONCILE_POOL_STEPS.clone();
-        let _ = SYNTHETICS_STEP_RECONCILE_DIVERGENCE_STEPS.clone();
-        let _ = SYNTHETICS_STEP_RECONCILE_SCANS_TOTAL.clone();
     }
 
     #[test]

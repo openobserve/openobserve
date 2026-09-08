@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <!--
-  "Annotate" on a trace or span — queue it for human review. Picking a queue is a
+  "Annotate" on a trace, span, or session — queue it for human review. Picking a queue is a
   one-field decision, so it drops straight off the button: the same
   AddToQueueMenu Discovery uses, wrapped with the enqueue call and the org, so
   the trace views stay free of Annotate wiring.
@@ -68,7 +68,7 @@ defineOptions({ name: "TraceAnnotateMenu" });
 
 const props = withDefaults(
   defineProps<{
-    refType: "trace" | "span";
+    refType: "trace" | "span" | "session";
     refId: string;
     /** Owning trace, required when refType is `span`. */
     refTraceId?: string;

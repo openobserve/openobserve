@@ -1283,8 +1283,8 @@ pub fn service_routes() -> Router {
 
                 // LLM Providers (Online Eval Phase 2)
                 .route("/{org_id}/providers", get(providers::list_providers).post(providers::create_provider))
+                .route("/{org_id}/providers/test", post(providers::test_provider_config))
                 .route("/{org_id}/providers/{provider_id}", get(providers::get_provider).put(providers::update_provider).delete(providers::delete_provider))
-                .route("/{org_id}/providers/{provider_id}/test", post(providers::test_provider))
 
                 // Score Configs (Online Eval Phase 2)
                 // NOTE: /{entity_id}/versions must precede /{entity_id} for routing correctness
