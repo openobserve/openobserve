@@ -300,6 +300,50 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
               }}{{ Number(llmMetrics.cost.total).toFixed(5) }}</span
             >
           </OTag>
+
+          <!-- Score Chips — real evaluator scores recorded against this exact
+               span, so a reviewer sees "safe/unsafe" without a trip to
+               Quality. Nothing until a real score resolves for this span. -->
+          <template v-if="isLLMSpan">
+            <OSeparator vertical class="mx-1.5 h-3.5" />
+            <span class="text-3xs text-text-secondary me-1 shrink-0 font-medium">{{
+              t("traces.traceDetailsSidebar.scores")
+            }}</span>
+            <TraceScoreChips
+              ref="scoreChipsRef"
+              scope="span"
+              :target-id="String(span.span_id ?? '')"
+              :start-time-us="spanStartTimeUs"
+            >
+              <template v-if="showAnnotateButtons" #empty>
+                <span class="text-3xs text-text-secondary me-1 shrink-0">{{
+                  t("traces.traceDetailsSidebar.notScoredYet")
+                }}</span>
+                <OButton
+                  variant="outline"
+                  size="xs"
+                  icon-left="rule"
+                  class="text-3xs! h-5.5"
+                  data-test="trace-details-sidebar-scores-annotate-btn"
+                  @click.stop="annotateFromScoresOpen = true"
+                >
+                  {{ t("aiObservability.annotate.button") }}
+                </OButton>
+              </template>
+            </TraceScoreChips>
+
+            <AnnotateDrawer
+              v-if="showAnnotateButtons"
+              :open="annotateFromScoresOpen"
+              scope="span"
+              :target-id="String(span.span_id ?? '')"
+              :trace-id="String(span.trace_id ?? '')"
+              :ref-timestamp="spanStartTimeUs"
+              :source-stream="spanSourceStream"
+              @update:open="(value: boolean) => (annotateFromScoresOpen = value)"
+              @annotated="onScoreAnnotated"
+            />
+          </template>
         </div>
 
         <div class="flex items-center">
@@ -1065,6 +1109,12 @@ export default defineComponent({
     TraceAnnotateMenu: defineAsyncComponent(
       () => import("@/enterprise/components/AIObservability/TraceAnnotateMenu.vue"),
     ),
+    TraceScoreChips: defineAsyncComponent(
+      () => import("@/enterprise/components/onlineEvals/TraceScoreChips.vue"),
+    ),
+    AnnotateDrawer: defineAsyncComponent(
+      () => import("@/enterprise/components/AIObservability/AnnotateDrawer.vue"),
+    ),
     EqualIcon,
     NotEqualIcon,
     AttributeValueCell,
@@ -1095,6 +1145,13 @@ export default defineComponent({
     // Check if this is an LLM span to set default tab
     const isLLMSpan = computed(() => isLLMTrace(props.span));
     const canPreviewSpan = computed(() => hasTracePreview(props.span));
+    // The empty-scores CTA opens the drawer directly — a reviewer landing
+    // here already wants to score this exact span, not pick a queue first.
+    const scoreChipsRef = ref<{ refresh: () => void } | null>(null);
+    const annotateFromScoresOpen = ref(false);
+    function onScoreAnnotated() {
+      scoreChipsRef.value?.refresh();
+    }
     const previewInput = computed(
       () => props.span?.gen_ai_input_messages ?? props.span?.attributes_prompt ?? "",
     );
@@ -2313,6 +2370,9 @@ export default defineComponent({
       // LLM
       isLLMSpan,
       canPreviewSpan,
+      scoreChipsRef,
+      annotateFromScoresOpen,
+      onScoreAnnotated,
       previewInput,
       previewOutput,
       previewOperationName,
