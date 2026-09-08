@@ -169,9 +169,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <CommandPalette
       v-model:open="showPalette"
       :nav-links="navLinks"
+      :ai-enabled="config.isEnterprise == 'true' && !!store.state.zoConfig?.ai_enabled"
       @open-shortcuts="openShortcutsList"
       @open-docs="navigateToDocs"
       @open-slack="openSlack"
+      @ask-ai="sendToAiChat($event, false, true)"
     />
   </div>
 </template>

@@ -17153,8 +17153,25 @@
   },
   "palette": {
     "title": "Command palette",
-    "placeholder": "Search pages, actions and more…",
+    "placeholder": "Search pages, dashboards, alerts, streams and more…",
+    "placeholderScoped": "Search within {scope}…",
     "trigger": "Search or jump to…",
+    "askAi": "Ask O2 AI about \"{q}\"",
+    "scopes": {
+      "actions": "Actions",
+      "pages": "Pages",
+      "dashboard": "Dashboards",
+      "alert": "Alerts",
+      "stream": "Streams",
+      "savedView": "Saved views",
+      "function": "Functions",
+      "pipeline": "Pipelines"
+    },
+    "streamTypes": {
+      "logs": "Logs stream",
+      "metrics": "Metrics stream",
+      "traces": "Traces stream"
+    },
     "groups": {
       "recent": "Recent",
       "actions": "Actions",
@@ -17169,7 +17186,9 @@
     "hint": {
       "navigate": "navigate",
       "open": "open",
-      "newTab": "new tab"
+      "newTab": "new tab",
+      "showScopes": "filter by type",
+      "hideScopes": "hide filters"
     },
     "noResults": "No matches for \"{q}\""
   }

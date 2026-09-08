@@ -17,7 +17,7 @@ import { describe, it, expect } from "vitest";
 import { ref } from "vue";
 import { raw } from "@/types/i18n";
 import { usePaletteRows } from "./usePaletteRows";
-import type { PaletteItem } from "./types";
+import type { PaletteItem, PaletteScope } from "./types";
 
 const t = raw as any;
 const page = (id: string, label: string): PaletteItem => ({
@@ -32,21 +32,37 @@ const action = (id: string, label: string): PaletteItem => ({
   label,
   icon: "add",
 });
+const dash = (id: string, label: string): PaletteItem => ({
+  id,
+  type: "dashboard",
+  label,
+  icon: "dashboard",
+});
+const ids = (rows: { kind: string; item?: PaletteItem; label?: string }[]) =>
+  rows.map((r) => (r.kind === "header" ? r.label : r.item!.id));
+
+const base = (over: Partial<Parameters<typeof usePaletteRows>[0]> = {}) => ({
+  query: ref(""),
+  scope: ref<PaletteScope | null>(null),
+  pages: ref<PaletteItem[]>([page("page:logs", "Logs"), page("page:metrics", "Metrics")]),
+  actions: ref<PaletteItem[]>([action("action:newAlert", "New alert")]),
+  entities: ref<PaletteItem[]>([]),
+  fallback: () => null,
+  frecency: () => new Map<string, number>(),
+  t,
+  ...over,
+});
 
 describe("usePaletteRows", () => {
-  const pages = ref([page("page:logs", "Logs"), page("page:metrics", "Metrics")]);
-  const actions = ref([action("action:newAlert", "New alert")]);
-
   it("sections the empty state as recent, actions, pages with frecency on top", () => {
-    const query = ref("");
     const frecency = () =>
       new Map([
         ["page:metrics", 0.8],
         ["page:missing", 5],
         ["page:logs", 0],
       ]);
-    const { rows, itemIndexes } = usePaletteRows({ query, pages, actions, frecency, t });
-    expect(rows.value.map((r) => (r.kind === "header" ? r.label : r.item.id))).toEqual([
+    const { rows, itemIndexes } = usePaletteRows(base({ frecency }));
+    expect(ids(rows.value)).toEqual([
       "palette.groups.recent",
       "page:metrics",
       "palette.groups.actions",
@@ -59,27 +75,53 @@ describe("usePaletteRows", () => {
   });
 
   it("omits the recent section when nothing has been used", () => {
-    const { rows } = usePaletteRows({
-      query: ref(""),
-      pages,
-      actions,
-      frecency: () => new Map(),
-      t,
-    });
+    const { rows } = usePaletteRows(base());
     expect(rows.value[0]).toMatchObject({ kind: "header", label: "palette.groups.actions" });
   });
 
   it("flattens to a ranked list when a query is typed", () => {
-    const query = ref("me");
-    const { rows, itemIndexes } = usePaletteRows({
-      query,
-      pages,
-      actions,
-      frecency: () => new Map(),
-      t,
-    });
+    const { rows, itemIndexes } = usePaletteRows(base({ query: ref("me") }));
     expect(rows.value.every((r) => r.kind === "item")).toBe(true);
-    expect(rows.value.map((r) => r.kind === "item" && r.item.id)).toEqual(["page:metrics"]);
+    expect(ids(rows.value)).toEqual(["page:metrics"]);
     expect(itemIndexes.value).toEqual([0]);
+  });
+
+  it("narrows to the scope and pins its create verb first on an empty query", () => {
+    const entities = ref([dash("dashboard:b", "Beta"), dash("dashboard:a", "Alpha")]);
+    const actions = ref([
+      action("action:newDashboard", "New dashboard"),
+      action("action:newAlert", "New alert"),
+    ]);
+    const scope = ref<PaletteScope | null>("dashboard");
+    const { rows } = usePaletteRows(
+      base({ scope, actions, entities, frecency: () => new Map([["dashboard:b", 1]]) }),
+    );
+    expect(ids(rows.value)).toEqual(["action:newDashboard", "dashboard:b", "dashboard:a"]);
+    scope.value = "pages";
+    expect(ids(rows.value)).toEqual(["page:logs", "page:metrics"]);
+  });
+
+  it("keeps the scope filter while ranking a typed query", () => {
+    const entities = ref([dash("dashboard:logs-overview", "Logs overview")]);
+    const { rows } = usePaletteRows(
+      base({ query: ref("log"), scope: ref<PaletteScope | null>("dashboard"), entities }),
+    );
+    expect(ids(rows.value)).toEqual(["dashboard:logs-overview"]);
+  });
+
+  it("offers the fallback row only when nothing matches and the query is long enough", () => {
+    const query = ref("zz");
+    const fallback = (q: string): PaletteItem => ({
+      id: "ai:ask",
+      type: "ai",
+      label: q,
+      icon: "auto-awesome",
+    });
+    const { rows } = usePaletteRows(base({ query, fallback }));
+    expect(rows.value).toEqual([]);
+    query.value = "zzz";
+    expect(ids(rows.value)).toEqual(["ai:ask"]);
+    query.value = "log";
+    expect(ids(rows.value)).toEqual(["page:logs"]);
   });
 });

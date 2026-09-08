@@ -23,6 +23,26 @@ import i18n from "@/locales";
 import CommandPalette from "./CommandPalette.vue";
 import { useFrecency } from "./useFrecency";
 
+vi.mock("./providers/entities", () => ({
+  createEntityProviders: () => [
+    {
+      id: "dashboards",
+      scope: "dashboard",
+      enabled: () => true,
+      list: async () => [
+        {
+          id: "dashboard:default/d1",
+          type: "dashboard",
+          label: "Payments overview",
+          subtitle: "default",
+          icon: "dashboard",
+          route: { path: "/dashboards/view", query: { dashboard: "d1", folder: "default" } },
+        },
+      ],
+    },
+  ],
+}));
+
 vi.mock("@/services/settings", () => ({
   default: {
     getSetting: vi.fn().mockRejectedValue({}),
@@ -61,6 +81,7 @@ function makeRouter() {
       { path: "/", name: "home", component: { template: "<div />" } },
       { path: "/logs", name: "logs", component: { template: "<div />" } },
       { path: "/alerts", name: "alertList", component: { template: "<div />" } },
+      { path: "/dashboards", name: "dashboards", component: { template: "<div />" } },
     ],
   });
 }
@@ -172,5 +193,35 @@ describe("CommandPalette", () => {
     await wrapper.find('[data-test="command-palette-search-field"]').setValue("keyboard");
     await wrapper.find('[role="option"]').trigger("click");
     expect(wrapper.emitted("open-shortcuts")).toHaveLength(1);
+  });
+
+  it("lists entities from providers and ranks them with pages", async () => {
+    await wrapper.find('[data-test="command-palette-search-field"]').setValue("payments");
+    expect(rowIds()).toEqual(["dashboard:default/d1"]);
+  });
+
+  it("toggles scope chips with Tab and narrows the list to a scope", async () => {
+    expect(wrapper.find('[data-test="command-palette-scopes"]').exists()).toBe(false);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
+    await flushPromises();
+    expect(wrapper.find('[data-test="command-palette-scopes"]').exists()).toBe(true);
+    await wrapper.find('[data-test="command-palette-scope-dashboard"]').trigger("click");
+    await flushPromises();
+    expect(rowIds()).toEqual(["action:newDashboard", "dashboard:default/d1"]);
+    expect(wrapper.find('[data-test="command-palette-scope-pill"]').exists()).toBe(true);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Backspace" }));
+    await flushPromises();
+    expect(wrapper.find('[data-test="command-palette-scope-pill"]').exists()).toBe(false);
+  });
+
+  it("offers the AI hand-off only when enabled and nothing matches", async () => {
+    await wrapper.find('[data-test="command-palette-search-field"]').setValue("zzqxv");
+    expect(rowIds()).toEqual([]);
+    await wrapper.setProps({ aiEnabled: true });
+    await flushPromises();
+    expect(rowIds()).toEqual(["ai:ask"]);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
+    await flushPromises();
+    expect(wrapper.emitted("ask-ai")).toEqual([["zzqxv"]]);
   });
 });

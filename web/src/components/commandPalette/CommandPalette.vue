@@ -23,23 +23,28 @@ import ODialog from "@/lib/overlay/Dialog/ODialog.vue";
 import OSearchInput from "@/lib/forms/SearchInput/OSearchInput.vue";
 import OShortcut from "@/lib/core/Shortcut/OShortcut.vue";
 import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
+import OButton from "@/lib/core/Button/OButton.vue";
 import { useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { useTheme } from "@/composables/useTheme";
 import { switchThemeMode } from "@/utils/theme";
 import { focusSearchInput } from "@/utils/keyboardShortcuts";
 import PaletteRow from "./PaletteRow.vue";
+import PaletteScopeChips from "./PaletteScopeChips.vue";
 import { buildPageItems } from "./providers/pages";
 import { buildActionItems } from "./providers/actions";
+import { createEntityProviders } from "./providers/entities";
+import { usePaletteEntities } from "./usePaletteEntities";
 import { usePaletteRows } from "./usePaletteRows";
 import { useFrecency } from "./useFrecency";
-import type { PaletteItem } from "./types";
+import { SCOPE_ORDER, type PaletteItem, type PaletteScope } from "./types";
 
 const SEARCH_DATA_TEST = "command-palette-search";
 
 const props = defineProps<{
   open: boolean;
   navLinks: NavItem[];
+  aiEnabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -47,6 +52,7 @@ const emit = defineEmits<{
   (e: "open-shortcuts"): void;
   (e: "open-docs"): void;
   (e: "open-slack"): void;
+  (e: "ask-ai", query: string): void;
 }>();
 
 const store = useStore();
@@ -57,8 +63,11 @@ const { isDark } = useTheme();
 const frecency = useFrecency();
 
 const query = ref("");
+const scope = ref<PaletteScope | null>(null);
+const showScopes = ref(false);
 const activeIndex = ref(0);
 const listRef = ref<HTMLElement | null>(null);
+const isOpen = computed(() => props.open);
 
 const orgId = computed<string>(() => store.state.selectedOrganization?.identifier ?? "");
 const userId = computed<string>(() => store.state.userInfo?.email ?? "");
@@ -102,13 +111,69 @@ const actions = computed(() =>
   }),
 );
 
+const providers = computed(() =>
+  createEntityProviders({ store, t, org: orgId.value, hasRoute: (name) => router.hasRoute(name) }),
+);
+const { entities, loading } = usePaletteEntities({
+  open: isOpen,
+  query,
+  scope,
+  org: orgId,
+  providers,
+});
+
+const fallback = (q: string): PaletteItem | null =>
+  props.aiEnabled
+    ? {
+        id: "ai:ask",
+        type: "ai",
+        label: String(t("palette.askAi", { q })),
+        icon: "auto-awesome",
+        trailing: { kind: "shortcut", value: "enter" },
+        run: () => emit("ask-ai", q),
+      }
+    : null;
+
 const { rows, itemIndexes } = usePaletteRows({
   query,
+  scope,
   pages,
   actions,
+  entities,
+  fallback,
   frecency: () => frecency.scores("palette_item"),
   t,
 });
+
+// Chips: one per scope that has at least one enabled source, ordered by how often each was used.
+const scopes = computed(() => {
+  const available = new Set<PaletteScope>(["actions", "pages"]);
+  for (const p of providers.value) if (p.enabled()) available.add(p.scope);
+  const scores = frecency.scores("palette_scope");
+  return SCOPE_ORDER.filter((s) => available.has(s))
+    .sort((a, b) => (scores.get(b) ?? 0) - (scores.get(a) ?? 0))
+    .map((id) => ({ id, label: String(t(`palette.scopes.${id}`)) }));
+});
+const scopeLabel = computed(() => scopes.value.find((s) => s.id === scope.value)?.label ?? "");
+const placeholder = computed(() =>
+  scope.value
+    ? t("palette.placeholderScoped", { scope: scopeLabel.value })
+    : t("palette.placeholder"),
+);
+
+function selectScope(next: PaletteScope | null): void {
+  scope.value = next;
+  if (next) frecency.record("palette_scope", next);
+  void nextTick(() => focusSearchInput(SEARCH_DATA_TEST));
+}
+
+function cycleScope(delta: number): void {
+  const ids = scopes.value.map((s) => s.id);
+  if (ids.length === 0) return;
+  const pos = scope.value ? ids.indexOf(scope.value) : -1;
+  const next = (pos + delta + ids.length + 1) % (ids.length + 1);
+  selectScope(next === ids.length ? null : ids[next]);
+}
 
 const activeOptionId = computed(() => `command-palette-option-${activeIndex.value}`);
 
@@ -129,12 +194,12 @@ function moveActive(delta: number): void {
 
 function withOrg(route: RouteLocationRaw): RouteLocationRaw {
   const base = typeof route === "string" ? { path: route } : route;
-  const query = "query" in base && base.query ? base.query : {};
-  return { ...base, query: { ...query, org_identifier: orgId.value } } as RouteLocationRaw;
+  const routeQuery = "query" in base && base.query ? base.query : {};
+  return { ...base, query: { ...routeQuery, org_identifier: orgId.value } } as RouteLocationRaw;
 }
 
 async function select(item: PaletteItem, newTab = false): Promise<void> {
-  frecency.record("palette_item", item.id);
+  if (item.type !== "ai") frecency.record("palette_item", item.id);
   emit("update:open", false);
   if (item.run) {
     await item.run();
@@ -153,21 +218,41 @@ async function select(item: PaletteItem, newTab = false): Promise<void> {
   await router.push(location);
 }
 
+function consume(e: KeyboardEvent): void {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
 // Capture phase so the global shortcut manager never sees the keys the palette consumes.
 function onKeydown(e: KeyboardEvent): void {
   if (!props.open) return;
-  if (e.key === "ArrowDown" || e.key === "ArrowUp") {
-    e.preventDefault();
-    e.stopPropagation();
-    moveActive(e.key === "ArrowDown" ? 1 : -1);
-    return;
-  }
-  if (e.key === "Enter") {
-    const row = rows.value[activeIndex.value];
-    if (row?.kind !== "item") return;
-    e.preventDefault();
-    e.stopPropagation();
-    void select(row.item, e.metaKey || e.ctrlKey);
+  switch (e.key) {
+    case "ArrowDown":
+    case "ArrowUp":
+      consume(e);
+      moveActive(e.key === "ArrowDown" ? 1 : -1);
+      return;
+    case "Tab":
+      consume(e);
+      showScopes.value = !showScopes.value;
+      return;
+    case "ArrowLeft":
+    case "ArrowRight":
+      if (!showScopes.value) return;
+      consume(e);
+      cycleScope(e.key === "ArrowRight" ? 1 : -1);
+      return;
+    case "Backspace":
+      if (query.value !== "" || !scope.value) return;
+      consume(e);
+      selectScope(null);
+      return;
+    case "Enter": {
+      const row = rows.value[activeIndex.value];
+      if (row?.kind !== "item") return;
+      consume(e);
+      void select(row.item, e.metaKey || e.ctrlKey);
+    }
   }
 }
 
@@ -182,6 +267,8 @@ watch(
   (open) => {
     if (open) {
       query.value = "";
+      scope.value = null;
+      showScopes.value = false;
       resetActive();
       window.addEventListener("keydown", onKeydown, true);
       void nextTick(() => setTimeout(() => focusSearchInput(SEARCH_DATA_TEST), 0));
@@ -207,16 +294,35 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
     @update:open="emit('update:open', $event)"
   >
     <template #header>
-      <div class="flex items-center gap-2">
-        <OSearchInput
-          v-model="query"
-          size="md"
-          class="min-w-0 flex-1"
-          :placeholder="t('palette.placeholder')"
-          :clearable="false"
-          :data-test="SEARCH_DATA_TEST"
+      <div class="flex flex-col gap-2">
+        <div class="flex items-center gap-2">
+          <OButton
+            v-if="scope"
+            variant="outline"
+            size="chip"
+            icon-right="close"
+            data-test="command-palette-scope-pill"
+            @mousedown.prevent
+            @click="selectScope(null)"
+          >
+            {{ scopeLabel }}
+          </OButton>
+          <OSearchInput
+            v-model="query"
+            size="md"
+            class="min-w-0 flex-1"
+            :placeholder="placeholder"
+            :clearable="false"
+            :data-test="SEARCH_DATA_TEST"
+          />
+          <OShortcut keys="esc" />
+        </div>
+        <PaletteScopeChips
+          v-if="showScopes || scope"
+          :scopes="scopes"
+          :selected="scope"
+          @select="selectScope"
         />
-        <OShortcut keys="esc" />
       </div>
     </template>
 
@@ -226,6 +332,7 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
       tabindex="-1"
       :aria-label="t('palette.title')"
       :aria-activedescendant="activeOptionId"
+      :aria-busy="loading"
       class="flex flex-col outline-none"
       data-test="command-palette-list"
     >
@@ -270,6 +377,10 @@ onBeforeUnmount(() => window.removeEventListener("keydown", onKeydown, true));
         <span class="flex items-center gap-1">
           <OShortcut keys="ctrl+enter" />
           {{ t("palette.hint.newTab") }}
+        </span>
+        <span class="flex items-center gap-1">
+          <OShortcut keys="tab" />
+          {{ showScopes ? t("palette.hint.hideScopes") : t("palette.hint.showScopes") }}
         </span>
       </div>
     </template>

@@ -28,6 +28,43 @@ export type PaletteItemType =
   | "pipeline"
   | "ai";
 
+/** A chip the user can narrow the list to; each maps to one or more item types. */
+export type PaletteScope =
+  "actions" | "pages" | "dashboard" | "alert" | "stream" | "savedView" | "function" | "pipeline";
+
+export const SCOPE_ORDER: PaletteScope[] = [
+  "actions",
+  "pages",
+  "dashboard",
+  "alert",
+  "stream",
+  "savedView",
+  "function",
+  "pipeline",
+];
+
+export function scopeOfType(type: PaletteItemType): PaletteScope | null {
+  switch (type) {
+    case "action":
+    case "external":
+      return "actions";
+    case "page":
+      return "pages";
+    case "ai":
+      return null;
+    default:
+      return type;
+  }
+}
+
+/** The create verb pinned first when a scope is selected with an empty query. */
+export const SCOPE_CREATE_ACTION: Partial<Record<PaletteScope, string>> = {
+  dashboard: "action:newDashboard",
+  alert: "action:newAlert",
+  function: "action:newFunction",
+  pipeline: "action:newPipeline",
+};
+
 export interface PaletteTrailing {
   kind: "path" | "url" | "shortcut";
   value: string;
