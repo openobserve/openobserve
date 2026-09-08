@@ -45,14 +45,11 @@ use config::{RwAHashMap, get_config, meta::stream::StreamType, utils::time::hour
 use infra::cluster::get_cached_online_ingester_nodes;
 
 /// key: `org/stream_type/stream` -> (data partition hour in micros, files seen this hour)
-static PENDING_FILES: LazyLock<RwAHashMap<String, (i64, usize)>> = LazyLock::new(Default::default);
+/// Pending ingester files an open metrics-index hour holds before they all merge; one round
+/// per this many flushes keeps the hour at a few merge chains at any ingester count.
+pub const OPEN_HOUR_MERGE_FILES: usize = 12;
 
-/// Files an open hour holds before its pending ingester files merge: three full-size groups'
-/// worth, the count the ingester's trigger was derived from all along.
-pub fn open_hour_merge_files() -> usize {
-    let cfg = get_config();
-    (cfg.compact.max_file_size / cfg.limit.max_file_size_in_memory).max(1) * 3
-}
+static PENDING_FILES: LazyLock<RwAHashMap<String, (i64, usize)>> = LazyLock::new(Default::default);
 
 /// Record that one new file was uploaded for `(org, stream_type, stream)` whose data
 /// falls in the hour containing `min_ts`. When the per-hour count crosses the configured
@@ -104,17 +101,5 @@ pub async fn incr_pending_file(
         log::debug!(
             "[COMPACTOR:INCREMENTAL] enqueued incremental merge for [{org_id}/{stream_type}/{stream_name}] hour {hour}"
         );
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_open_hour_merge_files_is_three_full_groups() {
-        let cfg = get_config();
-        let per_group = (cfg.compact.max_file_size / cfg.limit.max_file_size_in_memory).max(1);
-        assert_eq!(open_hour_merge_files(), per_group * 3);
     }
 }
