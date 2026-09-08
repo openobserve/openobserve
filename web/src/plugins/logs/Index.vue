@@ -673,6 +673,20 @@ export default defineComponent({
       if (isLogsMounted.value) handleActivation();
     });
 
+    // ?view_id= deep link (command palette): apply the saved view once the search bar exists.
+    let appliedViewId = "";
+    watch(
+      () => [router.currentRoute.value.query.view_id, searchBarRef.value] as const,
+      ([viewId, bar]) => {
+        const id = Array.isArray(viewId) ? viewId[0] : viewId;
+        if (!id || !bar || id === appliedViewId || router.currentRoute.value.name !== "logs")
+          return;
+        appliedViewId = id;
+        (bar as any).applySavedView?.({ view_id: id });
+      },
+      { immediate: true },
+    );
+
     /**
      * As we are redirecting stream explorer to logs page, we need to check if the user has changed the stream type from stream explorer to logs.
      * This watcher is used to check if the user has changed the stream type from stream explorer to logs.
