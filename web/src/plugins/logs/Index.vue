@@ -883,7 +883,21 @@ export default defineComponent({
       return searchObj.meta.logsVisualizeToggle === "logs";
     }
 
+    // Arrivals that carry the whole search in the URL. Search History and the AI chat only
+    // re-apply the query into the editor; the scheduler also runs it.
+    const RE_APPLY_QUERY_TYPES = ["search_history_re_apply", "ai_chat_query"];
+    const URL_DRIVEN_QUERY_TYPES = [...RE_APPLY_QUERY_TYPES, "search_scheduler"];
+
     const isRouteChanged = () => {
+      // Search History / Scheduler are standalone routes and /logs is not kept alive, so this
+      // is a fresh mount and the query.type watchers below never see the initial value. Unless
+      // the cached state is dropped, initialLogsState() restores the previous searchObj over
+      // the query carried in the URL and the re-applied query is silently lost (#14283).
+      if (URL_DRIVEN_QUERY_TYPES.includes(router.currentRoute.value.query.type)) {
+        store.dispatch("logs/setIsInitialized", false);
+        return;
+      }
+
       if (
         !Object.hasOwn(router.currentRoute.value.query, "stream") ||
         !Object.hasOwn(router.currentRoute.value.query, "org_identifier")
@@ -911,6 +925,8 @@ export default defineComponent({
     // Setup logic for the logs tab
     async function setupLogsTab() {
       try {
+        // restoreUrlQueryParams() strips `type` off the route, so read it before that runs.
+        const arrivalType = router.currentRoute.value.query.type;
         isRouteChanged();
         if (!store.state.logs.isInitialized) {
           searchObj.organizationIdentifier = store.state.selectedOrganization.identifier;
@@ -970,8 +986,12 @@ export default defineComponent({
           }
 
           if (isLogsTab()) {
-            searchObj.loading = true;
-            loadLogsData();
+            if (RE_APPLY_QUERY_TYPES.includes(arrivalType)) {
+              await applyReAppliedQuery();
+            } else {
+              searchObj.loading = true;
+              loadLogsData();
+            }
           } else if (searchObj.meta.logsVisualizeToggle === "patterns") {
             await loadPatternsData();
             await extractPatternsForCurrentQuery();
@@ -1109,6 +1129,17 @@ export default defineComponent({
       resetStreamData();
       await restoreUrlQueryParams(dashboardPanelData);
       loadLogsData();
+    }
+
+    // Mirrors loadLogsData() minus getQueryData(): a re-applied query is loaded into the
+    // editor for the user to run, never run on their behalf.
+    async function applyReAppliedQuery() {
+      searchObj.meta.searchApplied = false;
+      await getStreamList();
+      await getFunctions();
+      await extractFields();
+      refreshData();
+      searchObj.loading = false;
     }
 
     // Helper function for handling the stream explorer
