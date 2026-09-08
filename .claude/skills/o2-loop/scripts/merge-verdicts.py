@@ -24,7 +24,7 @@ def renumber(findings, backend, rnd):
 
 
 def same_issue(a, b):
-    if a.get("repo") != b.get("repo") or a.get("file") != b.get("file"):
+    if a.get("repo") != b.get("repo") or a.get("file") != b.get("file") or a.get("category") != b.get("category"):
         return False
     la, lb = a.get("line"), b.get("line")
     if la is None or lb is None:
@@ -39,6 +39,7 @@ def merge_pair(primary, other):
     m = dict(primary)
     m["sources"] = sorted(set(primary["sources"]) | set(other["sources"]))
     m["also_reported_as"] = other["id"]
+    m["title"] = f"{primary['title']} / {other['title']}"
     m["detail"] = f"{primary['sources'][0]}: {primary['detail']}\n\n{other['sources'][0]}: {other['detail']}"
     m["suggestion"] = f"{primary['sources'][0]}: {primary['suggestion']}\n\n{other['sources'][0]}: {other['suggestion']}"
     return m
@@ -57,7 +58,7 @@ def merge_findings(codex, claude):
 
 
 def merge_prior(codex, claude):
-    """A prior finding is open if either reviewer still sees it; resolved beats withdrawn once both agree it is closed."""
+    """A prior finding closes only when both reviewers examined it and neither still sees it; one vote keeps it open."""
     by_id = {}
     for backend, items in (("codex", codex), ("claude", claude)):
         for p in items:
@@ -65,13 +66,16 @@ def merge_prior(codex, claude):
     out = []
     for fid, votes in by_id.items():
         statuses = {v["status"] for v in votes.values()}
-        if "still_open" in statuses:
+        missing = [b for b in ("codex", "claude") if b not in votes]
+        if "still_open" in statuses or missing:
             status = "still_open"
         elif "resolved" in statuses:
             status = "resolved"
         else:
             status = "withdrawn"
         note = " | ".join(f"{b}: {v['note']}" for b, v in votes.items())
+        if missing:
+            note += f" | not verified by {', '.join(missing)}; stays open"
         out.append({"id": fid, "status": status, "note": note, "sources": sorted(votes)})
     return out
 

@@ -97,7 +97,11 @@ repo_name_of() { basename "$(dirname "$(git -C "$1" rev-parse --path-format=abso
 die() {
   log "$*"
   if [ -d "${ROUND_DIR:-/nonexistent}" ]; then
-    echo "$(date +%H:%M:%S) ${PROGRESS_PREFIX:+$PROGRESS_PREFIX | failed}${PROGRESS_PREFIX:-error}: $*" >> "$ROUND_DIR/progress.log"
+    if [ -n "$PROGRESS_PREFIX" ]; then
+      echo "$(date +%H:%M:%S) $PROGRESS_PREFIX | failed: $*" >> "$ROUND_DIR/progress.log"
+    else
+      echo "$(date +%H:%M:%S) error: $*" >> "$ROUND_DIR/progress.log"
+    fi
   fi
   exit 1
 }
@@ -195,6 +199,9 @@ resolve_paths() {
     git -C "$also" rev-parse --show-toplevel >/dev/null 2>&1 || die "--also $also is not a git checkout"
     git -C "$also" rev-parse --verify --quiet "$BASE" >/dev/null || die "base branch $BASE not found in $also"
     [ "$(repo_name_of "$also")" != "$REPO_NAME" ] || die "--also $also has the same repository name as the primary checkout"
+    case "$LEDGER/" in
+      "$(realpath_of "$(git -C "$also" rev-parse --show-toplevel)")"/*) die "ledger $LEDGER is inside the paired checkout $also; it would be swept into its WIP commit" ;;
+    esac
   done
   LEDGER="$(python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$LEDGER")"
   case "$LEDGER/" in
@@ -206,7 +213,8 @@ resolve_paths() {
   mkdir -p "$ROUND_DIR"
   [ ! -e "$ROUND_DIR/verdict.json" ] || die "round $ROUND already has a verdict in $ROUND_DIR/verdict.json; use the next round number, or delete the round directory to redo it"
   : > "$ROUND_DIR/progress.log"
-  rm -f "$ROUND_DIR/candidates.md" "$ROUND_DIR/candidates.cost" "$ROUND_DIR/candidates.err"
+  rm -f "$ROUND_DIR"/candidates.md "$ROUND_DIR"/candidates.cost "$ROUND_DIR"/candidates.err \
+    "$ROUND_DIR"/*/candidates.md "$ROUND_DIR"/*/candidates.cost "$ROUND_DIR"/*/candidates.err
 }
 
 check_inputs() {
@@ -236,7 +244,6 @@ snapshot() {
   echo "$COMMIT" > "$ROUND_DIR/commit"
   git diff "$MERGE_BASE" "$COMMIT" > "$ROUND_DIR/diff.patch"
   CHANGED_FILES="$(git diff --name-only "$MERGE_BASE" "$COMMIT")"
-  [ -n "$CHANGED_FILES" ] || die "no changes vs $BASE ($MERGE_BASE); nothing to review"
   PREV_COMMIT=""
   if [ "$ROUND" -gt 1 ]; then
     PREV_COMMIT="$(cat "$PREV_DIR/commit")"
@@ -244,10 +251,12 @@ snapshot() {
     git diff "$PREV_COMMIT" "$COMMIT" > "$ROUND_DIR/delta.patch"
     [ "$PREV_COMMIT" != "$COMMIT" ] || log "warning: round $ROUND reviews the same commit as round $((ROUND - 1)); only responses changed"
   fi
-  local also
+  local also any_paired_change=0
   for also in ${ALSO_REPOS[@]+"${ALSO_REPOS[@]}"}; do
     snapshot_also "$also"
+    [ ! -s "$ROUND_DIR/also/$(repo_name_of "$also")/diff.patch" ] || any_paired_change=1
   done
+  [ -n "$CHANGED_FILES" ] || [ "$any_paired_change" -eq 1 ] || die "no changes vs $BASE in any checkout; nothing to review"
 }
 
 # Same freeze for a paired repository; its artifacts go under round-N/also/<name>/.
@@ -369,14 +378,18 @@ run_with_timeout() {
   fi
 }
 
-# Containment comes from the worktree and seatbelt; --allowedTools only pre-approves read-only commands so the reviewer is not blocked.
+# Containment is the worktree plus seatbelt; the pre-approved commands can write only to temp dirs, and python3/bash may reach the network (accepted).
 claude_common_args() {
   printf '%s\n' --restricted --strict-mcp-config --mcp-config '{"mcpServers":{}}' --model "$MODEL" \
     --max-budget-usd "$1" --add-dir "$ROUND_DIR" \
     ${ALSO_REVIEW_DIRS[@]+"${ALSO_REVIEW_DIRS[@]/#/--add-dir=}"} \
     --disallowedTools "Write" "Edit" "NotebookEdit" "WebFetch" "WebSearch" \
     --allowedTools "Bash(git diff:*)" "Bash(git log:*)" "Bash(git show:*)" "Bash(git status:*)" "Bash(git rev-parse:*)" "Bash(git merge-base:*)" \
-      "Bash(head:*)" "Bash(tail:*)" "Bash(cat:*)" "Bash(ls:*)" "Bash(wc:*)" "Bash(nl:*)"
+      "Bash(git grep:*)" "Bash(git ls-files:*)" "Bash(git blame:*)" \
+      "Bash(head:*)" "Bash(tail:*)" "Bash(cat:*)" "Bash(ls:*)" "Bash(wc:*)" "Bash(nl:*)" \
+      "Bash(grep:*)" "Bash(sed:*)" "Bash(awk:*)" "Bash(find:*)" "Bash(diff:*)" "Bash(sort:*)" "Bash(uniq:*)" \
+      "Bash(cut:*)" "Bash(tr:*)" "Bash(xargs:*)" "Bash(stat:*)" "Bash(file:*)" "Bash(echo:*)" "Bash(printf:*)" \
+      "Bash(python3:*)" "Bash(bash:*)" "Bash(sh:*)"
 }
 
 claude_reviewer_args() {
@@ -627,8 +640,10 @@ run_reviewers() {
   [ "$DRY_RUN" -eq 0 ] || exit 0
   [ "$s_codex" -eq 0 ] && [ "$s_claude" -eq 0 ] || die "both mode needs both reviewers to finish (codex exit $s_codex, claude exit $s_claude); see $ROUND_DIR/*/reviewer.err"
   check_drift
-  python3 "$SKILL_DIR/scripts/merge-verdicts.py" "$ROUND" "$ROUND_DIR/codex/verdict.json" "$ROUND_DIR/claude/verdict.json" > "$ROUND_DIR/verdict.json" \
-    || die "could not merge the two verdicts"
+  # Merge into a scratch file first so a failed merge never leaves an empty verdict.json behind.
+  python3 "$SKILL_DIR/scripts/merge-verdicts.py" "$ROUND" "$ROUND_DIR/codex/verdict.json" "$ROUND_DIR/claude/verdict.json" > "$ROUND_DIR/verdict.merging" \
+    || { rm -f "$ROUND_DIR/verdict.merging"; die "could not merge the two verdicts; the per-backend verdicts are in $ROUND_DIR/codex and $ROUND_DIR/claude"; }
+  mv "$ROUND_DIR/verdict.merging" "$ROUND_DIR/verdict.json"
   echo "$(date +%H:%M:%S) done: both reviewers finished, verdicts merged" >> "$ROUND_DIR/progress.log"
 }
 

@@ -64,7 +64,7 @@ then run `review.sh --round N` in the background, adding `--also <checkout>` for
 
 **3. Relay the verdict before anything else.** As soon as `review.sh` returns, post: backend, verdict, every finding as one line (id, severity, file:line, title, and with `both` which reviewers reported it), and each prior finding's status. With `both`, say when the two reviewers disagreed on a prior finding; the merge keeps it open if either did. The user sees what the reviewer said before seeing what the coder does about it.
 
-**4. Hand the findings to the coder.** Run `loop-state.py`; it should say `respond`. `SendMessage` to the same coder agent: the path of `round-N/verdict.json`, "round N+1", and, only if the verdict is `approve` and the remaining findings are low, "defer the lows". With paired repositories, message every coder; each answers the findings whose `repo` is its own and ignores the rest, and `loop-state.py` merges the responses. Start a `Monitor` on `round-(N+1)/coder.log` first. When the coder reports, post its per-finding decisions to the user (id, action, reason).
+**4. Hand the findings to the coder.** Run `loop-state.py`; it says `respond`, or `cap` when the round cap is already reached with a non-approving verdict, in which case go to step 5 before the coder does any more work. `SendMessage` to the same coder agent: the path of `round-N/verdict.json`, "round N+1", and, only if the verdict is `approve` and the remaining findings are low, "defer the lows". With paired repositories, message every coder; each answers the findings whose `repo` is its own and ignores the rest, and `loop-state.py` merges the responses. Start a `Monitor` on `round-(N+1)/coder.log` first. When the coder reports, post its per-finding decisions to the user (id, action, reason).
 
 **5. Decide by the state machine.** Run `loop-state.py` and do exactly what `ACTION` says:
 - `agreed`: go to Ending the loop.
@@ -72,7 +72,7 @@ then run `review.sh --round N` in the background, adding `--also <checkout>` for
 - `cap`: write an interim `report.md` (outcome `paused after N rounds with K open items`), then `AskUserQuestion`: continue for up to 3 more rounds, or stop and hand over. Show the open items. On continue, rerun `loop-state.py --cap N+3` and go on; on stop, finish with outcome `stopped after N rounds with K open items`.
 - `respond`, `evidence`, `review`: something is missing; do that step.
 
-Agreement, as `loop-state.py` computes it: the last verdict is `approve`, no finding with original severity critical, high, or medium is open, every open low is answered with `defer`, the coder's `open_items` is empty, and HEAD equals the reviewed commit with a clean tree. Any edit after an approve invalidates it and needs another round.
+`loop-state.py` judges the last round that has a verdict, so a prepared next round (its `coder.log` or `evidence.md`) never hides `agreed` or `cap`. Agreement, as it computes it: the last verdict is `approve`, no finding with original severity critical, high, or medium is open, every open low is answered with `defer`, the coder's `open_items` is empty, and HEAD equals the reviewed commit with a clean tree. Any edit after an approve invalidates it and needs another round.
 
 ## Ending the loop
 

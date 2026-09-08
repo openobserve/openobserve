@@ -90,43 +90,53 @@ def collect(ledger):
 def finding_registry(rounds):
     """Latest known state of every finding id: severity from the round that reported it, status from the latest mention."""
     reg = {}
+    alias = {}
     for r in rounds:
         v = r["verdict"]
         if not v:
             continue
         for f in v.get("findings", []):
-            reg[f["id"]] = {"severity": f["severity"], "status": "open", "round": r["n"], "title": f.get("title", ""), "repo": f.get("repo", "")}
+            reg[f["id"]] = {"severity": f["severity"], "status": "open", "round": r["n"], "title": f.get("title", ""), "repo": f.get("repo", ""), "aliases": []}
+            if f.get("also_reported_as"):
+                alias[f["also_reported_as"]] = f["id"]
+                reg[f["id"]]["aliases"].append(f["also_reported_as"])
         for p in v.get("prior_findings", []):
-            if p["id"] in reg:
-                reg[p["id"]]["status"] = p["status"]
+            fid = alias.get(p["id"], p["id"])
+            if fid in reg:
+                reg[fid]["status"] = p["status"]
         resp = r["response"]
         if resp:
             for a in resp.get("responses", []):
-                if a["id"] in reg:
-                    reg[a["id"]]["action"] = a["action"]
+                fid = alias.get(a["id"], a["id"])
+                if fid in reg:
+                    reg[fid]["action"] = a["action"]
     return reg
 
 
 def decide(rounds, reg, cap, head, clean):
+    """Judge the last round that has a verdict; a prepared next round only matters once that judgement says next."""
     if not rounds:
         return "start", "no round yet: write spec.md and round-1/evidence.md, then run review.sh --round 1"
-    last = rounds[-1]
+    judged = [r for r in rounds if r["verdict"]]
+    if not judged:
+        first = rounds[0]
+        if not first["evidence"]:
+            return "evidence", "round 1: evidence.md missing or empty; the coder must write it before review.sh runs"
+        return "review", "round 1: no verdict yet; run review.sh --round 1"
+    last = judged[-1]
     n = last["n"]
-    if not last["evidence"]:
-        return "evidence", f"round {n}: evidence.md missing or empty; the coder must write it before review.sh runs"
-    if not last["verdict"]:
-        return "review", f"round {n}: no verdict yet; run review.sh --round {n}"
-    if not last["response"]:
-        return "respond", f"round {n}: verdict present, coder-response.json missing; hand the findings to the coder"
-    answered = {a["id"] for a in last["response"].get("responses", [])}
     open_ids = [i for i, f in reg.items() if f["status"] in ("open", "still_open")]
-    unanswered = [i for i in open_ids if i not in answered]
-    if unanswered:
-        return "respond", f"round {n}: findings without a response: {unanswered}"
     blocking = [i for i in open_ids if reg[i]["severity"] in BLOCKING]
+    verdict = last["verdict"]["verdict"]
+    answered = {a["id"] for a in (last["response"] or {}).get("responses", [])}
+    unanswered = [i for i in open_ids if i not in answered and not (set(reg[i].get("aliases", [])) & answered)]
+    if not last["response"] or unanswered:
+        if n >= cap and (verdict != "approve" or blocking):
+            return "cap", f"round cap {cap} reached with the round-{n} verdict {verdict} and open findings {open_ids}; write the interim report and ask the user before any more coding"
+        what = "coder-response.json missing" if not last["response"] else f"findings without a response: {unanswered}"
+        return "respond", f"round {n}: verdict present, {what}; hand the findings to the coder"
     low_not_deferred = [i for i in open_ids if reg[i]["severity"] == "low" and reg[i].get("action") != "defer"]
     open_items = last["response"].get("open_items") or []
-    verdict = last["verdict"]["verdict"]
     drift = head != last["commit"] or not clean
     for name, path, commit in last["paired"]:
         if not path or sh("git", "-C", path, "rev-parse", "HEAD") != commit or sh("git", "-C", path, "status", "--porcelain") != "":
@@ -146,6 +156,11 @@ def decide(rounds, reg, cap, head, clean):
         reasons.append("HEAD or working tree differs from the reviewed commit")
     if n >= cap:
         return "cap", f"round cap {cap} reached with items open ({'; '.join(reasons)}); write the interim report and ask the user"
+    nxt = next((r for r in rounds if r["n"] == n + 1), None)
+    if nxt and nxt["evidence"]:
+        return "review", f"round {n + 1} is prepared ({'; '.join(reasons)}); run review.sh --round {n + 1}"
+    if nxt:
+        return "evidence", f"round {n + 1}: evidence.md missing or empty; the coder must write it before review.sh runs"
     return "next", f"start round {n + 1} ({'; '.join(reasons)}): coder fixes, writes evidence.md, then review.sh --round {n + 1}"
 
 
