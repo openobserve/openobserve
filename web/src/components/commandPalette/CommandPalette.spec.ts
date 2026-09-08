@@ -255,6 +255,10 @@ describe("CommandPalette", () => {
   it("moves along the chip row with the arrows and toggles with Enter", async () => {
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Tab" }));
     await flushPromises();
+    expect(wrapper.findAll('[data-test^="command-palette-scope-"].ring-2')).toHaveLength(0);
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
+    await flushPromises();
+    expect(wrapper.find('[data-test="command-palette-scope-pages"]').classes()).toContain("ring-2");
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight" }));
     window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }));
     await flushPromises();

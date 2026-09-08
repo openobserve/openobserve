@@ -258,13 +258,19 @@ function onKeydown(e: KeyboardEvent): void {
     case "Tab":
       consume(e);
       showScopes.value = !showScopes.value;
-      chipCursor.value = showScopes.value ? 0 : null;
+      chipCursor.value = null;
       return;
     case "ArrowLeft":
     case "ArrowRight": {
-      if (chipCursor.value === null || scopeList.value.length === 0) return;
+      if (!showScopes.value && scopes.value.length === 0) return;
       consume(e);
       const n = scopeList.value.length;
+      if (n === 0) return;
+      // The first arrow press only lands on an end chip; nothing is ringed until then.
+      if (chipCursor.value === null) {
+        chipCursor.value = e.key === "ArrowRight" ? 0 : n - 1;
+        return;
+      }
       chipCursor.value = (chipCursor.value + (e.key === "ArrowRight" ? 1 : -1) + n) % n;
       return;
     }
