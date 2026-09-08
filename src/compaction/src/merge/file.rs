@@ -67,7 +67,8 @@ pub async fn merge_files(
     let start = std::time::Instant::now();
     // a whole-batch mode (downsampling) merges everything it is given, even a
     // single file; otherwise 0/1 files means nothing to do
-    let merge_whole_batch = mode.merges_whole_batch();
+    // a fan-in batch is sized in files by the planner, so it is never cut by bytes here
+    let merge_whole_batch = mode.merges_whole_batch() || mode.merges_by_fan_in();
     if files_with_size.len() <= 1 && !merge_whole_batch {
         return Ok((Vec::new(), Vec::new()));
     }

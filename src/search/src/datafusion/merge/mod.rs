@@ -228,15 +228,15 @@ mod tests {
         };
         assert_eq!(
             metrics.file_name("1", FileFormat::Parquet),
-            "hash-sorted-v1-1.parquet"
+            "hash-merged-v1-1.parquet"
         );
         assert_eq!(
             metrics.file_name("1", FileFormat::Vortex),
-            "hash-sorted-v1-1.vortex"
+            "hash-merged-v1-1.vortex"
         );
         assert_eq!(
             metrics.mark_file_key("files/o/metrics/s/1.parquet"),
-            "files/o/metrics/s/hash-sorted-v1-1.parquet"
+            "files/o/metrics/s/hash-merged-v1-1.parquet"
         );
     }
 

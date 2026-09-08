@@ -2835,7 +2835,7 @@ pub struct Compact {
     #[env_config(
         name = "ZO_COMPACT_METRICS_MERGE_FAN_IN",
         default = 16,
-        help = "Open metrics-index hour: once this many hash-sorted ingester files are pending, merge them all into indexed files the way a closed hour does, leaving earlier compactor outputs alone; 0 keeps the size-bounded hash-sorted grouping"
+        help = "Open metrics-index hour: once this many hash-sorted ingester files are pending, merge them all into one hash-merged file; earlier round outputs wait for the hour-end merge, which takes every file of the hour once. 0 keeps the size-bounded grouping"
     )]
     pub metrics_merge_fan_in: usize,
     #[env_config(

@@ -49,9 +49,9 @@ pub enum MergeMode {
     TraceTimeIndex,
     /// The file-list stream has no `_timestamp`; order by `min_ts DESC`.
     FileList,
-    /// Metrics index stream, hour still open: the ingester and the incremental
-    /// compactor merges write one `hash-sorted-v1-*` file
-    /// ordered by `(__hash__, _timestamp)`.
+    /// Metrics index stream, hour still open: an open-hour round merges the pending
+    /// `hash-sorted-v1-*` ingester files into one `hash-merged-v1-*` file ordered by
+    /// `(__hash__, _timestamp)`, which the hour-end merge takes once more.
     MetricsHashSorted,
     /// Metrics index stream, closed hour: the whole hour merges into
     /// size-split `indexed-v1-*` files in the same order.
@@ -130,8 +130,8 @@ impl MergeMode {
     }
 
     /// Metrics-specific layout of the file(s) the merge writes.
-    /// The open metrics-index hour merges every pending ingester file at once into indexed
-    /// files, so its listing must not be capped by size.
+    /// The open metrics-index hour merges every pending ingester file at once, so its
+    /// listing must not be capped by size and its batch must not be cut by size.
     pub fn merges_by_fan_in(&self) -> bool {
         matches!(self, Self::MetricsHashSorted)
     }

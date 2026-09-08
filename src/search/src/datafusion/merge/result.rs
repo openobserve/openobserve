@@ -57,7 +57,7 @@ impl MergedFile {
     fn metrics_layout(&self) -> Option<MetricsFileLayout> {
         match self {
             Self::Standard { .. } => None,
-            Self::MetricsHashSorted { .. } => Some(MetricsFileLayout::HashSorted),
+            Self::MetricsHashSorted { .. } => Some(MetricsFileLayout::HashMerged),
             Self::MetricsIndexed { .. } => Some(MetricsFileLayout::Indexed),
         }
     }
