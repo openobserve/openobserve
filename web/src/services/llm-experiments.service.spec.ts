@@ -93,7 +93,6 @@ describe("list()", () => {
     });
   });
 });
-
 describe("llm-experiments compare()", () => {
   it.each([{ ids: ["cost", "latency"] }, { ids: [] }])(
     "sends explicit column selections, including none: $ids",
