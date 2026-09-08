@@ -60,6 +60,40 @@ function sanitize(input: unknown): FrecencyDoc {
   return out;
 }
 
+// Per item: the higher count and the later timestamp win, so local-only visits survive a server load.
+function mergeDocs(local: FrecencyDoc, server: FrecencyDoc): FrecencyDoc {
+  const out = emptyDoc();
+  const orgs = new Set([...Object.keys(local.buckets), ...Object.keys(server.buckets)]);
+  for (const org of orgs) {
+    out.buckets[org] = {};
+    const buckets = new Set([
+      ...Object.keys(local.buckets[org] ?? {}),
+      ...Object.keys(server.buckets[org] ?? {}),
+    ]) as Set<FrecencyBucketName>;
+    for (const bucket of buckets) {
+      const byId = new Map<string, FrecencyRecord>();
+      for (const r of [
+        ...(server.buckets[org]?.[bucket] ?? []),
+        ...(local.buckets[org]?.[bucket] ?? []),
+      ]) {
+        const prev = byId.get(r.item_id);
+        byId.set(
+          r.item_id,
+          prev
+            ? {
+                item_id: r.item_id,
+                count: Math.max(prev.count, r.count),
+                last: Math.max(prev.last, r.last),
+              }
+            : r,
+        );
+      }
+      out.buckets[org][bucket] = [...byId.values()];
+    }
+  }
+  return out;
+}
+
 function readLocal(): FrecencyDoc | null {
   try {
     const raw = window.localStorage.getItem(LOCAL_KEY);
@@ -123,7 +157,7 @@ export function useFrecency() {
       const res = await settings.getSetting(org, SETTING_KEY, userId);
       const value = res?.data?.setting_value;
       if (value && typeof value === "object") {
-        doc.value = sanitize(value);
+        doc.value = mergeDocs(doc.value, sanitize(value));
         writeLocal(doc.value);
       }
     } catch {
@@ -131,7 +165,13 @@ export function useFrecency() {
     }
   };
 
-  const record = (bucket: FrecencyBucketName, itemId: string, now: number = Date.now()): void => {
+  /** `persist: false` keeps the record in localStorage only; a later palette selection uploads the merged doc. */
+  const record = (
+    bucket: FrecencyBucketName,
+    itemId: string,
+    now: number = Date.now(),
+    persist: boolean = true,
+  ): void => {
     const org = currentOrg.value;
     if (!org || !itemId) return;
     const records = bucketRecords(bucket, org).filter((r) => r.item_id !== itemId);
@@ -140,7 +180,8 @@ export function useFrecency() {
     // Cap by decayed score so a burst of new items evicts stale ones, not fresh ones.
     records.sort((a, b) => frecencyScore(b, now) - frecencyScore(a, now));
     setBucketRecords(bucket, org, records.slice(0, MAX_RECORDS));
-    schedulePersist();
+    if (persist) schedulePersist();
+    else writeLocal(doc.value);
   };
 
   const scores = (bucket: FrecencyBucketName, now: number = Date.now()): Map<string, number> => {

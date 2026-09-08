@@ -60,7 +60,7 @@ export function useRecentlyViewed() {
     if (id === lastId && now - lastAt < THROTTLE_MS) return;
     lastId = id;
     lastAt = now;
-    record("palette_item", id, now);
+    record("palette_item", id, now, false);
   };
 
   const resetThrottle = (): void => {

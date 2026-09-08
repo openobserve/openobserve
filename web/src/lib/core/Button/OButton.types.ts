@@ -97,6 +97,8 @@ export interface ButtonProps extends PrimitiveProps {
   loading?: boolean;
   /** Applies active/selected state styling (overrides variant to primary appearance) */
   active?: boolean;
+  /** Horizontal placement of icon, label and trailing icon; `between` pins them to the edges (search pills). */
+  contentAlign?: "center" | "between";
   /** Native button type attribute — only meaningful when as="button" */
   type?: "button" | "submit" | "reset";
   /** Makes the button a block-level element ( full width, flex instead of inline-flex ) */

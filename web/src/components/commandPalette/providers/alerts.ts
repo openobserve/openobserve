@@ -28,6 +28,7 @@ interface AlertRow {
   description?: string;
 }
 
+/** An alert row: id `alert:<id>`, opened on its detail page with its folder. */
 export function alertToItem(row: AlertRow, group?: string): PaletteItem {
   const folder = row.folder_id || "default";
   const state = row.enabled === false ? "paused" : "";

@@ -26,6 +26,7 @@ interface DashboardRow {
   description?: string;
 }
 
+/** A dashboard row: id `dashboard:<folder>/<id>`, opened on its view page. */
 export function dashboardToItem(row: DashboardRow, group?: string): PaletteItem {
   const folder = row.folder_id || "default";
   return {

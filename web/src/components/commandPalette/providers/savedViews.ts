@@ -23,6 +23,7 @@ interface SavedViewRow {
   view_name: string;
 }
 
+/** A saved-view row: id `savedView:<id>`, opened through the Logs `view_id` deep link. */
 export function savedViewToItem(row: SavedViewRow, subtitle: string, group?: string): PaletteItem {
   return {
     id: `savedView:${row.view_id}`,

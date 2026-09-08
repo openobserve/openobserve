@@ -45,12 +45,13 @@ export function fold(value: string): string {
     .trim();
 }
 
-function wordStart(haystack: string, needle: string): boolean {
-  return haystack.split(" ").some((w) => w.startsWith(needle));
+function wordStart(words: string[], needle: string): boolean {
+  return words.some((w) => w.startsWith(needle));
 }
 
 interface Folded {
   label: string;
+  words: string[];
   subtitle: string;
   keywords: string[];
 }
@@ -61,8 +62,10 @@ const foldedCache = new WeakMap<PaletteItem, Folded>();
 function folded(item: PaletteItem): Folded {
   let f = foldedCache.get(item);
   if (!f) {
+    const label = fold(item.label);
     f = {
-      label: fold(item.label),
+      label,
+      words: label.split(" "),
       subtitle: item.subtitle ? fold(item.subtitle) : "",
       keywords: (item.keywords ?? []).map(fold),
     };
@@ -73,12 +76,12 @@ function folded(item: PaletteItem): Folded {
 
 function matchScore(item: PaletteItem, q: string, aliasHits: Set<string>): number {
   if (aliasHits.has(item.id)) return 100;
-  const { label, subtitle, keywords } = folded(item);
+  const { label, words, subtitle, keywords } = folded(item);
   if (label === q) return 80;
   // A pasted entity id is an exact keyword; it must beat every label substring.
   if (keywords.some((k) => k === q)) return 70;
   if (label.startsWith(q)) return 60;
-  if (wordStart(label, q)) return 40;
+  if (wordStart(words, q)) return 40;
   if (label.includes(q)) return 20;
   if (subtitle.includes(q)) return 10;
   if (keywords.some((k) => k.includes(q))) return 10;

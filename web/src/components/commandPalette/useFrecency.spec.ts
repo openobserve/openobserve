@@ -107,7 +107,7 @@ describe("useFrecency", () => {
     );
   });
 
-  it("loads localStorage first, then lets the server copy win", async () => {
+  it("loads localStorage first, then merges the server copy in", async () => {
     window.localStorage.setItem(
       "o2.commandPalette",
       JSON.stringify({
@@ -127,7 +127,7 @@ describe("useFrecency", () => {
     const pending = f.load("org1", "me@example.com");
     expect(f.scores("palette_item", NOW).has("local")).toBe(true);
     await pending;
-    expect([...f.scores("palette_item", NOW).keys()]).toEqual(["server"]);
+    expect([...f.scores("palette_item", NOW).keys()].sort()).toEqual(["local", "server"]);
   });
 
   it("drops malformed records from either source", async () => {
@@ -144,5 +144,62 @@ describe("useFrecency", () => {
     const f = useFrecency();
     await f.load("org1", "me@example.com");
     expect([...f.scores("palette_item", NOW).keys()]).toEqual(["ok"]);
+  });
+
+  it("keeps route visits local and uploads them with the next palette selection", async () => {
+    const f = useFrecency();
+    await f.load("org1", "me@example.com");
+    f.record("palette_item", "page:logs", NOW, false);
+    vi.advanceTimersByTime(5000);
+    expect(settings.setUserSetting).not.toHaveBeenCalled();
+    expect(
+      JSON.parse(window.localStorage.getItem("o2.commandPalette") ?? "{}").buckets.org1
+        .palette_item,
+    ).toHaveLength(1);
+    f.record("palette_item", "dashboard:default/abc", NOW);
+    vi.advanceTimersByTime(2000);
+    expect(settings.setUserSetting).toHaveBeenCalledTimes(1);
+    const sent = (settings.setUserSetting as any).mock.calls[0][3];
+    expect(sent.buckets.org1.palette_item.map((r: any) => r.item_id).sort()).toEqual([
+      "dashboard:default/abc",
+      "page:logs",
+    ]);
+  });
+
+  it("merges local and server records instead of letting the server copy erase local visits", async () => {
+    window.localStorage.setItem(
+      "o2.commandPalette",
+      JSON.stringify({
+        v: 1,
+        buckets: {
+          org1: {
+            palette_item: [
+              { item_id: "local", count: 1, last: NOW },
+              { item_id: "both", count: 5, last: NOW - DAY },
+            ],
+          },
+        },
+      }),
+    );
+    (settings.getSetting as any).mockResolvedValue({
+      data: {
+        setting_value: {
+          v: 1,
+          buckets: {
+            org1: {
+              palette_item: [
+                { item_id: "server", count: 2, last: NOW },
+                { item_id: "both", count: 3, last: NOW },
+              ],
+            },
+          },
+        },
+      },
+    });
+    const f = useFrecency();
+    await f.load("org1", "me@example.com");
+    const ids = f.scores("palette_item", NOW);
+    expect([...ids.keys()].sort()).toEqual(["both", "local", "server"]);
+    expect(ids.get("both")).toBe(5);
   });
 });

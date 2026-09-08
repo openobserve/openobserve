@@ -17186,7 +17186,7 @@
     "placeholderScopedMore": "Search within {scope} and {n} more…",
     "trigger": "Search or jump to…",
     "menuEntry": "Search & jump to…",
-    "askAi": "Ask O2 AI about \"{q}\"",
+    "askAi": "Ask O2 Assistant about \"{q}\"",
     "clearScopes": "Clear",
     "scopes": {
       "actions": "Commands",
@@ -17200,15 +17200,6 @@
       "user": "Users",
       "synthetic": "Synthetics"
     },
-    "roles": {
-      "admin": "Admin",
-      "member": "Member",
-      "root": "Root",
-      "viewer": "Viewer",
-      "editor": "Editor",
-      "user": "User"
-    },
-    "serviceAccount": "Service account",
     "switchOrg": "Switch to {name}",
     "streamTypes": {
       "logs": "Logs stream",

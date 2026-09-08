@@ -14,6 +14,7 @@ const props = withDefaults(defineProps<ButtonProps>(), {
   disabled: false,
   loading: false,
   active: false,
+  contentAlign: "center",
   block: false,
 });
 
@@ -309,8 +310,8 @@ const activeClasses = [
 const classes = computed<string[]>(() => [
   // Base - layout, typography, interaction
   props.block
-    ? "flex w-full items-center justify-center"
-    : "inline-flex items-center justify-center",
+    ? `flex w-full items-center ${props.contentAlign === "between" ? "justify-between" : "justify-center"}`
+    : `inline-flex items-center ${props.contentAlign === "between" ? "justify-between" : "justify-center"}`,
   // box-border so a variant's 1px border is drawn INSIDE the fixed size box
   // (outline/secondary/etc.) — otherwise a bordered icon button renders 2px
   // taller than a borderless ghost one of the same size.

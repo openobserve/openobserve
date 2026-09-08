@@ -32,8 +32,6 @@ export interface ActionsProviderInput {
   railKeys?: string[];
 }
 
-const DOCS_URL = "https://openobserve.ai/docs";
-
 /** Create verbs and utilities; rows whose route is not registered in this build are dropped. */
 export function buildActionItems({
   t,
@@ -116,7 +114,6 @@ export function buildActionItems({
       type: "external",
       label: String(t("menu.docs")),
       icon: "open-in-new",
-      trailing: { kind: "url", value: DOCS_URL },
       run: handlers.openDocs,
       keywords: ["documentation", "help", "manual"],
     },

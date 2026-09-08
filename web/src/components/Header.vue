@@ -131,18 +131,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
     <!-- CENTER: command palette trigger -->
     <div class="min-w-0 flex-1" />
-    <!-- Native button: OButton centers its slot, this pill needs an edge-aligned glyph and keycap. -->
-    <button
-      type="button"
-      class="group bg-surface-base border-border-default text-text-secondary hover:border-accent focus-visible:ring-focus-ring-accent absolute top-1/2 left-1/2 hidden h-7 w-[min(24rem,calc(100vw-66rem))] -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center gap-2 rounded-full border ps-3 pe-1.5 text-sm shadow-xs transition-[border-color,box-shadow] duration-150 outline-none hover:shadow-sm focus-visible:ring-2 xl:flex"
+    <OButton
+      variant="outline"
+      size="sm"
+      content-align="between"
+      icon-left="search"
+      class="bg-surface-base text-text-secondary hover:border-accent absolute top-1/2 left-1/2 hidden h-7! w-[min(24rem,calc(100vw-66rem))] -translate-x-1/2 -translate-y-1/2 rounded-full! pe-1.5! font-normal shadow-xs xl:inline-flex"
       data-test="header-command-palette-trigger"
       :aria-label="t('palette.title')"
-      @click="openPalette"
+      @click="openPalette('header')"
     >
-      <OIcon name="search" size="sm" class="text-accent shrink-0" />
       <span class="min-w-0 flex-1 truncate text-start">{{ t("palette.trigger") }}</span>
       <OShortcut id="commandPalette" />
-    </button>
+    </OButton>
 
     <!-- RIGHT SIDE: Controls -->
     <div class="flex shrink-0 items-center justify-end gap-1 pe-3">

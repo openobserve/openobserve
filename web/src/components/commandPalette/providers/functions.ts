@@ -23,6 +23,7 @@ interface FunctionRow {
   function?: string;
 }
 
+/** A function row: id `function:<name>`, opened in the functions list's edit form. */
 export function functionToItem(row: FunctionRow, subtitle: string, group?: string): PaletteItem {
   return {
     id: `function:${row.name}`,

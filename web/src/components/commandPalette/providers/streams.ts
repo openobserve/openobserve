@@ -41,6 +41,7 @@ function iconFor(type: string): string {
   return "window";
 }
 
+/** A stream row: id `stream:<type>/<name>`, opened in the explorer for its type. */
 export function streamToItem(row: StreamRow, typeLabel: string, group?: string): PaletteItem {
   return {
     id: `stream:${row.stream_type}/${row.name}`,

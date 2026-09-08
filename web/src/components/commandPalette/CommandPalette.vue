@@ -27,7 +27,7 @@ import { useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { useTheme } from "@/composables/useTheme";
 import useStreams from "@/composables/useStreams";
-import { switchThemeMode } from "@/utils/theme";
+import { applyThemeMode } from "@/composables/useThemeMode";
 import { focusSearchInput } from "@/utils/keyboardShortcuts";
 import PaletteRow from "./PaletteRow.vue";
 import PaletteScopeChips from "./PaletteScopeChips.vue";
@@ -88,21 +88,8 @@ watch(
   { immediate: true },
 );
 
-// Mirrors ThemeSwitcher.setTheme so the header toggle stays in sync through the store.
-function applyTheme(mode: "light" | "dark"): void {
-  try {
-    localStorage.setItem("theme", mode);
-  } catch {
-    // Storage unavailable: the in-memory theme still flips for this session.
-  }
-  switchThemeMode(mode, () => {
-    document.documentElement.classList.toggle("dark", mode === "dark");
-    store.dispatch("appTheme", mode);
-  });
-}
-
 const handlers = {
-  toggleTheme: () => applyTheme(isDark.value ? "light" : "dark"),
+  toggleTheme: () => applyThemeMode(isDark.value ? "light" : "dark", store),
   openShortcuts: () => emit("open-shortcuts"),
   openDocs: () => emit("open-docs"),
   openSlack: () => emit("open-slack"),
@@ -150,7 +137,9 @@ const providers = computed(() =>
     t,
     org: orgId.value,
     hasRoute: (name) => router.hasRoute(name),
-    navNames: new Set(props.navLinks.map((l) => l.name)),
+    navNames: new Set(
+      props.navLinks.filter((l) => l.display !== false && !l.hide).map((l) => l.name),
+    ),
     railKeys: railKeys.value,
     searchStreams: (type, q, limit) =>
       getPaginatedStreams(type, false, false, 0, limit, q) as Promise<{

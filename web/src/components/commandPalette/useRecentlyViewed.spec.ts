@@ -67,6 +67,6 @@ describe("useRecentlyViewed", () => {
     recordRouteVisit(route("metrics"), 3000);
     recordRouteVisit(route("logs"), 9000);
     expect(record.mock.calls.map((c) => c[1])).toEqual(["page:logs", "page:metrics", "page:logs"]);
-    expect(record).toHaveBeenCalledWith("palette_item", "page:logs", 1000);
+    expect(record).toHaveBeenCalledWith("palette_item", "page:logs", 1000, false);
   });
 });

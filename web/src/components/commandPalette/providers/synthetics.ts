@@ -29,6 +29,7 @@ interface CheckRow {
   tags?: string[];
 }
 
+/** A synthetic-check row: id `synthetic:<id>`, opened on its results page. */
 export function syntheticToItem(row: CheckRow, org: string, group?: string): PaletteItem {
   const id = String(row.id);
   const folder = row.folder_id || "default";

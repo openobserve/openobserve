@@ -26,11 +26,20 @@ interface UserRow {
   role?: string;
 }
 
+// Same keys as the IAM role badge, so the palette and the Users page never disagree on a role name.
+function roleLabel(ctx: EntityProviderContext, role?: string): string {
+  if (!role) return "";
+  const key = `components.badge.userRole.${role.toLowerCase()}`;
+  const label = String(ctx.t(key));
+  return label === key ? role : label;
+}
+
 function displayName(row: UserRow): string {
   const name = [row.first_name, row.last_name].filter(Boolean).join(" ").trim();
   return name || row.email;
 }
 
+/** A user row: id `user:<email>`, opened on the user's IAM edit form. */
 export function userToItem(row: UserRow, roleLabel: string, group?: string): PaletteItem {
   const name = displayName(row);
   return {
@@ -45,6 +54,7 @@ export function userToItem(row: UserRow, roleLabel: string, group?: string): Pal
   };
 }
 
+/** A service-account row: id `serviceAccount:<email>`, opened on its IAM edit form. */
 export function serviceAccountToItem(row: UserRow, subtitle: string, group?: string): PaletteItem {
   return {
     id: `serviceAccount:${row.email}`,
@@ -88,7 +98,7 @@ export function createServiceAccountsProvider(ctx: EntityProviderContext): Entit
     list: async (signal) => {
       const res = await serviceAccountsService.list(ctx.org, signal);
       const rows: UserRow[] = res?.data?.data ?? [];
-      const subtitle = String(ctx.t("palette.serviceAccount"));
+      const subtitle = roleLabel(ctx, "serviceaccount");
       return rows.filter((r) => r.email).map((r) => serviceAccountToItem(r, subtitle, group));
     },
   };

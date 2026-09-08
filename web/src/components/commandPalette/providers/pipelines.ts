@@ -25,6 +25,7 @@ interface PipelineRow {
   source?: { source_type?: string; stream_name?: string; stream_type?: string };
 }
 
+/** A pipeline row: id `pipeline:<id>`, opened in the pipeline editor. */
 export function pipelineToItem(row: PipelineRow, group?: string): PaletteItem {
   const parts = [
     row.source?.source_type,
