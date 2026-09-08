@@ -3835,50 +3835,8 @@ fn check_common_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
     // check queue store
     check_queue_store_config(cfg)?;
 
-    // format metadata storage
-    if cfg.common.meta_store.is_empty() {
-        if cfg.common.local_mode {
-            cfg.common.meta_store = "sqlite".to_string();
-        } else {
-            cfg.common.meta_store = "nats".to_string();
-        }
-    }
-    cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
-    if !cfg.common.local_mode && !cfg.common.meta_store.starts_with("postgres") {
-        return Err(anyhow::anyhow!(
-            "Meta store only supports postgres in cluster mode."
-        ));
-    }
-    if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
-        let c = &cfg.common;
-        if c.meta_postgres_host.is_empty()
-            || c.meta_postgres_user.is_empty()
-            || c.meta_postgres_password.is_empty()
-            || c.meta_postgres_dbname.is_empty()
-        {
-            return Err(anyhow::anyhow!(
-                "Meta store is PostgreSQL, you must set either ZO_META_POSTGRES_DSN or all of \
-                 ZO_META_POSTGRES_HOST, ZO_META_POSTGRES_USER, ZO_META_POSTGRES_PASSWORD, \
-                 ZO_META_POSTGRES_DBNAME"
-            ));
-        }
-        // Compose the DSN from the individual vars. User, password and dbname are
-        // percent-encoded so credentials with special characters survive the round
-        // trip — sqlx percent-decodes them again when it parses the DSN.
-        let dsn = format!(
-            "postgres://{}:{}@{}:{}/{}",
-            urlencoding::encode(&c.meta_postgres_user),
-            urlencoding::encode(&c.meta_postgres_password),
-            c.meta_postgres_host,
-            c.meta_postgres_port,
-            urlencoding::encode(&c.meta_postgres_dbname),
-        );
-        cfg.common.meta_postgres_dsn = dsn;
-    }
-
-    if cfg.common.meta_store.starts_with("mysql") {
-        return Err(anyhow::anyhow!("We don't support MySQL anymore."));
-    }
+    // check meta store
+    check_meta_store_config(cfg)?;
 
     // check meta partition mode
     if cfg.common.meta_partition_mode != "manual" {
@@ -3990,6 +3948,54 @@ fn check_queue_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
                 cfg.common.memory_queue_max_size
             )
         })?;
+    Ok(())
+}
+
+fn check_meta_store_config(cfg: &mut Config) -> Result<(), anyhow::Error> {
+    // format metadata storage
+    if cfg.common.meta_store.is_empty() {
+        if cfg.common.local_mode {
+            cfg.common.meta_store = "sqlite".to_string();
+        } else {
+            cfg.common.meta_store = "nats".to_string();
+        }
+    }
+    cfg.common.meta_store = cfg.common.meta_store.to_lowercase();
+    cfg.common
+        .meta_store
+        .parse::<crate::meta::meta_store::MetaStore>()
+        .map_err(|e| anyhow::anyhow!("{e}"))?;
+    if !cfg.common.local_mode && !cfg.common.meta_store.starts_with("postgres") {
+        return Err(anyhow::anyhow!(
+            "Meta store only supports postgres in cluster mode."
+        ));
+    }
+    if cfg.common.meta_store.starts_with("postgres") && cfg.common.meta_postgres_dsn.is_empty() {
+        let c = &cfg.common;
+        if c.meta_postgres_host.is_empty()
+            || c.meta_postgres_user.is_empty()
+            || c.meta_postgres_password.is_empty()
+            || c.meta_postgres_dbname.is_empty()
+        {
+            return Err(anyhow::anyhow!(
+                "Meta store is PostgreSQL, you must set either ZO_META_POSTGRES_DSN or all of \
+                 ZO_META_POSTGRES_HOST, ZO_META_POSTGRES_USER, ZO_META_POSTGRES_PASSWORD, \
+                 ZO_META_POSTGRES_DBNAME"
+            ));
+        }
+        // Compose the DSN from the individual vars. User, password and dbname are
+        // percent-encoded so credentials with special characters survive the round
+        // trip — sqlx percent-decodes them again when it parses the DSN.
+        let dsn = format!(
+            "postgres://{}:{}@{}:{}/{}",
+            urlencoding::encode(&c.meta_postgres_user),
+            urlencoding::encode(&c.meta_postgres_password),
+            c.meta_postgres_host,
+            c.meta_postgres_port,
+            urlencoding::encode(&c.meta_postgres_dbname),
+        );
+        cfg.common.meta_postgres_dsn = dsn;
+    }
     Ok(())
 }
 
@@ -5613,6 +5619,84 @@ mod tests {
         cfg.common.memory_queue_max_size = 32;
         assert!(check_queue_store_config(&mut cfg).is_ok());
         assert_eq!(cfg.common.memory_queue_max_size, 32 * 1024 * 1024);
+    }
+
+    #[test]
+    fn test_check_meta_store_config_defaults() {
+        // unset resolves to sqlite in local mode
+        let mut cfg = Config::default();
+        cfg.common.local_mode = true;
+        cfg.common.meta_store = "".to_string();
+        check_meta_store_config(&mut cfg).unwrap();
+        assert_eq!(cfg.common.meta_store, "sqlite");
+
+        // unset resolves to nats in cluster mode, which the cluster guard then rejects
+        let mut cfg = Config::default();
+        cfg.common.local_mode = false;
+        cfg.common.meta_store = "".to_string();
+        let err = check_meta_store_config(&mut cfg).unwrap_err().to_string();
+        assert_eq!(cfg.common.meta_store, "nats");
+        assert!(err.contains("cluster mode"), "unexpected error: {err}");
+    }
+
+    #[test]
+    fn test_check_meta_store_config_accepts_supported_values() {
+        for value in ["sqlite", "nats", "SQLITE"] {
+            let mut cfg = Config::default();
+            cfg.common.local_mode = true;
+            cfg.common.meta_store = value.to_string();
+            check_meta_store_config(&mut cfg).unwrap();
+            assert_eq!(cfg.common.meta_store, value.to_lowercase());
+        }
+
+        for value in ["postgres", "postgresql"] {
+            let mut cfg = Config::default();
+            cfg.common.local_mode = false;
+            cfg.common.meta_store = value.to_string();
+            cfg.common.meta_postgres_dsn = "postgres://u:p@h:5432/db".to_string();
+            check_meta_store_config(&mut cfg).unwrap();
+            assert_eq!(cfg.common.meta_store, value);
+        }
+    }
+
+    #[test]
+    fn test_check_meta_store_config_rejects_mysql() {
+        for value in [
+            "mysql",
+            "MySQL",
+            "mysql://user:pass@localhost:3306/openobserve",
+        ] {
+            let mut cfg = Config::default();
+            cfg.common.local_mode = true;
+            cfg.common.meta_store = value.to_string();
+            let err = check_meta_store_config(&mut cfg).unwrap_err().to_string();
+            assert!(
+                err.contains("mysql"),
+                "error must name the offending scheme {value}: {err}"
+            );
+            assert!(
+                !err.contains("pass"),
+                "a DSN password must never reach the startup error: {err}"
+            );
+            assert!(
+                err.to_lowercase().contains("no longer supported"),
+                "error must say MySQL is no longer supported: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_check_meta_store_config_rejects_unknown_values() {
+        for value in ["mongodb", "sqllite", "postgre", "etcd"] {
+            let mut cfg = Config::default();
+            cfg.common.local_mode = true;
+            cfg.common.meta_store = value.to_string();
+            let err = check_meta_store_config(&mut cfg).unwrap_err().to_string();
+            assert!(
+                err.contains(value),
+                "error must name the offending value {value}: {err}"
+            );
+        }
     }
 
     #[test]

@@ -13,6 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
+use std::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
@@ -23,14 +25,34 @@ pub enum MetaStore {
     PostgreSQL,
 }
 
+impl FromStr for MetaStore {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.to_lowercase();
+        match s.as_str() {
+            "sqlite" => Ok(Self::Sqlite),
+            "nats" => Ok(Self::Nats),
+            "postgres" | "postgresql" => Ok(Self::PostgreSQL),
+            // MySQL shipped once, so its operators need migration advice, not a typo hint
+            _ if s.starts_with("mysql") => Err(format!(
+                "invalid meta store: {}, MySQL is no longer supported as a metadata store; set \
+                 ZO_META_STORE to one of: sqlite, nats, postgres, postgresql",
+                redacted(&s)
+            )),
+            _ => Err(format!(
+                "invalid meta store: {}, set ZO_META_STORE to one of: sqlite, nats, postgres, \
+                 postgresql",
+                redacted(&s)
+            )),
+        }
+    }
+}
+
+// Infallible for callers reading an already-validated config; startup rejects bad values
 impl From<&str> for MetaStore {
     fn from(s: &str) -> Self {
-        match s.to_lowercase().as_str() {
-            "sqlite" => Self::Sqlite,
-            "nats" => Self::Nats,
-            "postgres" | "postgresql" => Self::PostgreSQL,
-            _ => Self::Sqlite,
-        }
+        s.parse().unwrap_or(Self::Sqlite)
     }
 }
 
@@ -48,6 +70,11 @@ impl std::fmt::Display for MetaStore {
             Self::PostgreSQL => write!(f, "postgresql"),
         }
     }
+}
+
+/// A DSN-shaped value carries a password, and this reaches stderr and crash reports.
+fn redacted(s: &str) -> &str {
+    s.split("://").next().unwrap_or(s)
 }
 
 #[cfg(test)]
@@ -96,6 +123,54 @@ mod tests {
             let s = serde_json::to_string(&variant).unwrap();
             let back: MetaStore = serde_json::from_str(&s).unwrap();
             assert_eq!(back, variant);
+        }
+    }
+
+    #[test]
+    fn test_metastore_parse_supported_values() {
+        assert_eq!("sqlite".parse::<MetaStore>(), Ok(MetaStore::Sqlite));
+        assert_eq!("nats".parse::<MetaStore>(), Ok(MetaStore::Nats));
+        assert_eq!("postgres".parse::<MetaStore>(), Ok(MetaStore::PostgreSQL));
+        assert_eq!("postgresql".parse::<MetaStore>(), Ok(MetaStore::PostgreSQL));
+        assert_eq!("SQLITE".parse::<MetaStore>(), Ok(MetaStore::Sqlite));
+        assert_eq!("PostgreSQL".parse::<MetaStore>(), Ok(MetaStore::PostgreSQL));
+    }
+
+    #[test]
+    fn test_metastore_parse_rejects_mysql_with_removal_notice() {
+        for value in [
+            "mysql",
+            "MySQL",
+            "mysql://user:pass@localhost:3306/openobserve",
+        ] {
+            let err = value.parse::<MetaStore>().unwrap_err();
+            assert!(
+                err.contains("mysql"),
+                "error must name the offending scheme {value}: {err}"
+            );
+            assert!(
+                !err.contains("pass"),
+                "a DSN password must never reach the startup error: {err}"
+            );
+            assert!(
+                err.contains("no longer supported"),
+                "error must state MySQL is no longer supported: {err}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_metastore_parse_rejects_unknown_values() {
+        for value in ["mongodb", "sqllite", "postgre", "etcd", ""] {
+            let err = value.parse::<MetaStore>().unwrap_err();
+            assert!(
+                err.contains(value),
+                "error must name the offending value {value}: {err}"
+            );
+            assert!(
+                !err.contains("no longer supported"),
+                "a plain unknown value must not claim a removed backend: {err}"
+            );
         }
     }
 
