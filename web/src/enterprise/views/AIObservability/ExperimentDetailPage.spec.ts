@@ -517,7 +517,11 @@ describe("ExperimentDetailPage", () => {
   // "Incomplete" can be zero on a failed run — errors are terminal — so the
   // retry affordance keys off the error count instead.
   it("offers retry when the run holds errored slots", async () => {
-    const experiment = makeExperiment({ id: "exp-1", status: "failed" });
+    const experiment = makeExperiment({
+      id: "exp-1",
+      status: "execution_failed",
+      executionStatus: "failed",
+    });
     const detail = makeExperimentDetail(experiment, {
       results: {
         executions: [],

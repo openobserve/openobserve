@@ -192,6 +192,28 @@ describe("ExperimentBrowser", () => {
     expect(done.find('[data-test="ai-experiment-status-chip-done"]').exists()).toBe(true);
   });
 
+  it("shows scoring after execution has completed", () => {
+    const scoring = makeExperiment({
+      id: "scoring",
+      status: "scoring",
+      executionStatus: "completed",
+      executionStatusReason: "task execution finished",
+    });
+    const wrapper = mount(ExperimentBrowser, {
+      props: {
+        orgId: "acme",
+        experiments: [scoring],
+        datasets: [{ id: "dataset-a", name: "Dataset A" }] as any,
+      },
+      global: { stubs },
+    });
+
+    const cell = wrapper.get('[data-test="cell-status-scoring"]');
+    expect(cell.text()).toContain("Scoring");
+    expect(cell.text()).not.toContain("Completed");
+    expect(cell.text()).not.toContain("task execution finished");
+  });
+
   // First load has no dataset groups yet, so one section stands up around an
   // OTable in its loading state — the shared skeleton, not a hand-rolled one.
   // The placeholders already name both controls, so the labels above them were

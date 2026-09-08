@@ -44,6 +44,54 @@ describe("list()", () => {
       params: { includeSummary: true, datasetId: "dataset-1" },
     });
   });
+
+  it("uses the consolidated summary status while preserving execution status", async () => {
+    mockClient.get.mockResolvedValue({
+      data: {
+        list: [
+          {
+            id: "experiment-1",
+            status: "scoring",
+            executionStatus: "completed",
+            executionStatusReason: "task execution finished",
+          },
+        ],
+      },
+    });
+
+    const [experiment] = await llmExperimentsService.list("acme", {
+      includeSummary: true,
+    });
+
+    expect(experiment).toMatchObject({
+      status: "scoring",
+      executionStatus: "completed",
+      executionStatusReason: "task execution finished",
+    });
+  });
+
+  it("falls back to execution status when summary status is unavailable", async () => {
+    mockClient.get.mockResolvedValue({
+      data: {
+        list: [
+          {
+            id: "experiment-1",
+            status: null,
+            execution_status: "running",
+          },
+        ],
+      },
+    });
+
+    const [experiment] = await llmExperimentsService.list("acme", {
+      includeSummary: true,
+    });
+
+    expect(experiment).toMatchObject({
+      status: "running",
+      executionStatus: "running",
+    });
+  });
 });
 
 describe("llm-experiments compare()", () => {

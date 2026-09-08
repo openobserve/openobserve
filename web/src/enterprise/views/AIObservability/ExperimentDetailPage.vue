@@ -17,7 +17,7 @@
         {{ statusVariant(detail.experiment.status, "eval").label }}
       </OTag>
       <OButton
-        v-if="detail?.experiment.status === 'running'"
+        v-if="detail?.experiment.executionStatus === 'running'"
         size="sm"
         variant="outline"
         :disabled="acting"
@@ -27,7 +27,7 @@
         {{ t("aiObservability.experiments.cancel") }}
       </OButton>
       <OButton
-        v-else-if="detail?.experiment.status === 'failed' || failedSlotCount > 0"
+        v-else-if="detail?.experiment.executionStatus === 'failed' || failedSlotCount > 0"
         size="sm"
         variant="outline"
         :disabled="acting"

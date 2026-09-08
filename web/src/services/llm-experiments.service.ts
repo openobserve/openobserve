@@ -126,14 +126,23 @@ export interface ExperimentApplicability {
   scorerApplicability: ExperimentScorerApplicability[];
 }
 
+export type ExperimentExecutionStatus =
+  "pending" | "running" | "completed" | "failed" | "cancelled";
+
+export type ExperimentStatus =
+  ExperimentExecutionStatus | "scoring" | "execution_failed" | "scoring_failed";
+
 export interface LlmExperiment extends ExperimentCreatePayload {
   id: string;
   orgId: string;
   /** Resolved server-side from the pinned dataset; null when it was deleted. */
   datasetName: string | null;
   scorers: PinnedExperimentScorer[];
-  status: "pending" | "running" | "completed" | "failed" | "cancelled";
-  statusReason: string | null;
+  /** Consolidated execution + scoring lifecycle when summary data is available. */
+  status: ExperimentStatus;
+  /** Stored execution lifecycle used by execution-only actions such as cancel/retry. */
+  executionStatus: ExperimentExecutionStatus;
+  executionStatusReason: string | null;
   deadlineAt: number;
   completedAt: number | null;
   lifecycleVersion: number;
@@ -526,6 +535,12 @@ function normalizePreview(input: any): ExperimentPreview {
 }
 
 function normalizeExperiment(input: any): LlmExperiment {
+  const executionStatus = value<ExperimentExecutionStatus>(
+    input,
+    "executionStatus",
+    "execution_status",
+    input.status,
+  );
   return {
     id: input.id,
     orgId: value(input, "orgId", "org_id", ""),
@@ -543,11 +558,12 @@ function normalizeExperiment(input: any): LlmExperiment {
     trialCount: Number(value(input, "trialCount", "trial_count", 0)),
     metadata: input.metadata ?? null,
     idempotencyKey: value(input, "idempotencyKey", "idempotency_key", null),
-    // The server renamed the stored field to executionStatus/etc so it can
-    // report a richer, derived `status` alongside it (e.g. "scoring"); the
-    // old names are kept as a fallback for a response predating the rename.
-    status: value(input, "executionStatus", "execution_status", input.status),
-    statusReason: value(
+    // Summary responses expose the full execution + scoring lifecycle as
+    // `status`. Mutation responses do not carry a summary, so fall back to the
+    // stored execution status there.
+    status: value<ExperimentStatus>(input, "status", "status", executionStatus),
+    executionStatus,
+    executionStatusReason: value(
       input,
       "executionStatusReason",
       "execution_status_reason",

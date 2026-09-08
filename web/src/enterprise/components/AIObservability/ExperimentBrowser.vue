@@ -192,8 +192,8 @@
               >
                 {{ statusVariant(row.status, "eval").label }}
               </OTag>
-              <span v-if="row.statusReason" class="text-text-secondary truncate text-xs">
-                {{ raw(row.statusReason) }}
+              <span v-if="visibleStatusReason(row)" class="text-text-secondary truncate text-xs">
+                {{ raw(visibleStatusReason(row)) }}
               </span>
             </template>
           </div>
@@ -508,6 +508,15 @@ function progressLabel(experiment: LlmExperiment) {
   return total
     ? t("aiObservability.experiments.progress", { done, total })
     : statusVariant(experiment.status, "eval").label;
+}
+
+// executionStatusReason describes the execution lifecycle only. Do not place
+// it beside a derived scoring state, where it would explain the wrong phase.
+function visibleStatusReason(experiment: LlmExperiment) {
+  return experiment.status === experiment.executionStatus ||
+    experiment.status === "execution_failed"
+    ? experiment.executionStatusReason
+    : null;
 }
 
 // One column per scorer in the group: the scores array already carries each
