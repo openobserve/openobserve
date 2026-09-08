@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import pipelinesService from "@/services/pipelines";
-import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import { resolveGroup, type EntityProviderContext } from "./context";
 
 interface PipelineRow {
   pipeline_id: string;
@@ -46,19 +43,5 @@ export function pipelineToItem(row: PipelineRow, group?: string): PaletteItem {
     ].filter(Boolean),
     group,
     route: { name: "pipelineEditor", query: { id: row.pipeline_id, name: row.name } },
-  };
-}
-
-export function createPipelinesProvider(ctx: EntityProviderContext): EntityProvider {
-  const group = resolveGroup(ctx.railKeys, "data", "pipeline");
-  return {
-    id: "pipelines",
-    groups: group ? [group] : [],
-    enabled: () => ctx.hasRoute("pipelineEditor"),
-    list: async (signal) => {
-      const res = await pipelinesService.getPipelines(ctx.org, signal);
-      const rows: PipelineRow[] = res?.data?.list ?? [];
-      return rows.filter((r) => r.pipeline_id && r.name).map((r) => pipelineToItem(r, group));
-    },
   };
 }

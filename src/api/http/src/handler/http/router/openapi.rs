@@ -293,6 +293,7 @@ use crate::{
         synthetics::job_resolve,
         synthetics::job_lease,
         synthetics::job_ack,
+        openobserve_api_management::request::resources::search,
     ),
     components(
         schemas(
@@ -493,6 +494,9 @@ use crate::{
             config::meta::synthetics::SyntheticVariable,
             config::meta::synthetics::SyntheticListItem,
             config::meta::synthetics::SyntheticListResponse,
+            openobserve_api_management::models::resources::ResourceType,
+            openobserve_api_management::models::resources::ResourceHit,
+            openobserve_api_management::models::resources::SearchResourcesResponse,
          ),
     ),
     modifiers(&SecurityAddon),
@@ -520,6 +524,7 @@ use crate::{
         (name = "Service Streams", description = "Multi-signal correlation across logs, traces, and metrics (enterprise)"),
         (name = "Synthetics", description = "Synthetic monitoring — uptime and browser checks (enterprise)"),
         (name = "Announcements", description = "Operator-authored announcement banners shown across organizations (enterprise)"),
+        (name = "Resources", description = "Cross-resource name search used by the command palette"),
     ),
     info(
         description = "OpenObserve API documents [https://openobserve.ai/docs/](https://openobserve.ai/docs/)",

@@ -13,23 +13,21 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import type { PaletteItem } from "../types";
+import http from "./http";
 
-interface FunctionRow {
-  name: string;
-  function?: string;
+export interface SearchResourcesParams {
+  q: string;
+  /** Comma-separated resource types; every type when omitted. */
+  types?: string;
+  /** Rows per type, 1 to 100. */
+  limit?: number;
 }
 
-/** A function row: id `function:<name>`, opened in the functions list's edit form. */
-export function functionToItem(row: FunctionRow, subtitle: string, group?: string): PaletteItem {
-  return {
-    id: `function:${row.name}`,
-    type: "function",
-    label: row.name,
-    subtitle,
-    icon: "function",
-    keywords: ["vrl"],
-    group,
-    route: { name: "functionList", query: { action: "update", name: row.name } },
-  };
-}
+const resources = {
+  search: (org_identifier: string, params: SearchResourcesParams, signal?: AbortSignal) => {
+    const url = `/api/${org_identifier}/resources/_search`;
+    return signal ? http().get(url, { params, signal }) : http().get(url, { params });
+  },
+};
+
+export default resources;

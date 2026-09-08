@@ -85,6 +85,7 @@ describe("buildPageItems", () => {
       route: { path: "/logs" },
     });
     expect(items.find((i) => i.id === "page:home")).toBeTruthy();
+    expect(logs!.group).toBe("logs");
   });
 
   it("hides links the rail hides", () => {
@@ -109,6 +110,7 @@ describe("buildPageItems", () => {
     const dest = items.find((i) => i.id === "page:alertDestinations")!;
     expect(dest.subtitle).toBe("menu.reliability · menu.alerts");
     expect(dest.route).toEqual({ name: "alertDestinations", query: {} });
+    expect(dest.group).toBe("reliability");
   });
 
   it("keeps a NAV_SUBNAV parent as a page and adds its tab children, skipping the default tab", () => {
@@ -123,6 +125,7 @@ describe("buildPageItems", () => {
     const catalog = items.find((i) => i.id === "page:traces:services-catalog")!;
     expect(catalog.trailing).toEqual({ kind: "path", value: "/traces?tab=services-catalog" });
     expect(catalog.route).toEqual({ name: "traces", query: { tab: "services-catalog" } });
+    expect(catalog.group).toBe("traces");
   });
 
   it("applies gate predicates and custom_hide_menus like the rail", () => {

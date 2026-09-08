@@ -21,10 +21,8 @@ export interface EntityProvider {
   /** Rail categories this source's rows belong to; empty when the rail shows none of them. */
   groups: PaletteScope[];
   enabled(): boolean;
-  /** Full list, fetched when the palette opens and cached for LIST_TTL_MS. */
-  list?(signal: AbortSignal): Promise<PaletteItem[]>;
-  /** Keyword search per query, for sources too large to list. */
-  search?(query: string, signal: AbortSignal): Promise<PaletteItem[]>;
+  /** Server-side search for the query, narrowed to the selected rail categories. */
+  search(query: string, scopes: PaletteScope[], signal: AbortSignal): Promise<PaletteItem[]>;
 }
 
 export interface PaletteEntitiesInput {
@@ -35,20 +33,23 @@ export interface PaletteEntitiesInput {
   providers: Ref<EntityProvider[]>;
 }
 
-const LIST_TTL_MS = 60_000;
 const SEARCH_DEBOUNCE_MS = 120;
+const CACHE_TTL_MS = 60_000;
 
 interface CacheEntry {
-  org: string;
   at: number;
   items: PaletteItem[];
 }
 
-// Module-level so reopening the palette within the TTL costs no network.
-const listCache = new Map<string, CacheEntry>();
+// Module-level so retyping a query, or reopening on it, within the TTL costs no network.
+const searchCache = new Map<string, CacheEntry>();
 
 export function resetPaletteEntityCache(): void {
-  listCache.clear();
+  searchCache.clear();
+}
+
+function cacheKey(org: string, scopes: PaletteScope[], query: string): string {
+  return `${org}|${[...scopes].sort().join(",")}|${query}`;
 }
 
 function dedupe(items: PaletteItem[]): PaletteItem[] {
@@ -59,56 +60,40 @@ function dedupe(items: PaletteItem[]): PaletteItem[] {
 export function usePaletteEntities({ open, query, scopes, org, providers }: PaletteEntitiesInput): {
   entities: ComputedRef<PaletteItem[]>;
   loading: Ref<boolean>;
-  refresh: () => Promise<void>;
 } {
-  const listed = ref<PaletteItem[]>([]);
-  const searched = ref<PaletteItem[]>([]);
+  const found = ref<PaletteItem[]>([]);
   const loading = ref(false);
-  let listController: AbortController | null = null;
-  let searchController: AbortController | null = null;
-  let searchTimer: ReturnType<typeof setTimeout> | null = null;
+  let controller: AbortController | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
 
-  const active = () => providers.value.filter((p) => p.enabled());
+  const active = () =>
+    providers.value.filter(
+      (p) =>
+        p.enabled() &&
+        (scopes.value.length === 0 || p.groups.some((g) => scopes.value.includes(g))),
+    );
 
-  const refresh = async (): Promise<void> => {
-    listController?.abort();
-    listController = new AbortController();
-    const { signal } = listController;
-    const now = Date.now();
-    const current = org.value;
-    const pending = active()
-      .filter((p) => p.list)
-      .map(async (p) => {
-        const hit = listCache.get(p.id);
-        if (hit && hit.org === current && now - hit.at < LIST_TTL_MS) return hit.items;
-        try {
-          const items = await p.list!(signal);
-          listCache.set(p.id, { org: current, at: Date.now(), items });
-          return items;
-        } catch (e) {
-          if (!signal.aborted) console.warn(`[palette] provider ${p.id} failed`, e);
-          return hit?.org === current ? hit.items : [];
-        }
-      });
-    loading.value = true;
-    const results = await Promise.all(pending);
-    if (signal.aborted) return;
-    listed.value = results.flat();
+  const cancel = (): void => {
+    controller?.abort();
+    if (timer) clearTimeout(timer);
+    timer = null;
+  };
+
+  const clear = (): void => {
+    cancel();
+    found.value = [];
     loading.value = false;
   };
 
-  const runSearch = async (q: string): Promise<void> => {
-    searchController?.abort();
-    searchController = new AbortController();
-    const { signal } = searchController;
-    const targets = active().filter(
-      (p) =>
-        p.search && (scopes.value.length === 0 || p.groups.some((g) => scopes.value.includes(g))),
-    );
+  const run = async (q: string, key: string): Promise<void> => {
+    controller?.abort();
+    controller = new AbortController();
+    const { signal } = controller;
+    loading.value = true;
     const results = await Promise.all(
-      targets.map(async (p) => {
+      active().map(async (p) => {
         try {
-          return await p.search!(q, signal);
+          return await p.search(q, scopes.value, signal);
         } catch (e) {
           if (!signal.aborted) console.warn(`[palette] provider ${p.id} search failed`, e);
           return [];
@@ -116,41 +101,36 @@ export function usePaletteEntities({ open, query, scopes, org, providers }: Pale
       }),
     );
     if (signal.aborted) return;
-    searched.value = results.flat();
+    const items = dedupe(results.flat());
+    searchCache.set(key, { at: Date.now(), items });
+    found.value = items;
+    loading.value = false;
   };
 
   watch(
-    open,
-    (isOpen) => {
-      if (isOpen) {
-        void refresh();
-      } else {
-        listController?.abort();
-        searchController?.abort();
-        if (searchTimer) clearTimeout(searchTimer);
-        searched.value = [];
+    [open, query, scopes, org],
+    ([isOpen, q, selected, currentOrg]) => {
+      const trimmed = q.trim();
+      // Nothing to ask for: the empty state is pages, commands and recents, all local.
+      if (!isOpen || (trimmed === "" && selected.length === 0)) {
+        clear();
+        return;
       }
+      cancel();
+      const key = cacheKey(currentOrg, selected, trimmed);
+      const hit = searchCache.get(key);
+      if (hit && Date.now() - hit.at < CACHE_TTL_MS) {
+        found.value = hit.items;
+        loading.value = false;
+        return;
+      }
+      timer = setTimeout(() => void run(trimmed, key), SEARCH_DEBOUNCE_MS);
     },
     { immediate: true },
   );
 
-  watch([query, scopes], ([q]) => {
-    if (searchTimer) clearTimeout(searchTimer);
-    const trimmed = q.trim();
-    if (!open.value || trimmed === "") {
-      searchController?.abort();
-      searched.value = [];
-      return;
-    }
-    searchTimer = setTimeout(() => void runSearch(trimmed), SEARCH_DEBOUNCE_MS);
-  });
+  onBeforeUnmount(clear);
 
-  onBeforeUnmount(() => {
-    listController?.abort();
-    searchController?.abort();
-    if (searchTimer) clearTimeout(searchTimer);
-  });
-
-  const entities = computed(() => dedupe([...listed.value, ...searched.value]));
-  return { entities, loading, refresh };
+  const entities = computed(() => found.value);
+  return { entities, loading };
 }

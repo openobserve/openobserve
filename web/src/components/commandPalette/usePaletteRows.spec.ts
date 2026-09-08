@@ -124,6 +124,30 @@ describe("usePaletteRows", () => {
     expect(ids(rows.value)).toEqual(["dashboard:logs-overview"]);
   });
 
+  it("shows a recent entity via its snapshot even when the live list no longer holds it", () => {
+    const { rows } = usePaletteRows(
+      base({
+        entities: ref<PaletteItem[]>([]),
+        frecency: () => new Map([["dashboard:gone", 5]]),
+        recentSnapshots: () =>
+          new Map([
+            [
+              "dashboard:gone",
+              {
+                type: "dashboard",
+                label: "Archived board",
+                icon: "dashboard",
+                group: "dashboards",
+              },
+            ],
+          ]),
+      }),
+    );
+    expect(ids(rows.value)).toContain("dashboard:gone");
+    const recent = rows.value.find((r) => r.kind === "item" && r.item.id === "dashboard:gone");
+    expect(recent?.kind === "item" && recent.item.label).toBe("Archived board");
+  });
+
   it("offers the fallback row only when nothing matches and the query is long enough", () => {
     const query = ref("zz");
     const fallback = (q: string): PaletteItem => ({

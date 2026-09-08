@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import alertsService from "@/services/alerts";
-import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import { resolveGroup, type EntityProviderContext } from "./context";
 
 interface AlertRow {
   alert_id: string;
@@ -46,32 +43,5 @@ export function alertToItem(row: AlertRow, group?: string): PaletteItem {
     ].filter(Boolean),
     group,
     route: { name: "alertDetail", params: { alert_id: row.alert_id }, query: { folder } },
-  };
-}
-
-/** v2 list without a folder returns every alert with its folder attached. */
-export function createAlertsProvider(ctx: EntityProviderContext): EntityProvider {
-  const group = resolveGroup(ctx.railKeys, "reliability", "alertList");
-  return {
-    id: "alerts",
-    groups: group ? [group] : [],
-    enabled: () => ctx.hasRoute("alertDetail"),
-    list: async (signal) => {
-      const res = await alertsService.listByFolderId(
-        0,
-        1000,
-        "name",
-        false,
-        "",
-        ctx.org,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
-        signal,
-      );
-      const rows: AlertRow[] = res?.data?.list ?? [];
-      return rows.filter((r) => r.alert_id && r.name).map((r) => alertToItem(r, group));
-    },
   };
 }

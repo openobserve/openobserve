@@ -16,10 +16,8 @@
 import http from "./http";
 
 const service_accounts = {
-  list: (org_identifier: string, signal?: AbortSignal) => {
-    return signal
-      ? http().get(`/api/${org_identifier}/service_accounts`, { signal })
-      : http().get(`/api/${org_identifier}/service_accounts`);
+  list: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/service_accounts`);
   },
   create: (data: any, org_identifier: string) => {
     return http().post(`/api/${org_identifier}/service_accounts`, data);

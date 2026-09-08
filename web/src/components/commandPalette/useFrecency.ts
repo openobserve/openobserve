@@ -15,7 +15,7 @@
 
 import { ref, type Ref } from "vue";
 import settings from "@/services/settings";
-import type { FrecencyBucketName, FrecencyDoc, FrecencyRecord } from "./types";
+import type { FrecencyBucketName, FrecencyDoc, FrecencyRecord, PaletteSnapshot } from "./types";
 
 const SETTING_KEY = "command_palette";
 const SETTING_CATEGORY = "ui";
@@ -44,6 +44,18 @@ function isRecord(r: unknown): r is FrecencyRecord {
   );
 }
 
+function isSnapshot(s: unknown): s is PaletteSnapshot {
+  const x = s as PaletteSnapshot;
+  return (
+    !!x && typeof x.type === "string" && typeof x.label === "string" && typeof x.icon === "string"
+  );
+}
+
+function withValidSnapshot(r: FrecencyRecord): FrecencyRecord {
+  const { item, ...rest } = r;
+  return isSnapshot(item) ? { ...rest, item } : rest;
+}
+
 function sanitize(input: unknown): FrecencyDoc {
   const out = emptyDoc();
   const buckets = (input as FrecencyDoc | undefined)?.buckets;
@@ -53,11 +65,24 @@ function sanitize(input: unknown): FrecencyDoc {
     out.buckets[org] = {};
     for (const [bucket, records] of Object.entries(byBucket)) {
       if (Array.isArray(records)) {
-        out.buckets[org][bucket as FrecencyBucketName] = records.filter(isRecord);
+        out.buckets[org][bucket as FrecencyBucketName] = records
+          .filter(isRecord)
+          .map(withValidSnapshot);
       }
     }
   }
   return out;
+}
+
+function mergeRecord(prev: FrecencyRecord, next: FrecencyRecord): FrecencyRecord {
+  const merged: FrecencyRecord = {
+    item_id: next.item_id,
+    count: Math.max(prev.count, next.count),
+    last: Math.max(prev.last, next.last),
+  };
+  const item = (next.last >= prev.last ? next.item : prev.item) ?? prev.item ?? next.item;
+  if (item) merged.item = item;
+  return merged;
 }
 
 // Per item: the higher count and the later timestamp win, so local-only visits survive a server load.
@@ -77,16 +102,7 @@ function mergeDocs(local: FrecencyDoc, server: FrecencyDoc): FrecencyDoc {
         ...(local.buckets[org]?.[bucket] ?? []),
       ]) {
         const prev = byId.get(r.item_id);
-        byId.set(
-          r.item_id,
-          prev
-            ? {
-                item_id: r.item_id,
-                count: Math.max(prev.count, r.count),
-                last: Math.max(prev.last, r.last),
-              }
-            : r,
-        );
+        byId.set(r.item_id, prev ? mergeRecord(prev, r) : r);
       }
       out.buckets[org][bucket] = [...byId.values()];
     }
@@ -171,12 +187,16 @@ export function useFrecency() {
     itemId: string,
     now: number = Date.now(),
     persist: boolean = true,
+    snapshot?: PaletteSnapshot,
   ): void => {
     const org = currentOrg.value;
     if (!org || !itemId) return;
     const records = bucketRecords(bucket, org).filter((r) => r.item_id !== itemId);
     const existing = bucketRecords(bucket, org).find((r) => r.item_id === itemId);
-    records.push({ item_id: itemId, count: (existing?.count ?? 0) + 1, last: now });
+    const next: FrecencyRecord = { item_id: itemId, count: (existing?.count ?? 0) + 1, last: now };
+    const item = snapshot ?? existing?.item;
+    if (item) next.item = item;
+    records.push(next);
     // Cap by decayed score so a burst of new items evicts stale ones, not fresh ones.
     records.sort((a, b) => frecencyScore(b, now) - frecencyScore(a, now));
     setBucketRecords(bucket, org, records.slice(0, MAX_RECORDS));
@@ -188,6 +208,13 @@ export function useFrecency() {
     const out = new Map<string, number>();
     for (const r of bucketRecords(bucket, currentOrg.value))
       out.set(r.item_id, frecencyScore(r, now));
+    return out;
+  };
+
+  /** Display snapshots stored with entity records, keyed by item id. */
+  const snapshots = (bucket: FrecencyBucketName): Map<string, PaletteSnapshot> => {
+    const out = new Map<string, PaletteSnapshot>();
+    for (const r of bucketRecords(bucket, currentOrg.value)) if (r.item) out.set(r.item_id, r.item);
     return out;
   };
 
@@ -209,5 +236,5 @@ export function useFrecency() {
     persistTimer = null;
   };
 
-  return { doc, currentOrg, load, record, scores, topItems, reset };
+  return { doc, currentOrg, load, record, scores, snapshots, topItems, reset };
 }

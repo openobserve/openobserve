@@ -16,9 +16,9 @@
 import http from "./http";
 
 const savedViews = {
-  get: (org_identifier: string, signal?: AbortSignal) => {
+  get: (org_identifier: string) => {
     const url = `/api/${org_identifier}/savedviews`;
-    return signal ? http().get(url, { signal }) : http().get(url);
+    return http().get(url);
   },
   post: (org_identifier: string, data: any) => {
     const url = `/api/${org_identifier}/savedviews`;

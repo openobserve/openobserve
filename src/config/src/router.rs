@@ -14,7 +14,7 @@
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /// usize indicates the number of parts to skip based on their actual paths.
-const QUERIER_ROUTES: [(&str, usize); 37] = [
+const QUERIER_ROUTES: [(&str, usize); 38] = [
     ("config", 0),               // /config (unauthenticated bootstrap)
     ("config", 2),               // /api/{org_id}/config (authenticated full)
     ("summary", 2),              // /api/{org_id}/summary
@@ -54,6 +54,7 @@ const QUERIER_ROUTES: [(&str, usize); 37] = [
     ("annotation_queues", 2), // /api/{org_id}/annotation_queues/...
     ("playground", 2),        // /api/{org_id}/playground/...
     ("service_streams", 2),   // /api/{org_id}/service_streams/...
+    ("resources/_search", 2), // /api/{org_id}/resources/_search
     ("node/list", 2),         // /api/_meta/node/list
 ];
 const QUERIER_ROUTES_BY_BODY: [&str; 9] = [
@@ -241,6 +242,16 @@ mod tests {
         assert!(!is_querier_route("/api/org1/streams/v1/logs"));
         // regular streams route should pass
         assert!(is_querier_route("/api/org1/streams"));
+    }
+
+    #[test]
+    fn test_is_querier_route_resources_search_only() {
+        // The palette search reads querier-only caches; the FGA resources list does not.
+        assert!(is_querier_route("/api/org1/resources/_search"));
+        assert!(is_querier_route(
+            "/api/org1/resources/_search?q=pay&limit=20"
+        ));
+        assert!(!is_querier_route("/api/org1/resources"));
     }
 
     #[test]

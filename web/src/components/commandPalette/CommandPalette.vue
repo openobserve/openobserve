@@ -26,7 +26,6 @@ import OEmptyState from "@/lib/core/EmptyState/OEmptyState.vue";
 import { useNavGateContext } from "@/lib/core/Navbar/useNavGateContext";
 import type { NavItem } from "@/lib/core/Navbar/ONavbar.types";
 import { useTheme } from "@/composables/useTheme";
-import useStreams from "@/composables/useStreams";
 import { applyThemeMode } from "@/composables/useThemeMode";
 import { focusSearchInput } from "@/utils/keyboardShortcuts";
 import PaletteRow from "./PaletteRow.vue";
@@ -35,10 +34,10 @@ import { buildPageItems, railCategories } from "./providers/pages";
 import { buildActionItems } from "./providers/actions";
 import { createEntityProviders } from "./providers/entities";
 import { usePaletteEntities } from "./usePaletteEntities";
-import { usePaletteRows } from "./usePaletteRows";
+import { snapshotOf, usePaletteRows } from "./usePaletteRows";
 import { useFrecency } from "./useFrecency";
 import { usePaletteTelemetry, type PaletteOpenSource } from "./usePaletteTelemetry";
-import type { PaletteItem, PaletteScope } from "./types";
+import type { PaletteItem, PaletteScope, PaletteSnapshot } from "./types";
 
 const SEARCH_DATA_TEST = "command-palette-search";
 
@@ -74,6 +73,7 @@ const showScopes = ref(false);
 const chipCursor = ref<number | null>(null);
 // Frecency is read once per open so rows never reorder under the pointer.
 const itemScores = ref(new Map<string, number>());
+const itemSnapshots = ref(new Map<string, PaletteSnapshot>());
 const activeIndex = ref(0);
 const listRef = ref<HTMLElement | null>(null);
 const isOpen = computed(() => props.open);
@@ -126,7 +126,6 @@ const actions = computed(() => [
   ...orgRows.value,
 ]);
 
-const { getPaginatedStreams } = useStreams(t);
 // The chip row is the left rail: same tiles, same order, same labels.
 const categories = computed(() => railCategories(props.navLinks, gateContext.value, router, t));
 const railKeys = computed(() => categories.value.map((c) => c.key));
@@ -141,10 +140,6 @@ const providers = computed(() =>
       props.navLinks.filter((l) => l.display !== false && !l.hide).map((l) => l.name),
     ),
     railKeys: railKeys.value,
-    searchStreams: (type, q, limit) =>
-      getPaginatedStreams(type, false, false, 0, limit, q) as Promise<{
-        list?: { name: string }[];
-      }>,
   }),
 );
 const { entities, loading } = usePaletteEntities({
@@ -175,6 +170,7 @@ const { rows, itemIndexes } = usePaletteRows({
   entities,
   fallback,
   frecency: () => itemScores.value,
+  recentSnapshots: () => itemSnapshots.value,
   t,
 });
 
@@ -232,7 +228,9 @@ function withOrg(route: RouteLocationRaw): RouteLocationRaw {
 }
 
 async function select(item: PaletteItem, newTab = false): Promise<void> {
-  if (item.type !== "ai") frecency.record("palette_item", item.id);
+  if (item.type !== "ai") {
+    frecency.record("palette_item", item.id, Date.now(), true, snapshotOf(item));
+  }
   telemetry.trackSelect({
     type: item.type,
     position: itemIndexes.value.indexOf(activeIndex.value),
@@ -329,6 +327,7 @@ watch(
       showScopes.value = false;
       chipCursor.value = null;
       itemScores.value = frecency.scores("palette_item");
+      itemSnapshots.value = frecency.snapshots("palette_item");
       telemetry.trackOpen(props.openSource ?? "shortcut");
       resetActive();
       window.addEventListener("keydown", onKeydown, true);

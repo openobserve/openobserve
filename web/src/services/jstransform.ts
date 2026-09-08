@@ -24,10 +24,10 @@ const jstransform = {
     desc: boolean,
     name: string,
     org_identifier: string,
-    signal?: AbortSignal,
   ) => {
-    const url = `/api/${org_identifier}/functions?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`;
-    return signal ? http().get(url, { signal }) : http().get(url);
+    return http().get(
+      `/api/${org_identifier}/functions?page_num=${page_num}&page_size=${page_size}&sort_by=${sort_by}&desc=${desc}&name=${name}`,
+    );
   },
   create: (org_identifier: string, data: any) => {
     return http().post(`/api/${org_identifier}/functions`, data);

@@ -15,26 +15,8 @@
 
 import type { EntityProvider } from "../usePaletteEntities";
 import type { EntityProviderContext } from "./context";
-import { createAlertsProvider } from "./alerts";
-import { createDashboardsProvider } from "./dashboards";
-import { createFunctionsProvider } from "./functions";
-import { createPipelinesProvider } from "./pipelines";
-import { createSavedViewsProvider } from "./savedViews";
-import { createStreamsProvider } from "./streams";
-import { createSyntheticsProvider } from "./synthetics";
-import { createServiceAccountsProvider, createUsersProvider } from "./users";
+import { createResourcesProvider } from "./resources";
 
-/** Every entity source the palette can search, in scope-chip order. */
 export function createEntityProviders(ctx: EntityProviderContext): EntityProvider[] {
-  return [
-    createDashboardsProvider(ctx),
-    createAlertsProvider(ctx),
-    createStreamsProvider(ctx),
-    createSavedViewsProvider(ctx),
-    createFunctionsProvider(ctx),
-    createPipelinesProvider(ctx),
-    createSyntheticsProvider(ctx),
-    createUsersProvider(ctx),
-    createServiceAccountsProvider(ctx),
-  ];
+  return [createResourcesProvider(ctx)];
 }

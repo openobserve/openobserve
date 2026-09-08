@@ -19,8 +19,10 @@ import { byFoldedLabel, fold, rankItems } from "./rank";
 import {
   SCOPE_CREATE_ACTIONS,
   type PaletteItem,
+  type PaletteItemType,
   type PaletteRow,
   type PaletteScope,
+  type PaletteSnapshot,
 } from "./types";
 
 export interface PaletteRowsInput {
@@ -33,12 +35,25 @@ export interface PaletteRowsInput {
   fallback: (query: string) => PaletteItem | null;
   /** item id → decayed frecency score, re-read on every recompute. */
   frecency: () => Map<string, number>;
+  /** item id → display snapshot for entity rows that are not in the live list. */
+  recentSnapshots?: () => Map<string, PaletteSnapshot>;
   t: TranslateFn;
 }
 
 const RECENT_LIMIT = 7;
 const SCOPE_LIMIT = 50;
 const FALLBACK_MIN_QUERY = 3;
+const ENTITY_TYPES: ReadonlySet<PaletteItemType> = new Set([
+  "dashboard",
+  "alert",
+  "stream",
+  "savedView",
+  "function",
+  "pipeline",
+  "user",
+  "serviceAccount",
+  "synthetic",
+]);
 
 function section(key: string, label: string, items: PaletteItem[]): PaletteRow[] {
   if (items.length === 0) return [];
@@ -46,6 +61,20 @@ function section(key: string, label: string, items: PaletteItem[]): PaletteRow[]
     { kind: "header", key: `h:${key}`, label },
     ...items.map((item): PaletteRow => ({ kind: "item", key: `${key}:${item.id}`, item })),
   ];
+}
+
+/** Entity rows are only known while a search result holds them, so Recent keeps a copy. */
+export function snapshotOf(item: PaletteItem): PaletteSnapshot | undefined {
+  if (!ENTITY_TYPES.has(item.type)) return undefined;
+  const snap: PaletteSnapshot = { type: item.type, label: item.label, icon: item.icon };
+  if (item.subtitle) snap.subtitle = item.subtitle;
+  if (item.group) snap.group = item.group;
+  if (item.route) snap.route = item.route;
+  return snap;
+}
+
+function fromSnapshot(id: string, snap: PaletteSnapshot | undefined): PaletteItem | undefined {
+  return snap ? { id, ...snap } : undefined;
 }
 
 function toRows(items: PaletteItem[]): PaletteRow[] {
@@ -61,6 +90,7 @@ export function usePaletteRows({
   entities,
   fallback,
   frecency,
+  recentSnapshots,
   t,
 }: PaletteRowsInput): {
   rows: ComputedRef<PaletteRow[]>;
@@ -76,11 +106,13 @@ export function usePaletteRows({
 
   const emptyStateRows = (scores: Map<string, number>): PaletteRow[] => {
     const byId = new Map(all.value.map((i) => [i.id, i]));
+    const snapshots = recentSnapshots?.() ?? new Map<string, PaletteSnapshot>();
     const recent = [...scores.entries()]
-      .filter(([id, score]) => score > 0 && byId.has(id))
+      .filter(([, score]) => score > 0)
       .sort((a, b) => b[1] - a[1])
-      .slice(0, RECENT_LIMIT)
-      .map(([id]) => byId.get(id)!);
+      .map(([id]) => byId.get(id) ?? fromSnapshot(id, snapshots.get(id)))
+      .filter((item): item is PaletteItem => !!item)
+      .slice(0, RECENT_LIMIT);
     return [
       ...section("recent", String(t("palette.groups.recent")), recent),
       ...section("actions", String(t("palette.groups.actions")), actions.value),

@@ -13,11 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import usersService from "@/services/users";
-import serviceAccountsService from "@/services/service_accounts";
-import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import { resolveGroup, type EntityProviderContext } from "./context";
+import type { EntityProviderContext } from "./context";
 
 interface UserRow {
   email: string;
@@ -27,7 +24,7 @@ interface UserRow {
 }
 
 // Same keys as the IAM role badge, so the palette and the Users page never disagree on a role name.
-function roleLabel(ctx: EntityProviderContext, role?: string): string {
+export function roleLabel(ctx: EntityProviderContext, role?: string): string {
   if (!role) return "";
   const key = `components.badge.userRole.${role.toLowerCase()}`;
   const label = String(ctx.t(key));
@@ -65,41 +62,5 @@ export function serviceAccountToItem(row: UserRow, subtitle: string, group?: str
     keywords: [row.email, "token", "api key"],
     group,
     route: { name: "serviceAccounts", query: { action: "update", email: row.email } },
-  };
-}
-
-// Mirrors the rail: IAM is offered only to admins, and that decision already lives in navLinks.
-const canSeeIam = (ctx: EntityProviderContext) => ctx.navNames.has("iam");
-
-export function createUsersProvider(ctx: EntityProviderContext): EntityProvider {
-  const group = resolveGroup(ctx.railKeys, "iam");
-  return {
-    id: "users",
-    groups: group ? [group] : [],
-    enabled: () => ctx.hasRoute("users") && canSeeIam(ctx),
-    list: async (signal) => {
-      const res = await usersService.orgUsers(ctx.org, signal);
-      const rows: UserRow[] = res?.data?.data ?? [];
-      return rows
-        .filter((r) => r.email)
-        .map((r) =>
-          userToItem(r, r.role ? String(ctx.t(`palette.roles.${r.role}`, r.role)) : "", group),
-        );
-    },
-  };
-}
-
-export function createServiceAccountsProvider(ctx: EntityProviderContext): EntityProvider {
-  const group = resolveGroup(ctx.railKeys, "iam");
-  return {
-    id: "serviceAccounts",
-    groups: group ? [group] : [],
-    enabled: () => ctx.hasRoute("serviceAccounts") && canSeeIam(ctx),
-    list: async (signal) => {
-      const res = await serviceAccountsService.list(ctx.org, signal);
-      const rows: UserRow[] = res?.data?.data ?? [];
-      const subtitle = roleLabel(ctx, "serviceaccount");
-      return rows.filter((r) => r.email).map((r) => serviceAccountToItem(r, subtitle, group));
-    },
   };
 }

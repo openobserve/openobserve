@@ -13,10 +13,7 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import dashboardService from "@/services/dashboards";
-import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import { resolveGroup, type EntityProviderContext } from "./context";
 
 interface DashboardRow {
   dashboard_id: string;
@@ -38,20 +35,5 @@ export function dashboardToItem(row: DashboardRow, group?: string): PaletteItem 
     keywords: [row.dashboard_id, row.folder_name ?? "", row.description ?? ""].filter(Boolean),
     group,
     route: { path: "/dashboards/view", query: { dashboard: row.dashboard_id, folder } },
-  };
-}
-
-/** One cross-folder call: an empty folder id lists every dashboard the user can see. */
-export function createDashboardsProvider(ctx: EntityProviderContext): EntityProvider {
-  const group = resolveGroup(ctx.railKeys, "dashboards");
-  return {
-    id: "dashboards",
-    groups: group ? [group] : [],
-    enabled: () => ctx.hasRoute("dashboards"),
-    list: async (signal) => {
-      const res = await dashboardService.list(0, 1000, "name", false, "", ctx.org, "", "", signal);
-      const rows: DashboardRow[] = res?.data?.dashboards ?? [];
-      return rows.filter((r) => r.dashboard_id && r.title).map((r) => dashboardToItem(r, group));
-    },
   };
 }

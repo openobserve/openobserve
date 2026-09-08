@@ -13,22 +13,12 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { raw } from "@/types/i18n";
 
-vi.mock("@/services/dashboards", () => ({ default: { list: vi.fn() } }));
-vi.mock("@/services/alerts", () => ({ default: { listByFolderId: vi.fn() } }));
-vi.mock("@/services/saved_views", () => ({ default: { get: vi.fn() } }));
-vi.mock("@/services/jstransform", () => ({ default: { list: vi.fn() } }));
-vi.mock("@/services/pipelines", () => ({ default: { getPipelines: vi.fn() } }));
-vi.mock("@/services/users", () => ({ default: { orgUsers: vi.fn() } }));
-vi.mock("@/services/synthetics", () => ({ default: { listByFolderId: vi.fn() } }));
-vi.mock("@/services/service_accounts", () => ({ default: { list: vi.fn() } }));
-const searchStreams = vi.fn();
+vi.mock("@/services/resources", () => ({ default: { search: vi.fn() } }));
 
-import dashboardService from "@/services/dashboards";
-import alertsService from "@/services/alerts";
-import transformService from "@/services/jstransform";
+import resourcesService from "@/services/resources";
 import { createEntityProviders } from "./entities";
 import { dashboardToItem } from "./dashboards";
 import { alertToItem } from "./alerts";
@@ -36,19 +26,34 @@ import { streamToItem } from "./streams";
 import { pipelineToItem } from "./pipelines";
 import { serviceAccountToItem, userToItem } from "./users";
 import { syntheticToItem } from "./synthetics";
-import syntheticsService from "@/services/synthetics";
-import usersService from "@/services/users";
+import {
+  createResourcesProvider,
+  hitToItem,
+  resourceTypeSpecs,
+  typesForScopes,
+  type ResourceHit,
+} from "./resources";
 
-const ctx = (
-  over: Partial<{ routes: string[]; state: any; nav: string[]; rail: string[] }> = {},
-) => ({
-  store: { state: over.state ?? {} },
-  navNames: new Set(over.nav ?? []),
+const ALL_ROUTES = [
+  "dashboards",
+  "alertDetail",
+  "logs",
+  "functionList",
+  "pipelineEditor",
+  "users",
+  "serviceAccounts",
+  "synthetic-monitor-results",
+];
+
+const ctx = (over: Partial<{ routes: string[]; nav: string[]; rail: string[] }> = {}) => ({
+  store: { state: {} },
+  navNames: new Set(over.nav ?? ["iam"]),
   railKeys: over.rail ?? [
     "home",
     "logs",
     "metrics",
     "traces",
+    "experience",
     "dashboards",
     "reliability",
     "data",
@@ -56,12 +61,17 @@ const ctx = (
   ],
   t: raw as any,
   org: "org1",
-  hasRoute: (n: string) =>
-    (
-      over.routes ?? ["dashboards", "alertDetail", "logs", "functionList", "pipelineEditor"]
-    ).includes(n),
-  searchStreams,
+  hasRoute: (n: string) => (over.routes ?? ALL_ROUTES).includes(n),
 });
+
+const hit = (
+  over: Partial<ResourceHit> & Pick<ResourceHit, "type" | "id" | "name">,
+): ResourceHit => ({
+  score: 0,
+  ...over,
+});
+
+const signal = () => new AbortController().signal;
 
 describe("entity mappers", () => {
   it("maps a dashboard to its folder-aware deep link", () => {
@@ -127,122 +137,8 @@ describe("entity mappers", () => {
     expect(item).toMatchObject({ id: "pipeline:p1", subtitle: "realtime · default" });
     expect(item.route).toEqual({ name: "pipelineEditor", query: { id: "p1", name: "etl" } });
   });
-});
 
-describe("createEntityProviders", () => {
-  it("gates each provider on its route", () => {
-    const providers = createEntityProviders(ctx({ routes: ["logs"] }));
-    expect(providers.map((p) => [p.id, p.enabled()])).toEqual([
-      ["dashboards", false],
-      ["alerts", false],
-      ["streams", true],
-      ["savedViews", true],
-      ["functions", false],
-      ["pipelines", false],
-      ["synthetics", false],
-      ["users", false],
-      ["serviceAccounts", false],
-    ]);
-  });
-
-  it("lists dashboards across folders in one call and skips malformed rows", async () => {
-    (dashboardService.list as any).mockResolvedValue({
-      data: {
-        dashboards: [
-          { dashboard_id: "d1", title: "A", folder_id: "f" },
-          { dashboard_id: "", title: "bad" },
-        ],
-      },
-    });
-    const p = createEntityProviders(ctx()).find((x) => x.id === "dashboards")!;
-    const items = await p.list!(new AbortController().signal);
-    expect(dashboardService.list).toHaveBeenCalledWith(
-      0,
-      1000,
-      "name",
-      false,
-      "",
-      "org1",
-      "",
-      "",
-      expect.any(AbortSignal),
-    );
-    expect(items.map((i) => i.id)).toEqual(["dashboard:f/d1"]);
-  });
-
-  it("lists alerts through the v2 endpoint without a folder", async () => {
-    (alertsService.listByFolderId as any).mockResolvedValue({
-      data: { list: [{ alert_id: "a", name: "n" }] },
-    });
-    const p = createEntityProviders(ctx()).find((x) => x.id === "alerts")!;
-    expect((await p.list!(new AbortController().signal)).map((i) => i.id)).toEqual(["alert:a"]);
-    expect(alertsService.listByFolderId).toHaveBeenCalledWith(
-      0,
-      1000,
-      "name",
-      false,
-      "",
-      "org1",
-      undefined,
-      undefined,
-      undefined,
-      undefined,
-      expect.any(AbortSignal),
-    );
-  });
-
-  it("uses the warm store for functions and falls back to the API", async () => {
-    const warm = createEntityProviders(
-      ctx({ state: { organizationData: { functions: [{ name: "f1" }] } } }),
-    );
-    expect(
-      (await warm.find((x) => x.id === "functions")!.list!(new AbortController().signal)).map(
-        (i) => i.id,
-      ),
-    ).toEqual(["function:f1"]);
-    expect(transformService.list).not.toHaveBeenCalled();
-    (transformService.list as any).mockResolvedValue({ data: { list: [{ name: "f2" }] } });
-    const cold = createEntityProviders(ctx());
-    expect(
-      (await cold.find((x) => x.id === "functions")!.list!(new AbortController().signal)).map(
-        (i) => i.id,
-      ),
-    ).toEqual(["function:f2"]);
-  });
-
-  it("lists streams once on open and only searches types too large to list", async () => {
-    const state = {
-      streams: {
-        logs: { list: [{ name: "l", stream_type: "logs" }] },
-        metrics: null,
-        traces: null,
-      },
-    };
-    const p = createEntityProviders(ctx({ state })).find((x) => x.id === "streams")!;
-    searchStreams.mockImplementation(async (type: string) =>
-      type === "metrics"
-        ? { list: [{ name: "m" }], total: 5000 }
-        : { list: [{ name: "t" }], total: 1 },
-    );
-    const listed = await p.list!(new AbortController().signal);
-    expect(listed.map((i) => i.id).sort()).toEqual([
-      "stream:logs/l",
-      "stream:metrics/m",
-      "stream:traces/t",
-    ]);
-    expect(searchStreams).toHaveBeenCalledTimes(2);
-    expect(searchStreams).toHaveBeenCalledWith("metrics", "", 1000);
-    searchStreams.mockClear();
-    expect(await p.search!("x", new AbortController().signal)).toEqual([]);
-    expect(searchStreams).not.toHaveBeenCalled();
-    searchStreams.mockResolvedValue({ list: [{ name: "xm" }] });
-    const found = await p.search!("xm", new AbortController().signal);
-    expect(searchStreams).toHaveBeenCalledTimes(1);
-    expect(searchStreams).toHaveBeenCalledWith("metrics", "xm", 20);
-    expect(found.map((i) => i.id)).toEqual(["stream:metrics/xm"]);
-  });
-
-  it("maps people rows and gates them on the IAM rail link", async () => {
+  it("maps people rows to their IAM edit forms", () => {
     expect(
       userToItem({ email: "a@x.io", first_name: "Ada", last_name: "L", role: "admin" }, "Admin"),
     ).toMatchObject({
@@ -258,19 +154,9 @@ describe("createEntityProviders", () => {
       name: "serviceAccounts",
       query: { action: "update", email: "svc@x.io" },
     });
-    const routes = ["users", "serviceAccounts"];
-    const member = createEntityProviders(ctx({ routes, nav: ["logs"] }));
-    expect(member.find((p) => p.id === "users")!.enabled()).toBe(false);
-    const admin = createEntityProviders(ctx({ routes, nav: ["logs", "iam"] }));
-    expect(admin.find((p) => p.id === "users")!.enabled()).toBe(true);
-    (usersService.orgUsers as any).mockResolvedValue({
-      data: { data: [{ email: "a@x.io", role: "admin" }] },
-    });
-    const items = await admin.find((p) => p.id === "users")!.list!(new AbortController().signal);
-    expect(items.map((i) => i.id)).toEqual(["user:a@x.io"]);
   });
 
-  it("maps synthetic checks to their results page and gates on the results route", async () => {
+  it("maps synthetic checks to their results page", () => {
     const item = syntheticToItem(
       {
         id: 42,
@@ -285,41 +171,166 @@ describe("createEntityProviders", () => {
     expect(item).toMatchObject({ id: "synthetic:42", subtitle: "BROWSER · https://x.io · paused" });
     expect(item.keywords).toContain("42");
     expect(item.route).toMatchObject({ name: "synthetic-monitor-results", params: { id: "42" } });
-    const off = createEntityProviders(ctx()).find((p) => p.id === "synthetics")!;
-    expect(off.enabled()).toBe(false);
-    const on = createEntityProviders(ctx({ routes: ["synthetic-monitor-results"] })).find(
-      (p) => p.id === "synthetics",
-    )!;
-    (syntheticsService.listByFolderId as any).mockResolvedValue({
-      data: { checks: [{ id: 1, name: "API" }] },
-    });
-    expect((await on.list!(new AbortController().signal)).map((i) => i.id)).toEqual([
-      "synthetic:1",
+  });
+});
+
+describe("resourceTypeSpecs", () => {
+  const enabled = (c: ReturnType<typeof ctx>) =>
+    resourceTypeSpecs(c)
+      .filter((s) => s.enabled)
+      .map((s) => s.type);
+
+  it("gates each type on its route and people on the visible IAM link", () => {
+    expect(enabled(ctx({ routes: ["logs"] }))).toEqual(["stream", "saved_view"]);
+    expect(enabled(ctx({ routes: ["users", "serviceAccounts"], nav: ["logs"] }))).toEqual([]);
+    expect(enabled(ctx({ routes: ["users", "serviceAccounts"], nav: ["logs", "iam"] }))).toEqual([
+      "user",
+      "service_account",
     ]);
-    expect(syntheticsService.listByFolderId).toHaveBeenCalledWith(
-      "org1",
-      "all",
-      expect.any(AbortSignal),
-    );
+    expect(enabled(ctx())).toHaveLength(9);
   });
 
-  it("places entity rows under the rail tile that shows them", () => {
-    const flat = createEntityProviders(
-      ctx({ rail: ["home", "logs", "alertList", "pipeline", "dashboards"] }),
+  it("places each type under the rail tile that shows it", () => {
+    const flat = Object.fromEntries(
+      resourceTypeSpecs(ctx({ rail: ["home", "logs", "alertList", "pipeline", "dashboards"] })).map(
+        (s) => [s.type, s.groups],
+      ),
     );
-    const g1 = Object.fromEntries(flat.map((p) => [p.id, p.groups]));
-    expect(g1.dashboards).toEqual(["dashboards"]);
-    expect(g1.alerts).toEqual(["alertList"]);
-    expect(g1.pipelines).toEqual(["pipeline"]);
-    expect(g1.streams).toEqual(["logs"]);
-    expect(g1.users).toEqual([]);
-    const grouped = createEntityProviders(
-      ctx({ rail: ["reliability", "data", "iam", "experience"] }),
+    expect(flat.dashboard).toEqual(["dashboards"]);
+    expect(flat.alert).toEqual(["alertList"]);
+    expect(flat.pipeline).toEqual(["pipeline"]);
+    expect(flat.stream).toEqual(["logs"]);
+    expect(flat.user).toEqual([]);
+    const grouped = Object.fromEntries(
+      resourceTypeSpecs(ctx({ rail: ["reliability", "data", "iam", "experience", "metrics"] })).map(
+        (s) => [s.type, s.groups],
+      ),
     );
-    const g2 = Object.fromEntries(grouped.map((p) => [p.id, p.groups]));
-    expect(g2.alerts).toEqual(["reliability"]);
-    expect(g2.functions).toEqual(["data"]);
-    expect(g2.synthetics).toEqual(["experience"]);
-    expect(g2.serviceAccounts).toEqual(["iam"]);
+    expect(grouped.alert).toEqual(["reliability"]);
+    expect(grouped.function).toEqual(["data"]);
+    expect(grouped.synthetic).toEqual(["experience"]);
+    expect(grouped.service_account).toEqual(["iam"]);
+    expect(grouped.stream).toEqual(["data", "metrics"]);
+  });
+
+  it("narrows the requested types to the selected tiles", () => {
+    const specs = resourceTypeSpecs(ctx());
+    expect(typesForScopes(specs, [])).toHaveLength(9);
+    expect(typesForScopes(specs, ["reliability"])).toEqual(["alert"]);
+    expect(typesForScopes(specs, ["data", "iam"])).toEqual([
+      "function",
+      "pipeline",
+      "user",
+      "service_account",
+    ]);
+    expect(typesForScopes(specs, ["home"])).toEqual([]);
+  });
+});
+
+describe("hitToItem", () => {
+  const specs = resourceTypeSpecs(ctx());
+  const c = ctx();
+
+  it("turns each hit type into the palette row its page opens", () => {
+    expect(
+      hitToItem(
+        hit({ type: "dashboard", id: "d1", name: "Pay", folder_id: "f", folder_name: "SRE" }),
+        c,
+        specs,
+      ),
+    ).toMatchObject({ id: "dashboard:f/d1", group: "dashboards", subtitle: "SRE" });
+    expect(
+      hitToItem(hit({ type: "alert", id: "a1", name: "p99", enabled: false }), c, specs),
+    ).toMatchObject({ id: "alert:a1", group: "reliability" });
+    expect(
+      hitToItem(
+        hit({ type: "stream", id: "metrics/m", name: "m", stream_type: "metrics" }),
+        c,
+        specs,
+      ),
+    ).toMatchObject({ id: "stream:metrics/m", group: "metrics" });
+    expect(
+      hitToItem(hit({ type: "stream", id: "x/y", name: "y", stream_type: "x" }), c, specs),
+    ).toBe(null);
+    expect(hitToItem(hit({ type: "saved_view", id: "v1", name: "errs" }), c, specs)).toMatchObject({
+      id: "savedView:v1",
+      group: "logs",
+    });
+    expect(hitToItem(hit({ type: "function", id: "f1", name: "f1" }), c, specs)).toMatchObject({
+      id: "function:f1",
+      group: "data",
+    });
+    expect(hitToItem(hit({ type: "pipeline", id: "p1", name: "etl" }), c, specs)).toMatchObject({
+      id: "pipeline:p1",
+      group: "data",
+    });
+    expect(
+      hitToItem(hit({ type: "user", id: "a@x.io", name: "Ada L", role: "admin" }), c, specs),
+    ).toMatchObject({ id: "user:a@x.io", label: "Ada L", group: "iam" });
+    expect(hitToItem(hit({ type: "user", id: "b@x.io", name: "b@x.io" }), c, specs)).toMatchObject({
+      label: "b@x.io",
+    });
+    expect(
+      hitToItem(hit({ type: "service_account", id: "svc@x.io", name: "CI" }), c, specs),
+    ).toMatchObject({ id: "serviceAccount:svc@x.io", group: "iam" });
+    expect(
+      hitToItem(hit({ type: "synthetic", id: "42", name: "Home", folder_id: "f1" }), c, specs),
+    ).toMatchObject({ id: "synthetic:42", group: "experience" });
+  });
+});
+
+describe("createResourcesProvider", () => {
+  beforeEach(() => (resourcesService.search as any).mockReset());
+
+  it("is the only entity provider and covers every tile with an enabled type", () => {
+    const providers = createEntityProviders(ctx());
+    expect(providers.map((p) => p.id)).toEqual(["resources"]);
+    expect([...providers[0].groups].sort()).toEqual(
+      [
+        "dashboards",
+        "data",
+        "experience",
+        "iam",
+        "logs",
+        "metrics",
+        "reliability",
+        "traces",
+      ].sort(),
+    );
+    expect(createEntityProviders(ctx({ routes: [] }))[0].enabled()).toBe(false);
+  });
+
+  it("asks the server once with the types for the selected tiles and maps the hits", async () => {
+    (resourcesService.search as any).mockResolvedValue({
+      data: {
+        hits: [
+          hit({ type: "alert", id: "a1", name: "p99", folder_id: "f" }),
+          hit({ type: "alert", id: "", name: "broken" }),
+        ],
+        truncated: [],
+      },
+    });
+    const p = createResourcesProvider(ctx());
+    const items = await p.search("p9", ["reliability"], signal());
+    expect(resourcesService.search).toHaveBeenCalledTimes(1);
+    expect(resourcesService.search).toHaveBeenCalledWith(
+      "org1",
+      { q: "p9", types: "alert", limit: 20 },
+      expect.any(AbortSignal),
+    );
+    expect(items.map((i) => i.id)).toEqual(["alert:a1"]);
+  });
+
+  it("lists a tile with a larger limit on an empty query and skips tiles with no types", async () => {
+    (resourcesService.search as any).mockResolvedValue({ data: { hits: [] } });
+    const p = createResourcesProvider(ctx());
+    await p.search("", ["dashboards"], signal());
+    expect(resourcesService.search).toHaveBeenCalledWith(
+      "org1",
+      { q: "", types: "dashboard", limit: 50 },
+      expect.any(AbortSignal),
+    );
+    expect(await p.search("x", ["home"], signal())).toEqual([]);
+    expect(resourcesService.search).toHaveBeenCalledTimes(1);
   });
 });

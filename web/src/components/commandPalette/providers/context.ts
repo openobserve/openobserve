@@ -15,11 +15,6 @@
 
 import type { TranslateFn } from "@/types/i18n";
 
-export interface StreamSearchRow {
-  name: string;
-  stream_type?: string;
-}
-
 /** What every entity provider needs; kept narrow so providers stay unit-testable. */
 export interface EntityProviderContext {
   store: { state: any };
@@ -30,12 +25,6 @@ export interface EntityProviderContext {
   navNames: Set<string>;
   /** Rail category keys currently shown (group tiles and standalone links), in rail order. */
   railKeys: string[];
-  /** Keyword search for one stream type; created inside a component setup because useStreams needs the store. */
-  searchStreams(
-    type: string,
-    query: string,
-    limit: number,
-  ): Promise<{ list?: StreamSearchRow[]; total?: number }>;
 }
 
 /** First rail key present among the candidates, so an entity lands in whatever tile the rail shows. */

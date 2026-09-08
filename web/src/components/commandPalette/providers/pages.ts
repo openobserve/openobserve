@@ -91,6 +91,7 @@ function fromChild(
       ...(child.tab ? [child.tab] : []),
       ...(category ? [category] : []),
     ],
+    group: groupKey,
     route: { name: child.name, query: child.tab ? { tab: child.tab } : {} },
   };
 }

@@ -79,11 +79,9 @@ const syntheticsService = {
 
   list: (orgIdentifier: string) => http().get(`/api/${orgIdentifier}/synthetics`),
 
-  listByFolderId: (orgIdentifier: string, folderId?: string, signal?: AbortSignal) => {
+  listByFolderId: (orgIdentifier: string, folderId?: string) => {
     const params = folderId && folderId !== "all" ? `?folder=${folderId}` : "";
-    return signal
-      ? http().get(`/api/${orgIdentifier}/synthetics${params}`, { signal })
-      : http().get(`/api/${orgIdentifier}/synthetics${params}`);
+    return http().get(`/api/${orgIdentifier}/synthetics${params}`);
   },
 
   delete: (orgIdentifier: string, id: string, folderId?: string) => {

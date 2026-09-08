@@ -29,7 +29,7 @@ vi.mock("./providers/entities", () => ({
       id: "dashboards",
       groups: ["dashboards"],
       enabled: () => true,
-      list: async () => [
+      search: async () => [
         {
           id: "dashboard:default/d1",
           type: "dashboard",
@@ -42,10 +42,6 @@ vi.mock("./providers/entities", () => ({
       ],
     },
   ],
-}));
-
-vi.mock("@/composables/useStreams", () => ({
-  default: () => ({ getPaginatedStreams: vi.fn().mockResolvedValue({ list: [] }) }),
 }));
 
 vi.mock("@/services/settings", () => ({
@@ -113,6 +109,12 @@ const navLinks = [
   { name: "alertList", link: "/alerts", title: raw("Alerts"), icon: "shield" },
   { name: "dashboards", link: "/dashboards", title: raw("Dashboards"), icon: "dashboard" },
 ];
+
+// The resources provider debounces 120ms then resolves async; wait past it.
+const settle = async () => {
+  await new Promise((r) => setTimeout(r, 140));
+  await flushPromises();
+};
 
 describe("CommandPalette", () => {
   let wrapper: VueWrapper;
@@ -208,6 +210,7 @@ describe("CommandPalette", () => {
 
   it("lists entities from providers and ranks them with pages", async () => {
     await wrapper.find('[data-test="command-palette-search-field"]').setValue("payments");
+    await settle();
     expect(rowIds()).toEqual(["dashboard:default/d1"]);
   });
 
@@ -217,7 +220,7 @@ describe("CommandPalette", () => {
     await flushPromises();
     expect(wrapper.find('[data-test="command-palette-scopes"]').exists()).toBe(true);
     await wrapper.find('[data-test="command-palette-scope-dashboards"]').trigger("click");
-    await flushPromises();
+    await settle();
     expect(rowIds()).toEqual(["action:newDashboard", "page:dashboards", "dashboard:default/d1"]);
     const pressed = () =>
       wrapper
@@ -225,7 +228,7 @@ describe("CommandPalette", () => {
         .map((c) => c.attributes("data-test"));
     expect(pressed()).toEqual(["command-palette-scope-dashboards"]);
     await wrapper.find('[data-test="command-palette-scope-logs"]').trigger("click");
-    await flushPromises();
+    await settle();
     expect(pressed()).toHaveLength(2);
     expect(rowIds()).toContain("page:logs");
     expect(rowIds()).toContain("dashboard:default/d1");

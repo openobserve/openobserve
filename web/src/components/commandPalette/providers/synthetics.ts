@@ -13,11 +13,8 @@
 // You should have received a copy of the GNU Affero General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-import syntheticsService from "@/services/synthetics";
 import { syntheticsResultsRoute } from "@/utils/synthetics/routes";
-import type { EntityProvider } from "../usePaletteEntities";
 import type { PaletteItem } from "../types";
-import { resolveGroup, type EntityProviderContext } from "./context";
 
 interface CheckRow {
   id: string | number;
@@ -43,23 +40,5 @@ export function syntheticToItem(row: CheckRow, org: string, group?: string): Pal
     keywords: [id, row.target ?? "", row.type ?? "", ...(row.tags ?? [])].filter(Boolean),
     group,
     route: syntheticsResultsRoute({ orgIdentifier: org, folderId: folder }, id, { name: row.name }),
-  };
-}
-
-/** Synthetic checks across all folders; the route exists only when synthetics is enabled. */
-export function createSyntheticsProvider(ctx: EntityProviderContext): EntityProvider {
-  const group = resolveGroup(ctx.railKeys, "experience", "synthetics");
-  return {
-    id: "synthetics",
-    groups: group ? [group] : [],
-    enabled: () => ctx.hasRoute("synthetic-monitor-results"),
-    list: async (signal) => {
-      const res = await syntheticsService.listByFolderId(ctx.org, "all", signal);
-      const data = res?.data ?? {};
-      const rows: CheckRow[] = data.checks ?? data.monitors ?? [];
-      return rows
-        .filter((r) => r.id != null && r.name)
-        .map((r) => syntheticToItem(r, ctx.org, group));
-    },
   };
 }

@@ -42,10 +42,8 @@ const users = {
   addNewUser: (data: any) => {
     return http().post(`/api/users/new_user`, data);
   },
-  orgUsers: (org_identifier: string, signal?: AbortSignal) => {
-    return signal
-      ? http().get(`/api/${org_identifier}/users`, { signal })
-      : http().get(`/api/${org_identifier}/users`);
+  orgUsers: (org_identifier: string) => {
+    return http().get(`/api/${org_identifier}/users`);
   },
   getRefreshToken: () => {
     return http().get(`/api/auth/refresh_token`);

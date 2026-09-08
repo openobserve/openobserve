@@ -72,11 +72,22 @@ export type PaletteRow =
 
 export type FrecencyBucketName = "palette_item" | "palette_scope";
 
+/** Display data kept with an entity's frecency record so Recent can show it without a lookup. */
+export interface PaletteSnapshot {
+  type: PaletteItemType;
+  label: string;
+  subtitle?: string;
+  icon: string;
+  group?: string;
+  route?: RouteLocationRaw;
+}
+
 export interface FrecencyRecord {
   item_id: string;
   count: number;
   /** Epoch ms of the most recent selection. */
   last: number;
+  item?: PaletteSnapshot;
 }
 
 /** One user's per-org frecency buckets, as stored in the user setting. */
