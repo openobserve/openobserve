@@ -15,6 +15,8 @@ test.describe('Regression: Search History re-apply retains the query (#14283)', 
 
   const EARLIER_QUERY = `SELECT * FROM "e2e_automate" WHERE code = '200'`;
   const LATEST_QUERY = `SELECT * FROM "e2e_automate" WHERE code = '404'`;
+  const EARLIER_MARKER = `'200'`;
+  const LATEST_MARKER = `'404'`;
 
   let pm;
 
@@ -45,28 +47,30 @@ test.describe('Regression: Search History re-apply retains the query (#14283)', 
   }, async ({ page }) => {
     await pm.searchHistoryPage.openFromLogs();
 
-    const reAppliedSql = await pm.searchHistoryPage.reApplyQuery(`code = '200'`);
-    expect(reAppliedSql).toContain(`code = '200'`);
+    // Match on the literal alone: the SQL recorded in usage may differ in spacing
+    // from what was typed, but 200 vs 404 is what discriminates the two queries.
+    const reAppliedSql = await pm.searchHistoryPage.reApplyQuery(EARLIER_MARKER);
+    expect(reAppliedSql).toContain(EARLIER_MARKER);
 
-    const editorText = await pm.logsPage.getQueryEditorTextWhenReady(`code = '200'`, 30000);
+    const editorText = await pm.logsPage.getQueryEditorTextWhenReady(EARLIER_MARKER, 30000);
 
-    expect(editorText).toContain(`code = '200'`);
+    expect(editorText).toContain(EARLIER_MARKER);
     // The stale cached query must not win over the one carried in the URL.
-    expect(editorText).not.toContain(`code = '404'`);
+    expect(editorText).not.toContain(LATEST_MARKER);
   });
 
   test('Re-applied query is carried in the logs URL', {
     tag: ['@regression', '@logs', '@searchHistory', '@P1'],
   }, async ({ page }) => {
     await pm.searchHistoryPage.openFromLogs();
-    await pm.searchHistoryPage.reApplyQuery(`code = '200'`);
+    await pm.searchHistoryPage.reApplyQuery(EARLIER_MARKER);
 
     const url = new URL(page.url());
     const encodedQuery = url.searchParams.get('query');
     expect(encodedQuery).toBeTruthy();
 
     const decoded = Buffer.from(encodedQuery, 'base64').toString('utf-8');
-    expect(decoded).toContain(`code = '200'`);
+    expect(decoded).toContain(EARLIER_MARKER);
     expect(url.searchParams.get('sql_mode')).toBe('true');
   });
 });

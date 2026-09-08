@@ -15,10 +15,12 @@ export class SearchHistoryPage {
     this.searchHistoryPath = '/web/logs/search-history';
 
     // ===== ENTRY POINT (SearchBar.vue) =====
-    this.utilitiesMenuBtn = '[data-test="logs-search-bar-utilities-menu-btn"]';
+    // Search History lives in the more-options (hamburger) menu, not the "More" utilities one.
+    this.moreOptionsMenuBtn = '[data-test="logs-search-bar-more-options-btn"]';
     this.searchHistoryItemBtn = '[data-test="search-history-item-btn"]';
 
     // ===== SEARCH HISTORY PAGE (SearchHistory.vue) =====
+    this.tableRow = '[data-test^="o2-table-row-"]';
     this.refreshHistoryBtn = '[data-test="search-history-get-history-btn"]';
     this.goToLogsBtn = '[data-test="search-history-go-to-logs-btn"]';
     this.colorizedSql = '[data-test="search-history-sql-colorized"]';
@@ -26,15 +28,18 @@ export class SearchHistoryPage {
 
   /** Opens Search History through the logs search-bar menu, as a user would. */
   async openFromLogs() {
-    await this.page.locator(this.utilitiesMenuBtn).click();
-    await this.page.locator(this.searchHistoryItemBtn).click();
+    await this.page.locator(this.moreOptionsMenuBtn).click();
+    const historyItem = this.page.locator(this.searchHistoryItemBtn);
+    await historyItem.waitFor({ state: 'visible', timeout: 15000 });
+    await historyItem.click();
     await this.page.waitForURL(/\/logs\/search-history/, { timeout: 30000 });
     await this.page.locator(this.refreshHistoryBtn).waitFor({ state: 'visible', timeout: 30000 });
     testLogger.info('Search History page opened');
   }
 
   rowContaining(sqlFragment) {
-    return this.page.locator('tr').filter({ hasText: sqlFragment }).first();
+    // Body rows only — the expansion panel is a separate <tr> carrying the same text.
+    return this.page.locator(this.tableRow).filter({ hasText: sqlFragment }).first();
   }
 
   /**
