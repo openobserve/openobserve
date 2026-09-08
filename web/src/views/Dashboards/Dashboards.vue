@@ -845,8 +845,12 @@ export default defineComponent({
     const selectedDashboardIds = computed(() => selectedIds.value);
 
     onMounted(async () => {
-      //get folders list
-      await getFoldersList(store);
+      // Awaited so the landing decision settles after FolderList's async init emission.
+      try {
+        await getFoldersList(store);
+      } catch {
+        // Already reported by the grouped access toast; the empty rail stands in.
+      }
 
       // Load favorites BEFORE picking the landing view — the favorites-first
       // landing below depends on knowing whether any exist.
@@ -908,9 +912,12 @@ export default defineComponent({
           dashboardList.value = response || [];
         } catch (error) {
           console.error("Error loading dashboards:", error);
-          showErrorNotification(
-            raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
-          );
+          // The grouped access toast already reports a 403; a second red toast adds nothing.
+          if (asCaughtError(error).response?.status !== 403) {
+            showErrorNotification(
+              raw(asCaughtError(error).message || t("dashboard.dashboards.failedToLoadFolder")),
+            );
+          }
         } finally {
           loading.value = false;
           searchAcrossFolders.value = false;
@@ -1175,9 +1182,12 @@ export default defineComponent({
           dashboardList.value = response ?? [];
         }
       } catch (err) {
-        showErrorNotification(
-          raw(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad")),
-        );
+        // The grouped access toast already reports a 403; a second red toast adds nothing.
+        if (asCaughtError(err).response?.status !== 403) {
+          showErrorNotification(
+            raw(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad")),
+          );
+        }
       } finally {
         dismiss();
         loading.value = false;
