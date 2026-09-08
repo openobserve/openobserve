@@ -603,6 +603,25 @@ export default defineComponent({
           e.preventDefault();
           e.stopPropagation();
           runQuery();
+          return;
+        }
+        // Monaco claims Ctrl/Cmd+K as a chord prefix, so the command palette never sees it.
+        if (
+          e.keyCode === monaco.KeyCode.KeyK &&
+          (e.ctrlKey || e.metaKey) &&
+          !e.shiftKey &&
+          !e.altKey
+        ) {
+          e.preventDefault();
+          e.stopPropagation();
+          window.dispatchEvent(
+            new KeyboardEvent("keydown", {
+              key: "k",
+              ctrlKey: e.ctrlKey,
+              metaKey: e.metaKey,
+              bubbles: true,
+            }),
+          );
         }
       });
       editorObj.onDidFocusEditorWidget(() => {

@@ -13,8 +13,18 @@ export class CommandPalettePage {
     this.headerTrigger = page.locator('[data-test="header-command-palette-trigger"]');
   }
 
+  // Mirrors the app's isMacOS(): the test config forces a Windows user agent, so the app
+  // binds Ctrl+K there even on a Mac host; the modifier must follow the page, not the runner.
   async openWithKeyboard() {
-    await this.page.keyboard.press('ControlOrMeta+k');
+    const isMac = await this.page.evaluate(() => {
+      const source =
+        (navigator.userAgentData && navigator.userAgentData.platform) ||
+        navigator.platform ||
+        navigator.userAgent ||
+        '';
+      return /mac|iphone|ipad|ipod/i.test(source);
+    });
+    await this.page.keyboard.press(isMac ? 'Meta+k' : 'Control+k');
     await this.expectOpen();
   }
 
