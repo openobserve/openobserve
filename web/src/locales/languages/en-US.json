@@ -10662,7 +10662,8 @@
         "scoreConfigs": "Score Configs",
         "targetDataset": "Target Dataset",
         "progress": "Progress",
-        "updated": "Updated"
+        "updated": "Updated",
+        "actions": "Actions"
       },
       "create": {
         "title": "New Queue",
@@ -10716,7 +10717,8 @@
           "refType": "Ref",
           "refId": "Reference",
           "added": "Added",
-          "status": "Status"
+          "status": "Status",
+          "actions": "Actions"
         },
         "status": {
           "pending": "Pending",
@@ -10828,6 +10830,8 @@
       "viewAll": "View experiments",
       "baseline": "Baseline",
       "setBaseline": "Set baseline",
+      "baselineRequiresCompleted": "Only a completed run can be set as the baseline",
+      "baselineError": "Failed to update the baseline",
       "selectForComparison": "Select for comparison",
       "progress": "{done} of {total} slots",
       "noScores": "No aggregate scores",
@@ -10938,8 +10942,10 @@
       "addToDataset": "Add",
       "detail": {
         "by": "by {user}",
-        "p50Latency": "P50 Latency",
+        "p50Latency": "P50 Task Latency",
         "totalCost": "Total Cost",
+        "costBreakdown": "Task {task} · Scoring {scoring}",
+        "partialCostBreakdown": "Task {task} · Scoring {scoring} · Partial",
         "highDispersion": "High-Dispersion Cases",
         "highDispersionHint": "Rows where trials disagree",
         "scoredRows": "{scored}/{total} rows scored",
@@ -10969,7 +10975,7 @@
           "run": "Run"
         },
         "runSummary": "{trials} · {scorers}",
-        "progress": "Progress",
+        "progress": "Task Progress",
         "scoring": "Scoring",
         "scoringDistribution": "{success} successful · {failed} failed · {pending} pending · {skipped} skipped",
         "compare": "Compare",
@@ -11062,6 +11068,16 @@
           "typeCategorical": "Categorical",
           "typeBoolean": "Boolean",
           "threshold": "Threshold",
+          "thresholdTooltip": "Baseline and candidate values within {percent} of each other count as unchanged, not regressed or improved.",
+          "outcomeDimensions": "Outcome criteria",
+          "outcomeTooltipNone": "No columns are selected — every comparable row will show as Not Compared.",
+          "outcomeTooltipAll": "All eligible columns determine each row's outcome.",
+          "outcomeTooltipPartial": "Only {names} determine each row's outcome. Other columns are shown but don't affect it.",
+          "allOutcomeDimensions": "All eligible columns",
+          "noOutcomeDimensions": "No columns",
+          "selectedOutcomeDimensions": "{count} column | {count} columns",
+          "outcomeDimensionUnavailable": "{name} (no comparison policy)",
+          "dimensionExcludedHint": "This column is excluded from outcomes. Select it under Outcome criteria to include it.",
           "measurePerRow": "Mean per row, over trials",
           "dimensionImproved": "{count} row improved | {count} rows improved",
           "dimensionUnchanged": "{count} row unchanged | {count} rows unchanged",
@@ -11143,8 +11159,8 @@
         },
         "searchPlaceholder": "Search Items...",
         "csvImport": {
-          "button": "Upload CSV",
-          "title": "Upload Dataset Items",
+          "button": "Import Items",
+          "title": "Import Dataset Items",
           "description": "Import dataset items from a CSV file.",
           "fileLabel": "CSV file",
           "placeholder": "Choose a CSV file",
@@ -12056,7 +12072,8 @@
       "remove": "Remove",
       "save": "Save",
       "saveAsDraft": "Save as Draft",
-      "createAndActivate": "Save & Activate"
+      "createAndActivate": "Save & Activate",
+      "testConnection": "Test Connection"
     },
     "scorerTypeDialog": {
       "title": "Create a New Scorer",
@@ -12082,15 +12099,19 @@
       "availableModelsLabel": "Available models",
       "apiKeyLabel": "API Key",
       "apiKeyPlaceholder": "Enter API key",
-      "apiKeyHelp": "Stored encrypted at rest and never read back. Leave blank when editing to keep the existing key.",
+      "apiKeyHelp": "Stored encrypted at rest and never read back. Leave blank when saving edits to keep the existing key.",
       "authSection": "Authentication",
-      "authEditNote": "Credentials cannot be read back. Re-enter the API key only if you want to rotate it.",
+      "authEditNote": "Credentials cannot be read back. To test a provider that requires authentication, enter its API key.",
       "cannotRename": "Cannot be renamed after creation.",
       "availableModelsHelp": "Optional. Comma-separated list of models available on this Provider.",
       "saveError": "Failed to save provider",
       "nameRequired": "Provider name is required",
       "typeRequired": "Provider type is required",
-      "defaultModelRequired": "Default model is required"
+      "defaultModelRequired": "Default model is required",
+      "testRunning": "Testing connection...",
+      "testPassed": "Connected",
+      "testFailed": "Connection failed",
+      "testError": "Failed to test connection"
     },
     "scoreConfig": {
       "gteSymbol": "≥",
