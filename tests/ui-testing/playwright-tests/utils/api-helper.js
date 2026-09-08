@@ -84,17 +84,6 @@ async function createMockDestination(page, name, template = 'Slack') {
 }
 
 /**
- * Delete a destination via API
- * @param {import('@playwright/test').Page} page - Playwright page instance
- * @param {string} name - Destination name to delete
- * @returns {Promise<{status: number, data: any}>}
- */
-/**
- * Delete an alert template by name.
- * @param {import('@playwright/test').Page} page
- * @param {string} name
- */
-/**
  * Run a SQL search and return the hits.
  * @param {import('@playwright/test').Page} page
  * @param {string} sql
@@ -258,12 +247,23 @@ async function waitForAnomalyTrained(page, anomalyId, timeoutMs = 180000) {
   throw new Error(`Model not trained within ${timeoutMs}ms`);
 }
 
+/**
+ * Delete an alert template by name.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} name
+ */
 async function deleteTemplate(page, name) {
   const org = getOrgName();
   testLogger.info('Deleting template via API', { name });
   return apiCall(page, 'DELETE', `/api/${org}/alerts/templates/${name}`);
 }
 
+/**
+ * Delete a destination via API
+ * @param {import('@playwright/test').Page} page - Playwright page instance
+ * @param {string} name - Destination name to delete
+ * @returns {Promise<{status: number, data: any}>}
+ */
 async function deleteDestination(page, name) {
   const org = getOrgName();
   testLogger.info('Deleting destination via API', { name });

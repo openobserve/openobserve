@@ -676,8 +676,10 @@ test.describe('Anomaly Detection', () => {
     }, async ({ page }) => {
       test.slow();
 
-      // 2 days of 5m buckets at a flat baseline, with a 120-count spike in the
-      // most recent buckets so it lands inside the 1h detection window.
+      // 4 hours of 1-minute buckets at a flat baseline, with a 120-count spike
+      // held back from the newest buckets so it stays inside the 1h detection
+      // window. Four hours because CI drops anything backdated further
+      // (ZO_INGEST_ALLOWED_UPTO), 1-minute because the model needs 100+ points.
       const seed = await seedAnomalyStream(page, seededStream, {
         hours: 4,
         bucketSeconds: 60,
