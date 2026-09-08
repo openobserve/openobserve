@@ -117,6 +117,9 @@ pub async fn save(
     mut report: Report,
     create: bool,
 ) -> Result<(), ReportError> {
+    // Persistence, relations and the trigger all read the org off the report, never the path.
+    report.org_id = org_id.to_string();
+
     let conn = get_orm_client_rw().await;
     let cfg = get_config();
     if cfg.common.report_server_url.is_empty() {
@@ -398,6 +401,9 @@ pub async fn update_by_id(
     new_folder_id: Option<&str>,
     mut report: Report,
 ) -> Result<(), ReportError> {
+    // Persistence, relations and the trigger all read the org off the report, never the path.
+    report.org_id = org_id.to_string();
+
     let conn = get_orm_client_rw().await;
     let cfg = get_config();
 
