@@ -21,20 +21,21 @@ use std::{
     collections::{BTreeMap, VecDeque},
     future::Future,
     ops::Range,
-    time::Duration,
+    sync::Arc,
+    time::{Duration, Instant},
 };
 
 use bytes::Bytes;
 use config::utils::time::get_ymdh_from_micros;
 use hashbrown::HashSet;
 use hashlink::lru_cache::LruCache;
-use moka::future::Cache;
 use object_store::{GetOptions, GetResult};
 use once_cell::sync::Lazy;
+use parking_lot::Mutex;
 
 const DOWNLOAD_RETRY_TIMES: usize = 3;
 const INITIAL_CACHE_SIZE: usize = 128;
-const DOWNLOAD_GATE_CAPACITY: u64 = 1_024;
+const DOWNLOAD_GATE_CAPACITY: usize = 1_024;
 const DOWNLOAD_GATE_TTL: Duration = Duration::from_secs(30);
 pub const TRACE_ID_FOR_CACHE_LATEST_FILE: &str = "cache_latest_file";
 
@@ -52,12 +53,26 @@ struct DownloadKey {
     cache_type: CacheType,
 }
 
+type DownloadResult = Result<usize, Arc<anyhow::Error>>;
+
+/// A download slot that the first caller fills, and the other callers read.
+type DownloadSlot = Arc<tokio::sync::Mutex<Option<DownloadResult>>>;
+
+enum DownloadGateEntry {
+    /// A download is in progress.
+    Running(DownloadSlot),
+    /// A download finished at this time.
+    Done(usize, Instant),
+}
+
+type DownloadGate = Mutex<LruCache<DownloadKey, DownloadGateEntry, ahash::RandomState>>;
+
 // This stores only completed download byte counts, not file data.
-static DOWNLOAD_GATE: Lazy<Cache<DownloadKey, usize>> = Lazy::new(|| {
-    Cache::builder()
-        .max_capacity(DOWNLOAD_GATE_CAPACITY)
-        .time_to_live(DOWNLOAD_GATE_TTL)
-        .build()
+static DOWNLOAD_GATE: Lazy<DownloadGate> = Lazy::new(|| {
+    Mutex::new(LruCache::with_hasher(
+        DOWNLOAD_GATE_CAPACITY,
+        ahash::RandomState::default(),
+    ))
 });
 
 #[derive(Debug)]
@@ -294,17 +309,49 @@ pub async fn download_to_cache(
     }
 }
 
-async fn download_with_gate<F, Fut, E>(
-    gate: &Cache<DownloadKey, usize>,
+/// Runs the download one time for each key. The other callers that wait get the same result.
+///
+/// A result stays in the gate for the TTL. The gate does not keep errors.
+async fn download_with_gate<F, Fut>(
+    gate: &DownloadGate,
     key: DownloadKey,
     download: F,
-) -> Result<usize, std::sync::Arc<E>>
+) -> DownloadResult
 where
     F: FnOnce() -> Fut,
-    Fut: Future<Output = Result<usize, E>>,
-    E: Send + Sync + 'static,
+    Fut: Future<Output = Result<usize, anyhow::Error>>,
 {
-    gate.try_get_with(key, download()).await
+    let slot = {
+        let mut gate = gate.lock();
+        let running = match gate.get(&key) {
+            Some(DownloadGateEntry::Done(size, at)) if at.elapsed() < DOWNLOAD_GATE_TTL => {
+                return Ok(*size);
+            }
+            Some(DownloadGateEntry::Running(slot)) => Some(slot.clone()),
+            _ => None,
+        };
+        running.unwrap_or_else(|| {
+            let slot = DownloadSlot::default();
+            gate.insert(key.clone(), DownloadGateEntry::Running(slot.clone()));
+            slot
+        })
+    };
+
+    // only the caller that holds the slot downloads, the others wait here
+    let mut slot = slot.lock().await;
+    if let Some(result) = slot.as_ref() {
+        return result.clone();
+    }
+
+    let result = download().await.map_err(Arc::new);
+    match &result {
+        Ok(size) => gate
+            .lock()
+            .insert(key, DownloadGateEntry::Done(*size, Instant::now())),
+        Err(_) => gate.lock().remove(&key),
+    };
+    *slot = Some(result.clone());
+    result
 }
 
 async fn validate_file(bytes: &[u8], ftype: FileType) -> Result<(), anyhow::Error> {
@@ -570,7 +617,10 @@ mod tests {
 
     #[tokio::test]
     async fn download_gate_collapses_concurrent_downloads() {
-        let cache = Cache::new(1_024);
+        let cache = Arc::new(DownloadGate::new(LruCache::with_hasher(
+            1_024,
+            ahash::RandomState::default(),
+        )));
         let key = DownloadKey {
             account: "default".to_owned(),
             file: "file".to_owned(),
@@ -603,7 +653,7 @@ mod tests {
                     if !*fetch_ready.borrow_and_update() {
                         assert!(fetch_ready.changed().await.is_ok());
                     }
-                    Ok::<_, &'static str>(42)
+                    Ok::<_, anyhow::Error>(42)
                 })
                 .await
                 .map(|bytes| (bytes, fetched.load(std::sync::atomic::Ordering::SeqCst)))
@@ -623,6 +673,39 @@ mod tests {
         }
         assert_eq!(callers_that_fetched, 1);
         assert_eq!(fetches.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn download_gate_keeps_results_but_not_errors() {
+        let gate = DownloadGate::new(LruCache::with_hasher(1_024, ahash::RandomState::default()));
+        let key = DownloadKey {
+            account: "default".to_owned(),
+            file: "file".to_owned(),
+            cache_type: CacheType::Memory,
+        };
+        let fetches = AtomicUsize::new(0);
+
+        // the gate does not keep errors, so the next caller downloads again
+        for _ in 0..2 {
+            let result = download_with_gate(&gate, key.clone(), || async {
+                fetches.fetch_add(1, Ordering::SeqCst);
+                Err::<usize, anyhow::Error>(anyhow::anyhow!("download failed"))
+            })
+            .await;
+            assert!(result.is_err());
+        }
+        assert_eq!(fetches.load(Ordering::SeqCst), 2);
+
+        // the gate keeps the result, so the next caller does not download again
+        for _ in 0..2 {
+            let result = download_with_gate(&gate, key.clone(), || async {
+                fetches.fetch_add(1, Ordering::SeqCst);
+                Ok(42)
+            })
+            .await;
+            assert_eq!(result.ok(), Some(42));
+        }
+        assert_eq!(fetches.load(Ordering::SeqCst), 3);
     }
 
     #[test]
