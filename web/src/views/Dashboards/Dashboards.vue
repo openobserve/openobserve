@@ -1182,12 +1182,9 @@ export default defineComponent({
           dashboardList.value = response ?? [];
         }
       } catch (err) {
-        // The grouped access toast already reports a 403; a second red toast adds nothing.
-        if (asCaughtError(err).response?.status !== 403) {
-          showErrorNotification(
-            raw(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad")),
-          );
-        }
+        showErrorNotification(
+          raw(asCaughtError(err).message || t("dashboard.dashboards.failedToLoad")),
+        );
       } finally {
         dismiss();
         loading.value = false;

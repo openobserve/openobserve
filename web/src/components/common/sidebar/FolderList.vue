@@ -206,8 +206,7 @@ export default defineComponent({
 
     onMounted(async () => {
       if (!store.state.organizationData.foldersByType?.[props.type]) {
-        // A 403 here must not abort the folder selection below; the access toast reports it.
-        await getFoldersListByType(store, props.type).catch(() => null);
+        await getFoldersListByType(store, props.type);
       }
       if (router.currentRoute.value.query.folder) {
         activeFolderId.value = router.currentRoute.value.query.folder as string;
