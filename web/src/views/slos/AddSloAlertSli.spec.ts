@@ -117,10 +117,11 @@ function byTest(wrapper: VueWrapper, component: Component, test: string) {
   return hit;
 }
 
-async function mountForm() {
+async function mountForm(setup?: () => void) {
   vi.mocked(sloService.eligibleAlerts).mockResolvedValue({
     data: { list: ELIGIBLE },
   } as never);
+  setup?.();
 
   const wrapper = mount(AddSlo, {
     attachTo: node,
@@ -302,6 +303,55 @@ describe("AddSlo — alert SLI", () => {
     expect(body.config).toEqual({ alert_id: "alert-fast" });
     expect(body.group_by).toBeNull();
     expect(body.slice_interval_secs).toBe(60);
+  });
+});
+
+describe("AddSlo — alert source load failure", () => {
+  beforeEach(() => {
+    vi.mocked(sloService.eligibleAlerts).mockClear();
+  });
+
+  // The picker itself carries the error now (:error / :error-message on
+  // OSelect), not a sibling OBanner — so the failure has to surface through
+  // the select's own error slot.
+  it("surfaces the server's message on the source picker", async () => {
+    const wrapper = await mountForm(() => {
+      vi.mocked(sloService.eligibleAlerts).mockRejectedValue({
+        response: { data: { message: "org has no alerts configured" } },
+      });
+    });
+    await selectAlertType(wrapper);
+
+    const select = byTest(wrapper, OSelect, "slos-addslo-alert-source");
+    expect(select.props("error")).toBe(true);
+    expect(select.props("errorMessage")).toBe("org has no alerts configured");
+    expect(wrapper.text()).toContain("org has no alerts configured");
+  });
+
+  // No server message at all (network failure, 500 with no body) falls back
+  // to the generic copy rather than showing "undefined" or an empty banner.
+  it("falls back to the generic message when the server gives no reason", async () => {
+    const wrapper = await mountForm(() => {
+      vi.mocked(sloService.eligibleAlerts).mockRejectedValue(new Error("network down"));
+    });
+    await selectAlertType(wrapper);
+
+    const select = byTest(wrapper, OSelect, "slos-addslo-alert-source");
+    expect(select.props("error")).toBe(true);
+    expect(select.props("errorMessage")).toBe(i18n.global.t("slos.alertSli.loadFailed"));
+  });
+
+  // Without the `!alertSourceError` guard, the "no eligible alerts" info
+  // banner and the picker's error would show side by side.
+  it("hides the empty-state banner while a load error is showing", async () => {
+    const wrapper = await mountForm(() => {
+      vi.mocked(sloService.eligibleAlerts).mockRejectedValue({
+        response: { data: { message: "boom" } },
+      });
+    });
+    await selectAlertType(wrapper);
+
+    expect(wrapper.find('[data-test="slos-addslo-alert-source-empty"]').exists()).toBe(false);
   });
 });
 
