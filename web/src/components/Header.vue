@@ -15,7 +15,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 -->
 
 <template>
-  <div class="bg-surface-chrome-deeper flex h-10 w-full shrink-0 flex-nowrap items-center">
+  <div class="bg-surface-chrome-deeper relative flex h-10 w-full shrink-0 flex-nowrap items-center">
     <!-- LEFT SIDE: Logo -->
     <div class="flex shrink-0 items-center justify-start ps-3">
       <!-- LOGO SECTION: Displays custom or default OpenObserve logo -->
@@ -130,19 +130,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
     <!-- end left side -->
 
     <!-- CENTER: command palette trigger -->
-    <div class="flex min-w-0 flex-1 items-center justify-center px-2">
-      <OButton
-        variant="outline"
-        size="sm"
-        icon-left="search"
-        class="hidden w-full max-w-[28rem] justify-between md:flex"
-        data-test="header-command-palette-trigger"
-        @click="openPalette"
-      >
-        <span class="text-text-secondary truncate font-normal">{{ t("palette.trigger") }}</span>
-        <OShortcut id="commandPalette" />
-      </OButton>
-    </div>
+    <div class="min-w-0 flex-1" />
+    <!-- Native button: OButton centers its slot, this pill needs an edge-aligned glyph and keycap. -->
+    <button
+      type="button"
+      class="group bg-surface-base border-border-default text-text-secondary hover:border-accent focus-visible:ring-focus-ring-accent absolute top-1/2 left-1/2 hidden h-7 w-[min(24rem,calc(100vw-66rem))] -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center gap-2 rounded-full border ps-3 pe-1.5 text-sm shadow-xs transition-[border-color,box-shadow] duration-150 outline-none hover:shadow-sm focus-visible:ring-2 xl:flex"
+      data-test="header-command-palette-trigger"
+      :aria-label="t('palette.title')"
+      @click="openPalette"
+    >
+      <OIcon name="search" size="sm" class="text-accent shrink-0" />
+      <span class="min-w-0 flex-1 truncate text-start">{{ t("palette.trigger") }}</span>
+      <OShortcut id="commandPalette" />
+    </button>
 
     <!-- RIGHT SIDE: Controls -->
     <div class="flex shrink-0 items-center justify-end gap-1 pe-3">
